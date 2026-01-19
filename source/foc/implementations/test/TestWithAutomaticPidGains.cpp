@@ -1,5 +1,5 @@
 #include "source/foc/implementations/TorqueControllerImpl.hpp"
-#include "source/foc/implementations/WithAutomaticPidGains.hpp"
+#include "source/foc/implementations/WithAutomaticCurrentPidGains.hpp"
 #include "source/foc/implementations/test_doubles/DriversMock.hpp"
 #include "source/foc/implementations/test_doubles/FieldOrientedControllerMock.hpp"
 #include "source/foc/interfaces/FieldOrientedController.hpp"
