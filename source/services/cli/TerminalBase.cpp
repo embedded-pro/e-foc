@@ -3,15 +3,6 @@
 #include "numerical/controllers/interfaces/PidController.hpp"
 #include "services/util/TerminalWithStorage.hpp"
 #include "source/services/cli/TerminalHelper.hpp"
-#include <numbers>
-
-namespace
-{
-    float CurrentLoopBandwidth(hal::Hertz baseFrequency, float nyquistFactor)
-    {
-        return (static_cast<float>(baseFrequency.Value()) / nyquistFactor) * 2.0f * std::numbers::pi_v<float>;
-    }
-}
 
 namespace services
 {

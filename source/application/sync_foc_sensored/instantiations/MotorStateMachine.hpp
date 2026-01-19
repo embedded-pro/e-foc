@@ -11,6 +11,7 @@
 #include "source/services/cli/TerminalBase.hpp"
 #include "source/services/cli/TerminalHelper.hpp"
 #include "source/services/parameter_identification/MotorIdentificationImpl.hpp"
+#include <optional>
 #include <type_traits>
 #include <variant>
 
@@ -41,6 +42,9 @@ namespace application
     public:
         template<typename... FocArgs>
         MotorStateMachine(const TerminalAndTracer& terminalAndTracer, const MotorDriverAndEncoder& motorDriverAndEncoder, foc::Volts vdc, FocArgs&&... focArgs);
+
+    private:
+        std::optional<std::pair<foc::Ohm, foc::MilliHenry>> ParseArgs(infra::Tokenizer& tokenizer);
 
     private:
         services::TerminalWithStorage& terminal;
@@ -86,32 +90,42 @@ namespace application
                 constexpr float nyquistFactor = 15.0f;
                 infra::Tokenizer tokenizer(params, ' ');
 
-                if (tokenizer.Size() != 2)
-                {
-                    this->terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "invalid number of arguments" });
-                    return;
-                }
+                auto args = ParseArgs(tokenizer);
 
-                auto resistance = services::ParseInput(tokenizer.Token(0));
-                if (!resistance.has_value())
-                {
-                    this->terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "invalid resistance value. It should be a float." });
+                if (!args.has_value())
                     return;
-                }
-
-                auto inductance = services::ParseInput(tokenizer.Token(1));
-                if (!inductance.has_value())
-                {
-                    this->terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "invalid inductance value. It should be a float." });
-                    return;
-                }
 
                 this->focImpl.Reset();
-
                 motorStates.template emplace<ControllerImpl>(this->driver, this->encoder, this->focImpl);
                 auto& focController = std::get<ControllerImpl>(this->motorStates);
-                focController.SetPidBasedOnResistanceAndInductance(this->vdc, foc::Ohm{ *resistance }, foc::MilliHenry{ *inductance }, nyquistFactor);
+                focController.SetPidBasedOnResistanceAndInductance(this->vdc, std::get<0>(*args), std::get<1>(*args), nyquistFactor);
                 terminalStates.template emplace<TerminalImpl>(this->terminal, this->vdc, focController, focController);
             } });
+    }
+
+    template<typename FocImpl, typename ControllerImpl, typename TerminalImpl, typename Enable>
+    std::optional<std::pair<foc::Ohm, foc::MilliHenry>> MotorStateMachine<FocImpl, ControllerImpl, TerminalImpl, Enable>::ParseArgs(infra::Tokenizer& tokenizer)
+    {
+        if (tokenizer.Size() != 2)
+        {
+            this->terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "invalid number of arguments" });
+            return std::nullopt;
+        }
+
+        auto resistance = services::ParseInput(tokenizer.Token(0));
+        if (!resistance.has_value())
+        {
+            this->terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "invalid resistance value. It should be a float." });
+            return std::nullopt;
+        }
+
+        auto inductance = services::ParseInput(tokenizer.Token(1));
+        if (!inductance.has_value())
+        {
+            this->terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "invalid inductance value. It should be a float." });
+            return std::nullopt;
+        }
+
+        return std::make_pair(foc::Ohm{ *resistance }, foc::MilliHenry{ *inductance });
     }
 }

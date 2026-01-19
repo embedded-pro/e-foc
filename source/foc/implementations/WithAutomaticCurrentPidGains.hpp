@@ -30,7 +30,7 @@ namespace foc
     private:
         static float CurrentLoopBandwidth(hal::Hertz baseFrequency, float nyquistFactor)
         {
-            return (baseFrequency.Value() / nyquistFactor) * 2.0f * std::numbers::pi_v<float>;
+            return (static_cast<float>(baseFrequency.Value()) / nyquistFactor) * 2.0f * std::numbers::pi_v<float>;
         }
     };
 
