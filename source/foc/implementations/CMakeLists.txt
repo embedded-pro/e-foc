@@ -19,6 +19,8 @@ target_sources(e_foc.foc.implementations PRIVATE
     SpeedControllerImpl.hpp
     TorqueControllerImpl.cpp
     TorqueControllerImpl.hpp
+    TorqueControllerWithAutomaticPidGains.cpp
+    TorqueControllerWithAutomaticPidGains.hpp
     TransformsClarkePark.cpp
     TransformsClarkePark.hpp
 )

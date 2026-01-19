@@ -1,5 +1,4 @@
 #include "source/services/cli/TerminalBase.hpp"
-#include "infra/util/Function.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "numerical/controllers/interfaces/PidController.hpp"
 #include "services/util/TerminalWithStorage.hpp"
@@ -25,12 +24,6 @@ namespace services
             [this](const auto& params)
             {
                 this->terminal.ProcessResult(SetFocPid(params));
-            } });
-
-        terminal.AddCommand({ { "set_r_l", "srl", "Set resistance and inductance in order to calculate torque PIDs. set_r_l <resistance [ohm]> <inductance [H]> <nyquist_factor [%]>. Ex: srl 0.5 0.001 15.0" },
-            [this](const auto& params)
-            {
-                this->terminal.ProcessResult(SetResistanceAndInductance(params));
             } });
 
         terminal.AddCommand({ { "start", "sts", "Start system. start. Ex: start" },
@@ -84,36 +77,6 @@ namespace services
 
         auto dPid = controllers::PidTunings<float>{ (*dkp), (*dki), (*dkd) };
         auto qPid = controllers::PidTunings<float>{ (*qkp), (*qki), (*qkd) };
-
-        foc.SetCurrentTunings(vdc, foc::IdAndIqTunings{ dPid, qPid });
-        return TerminalFocBaseInteractor::StatusWithMessage();
-    }
-
-    TerminalFocBaseInteractor::StatusWithMessage TerminalFocBaseInteractor::SetResistanceAndInductance(const infra::BoundedConstString& input)
-    {
-        infra::Tokenizer tokenizer(input, ' ');
-
-        if (tokenizer.Size() != 3)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments" };
-
-        auto resistance = ParseInput(tokenizer.Token(0));
-        if (!resistance.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
-
-        auto inductance = ParseInput(tokenizer.Token(1));
-        if (!inductance.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
-
-        auto nyquistFactor = ParseInput(tokenizer.Token(2), 10.0f, 20.0f);
-        if (!nyquistFactor.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float between 10.0 and 20.0" };
-
-        auto wc = CurrentLoopBandwidth(foc.BaseFrequency(), *nyquistFactor);
-        auto kp = *inductance * wc;
-        auto ki = *resistance * wc;
-
-        auto dPid = controllers::PidTunings<float>{ kp, ki, 0.0f };
-        auto qPid = controllers::PidTunings<float>{ kp, ki, 0.0f };
 
         foc.SetCurrentTunings(vdc, foc::IdAndIqTunings{ dPid, qPid });
         return TerminalFocBaseInteractor::StatusWithMessage();
