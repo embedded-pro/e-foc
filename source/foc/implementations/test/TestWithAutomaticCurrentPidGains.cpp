@@ -21,11 +21,11 @@ namespace
                std::abs(arg.second.kd - 0.0f) < tolerance;
     }
 
-    class TestTorqueControllerWithAutomaticPidGains
+    class TestWithAutomaticPidGains
         : public ::testing::Test
     {
     public:
-        TestTorqueControllerWithAutomaticPidGains()
+        TestWithAutomaticPidGains()
         {
             EXPECT_CALL(interfaceMock, PhaseCurrentsReady(::testing::_, ::testing::_))
                 .WillOnce([this](auto, const auto& onDone)
@@ -43,7 +43,7 @@ namespace
     };
 }
 
-TEST_F(TestTorqueControllerWithAutomaticPidGains, calculates_pid_gains_from_resistance_and_inductance)
+TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_from_resistance_and_inductance)
 {
     foc::Volts Vdc{ 12.0f };
     foc::Ohm resistance{ 0.5f };
@@ -61,7 +61,7 @@ TEST_F(TestTorqueControllerWithAutomaticPidGains, calculates_pid_gains_from_resi
     foc->SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, nyquistFactor);
 }
 
-TEST_F(TestTorqueControllerWithAutomaticPidGains, calculates_pid_gains_with_different_nyquist_factor)
+TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_different_nyquist_factor)
 {
     foc::Volts Vdc{ 24.0f };
     foc::Ohm resistance{ 1.0f };
@@ -79,7 +79,7 @@ TEST_F(TestTorqueControllerWithAutomaticPidGains, calculates_pid_gains_with_diff
     foc->SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, nyquistFactor);
 }
 
-TEST_F(TestTorqueControllerWithAutomaticPidGains, calculates_pid_gains_with_different_base_frequency)
+TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_different_base_frequency)
 {
     foc::Volts Vdc{ 12.0f };
     foc::Ohm resistance{ 0.5f };
@@ -98,7 +98,7 @@ TEST_F(TestTorqueControllerWithAutomaticPidGains, calculates_pid_gains_with_diff
     foc->SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, nyquistFactor);
 }
 
-TEST_F(TestTorqueControllerWithAutomaticPidGains, calculates_pid_gains_with_small_inductance)
+TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_small_inductance)
 {
     foc::Volts Vdc{ 12.0f };
     foc::Ohm resistance{ 2.0f };
@@ -116,7 +116,7 @@ TEST_F(TestTorqueControllerWithAutomaticPidGains, calculates_pid_gains_with_smal
     foc->SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, nyquistFactor);
 }
 
-TEST_F(TestTorqueControllerWithAutomaticPidGains, calculates_pid_gains_with_high_resistance)
+TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_high_resistance)
 {
     foc::Volts Vdc{ 48.0f };
     foc::Ohm resistance{ 5.0f };
@@ -134,7 +134,7 @@ TEST_F(TestTorqueControllerWithAutomaticPidGains, calculates_pid_gains_with_high
     foc->SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, nyquistFactor);
 }
 
-TEST_F(TestTorqueControllerWithAutomaticPidGains, inherits_basic_torque_controller_functionality)
+TEST_F(TestWithAutomaticPidGains, inherits_basic_torque_controller_functionality)
 {
     EXPECT_CALL(focMock, Reset());
     EXPECT_CALL(interfaceMock, Start());
@@ -148,7 +148,7 @@ TEST_F(TestTorqueControllerWithAutomaticPidGains, inherits_basic_torque_controll
     EXPECT_FALSE(foc->IsRunning());
 }
 
-TEST_F(TestTorqueControllerWithAutomaticPidGains, can_set_manual_tunings_after_automatic_calculation)
+TEST_F(TestWithAutomaticPidGains, can_set_manual_tunings_after_automatic_calculation)
 {
     foc::Volts Vdc{ 12.0f };
     foc::Ohm resistance{ 0.5f };
