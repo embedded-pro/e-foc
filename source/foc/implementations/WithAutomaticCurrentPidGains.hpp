@@ -6,11 +6,12 @@
 
 namespace foc
 {
-    template<typename TController>
-    class WithAutomaticCurrentPidGains : public TController
+    template<typename Controller>
+    class WithAutomaticCurrentPidGains
+        : public Controller
     {
     public:
-        using TController::TController;
+        using Controller::Controller;
 
         void SetPidBasedOnResistanceAndInductance(Volts Vdc, Ohm resistance, MilliHenry inductance, float nyquistFactor)
         {
@@ -30,4 +31,19 @@ namespace foc
             return (static_cast<float>(baseFrequency.Value()) / nyquistFactor) * 2.0f * std::numbers::pi_v<float>;
         }
     };
+
+    template<typename T>
+    struct IsWithAutomaticCurrentPidGains
+        : std::false_type
+    {
+    };
+
+    template<typename Controller>
+    struct IsWithAutomaticCurrentPidGains<WithAutomaticCurrentPidGains<Controller>>
+        : std::true_type
+    {
+    };
+
+    template<typename T>
+    constexpr bool IsWithAutomaticCurrentPidGains_v = IsWithAutomaticCurrentPidGains<T>::value;
 }

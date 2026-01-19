@@ -1,5 +1,6 @@
 #pragma once
 
+#include "foc/implementations/WithAutomaticCurrentPidGains.hpp"
 #include "services/util/DebugLed.hpp"
 #include "source/application/sync_foc_sensored/instantiations/MotorStateMachine.hpp"
 #include "source/foc/implementations/SpeedControllerImpl.hpp"
@@ -23,7 +24,7 @@ namespace application
         services::TerminalWithBanner::WithMaxSize<10> terminalWithStorage;
         MotorStateMachine<
             foc::FieldOrientedControllerSpeedImpl,
-            foc::SpeedControllerImpl,
+            foc::WithAutomaticCurrentPidGains<foc::SpeedControllerImpl>,
             services::TerminalFocSpeedInteractor>
             motorStateMachine;
     };
