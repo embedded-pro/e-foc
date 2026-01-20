@@ -2,6 +2,7 @@
 #include "infra/stream/StringInputStream.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "source/services/parameter_identification/MechanicalParametersIdentification.hpp"
+#include <numbers>
 
 namespace
 {
