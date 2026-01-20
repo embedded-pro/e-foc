@@ -12,11 +12,16 @@ target_link_libraries(e_foc.services.parameter_identification PUBLIC
 )
 
 target_sources(e_foc.services.parameter_identification PRIVATE
-    MotorIdentificationImpl.cpp
-    MotorIdentificationImpl.hpp
-    MotorIdentification.hpp
-    TerminalMotorIdentification.cpp
-    TerminalMotorIdentification.hpp
+    ElectricalParametersIdentificationImpl.cpp
+    ElectricalParametersIdentificationImpl.hpp
+    ElectricalParametersIdentification.hpp
+    TerminalElectricalParametersIdentification.cpp
+    TerminalElectricalParametersIdentification.hpp
+    MechanicalParametersIdentificationImpl.cpp
+    MechanicalParametersIdentificationImpl.hpp
+    MechanicalParametersIdentification.hpp
+    TerminalMechanicalParametersIdentification.cpp
+    TerminalMechanicalParametersIdentification.hpp
 )
 
 add_subdirectory(test)

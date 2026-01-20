@@ -6,15 +6,15 @@
 #include "infra/util/BoundedVector.hpp"
 #include "source/foc/implementations/TransformsClarkePark.hpp"
 #include "source/foc/interfaces/Driver.hpp"
-#include "source/services/parameter_identification/MotorIdentification.hpp"
+#include "source/services/parameter_identification/ElectricalParametersIdentification.hpp"
 
 namespace services
 {
-    class MotorIdentificationImpl
-        : public MotorIdentification
+    class ElectricalParametersIdentificationImpl
+        : public ElectricalParametersIdentification
     {
     public:
-        MotorIdentificationImpl(foc::MotorDriver& driver, foc::Encoder& encoder, foc::Volts vdc);
+        ElectricalParametersIdentificationImpl(foc::MotorDriver& driver, foc::Encoder& encoder, foc::Volts vdc);
 
         void EstimateResistanceAndInductance(const ResistanceAndInductanceConfig& config, const infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)>& onDone) override;
         void EstimateNumberOfPolePairs(const PolePairsConfig& config, const infra::Function<void(std::optional<std::size_t>)>& onDone) override;

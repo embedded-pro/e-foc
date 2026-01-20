@@ -1,14 +1,14 @@
 #pragma once
 
 #include "services/util/TerminalWithStorage.hpp"
-#include "source/services/parameter_identification/MotorIdentification.hpp"
+#include "source/services/parameter_identification/ElectricalParametersIdentification.hpp"
 
 namespace services
 {
-    class TerminalMotorIdentification
+    class TerminalElectricalParametersIdentification
     {
     public:
-        TerminalMotorIdentification(services::TerminalWithStorage& terminal, services::Tracer& tracer, MotorIdentification& identification);
+        TerminalElectricalParametersIdentification(services::TerminalWithStorage& terminal, services::Tracer& tracer, ElectricalParametersIdentification& identification);
 
     private:
         using StatusWithMessage = services::TerminalWithStorage::StatusWithMessage;
@@ -19,6 +19,6 @@ namespace services
     private:
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
-        MotorIdentification& identification;
+        ElectricalParametersIdentification& identification;
     };
 }
