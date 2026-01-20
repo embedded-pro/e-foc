@@ -37,17 +37,17 @@ graph TD
     K --> L[Callback(Offset)]
 ```
 
-1.  **Configuration**: Accepts a target voltage percentage and a settlement criteria.
-2.  **Force Voltage**:
-    *   The SVM (Space Vector Modulation) is used to generate a voltage vector at `alignmentAngle` (typically 0.0 radians).
-    *   Uses `Inverse` Park/Clarke transforms to generate PWM duty cycles for this static vector.
-3.  **Wait for Settlement**:
-    *   The encoder position is monitored periodically.
-    *   The system checks if the change in position between samples is less than `settledThreshold`.
-    *   It requires `consecutiveSettledSamples` to confirm the rotor has stopped moving.
-4.  **Capture Offset**:
-    *   Once settled, the current encoder value is recorded as the `alignedPosition`.
-    *   Verify the direction/pole-pairs multiplication to convert this mechanical position to the correct electrical offset.
+1. **Configuration**: Accepts a target voltage percentage and a settlement criteria.
+2. **Force Voltage**:
+    * The SVM (Space Vector Modulation) is used to generate a voltage vector at `alignmentAngle` (typically 0.0 radians).
+    * Uses `Inverse` Park/Clarke transforms to generate PWM duty cycles for this static vector.
+3. **Wait for Settlement**:
+    * The encoder position is monitored periodically.
+    * The system checks if the change in position between samples is less than `settledThreshold`.
+    * It requires `consecutiveSettledSamples` to confirm the rotor has stopped moving.
+4. **Capture Offset**:
+    * Once settled, the current encoder value is recorded as the `alignedPosition`.
+    * Verify the direction/pole-pairs multiplication to convert this mechanical position to the correct electrical offset.
 
 ### Re-entrancy Protection
 The service includes protection against multiple calls. If `ForceAlignment` is called while an alignment is already in progress, the new request is ignored to ensure the callback for the original request is honored correctly.
