@@ -48,7 +48,7 @@ namespace services
 
         auto targetSpeedRpm = ParseNumberInput<float>(tokenizer.Token(0));
         auto torqueConstant = ParseNumberInput<float>(tokenizer.Token(1));
-        auto numberOfPolePairs = ParseNumberInput<std::size_t>(tokenizer.Token(2));
+        auto numberOfPolePairs = ParseNumberInput<uint32_t>(tokenizer.Token(2));
 
         if (!targetSpeedRpm.has_value() || *targetSpeedRpm <= 0.0f)
             return { services::TerminalWithStorage::Status::error, "invalid target speed. Must be > 0 RPM" };
