@@ -13,11 +13,11 @@ $$ i(t) = \frac{V}{R} (1 - e^{-\frac{R}{L}t}) $$
 ![RL Circuit Step Response](images/rl_step_response.svg)
 
 Where:
-*   $V$ is the applied voltage.
-*   $R$ is the phase resistance.
-*   $L$ is the phase inductance.
-*   $t$ is time.
-*   $\tau = \frac{L}{R}$ is the time constant.
+* $V$ is the applied voltage.
+* $R$ is the phase resistance.
+* $L$ is the phase inductance.
+* $t$ is time.
+* $\tau = \frac{L}{R}$ is the time constant.
 
 ### Resistance Estimation ($R$)
 At steady state ($t \to \infty$), the inductor acts as a short circuit, and the current is limit only by the resistance:
@@ -54,18 +54,18 @@ graph TD
     J --> K[Done]
 ```
 
-1.  **Preparation**: The motor is stopped, and buffers for current samples are cleared.
-2.  **Voltage Step**: A constant voltage (defined by `measureVoltagePercent` and bus voltage `vdc`) is applied to the D-axis (or simply Phase A alignment).
-3.  **Sampling**: Phase A current is sampled at a fixed frequency (`samplingFrequency` = 10 kHz).
-4.  **Filtering**: Samples are passed through a moving average filter to reduce noise.
-5.  **Steady State Detection**: The algorithm waits for the current buffer to fill and calculates the steady-state current using the last 10% of samples (assuming the system has settled).
-6.  **Calculation**:
-    *   **Resistance**: calculated using $R = V_{applied} / I_{steadystate}$.
-    *   **Time Constant ($\tau$)**: The code searches the recorded samples for the first point where current exceeds $0.632 \times I_{steadystate}$. The index of this sample, adjusted for the filter delay, gives $\tau$.
-    *   **Inductance**: Calculated as $L = R \times \tau$.
+1. **Preparation**: The motor is stopped, and buffers for current samples are cleared.
+2. **Voltage Step**: A constant voltage (defined by `measureVoltagePercent` and bus voltage `vdc`) is applied to the D-axis (or simply Phase A alignment).
+3. **Sampling**: Phase A current is sampled at a fixed frequency (`samplingFrequency` = 10 kHz).
+4. **Filtering**: Samples are passed through a moving average filter to reduce noise.
+5. **Steady State Detection**: The algorithm waits for the current buffer to fill and calculates the steady-state current using the last 10% of samples (assuming the system has settled).
+6. **Calculation**:
+    * **Resistance**: calculated using $R = V_{applied} / I_{steadystate}$.
+    * **Time Constant ($\tau$)**: The code searches the recorded samples for the first point where current exceeds $0.632 \times I_{steadystate}$. The index of this sample, adjusted for the filter delay, gives $\tau$.
+    * **Inductance**: Calculated as $L = R \times \tau$.
 
 ### Code Reference
 
-*   `AverageAndRemoveFront`: Implements the moving average filter.
-*   `GetSteadyStateCurrent`: Averages the last portion of the sample buffer.
-*   `GetTauFromCurrentSamples`: Finds the time index corresponding to $63.2\%$ of max current.
+* `AverageAndRemoveFront`: Implements the moving average filter.
+* `GetSteadyStateCurrent`: Averages the last portion of the sample buffer.
+* `GetTauFromCurrentSamples`: Finds the time index corresponding to $63.2\%$ of max current.
