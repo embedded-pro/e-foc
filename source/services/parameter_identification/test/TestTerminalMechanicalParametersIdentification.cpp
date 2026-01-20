@@ -28,8 +28,7 @@ namespace
         : public services::MechanicalParametersIdentification
     {
     public:
-        MOCK_METHOD2(EstimateFriction, void(const FrictionConfig& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>)>& onDone));
-        MOCK_METHOD3(EstimateInertia, void(const InertiaConfig& config, foc::NewtonMeterSecondPerRadian damping, const infra::Function<void(std::optional<foc::NewtonMeterSecondSquared>)>& onDone));
+        MOCK_METHOD4(EstimateFrictionAndInertia, void(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone));
     };
 
     class TerminalMechanicalParametersIdentificationTest
@@ -84,14 +83,15 @@ namespace
 
 TEST_F(TerminalMechanicalParametersIdentificationTest, estfric_calls_identification_with_correct_parameters)
 {
-    InvokeCommand("estfric 500.0 0.1", [this]()
+    InvokeCommand("estmech 500.0 0.1 7", [this]()
         {
-            EXPECT_CALL(identificationMock, EstimateFriction(testing::_, testing::_))
-                .WillOnce([](const auto& config, const auto&)
+            EXPECT_CALL(identificationMock, EstimateFrictionAndInertia(testing::_, testing::_, testing::_, testing::_))
+                .WillOnce([](const auto& torqueConstant, std::size_t polePairs, const auto& config, const auto&)
                     {
                         float expectedSpeed = 500.0f * 2.0f * 3.14159265f / 60.0f; // RPM to rad/s
                         EXPECT_NEAR(config.targetSpeed.Value(), expectedSpeed, 0.1f);
-                        EXPECT_FLOAT_EQ(config.torqueConstant.Value(), 0.1f);
+                        EXPECT_FLOAT_EQ(torqueConstant.Value(), 0.1f);
+                        EXPECT_EQ(polePairs, 7);
                     });
         });
 
@@ -100,174 +100,56 @@ TEST_F(TerminalMechanicalParametersIdentificationTest, estfric_calls_identificat
 
 TEST_F(TerminalMechanicalParametersIdentificationTest, estfric_returns_error_for_invalid_arguments)
 {
-    InvokeCommandExpectingError("estfric 500.0", "invalid number of arguments. Usage: estfric <target_speed_rpm> <Kt_Nm_per_A>");
+    InvokeCommandExpectingError("estmech 500.0 0.1", "invalid number of arguments. Usage: estmech <target_speed_rpm> <Kt_Nm_per_A> <number_of_pole_pairs>");
 
     ExecuteAllActions();
 }
 
 TEST_F(TerminalMechanicalParametersIdentificationTest, estfric_successful_callback)
 {
-    infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>)> capturedCallback;
+    infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)> capturedCallback;
 
-    InvokeCommand("estimate_friction 300.0 0.15", [this, &capturedCallback]()
+    InvokeCommand("estmech 300.0 0.15 7", [this, &capturedCallback]()
         {
-            EXPECT_CALL(identificationMock, EstimateFriction(testing::_, testing::_))
-                .WillOnce(testing::SaveArg<1>(&capturedCallback));
+            EXPECT_CALL(identificationMock, EstimateFrictionAndInertia(testing::_, testing::_, testing::_, testing::_))
+                .WillOnce(testing::SaveArg<3>(&capturedCallback));
         });
 
     ExecuteAllActions();
 
     ::testing::InSequence _;
     std::string newline{ "\r\n" };
-    std::string prefix{ "Estimated Friction (B): " };
+    std::string prefix1{ "Estimated Friction (B): " };
+    std::string prefix2{ "Estimated Inertia (J): " };
     EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-    EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(prefix.begin(), prefix.end())), testing::_));
+    EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(prefix1.begin(), prefix1.end())), testing::_));
+    EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AtLeast(1));
+    EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+    EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(prefix2.begin(), prefix2.end())), testing::_));
     EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AtLeast(1));
 
-    capturedCallback(foc::NewtonMeterSecondPerRadian{ 0.05f });
+    capturedCallback(foc::NewtonMeterSecondPerRadian{ 0.05f }, foc::NewtonMeterSecondSquared{ 0.001f });
     ExecuteAllActions();
 }
 
 TEST_F(TerminalMechanicalParametersIdentificationTest, estfric_failure_callback)
 {
-    infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>)> capturedCallback;
+    infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)> capturedCallback;
 
-    InvokeCommand("estfric 400.0 0.1", [this, &capturedCallback]()
+    InvokeCommand("estmech 400.0 0.1 7", [this, &capturedCallback]()
         {
-            EXPECT_CALL(identificationMock, EstimateFriction(testing::_, testing::_))
-                .WillOnce(testing::SaveArg<1>(&capturedCallback));
+            EXPECT_CALL(identificationMock, EstimateFrictionAndInertia(testing::_, testing::_, testing::_, testing::_))
+                .WillOnce(testing::SaveArg<3>(&capturedCallback));
         });
 
     ExecuteAllActions();
 
     ::testing::InSequence _;
     std::string newline{ "\r\n" };
-    std::string message{ "Friction estimation failed." };
+    std::string message{ "Friction and inertia estimation failed." };
     EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
     EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(message.begin(), message.end())), testing::_));
 
-    capturedCallback(std::nullopt);
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalMechanicalParametersIdentificationTest, estinert_requires_friction_to_be_estimated_first)
-{
-    InvokeCommandExpectingError("estinert 1.0 0.1", "friction must be estimated first. Run 'estfric' command.");
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalMechanicalParametersIdentificationTest, estinert_calls_identification_after_friction_estimated)
-{
-    infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>)> frictionCallback;
-
-    InvokeCommand("estfric 500.0 0.1", [this, &frictionCallback]()
-        {
-            EXPECT_CALL(identificationMock, EstimateFriction(testing::_, testing::_))
-                .WillOnce(testing::SaveArg<1>(&frictionCallback));
-        });
-
-    ExecuteAllActions();
-
-    ::testing::InSequence _;
-    std::string newline{ "\r\n" };
-    EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-    EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AtLeast(1));
-
-    frictionCallback(foc::NewtonMeterSecondPerRadian{ 0.05f });
-    ExecuteAllActions();
-
-    InvokeCommand("estimate_inertia 2.0 0.1", [this]()
-        {
-            EXPECT_CALL(identificationMock, EstimateInertia(testing::_, testing::_, testing::_))
-                .WillOnce([](const auto& config, auto damping, const auto&)
-                    {
-                        EXPECT_FLOAT_EQ(config.torqueStepCurrent.Value(), 2.0f);
-                        EXPECT_FLOAT_EQ(config.torqueConstant.Value(), 0.1f);
-                        EXPECT_FLOAT_EQ(damping.Value(), 0.05f);
-                    });
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalMechanicalParametersIdentificationTest, estinert_successful_callback)
-{
-    infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>)> frictionCallback;
-
-    InvokeCommand("estfric 500.0 0.1", [this, &frictionCallback]()
-        {
-            EXPECT_CALL(identificationMock, EstimateFriction(testing::_, testing::_))
-                .WillOnce(testing::SaveArg<1>(&frictionCallback));
-        });
-
-    ExecuteAllActions();
-
-    ::testing::InSequence s1;
-    std::string newline1{ "\r\n" };
-    EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline1.begin(), newline1.end())), testing::_));
-    EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AtLeast(1));
-
-    frictionCallback(foc::NewtonMeterSecondPerRadian{ 0.05f });
-    ExecuteAllActions();
-
-    infra::Function<void(std::optional<foc::NewtonMeterSecondSquared>)> inertiaCallback;
-
-    InvokeCommand("estinert 1.5 0.1", [this, &inertiaCallback]()
-        {
-            EXPECT_CALL(identificationMock, EstimateInertia(testing::_, testing::_, testing::_))
-                .WillOnce(testing::SaveArg<2>(&inertiaCallback));
-        });
-
-    ExecuteAllActions();
-
-    ::testing::InSequence s2;
-    std::string newline2{ "\r\n" };
-    std::string prefix{ "Estimated Inertia (J): " };
-    EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline2.begin(), newline2.end())), testing::_));
-    EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(prefix.begin(), prefix.end())), testing::_));
-    EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AtLeast(1));
-
-    inertiaCallback(foc::NewtonMeterSecondSquared{ 0.001f });
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalMechanicalParametersIdentificationTest, estinert_failure_callback)
-{
-    infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>)> frictionCallback;
-
-    InvokeCommand("estfric 500.0 0.1", [this, &frictionCallback]()
-        {
-            EXPECT_CALL(identificationMock, EstimateFriction(testing::_, testing::_))
-                .WillOnce(testing::SaveArg<1>(&frictionCallback));
-        });
-
-    ExecuteAllActions();
-
-    ::testing::InSequence s1;
-    std::string newline1{ "\r\n" };
-    EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline1.begin(), newline1.end())), testing::_));
-    EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AtLeast(1));
-
-    frictionCallback(foc::NewtonMeterSecondPerRadian{ 0.05f });
-    ExecuteAllActions();
-
-    infra::Function<void(std::optional<foc::NewtonMeterSecondSquared>)> inertiaCallback;
-
-    InvokeCommand("estinert 1.0 0.1", [this, &inertiaCallback]()
-        {
-            EXPECT_CALL(identificationMock, EstimateInertia(testing::_, testing::_, testing::_))
-                .WillOnce(testing::SaveArg<2>(&inertiaCallback));
-        });
-
-    ExecuteAllActions();
-
-    ::testing::InSequence s2;
-    std::string newline2{ "\r\n" };
-    std::string message{ "Inertia estimation failed." };
-    EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline2.begin(), newline2.end())), testing::_));
-    EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(message.begin(), message.end())), testing::_));
-
-    inertiaCallback(std::nullopt);
+    capturedCallback(std::nullopt, std::nullopt);
     ExecuteAllActions();
 }

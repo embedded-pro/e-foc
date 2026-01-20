@@ -15,15 +15,17 @@ namespace
 
 namespace services
 {
-    MotorAlignmentImpl::MotorAlignmentImpl(foc::MotorDriver& driver, foc::Encoder& encoder, foc::Volts vdc)
+    MotorAlignmentImpl::MotorAlignmentImpl(foc::MotorDriver& driver, foc::Encoder& encoder)
         : driver(driver)
         , encoder(encoder)
-        , vdc(vdc)
     {
     }
 
     void MotorAlignmentImpl::ForceAlignment(std::size_t polePairs, const AlignmentConfig& config, const infra::Function<void(std::optional<foc::Radians>)>& onDone)
     {
+        if (onAlignmentDone)
+            return;
+
         this->polePairs = polePairs;
         alignmentConfig = config;
         onAlignmentDone = onDone;

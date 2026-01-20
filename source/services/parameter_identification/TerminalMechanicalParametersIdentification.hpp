@@ -13,8 +13,7 @@ namespace services
     private:
         using StatusWithMessage = services::TerminalWithStorage::StatusWithMessage;
 
-        StatusWithMessage EstimateFriction(const infra::BoundedConstString& param);
-        StatusWithMessage EstimateInertia(const infra::BoundedConstString& param);
+        StatusWithMessage EstimateFrictionAndInertia(const infra::BoundedConstString& param);
 
     private:
         services::TerminalWithStorage& terminal;

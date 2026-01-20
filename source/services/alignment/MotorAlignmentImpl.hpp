@@ -11,7 +11,7 @@ namespace services
         : public MotorAlignment
     {
     public:
-        MotorAlignmentImpl(foc::MotorDriver& driver, foc::Encoder& encoder, foc::Volts vdc);
+        MotorAlignmentImpl(foc::MotorDriver& driver, foc::Encoder& encoder);
 
         void ForceAlignment(std::size_t polePairs, const AlignmentConfig& config, const infra::Function<void(std::optional<foc::Radians>)>& onDone) override;
 
@@ -26,7 +26,6 @@ namespace services
 
         foc::MotorDriver& driver;
         foc::Encoder& encoder;
-        foc::Volts vdc;
         [[no_unique_address]] foc::ClarkePark transforms;
         AlignmentConfig alignmentConfig;
         std::size_t polePairs = 1;

@@ -11,22 +11,19 @@ namespace services
     class MechanicalParametersIdentification
     {
     public:
-        struct FrictionConfig
+        struct IdentificationResult
+        {
+            foc::NewtonMeterSecondPerRadian friction;
+            foc::NewtonMeterSecondSquared inertia;
+        };
+
+        struct Config
         {
             foc::RadiansPerSecond targetSpeed{ 52.36f };
-            infra::Duration settleTime{ std::chrono::seconds{ 3 } };
-            infra::Duration measurementTime{ std::chrono::seconds{ 2 } };
-            foc::NewtonMeter torqueConstant{ 0.1f };
+            float forgettingFactor{ 0.998f };
+            infra::Duration timeout{ std::chrono::seconds{ 5 } };
         };
 
-        struct InertiaConfig
-        {
-            foc::Ampere torqueStepCurrent{ 1.0f };
-            infra::Duration accelerationTime{ std::chrono::milliseconds{ 500 } };
-            foc::NewtonMeter torqueConstant{ 0.1f };
-        };
-
-        virtual void EstimateFriction(const FrictionConfig& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>)>& onDone) = 0;
-        virtual void EstimateInertia(const InertiaConfig& config, foc::NewtonMeterSecondPerRadian damping, const infra::Function<void(std::optional<foc::NewtonMeterSecondSquared>)>& onDone) = 0;
+        virtual void EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone) = 0;
     };
 }
