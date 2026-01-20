@@ -3,14 +3,14 @@
 #include "foc/instantiations/TrigonometricImpl.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "services/alignment/TerminalMotorAlignment.hpp"
-#include "services/parameter_identification/TerminalMotorIdentification.hpp"
+#include "services/parameter_identification/TerminalElectricalParametersIdentification.hpp"
 #include "source/foc/implementations/ControllerBaseImpl.hpp"
 #include "source/foc/implementations/WithAutomaticCurrentPidGains.hpp"
 #include "source/foc/interfaces/FieldOrientedController.hpp"
 #include "source/services/alignment/MotorAlignmentImpl.hpp"
 #include "source/services/cli/TerminalBase.hpp"
 #include "source/services/cli/TerminalHelper.hpp"
-#include "source/services/parameter_identification/MotorIdentificationImpl.hpp"
+#include "source/services/parameter_identification/ElectricalParametersIdentificationImpl.hpp"
 #include <optional>
 #include <type_traits>
 #include <variant>
@@ -44,7 +44,7 @@ namespace application
         MotorStateMachine(const TerminalAndTracer& terminalAndTracer, const MotorDriverAndEncoder& motorDriverAndEncoder, foc::Volts vdc, FocArgs&&... focArgs);
 
     private:
-        std::optional<std::pair<foc::Ohm, foc::MilliHenry>> ParseArgs(infra::Tokenizer& tokenizer);
+        std::optional<std::pair<foc::Ohm, foc::MilliHenry>> ParseArgs(const infra::Tokenizer& tokenizer);
 
     private:
         services::TerminalWithStorage& terminal;
@@ -54,8 +54,8 @@ namespace application
         foc::Volts vdc;
         foc::TrigonometricFunctions trigonometricFunctions;
         FocImpl focImpl;
-        std::variant<std::monostate, services::MotorAlignmentImpl, services::MotorIdentificationImpl, ControllerImpl> motorStates;
-        std::variant<std::monostate, services::TerminalMotorAlignment, services::TerminalMotorIdentification, TerminalImpl> terminalStates;
+        std::variant<std::monostate, services::MotorAlignmentImpl, services::ElectricalParametersIdentificationImpl, ControllerImpl> motorStates;
+        std::variant<std::monostate, services::TerminalMotorAlignment, services::TerminalElectricalParametersIdentification, TerminalImpl> terminalStates;
     };
 
     // Implementation
@@ -73,14 +73,14 @@ namespace application
         terminal.AddCommand({ { "ident_par", "ip", "Identify Parameters, which are resistance, inductance and number of pole pairs." },
             [this](const auto&)
             {
-                motorStates.template emplace<services::MotorIdentificationImpl>(this->driver, this->encoder, this->vdc);
-                terminalStates.template emplace<services::TerminalMotorIdentification>(this->terminal, this->tracer, std::get<services::MotorIdentificationImpl>(this->motorStates));
+                motorStates.template emplace<services::ElectricalParametersIdentificationImpl>(this->driver, this->encoder, this->vdc);
+                terminalStates.template emplace<services::TerminalElectricalParametersIdentification>(this->terminal, this->tracer, std::get<services::ElectricalParametersIdentificationImpl>(this->motorStates));
             } });
 
         terminal.AddCommand({ { "align_motor", "am", "Align Motor." },
             [this](const auto&)
             {
-                motorStates.template emplace<services::MotorAlignmentImpl>(this->driver, this->encoder, this->vdc);
+                motorStates.template emplace<services::MotorAlignmentImpl>(this->driver, this->encoder);
                 terminalStates.template emplace<services::TerminalMotorAlignment>(this->terminal, this->tracer, std::get<services::MotorAlignmentImpl>(this->motorStates));
             } });
 
@@ -104,7 +104,7 @@ namespace application
     }
 
     template<typename FocImpl, typename ControllerImpl, typename TerminalImpl, typename Enable>
-    std::optional<std::pair<foc::Ohm, foc::MilliHenry>> MotorStateMachine<FocImpl, ControllerImpl, TerminalImpl, Enable>::ParseArgs(infra::Tokenizer& tokenizer)
+    std::optional<std::pair<foc::Ohm, foc::MilliHenry>> MotorStateMachine<FocImpl, ControllerImpl, TerminalImpl, Enable>::ParseArgs(const infra::Tokenizer& tokenizer)
     {
         if (tokenizer.Size() != 2)
         {
