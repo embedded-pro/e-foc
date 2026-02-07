@@ -27,6 +27,8 @@ namespace
     public:
         TestWithAutomaticPidGains()
         {
+            EXPECT_CALL(interfaceMock, BaseFrequency())
+                .WillOnce(::testing::Return(hal::Hertz{ 10000 }));
             EXPECT_CALL(interfaceMock, PhaseCurrentsReady(::testing::_, ::testing::_))
                 .WillOnce([this](auto, const auto& onDone)
                     {

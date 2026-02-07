@@ -6,14 +6,19 @@ target_link_libraries(e_foc.foc_test PUBLIC
     gmock_main
     e_foc.foc.implementations
     numerical.math_test_helper
+    numerical.controllers.implementations
     infra.timer_test_helper
     e_foc.foc_mock
 )
 
 target_sources(e_foc.foc_test PRIVATE
+    TestFocTorqueImpl.cpp
+    TestFocWithSpeedPidImpl.cpp
+    TestRealTimeFrictionAndInertiaEstimator.cpp
     TestSpaceVectorModulation.cpp
     TestSpeedController.cpp
     TestTorqueController.cpp
-    TestWithAutomaticCurrentPidGains.cpp
     TestTransformsClarkePark.cpp
+    TestWithAutomaticCurrentPidGains.cpp
+    TestWithRealTimeSpeedPidTune.cpp
 )
