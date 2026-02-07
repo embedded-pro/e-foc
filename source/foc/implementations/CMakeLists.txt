@@ -14,6 +14,8 @@ target_sources(e_foc.foc.implementations PRIVATE
     ControllerBaseImpl.hpp
     FocTorqueImpl.cpp
     FocTorqueImpl.hpp
+    FocWithSpeedPidImpl.cpp
+    FocWithSpeedPidImpl.hpp
     NormalizedAngles.hpp
     RealTimeFrictionAndInertiaEstimator.cpp
     RealTimeFrictionAndInertiaEstimator.hpp

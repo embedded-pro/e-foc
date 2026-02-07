@@ -13,6 +13,7 @@ target_link_libraries(e_foc.foc_test PUBLIC
 
 target_sources(e_foc.foc_test PRIVATE
     TestFocTorqueImpl.cpp
+    TestFocWithSpeedPidImpl.cpp
     TestRealTimeFrictionAndInertiaEstimator.cpp
     TestSpaceVectorModulation.cpp
     TestSpeedController.cpp
