@@ -29,6 +29,7 @@ target_sources(e_foc.foc.implementations PRIVATE
     TransformsClarkePark.hpp
     WithAutomaticCurrentPidGains.cpp
     WithAutomaticCurrentPidGains.hpp
+    WithRealTimeSpeedPidTune.cpp
     WithRealTimeSpeedPidTune.hpp
 )
 

@@ -2,24 +2,19 @@
 
 #include "foc/implementations/TransformsClarkePark.hpp"
 #include "foc/interfaces/Driver.hpp"
+#include "foc/interfaces/FrictionAndInertiaEstimator.hpp"
 #include "numerical/estimators/RecursiveLeastSquares.hpp"
 #include "source/foc/interfaces/Units.hpp"
 
 namespace foc
 {
     class RealTimeFrictionAndInertiaEstimator
+        : public FrictionAndInertiaEstimator
     {
     public:
-        struct Result
-        {
-            foc::NewtonMeterSecondPerRadian inertia;
-            foc::NewtonMeterSecondSquared friction;
-            estimators::OnlineEstimator<float, 3>::EstimationMetrics metrics;
-        };
-
         RealTimeFrictionAndInertiaEstimator(float forgettingFactor, hal::Hertz samplingFrequency);
 
-        Result Update(foc::PhaseCurrents currentPhases, RadiansPerSecond speed, Radians electricalAngle, foc::NewtonMeter targetTorque);
+        Result Update(foc::PhaseCurrents currentPhases, RadiansPerSecond speed, Radians electricalAngle, foc::NewtonMeter targetTorque) override;
 
     private:
         using MotorRLS = estimators::RecursiveLeastSquares<float, 3>;
