@@ -13,6 +13,9 @@ target_sources(e_foc.foc.implementations PRIVATE
     ControllerBaseImpl.cpp
     ControllerBaseImpl.hpp
     NormalizedAngles.hpp
+    RealTimeFrictionAndInertiaEstimator.cpp
+    RealTimeFrictionAndInertiaEstimator.hpp
+    RealTimeSpeedPidTune.hpp
     SpaceVectorModulation.cpp
     SpaceVectorModulation.hpp
     SpeedControllerImpl.cpp
