@@ -7,7 +7,7 @@ namespace foc
         , position{ position }
         , foc{ foc }
     {
-        interface.PhaseCurrentsReady(hal::Hertz{ 10000 }, [this](auto currentPhases)
+        interface.PhaseCurrentsReady(interface.BaseFrequency(), [this](auto currentPhases)
             {
                 auto positionValue = this->position.Read();
                 this->interface.ThreePhasePwmOutput(this->foc.Calculate(currentPhases, positionValue));

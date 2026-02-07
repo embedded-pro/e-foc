@@ -39,21 +39,21 @@ namespace foc
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& mechanicalAngle) override;
 
     protected:
-        void ExecuteSpeedControlLoop(Radians& position);
+        virtual void ExecuteSpeedControlLoop(Radians& position, foc::PhaseCurrents currentPhases, RadiansPerSecond speed, Radians electricalAngle, foc::NewtonMeter targetTorque);
+        FocTorqueImpl& FocTorque();
 
-    protected:
+    private:
+        RadiansPerSecond FilteredSpeed(Radians currentPosition);
+        void ExecuteSpeedLoop(const PhaseCurrents& currentPhases, Radians& mechanicalAngle);
+
+    private:
         FocTorqueImpl focTorqueImpl;
-
-    private:
-        float CalculateFilteredSpeed(float currentPosition);
-
-    private:
         LowPriorityInterrupt& lowPriorityInterrupt;
         controllers::PidIncrementalSynchronous<float> speedPid;
-        float previousPosition = 0.0f;
+        Radians previousPosition = Radians{ 0.0f };
         float polePairs;
-        std::atomic<float> targetSpeed{ 0.0f };
-        uint8_t speedLoopCounter = 0;
+        std::atomic<NewtonMeter> targetTorque{ NewtonMeter{ 0.0f } };
+        uint8_t speedLoopCounter;
         uint8_t nyquistFactor;
         float speedLoopPeriod;
     };

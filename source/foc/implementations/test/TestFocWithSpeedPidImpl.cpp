@@ -26,7 +26,8 @@ namespace
         bool registerCalled = false;
     };
 
-    class ConcreteFocWithSpeedPidImpl : public foc::FocWithSpeedPidImpl
+    class ConcreteFocWithSpeedPidImpl
+        : public foc::FocWithSpeedPidImpl
     {
     public:
         using foc::FocWithSpeedPidImpl::FocWithSpeedPidImpl;
@@ -34,7 +35,7 @@ namespace
         void SetPolePairs(std::size_t polePairs) override
         {
             polePairsValue = polePairs;
-            focTorqueImpl.SetPolePairs(polePairs);
+            FocTorque().SetPolePairs(polePairs);
         }
 
         std::size_t polePairsValue = 1;

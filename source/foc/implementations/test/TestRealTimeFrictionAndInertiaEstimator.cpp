@@ -1,4 +1,3 @@
-#include "numerical/math/Tolerance.hpp"
 #include "source/foc/implementations/RealTimeFrictionAndInertiaEstimator.hpp"
 #include <gmock/gmock.h>
 

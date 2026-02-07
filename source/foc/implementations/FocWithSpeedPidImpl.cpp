@@ -2,6 +2,7 @@
 #include "infra/util/ReallyAssert.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <numbers>
+#include <utility>
 
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC optimize("O3", "fast-math")
@@ -13,12 +14,12 @@ namespace
     constexpr float two_pi = 2.0f * pi;
 
     OPTIMIZE_FOR_SPEED
-    float PositionWithWrapAround(float position)
+    foc::Radians PositionWithWrapAround(foc::Radians position)
     {
-        if (position > pi)
-            position -= two_pi;
-        else if (position < -pi)
-            position += two_pi;
+        if (position.Value() > pi)
+            position -= foc::Radians{ two_pi };
+        else if (position.Value() < -pi)
+            position += foc::Radians{ two_pi };
 
         return position;
     }
@@ -30,6 +31,7 @@ namespace foc
     FocWithSpeedPidImpl::FocWithSpeedPidImpl(LowPriorityInterrupt& lowPriorityInterrupt, foc::Ampere maxCurrent, hal::Hertz pwmFrequency, const NyquistFactor& nyquistFactor)
         : lowPriorityInterrupt{ lowPriorityInterrupt }
         , speedPid{ { 0.0f, 0.0f, 0.0f }, { -maxCurrent.Value(), maxCurrent.Value() } }
+        , speedLoopCounter{ static_cast<uint8_t>(nyquistFactor.Value()) }
         , nyquistFactor{ static_cast<uint8_t>(nyquistFactor.Value()) }
         , speedLoopPeriod{ this->nyquistFactor / static_cast<float>(pwmFrequency.Value()) }
     {
@@ -39,7 +41,7 @@ namespace foc
 
         lowPriorityInterrupt.Register([this]()
             {
-                focTorqueImpl.SetPoint(std::make_pair(foc::Ampere{ 0.0f }, foc::Ampere{ targetSpeed.load() }));
+                focTorqueImpl.SetPoint(std::make_pair(foc::Ampere{ 0.0f }, foc::Ampere{ targetTorque.load().Value() }));
             });
     }
 
@@ -72,14 +74,14 @@ namespace foc
         speedPid.Enable();
         focTorqueImpl.Reset();
 
-        previousPosition = 0.0f;
-        speedLoopCounter = 0;
+        previousPosition = Radians{ 0.0f };
+        speedLoopCounter = nyquistFactor;
     }
 
     OPTIMIZE_FOR_SPEED
-    float FocWithSpeedPidImpl::CalculateFilteredSpeed(float mechanicalPosition)
+    RadiansPerSecond FocWithSpeedPidImpl::FilteredSpeed(Radians mechanicalPosition)
     {
-        auto mechanicalSpeed = PositionWithWrapAround(mechanicalPosition - previousPosition) / speedLoopPeriod;
+        auto mechanicalSpeed = RadiansPerSecond{ PositionWithWrapAround(mechanicalPosition - previousPosition).Value() / speedLoopPeriod };
 
         previousPosition = mechanicalPosition;
 
@@ -87,21 +89,30 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocWithSpeedPidImpl::ExecuteSpeedControlLoop(Radians& position)
+    void FocWithSpeedPidImpl::ExecuteSpeedControlLoop(Radians&, foc::PhaseCurrents, RadiansPerSecond, Radians, foc::NewtonMeter)
     {
-        targetSpeed.store(speedPid.Process(CalculateFilteredSpeed(position.Value())));
+    }
+
+    FocTorqueImpl& FocWithSpeedPidImpl::FocTorque()
+    {
+        return focTorqueImpl;
+    }
+
+    OPTIMIZE_FOR_SPEED
+    void FocWithSpeedPidImpl::ExecuteSpeedLoop(const PhaseCurrents& currentPhases, Radians& mechanicalAngle)
+    {
+        auto speed = FilteredSpeed(mechanicalAngle);
+        auto torque = foc::NewtonMeter{ speedPid.Process(speed.Value()) };
+        targetTorque.store(torque);
         lowPriorityInterrupt.Trigger();
+        ExecuteSpeedControlLoop(mechanicalAngle, currentPhases, speed, mechanicalAngle, torque);
     }
 
     OPTIMIZE_FOR_SPEED
     PhasePwmDutyCycles FocWithSpeedPidImpl::Calculate(const PhaseCurrents& currentPhases, Radians& mechanicalAngle)
     {
-        speedLoopCounter++;
-        if (speedLoopCounter >= nyquistFactor)
-        {
-            speedLoopCounter = 0;
-            ExecuteSpeedControlLoop(mechanicalAngle);
-        }
+        if (std::exchange(speedLoopCounter, speedLoopCounter > 1 ? speedLoopCounter - 1 : nyquistFactor) == 1)
+            ExecuteSpeedLoop(currentPhases, mechanicalAngle);
 
         return focTorqueImpl.Calculate(currentPhases, mechanicalAngle);
     }
