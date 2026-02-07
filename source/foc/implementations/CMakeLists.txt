@@ -12,20 +12,22 @@ target_link_libraries(e_foc.foc.implementations PUBLIC
 target_sources(e_foc.foc.implementations PRIVATE
     ControllerBaseImpl.cpp
     ControllerBaseImpl.hpp
+    FocTorqueImpl.cpp
+    FocTorqueImpl.hpp
     NormalizedAngles.hpp
     RealTimeFrictionAndInertiaEstimator.cpp
     RealTimeFrictionAndInertiaEstimator.hpp
-    RealTimeSpeedPidTune.hpp
     SpaceVectorModulation.cpp
     SpaceVectorModulation.hpp
     SpeedControllerImpl.cpp
     SpeedControllerImpl.hpp
     TorqueControllerImpl.cpp
     TorqueControllerImpl.hpp
-    WithAutomaticCurrentPidGains.cpp
-    WithAutomaticCurrentPidGains.hpp
     TransformsClarkePark.cpp
     TransformsClarkePark.hpp
+    WithAutomaticCurrentPidGains.cpp
+    WithAutomaticCurrentPidGains.hpp
+    WithRealTimeSpeedPidTune.hpp
 )
 
 add_subdirectory(test)

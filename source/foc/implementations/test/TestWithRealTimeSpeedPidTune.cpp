@@ -1,7 +1,5 @@
 #include "numerical/estimators/Estimator.hpp"
-#include "numerical/estimators/RecursiveLeastSquares.hpp"
-#include "numerical/math/Tolerance.hpp"
-#include "source/foc/implementations/RealTimeSpeedPidTune.hpp"
+#include "source/foc/implementations/WithRealTimeSpeedPidTune.hpp"
 #include <gmock/gmock.h>
 #include <numbers>
 

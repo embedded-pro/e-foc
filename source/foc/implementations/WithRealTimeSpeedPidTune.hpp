@@ -3,6 +3,7 @@
 #include "foc/interfaces/FieldOrientedController.hpp"
 #include "foc/interfaces/Units.hpp"
 #include "numerical/estimators/RecursiveLeastSquares.hpp"
+#include <numbers>
 
 namespace foc
 {
