@@ -3,8 +3,8 @@
 #include "infra/util/ByteRange.hpp"
 #include "infra/util/test_helper/MockHelpers.hpp"
 #include "services/util/TerminalWithStorage.hpp"
-#include "source/services/parameter_identification/MotorIdentification.hpp"
-#include "source/services/parameter_identification/TerminalMotorIdentification.hpp"
+#include "source/services/parameter_identification/ElectricalParametersIdentification.hpp"
+#include "source/services/parameter_identification/TerminalElectricalParametersIdentification.hpp"
 #include "gmock/gmock.h"
 
 namespace
@@ -24,20 +24,20 @@ namespace
         MOCK_METHOD1(Overwrite, infra::ByteRange(std::size_t marker));
     };
 
-    class MotorIdentificationMock
-        : public services::MotorIdentification
+    class ElectricalParametersIdentificationMock
+        : public services::ElectricalParametersIdentification
     {
     public:
         MOCK_METHOD2(EstimateResistanceAndInductance, void(const ResistanceAndInductanceConfig& config, const infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)>& onDone));
         MOCK_METHOD2(EstimateNumberOfPolePairs, void(const PolePairsConfig& config, const infra::Function<void(std::optional<std::size_t>)>& onDone));
     };
 
-    class TerminalMotorIdentificationTest
+    class TerminalElectricalParametersIdentificationTest
         : public ::testing::Test
         , public infra::EventDispatcherWithWeakPtrFixture
     {
     public:
-        ::testing::StrictMock<MotorIdentificationMock> identificationMock;
+        ::testing::StrictMock<ElectricalParametersIdentificationMock> identificationMock;
         ::testing::StrictMock<StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
@@ -48,7 +48,7 @@ namespace
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
         services::TerminalWithStorage::WithMaxSize<16> terminalWithStorage{ terminalWithCommands, tracer };
-        services::TerminalMotorIdentification terminalIdentification{ terminalWithStorage, tracer, identificationMock };
+        services::TerminalElectricalParametersIdentification terminalIdentification{ terminalWithStorage, tracer, identificationMock };
 
         void InvokeCommand(const std::string& command, const infra::Function<void()>& onCommandReceived)
         {
@@ -66,7 +66,7 @@ namespace
     };
 }
 
-TEST_F(TerminalMotorIdentificationTest, estrl_calls_identification_with_wye)
+TEST_F(TerminalElectricalParametersIdentificationTest, estrl_calls_identification_with_wye)
 {
     InvokeCommand("estrl wye", [this]()
         {
@@ -80,7 +80,7 @@ TEST_F(TerminalMotorIdentificationTest, estrl_calls_identification_with_wye)
     ExecuteAllActions();
 }
 
-TEST_F(TerminalMotorIdentificationTest, estrl_calls_identification_with_delta)
+TEST_F(TerminalElectricalParametersIdentificationTest, estrl_calls_identification_with_delta)
 {
     InvokeCommand("estrl delta", [this]()
         {
@@ -94,7 +94,7 @@ TEST_F(TerminalMotorIdentificationTest, estrl_calls_identification_with_delta)
     ExecuteAllActions();
 }
 
-TEST_F(TerminalMotorIdentificationTest, estrl_successful_callback)
+TEST_F(TerminalElectricalParametersIdentificationTest, estrl_successful_callback)
 {
     infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)> capturedCallback;
 
@@ -117,7 +117,7 @@ TEST_F(TerminalMotorIdentificationTest, estrl_successful_callback)
     ExecuteAllActions();
 }
 
-TEST_F(TerminalMotorIdentificationTest, estrl_resistance_failure_callback)
+TEST_F(TerminalElectricalParametersIdentificationTest, estrl_resistance_failure_callback)
 {
     infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)> capturedCallback;
 
@@ -139,7 +139,7 @@ TEST_F(TerminalMotorIdentificationTest, estrl_resistance_failure_callback)
     ExecuteAllActions();
 }
 
-TEST_F(TerminalMotorIdentificationTest, estpp_calls_identification)
+TEST_F(TerminalElectricalParametersIdentificationTest, estpp_calls_identification)
 {
     InvokeCommand("estpp", [this]()
         {
@@ -149,7 +149,7 @@ TEST_F(TerminalMotorIdentificationTest, estpp_calls_identification)
     ExecuteAllActions();
 }
 
-TEST_F(TerminalMotorIdentificationTest, estpp_successful_callback)
+TEST_F(TerminalElectricalParametersIdentificationTest, estpp_successful_callback)
 {
     infra::Function<void(std::optional<std::size_t>)> capturedCallback;
 
@@ -172,7 +172,7 @@ TEST_F(TerminalMotorIdentificationTest, estpp_successful_callback)
     ExecuteAllActions();
 }
 
-TEST_F(TerminalMotorIdentificationTest, estpp_failure_callback)
+TEST_F(TerminalElectricalParametersIdentificationTest, estpp_failure_callback)
 {
     infra::Function<void(std::optional<std::size_t>)> capturedCallback;
 

@@ -24,6 +24,8 @@ namespace foc
     using HallState = uint8_t;
     using Nm = infra::Quantity<unit::NewtonMeter, float>;
     using NewtonMeter = Nm;
+    using NewtonMeterSecondSquared = infra::Quantity<unit::NewtonMeter::Mul<infra::Second>::Mul<infra::Second>, float>;
+    using NewtonMeterSecondPerRadian = infra::Quantity<unit::NewtonMeter::Mul<infra::Second>::Div<unit::Radians>, float>;
     using RevPerMinute = infra::Quantity<unit::RevPerMinute, float>;
     using Henry = infra::Quantity<unit::Henry, float>;
     using MilliHenry = infra::Quantity<unit::Henry::Scale<infra::StaticRational<1, 1000>>, float>;

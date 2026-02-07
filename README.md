@@ -18,6 +18,7 @@ This project provides a production-ready motor control implementation designed f
 - **Space Vector Modulation (SVM)**: Efficient PWM generation
 - **PID Control**: Anti-windup implementations for current and velocity loops
 - **Sensored Control**: Encoder and Hall sensor feedback integration
+- **Auto-Tuning**: Resistance and Inductance estimation
 - **Real-Time Performance**: Deterministic execution with no heap allocation
 
 ### Embedded Constraints
@@ -109,6 +110,9 @@ cmake --build --preset EK-TM4C1294XL-Debug
 ## Documentation
 
 For detailed information about the project structure and coding guidelines, see:
+- [FOC Theory](documentation/theory/foc.md) - Field-Oriented Control theory and control block diagrams
+- [Alignment Theory](documentation/theory/alignment.md) - Motor alignment and offset detection
+- [Parameter Estimation](documentation/theory/resistance-inductance-estimation.md) - Resistance and inductance estimation theory
 - [Copilot Instructions](/.github/copilot-instructions.md) - Development guidelines and patterns
 - [Performance Optimization Guide](documentation/performance-optimization/README.md) - Writing high-performance embedded code, analyzing assembly, measuring cycles
 - [embedded-infra-lib Documentation](embedded-infra-lib/README.md) - Infrastructure library reference

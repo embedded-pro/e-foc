@@ -19,8 +19,7 @@ namespace
     public:
         StrictMock<foc::FieldOrientedControllerInterfaceMock> driverMock;
         StrictMock<foc::EncoderMock> encoderMock;
-        foc::Volts vdc{ 24.0f };
-        services::MotorAlignmentImpl alignment{ driverMock, encoderMock, vdc };
+        services::MotorAlignmentImpl alignment{ driverMock, encoderMock };
     };
 }
 
@@ -304,40 +303,6 @@ TEST_F(MotorAlignmentTest, ForceAlignment_StopsDriverBeforeCallback)
     driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
     EXPECT_TRUE(callbackCalled);
-}
-
-TEST_F(MotorAlignmentTest, ForceAlignment_WithDifferentVdc)
-{
-    foc::Volts customVdc{ 48.0f };
-    services::MotorAlignmentImpl customAlignment{ driverMock, encoderMock, customVdc };
-
-    services::MotorAlignmentImpl::AlignmentConfig config;
-    config.testVoltagePercent = hal::Percent{ 20 };
-    config.settledCount = 2;
-    std::size_t polePairs = 7;
-
-    EXPECT_CALL(encoderMock, Read())
-        .Times(AtLeast(1))
-        .WillRepeatedly(Return(foc::Radians{ 1.0f }));
-    EXPECT_CALL(driverMock, Stop()).Times(2);
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
-        .WillOnce([this](auto, const auto& onDone)
-            {
-                driverMock.StorePhaseCurrentsCallback(onDone);
-            });
-
-    std::optional<foc::Radians> result;
-    customAlignment.ForceAlignment(polePairs, config, [&result](std::optional<foc::Radians> offset)
-        {
-            result = offset;
-        });
-
-    for (std::size_t i = 0; i < config.settledCount; ++i)
-        driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
-
-    ASSERT_TRUE(result.has_value());
-    EXPECT_NEAR(result->Value(), 7.0f, 0.01f);
 }
 
 TEST_F(MotorAlignmentTest, ForceAlignment_WithZeroPosition)

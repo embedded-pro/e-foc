@@ -1,6 +1,6 @@
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "source/foc/implementations/test_doubles/DriversMock.hpp"
-#include "source/services/parameter_identification/MotorIdentificationImpl.hpp"
+#include "source/services/parameter_identification/ElectricalParametersIdentificationImpl.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
 
@@ -30,7 +30,7 @@ namespace
         return electricalAngle / static_cast<float>(expectedPolePairs);
     }
 
-    class MotorIdentificationTest
+    class ElectricalParametersIdentificationTest
         : public ::testing::Test
         , public infra::ClockFixture
     {
@@ -41,13 +41,13 @@ namespace
         StrictMock<foc::FieldOrientedControllerInterfaceMock> driverMock;
         StrictMock<foc::EncoderMock> encoderMock;
         foc::Volts vdc{ 24.0f };
-        services::MotorIdentificationImpl identification{ driverMock, encoderMock, vdc };
+        services::ElectricalParametersIdentificationImpl identification{ driverMock, encoderMock, vdc };
     };
 }
 
-TEST_F(MotorIdentificationTest, estimate_resistance_and_inductance_starts_with_neutral_duty_and_settles)
+TEST_F(ElectricalParametersIdentificationTest, estimate_resistance_and_inductance_starts_with_neutral_duty_and_settles)
 {
-    services::MotorIdentification::ResistanceAndInductanceConfig config{
+    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
         hal::Percent{ 15 },
         std::chrono::seconds{ 1 },
         services::WindingConfiguration::Wye
@@ -62,9 +62,9 @@ TEST_F(MotorIdentificationTest, estimate_resistance_and_inductance_starts_with_n
     identification.EstimateResistanceAndInductance(config, [](auto, auto) {});
 }
 
-TEST_F(MotorIdentificationTest, estimate_resistance_and_inductance_applies_test_voltage_after_settle_time)
+TEST_F(ElectricalParametersIdentificationTest, estimate_resistance_and_inductance_applies_test_voltage_after_settle_time)
 {
-    services::MotorIdentification::ResistanceAndInductanceConfig config{
+    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
         hal::Percent{ 20 },
         std::chrono::milliseconds{ 100 },
         services::WindingConfiguration::Wye
@@ -91,9 +91,9 @@ TEST_F(MotorIdentificationTest, estimate_resistance_and_inductance_applies_test_
     ForwardTime(std::chrono::milliseconds{ 100 });
 }
 
-TEST_F(MotorIdentificationTest, estimate_resistance_and_inductance_collects_current_samples_and_calculates_parameters)
+TEST_F(ElectricalParametersIdentificationTest, estimate_resistance_and_inductance_collects_current_samples_and_calculates_parameters)
 {
-    services::MotorIdentification::ResistanceAndInductanceConfig config{
+    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
         hal::Percent{ 15 },
         std::chrono::milliseconds{ 50 },
         services::WindingConfiguration::Wye
@@ -141,9 +141,9 @@ TEST_F(MotorIdentificationTest, estimate_resistance_and_inductance_collects_curr
     EXPECT_NEAR(resultInductance->Value(), inductance * 1000.0f, 1.0f);
 }
 
-TEST_F(MotorIdentificationTest, estimate_resistance_and_inductance_returns_nullopt_for_zero_current)
+TEST_F(ElectricalParametersIdentificationTest, estimate_resistance_and_inductance_returns_nullopt_for_zero_current)
 {
-    services::MotorIdentification::ResistanceAndInductanceConfig config{
+    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
         hal::Percent{ 10 },
         std::chrono::milliseconds{ 50 },
         services::WindingConfiguration::Wye
@@ -183,9 +183,9 @@ TEST_F(MotorIdentificationTest, estimate_resistance_and_inductance_returns_nullo
     EXPECT_FALSE(resultInductance.has_value());
 }
 
-TEST_F(MotorIdentificationTest, estimate_resistance_and_inductance_with_low_resistance_motor)
+TEST_F(ElectricalParametersIdentificationTest, estimate_resistance_and_inductance_with_low_resistance_motor)
 {
-    services::MotorIdentification::ResistanceAndInductanceConfig config{
+    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
         hal::Percent{ 15 },
         std::chrono::milliseconds{ 50 },
         services::WindingConfiguration::Wye
@@ -233,9 +233,9 @@ TEST_F(MotorIdentificationTest, estimate_resistance_and_inductance_with_low_resi
     EXPECT_NEAR(resultInductance->Value(), inductance * 1000.0f, 0.5f);
 }
 
-TEST_F(MotorIdentificationTest, estimate_number_of_pole_pairs_initializes_encoder_and_applies_voltages)
+TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_initializes_encoder_and_applies_voltages)
 {
-    services::MotorIdentification::PolePairsConfig config{
+    services::ElectricalParametersIdentification::PolePairsConfig config{
         hal::Percent{ 20 },
         5,
         std::chrono::milliseconds{ 50 }
@@ -250,9 +250,9 @@ TEST_F(MotorIdentificationTest, estimate_number_of_pole_pairs_initializes_encode
     identification.EstimateNumberOfPolePairs(config, [](auto) {});
 }
 
-TEST_F(MotorIdentificationTest, estimate_number_of_pole_pairs_calculates_correct_pole_pairs_for_4_pole_motor)
+TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_calculates_correct_pole_pairs_for_4_pole_motor)
 {
-    services::MotorIdentification::PolePairsConfig config{
+    services::ElectricalParametersIdentification::PolePairsConfig config{
         hal::Percent{ 20 },
         5,
         std::chrono::milliseconds{ 50 }
@@ -289,9 +289,9 @@ TEST_F(MotorIdentificationTest, estimate_number_of_pole_pairs_calculates_correct
     EXPECT_EQ(*resultPolePairs, expectedPolePairs);
 }
 
-TEST_F(MotorIdentificationTest, estimate_number_of_pole_pairs_calculates_correct_pole_pairs_for_6_pole_motor)
+TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_calculates_correct_pole_pairs_for_6_pole_motor)
 {
-    services::MotorIdentification::PolePairsConfig config{
+    services::ElectricalParametersIdentification::PolePairsConfig config{
         hal::Percent{ 20 },
         5,
         std::chrono::milliseconds{ 50 }
@@ -327,9 +327,9 @@ TEST_F(MotorIdentificationTest, estimate_number_of_pole_pairs_calculates_correct
     EXPECT_EQ(*resultPolePairs, expectedPolePairs);
 }
 
-TEST_F(MotorIdentificationTest, estimate_number_of_pole_pairs_returns_nullopt_for_insufficient_rotation)
+TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_returns_nullopt_for_insufficient_rotation)
 {
-    services::MotorIdentification::PolePairsConfig config{
+    services::ElectricalParametersIdentification::PolePairsConfig config{
         hal::Percent{ 20 },
         5,
         std::chrono::milliseconds{ 50 }
@@ -357,9 +357,9 @@ TEST_F(MotorIdentificationTest, estimate_number_of_pole_pairs_returns_nullopt_fo
     EXPECT_FALSE(resultPolePairs.has_value());
 }
 
-TEST_F(MotorIdentificationTest, estimate_number_of_pole_pairs_with_different_electrical_revolutions)
+TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_with_different_electrical_revolutions)
 {
-    services::MotorIdentification::PolePairsConfig config{
+    services::ElectricalParametersIdentification::PolePairsConfig config{
         hal::Percent{ 20 },
         10,
         std::chrono::milliseconds{ 50 }
@@ -395,9 +395,9 @@ TEST_F(MotorIdentificationTest, estimate_number_of_pole_pairs_with_different_ele
     EXPECT_EQ(*resultPolePairs, expectedPolePairs);
 }
 
-TEST_F(MotorIdentificationTest, estimate_number_of_pole_pairs_with_8_pole_motor)
+TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_with_8_pole_motor)
 {
-    services::MotorIdentification::PolePairsConfig config{
+    services::ElectricalParametersIdentification::PolePairsConfig config{
         hal::Percent{ 20 },
         5,
         std::chrono::milliseconds{ 50 }

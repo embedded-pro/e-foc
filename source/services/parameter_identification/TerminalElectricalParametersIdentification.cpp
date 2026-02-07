@@ -1,7 +1,7 @@
-#include "source/services/parameter_identification/TerminalMotorIdentification.hpp"
+#include "source/services/parameter_identification/TerminalElectricalParametersIdentification.hpp"
 #include "infra/stream/StringInputStream.hpp"
 #include "infra/util/Tokenizer.hpp"
-#include "source/services/parameter_identification/MotorIdentification.hpp"
+#include "source/services/parameter_identification/ElectricalParametersIdentification.hpp"
 
 namespace
 {
@@ -30,7 +30,7 @@ namespace
 
 namespace services
 {
-    TerminalMotorIdentification::TerminalMotorIdentification(services::TerminalWithStorage& terminal, services::Tracer& tracer, MotorIdentification& identification)
+    TerminalElectricalParametersIdentification::TerminalElectricalParametersIdentification(services::TerminalWithStorage& terminal, services::Tracer& tracer, ElectricalParametersIdentification& identification)
         : terminal(terminal)
         , tracer(tracer)
         , identification(identification)
@@ -48,9 +48,9 @@ namespace services
             } });
     }
 
-    TerminalMotorIdentification::StatusWithMessage TerminalMotorIdentification::EstimateResistanceAndInductance(const infra::BoundedConstString& param)
+    TerminalElectricalParametersIdentification::StatusWithMessage TerminalElectricalParametersIdentification::EstimateResistanceAndInductance(const infra::BoundedConstString& param)
     {
-        MotorIdentification::ResistanceAndInductanceConfig config;
+        ElectricalParametersIdentification::ResistanceAndInductanceConfig config;
         infra::Tokenizer tokenizer(param, ' ');
 
         if (tokenizer.Size() != 1)
@@ -71,12 +71,12 @@ namespace services
                 else
                     tracer.Trace() << "Estimated Resistance: " << resistance->Value() << " Ohms, Inductance: " << inductance->Value() << " mH";
             });
-        return TerminalMotorIdentification::StatusWithMessage();
+        return TerminalElectricalParametersIdentification::StatusWithMessage();
     }
 
-    TerminalMotorIdentification::StatusWithMessage TerminalMotorIdentification::EstimateNumberOfPolePairs(const infra::BoundedConstString& param)
+    TerminalElectricalParametersIdentification::StatusWithMessage TerminalElectricalParametersIdentification::EstimateNumberOfPolePairs(const infra::BoundedConstString& param)
     {
-        MotorIdentification::PolePairsConfig config;
+        ElectricalParametersIdentification::PolePairsConfig config;
 
         identification.EstimateNumberOfPolePairs(config, [this](auto polePairs)
             {
@@ -86,6 +86,6 @@ namespace services
                     tracer.Trace() << "Estimated Pole Pairs: " << *polePairs;
             });
 
-        return TerminalMotorIdentification::StatusWithMessage();
+        return TerminalElectricalParametersIdentification::StatusWithMessage();
     }
 }

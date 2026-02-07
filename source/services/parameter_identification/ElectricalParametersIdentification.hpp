@@ -15,7 +15,7 @@ namespace services
         Delta
     };
 
-    class MotorIdentification
+    class ElectricalParametersIdentification
     {
     public:
         struct ResistanceAndInductanceConfig

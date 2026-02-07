@@ -17,7 +17,6 @@ namespace services
 
     private:
         StatusWithMessage SetFocPid(const infra::BoundedConstString& param);
-        StatusWithMessage SetResistanceAndInductance(const infra::BoundedConstString& param);
         StatusWithMessage Start();
         StatusWithMessage Stop();
 

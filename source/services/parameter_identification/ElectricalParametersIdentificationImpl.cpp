@@ -1,4 +1,4 @@
-#include "source/services/parameter_identification/MotorIdentificationImpl.hpp"
+#include "source/services/parameter_identification/ElectricalParametersIdentificationImpl.hpp"
 #include "source/foc/interfaces/Driver.hpp"
 #include "source/foc/interfaces/Units.hpp"
 #include <cmath>
@@ -78,14 +78,14 @@ namespace
 
 namespace services
 {
-    MotorIdentificationImpl::MotorIdentificationImpl(foc::MotorDriver& driver, foc::Encoder& encoder, foc::Volts vdc)
+    ElectricalParametersIdentificationImpl::ElectricalParametersIdentificationImpl(foc::MotorDriver& driver, foc::Encoder& encoder, foc::Volts vdc)
         : driver(driver)
         , encoder(encoder)
         , vdc(vdc)
     {
     }
 
-    void MotorIdentificationImpl::EstimateResistanceAndInductance(const ResistanceAndInductanceConfig& config, const infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)>& onDone)
+    void ElectricalParametersIdentificationImpl::EstimateResistanceAndInductance(const ResistanceAndInductanceConfig& config, const infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)>& onDone)
     {
         resistanceAndInductanceConfig = config;
         onResistanceAndInductanceDone = onDone;
@@ -118,7 +118,7 @@ namespace services
             });
     }
 
-    void MotorIdentificationImpl::AnalyzeInductanceMeasures()
+    void ElectricalParametersIdentificationImpl::AnalyzeInductanceMeasures()
     {
         driver.Stop();
 
@@ -140,7 +140,7 @@ namespace services
         }
     }
 
-    void MotorIdentificationImpl::EstimateNumberOfPolePairs(const PolePairsConfig& config, const infra::Function<void(std::optional<std::size_t>)>& onDone)
+    void ElectricalParametersIdentificationImpl::EstimateNumberOfPolePairs(const PolePairsConfig& config, const infra::Function<void(std::optional<std::size_t>)>& onDone)
     {
         polePairsConfig = config;
         onPolePairsDone = onDone;
@@ -154,7 +154,7 @@ namespace services
         ApplyNextElectricalAngle();
     }
 
-    void MotorIdentificationImpl::ApplyNextElectricalAngle()
+    void ElectricalParametersIdentificationImpl::ApplyNextElectricalAngle()
     {
         const std::size_t totalSteps = polePairsConfig.electricalRevolutions * stepsPerRevolution;
 
@@ -164,7 +164,7 @@ namespace services
             CalculatePolePairs();
     }
 
-    void MotorIdentificationImpl::RunPolePairLogic()
+    void ElectricalParametersIdentificationImpl::RunPolePairLogic()
     {
         auto electricalAngle = static_cast<float>(currentSampleIndex) * anglePerStep;
         auto voltage = static_cast<float>(polePairsConfig.testVoltagePercent.Value()) / 100.0f;
@@ -186,7 +186,7 @@ namespace services
             });
     }
 
-    void MotorIdentificationImpl::CalculatePolePairs()
+    void ElectricalParametersIdentificationImpl::CalculatePolePairs()
     {
         driver.Stop();
 

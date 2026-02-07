@@ -14,5 +14,6 @@ target_sources(e_foc.foc_test PRIVATE
     TestSpaceVectorModulation.cpp
     TestSpeedController.cpp
     TestTorqueController.cpp
+    TestWithAutomaticCurrentPidGains.cpp
     TestTransformsClarkePark.cpp
 )
