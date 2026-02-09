@@ -4,8 +4,8 @@
 #include "infra/util/AutoResetFunction.hpp"
 #include "numerical/estimators/RecursiveLeastSquares.hpp"
 #include "source/foc/implementations/TransformsClarkePark.hpp"
-#include "source/foc/interfaces/Controller.hpp"
 #include "source/foc/interfaces/Driver.hpp"
+#include "source/foc/interfaces/Foc.hpp"
 #include "source/services/parameter_identification/MechanicalParametersIdentification.hpp"
 
 namespace services
@@ -14,14 +14,14 @@ namespace services
         : public MechanicalParametersIdentification
     {
     public:
-        MechanicalParametersIdentificationImpl(foc::SpeedController& controller, foc::MotorDriver& driver, foc::Encoder& encoder);
+        MechanicalParametersIdentificationImpl(foc::FocSpeed& controller, foc::MotorDriver& driver, foc::Encoder& encoder);
 
         void EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone) override;
 
     private:
         void OnSamplingUpdate(foc::PhaseCurrents currentPhases, const foc::NewtonMeter& torqueConstant);
 
-        foc::SpeedController& controller;
+        foc::FocSpeed& controller;
         foc::MotorDriver& driver;
         foc::Encoder& encoder;
 

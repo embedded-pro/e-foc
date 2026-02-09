@@ -35,7 +35,7 @@ The outputs of these controllers are voltage commands ($v_d, v_q$).
 
 ## Implementation Details
 
-The core FOC loop is implemented in `source/foc/instantiations/FieldOrientedControllerImpl.cpp` within the `FieldOrientedControllerTorqueImpl` class.
+The core FOC loop is implemented in `source/foc/instantiations/FieldOrientedControllerImpl.cpp` within the `FocTorqueImpl` class.
 
 #### Control Diagram
 

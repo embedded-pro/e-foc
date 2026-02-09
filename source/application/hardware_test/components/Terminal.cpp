@@ -2,7 +2,6 @@
 #include "foc/interfaces/Driver.hpp"
 #include "infra/stream/StringInputStream.hpp"
 #include "infra/util/BoundedString.hpp"
-#include "infra/util/ReallyAssert.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
 #include <algorithm>
@@ -75,7 +74,7 @@ namespace application
         , performanceTimer{ hardware.PerformanceTimer() }
         , Vdc{ hardware.PowerSupplyVoltage() }
         , systemClock{ hardware.SystemClock() }
-        , foc{ trigFunctions, hardware.MaxCurrentSupported(), std::chrono::microseconds(static_cast<std::size_t>(1e6f / 1000.0f)) }
+        , foc{ hardware.MaxCurrentSupported(), std::chrono::microseconds(static_cast<std::size_t>(1e6f / 1000.0f)) }
     {
         terminal.AddCommand({ { "enc", "e", "Read encoder. stop. Ex: enc" },
             [this](const auto&)

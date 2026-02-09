@@ -4,9 +4,9 @@
 #include "infra/util/Tokenizer.hpp"
 #include "services/alignment/TerminalMotorAlignment.hpp"
 #include "services/parameter_identification/TerminalElectricalParametersIdentification.hpp"
-#include "source/foc/implementations/ControllerBaseImpl.hpp"
+#include "source/foc/implementations/Runner.hpp"
 #include "source/foc/implementations/WithAutomaticCurrentPidGains.hpp"
-#include "source/foc/interfaces/FieldOrientedController.hpp"
+#include "source/foc/interfaces/Foc.hpp"
 #include "source/services/alignment/MotorAlignmentImpl.hpp"
 #include "source/services/cli/TerminalBase.hpp"
 #include "source/services/cli/TerminalHelper.hpp"
@@ -29,14 +29,12 @@ namespace application
         foc::Encoder& encoder;
     };
 
-    template<typename FocImpl, typename ControllerImpl, typename TerminalImpl>
+    template<typename FocImpl, typename TerminalImpl>
     constexpr bool IsValidMotorStateMachineTypes_v =
-        std::is_base_of_v<foc::FieldOrientedControllerBase, FocImpl> &&
-        std::is_base_of_v<foc::ControllerBaseImpl, ControllerImpl> &&
-        std::is_base_of_v<services::TerminalFocBaseInteractor, TerminalImpl> &&
-        foc::IsWithAutomaticCurrentPidGains_v<ControllerImpl>;
+        std::is_base_of_v<foc::FocBase, FocImpl> &&
+        std::is_base_of_v<services::TerminalFocBaseInteractor, TerminalImpl>;
 
-    template<typename FocImpl, typename ControllerImpl, typename TerminalImpl, typename = std::enable_if_t<IsValidMotorStateMachineTypes_v<FocImpl, ControllerImpl, TerminalImpl>>>
+    template<typename FocImpl, typename TerminalImpl, typename = std::enable_if_t<IsValidMotorStateMachineTypes_v<FocImpl, TerminalImpl>>>
     class MotorStateMachine
     {
     public:
@@ -52,23 +50,24 @@ namespace application
         foc::MotorDriver& driver;
         foc::Encoder& encoder;
         foc::Volts vdc;
-        foc::TrigonometricFunctions trigonometricFunctions;
         FocImpl focImpl;
-        std::variant<std::monostate, services::MotorAlignmentImpl, services::ElectricalParametersIdentificationImpl, ControllerImpl> motorStates;
+        foc::WithAutomaticCurrentPidGains focController{ focImpl };
+        foc::Runner focRunner{ driver, encoder, focImpl };
+        std::variant<std::monostate, services::MotorAlignmentImpl, services::ElectricalParametersIdentificationImpl> motorStates;
         std::variant<std::monostate, services::TerminalMotorAlignment, services::TerminalElectricalParametersIdentification, TerminalImpl> terminalStates;
     };
 
     // Implementation
 
-    template<typename FocImpl, typename ControllerImpl, typename TerminalImpl, typename Enable>
+    template<typename FocImpl, typename TerminalImpl, typename Enable>
     template<typename... FocArgs>
-    MotorStateMachine<FocImpl, ControllerImpl, TerminalImpl, Enable>::MotorStateMachine(const TerminalAndTracer& terminalAndTracer, const MotorDriverAndEncoder& motorDriverAndEncoder, foc::Volts vdc, FocArgs&&... focArgs)
+    MotorStateMachine<FocImpl, TerminalImpl, Enable>::MotorStateMachine(const TerminalAndTracer& terminalAndTracer, const MotorDriverAndEncoder& motorDriverAndEncoder, foc::Volts vdc, FocArgs&&... focArgs)
         : terminal(terminalAndTracer.terminal)
         , tracer(terminalAndTracer.tracer)
         , driver(motorDriverAndEncoder.driver)
         , encoder(motorDriverAndEncoder.encoder)
         , vdc(vdc)
-        , focImpl{ trigonometricFunctions, std::forward<FocArgs>(focArgs)... }
+        , focImpl{ std::forward<FocArgs>(focArgs)... }
     {
         terminal.AddCommand({ { "ident_par", "ip", "Identify Parameters, which are resistance, inductance and number of pole pairs." },
             [this](const auto&)
@@ -95,16 +94,14 @@ namespace application
                 if (!args.has_value())
                     return;
 
-                this->focImpl.Reset();
-                motorStates.template emplace<ControllerImpl>(this->driver, this->encoder, this->focImpl);
-                auto& focController = std::get<ControllerImpl>(this->motorStates);
-                focController.SetPidBasedOnResistanceAndInductance(this->vdc, std::get<0>(*args), std::get<1>(*args), nyquistFactor);
-                terminalStates.template emplace<TerminalImpl>(this->terminal, this->vdc, focController, focController);
+                focController.SetPidBasedOnResistanceAndInductance(this->vdc, std::get<0>(*args), std::get<1>(*args), driver.BaseFrequency(), nyquistFactor);
+                terminalStates.template emplace<TerminalImpl>(this->terminal, this->vdc, this->focImpl);
+                this->focRunner.Enable();
             } });
     }
 
-    template<typename FocImpl, typename ControllerImpl, typename TerminalImpl, typename Enable>
-    std::optional<std::pair<foc::Ohm, foc::MilliHenry>> MotorStateMachine<FocImpl, ControllerImpl, TerminalImpl, Enable>::ParseArgs(const infra::Tokenizer& tokenizer)
+    template<typename FocImpl, typename TerminalImpl, typename Enable>
+    std::optional<std::pair<foc::Ohm, foc::MilliHenry>> MotorStateMachine<FocImpl, TerminalImpl, Enable>::ParseArgs(const infra::Tokenizer& tokenizer)
     {
         if (tokenizer.Size() != 2)
         {
