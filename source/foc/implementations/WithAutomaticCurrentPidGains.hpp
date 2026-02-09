@@ -12,9 +12,9 @@ namespace foc
             : foc{ foc }
         {}
 
-        void SetPidBasedOnResistanceAndInductance(Volts Vdc, Ohm resistance, MilliHenry inductance, float nyquistFactor)
+        void SetPidBasedOnResistanceAndInductance(Volts Vdc, Ohm resistance, MilliHenry inductance, hal::Hertz baseFrequency, float nyquistFactor)
         {
-            auto wc = CurrentLoopBandwidth(foc.BaseFrequency(), nyquistFactor);
+            auto wc = CurrentLoopBandwidth(baseFrequency, nyquistFactor);
             auto kp = inductance.Value() * 0.001f * wc;
             auto ki = resistance.Value() * wc;
 

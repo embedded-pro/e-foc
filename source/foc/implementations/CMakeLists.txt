@@ -11,6 +11,8 @@ target_link_libraries(e_foc.foc.implementations PUBLIC
 
 target_sources(e_foc.foc.implementations PRIVATE
     NormalizedAngles.hpp
+    Runner.cpp
+    Runner.hpp
     SpaceVectorModulation.cpp
     SpaceVectorModulation.hpp
     WithAutomaticCurrentPidGains.cpp

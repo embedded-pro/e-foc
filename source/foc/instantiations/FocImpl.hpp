@@ -21,7 +21,6 @@ namespace foc
         void Enable() override;
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
-        hal::Hertz BaseFrequency() const override;
 
     private:
         math::TrigonometricFunctions<float>& trigFunctions;
@@ -46,7 +45,6 @@ namespace foc
         void Enable() override;
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
-        hal::Hertz BaseFrequency() const override;
 
     private:
         float CalculateFilteredSpeed(float currentPosition);

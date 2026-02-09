@@ -1,7 +1,5 @@
 #include "source/foc/implementations/WithAutomaticCurrentPidGains.hpp"
-#include "source/foc/implementations/test_doubles/DriversMock.hpp"
 #include "source/foc/implementations/test_doubles/FocMock.hpp"
-#include "source/foc/interfaces/Foc.hpp"
 #include "gmock/gmock.h"
 #include <numbers>
 
@@ -24,21 +22,8 @@ namespace
         : public ::testing::Test
     {
     public:
-        TestWithAutomaticPidGains()
-        {
-            EXPECT_CALL(interfaceMock, PhaseCurrentsReady(::testing::_, ::testing::_))
-                .WillOnce([this](auto, const auto& onDone)
-                    {
-                        interfaceMock.StorePhaseCurrentsCallback(onDone);
-                    });
-
-            foc.emplace(interfaceMock, encoderMock, focMock);
-        }
-
-        ::testing::StrictMock<foc::FieldOrientedControllerInterfaceMock> interfaceMock;
-        ::testing::StrictMock<foc::EncoderMock> encoderMock;
         ::testing::StrictMock<foc::FocTorqueMock> focMock;
-        std::optional<foc::WithAutomaticCurrentPidGains<foc::TorqueControllerImpl>> foc;
+        foc::WithAutomaticCurrentPidGains autoGains{ focMock };
     };
 }
 
@@ -53,11 +38,8 @@ TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_from_resistance_and_induc
     float expectedKp = 0.001f * expectedWc;
     float expectedKi = 0.5f * expectedWc;
 
-    EXPECT_CALL(interfaceMock, BaseFrequency())
-        .WillOnce(::testing::Return(hal::Hertz{ 10000 }));
     EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(Vdc), IdAndIqTuningsNear(expectedKp, expectedKi)));
-
-    foc->SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, nyquistFactor);
+    autoGains.SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, hal::Hertz{ 10000 }, nyquistFactor);
 }
 
 TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_different_nyquist_factor)
@@ -71,11 +53,8 @@ TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_different_nyquist_fa
     float expectedKp = 0.002f * expectedWc;
     float expectedKi = 1.0f * expectedWc;
 
-    EXPECT_CALL(interfaceMock, BaseFrequency())
-        .WillOnce(::testing::Return(hal::Hertz{ 10000 }));
     EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(Vdc), IdAndIqTuningsNear(expectedKp, expectedKi)));
-
-    foc->SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, nyquistFactor);
+    autoGains.SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, hal::Hertz{ 10000 }, nyquistFactor);
 }
 
 TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_different_base_frequency)
@@ -90,11 +69,8 @@ TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_different_base_frequ
     float expectedKp = 0.001f * expectedWc;
     float expectedKi = 0.5f * expectedWc;
 
-    EXPECT_CALL(interfaceMock, BaseFrequency())
-        .WillOnce(::testing::Return(hal::Hertz{ 20000 }));
     EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(Vdc), IdAndIqTuningsNear(expectedKp, expectedKi)));
-
-    foc->SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, nyquistFactor);
+    autoGains.SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, hal::Hertz{ 20000 }, nyquistFactor);
 }
 
 TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_small_inductance)
@@ -108,11 +84,8 @@ TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_small_inductance)
     float expectedKp = 0.0001f * expectedWc;
     float expectedKi = 2.0f * expectedWc;
 
-    EXPECT_CALL(interfaceMock, BaseFrequency())
-        .WillOnce(::testing::Return(hal::Hertz{ 10000 }));
     EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(Vdc), IdAndIqTuningsNear(expectedKp, expectedKi)));
-
-    foc->SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, nyquistFactor);
+    autoGains.SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, hal::Hertz{ 10000 }, nyquistFactor);
 }
 
 TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_high_resistance)
@@ -126,46 +99,6 @@ TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_high_resistance)
     float expectedKp = 0.003f * expectedWc;
     float expectedKi = 5.0f * expectedWc;
 
-    EXPECT_CALL(interfaceMock, BaseFrequency())
-        .WillOnce(::testing::Return(hal::Hertz{ 10000 }));
     EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(Vdc), IdAndIqTuningsNear(expectedKp, expectedKi)));
-
-    foc->SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, nyquistFactor);
-}
-
-TEST_F(TestWithAutomaticPidGains, inherits_basic_torque_controller_functionality)
-{
-    EXPECT_CALL(focMock, Reset());
-    EXPECT_CALL(interfaceMock, Start());
-    foc->Enable();
-
-    EXPECT_TRUE(foc->IsRunning());
-
-    EXPECT_CALL(interfaceMock, Stop());
-    foc->Disable();
-
-    EXPECT_FALSE(foc->IsRunning());
-}
-
-TEST_F(TestWithAutomaticPidGains, can_set_manual_tunings_after_automatic_calculation)
-{
-    foc::Volts Vdc{ 12.0f };
-    foc::Ohm resistance{ 0.5f };
-    foc::MilliHenry inductance{ 1.0f };
-    float nyquistFactor = 15.0f;
-
-    float expectedWc = (10000.0f / 15.0f) * 2.0f * std::numbers::pi_v<float>;
-    float expectedKp = 0.001f * expectedWc;
-    float expectedKi = 0.5f * expectedWc;
-
-    EXPECT_CALL(interfaceMock, BaseFrequency())
-        .WillOnce(::testing::Return(hal::Hertz{ 10000 }));
-    EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(Vdc), IdAndIqTuningsNear(expectedKp, expectedKi)));
-    foc->SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, nyquistFactor);
-
-    controllers::PidTunings<float> customDTunings{ 10.0f, 20.0f, 0.5f };
-    controllers::PidTunings<float> customQTunings{ 15.0f, 25.0f, 1.0f };
-
-    EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(Vdc), ::testing::_));
-    foc->SetCurrentTunings(Vdc, { customDTunings, customQTunings });
+    autoGains.SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, hal::Hertz{ 10000 }, nyquistFactor);
 }

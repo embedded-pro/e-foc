@@ -23,7 +23,6 @@ namespace application
         services::TerminalWithBanner::WithMaxSize<10> terminalWithStorage;
         MotorStateMachine<
             foc::FocTorqueImpl,
-            foc::WithAutomaticCurrentPidGains<foc::TorqueControllerImpl>,
             services::TerminalFocTorqueInteractor>
             motorStateMachine;
     };
