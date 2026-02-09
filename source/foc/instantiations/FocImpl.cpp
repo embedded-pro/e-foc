@@ -28,10 +28,6 @@ namespace
 
 namespace foc
 {
-    FocTorqueImpl::FocTorqueImpl(math::TrigonometricFunctions<float>& trigFunctions)
-        : trigFunctions{ trigFunctions }
-    {}
-
     OPTIMIZE_FOR_SPEED
     void FocTorqueImpl::Enable()
     {
@@ -96,9 +92,8 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    FocSpeedImpl::FocSpeedImpl(math::TrigonometricFunctions<float>& trigFunctions, foc::Ampere maxCurrent, std::chrono::system_clock::duration timeStep)
-        : trigFunctions{ trigFunctions }
-        , speedPid{ { 0.0f, 0.0f, 0.0f }, { -maxCurrent.Value(), maxCurrent.Value() } }
+    FocSpeedImpl::FocSpeedImpl(foc::Ampere maxCurrent, std::chrono::system_clock::duration timeStep)
+        : speedPid{ { 0.0f, 0.0f, 0.0f }, { -maxCurrent.Value(), maxCurrent.Value() } }
         , dt{ std::chrono::duration_cast<std::chrono::duration<float>>(timeStep).count() }
     {
         really_assert(maxCurrent.Value() > 0);

@@ -2,7 +2,6 @@
 #include "simulator/pmsm/Jk42bls01X038ed.hpp"
 #include "simulator/pmsm/Model.hpp"
 #include "source/foc/instantiations/FocImpl.hpp"
-#include "source/foc/instantiations/TrigonometricImpl.hpp"
 #include "source/foc/interfaces/Driver.hpp"
 #include "source/foc/interfaces/Foc.hpp"
 #include <chrono>
@@ -129,8 +128,7 @@ namespace
         std::vector<float> theta_data;
         std::vector<float> speed_data;
 
-        foc::TrigonometricFunctions trigFunctions;
-        foc::FocTorqueImpl foc{ trigFunctions };
+        foc::FocTorqueImpl foc;
         foc::PhasePwmDutyCycles dutyCycles{ hal::Percent(0), hal::Percent(0), hal::Percent(0) };
     };
 }

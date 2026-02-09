@@ -13,8 +13,6 @@ namespace foc
         : public FocTorque
     {
     public:
-        explicit FocTorqueImpl(math::TrigonometricFunctions<float>& trigFunctions);
-
         void SetPolePairs(std::size_t polePairs) override;
         void SetPoint(IdAndIqPoint setPoint) override;
         void SetCurrentTunings(Volts Vdc, const IdAndIqTunings& tunings) override;
@@ -23,7 +21,6 @@ namespace foc
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
 
     private:
-        math::TrigonometricFunctions<float>& trigFunctions;
         [[no_unique_address]] Park park;
         [[no_unique_address]] Clarke clarke;
         controllers::PidIncrementalSynchronous<float> dPid{ { 0.0f, 0.0f, 0.0f }, { -1.0f, 1.0f } };
@@ -36,7 +33,7 @@ namespace foc
         : public FocSpeed
     {
     public:
-        explicit FocSpeedImpl(math::TrigonometricFunctions<float>& trigFunctions, foc::Ampere maxCurrent, std::chrono::system_clock::duration timeStep);
+        explicit FocSpeedImpl(foc::Ampere maxCurrent, std::chrono::system_clock::duration timeStep);
 
         void SetPolePairs(std::size_t polePairs) override;
         void SetPoint(RadiansPerSecond point) override;
@@ -50,7 +47,6 @@ namespace foc
         float CalculateFilteredSpeed(float currentPosition);
 
     private:
-        math::TrigonometricFunctions<float>& trigFunctions;
         [[no_unique_address]] Park park;
         [[no_unique_address]] Clarke clarke;
         controllers::PidIncrementalSynchronous<float> speedPid;

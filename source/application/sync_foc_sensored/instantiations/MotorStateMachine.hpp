@@ -50,7 +50,6 @@ namespace application
         foc::MotorDriver& driver;
         foc::Encoder& encoder;
         foc::Volts vdc;
-        foc::TrigonometricFunctions trigonometricFunctions;
         FocImpl focImpl;
         foc::WithAutomaticCurrentPidGains focController{ focImpl };
         foc::Runner focRunner{ driver, encoder, focImpl };
@@ -68,7 +67,7 @@ namespace application
         , driver(motorDriverAndEncoder.driver)
         , encoder(motorDriverAndEncoder.encoder)
         , vdc(vdc)
-        , focImpl{ trigonometricFunctions, std::forward<FocArgs>(focArgs)... }
+        , focImpl{ std::forward<FocArgs>(focArgs)... }
     {
         terminal.AddCommand({ { "ident_par", "ip", "Identify Parameters, which are resistance, inductance and number of pole pairs." },
             [this](const auto&)
@@ -95,9 +94,9 @@ namespace application
                 if (!args.has_value())
                     return;
 
-                this->focImpl.Enable();
                 focController.SetPidBasedOnResistanceAndInductance(this->vdc, std::get<0>(*args), std::get<1>(*args), driver.BaseFrequency(), nyquistFactor);
                 terminalStates.template emplace<TerminalImpl>(this->terminal, this->vdc, this->focImpl);
+                this->focRunner.Enable();
             } });
     }
 

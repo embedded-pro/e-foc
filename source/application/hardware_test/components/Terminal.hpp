@@ -6,7 +6,6 @@
 #include "services/tracer/Tracer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
 #include "source/foc/instantiations/FocImpl.hpp"
-#include "source/foc/instantiations/TrigonometricImpl.hpp"
 #include "source/foc/interfaces/Driver.hpp"
 #include "source/hardware/HardwareFactory.hpp"
 
@@ -53,7 +52,6 @@ namespace application
         controllers::PidTunings<float> speedPidTunings;
         controllers::PidTunings<float> dqPidTunings;
         std::optional<std::size_t> polePairs = 0;
-        foc::TrigonometricFunctions trigFunctions;
         foc::FocSpeedImpl foc;
     };
 }
