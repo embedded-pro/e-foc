@@ -4,9 +4,8 @@
 #include "infra/util/Tokenizer.hpp"
 #include "services/alignment/TerminalMotorAlignment.hpp"
 #include "services/parameter_identification/TerminalElectricalParametersIdentification.hpp"
-#include "source/foc/implementations/ControllerBaseImpl.hpp"
 #include "source/foc/implementations/WithAutomaticCurrentPidGains.hpp"
-#include "source/foc/interfaces/FieldOrientedController.hpp"
+#include "source/foc/interfaces/Foc.hpp"
 #include "source/services/alignment/MotorAlignmentImpl.hpp"
 #include "source/services/cli/TerminalBase.hpp"
 #include "source/services/cli/TerminalHelper.hpp"
@@ -31,10 +30,8 @@ namespace application
 
     template<typename FocImpl, typename ControllerImpl, typename TerminalImpl>
     constexpr bool IsValidMotorStateMachineTypes_v =
-        std::is_base_of_v<foc::FieldOrientedControllerBase, FocImpl> &&
-        std::is_base_of_v<foc::ControllerBaseImpl, ControllerImpl> &&
-        std::is_base_of_v<services::TerminalFocBaseInteractor, TerminalImpl> &&
-        foc::IsWithAutomaticCurrentPidGains_v<ControllerImpl>;
+        std::is_base_of_v<foc::FocBase, FocImpl> &&
+        std::is_base_of_v<services::TerminalFocBaseInteractor, TerminalImpl>;
 
     template<typename FocImpl, typename ControllerImpl, typename TerminalImpl, typename = std::enable_if_t<IsValidMotorStateMachineTypes_v<FocImpl, ControllerImpl, TerminalImpl>>>
     class MotorStateMachine

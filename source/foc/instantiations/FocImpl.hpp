@@ -5,21 +5,23 @@
 #include "source/foc/implementations/SpaceVectorModulation.hpp"
 #include "source/foc/implementations/TransformsClarkePark.hpp"
 #include "source/foc/interfaces/Driver.hpp"
-#include "source/foc/interfaces/FieldOrientedController.hpp"
+#include "source/foc/interfaces/Foc.hpp"
 
 namespace foc
 {
-    class FieldOrientedControllerTorqueImpl
-        : public FieldOrientedControllerTorqueControl
+    class FocTorqueImpl
+        : public FocTorque
     {
     public:
-        explicit FieldOrientedControllerTorqueImpl(math::TrigonometricFunctions<float>& trigFunctions);
+        explicit FocTorqueImpl(math::TrigonometricFunctions<float>& trigFunctions);
 
         void SetPolePairs(std::size_t polePairs) override;
         void SetPoint(IdAndIqPoint setPoint) override;
         void SetCurrentTunings(Volts Vdc, const IdAndIqTunings& tunings) override;
-        void Reset() override;
+        void Enable() override;
+        void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
+        hal::Hertz BaseFrequency() const override;
 
     private:
         math::TrigonometricFunctions<float>& trigFunctions;
@@ -31,18 +33,20 @@ namespace foc
         float polePairs;
     };
 
-    class FieldOrientedControllerSpeedImpl
-        : public FieldOrientedControllerSpeedControl
+    class FocSpeedImpl
+        : public FocSpeed
     {
     public:
-        explicit FieldOrientedControllerSpeedImpl(math::TrigonometricFunctions<float>& trigFunctions, foc::Ampere maxCurrent, std::chrono::system_clock::duration timeStep);
+        explicit FocSpeedImpl(math::TrigonometricFunctions<float>& trigFunctions, foc::Ampere maxCurrent, std::chrono::system_clock::duration timeStep);
 
         void SetPolePairs(std::size_t polePairs) override;
         void SetPoint(RadiansPerSecond point) override;
         void SetCurrentTunings(Volts Vdc, const IdAndIqTunings& torqueTunings) override;
         void SetSpeedTunings(Volts Vdc, const SpeedTunings& speedTuning) override;
-        void Reset() override;
+        void Enable() override;
+        void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
+        hal::Hertz BaseFrequency() const override;
 
     private:
         float CalculateFilteredSpeed(float currentPosition);

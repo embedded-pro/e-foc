@@ -9,7 +9,7 @@ namespace services
         : public TerminalFocBaseInteractor
     {
     public:
-        TerminalFocSpeedInteractor(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::ControllerBase& foc, foc::SpeedController& speed);
+        TerminalFocSpeedInteractor(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::FocSpeed& foc);
 
     private:
         StatusWithMessage SetSpeedPid(const infra::BoundedConstString& param);
@@ -17,6 +17,6 @@ namespace services
 
     private:
         foc::Volts vdc;
-        foc::SpeedController& foc;
+        foc::FocSpeed& foc;
     };
 }

@@ -12,8 +12,7 @@ target_link_libraries(e_foc.foc.interfaces INTERFACE
 )
 
 target_sources(e_foc.foc.interfaces PRIVATE
-    Controller.hpp
     Driver.hpp
-    FieldOrientedController.hpp
+    Foc.hpp
     Units.hpp
 )

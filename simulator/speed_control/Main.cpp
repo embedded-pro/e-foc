@@ -1,8 +1,8 @@
-#include "foc/interfaces/FieldOrientedController.hpp"
+#include "foc/interfaces/Foc.hpp"
 #include "simulator/plot/Plot.hpp"
 #include "simulator/pmsm/Jk42bls01X038ed.hpp"
 #include "simulator/pmsm/Model.hpp"
-#include "source/foc/instantiations/FieldOrientedControllerImpl.hpp"
+#include "source/foc/instantiations/FocImpl.hpp"
 #include "source/foc/instantiations/TrigonometricImpl.hpp"
 #include "source/foc/interfaces/Driver.hpp"
 #include <chrono>
@@ -140,7 +140,7 @@ namespace
         std::vector<float> speed_data;
 
         foc::TrigonometricFunctions trigFunctions;
-        foc::FieldOrientedControllerSpeedImpl foc{ trigFunctions, foc::Ampere{ 15.0f }, timeStep };
+        foc::FocSpeedImpl foc{ trigFunctions, foc::Ampere{ 15.0f }, timeStep };
         foc::PhasePwmDutyCycles dutyCycles{ hal::Percent(0), hal::Percent(0), hal::Percent(0) };
     };
 }

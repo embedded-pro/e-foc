@@ -1,8 +1,7 @@
-#include "source/foc/implementations/TorqueControllerImpl.hpp"
 #include "source/foc/implementations/WithAutomaticCurrentPidGains.hpp"
 #include "source/foc/implementations/test_doubles/DriversMock.hpp"
-#include "source/foc/implementations/test_doubles/FieldOrientedControllerMock.hpp"
-#include "source/foc/interfaces/FieldOrientedController.hpp"
+#include "source/foc/implementations/test_doubles/FocMock.hpp"
+#include "source/foc/interfaces/Foc.hpp"
 #include "gmock/gmock.h"
 #include <numbers>
 
@@ -38,7 +37,7 @@ namespace
 
         ::testing::StrictMock<foc::FieldOrientedControllerInterfaceMock> interfaceMock;
         ::testing::StrictMock<foc::EncoderMock> encoderMock;
-        ::testing::StrictMock<foc::FieldOrientedControllerMock> focMock;
+        ::testing::StrictMock<foc::FocTorqueMock> focMock;
         std::optional<foc::WithAutomaticCurrentPidGains<foc::TorqueControllerImpl>> foc;
     };
 }

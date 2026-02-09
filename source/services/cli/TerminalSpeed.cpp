@@ -4,10 +4,10 @@
 
 namespace services
 {
-    TerminalFocSpeedInteractor::TerminalFocSpeedInteractor(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::ControllerBase& foc, foc::SpeedController& speed)
+    TerminalFocSpeedInteractor::TerminalFocSpeedInteractor(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::FocSpeed& foc)
         : TerminalFocBaseInteractor(terminal, vdc, foc)
         , vdc(vdc)
-        , foc(speed)
+        , foc(foc)
     {
         terminal.AddCommand({ { "set_speed_pid", "sspid", "Set speed PID parameters. set_speed_pid <kp> <ki> <kd>. Ex: sspid 1.0 0.2 0.01" },
             [this](const auto& params)

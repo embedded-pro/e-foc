@@ -2,14 +2,15 @@
 #include "infra/util/Function.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
+#include "source/foc/interfaces/Foc.hpp"
 #include "source/foc/interfaces/Units.hpp"
 #include "source/services/cli/TerminalHelper.hpp"
 
 namespace services
 {
-    TerminalFocTorqueInteractor::TerminalFocTorqueInteractor(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::ControllerBase& foc, foc::TorqueController& torque)
+    TerminalFocTorqueInteractor::TerminalFocTorqueInteractor(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::FocTorque& foc)
         : TerminalFocBaseInteractor(terminal, vdc, foc)
-        , foc(torque)
+        , foc(foc)
     {
         terminal.AddCommand({ { "set_torque", "st", "Set torque. set_torque <torque>. Ex: st 20.0" },
             [this](const auto& params)
