@@ -11,6 +11,7 @@ target_link_libraries(e_foc.foc_test PUBLIC
 )
 
 target_sources(e_foc.foc_test PRIVATE
+    TestRunner.cpp
     TestSpaceVectorModulation.cpp
     TestWithAutomaticCurrentPidGains.cpp
     TestTransformsClarkePark.cpp

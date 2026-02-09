@@ -7,98 +7,98 @@ namespace
 {
     using namespace testing;
 
-    MATCHER_P2(IdAndIqTuningsNear, expectedKp, expectedKi, "")
+    struct AutoPidGainsParams
     {
-        constexpr float tolerance = 1e-4f;
-        return std::abs(arg.first.kp - expectedKp) < tolerance &&
-               std::abs(arg.first.ki - expectedKi) < tolerance &&
-               std::abs(arg.first.kd - 0.0f) < tolerance &&
-               std::abs(arg.second.kp - expectedKp) < tolerance &&
-               std::abs(arg.second.ki - expectedKi) < tolerance &&
-               std::abs(arg.second.kd - 0.0f) < tolerance;
+        foc::Volts vdc;
+        foc::Ohm resistance;
+        foc::MilliHenry inductance;
+        hal::Hertz baseFrequency;
+        float nyquistFactor;
+    };
+
+    AutoPidGainsParams MakeParams(float vdc, float resistance, float inductance, unsigned int baseFrequency, float nyquistFactor)
+    {
+        return { foc::Volts{ vdc }, foc::Ohm{ resistance }, foc::MilliHenry{ inductance }, hal::Hertz{ baseFrequency }, nyquistFactor };
     }
 
     class TestWithAutomaticPidGains
-        : public ::testing::Test
+        : public ::testing::TestWithParam<AutoPidGainsParams>
     {
     public:
         ::testing::StrictMock<foc::FocTorqueMock> focMock;
         foc::WithAutomaticCurrentPidGains autoGains{ focMock };
     };
+
+    // clang-format off
+    INSTANTIATE_TEST_SUITE_P(CurrentPidGains, TestWithAutomaticPidGains, ::testing::Values(
+        MakeParams(12.0f, 0.5f, 1.0f, 10000, 15.0f),
+        MakeParams(24.0f, 1.0f, 2.0f, 10000, 10.0f),
+        MakeParams(12.0f, 0.5f, 1.0f, 20000, 15.0f),
+        MakeParams(12.0f, 2.0f, 0.1f, 10000, 15.0f),
+        MakeParams(48.0f, 5.0f, 3.0f, 10000, 12.0f)
+    ));
+    // clang-format on
 }
 
-TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_from_resistance_and_inductance)
+TEST_P(TestWithAutomaticPidGains, kp_equals_inductance_in_henry_times_bandwidth)
 {
-    foc::Volts Vdc{ 12.0f };
-    foc::Ohm resistance{ 0.5f };
-    foc::MilliHenry inductance{ 1.0f };
-    float nyquistFactor = 15.0f;
+    const auto& p = GetParam();
 
-    float expectedWc = (10000.0f / 15.0f) * 2.0f * std::numbers::pi_v<float>;
-    float expectedKp = 0.001f * expectedWc;
-    float expectedKi = 0.5f * expectedWc;
+    float expectedWc = (static_cast<float>(p.baseFrequency.Value()) / p.nyquistFactor) * 2.0f * std::numbers::pi_v<float>;
+    float expectedKp = p.inductance.Value() * 0.001f * expectedWc;
 
-    EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(Vdc), IdAndIqTuningsNear(expectedKp, expectedKi)));
-    autoGains.SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, hal::Hertz{ 10000 }, nyquistFactor);
+    EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(p.vdc), ::testing::_))
+        .WillOnce([&](auto, const foc::IdAndIqTunings& tunings)
+            {
+                EXPECT_NEAR(tunings.first.kp, expectedKp, 1e-4f);
+                EXPECT_NEAR(tunings.second.kp, expectedKp, 1e-4f);
+            });
+
+    autoGains.SetPidBasedOnResistanceAndInductance(p.vdc, p.resistance, p.inductance, p.baseFrequency, p.nyquistFactor);
 }
 
-TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_different_nyquist_factor)
+TEST_P(TestWithAutomaticPidGains, ki_equals_resistance_times_bandwidth)
 {
-    foc::Volts Vdc{ 24.0f };
-    foc::Ohm resistance{ 1.0f };
-    foc::MilliHenry inductance{ 2.0f };
-    float nyquistFactor = 10.0f;
+    const auto& p = GetParam();
 
-    float expectedWc = (10000.0f / 10.0f) * 2.0f * std::numbers::pi_v<float>;
-    float expectedKp = 0.002f * expectedWc;
-    float expectedKi = 1.0f * expectedWc;
+    float expectedWc = (static_cast<float>(p.baseFrequency.Value()) / p.nyquistFactor) * 2.0f * std::numbers::pi_v<float>;
+    float expectedKi = p.resistance.Value() * expectedWc;
 
-    EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(Vdc), IdAndIqTuningsNear(expectedKp, expectedKi)));
-    autoGains.SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, hal::Hertz{ 10000 }, nyquistFactor);
+    EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(p.vdc), ::testing::_))
+        .WillOnce([&](auto, const foc::IdAndIqTunings& tunings)
+            {
+                EXPECT_NEAR(tunings.first.ki, expectedKi, 1e-4f);
+                EXPECT_NEAR(tunings.second.ki, expectedKi, 1e-4f);
+            });
+
+    autoGains.SetPidBasedOnResistanceAndInductance(p.vdc, p.resistance, p.inductance, p.baseFrequency, p.nyquistFactor);
 }
 
-TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_different_base_frequency)
+TEST_P(TestWithAutomaticPidGains, kd_is_zero)
 {
-    foc::Volts Vdc{ 12.0f };
-    foc::Ohm resistance{ 0.5f };
-    foc::MilliHenry inductance{ 1.0f };
-    float nyquistFactor = 15.0f;
+    const auto& p = GetParam();
 
-    float baseFreq = 20000.0f;
-    float expectedWc = (baseFreq / 15.0f) * 2.0f * std::numbers::pi_v<float>;
-    float expectedKp = 0.001f * expectedWc;
-    float expectedKi = 0.5f * expectedWc;
+    EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(p.vdc), ::testing::_))
+        .WillOnce([](auto, const foc::IdAndIqTunings& tunings)
+            {
+                EXPECT_FLOAT_EQ(tunings.first.kd, 0.0f);
+                EXPECT_FLOAT_EQ(tunings.second.kd, 0.0f);
+            });
 
-    EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(Vdc), IdAndIqTuningsNear(expectedKp, expectedKi)));
-    autoGains.SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, hal::Hertz{ 20000 }, nyquistFactor);
+    autoGains.SetPidBasedOnResistanceAndInductance(p.vdc, p.resistance, p.inductance, p.baseFrequency, p.nyquistFactor);
 }
 
-TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_small_inductance)
+TEST_P(TestWithAutomaticPidGains, id_and_iq_tunings_are_identical)
 {
-    foc::Volts Vdc{ 12.0f };
-    foc::Ohm resistance{ 2.0f };
-    foc::MilliHenry inductance{ 0.1f };
-    float nyquistFactor = 15.0f;
+    const auto& p = GetParam();
 
-    float expectedWc = (10000.0f / 15.0f) * 2.0f * std::numbers::pi_v<float>;
-    float expectedKp = 0.0001f * expectedWc;
-    float expectedKi = 2.0f * expectedWc;
+    EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(p.vdc), ::testing::_))
+        .WillOnce([](auto, const foc::IdAndIqTunings& tunings)
+            {
+                EXPECT_FLOAT_EQ(tunings.first.kp, tunings.second.kp);
+                EXPECT_FLOAT_EQ(tunings.first.ki, tunings.second.ki);
+                EXPECT_FLOAT_EQ(tunings.first.kd, tunings.second.kd);
+            });
 
-    EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(Vdc), IdAndIqTuningsNear(expectedKp, expectedKi)));
-    autoGains.SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, hal::Hertz{ 10000 }, nyquistFactor);
-}
-
-TEST_F(TestWithAutomaticPidGains, calculates_pid_gains_with_high_resistance)
-{
-    foc::Volts Vdc{ 48.0f };
-    foc::Ohm resistance{ 5.0f };
-    foc::MilliHenry inductance{ 3.0f };
-    float nyquistFactor = 12.0f;
-
-    float expectedWc = (10000.0f / 12.0f) * 2.0f * std::numbers::pi_v<float>;
-    float expectedKp = 0.003f * expectedWc;
-    float expectedKi = 5.0f * expectedWc;
-
-    EXPECT_CALL(focMock, SetCurrentTunings(::testing::Eq(Vdc), IdAndIqTuningsNear(expectedKp, expectedKi)));
-    autoGains.SetPidBasedOnResistanceAndInductance(Vdc, resistance, inductance, hal::Hertz{ 10000 }, nyquistFactor);
+    autoGains.SetPidBasedOnResistanceAndInductance(p.vdc, p.resistance, p.inductance, p.baseFrequency, p.nyquistFactor);
 }
