@@ -9,6 +9,10 @@ namespace foc
     {
     public:
         Runner(MotorDriver& driver, Encoder& encoder, FocBase& foc);
+        ~Runner();
+
+        void Enable();
+        void Disable();
 
     private:
         MotorDriver& driver;

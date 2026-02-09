@@ -26,6 +26,19 @@ namespace
         ::testing::StrictMock<foc::EncoderMock> encoderMock;
         ::testing::StrictMock<foc::FocTorqueMock> focMock;
         std::optional<foc::Runner> runner;
+
+        void DestroyRunner()
+        {
+            EXPECT_CALL(driverMock, Stop());
+            EXPECT_CALL(focMock, Disable());
+            runner.reset();
+        }
+
+        ~TestRunner() override
+        {
+            if (runner.has_value())
+                DestroyRunner();
+        }
     };
 }
 
@@ -61,4 +74,27 @@ TEST_F(TestRunner, outputs_duty_cycles_from_foc_calculation)
             });
 
     driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+}
+
+TEST_F(TestRunner, enable_enables_foc_and_starts_driver)
+{
+    ::testing::InSequence seq;
+    EXPECT_CALL(focMock, Enable());
+    EXPECT_CALL(driverMock, Start());
+
+    runner->Enable();
+}
+
+TEST_F(TestRunner, disable_stops_driver_and_disables_foc)
+{
+    ::testing::InSequence seq;
+    EXPECT_CALL(driverMock, Stop());
+    EXPECT_CALL(focMock, Disable());
+
+    runner->Disable();
+}
+
+TEST_F(TestRunner, destructor_disables)
+{
+    DestroyRunner();
 }

@@ -14,4 +14,21 @@ namespace foc
                 this->driver.ThreePhasePwmOutput(dutyCycles);
             });
     }
+
+    Runner::~Runner()
+    {
+        Disable();
+    }
+
+    void Runner::Enable()
+    {
+        foc.Enable();
+        driver.Start();
+    }
+
+    void Runner::Disable()
+    {
+        driver.Stop();
+        foc.Disable();
+    }
 }
