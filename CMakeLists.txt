@@ -58,10 +58,6 @@ endif()
 add_subdirectory(numerical-toolbox)
 add_subdirectory(source)
 
-if (E_FOC_BUILD_SIMULATOR)
-    add_subdirectory(simulator)
-endif()
-
 emil_clangformat_directories(e_foc DIRECTORIES source)
 emil_folderize_all_targets()
 emil_exclude_directory_from_coverage(embedded-infra-lib)

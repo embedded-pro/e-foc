@@ -8,7 +8,6 @@ namespace foc
 {
     TwoPhase Clarke::Forward(const ThreePhase& input) const
     {
-
         const float a = input.a;
         const float b = input.b;
         const float c = input.c;
@@ -19,7 +18,6 @@ namespace foc
 
     ThreePhase Clarke::Inverse(const TwoPhase& input) const
     {
-
         const float alpha = input.alpha;
         const float beta = input.beta;
 
@@ -30,7 +28,6 @@ namespace foc
 
     RotatingFrame Park::Forward(const TwoPhase& input, const float& cosTheta, const float& sinTheta) const
     {
-
         const float alpha = input.alpha;
         const float beta = input.beta;
         const float cos_t = cosTheta;
@@ -46,7 +43,6 @@ namespace foc
 
     TwoPhase Park::Inverse(const RotatingFrame& input, const float& cosTheta, const float& sinTheta) const
     {
-
         const float d = input.d;
         const float q = input.q;
         const float cos_t = cosTheta;
