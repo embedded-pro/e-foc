@@ -36,8 +36,8 @@ namespace simulator
     {
         Model(dutyPhases);
 
-        if (counter.has_value() && --counter.value())
-            if (counter.value() == 0)
+        if (counter.has_value())
+            if (--counter.value() == 0)
                 running = false;
 
         if (onCurrentPhasesReady && running)
