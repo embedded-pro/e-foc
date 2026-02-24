@@ -74,8 +74,8 @@ namespace simulator
         foc::RadiansPerSecond omega{ 0.0f };
         foc::RadiansPerSecond omega_mech{ 0.0f };
 
-        foc::Clarke clarke;
-        foc::Park park;
+        [[no_unique_address]] foc::Clarke clarke;
+        [[no_unique_address]] foc::Park park;
 
         infra::Function<void(foc::PhaseCurrents)> onCurrentPhasesReady;
         bool running = false;

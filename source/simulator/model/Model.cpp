@@ -36,7 +36,7 @@ namespace simulator
     {
         Model(dutyPhases);
 
-        if (counter && --(*counter) == 0)
+        if (counter.has_value() && --counter.value() == 0)
             running = false;
 
         if (onCurrentPhasesReady && running)
@@ -46,7 +46,7 @@ namespace simulator
                 });
 
         if (running)
-            NotifyObservers([&](auto& observer)
+            NotifyObservers([this](auto& observer)
                 {
                     observer.PhaseCurrentsWithMechanicalAngle({ ia, ib, ic }, theta_mech);
                 });
@@ -110,7 +110,7 @@ namespace simulator
 
     void ThreePhaseMotorModel::Model(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        auto dt = 1.0f / baseFrequency.Value();
+        auto dt = 1.0f / static_cast<float>(baseFrequency.Value());
         auto duty_a = dutyPhases.a.Value() / 100.0f;
         auto duty_b = dutyPhases.b.Value() / 100.0f;
         auto duty_c = dutyPhases.c.Value() / 100.0f;

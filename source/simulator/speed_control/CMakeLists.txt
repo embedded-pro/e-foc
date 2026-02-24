@@ -13,6 +13,10 @@ target_sources(e_foc.simulator.speed_control PRIVATE
     Main.cpp
 )
 
+target_compile_definitions(e_foc.simulator.speed_control PRIVATE
+    PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}"
+)
+
 if(MSVC)
     target_compile_options(e_foc.simulator.speed_control PRIVATE /W4)
 else()

@@ -2,6 +2,7 @@
 
 #include "source/simulator/model/Model.hpp"
 #include <chrono>
+#include <filesystem>
 #include <sciplot/sciplot.hpp>
 #include <vector>
 
@@ -18,18 +19,17 @@ namespace simulator
             std::vector<float> i_c;
         };
 
-        Plot(ThreePhaseMotorModel& model, const std::string& title, const std::string& filename, std::chrono::microseconds timeStep, std::chrono::milliseconds simulationTime);
+        Plot(ThreePhaseMotorModel& model, const std::string& title, const std::string& filename, const std::filesystem::path& outputDirectory, std::chrono::microseconds timeStep, std::chrono::milliseconds simulationTime);
 
         // Implementation of ThreePhaseMotorModelObserver
         void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta) override;
         void Finished() override;
 
     private:
-        ThreePhaseMotorModel& model;
         std::string title;
         std::string filename;
+        std::filesystem::path outputDirectory;
         std::chrono::microseconds timeStep;
-        std::chrono::milliseconds simulationTime;
         std::vector<float> time;
         std::vector<float> i_a;
         std::vector<float> i_b;

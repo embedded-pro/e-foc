@@ -1,14 +1,15 @@
 #include "source/simulator/view/Plot.hpp"
+#include <iomanip>
+#include <sstream>
 
 namespace simulator
 {
-    Plot::Plot(ThreePhaseMotorModel& model, const std::string& title, const std::string& filename, std::chrono::microseconds timeStep, std::chrono::milliseconds simulationTime)
+    Plot::Plot(ThreePhaseMotorModel& model, const std::string& title, const std::string& filename, const std::filesystem::path& outputDirectory, std::chrono::microseconds timeStep, std::chrono::milliseconds simulationTime)
         : ThreePhaseMotorModelObserver(model)
-        , model(model)
         , title(title)
         , filename(filename)
+        , outputDirectory(outputDirectory)
         , timeStep(timeStep)
-        , simulationTime(simulationTime)
     {
         const auto steps = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::duration<float>>(simulationTime).count() / std::chrono::duration_cast<std::chrono::duration<float>>(timeStep).count());
 
@@ -59,8 +60,8 @@ namespace simulator
         plot3.xlabel("Time [s]");
         plot3.ylabel("Phase Currents [A]");
 
-        double zoom_end = static_cast<double>(time.back());
-        double zoom_start = std::max(zoom_end - 0.2, 0.0);
+        auto zoom_end = static_cast<float>(time.back());
+        auto zoom_start = std::max(zoom_end - 0.2f, 0.0f);
 
         auto start_it = std::lower_bound(time.begin(), time.end(), zoom_start);
         auto start_idx = std::distance(time.begin(), start_it);
@@ -72,8 +73,8 @@ namespace simulator
         auto i_c_zoom_min = *std::min_element(i_c.begin() + start_idx, i_c.end());
         auto i_c_zoom_max = *std::max_element(i_c.begin() + start_idx, i_c.end());
 
-        double zoom_current_min = std::min({ i_a_zoom_min, i_b_zoom_min, i_c_zoom_min });
-        double zoom_current_max = std::max({ i_a_zoom_max, i_b_zoom_max, i_c_zoom_max });
+        auto zoom_current_min = std::min({ i_a_zoom_min, i_b_zoom_min, i_c_zoom_min });
+        auto zoom_current_max = std::max({ i_a_zoom_max, i_b_zoom_max, i_c_zoom_max });
 
         plot3.xrange(zoom_start, zoom_end);
         plot3.yrange(zoom_current_min * 1.1, zoom_current_max * 1.1);
@@ -89,7 +90,16 @@ namespace simulator
         sciplot::Figure fig = { { plot1 }, { plot2 }, { plot3 } };
         fig.title(title);
         fig.size(950, 1200);
-        fig.save(filename + ".png");
-        fig.save(filename + ".pdf");
+
+        std::filesystem::create_directories(outputDirectory);
+
+        auto now = std::chrono::system_clock::now();
+        auto timeT = std::chrono::system_clock::to_time_t(now);
+        std::ostringstream timestamp;
+        timestamp << std::put_time(std::localtime(&timeT), "%Y-%m-%d_%H-%M-%S");
+
+        auto outputPath = outputDirectory / (filename + "_" + timestamp.str());
+        fig.save(outputPath.string() + ".png");
+        fig.save(outputPath.string() + ".pdf");
     }
 }
