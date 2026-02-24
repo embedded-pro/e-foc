@@ -1,4 +1,5 @@
 #include "source/simulator/view/Plot.hpp"
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 
@@ -38,7 +39,7 @@ namespace simulator
         plot1.xlabel("Time [s]");
         plot1.ylabel("Phase Currents [A]");
         plot1.xrange(0.0, time.back());
-        plot1.yrange(*std::min_element(i_a.begin(), i_a.end()) * 1.1, *std::max_element(i_a.begin(), i_a.end()));
+        plot1.yrange(*std::ranges::min_element(i_a) * 1.1, *std::ranges::max_element(i_a));
         plot1.legend()
             .atOutsideRight()
             .displayHorizontal()
@@ -60,10 +61,10 @@ namespace simulator
         plot3.xlabel("Time [s]");
         plot3.ylabel("Phase Currents [A]");
 
-        auto zoom_end = static_cast<float>(time.back());
+        auto zoom_end = time.back();
         auto zoom_start = std::max(zoom_end - 0.2f, 0.0f);
 
-        auto start_it = std::lower_bound(time.begin(), time.end(), zoom_start);
+        auto start_it = std::ranges::lower_bound(time, zoom_start);
         auto start_idx = std::distance(time.begin(), start_it);
 
         auto i_a_zoom_min = *std::min_element(i_a.begin() + start_idx, i_a.end());
@@ -95,8 +96,10 @@ namespace simulator
 
         auto now = std::chrono::system_clock::now();
         auto timeT = std::chrono::system_clock::to_time_t(now);
+        std::tm timeBuf{};
+        localtime_r(&timeT, &timeBuf);
         std::ostringstream timestamp;
-        timestamp << std::put_time(std::localtime(&timeT), "%Y-%m-%d_%H-%M-%S");
+        timestamp << std::put_time(&timeBuf, "%Y-%m-%d_%H-%M-%S");
 
         auto outputPath = outputDirectory / (filename + "_" + timestamp.str());
         fig.save(outputPath.string() + ".png");

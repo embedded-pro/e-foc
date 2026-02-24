@@ -36,8 +36,9 @@ namespace simulator
     {
         Model(dutyPhases);
 
-        if (counter.has_value() && --counter.value() == 0)
-            running = false;
+        if (counter.has_value() && --counter.value())
+            if (counter.value() == 0)
+                running = false;
 
         if (onCurrentPhasesReady && running)
             infra::EventDispatcherWithWeakPtr::Instance().Schedule([this]()
