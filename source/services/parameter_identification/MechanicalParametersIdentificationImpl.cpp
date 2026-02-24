@@ -14,7 +14,7 @@ namespace
 
 namespace services
 {
-    MechanicalParametersIdentificationImpl::MechanicalParametersIdentificationImpl(foc::SpeedController& controller, foc::MotorDriver& driver, foc::Encoder& encoder)
+    MechanicalParametersIdentificationImpl::MechanicalParametersIdentificationImpl(foc::FocSpeed& controller, foc::MotorDriver& driver, foc::Encoder& encoder)
         : controller(controller)
         , driver(driver)
         , encoder(encoder)

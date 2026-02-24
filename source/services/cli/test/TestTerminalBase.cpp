@@ -4,7 +4,7 @@
 #include "infra/util/Function.hpp"
 #include "infra/util/test_helper/MockHelpers.hpp"
 #include "services/util/Terminal.hpp"
-#include "source/foc/implementations/test_doubles/ControllerMock.hpp"
+#include "source/foc/implementations/test_doubles/FocMock.hpp"
 #include "source/services/cli/TerminalBase.hpp"
 #include "gmock/gmock.h"
 #include <optional>
@@ -29,7 +29,7 @@ namespace
     struct TerminalBaseImpl
         : services::TerminalFocBaseInteractor
     {
-        TerminalBaseImpl(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::ControllerBase& controller)
+        TerminalBaseImpl(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::FocBase& controller)
             : services::TerminalFocBaseInteractor(terminal, vdc, controller)
         {}
     };
@@ -39,7 +39,7 @@ namespace
         , public infra::EventDispatcherWithWeakPtrFixture
     {
     public:
-        ::testing::StrictMock<foc::ControllerBaseMock> controllerBaseMock;
+        ::testing::StrictMock<foc::FocTorqueMock> controllerBaseMock;
         ::testing::StrictMock<StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };

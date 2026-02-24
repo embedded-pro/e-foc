@@ -1,10 +1,11 @@
 
 #pragma once
 
-#include "foc/implementations/TransformsClarkePark.hpp"
-#include "foc/interfaces/Driver.hpp"
-#include "foc/interfaces/Units.hpp"
 #include "infra/util/Observer.hpp"
+#include "source/foc/implementations/TransformsClarkePark.hpp"
+#include "source/foc/interfaces/Driver.hpp"
+#include "source/foc/interfaces/Units.hpp"
+#include <cstddef>
 #include <optional>
 
 namespace simulator
@@ -18,6 +19,7 @@ namespace simulator
         using infra::Observer<ThreePhaseMotorModelObserver, ThreePhaseMotorModel>::Observer;
 
         virtual void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta) = 0;
+        virtual void Finished() = 0;
     };
 
     class ThreePhaseMotorModel
@@ -38,12 +40,9 @@ namespace simulator
             // Mechanical parameters
             foc::KilogramMeterSquared J;       // Rotor inertia [kg·m²]
             foc::NewtonMeterSecondPerRadian B; // Viscous friction coefficient [N·m·s/rad]
-
-            // Operating conditions
-            foc::Volts Vdc; // DC bus voltage [V]
         };
 
-        ThreePhaseMotorModel(const Parameters& params);
+        ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, std::optional<std::size_t> maxIterations);
 
         void SetLoad(foc::NewtonMeter load);
 
@@ -60,8 +59,12 @@ namespace simulator
         void SetZero() override;
 
     private:
+        void Model(const foc::PhasePwmDutyCycles& dutyPhases);
+
+    private:
         Parameters parameters;
         hal::Hertz baseFrequency;
+        foc::Volts powerSupplyVoltage;
 
         foc::Ampere ia{ 0.0f };
         foc::Ampere ib{ 0.0f };
@@ -77,5 +80,7 @@ namespace simulator
         infra::Function<void(foc::PhaseCurrents)> onCurrentPhasesReady;
         bool running = false;
         std::optional<foc::NewtonMeter> load;
+        const std::optional<std::size_t> maxIterations;
+        std::optional<std::size_t> counter;
     };
 }

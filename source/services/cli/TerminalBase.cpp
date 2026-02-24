@@ -6,7 +6,7 @@
 
 namespace services
 {
-    TerminalFocBaseInteractor::TerminalFocBaseInteractor(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::ControllerBase& foc)
+    TerminalFocBaseInteractor::TerminalFocBaseInteractor(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::FocBase& foc)
         : terminal(terminal)
         , vdc(vdc)
         , foc(foc)

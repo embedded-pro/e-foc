@@ -4,7 +4,7 @@
 #include "infra/util/Function.hpp"
 #include "infra/util/test_helper/MockHelpers.hpp"
 #include "services/util/Terminal.hpp"
-#include "source/foc/implementations/test_doubles/ControllerMock.hpp"
+#include "source/foc/implementations/test_doubles/FocMock.hpp"
 #include "source/services/cli/TerminalTorque.hpp"
 #include "gmock/gmock.h"
 #include <optional>
@@ -31,8 +31,7 @@ namespace
         , public infra::EventDispatcherWithWeakPtrFixture
     {
     public:
-        ::testing::StrictMock<foc::ControllerBaseMock> controllerBaseMock;
-        ::testing::StrictMock<foc::TorqueControllerMock> torqueControllerMock;
+        ::testing::StrictMock<foc::FocTorqueMock> focMock;
         ::testing::StrictMock<StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
@@ -43,7 +42,7 @@ namespace
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
         services::TerminalWithStorage::WithMaxSize<10> terminal{ terminalWithCommands, tracer };
-        services::TerminalFocTorqueInteractor terminalInteractor{ terminal, foc::Volts{ 12.0f }, controllerBaseMock, torqueControllerMock };
+        services::TerminalFocTorqueInteractor terminalInteractor{ terminal, foc::Volts{ 12.0f }, focMock };
 
         void InvokeCommand(std::string command, const std::function<void()>& onCommandReceived)
         {
@@ -65,7 +64,7 @@ TEST_F(TerminalTorqueTest, set_torque)
 {
     InvokeCommand("set_torque 2.5", [this]()
         {
-            EXPECT_CALL(torqueControllerMock, SetPoint(testing::_))
+            EXPECT_CALL(focMock, SetPoint(testing::_))
                 .WillOnce(testing::Invoke([](const foc::IdAndIqPoint& point)
                     {
                         EXPECT_NEAR(point.first.Value(), 2.5f, 1e-5f);

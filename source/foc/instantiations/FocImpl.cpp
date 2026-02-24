@@ -1,4 +1,4 @@
-#include "source/foc/instantiations/FieldOrientedControllerImpl.hpp"
+#include "source/foc/instantiations/FocImpl.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "source/foc/instantiations/TrigonometricImpl.hpp"
@@ -28,34 +28,34 @@ namespace
 
 namespace foc
 {
-    FieldOrientedControllerTorqueImpl::FieldOrientedControllerTorqueImpl(math::TrigonometricFunctions<float>& trigFunctions)
-        : trigFunctions{ trigFunctions }
-    {}
-
     OPTIMIZE_FOR_SPEED
-    void FieldOrientedControllerTorqueImpl::Reset()
+    void FocTorqueImpl::Enable()
     {
-        dPid.Disable();
-        qPid.Disable();
-
         dPid.Enable();
         qPid.Enable();
     }
 
-    void FieldOrientedControllerTorqueImpl::SetPolePairs(std::size_t polePairs)
+    OPTIMIZE_FOR_SPEED
+    void FocTorqueImpl::Disable()
+    {
+        dPid.Disable();
+        qPid.Disable();
+    }
+
+    void FocTorqueImpl::SetPolePairs(std::size_t polePairs)
     {
         this->polePairs = static_cast<float>(polePairs);
     }
 
     OPTIMIZE_FOR_SPEED
-    void FieldOrientedControllerTorqueImpl::SetPoint(IdAndIqPoint setPoint)
+    void FocTorqueImpl::SetPoint(IdAndIqPoint setPoint)
     {
         dPid.SetPoint(setPoint.first.Value());
         qPid.SetPoint(setPoint.second.Value());
     }
 
     OPTIMIZE_FOR_SPEED
-    void FieldOrientedControllerTorqueImpl::SetCurrentTunings(Volts Vdc, const IdAndIqTunings& tunings)
+    void FocTorqueImpl::SetCurrentTunings(Volts Vdc, const IdAndIqTunings& tunings)
     {
         auto scale = 1.0f / (invSqrt3 * Vdc.Value());
 
@@ -71,7 +71,7 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    PhasePwmDutyCycles FieldOrientedControllerTorqueImpl::Calculate(const PhaseCurrents& currentPhases, Radians& position)
+    PhasePwmDutyCycles FocTorqueImpl::Calculate(const PhaseCurrents& currentPhases, Radians& position)
     {
         const float ia = currentPhases.a.Value();
         const float ib = currentPhases.b.Value();
@@ -92,9 +92,8 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    FieldOrientedControllerSpeedImpl::FieldOrientedControllerSpeedImpl(math::TrigonometricFunctions<float>& trigFunctions, foc::Ampere maxCurrent, std::chrono::system_clock::duration timeStep)
-        : trigFunctions{ trigFunctions }
-        , speedPid{ { 0.0f, 0.0f, 0.0f }, { -maxCurrent.Value(), maxCurrent.Value() } }
+    FocSpeedImpl::FocSpeedImpl(foc::Ampere maxCurrent, std::chrono::system_clock::duration timeStep)
+        : speedPid{ { 0.0f, 0.0f, 0.0f }, { -maxCurrent.Value(), maxCurrent.Value() } }
         , dt{ std::chrono::duration_cast<std::chrono::duration<float>>(timeStep).count() }
     {
         really_assert(maxCurrent.Value() > 0);
@@ -104,20 +103,20 @@ namespace foc
         qPid.Enable();
     }
 
-    void FieldOrientedControllerSpeedImpl::SetPolePairs(std::size_t pole)
+    void FocSpeedImpl::SetPolePairs(std::size_t pole)
     {
         polePairs = static_cast<float>(pole);
     }
 
     OPTIMIZE_FOR_SPEED
-    void FieldOrientedControllerSpeedImpl::SetPoint(RadiansPerSecond point)
+    void FocSpeedImpl::SetPoint(RadiansPerSecond point)
     {
         speedPid.SetPoint(point.Value());
         dPid.SetPoint(0.0f);
     }
 
     OPTIMIZE_FOR_SPEED
-    void FieldOrientedControllerSpeedImpl::SetCurrentTunings(Volts Vdc, const IdAndIqTunings& torqueTunings)
+    void FocSpeedImpl::SetCurrentTunings(Volts Vdc, const IdAndIqTunings& torqueTunings)
     {
         auto scale = 1.0f / (invSqrt3 * Vdc.Value());
         auto scale_dt = scale * dt;
@@ -135,7 +134,7 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    void FieldOrientedControllerSpeedImpl::SetSpeedTunings(Volts Vdc, const SpeedTunings& speedTuning)
+    void FocSpeedImpl::SetSpeedTunings(Volts Vdc, const SpeedTunings& speedTuning)
     {
         const float kp = speedTuning.kp;
         const float ki = speedTuning.ki;
@@ -145,12 +144,8 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    void FieldOrientedControllerSpeedImpl::Reset()
+    void FocSpeedImpl::Enable()
     {
-        speedPid.Disable();
-        dPid.Disable();
-        qPid.Disable();
-
         speedPid.Enable();
         dPid.Enable();
         qPid.Enable();
@@ -159,7 +154,15 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    float FieldOrientedControllerSpeedImpl::CalculateFilteredSpeed(float mechanicalPosition)
+    void FocSpeedImpl::Disable()
+    {
+        speedPid.Disable();
+        dPid.Disable();
+        qPid.Disable();
+    }
+
+    OPTIMIZE_FOR_SPEED
+    float FocSpeedImpl::CalculateFilteredSpeed(float mechanicalPosition)
     {
         auto mechanicalSpeed = PositionWithWrapAround(mechanicalPosition - previousPosition) / dt;
 
@@ -169,7 +172,7 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    PhasePwmDutyCycles FieldOrientedControllerSpeedImpl::Calculate(const PhaseCurrents& currentPhases, Radians& position)
+    PhasePwmDutyCycles FocSpeedImpl::Calculate(const PhaseCurrents& currentPhases, Radians& position)
     {
         const float ia = currentPhases.a.Value();
         const float ib = currentPhases.b.Value();

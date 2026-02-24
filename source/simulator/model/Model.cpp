@@ -2,6 +2,7 @@
 #include "foc/instantiations/TrigonometricImpl.hpp"
 #include "foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
+#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "source/foc/interfaces/Driver.hpp"
 #include <cmath>
 
@@ -13,8 +14,10 @@ namespace simulator
         constexpr float half = 0.5f;
     }
 
-    ThreePhaseMotorModel::ThreePhaseMotorModel(const Parameters& params)
+    ThreePhaseMotorModel::ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, std::optional<std::size_t> maxIterations)
         : parameters(params)
+        , powerSupplyVoltage(powerSupplyVoltage)
+        , maxIterations(maxIterations)
     {
     }
 
@@ -31,14 +34,90 @@ namespace simulator
 
     void ThreePhaseMotorModel::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
+        Model(dutyPhases);
+
+        if (counter && --(*counter) == 0)
+            running = false;
+
+        if (onCurrentPhasesReady && running)
+            infra::EventDispatcherWithWeakPtr::Instance().Schedule([this]()
+                {
+                    onCurrentPhasesReady({ foc::Ampere{ ia }, foc::Ampere{ ib }, foc::Ampere{ ic } });
+                });
+
+        if (running)
+            NotifyObservers([&](auto& observer)
+                {
+                    observer.PhaseCurrentsWithMechanicalAngle({ ia, ib, ic }, theta_mech);
+                });
+        else
+            NotifyObservers([](auto& observer)
+                {
+                    observer.Finished();
+                });
+    }
+
+    void ThreePhaseMotorModel::Start()
+    {
+        if (running)
+            return;
+
+        running = true;
+        counter = maxIterations;
+        ia = foc::Ampere{ 0.0f };
+        ib = foc::Ampere{ 0.0f };
+        ic = foc::Ampere{ 0.0f };
+
+        infra::EventDispatcherWithWeakPtr::Instance().Schedule([this]()
+            {
+                ThreePhasePwmOutput({ hal::Percent{ 50 }, hal::Percent{ 49 }, hal::Percent{ 51 } });
+            });
+    }
+
+    void ThreePhaseMotorModel::Stop()
+    {
+        if (!running)
+            return;
+
+        running = false;
+        counter = std::nullopt;
+        ia = foc::Ampere{ 0.0f };
+        ib = foc::Ampere{ 0.0f };
+        ic = foc::Ampere{ 0.0f };
+    }
+
+    hal::Hertz ThreePhaseMotorModel::BaseFrequency() const
+    {
+        return baseFrequency;
+    }
+
+    foc::Radians ThreePhaseMotorModel::Read()
+    {
+        return theta_mech;
+    }
+
+    void ThreePhaseMotorModel::Set(foc::Radians value)
+    {
+        theta_mech = value;
+        theta = foc::Radians{ parameters.p * theta_mech.Value() };
+    }
+
+    void ThreePhaseMotorModel::SetZero()
+    {
+        theta_mech = foc::Radians{ 0.0f };
+        theta = foc::Radians{ 0.0f };
+    }
+
+    void ThreePhaseMotorModel::Model(const foc::PhasePwmDutyCycles& dutyPhases)
+    {
         auto dt = 1.0f / baseFrequency.Value();
         auto duty_a = dutyPhases.a.Value() / 100.0f;
         auto duty_b = dutyPhases.b.Value() / 100.0f;
         auto duty_c = dutyPhases.c.Value() / 100.0f;
 
-        auto va = (duty_a - half) * parameters.Vdc;
-        auto vb = (duty_b - half) * parameters.Vdc;
-        auto vc = (duty_c - half) * parameters.Vdc;
+        auto va = (duty_a - half) * powerSupplyVoltage;
+        auto vb = (duty_b - half) * powerSupplyVoltage;
+        auto vc = (duty_c - half) * powerSupplyVoltage;
 
         auto cos_theta = foc::FastTrigonometry::Cosine(theta.Value());
         auto sin_theta = foc::FastTrigonometry::Sine(theta.Value());
@@ -72,52 +151,5 @@ namespace simulator
 
         theta_mech = foc::Radians{ std::fmod(theta_mech.Value(), two_pi) };
         theta = foc::Radians{ std::fmod(theta.Value(), two_pi) };
-
-        if (onCurrentPhasesReady && running)
-            onCurrentPhasesReady({ foc::Ampere{ ia }, foc::Ampere{ ib }, foc::Ampere{ ic } });
-
-        if (running)
-            NotifyObservers([&](auto& observer)
-                {
-                    observer.PhaseCurrentsWithMechanicalAngle({ ia, ib, ic }, theta_mech);
-                });
-    }
-
-    void ThreePhaseMotorModel::Start()
-    {
-        running = true;
-        ia = foc::Ampere{ 0.0f };
-        ib = foc::Ampere{ 0.0f };
-        ic = foc::Ampere{ 0.0f };
-    }
-
-    void ThreePhaseMotorModel::Stop()
-    {
-        running = false;
-        ia = foc::Ampere{ 0.0f };
-        ib = foc::Ampere{ 0.0f };
-        ic = foc::Ampere{ 0.0f };
-    }
-
-    hal::Hertz ThreePhaseMotorModel::BaseFrequency() const
-    {
-        return baseFrequency;
-    }
-
-    foc::Radians ThreePhaseMotorModel::Read()
-    {
-        return theta_mech;
-    }
-
-    void ThreePhaseMotorModel::Set(foc::Radians value)
-    {
-        theta_mech = value;
-        theta = foc::Radians{ parameters.p * theta_mech.Value() };
-    }
-
-    void ThreePhaseMotorModel::SetZero()
-    {
-        theta_mech = foc::Radians{ 0.0f };
-        theta = foc::Radians{ 0.0f };
     }
 }

@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "motor-parameters.schema.json",
+  "title": "Three-Phase Motor Parameters",
+  "description": "Schema for validating BLDC/PMSM motor parameters used in FOC simulation",
+  "type": "object",
+  "required": [
+    "model",
+    "parameters"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference"
+    },
+    "model": {
+      "type": "string",
+      "description": "Motor model identifier",
+      "minLength": 1
+    },
+    "parameters": {
+      "type": "object",
+      "required": [
+        "stator_resistance_ohm",
+        "d_axis_inductance_henry",
+        "q_axis_inductance_henry",
+        "flux_linkage_weber",
+        "pole_pairs",
+        "rotor_inertia_kg_m2",
+        "viscous_damping_nm_s_per_rad",
+        "dc_bus_voltage_volts"
+      ],
+      "properties": {
+        "stator_resistance_ohm": {
+          "type": "number",
+          "description": "Stator winding resistance (R) in Ohms",
+          "exclusiveMinimum": 0
+        },
+        "d_axis_inductance_henry": {
+          "type": "number",
+          "description": "D-axis inductance (Ld) in Henry",
+          "exclusiveMinimum": 0
+        },
+        "q_axis_inductance_henry": {
+          "type": "number",
+          "description": "Q-axis inductance (Lq) in Henry",
+          "exclusiveMinimum": 0
+        },
+        "flux_linkage_weber": {
+          "type": "number",
+          "description": "Permanent magnet flux linkage (ψf) in Weber",
+          "exclusiveMinimum": 0
+        },
+        "pole_pairs": {
+          "type": "integer",
+          "description": "Number of pole pairs (p)",
+          "minimum": 1
+        },
+        "rotor_inertia_kg_m2": {
+          "type": "number",
+          "description": "Rotor moment of inertia (J) in kg·m²",
+          "exclusiveMinimum": 0
+        },
+        "viscous_damping_nm_s_per_rad": {
+          "type": "number",
+          "description": "Viscous damping coefficient (B) in N·m·s/rad",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

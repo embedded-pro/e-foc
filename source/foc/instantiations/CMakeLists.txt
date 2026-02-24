@@ -11,8 +11,8 @@ target_link_libraries(e_foc.foc.instantiations PUBLIC
 )
 
 target_sources(e_foc.foc.instantiations PRIVATE
-    FieldOrientedControllerImpl.cpp
-    FieldOrientedControllerImpl.hpp
+    FocImpl.cpp
+    FocImpl.hpp
     TrigonometricImpl.cpp
     TrigonometricImpl.hpp
 )

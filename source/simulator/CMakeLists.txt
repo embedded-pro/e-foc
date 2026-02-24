@@ -28,6 +28,6 @@ target_include_directories(sciplot INTERFACE
 )
 
 add_subdirectory(model)
-add_subdirectory(plot)
+add_subdirectory(view)
 add_subdirectory(speed_control)
 add_subdirectory(torque_control)

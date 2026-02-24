@@ -4,7 +4,7 @@
 #include "infra/util/Function.hpp"
 #include "infra/util/test_helper/MockHelpers.hpp"
 #include "services/util/Terminal.hpp"
-#include "source/foc/implementations/test_doubles/ControllerMock.hpp"
+#include "source/foc/implementations/test_doubles/FocMock.hpp"
 #include "source/services/cli/TerminalSpeed.hpp"
 #include "gmock/gmock.h"
 #include <cmath>
@@ -32,8 +32,7 @@ namespace
         , public infra::EventDispatcherWithWeakPtrFixture
     {
     public:
-        ::testing::StrictMock<foc::ControllerBaseMock> controllerBaseMock;
-        ::testing::StrictMock<foc::SpeedControllerMock> speedControllerMock;
+        ::testing::StrictMock<foc::FocSpeedMock> focMock;
         ::testing::StrictMock<StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
@@ -44,7 +43,7 @@ namespace
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
         services::TerminalWithStorage::WithMaxSize<10> terminal{ terminalWithCommands, tracer };
-        services::TerminalFocSpeedInteractor terminalInteractor{ terminal, foc::Volts{ 12.0f }, controllerBaseMock, speedControllerMock };
+        services::TerminalFocSpeedInteractor terminalInteractor{ terminal, foc::Volts{ 12.0f }, focMock };
 
         void InvokeCommand(std::string command, const std::function<void()>& onCommandReceived)
         {
@@ -72,7 +71,7 @@ TEST_F(TerminalSpeedTest, set_speed_pid)
 
     InvokeCommand("sspid 0.5 0.1 0.01", [this, &tunings]()
         {
-            EXPECT_CALL(speedControllerMock, SetSpeedTunings(testing::_, testing::_));
+            EXPECT_CALL(focMock, SetSpeedTunings(testing::_, testing::_));
         });
 
     ExecuteAllActions();
@@ -154,7 +153,7 @@ TEST_F(TerminalSpeedTest, set_speed)
 {
     InvokeCommand("ss 2.5", [this]()
         {
-            EXPECT_CALL(speedControllerMock, SetPoint(testing::_))
+            EXPECT_CALL(focMock, SetPoint(testing::_))
                 .WillOnce(testing::Invoke([](foc::RadiansPerSecond s)
                     {
                         EXPECT_NEAR(s.Value(), 2.5f, 1e-5f);
