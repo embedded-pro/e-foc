@@ -1,6 +1,8 @@
 #include "source/simulator/view/Plot.hpp"
 #include <algorithm>
+#include <chrono>
 #include <iomanip>
+#include <numbers>
 #include <sstream>
 
 namespace simulator
@@ -19,7 +21,7 @@ namespace simulator
         i_b.reserve(steps);
         i_c.reserve(steps);
         theta.reserve(steps);
-    };
+    }
 
     void Plot::Started()
     {
@@ -52,8 +54,10 @@ namespace simulator
 
         auto allCurrentsMin = std::min({ *std::ranges::min_element(i_a), *std::ranges::min_element(i_b), *std::ranges::min_element(i_c) });
         auto allCurrentsMax = std::max({ *std::ranges::max_element(i_a), *std::ranges::max_element(i_b), *std::ranges::max_element(i_c) });
+        constexpr auto marginFraction = 0.1f;
+        constexpr auto fallbackMargin = 0.01f;
         auto fullRange = allCurrentsMax - allCurrentsMin;
-        auto fullMargin = (fullRange > 0.0f) ? fullRange * 0.1f : 0.01f;
+        auto fullMargin = (fullRange > 0.0f) ? fullRange * marginFraction : fallbackMargin;
 
         sciplot::Plot plot1;
         plot1.xlabel("Time [s]");
@@ -73,7 +77,8 @@ namespace simulator
         plot2.xlabel("Time [s]");
         plot2.ylabel("Electrical Angle [rad]");
         plot2.xrange(0.0, time.back());
-        plot2.yrange(0.0, 2.0 * M_PI * 1.1);
+        constexpr auto angleRangeMargin = 1.1;
+        plot2.yrange(0.0, 2.0 * std::numbers::pi * angleRangeMargin);
 
         plot2.drawCurve(time, theta).label("theta").lineWidth(2).lineColor("blue");
 
@@ -81,23 +86,28 @@ namespace simulator
         plot3.xlabel("Time [s]");
         plot3.ylabel("Phase Currents [A]");
 
+        constexpr auto zoomWindowSeconds = 0.2f;
+
         auto zoom_end = time.back();
-        auto zoom_start = std::max(zoom_end - 0.2f, 0.0f);
+        auto zoom_start = std::max(zoom_end - zoomWindowSeconds, 0.0f);
 
         auto start_it = std::ranges::lower_bound(time, zoom_start);
         auto start_idx = std::distance(time.begin(), start_it);
 
-        auto i_a_zoom_min = *std::min_element(i_a.begin() + start_idx, i_a.end());
-        auto i_a_zoom_max = *std::max_element(i_a.begin() + start_idx, i_a.end());
-        auto i_b_zoom_min = *std::min_element(i_b.begin() + start_idx, i_b.end());
-        auto i_b_zoom_max = *std::max_element(i_b.begin() + start_idx, i_b.end());
-        auto i_c_zoom_min = *std::min_element(i_c.begin() + start_idx, i_c.end());
-        auto i_c_zoom_max = *std::max_element(i_c.begin() + start_idx, i_c.end());
+        if (start_it == time.end())
+            return;
+
+        auto i_a_zoom_min = *std::ranges::min_element(i_a.begin() + start_idx, i_a.end());
+        auto i_a_zoom_max = *std::ranges::max_element(i_a.begin() + start_idx, i_a.end());
+        auto i_b_zoom_min = *std::ranges::min_element(i_b.begin() + start_idx, i_b.end());
+        auto i_b_zoom_max = *std::ranges::max_element(i_b.begin() + start_idx, i_b.end());
+        auto i_c_zoom_min = *std::ranges::min_element(i_c.begin() + start_idx, i_c.end());
+        auto i_c_zoom_max = *std::ranges::max_element(i_c.begin() + start_idx, i_c.end());
 
         auto zoom_current_min = std::min({ i_a_zoom_min, i_b_zoom_min, i_c_zoom_min });
         auto zoom_current_max = std::max({ i_a_zoom_max, i_b_zoom_max, i_c_zoom_max });
         auto zoomRange = zoom_current_max - zoom_current_min;
-        auto zoomMargin = (zoomRange > 0.0f) ? zoomRange * 0.1f : 0.01f;
+        auto zoomMargin = (zoomRange > 0.0f) ? zoomRange * marginFraction : fallbackMargin;
 
         plot3.xrange(zoom_start, zoom_end);
         plot3.yrange(zoom_current_min - zoomMargin, zoom_current_max + zoomMargin);
@@ -116,10 +126,14 @@ namespace simulator
 
         std::filesystem::create_directories(outputDirectory);
 
-        auto now = std::chrono::system_clock::now();
-        auto timeT = std::chrono::system_clock::to_time_t(now);
+        const auto now = std::chrono::system_clock::now();
+        const auto timeT = std::chrono::system_clock::to_time_t(now);
         std::tm timeBuf{};
+#ifdef _WIN32
+        localtime_s(&timeBuf, &timeT);
+#else
         localtime_r(&timeT, &timeBuf);
+#endif
         std::ostringstream timestamp;
         timestamp << std::put_time(&timeBuf, "%Y-%m-%d_%H-%M-%S");
 

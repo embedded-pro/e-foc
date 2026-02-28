@@ -7,7 +7,6 @@
 #include "simulator/view/Plot.hpp"
 #include "source/foc/instantiations/FocImpl.hpp"
 #include <chrono>
-#include <cmath>
 #include <iostream>
 #include <numbers>
 #include <stdexcept>
@@ -15,9 +14,12 @@
 
 namespace
 {
+    constexpr float rpmToRadPerSecFactor = std::numbers::pi_v<float> / 30.0f;
+    constexpr int microsecondsPerSecond = 1000000;
+
     foc::RadiansPerSecond ToRadiansPerSecond(float rpm)
     {
-        return foc::RadiansPerSecond{ rpm * std::numbers::pi_v<float> / 30.0f };
+        return foc::RadiansPerSecond{ rpm * rpmToRadPerSecFactor };
     }
 
     void ValidateInputs(float powerSupplyVoltage, float maxCurrent, int timeStepUs, int simulationTimeMs)
@@ -33,7 +35,7 @@ namespace
     }
 }
 
-int main(int argc, char* argv[], const char* env[])
+int main(int argc, char* argv[])
 {
     std::string toolname = argv[0];
     args::ArgumentParser parser(toolname + " is a tool to simulate FOC speed control.");
@@ -66,8 +68,10 @@ int main(int argc, char* argv[], const char* env[])
 
         const auto timeStep = std::chrono::microseconds{ timeStepUs };
         const auto simulationTime = std::chrono::milliseconds{ simulationTimeMs };
-        const auto baseFrequency = hal::Hertz{ static_cast<uint32_t>(1000000 / timeStepUs) };
+        const auto baseFrequency = hal::Hertz{ static_cast<uint32_t>(microsecondsPerSecond / timeStepUs) };
         const auto steps = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::duration<float>>(simulationTime).count() / std::chrono::duration_cast<std::chrono::duration<float>>(timeStep).count());
+
+        bool simulationFinished = false;
 
         simulator::ThreePhaseMotorModel model{ simulator::JK42BLS01_X038ED::parameters, foc::Volts{ powerSupplyVoltage }, baseFrequency, steps };
         simulator::Plot plotter{ model, "FOC Speed Control", "foc_speed_results", std::string(PROJECT_ROOT_DIR) + "/simulator/speed_control", timeStep, simulationTime };
@@ -82,9 +86,18 @@ int main(int argc, char* argv[], const char* env[])
                 { args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument) } });
         focSpeed.SetPolePairs(simulator::JK42BLS01_X038ED::parameters.p);
         focSpeed.SetPoint(ToRadiansPerSecond(args::get(speedSetPointArgument)));
+
+        simulator::SimulationFinishedObserver finishedObserver{ model, [&simulationFinished]()
+            {
+                simulationFinished = true;
+            } };
+
         focRunner.Enable();
 
-        eventDispatcher.Run();
+        eventDispatcher.ExecuteUntil([&simulationFinished]()
+            {
+                return simulationFinished;
+            });
     }
     catch (const args::Help&)
     {

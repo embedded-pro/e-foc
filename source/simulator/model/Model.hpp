@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "infra/util/Function.hpp"
 #include "infra/util/Observer.hpp"
 #include "source/foc/implementations/TransformsClarkePark.hpp"
 #include "source/foc/interfaces/Driver.hpp"
@@ -83,5 +84,19 @@ namespace simulator
         std::optional<foc::NewtonMeter> load;
         const std::optional<std::size_t> maxIterations;
         std::optional<std::size_t> counter;
+    };
+
+    class SimulationFinishedObserver
+        : public ThreePhaseMotorModelObserver
+    {
+    public:
+        SimulationFinishedObserver(ThreePhaseMotorModel& model, const infra::Function<void()>& onFinished);
+
+        void Started() override;
+        void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta) override;
+        void Finished() override;
+
+    private:
+        infra::Function<void()> onFinished;
     };
 }

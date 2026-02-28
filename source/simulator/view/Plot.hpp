@@ -12,13 +12,6 @@ namespace simulator
         : public ThreePhaseMotorModelObserver
     {
     public:
-        struct Currents
-        {
-            std::vector<float> i_a;
-            std::vector<float> i_b;
-            std::vector<float> i_c;
-        };
-
         Plot(ThreePhaseMotorModel& model, const std::string& title, const std::string& filename, const std::filesystem::path& outputDirectory, std::chrono::microseconds timeStep, std::chrono::milliseconds simulationTime);
 
         // Implementation of ThreePhaseMotorModelObserver

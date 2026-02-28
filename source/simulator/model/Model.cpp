@@ -13,6 +13,8 @@ namespace simulator
     {
         constexpr float two_pi = 2.0f * std::numbers::pi_v<float>;
         constexpr float half = 0.5f;
+        constexpr float percentToFraction = 100.0f;
+        constexpr float torqueConstant = 1.5f;
 
         float WrapAngle(float angle)
         {
@@ -46,9 +48,8 @@ namespace simulator
     {
         Model(dutyPhases);
 
-        if (counter.has_value())
-            if (--counter.value() == 0)
-                running = false;
+        if (counter.has_value() && --counter.value() == 0)
+            running = false;
 
         if (onCurrentPhasesReady && running)
             infra::EventDispatcherWithWeakPtr::Instance().Schedule([this]()
@@ -127,9 +128,9 @@ namespace simulator
     void ThreePhaseMotorModel::Model(const foc::PhasePwmDutyCycles& dutyPhases)
     {
         auto dt = 1.0f / static_cast<float>(baseFrequency.Value());
-        auto duty_a = dutyPhases.a.Value() / 100.0f;
-        auto duty_b = dutyPhases.b.Value() / 100.0f;
-        auto duty_c = dutyPhases.c.Value() / 100.0f;
+        auto duty_a = dutyPhases.a.Value() / percentToFraction;
+        auto duty_b = dutyPhases.b.Value() / percentToFraction;
+        auto duty_c = dutyPhases.c.Value() / percentToFraction;
 
         auto va = (duty_a - half) * powerSupplyVoltage;
         auto vb = (duty_b - half) * powerSupplyVoltage;
@@ -156,7 +157,7 @@ namespace simulator
         ib = foc::Ampere{ i_abc.b };
         ic = foc::Ampere{ i_abc.c };
 
-        auto torqueElec = 1.5f * parameters.p * (parameters.psi_f.Value() * iq + (parameters.Ld.Value() - parameters.Lq.Value()) * id * iq);
+        auto torqueElec = torqueConstant * parameters.p * (parameters.psi_f.Value() * iq + (parameters.Ld.Value() - parameters.Lq.Value()) * id * iq);
 
         auto loadTorque = load.value_or(foc::NewtonMeter{ 0.0f }).Value();
         auto loadOpposing = (omega_mech.Value() >= 0.0f) ? loadTorque : -loadTorque;
@@ -171,5 +172,24 @@ namespace simulator
 
         theta_mech = foc::Radians{ WrapAngle(theta_mech.Value()) };
         theta = foc::Radians{ WrapAngle(theta.Value()) };
+    }
+
+    SimulationFinishedObserver::SimulationFinishedObserver(ThreePhaseMotorModel& model, const infra::Function<void()>& onFinished)
+        : ThreePhaseMotorModelObserver(model)
+        , onFinished(onFinished)
+    {
+    }
+
+    void SimulationFinishedObserver::Started()
+    {
+    }
+
+    void SimulationFinishedObserver::PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta)
+    {
+    }
+
+    void SimulationFinishedObserver::Finished()
+    {
+        onFinished();
     }
 }
