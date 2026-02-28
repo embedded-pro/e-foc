@@ -86,6 +86,7 @@ int main(int argc, char* argv[])
                 { args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument) } });
         focSpeed.SetPolePairs(simulator::JK42BLS01_X038ED::parameters.p);
         focSpeed.SetPoint(ToRadiansPerSecond(args::get(speedSetPointArgument)));
+        focRunner.Enable();
 
         simulator::SimulationFinishedObserver finishedObserver{ model, [&simulationFinished]()
             {
