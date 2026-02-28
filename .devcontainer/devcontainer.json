@@ -3,18 +3,22 @@
     "context": "..",
     "dockerfile": "Dockerfile"
   },
+  // GUI support: requires an X server on the host.
+  //   Windows: install VcXsrv or X410, launch with "Disable access control" enabled.
+  //   macOS:   install XQuartz, enable "Allow connections from network clients" in Preferences > Security.
+  //   Linux:   run 'xhost +local:docker' to allow container access.
   "mounts": [
-    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
-    "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind"
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
   "containerEnv": {
-    "DISPLAY": "${localEnv:DISPLAY}",
-    "QT_X11_NO_MITSHM": "1"
+    "DISPLAY": "host.docker.internal:0.0",
+    "QT_X11_NO_MITSHM": "1",
+    "LIBGL_ALWAYS_INDIRECT": "1"
   },
   "runArgs": [
     "--add-host=host.docker.internal:host-gateway",
     "--privileged",
-    "--ipc=host"
+    "--shm-size=256m"
   ],
   "customizations": {
     "vscode": {

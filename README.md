@@ -107,6 +107,64 @@ cmake --build --preset EK-TM4C1294XL-Debug
 - **Hardware Abstraction**: Clean separation between application logic and hardware
 - **Interface-Driven Design**: Pure virtual interfaces enable mocking and testing
 
+## How to Run the Simulator
+
+The simulator includes a Qt-based GUI for real-time visualization. Since the development environment runs inside a Dev Container, an X server on the host machine is required to display the GUI.
+
+### Host Setup
+
+#### Windows
+
+1. Install [VcXsrv](https://sourceforge.net/projects/vcxsrv/) (free) or [X410](https://x410.dev/) from the Microsoft Store.
+2. Launch VcXsrv with the following settings:
+   - **Multiple windows**
+   - **Start no client**
+   - **Disable access control** (checked)
+3. Open the project in VS Code and reopen in the Dev Container.
+
+#### Linux
+
+1. Allow Docker containers to access your X server:
+   ```bash
+   xhost +local:docker
+   ```
+2. Open the project in VS Code and reopen in the Dev Container.
+
+> **Note:** The Dev Container sets `DISPLAY=host.docker.internal:0.0` to forward GUI windows over TCP.
+> On Linux, if you prefer Unix socket forwarding, you can override `DISPLAY` to `:0` inside the container and add a bind mount for `/tmp/.X11-unix`.
+
+### Build & Run
+
+Inside the Dev Container terminal:
+
+```bash
+cmake --preset host
+cmake --build --preset host-Debug
+```
+
+Run the speed control simulator:
+```bash
+./build/host/bin/Debug/e_foc.simulator.speed_control
+```
+
+Run the torque control simulator:
+```bash
+./build/host/bin/Debug/e_foc.simulator.torque_control
+```
+
+Run with custom parameters (example):
+```bash
+./build/host/bin/Debug/e_foc.simulator.speed_control --help
+```
+
+### Troubleshooting
+
+| Problem | Solution |
+|---|---|
+| `cannot open display` | Ensure the X server is running on the host and "Disable access control" is enabled |
+| Black window or no rendering | Set `LIBGL_ALWAYS_INDIRECT=1` (already configured in the Dev Container) |
+| Windows firewall blocks display | Allow VcXsrv (`vcxsrv.exe`) through the Windows firewall for private networks |
+
 ## Documentation
 
 For detailed information about the project structure and coding guidelines, see:
