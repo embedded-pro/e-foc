@@ -1,10 +1,5 @@
 #include "source/simulator/view/Plot.hpp"
-#include <algorithm>
-<<<<<<< HEAD
 #include <chrono>
-=======
-#include <algorithm>
->>>>>>> 844c569291d1607113e35cab607740de88d99701
 #include <iomanip>
 #include <numbers>
 #include <sstream>
