@@ -7,6 +7,7 @@
 #include "simulator/view/Plot.hpp"
 #include "source/foc/instantiations/FocImpl.hpp"
 #include <chrono>
+#include <format>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -15,27 +16,29 @@ namespace
 {
     constexpr int microsecondsPerSecond = 1000000;
 
-    void ValidateInputs(float powerSupplyVoltage, int timeStepUs, int simulationTimeMs)
+    void ValidateInputs(float powerSupplyVoltage, float loadTorque, int timeStepUs, int simulationTimeMs)
     {
         if (powerSupplyVoltage <= 0.0f)
-            throw std::invalid_argument("Power supply voltage must be positive (got " + std::to_string(powerSupplyVoltage) + " V)");
+            throw std::invalid_argument(std::format("Power supply voltage must be positive (got {} V)", powerSupplyVoltage));
+        if (loadTorque < 0.0f)
+            throw std::invalid_argument(std::format("Load torque must be non-negative (got {} Nm)", loadTorque));
         if (timeStepUs <= 0)
-            throw std::invalid_argument("Time step must be positive (got " + std::to_string(timeStepUs) + " us)");
+            throw std::invalid_argument(std::format("Time step must be positive (got {} us)", timeStepUs));
         if (simulationTimeMs <= 0)
-            throw std::invalid_argument("Simulation time must be positive (got " + std::to_string(simulationTimeMs) + " ms)");
+            throw std::invalid_argument(std::format("Simulation time must be positive (got {} ms)", simulationTimeMs));
     }
 }
 
 int main(int argc, char* argv[])
 {
-    std::string toolname = argv[0];
-    args::ArgumentParser parser(toolname + " is a tool to simulate FOC torque control.");
+    args::ArgumentParser parser(std::format("{} is a tool to simulate FOC torque control.", argv[0]));
     args::Group positionals(parser, "Positional arguments:");
     args::Positional currentSetPointArgument(positionals, "currentSetPoint", "current set point for the simulation (in Amperes) [default = 0.1 A]", 0.1f, args::Options::Single);
     args::Positional kpTorqueArgument(positionals, "kpTorque", "proportional gain for the torque controller [default = 15.0]", 15.0f, args::Options::Single);
     args::Positional kiTorqueArgument(positionals, "kiTorque", "integral gain for the torque controller [default = 2000.0]", 2000.0f, args::Options::Single);
     args::Positional kdTorqueArgument(positionals, "kdTorque", "derivative gain for the torque controller [default = 0.0]", 0.0f, args::Options::Single);
     args::Positional powerSupplyVoltageArgument(positionals, "powerSupplyVoltage", "power supply voltage for the simulation (in Volts) [default = 24 Volts]", 24.0f, args::Options::Single);
+    args::Positional loadTorqueArgument(positionals, "loadTorque", "load torque for the simulation (in N\xC2\xB7m) [default = 0.02 Nm]", 0.02f, args::Options::Single);
     args::Positional timeStepArgument(positionals, "timeStep", "time step for the simulation (in microseconds) [default = 10 us]", 10, args::Options::Single);
     args::Positional simulationTimeArgument(positionals, "simulationTime", "total simulation time (in milliseconds) [default = 1000 ms]", 1000, args::Options::Single);
     args::HelpFlag help(parser, "help", "display this help menu.", { 'h', "help" });
@@ -49,8 +52,9 @@ int main(int argc, char* argv[])
         const auto timeStepUs = args::get(timeStepArgument);
         const auto simulationTimeMs = args::get(simulationTimeArgument);
         const auto powerSupplyVoltage = args::get(powerSupplyVoltageArgument);
+        const auto loadTorque = args::get(loadTorqueArgument);
 
-        ValidateInputs(powerSupplyVoltage, timeStepUs, simulationTimeMs);
+        ValidateInputs(powerSupplyVoltage, loadTorque, timeStepUs, simulationTimeMs);
 
         const auto timeStep = std::chrono::microseconds{ timeStepUs };
         const auto simulationTime = std::chrono::milliseconds{ simulationTimeMs };
@@ -60,7 +64,9 @@ int main(int argc, char* argv[])
         bool simulationFinished = false;
 
         simulator::ThreePhaseMotorModel model{ simulator::JK42BLS01_X038ED::parameters, foc::Volts{ powerSupplyVoltage }, baseFrequency, steps };
-        simulator::Plot plotter{ model, "FOC Torque Control", "foc_torque_results", std::string(PROJECT_ROOT_DIR) + "/simulator/torque_control", timeStep, simulationTime };
+        if (loadTorque > 0.0f)
+            model.SetLoad(foc::NewtonMeter{ loadTorque });
+        simulator::Plot plotter{ model, "FOC Torque Control", "foc_torque_results", std::format("{}/output/simulator/torque_control", PROJECT_ROOT_DIR), timeStep, simulationTime };
         foc::FocTorqueImpl focTorque;
         foc::Runner focRunner{ model, model, focTorque };
 
