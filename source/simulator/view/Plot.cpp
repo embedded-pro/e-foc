@@ -2,6 +2,8 @@
 #include <chrono>
 #include <iomanip>
 #include <numbers>
+#include <sciplot/Figure.hpp>
+#include <sciplot/Plot.hpp>
 #include <sstream>
 
 namespace simulator
