@@ -5,17 +5,27 @@
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "source/foc/interfaces/Driver.hpp"
 #include <cmath>
+#include <numbers>
 
 namespace simulator
 {
     namespace
     {
-        constexpr float two_pi = 6.28318530718f;
+        constexpr float two_pi = 2.0f * std::numbers::pi_v<float>;
         constexpr float half = 0.5f;
+
+        float WrapAngle(float angle)
+        {
+            auto result = std::fmod(angle, two_pi);
+            if (result < 0.0f)
+                result += two_pi;
+            return result;
+        }
     }
 
-    ThreePhaseMotorModel::ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, std::optional<std::size_t> maxIterations)
+    ThreePhaseMotorModel::ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency, std::optional<std::size_t> maxIterations)
         : parameters(params)
+        , baseFrequency(baseFrequency)
         , powerSupplyVoltage(powerSupplyVoltage)
         , maxIterations(maxIterations)
     {
@@ -68,6 +78,11 @@ namespace simulator
         ia = foc::Ampere{ 0.0f };
         ib = foc::Ampere{ 0.0f };
         ic = foc::Ampere{ 0.0f };
+
+        NotifyObservers([](auto& observer)
+            {
+                observer.Started();
+            });
 
         infra::EventDispatcherWithWeakPtr::Instance().Schedule([this]()
             {
@@ -142,7 +157,11 @@ namespace simulator
         ic = foc::Ampere{ i_abc.c };
 
         auto torqueElec = 1.5f * parameters.p * (parameters.psi_f.Value() * iq + (parameters.Ld.Value() - parameters.Lq.Value()) * id * iq);
-        auto d_omega_mech_dt = (torqueElec - parameters.B.Value() * omega_mech.Value() - (load.value_or(foc::NewtonMeter{ 0.0f }).Value())) / parameters.J.Value();
+
+        auto loadTorque = load.value_or(foc::NewtonMeter{ 0.0f }).Value();
+        auto loadOpposing = (omega_mech.Value() >= 0.0f) ? loadTorque : -loadTorque;
+
+        auto d_omega_mech_dt = (torqueElec - parameters.B.Value() * omega_mech.Value() - loadOpposing) / parameters.J.Value();
 
         omega_mech += foc::RadiansPerSecond{ d_omega_mech_dt * dt };
         omega = foc::RadiansPerSecond{ parameters.p * omega_mech.Value() };
@@ -150,7 +169,7 @@ namespace simulator
         theta_mech += foc::Radians{ omega_mech.Value() * dt };
         theta += foc::Radians{ omega.Value() * dt };
 
-        theta_mech = foc::Radians{ std::fmod(theta_mech.Value(), two_pi) };
-        theta = foc::Radians{ std::fmod(theta.Value(), two_pi) };
+        theta_mech = foc::Radians{ WrapAngle(theta_mech.Value()) };
+        theta = foc::Radians{ WrapAngle(theta.Value()) };
     }
 }

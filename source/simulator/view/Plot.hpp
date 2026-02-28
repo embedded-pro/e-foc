@@ -22,6 +22,7 @@ namespace simulator
         Plot(ThreePhaseMotorModel& model, const std::string& title, const std::string& filename, const std::filesystem::path& outputDirectory, std::chrono::microseconds timeStep, std::chrono::milliseconds simulationTime);
 
         // Implementation of ThreePhaseMotorModelObserver
+        void Started() override;
         void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta) override;
         void Finished() override;
 

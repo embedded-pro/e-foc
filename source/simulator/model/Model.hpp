@@ -18,6 +18,7 @@ namespace simulator
     public:
         using infra::Observer<ThreePhaseMotorModelObserver, ThreePhaseMotorModel>::Observer;
 
+        virtual void Started() = 0;
         virtual void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta) = 0;
         virtual void Finished() = 0;
     };
@@ -42,7 +43,7 @@ namespace simulator
             foc::NewtonMeterSecondPerRadian B; // Viscous friction coefficient [N·m·s/rad]
         };
 
-        ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, std::optional<std::size_t> maxIterations);
+        ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency, std::optional<std::size_t> maxIterations);
 
         void SetLoad(foc::NewtonMeter load);
 

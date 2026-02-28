@@ -8,7 +8,6 @@ target_include_directories(e_foc.simulator.model PUBLIC
 target_link_libraries(e_foc.simulator.model PUBLIC
     infra.util
     numerical.math
-    numerical.controllers.implementations
     e_foc.foc.instantiations
 )
 

@@ -27,8 +27,7 @@
         "flux_linkage_weber",
         "pole_pairs",
         "rotor_inertia_kg_m2",
-        "viscous_damping_nm_s_per_rad",
-        "dc_bus_voltage_volts"
+        "viscous_damping_nm_s_per_rad"
       ],
       "properties": {
         "stator_resistance_ohm": {

@@ -1,9 +1,4 @@
-execute_process(
-    COMMAND git config --global url.https://github.com/.insteadOf git@github.com:
-    RESULT_VARIABLE GIT_CONFIG_RESULT
-    OUTPUT_QUIET
-    ERROR_QUIET
-)
+include(FetchContent)
 
 FetchContent_Declare(
     sciplot
@@ -19,12 +14,13 @@ if(NOT sciplot_POPULATED)
 endif()
 
 add_library(sciplot INTERFACE)
-target_include_directories(sciplot INTERFACE 
+target_include_directories(sciplot SYSTEM INTERFACE
     ${sciplot_SOURCE_DIR}
-    OPTIONS 
-    -Wno-error           # Disable -Werror for sciplot headers
-    -Wno-unused-variable # Disable specific warning
-    -Wno-sign-compare    # Disable specific warning
+)
+target_compile_options(sciplot INTERFACE
+    -Wno-error
+    -Wno-unused-variable
+    -Wno-sign-compare
 )
 
 add_subdirectory(model)

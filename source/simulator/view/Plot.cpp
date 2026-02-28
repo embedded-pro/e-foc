@@ -21,6 +21,15 @@ namespace simulator
         theta.reserve(steps);
     };
 
+    void Plot::Started()
+    {
+        time.clear();
+        i_a.clear();
+        i_b.clear();
+        i_c.clear();
+        theta.clear();
+    }
+
     void Plot::PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta)
     {
         auto [i_a, i_b, i_c] = currentPhases;
@@ -35,11 +44,22 @@ namespace simulator
 
     void Plot::Finished()
     {
+        if (time.empty() || i_a.empty() || i_b.empty() || i_c.empty() || theta.empty())
+            return;
+
+        if (time.size() != i_a.size() || time.size() != i_b.size() || time.size() != i_c.size() || time.size() != theta.size())
+            return;
+
+        auto allCurrentsMin = std::min({ *std::ranges::min_element(i_a), *std::ranges::min_element(i_b), *std::ranges::min_element(i_c) });
+        auto allCurrentsMax = std::max({ *std::ranges::max_element(i_a), *std::ranges::max_element(i_b), *std::ranges::max_element(i_c) });
+        auto fullRange = allCurrentsMax - allCurrentsMin;
+        auto fullMargin = (fullRange > 0.0f) ? fullRange * 0.1f : 0.01f;
+
         sciplot::Plot plot1;
         plot1.xlabel("Time [s]");
         plot1.ylabel("Phase Currents [A]");
         plot1.xrange(0.0, time.back());
-        plot1.yrange(*std::ranges::min_element(i_a) * 1.1, *std::ranges::max_element(i_a));
+        plot1.yrange(allCurrentsMin - fullMargin, allCurrentsMax + fullMargin);
         plot1.legend()
             .atOutsideRight()
             .displayHorizontal()
@@ -76,9 +96,11 @@ namespace simulator
 
         auto zoom_current_min = std::min({ i_a_zoom_min, i_b_zoom_min, i_c_zoom_min });
         auto zoom_current_max = std::max({ i_a_zoom_max, i_b_zoom_max, i_c_zoom_max });
+        auto zoomRange = zoom_current_max - zoom_current_min;
+        auto zoomMargin = (zoomRange > 0.0f) ? zoomRange * 0.1f : 0.01f;
 
         plot3.xrange(zoom_start, zoom_end);
-        plot3.yrange(zoom_current_min * 1.1, zoom_current_max * 1.1);
+        plot3.yrange(zoom_current_min - zoomMargin, zoom_current_max + zoomMargin);
         plot3.legend()
             .atOutsideRight()
             .displayHorizontal()
