@@ -1,7 +1,6 @@
 #pragma once
 
 #include "numerical/controllers/implementations/PidIncremental.hpp"
-#include "numerical/math/TrigonometricFunctions.hpp"
 #include "source/foc/implementations/SpaceVectorModulation.hpp"
 #include "source/foc/implementations/TransformsClarkePark.hpp"
 #include "source/foc/interfaces/Driver.hpp"

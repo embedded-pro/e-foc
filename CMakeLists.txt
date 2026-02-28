@@ -7,6 +7,7 @@ endif()
 option(CMAKE_COMPILE_WARNING_AS_ERROR "Enable warnings-as-error" On)
 option(E_FOC_INCLUDE_DEFAULT_INIT "Include default initialization code; turn off when providing custom initialization" On)
 option(E_FOC_BUILD_TESTS "Enable build of the examples" Off)
+option(E_FOC_BUILD_SIMULATOR "Build the host simulator executables" Off)
 
 if (E_FOC_BUILD_TESTS)
     set(BUILD_TESTING On)
@@ -57,10 +58,6 @@ endif()
 
 add_subdirectory(numerical-toolbox)
 add_subdirectory(source)
-
-if (E_FOC_BUILD_SIMULATOR)
-    add_subdirectory(simulator)
-endif()
 
 emil_clangformat_directories(e_foc DIRECTORIES source)
 emil_folderize_all_targets()
