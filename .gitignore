@@ -6,3 +6,4 @@ out/
 megalinter-reports/
 install/
 .venv/
+output/
