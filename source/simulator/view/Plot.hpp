@@ -2,8 +2,9 @@
 
 #include "source/simulator/model/Model.hpp"
 #include <chrono>
+#include <string>
 #include <filesystem>
-#include <sciplot/sciplot.hpp>
+
 #include <vector>
 
 namespace simulator

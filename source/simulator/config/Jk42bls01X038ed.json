@@ -1,13 +1,13 @@
 {
-    "$schema": "./motor-parameters.schema.json",
-    "model": "JK42BLS01_X038ED",
-    "parameters": {
-        "stator_resistance_ohm": 0.073,
-        "d_axis_inductance_henry": 0.0005,
-        "q_axis_inductance_henry": 0.0005,
-        "flux_linkage_weber": 0.007,
-        "pole_pairs": 4,
-        "rotor_inertia_kg_m2": 0.0000075,
-        "viscous_damping_nm_s_per_rad": 0.00002
-    }
+  "$schema": "./motor-parameters.schema.json",
+  "model": "JK42BLS01_X038ED",
+  "parameters": {
+    "stator_resistance_ohm": 0.073,
+    "d_axis_inductance_henry": 0.0005,
+    "q_axis_inductance_henry": 0.0005,
+    "flux_linkage_weber": 0.007,
+    "pole_pairs": 4,
+    "rotor_inertia_kg_m2": 0.0000075,
+    "viscous_damping_nm_s_per_rad": 0.00002
+  }
 }

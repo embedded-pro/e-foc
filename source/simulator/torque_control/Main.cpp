@@ -12,18 +12,11 @@
 #include <numbers>
 #include <string>
 
-namespace
-{
-    foc::RadiansPerSecond ToRadiansPerSecond(float rpm)
-    {
-        return foc::RadiansPerSecond{ rpm * std::numbers::pi_v<float> / 30.0f };
-    }
-}
 
-int main(int argc, char* argv[], const char* env[])
+int main(int argc, char* argv[])
 {
     std::string toolname = argv[0];
-    args::ArgumentParser parser(toolname + " is a tool to simulate FOC torque control`.");
+    args::ArgumentParser parser(toolname + " is a tool to simulate FOC torque control.");
     args::Group positionals(parser, "Positional arguments:");
     args::Positional currentSetPointArgument(positionals, "currentSetPoint", "current set point for the simulation (in Amperes) [default = 0.1 A]", 0.1f, args::Options::Single);
     args::Positional kpTorqueArgument(positionals, "kpTorque", "proportional gain for the torque controller [default = 15.0]", 15.0f, args::Options::Single);
@@ -56,8 +49,8 @@ int main(int argc, char* argv[], const char* env[])
                 { args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument) } });
         focTorque.SetPolePairs(simulator::JK42BLS01_X038ED::parameters.p);
         focTorque.SetPoint(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ args::get(currentSetPointArgument) } });
-        focTorque.Enable();
 
+        focRunner.Enable();
         eventDispatcher.Run();
     }
     catch (const args::Help&)

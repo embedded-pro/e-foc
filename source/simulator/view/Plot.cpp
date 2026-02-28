@@ -1,5 +1,6 @@
 #include "source/simulator/view/Plot.hpp"
 #include <algorithm>
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 
