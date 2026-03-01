@@ -9,7 +9,8 @@
 
 namespace simulator
 {
-    class Gui : public QMainWindow
+    class Gui
+        : public QMainWindow
     {
         Q_OBJECT
 

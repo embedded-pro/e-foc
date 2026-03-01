@@ -9,6 +9,7 @@
 #include "source/foc/instantiations/FocImpl.hpp"
 #include <QApplication>
 #include <chrono>
+#include <cstdlib>
 #include <format>
 #include <iostream>
 #include <numbers>
@@ -19,6 +20,21 @@ namespace
 {
     constexpr float rpmToRadPerSecFactor = std::numbers::pi_v<float> / 30.0f;
     constexpr int microsecondsPerSecond = 1000000;
+
+    void GuiMessageHandler(QtMsgType type, const QMessageLogContext& /*context*/, const QString& msg)
+    {
+        if (type == QtFatalMsg)
+        {
+            std::cerr << "GUI initialization failed: " << msg.toStdString() << "\n\n"
+                      << "To use the GUI, start an X server (e.g., VcXsrv on Windows) and set:\n"
+                      << "  export DISPLAY=host.docker.internal:0.0\n\n"
+                      << "To run without GUI, set:\n"
+                      << "  export QT_QPA_PLATFORM=offscreen\n";
+            std::exit(1); // NOLINT
+        }
+
+        std::cerr << msg.toStdString() << std::endl;
+    }
 
     foc::RadiansPerSecond ToRadiansPerSecond(float rpm)
     {
@@ -42,6 +58,10 @@ namespace
 
 int main(int argc, char* argv[])
 {
+    if (qEnvironmentVariableIsEmpty("DISPLAY") && qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY"))
+        qputenv("DISPLAY", "host.docker.internal:0.0");
+
+    qInstallMessageHandler(GuiMessageHandler);
     QApplication app(argc, argv);
 
     args::ArgumentParser parser(std::format("{} is a tool to simulate FOC speed control.", argv[0]));
