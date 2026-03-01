@@ -4,6 +4,7 @@ emil_build_for(e_foc.simulator.torque_control HOST All PREREQUISITE_BOOL E_FOC_B
 target_link_libraries(e_foc.simulator.torque_control PUBLIC
     e_foc.simulator.model
     e_foc.simulator.view
+    e_foc.simulator.view.gui
     e_foc.foc.instantiations
     infra.event
     args

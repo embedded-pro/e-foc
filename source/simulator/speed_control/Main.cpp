@@ -4,8 +4,10 @@
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "simulator/model/Jk42bls01X038ed.hpp"
 #include "simulator/model/Model.hpp"
-#include "simulator/view/Plot.hpp"
+#include "simulator/view/gui/Gui.hpp"
+#include "simulator/view/plot/Plot.hpp"
 #include "source/foc/instantiations/FocImpl.hpp"
+#include <QApplication>
 #include <chrono>
 #include <format>
 #include <iostream>
@@ -40,6 +42,8 @@ namespace
 
 int main(int argc, char* argv[])
 {
+    QApplication app(argc, argv);
+
     args::ArgumentParser parser(std::format("{} is a tool to simulate FOC speed control.", argv[0]));
     args::Group positionals(parser, "Positional arguments:");
     args::Positional speedSetPointArgument(positionals, "speedSetPoint", "speed set point for the simulation (in RPM) [default = 100.0 RPM]", 100.0f, args::Options::Single);
@@ -81,6 +85,10 @@ int main(int argc, char* argv[])
         if (loadTorque > 0.0f)
             model.SetLoad(foc::NewtonMeter{ loadTorque });
         simulator::Plot plotter{ model, "FOC Speed Control", "foc_speed_results", std::format("{}/output/simulator/speed_control", PROJECT_ROOT_DIR), timeStep, simulationTime };
+
+        simulator::Gui gui;
+        gui.show();
+
         foc::FocSpeedImpl focSpeed{ foc::Ampere{ maxCurrent }, timeStep };
         foc::Runner focRunner{ model, model, focSpeed };
 

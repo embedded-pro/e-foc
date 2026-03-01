@@ -1,4 +1,4 @@
-#include "source/simulator/view/Plot.hpp"
+#include "source/simulator/view/plot/Plot.hpp"
 #include <chrono>
 #include <iomanip>
 #include <numbers>
