@@ -12,6 +12,10 @@ target_link_libraries(e_foc.simulator.view.gui PUBLIC
 target_sources(e_foc.simulator.view.gui PRIVATE
     Gui.hpp
     Gui.cpp
+    ScopeWidget.hpp
+    ScopeWidget.cpp
+    ScopeToolbar.hpp
+    ScopeToolbar.cpp
 )
 
 set_target_properties(e_foc.simulator.view.gui PROPERTIES

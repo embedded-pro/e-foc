@@ -8,10 +8,12 @@
 #include "simulator/view/plot/Plot.hpp"
 #include "source/foc/instantiations/FocImpl.hpp"
 #include <QApplication>
+#include <QTimer>
 #include <chrono>
 #include <cstdlib>
 #include <format>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 
@@ -26,7 +28,7 @@ namespace
             std::cerr << "GUI initialization failed: " << msg.toStdString() << "\n\n"
                       << "To use the GUI, start an X server (e.g., VcXsrv on Windows) and set:\n"
                       << "  export DISPLAY=host.docker.internal:0.0\n\n"
-                      << "To run without GUI, set:\n"
+                      << "To run without GUI, pass --no-gui or set:\n"
                       << "  export QT_QPA_PLATFORM=offscreen\n";
             std::exit(1); // NOLINT
         }
@@ -49,12 +51,6 @@ namespace
 
 int main(int argc, char* argv[])
 {
-    if (qEnvironmentVariableIsEmpty("DISPLAY") && qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY"))
-        qputenv("DISPLAY", "host.docker.internal:0.0");
-
-    qInstallMessageHandler(GuiMessageHandler);
-    QApplication app(argc, argv);
-
     args::ArgumentParser parser(std::format("{} is a tool to simulate FOC torque control.", argv[0]));
     args::Group positionals(parser, "Positional arguments:");
     args::Positional currentSetPointArgument(positionals, "currentSetPoint", "current set point for the simulation (in Amperes) [default = 0.1 A]", 0.1f, args::Options::Single);
@@ -65,13 +61,40 @@ int main(int argc, char* argv[])
     args::Positional loadTorqueArgument(positionals, "loadTorque", "load torque for the simulation (in N\xC2\xB7m) [default = 0.02 Nm]", 0.02f, args::Options::Single);
     args::Positional timeStepArgument(positionals, "timeStep", "time step for the simulation (in microseconds) [default = 10 us]", 10, args::Options::Single);
     args::Positional simulationTimeArgument(positionals, "simulationTime", "total simulation time (in milliseconds) [default = 1000 ms]", 1000, args::Options::Single);
+    args::Flag noGuiFlag(parser, "no-gui", "Run without GUI (headless mode).", { "no-gui" });
     args::HelpFlag help(parser, "help", "display this help menu.", { 'h', "help" });
 
     try
     {
-        infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
-
         parser.ParseCLI(argc, argv);
+    }
+    catch (const args::Help&)
+    {
+        std::cout << parser;
+        return 0;
+    }
+    catch (const args::ParseError& ex)
+    {
+        std::cerr << ex.what() << std::endl;
+        return 1;
+    }
+
+    const bool enableGui = !noGuiFlag;
+
+    try
+    {
+        if (enableGui)
+        {
+            if (qEnvironmentVariableIsEmpty("DISPLAY") && qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY"))
+                qputenv("DISPLAY", "host.docker.internal:0.0");
+            qInstallMessageHandler(GuiMessageHandler);
+        }
+
+        std::optional<QApplication> app;
+        if (enableGui)
+            app.emplace(argc, argv);
+
+        infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
 
         const auto timeStepUs = args::get(timeStepArgument);
         const auto simulationTimeMs = args::get(simulationTimeArgument);
@@ -85,15 +108,16 @@ int main(int argc, char* argv[])
         const auto baseFrequency = hal::Hertz{ static_cast<uint32_t>(microsecondsPerSecond / timeStepUs) };
         const auto steps = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::duration<float>>(simulationTime).count() / std::chrono::duration_cast<std::chrono::duration<float>>(timeStep).count());
 
-        bool simulationFinished = false;
-
         simulator::ThreePhaseMotorModel model{ simulator::JK42BLS01_X038ED::parameters, foc::Volts{ powerSupplyVoltage }, baseFrequency, steps };
         if (loadTorque > 0.0f)
             model.SetLoad(foc::NewtonMeter{ loadTorque });
-        simulator::Plot plotter{ model, "FOC Torque Control", "foc_torque_results", std::format("{}/output/simulator/torque_control", PROJECT_ROOT_DIR), timeStep, simulationTime };
 
-        simulator::Gui gui;
-        gui.show();
+        std::optional<simulator::Gui> gui;
+        if (enableGui)
+        {
+            gui.emplace();
+            gui->show();
+        }
 
         foc::FocTorqueImpl focTorque;
         foc::Runner focRunner{ model, model, focTorque };
@@ -105,22 +129,30 @@ int main(int argc, char* argv[])
         focTorque.SetPolePairs(simulator::JK42BLS01_X038ED::parameters.p);
         focTorque.SetPoint(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ args::get(currentSetPointArgument) } });
 
+        focRunner.Enable();
+
+        if (enableGui)
+        {
+            QTimer simulationTimer;
+            QObject::connect(&simulationTimer, &QTimer::timeout, [&eventDispatcher]()
+                {
+                    eventDispatcher.ExecuteAllActions();
+                });
+            simulationTimer.start(0);
+            return app->exec();
+        }
+
+        bool simulationFinished = false;
+        simulator::Plot plotter{ model, "FOC Torque Control", "foc_torque_results", std::format("{}/output/simulator/torque_control", PROJECT_ROOT_DIR), timeStep, simulationTime };
         simulator::SimulationFinishedObserver finishedObserver{ model, [&simulationFinished]()
             {
                 simulationFinished = true;
             } };
 
-        focRunner.Enable();
-
         eventDispatcher.ExecuteUntil([&simulationFinished]()
             {
                 return simulationFinished;
             });
-    }
-    catch (const args::Help&)
-    {
-        std::cout << parser;
-        return 0;
     }
     catch (const std::exception& ex)
     {

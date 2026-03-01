@@ -1,5 +1,7 @@
 #pragma once
 
+#include "source/simulator/view/gui/ScopeToolbar.hpp"
+#include "source/simulator/view/gui/ScopeWidget.hpp"
 #include <QGroupBox>
 #include <QLabel>
 #include <QMainWindow>
@@ -38,8 +40,10 @@ namespace simulator
         QLabel& SpeedKiLabel();
         QLabel& SpeedKdLabel();
 
-        QWidget& CurrentChartPlaceholder();
-        QWidget& PositionSpeedChartPlaceholder();
+        ScopeWidget& CurrentScope();
+        ScopeToolbar& CurrentScopeToolbar();
+        ScopeWidget& PositionSpeedScope();
+        ScopeToolbar& PositionSpeedScopeToolbar();
 
     private:
         void SetupUi();
@@ -69,7 +73,9 @@ namespace simulator
         QLabel* speedKiLabel;
         QLabel* speedKdLabel;
 
-        QWidget* currentChartPlaceholder;
-        QWidget* positionSpeedChartPlaceholder;
+        ScopeWidget* currentScope;
+        ScopeToolbar* currentScopeToolbar;
+        ScopeWidget* positionSpeedScope;
+        ScopeToolbar* positionSpeedScopeToolbar;
     };
 }

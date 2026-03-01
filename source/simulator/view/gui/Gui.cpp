@@ -202,26 +202,37 @@ namespace simulator
         auto* panel = QtOwned<QWidget>(this);
         auto* layout = QtOwned<QVBoxLayout>(panel);
 
-        // Phase currents chart placeholder
+        // Phase currents scope
         auto* currentGroup = QtOwned<QGroupBox>("Phase Currents (A, B, C)", this);
         auto* currentLayout = QtOwned<QVBoxLayout>();
 
-        currentChartPlaceholder = QtOwned<QWidget>(this);
-        currentChartPlaceholder->setMinimumHeight(300);
-        currentChartPlaceholder->setStyleSheet("background-color: #1e1e1e;");
-        currentLayout->addWidget(currentChartPlaceholder);
+        currentScope = QtOwned<ScopeWidget>(this);
+        currentScope->SetChannelCount(3);
+        currentScope->SetChannelConfig(0, { "Ia", QColor(0, 150, 255) });
+        currentScope->SetChannelConfig(1, { "Ib", QColor(255, 165, 0) });
+        currentScope->SetChannelConfig(2, { "Ic", QColor(0, 200, 80) });
+
+        currentScopeToolbar = QtOwned<ScopeToolbar>(*currentScope, this);
+
+        currentLayout->addWidget(currentScopeToolbar);
+        currentLayout->addWidget(currentScope);
 
         currentGroup->setLayout(currentLayout);
         layout->addWidget(currentGroup);
 
-        // Position & Speed chart placeholder
+        // Position & Speed scope
         auto* positionSpeedGroup = QtOwned<QGroupBox>("Position && Speed", this);
         auto* positionSpeedLayout = QtOwned<QVBoxLayout>();
 
-        positionSpeedChartPlaceholder = QtOwned<QWidget>(this);
-        positionSpeedChartPlaceholder->setMinimumHeight(300);
-        positionSpeedChartPlaceholder->setStyleSheet("background-color: #1e1e1e;");
-        positionSpeedLayout->addWidget(positionSpeedChartPlaceholder);
+        positionSpeedScope = QtOwned<ScopeWidget>(this);
+        positionSpeedScope->SetChannelCount(2);
+        positionSpeedScope->SetChannelConfig(0, { "θ (rad)", QColor(0, 150, 255) });
+        positionSpeedScope->SetChannelConfig(1, { "ω (rad/s)", QColor(255, 100, 100) });
+
+        positionSpeedScopeToolbar = QtOwned<ScopeToolbar>(*positionSpeedScope, this);
+
+        positionSpeedLayout->addWidget(positionSpeedScopeToolbar);
+        positionSpeedLayout->addWidget(positionSpeedScope);
 
         positionSpeedGroup->setLayout(positionSpeedLayout);
         layout->addWidget(positionSpeedGroup);
@@ -314,13 +325,23 @@ namespace simulator
         return *speedKdLabel;
     }
 
-    QWidget& Gui::CurrentChartPlaceholder()
+    ScopeWidget& Gui::CurrentScope()
     {
-        return *currentChartPlaceholder;
+        return *currentScope;
     }
 
-    QWidget& Gui::PositionSpeedChartPlaceholder()
+    ScopeToolbar& Gui::CurrentScopeToolbar()
     {
-        return *positionSpeedChartPlaceholder;
+        return *currentScopeToolbar;
+    }
+
+    ScopeWidget& Gui::PositionSpeedScope()
+    {
+        return *positionSpeedScope;
+    }
+
+    ScopeToolbar& Gui::PositionSpeedScopeToolbar()
+    {
+        return *positionSpeedScopeToolbar;
     }
 }
