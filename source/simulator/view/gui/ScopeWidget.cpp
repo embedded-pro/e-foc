@@ -320,24 +320,18 @@ namespace simulator
 
         for (auto i = buf.count - 1; i > searchStart; --i)
         {
-            float prev = buf.At(i - 1);
-            float curr = buf.At(i);
+            auto prev = buf.At(i - 1);
+            auto curr = buf.At(i);
 
             if (triggerEdge == TriggerEdge::Rising)
             {
                 if (prev < triggerLevel && curr >= triggerLevel)
-                {
-                    bestTrigger = i;
-                    break;
-                }
+                    return i;
             }
             else
             {
                 if (prev > triggerLevel && curr <= triggerLevel)
-                {
-                    bestTrigger = i;
-                    break;
-                }
+                    return i;
             }
         }
 

@@ -39,9 +39,9 @@ namespace simulator
         };
 
         constexpr int defaultTimeDivIndex = 9; // 10 ms/div
-        constexpr float triggerSpinMin = -100.0;
-        constexpr float triggerSpinMax = 100.0;
-        constexpr float triggerSpinStep = 0.01;
+        constexpr float triggerSpinMin = -100.0f;
+        constexpr float triggerSpinMax = 100.0f;
+        constexpr float triggerSpinStep = 0.01f;
         constexpr int triggerSpinDecimals = 3;
     }
 

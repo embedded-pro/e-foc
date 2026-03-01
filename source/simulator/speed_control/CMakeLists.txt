@@ -5,6 +5,7 @@ target_link_libraries(e_foc.simulator.speed_control PUBLIC
     e_foc.simulator.model
     e_foc.simulator.view
     e_foc.simulator.view.gui
+    e_foc.simulator.headless
     e_foc.foc.instantiations
     infra.event
     args

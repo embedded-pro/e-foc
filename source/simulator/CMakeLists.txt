@@ -28,5 +28,6 @@ qt_standard_project_setup()
 
 add_subdirectory(model)
 add_subdirectory(view)
+add_subdirectory(headless)
 add_subdirectory(speed_control)
 add_subdirectory(torque_control)
