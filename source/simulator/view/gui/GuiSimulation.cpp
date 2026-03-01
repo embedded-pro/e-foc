@@ -23,7 +23,7 @@ namespace simulator
 
         QObject::connect(&eventLoopTimer, &QTimer::timeout, [&eventDispatcher]()
             {
-                eventDispatcher.ExecuteAllActions();
+                eventDispatcher.ExecuteFirstAction();
             });
         eventLoopTimer.start(0);
     }
@@ -33,9 +33,9 @@ namespace simulator
         return gui;
     }
 
-    int GuiSimulation::Run()
+    int GuiSimulation::Run() const
     {
-        return app.exec();
+        return QApplication::exec();
     }
 
     void GuiSimulation::Init()

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QTimer>
 #include <QWidget>
 #include <array>
 #include <cstddef>
@@ -108,5 +109,7 @@ namespace simulator
 
         std::size_t lastTriggerPoint = 0;
         float previousTriggerSample = 0.0f;
+
+        QTimer refreshTimer;
     };
 }

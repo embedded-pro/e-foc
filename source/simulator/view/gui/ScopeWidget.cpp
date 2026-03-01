@@ -79,6 +79,9 @@ namespace simulator
 
         for (auto& buf : ringBuffers)
             buf.Resize(ringBufferCapacity);
+
+        connect(&refreshTimer, &QTimer::timeout, this, QOverload<>::of(&QWidget::update));
+        refreshTimer.start(33);
     }
 
     void ScopeWidget::SetChannelCount(std::size_t count)

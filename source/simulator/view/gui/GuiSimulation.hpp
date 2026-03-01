@@ -16,7 +16,7 @@ namespace simulator
             const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters);
 
         Gui& GetGui();
-        int Run();
+        int Run() const;
 
         static void Init();
 
