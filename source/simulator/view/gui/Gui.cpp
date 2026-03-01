@@ -2,7 +2,10 @@
 #include <QFont>
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QString>
 #include <QVBoxLayout>
+#include <array>
+#include <cmath>
 #include <memory>
 
 namespace simulator
@@ -27,15 +30,47 @@ namespace simulator
         }
     }
 
-    Gui::Gui(QWidget* parent)
+    Gui::Gui(ThreePhaseMotorModel& model, const ThreePhaseMotorModel::Parameters& motorParameters, const PidParameters& pidParameters, QWidget* parent)
         : QMainWindow(parent)
+        , ThreePhaseMotorModelObserver(model)
+        , motorParameters(motorParameters)
+        , pidParameters(pidParameters)
     {
         SetupUi();
+        PopulateMotorParameters();
+        PopulatePidParameters();
+    }
+
+    void Gui::Started()
+    {
+        statusLabel->setText("Running");
+        hasPreviousTheta = false;
+    }
+
+    void Gui::PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta)
+    {
+        const std::array<float, 3> currents = { currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() };
+        currentScope->AddSample(currents);
+
+        float omega = 0.0f;
+        if (hasPreviousTheta)
+            omega = theta.Value() - previousTheta.Value();
+
+        previousTheta = theta;
+        hasPreviousTheta = true;
+
+        const std::array<float, 2> positionSpeed = { theta.Value(), omega };
+        positionSpeedScope->AddSample(positionSpeed);
+    }
+
+    void Gui::Finished()
+    {
+        statusLabel->setText("Finished");
     }
 
     void Gui::SetupUi()
     {
-        setWindowTitle("FOC Motor Controller Simulator");
+        setWindowTitle("e-foc Simulator");
         setFixedSize(windowWidth, windowHeight);
 
         auto* centralWidget = QtOwned<QWidget>(this);
@@ -45,6 +80,16 @@ namespace simulator
         mainLayout->addWidget(CreateLeftPanel(), leftPanelStretch);
         mainLayout->addWidget(CreateMiddlePanel(), middlePanelStretch);
         mainLayout->addWidget(CreateRightPanel(), rightPanelStretch);
+    }
+
+    void Gui::SetEditable(bool editable)
+    {
+        alignButton->setEnabled(editable);
+        identifyElectricalButton->setEnabled(editable);
+        identifyMechanicalButton->setEnabled(editable);
+        speedSlider->setEnabled(editable);
+        startButton->setEnabled(editable);
+        stopButton->setEnabled(!editable);
     }
 
     QWidget* Gui::CreateLeftPanel()
@@ -112,6 +157,22 @@ namespace simulator
         layout->addWidget(statusGroup);
 
         layout->addStretch();
+
+        connect(startButton, &QPushButton::clicked, this, [this]()
+            {
+                SetEditable(false);
+            });
+
+        connect(stopButton, &QPushButton::clicked, this, [this]()
+            {
+                SetEditable(true);
+            });
+
+        connect(speedSlider, &QSlider::valueChanged, this, [this](int value)
+            {
+                speedValueLabel->setText(QString("%1 RPM").arg(value));
+            });
+
         return panel;
     }
 
@@ -240,108 +301,20 @@ namespace simulator
         return panel;
     }
 
-    QPushButton& Gui::AlignButton()
+    void Gui::PopulateMotorParameters()
     {
-        return *alignButton;
+        resistanceLabel->setText(QString::number(static_cast<double>(motorParameters.R.Value()), 'g', 4) + " Ω");
+        inductanceLabel->setText(QString::number(static_cast<double>(motorParameters.Ld.Value()), 'g', 4) + " H");
+        frictionLabel->setText(QString::number(static_cast<double>(motorParameters.B.Value()), 'g', 4) + " N·m·s/rad");
+        inertiaLabel->setText(QString::number(static_cast<double>(motorParameters.J.Value()), 'g', 4) + " kg·m²");
     }
 
-    QPushButton& Gui::IdentifyElectricalButton()
+    void Gui::PopulatePidParameters()
     {
-        return *identifyElectricalButton;
-    }
-
-    QPushButton& Gui::IdentifyMechanicalButton()
-    {
-        return *identifyMechanicalButton;
-    }
-
-    QPushButton& Gui::StartButton()
-    {
-        return *startButton;
-    }
-
-    QPushButton& Gui::StopButton()
-    {
-        return *stopButton;
-    }
-
-    QSlider& Gui::SpeedSlider()
-    {
-        return *speedSlider;
-    }
-
-    QLabel& Gui::SpeedValueLabel()
-    {
-        return *speedValueLabel;
-    }
-
-    QLabel& Gui::StatusLabel()
-    {
-        return *statusLabel;
-    }
-
-    QLabel& Gui::ResistanceLabel()
-    {
-        return *resistanceLabel;
-    }
-
-    QLabel& Gui::InductanceLabel()
-    {
-        return *inductanceLabel;
-    }
-
-    QLabel& Gui::FrictionLabel()
-    {
-        return *frictionLabel;
-    }
-
-    QLabel& Gui::InertiaLabel()
-    {
-        return *inertiaLabel;
-    }
-
-    QLabel& Gui::CurrentKpLabel()
-    {
-        return *currentKpLabel;
-    }
-
-    QLabel& Gui::CurrentKiLabel()
-    {
-        return *currentKiLabel;
-    }
-
-    QLabel& Gui::SpeedKpLabel()
-    {
-        return *speedKpLabel;
-    }
-
-    QLabel& Gui::SpeedKiLabel()
-    {
-        return *speedKiLabel;
-    }
-
-    QLabel& Gui::SpeedKdLabel()
-    {
-        return *speedKdLabel;
-    }
-
-    ScopeWidget& Gui::CurrentScope()
-    {
-        return *currentScope;
-    }
-
-    ScopeToolbar& Gui::CurrentScopeToolbar()
-    {
-        return *currentScopeToolbar;
-    }
-
-    ScopeWidget& Gui::PositionSpeedScope()
-    {
-        return *positionSpeedScope;
-    }
-
-    ScopeToolbar& Gui::PositionSpeedScopeToolbar()
-    {
-        return *positionSpeedScopeToolbar;
+        currentKpLabel->setText(QString::number(static_cast<double>(pidParameters.currentKp), 'g', 6));
+        currentKiLabel->setText(QString::number(static_cast<double>(pidParameters.currentKi), 'g', 6));
+        speedKpLabel->setText(QString::number(static_cast<double>(pidParameters.speedKp), 'g', 6));
+        speedKiLabel->setText(QString::number(static_cast<double>(pidParameters.speedKi), 'g', 6));
+        speedKdLabel->setText(QString::number(static_cast<double>(pidParameters.speedKd), 'g', 6));
     }
 }

@@ -129,7 +129,10 @@ int main(int argc, char* argv[])
         std::optional<simulator::Gui> gui;
         if (enableGui)
         {
-            gui.emplace();
+            gui.emplace(model, simulator::JK42BLS01_X038ED::parameters,
+                simulator::Gui::PidParameters{
+                    args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument),
+                    args::get(kpSpeedArgument), args::get(kiSpeedArgument), args::get(kdSpeedArgument) });
             gui->show();
         }
 

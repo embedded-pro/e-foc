@@ -7,6 +7,7 @@ target_include_directories(e_foc.simulator.view.gui PUBLIC
 
 target_link_libraries(e_foc.simulator.view.gui PUBLIC
     Qt6::Widgets
+    e_foc.simulator.model
 )
 
 target_sources(e_foc.simulator.view.gui PRIVATE

@@ -115,7 +115,10 @@ int main(int argc, char* argv[])
         std::optional<simulator::Gui> gui;
         if (enableGui)
         {
-            gui.emplace();
+            gui.emplace(model, simulator::JK42BLS01_X038ED::parameters,
+                simulator::Gui::PidParameters{
+                    args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument),
+                    0.0f, 0.0f, 0.0f });
             gui->show();
         }
 
