@@ -165,6 +165,22 @@ namespace simulator
         }
     }
 
+    void ScopeWidget::Clear()
+    {
+        for (std::size_t i = 0; i < maxChannels; ++i)
+        {
+            std::fill(ringBuffers[i].data.begin(), ringBuffers[i].data.end(), 0.0f);
+            ringBuffers[i].head = 0;
+            ringBuffers[i].count = 0;
+        }
+
+        triggered = false;
+        singleShotDone = false;
+        lastTriggerPoint = 0;
+        previousTriggerSample = 0.0f;
+        update();
+    }
+
     void ScopeWidget::SetRunning(bool run)
     {
         running = run;

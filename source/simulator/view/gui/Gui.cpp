@@ -21,10 +21,13 @@ namespace simulator
         }
     }
 
-    Gui::Gui(ThreePhaseMotorModel& model, foc::Runner& runner, const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters, QWidget* parent)
+    Gui::Gui(ThreePhaseMotorModel& model, foc::Runner& runner, infra::EventDispatcherWithWeakPtr& eventDispatcher,
+        const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters, QWidget* parent)
         : QMainWindow(parent)
         , ThreePhaseMotorModelObserver(model)
+        , model(model)
         , runner(runner)
+        , eventDispatcher(eventDispatcher)
     {
         setWindowTitle("e-foc Simulator");
         setFixedSize(windowWidth, windowHeight);
@@ -43,6 +46,9 @@ namespace simulator
 
         connect(controlPanel, &ControlPanel::startClicked, this, [this]()
             {
+                while (!this->eventDispatcher.IsIdle())
+                    this->eventDispatcher.ExecuteFirstAction();
+
                 this->runner.Enable();
             });
 
@@ -52,12 +58,19 @@ namespace simulator
             });
 
         connect(controlPanel, &ControlPanel::speedChanged, this, &Gui::speedChanged);
+
+        connect(controlPanel, &ControlPanel::loadChanged, this, [this](double torqueNm)
+            {
+                this->model.SetLoad(foc::NewtonMeter{ static_cast<float>(torqueNm) });
+            });
     }
 
     void Gui::Started()
     {
         controlPanel->SetStatus("Running");
+        scopesPanel->Clear();
         hasPreviousTheta = false;
+        previousTheta = foc::Radians{ 0.0f };
     }
 
     void Gui::PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QDoubleSpinBox>
 #include <QGroupBox>
 #include <QLabel>
 #include <QPushButton>
@@ -23,6 +24,7 @@ namespace simulator
         void startClicked();
         void stopClicked();
         void speedChanged(int rpm);
+        void loadChanged(double torqueNm);
 
     private:
         QPushButton* alignButton;
@@ -32,6 +34,7 @@ namespace simulator
         QPushButton* stopButton;
         QSlider* speedSlider;
         QLabel* speedValueLabel;
+        QDoubleSpinBox* loadSpinBox;
         QLabel* statusLabel;
     };
 }

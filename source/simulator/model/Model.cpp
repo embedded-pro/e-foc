@@ -79,6 +79,10 @@ namespace simulator
         ia = foc::Ampere{ 0.0f };
         ib = foc::Ampere{ 0.0f };
         ic = foc::Ampere{ 0.0f };
+        theta = foc::Radians{ 0.0f };
+        theta_mech = foc::Radians{ 0.0f };
+        omega = foc::RadiansPerSecond{ 0.0f };
+        omega_mech = foc::RadiansPerSecond{ 0.0f };
 
         NotifyObservers([](auto& observer)
             {

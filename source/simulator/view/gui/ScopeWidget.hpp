@@ -51,6 +51,7 @@ namespace simulator
         void SetSamplePeriod(float seconds);
 
         void AddSample(std::span<const float> channelValues);
+        void Clear();
         void SetRunning(bool running);
         void ForceTrigger();
 

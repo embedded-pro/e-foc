@@ -17,13 +17,16 @@ namespace simulator
     GuiSimulation::GuiSimulation(int& argc, char** argv, ThreePhaseMotorModel& model, foc::Runner& runner, infra::EventDispatcherWithWeakPtr& eventDispatcher,
         const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters)
         : app(InitAndPassArgc(argc), argv)
-        , gui(model, runner, motorParameters, pidParameters)
+        , gui(model, runner, eventDispatcher, motorParameters, pidParameters)
     {
         gui.show();
 
         QObject::connect(&eventLoopTimer, &QTimer::timeout, [&eventDispatcher]()
             {
-                eventDispatcher.ExecuteFirstAction();
+                constexpr int batchSize = 1000;
+
+                for (int i = 0; i < batchSize && !eventDispatcher.IsIdle(); ++i)
+                    eventDispatcher.ExecuteFirstAction();
             });
         eventLoopTimer.start(0);
     }

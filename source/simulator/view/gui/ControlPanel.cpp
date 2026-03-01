@@ -1,4 +1,5 @@
 #include "source/simulator/view/gui/ControlPanel.hpp"
+#include <QDoubleSpinBox>
 #include <QFont>
 #include <QGroupBox>
 #include <QString>
@@ -73,6 +74,24 @@ namespace simulator
         controlGroup->setLayout(controlLayout);
         layout->addWidget(controlGroup);
 
+        // Load group
+        auto* loadGroup = QtOwned<QGroupBox>("Load", this);
+        auto* loadLayout = QtOwned<QVBoxLayout>();
+
+        auto* loadLabel = QtOwned<QLabel>("Torque (N\xC2\xB7m):", this);
+        loadLayout->addWidget(loadLabel);
+
+        loadSpinBox = QtOwned<QDoubleSpinBox>(this);
+        loadSpinBox->setRange(0.0, 1.0);
+        loadSpinBox->setSingleStep(0.001);
+        loadSpinBox->setDecimals(4);
+        loadSpinBox->setValue(0.02);
+        loadSpinBox->setSuffix(" N\xC2\xB7m");
+        loadLayout->addWidget(loadSpinBox);
+
+        loadGroup->setLayout(loadLayout);
+        layout->addWidget(loadGroup);
+
         // Status group
         auto* statusGroup = QtOwned<QGroupBox>("Status", this);
         auto* statusLayout = QtOwned<QVBoxLayout>();
@@ -103,6 +122,11 @@ namespace simulator
                 speedValueLabel->setText(QString("%1 RPM").arg(value));
                 emit speedChanged(value);
             });
+
+        connect(loadSpinBox, &QDoubleSpinBox::valueChanged, this, [this](double value)
+            {
+                emit loadChanged(value);
+            });
     }
 
     void ControlPanel::SetEditable(bool editable)
@@ -111,6 +135,7 @@ namespace simulator
         identifyElectricalButton->setEnabled(editable);
         identifyMechanicalButton->setEnabled(editable);
         speedSlider->setEnabled(editable);
+        loadSpinBox->setEnabled(editable);
         startButton->setEnabled(editable);
         stopButton->setEnabled(!editable);
     }

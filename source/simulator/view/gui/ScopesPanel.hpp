@@ -17,6 +17,7 @@ namespace simulator
 
         void AddCurrentSample(std::span<const float> sample);
         void AddPositionSpeedSample(std::span<const float> sample);
+        void Clear();
 
     private:
         ScopeWidget* currentScope;

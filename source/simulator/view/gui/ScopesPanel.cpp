@@ -65,4 +65,10 @@ namespace simulator
     {
         positionSpeedScope->AddSample(sample);
     }
+
+    void ScopesPanel::Clear()
+    {
+        currentScope->Clear();
+        positionSpeedScope->Clear();
+    }
 }
