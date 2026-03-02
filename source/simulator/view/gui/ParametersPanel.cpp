@@ -109,4 +109,13 @@ namespace simulator
         speedKiLabel->setText(QString::number(static_cast<double>(pidParameters.speedKi), 'g', 6));
         speedKdLabel->setText(QString::number(static_cast<double>(pidParameters.speedKd), 'g', 6));
     }
+
+    void ParametersPanel::UpdatePidParameters(const PidParameters& pidParameters)
+    {
+        currentKpLabel->setText(QString::number(static_cast<double>(pidParameters.currentKp), 'g', 6));
+        currentKiLabel->setText(QString::number(static_cast<double>(pidParameters.currentKi), 'g', 6));
+        speedKpLabel->setText(QString::number(static_cast<double>(pidParameters.speedKp), 'g', 6));
+        speedKiLabel->setText(QString::number(static_cast<double>(pidParameters.speedKi), 'g', 6));
+        speedKdLabel->setText(QString::number(static_cast<double>(pidParameters.speedKd), 'g', 6));
+    }
 }

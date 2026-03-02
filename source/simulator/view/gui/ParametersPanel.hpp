@@ -24,6 +24,8 @@ namespace simulator
 
         ParametersPanel(const ThreePhaseMotorModel::Parameters& motorParameters, const PidParameters& pidParameters, QWidget* parent = nullptr);
 
+        void UpdatePidParameters(const PidParameters& pidParameters);
+
     private:
         QLabel* resistanceLabel;
         QLabel* inductanceLabel;

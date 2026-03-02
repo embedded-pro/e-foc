@@ -169,7 +169,7 @@ namespace simulator
     {
         for (std::size_t i = 0; i < maxChannels; ++i)
         {
-            std::fill(ringBuffers[i].data.begin(), ringBuffers[i].data.end(), 0.0f);
+            std::ranges::fill(ringBuffers[i].data, 0.0f);
             ringBuffers[i].head = 0;
             ringBuffers[i].count = 0;
         }

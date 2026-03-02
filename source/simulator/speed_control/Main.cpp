@@ -119,9 +119,19 @@ int main(int argc, char* argv[])
 
             simulator::GuiSimulation simulation{ argc, argv, model, focRunner, eventDispatcher, simulator::JK42BLS01_X038ED::parameters, pidParameters };
 
-            QObject::connect(&simulation.GetGui(), &simulator::Gui::speedChanged, [&focSpeed](int rpm)
+            auto& gui = simulation.GetGui();
+            QObject::connect(&gui, &simulator::Gui::speedChanged, [&focSpeed, &gui, powerSupplyVoltage, &pidParameters](int rpm)
                 {
                     focSpeed.SetPoint(ToRadiansPerSecond(static_cast<float>(rpm)));
+
+                    focSpeed.SetSpeedTunings(foc::Volts{ powerSupplyVoltage },
+                        controllers::PidTunings<float>{ pidParameters.speedKp, pidParameters.speedKi, pidParameters.speedKd });
+                    focSpeed.SetCurrentTunings(foc::Volts{ powerSupplyVoltage },
+                        foc::IdAndIqTunings{
+                            { pidParameters.currentKp, pidParameters.currentKi, pidParameters.currentKd },
+                            { pidParameters.currentKp, pidParameters.currentKi, pidParameters.currentKd } });
+
+                    gui.UpdatePidParameters(pidParameters);
                 });
 
             return simulation.Run();

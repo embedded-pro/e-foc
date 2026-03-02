@@ -28,6 +28,9 @@ namespace simulator
     signals:
         void speedChanged(int rpm);
 
+    public:
+        void UpdatePidParameters(const ParametersPanel::PidParameters& pidParameters);
+
     private:
         ThreePhaseMotorModel& model;
         foc::Runner& runner;

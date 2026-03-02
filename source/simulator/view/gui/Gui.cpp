@@ -94,4 +94,9 @@ namespace simulator
         controlPanel->SetStatus("Finished");
         controlPanel->SetEditable(true);
     }
+
+    void Gui::UpdatePidParameters(const ParametersPanel::PidParameters& pidParameters)
+    {
+        parametersPanel->UpdatePidParameters(pidParameters);
+    }
 }

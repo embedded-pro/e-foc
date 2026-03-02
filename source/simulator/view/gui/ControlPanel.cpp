@@ -134,8 +134,6 @@ namespace simulator
         alignButton->setEnabled(editable);
         identifyElectricalButton->setEnabled(editable);
         identifyMechanicalButton->setEnabled(editable);
-        speedSlider->setEnabled(editable);
-        loadSpinBox->setEnabled(editable);
         startButton->setEnabled(editable);
         stopButton->setEnabled(!editable);
     }
