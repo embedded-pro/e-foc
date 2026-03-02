@@ -1,4 +1,4 @@
-#include "source/foc/instantiations/TrigonometricImpl.hpp"
+#include "source/foc/implementations/TrigonometricImpl.hpp"
 
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC optimize("O3", "fast-math")

@@ -1,5 +1,5 @@
 #include "simulator/model/Model.hpp"
-#include "foc/instantiations/TrigonometricImpl.hpp"
+#include "foc/implementations/TrigonometricImpl.hpp"
 #include "foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "foc/instantiations/TrigonometricImpl.hpp"
+#include "foc/implementations/TrigonometricImpl.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "services/alignment/TerminalMotorAlignment.hpp"
 #include "services/parameter_identification/TerminalElectricalParametersIdentification.hpp"

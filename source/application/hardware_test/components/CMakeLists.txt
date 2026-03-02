@@ -10,7 +10,7 @@ target_link_libraries(e_foc.hardware_test.components PUBLIC
     e_foc.hardware
     services.util
     services.tracer
-    e_foc.foc.instantiations
+    e_foc.foc.implementations
 )
 
 target_sources(e_foc.hardware_test.components PRIVATE

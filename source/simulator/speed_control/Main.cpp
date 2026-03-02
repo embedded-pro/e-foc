@@ -7,7 +7,7 @@
 #include "simulator/model/Model.hpp"
 #include "simulator/view/gui/GuiSimulation.hpp"
 #include "simulator/view/gui/ParametersPanel.hpp"
-#include "source/foc/instantiations/FocImpl.hpp"
+#include "source/foc/implementations/FocSpeedImpl.hpp"
 #include <chrono>
 #include <format>
 #include <iostream>

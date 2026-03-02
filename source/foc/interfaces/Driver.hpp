@@ -26,6 +26,13 @@ namespace foc
         reverse,
     };
 
+    class LowPriorityInterrupt
+    {
+    public:
+        virtual void Trigger() = 0;
+        virtual void Register(const infra::Function<void()>& handler) = 0;
+    };
+
     class Encoder
     {
     public:

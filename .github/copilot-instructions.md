@@ -35,7 +35,6 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 4) Patterns & code locations (concrete examples)
 - Add a new FOC algorithm:
   - Implement code in `source/foc/implementations/` and keep public interfaces in `source/foc/interfaces/`.
-  - Add an instantiation in `source/foc/instantiations/` to wire DI and platform adapters.
   - Motor-specific application code now lives under `source/application/` (renamed from `application/motors`).
 - Hardware abstraction & factory: see `source/hardware/HardwareFactory.hpp` for how peripherals and adapters are created and injected.
 - Numerical algorithms: follow patterns in `numerical-toolbox/` — implement float first, then Q15/Q31 variants, and add typed GoogleTest suites.

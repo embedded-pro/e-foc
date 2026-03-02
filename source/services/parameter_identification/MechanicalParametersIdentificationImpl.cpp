@@ -1,5 +1,5 @@
 #include "source/services/parameter_identification/MechanicalParametersIdentificationImpl.hpp"
-#include "source/foc/instantiations/TrigonometricImpl.hpp"
+#include "source/foc/implementations/TrigonometricImpl.hpp"
 #include "source/foc/interfaces/Units.hpp"
 #include <cmath>
 #include <numbers>
