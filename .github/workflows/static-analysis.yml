@@ -45,6 +45,7 @@ jobs:
           save: ${{ github.ref == 'refs/heads/main' }}
       - name: Build & Collect Coverage
         run: |
+          apt-get update && apt-get install -y --no-install-recommends qt6-base-dev libgl1-mesa-dev
           cmake --preset coverage -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build --preset coverage
           GTEST_OUTPUT="xml:${PWD}/testresults/" ctest --preset coverage

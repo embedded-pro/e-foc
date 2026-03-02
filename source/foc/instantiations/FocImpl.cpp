@@ -33,6 +33,7 @@ namespace foc
     {
         dPid.Enable();
         qPid.Enable();
+        SetPoint(lastSetPoint);
     }
 
     OPTIMIZE_FOR_SPEED
@@ -50,6 +51,7 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     void FocTorqueImpl::SetPoint(IdAndIqPoint setPoint)
     {
+        lastSetPoint = setPoint;
         dPid.SetPoint(setPoint.first.Value());
         qPid.SetPoint(setPoint.second.Value());
     }
@@ -111,6 +113,7 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     void FocSpeedImpl::SetPoint(RadiansPerSecond point)
     {
+        lastSpeedSetPoint = point;
         speedPid.SetPoint(point.Value());
         dPid.SetPoint(0.0f);
     }
@@ -151,6 +154,7 @@ namespace foc
         qPid.Enable();
 
         previousPosition = 0.0f;
+        SetPoint(lastSpeedSetPoint);
     }
 
     OPTIMIZE_FOR_SPEED

@@ -2,14 +2,17 @@
 #include "foc/implementations/Runner.hpp"
 #include "foc/interfaces/Units.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "simulator/headless/HeadlessSimulation.hpp"
 #include "simulator/model/Jk42bls01X038ed.hpp"
 #include "simulator/model/Model.hpp"
-#include "simulator/view/Plot.hpp"
+#include "simulator/view/gui/GuiSimulation.hpp"
+#include "simulator/view/gui/ParametersPanel.hpp"
 #include "source/foc/instantiations/FocImpl.hpp"
 #include <chrono>
 #include <format>
 #include <iostream>
 #include <numbers>
+#include <optional>
 #include <stdexcept>
 #include <string>
 
@@ -54,13 +57,29 @@ int main(int argc, char* argv[])
     args::Positional loadTorqueArgument(positionals, "loadTorque", "load torque for the simulation (in N·m) [default = 0.02 Nm]", 0.02f, args::Options::Single);
     args::Positional timeStepArgument(positionals, "timeStep", "time step for the simulation (in microseconds) [default = 10 us]", 10, args::Options::Single);
     args::Positional simulationTimeArgument(positionals, "simulationTime", "total simulation time (in milliseconds) [default = 1000 ms]", 1000, args::Options::Single);
+    args::Flag noGuiFlag(parser, "no-gui", "Run without GUI (headless mode).", { "no-gui" });
     args::HelpFlag help(parser, "help", "display this help menu.", { 'h', "help" });
 
     try
     {
-        infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
-
         parser.ParseCLI(argc, argv);
+    }
+    catch (const args::Help&)
+    {
+        std::cout << parser;
+        return 0;
+    }
+    catch (const args::ParseError& ex)
+    {
+        std::cerr << ex.what() << std::endl;
+        return 1;
+    }
+
+    const bool enableGui = !noGuiFlag;
+
+    try
+    {
+        infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
 
         const auto timeStepUs = args::get(timeStepArgument);
         const auto simulationTimeMs = args::get(simulationTimeArgument);
@@ -75,12 +94,10 @@ int main(int argc, char* argv[])
         const auto baseFrequency = hal::Hertz{ static_cast<uint32_t>(microsecondsPerSecond / timeStepUs) };
         const auto steps = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::duration<float>>(simulationTime).count() / std::chrono::duration_cast<std::chrono::duration<float>>(timeStep).count());
 
-        bool simulationFinished = false;
-
-        simulator::ThreePhaseMotorModel model{ simulator::JK42BLS01_X038ED::parameters, foc::Volts{ powerSupplyVoltage }, baseFrequency, steps };
+        simulator::ThreePhaseMotorModel model{ simulator::JK42BLS01_X038ED::parameters, foc::Volts{ powerSupplyVoltage }, baseFrequency, enableGui ? std::optional<std::size_t>{} : std::optional<std::size_t>{ steps } };
         if (loadTorque > 0.0f)
             model.SetLoad(foc::NewtonMeter{ loadTorque });
-        simulator::Plot plotter{ model, "FOC Speed Control", "foc_speed_results", std::format("{}/output/simulator/speed_control", PROJECT_ROOT_DIR), timeStep, simulationTime };
+
         foc::FocSpeedImpl focSpeed{ foc::Ampere{ maxCurrent }, timeStep };
         foc::Runner focRunner{ model, model, focSpeed };
 
@@ -93,22 +110,37 @@ int main(int argc, char* argv[])
         focSpeed.SetPolePairs(simulator::JK42BLS01_X038ED::parameters.p);
         focSpeed.SetPoint(ToRadiansPerSecond(args::get(speedSetPointArgument)));
 
-        simulator::SimulationFinishedObserver finishedObserver{ model, [&simulationFinished]()
-            {
-                simulationFinished = true;
-            } };
+        if (enableGui)
+        {
+            const simulator::ParametersPanel::PidParameters pidParameters{
+                args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument),
+                args::get(kpSpeedArgument), args::get(kiSpeedArgument), args::get(kdSpeedArgument)
+            };
 
-        focRunner.Enable();
+            simulator::GuiSimulation simulation{ argc, argv, model, focRunner, eventDispatcher, simulator::JK42BLS01_X038ED::parameters, pidParameters };
 
-        eventDispatcher.ExecuteUntil([&simulationFinished]()
-            {
-                return simulationFinished;
-            });
-    }
-    catch (const args::Help&)
-    {
-        std::cout << parser;
-        return 0;
+            auto& gui = simulation.GetGui();
+            QObject::connect(&gui, &simulator::Gui::speedChanged, [&focSpeed, &gui, powerSupplyVoltage, &pidParameters](int rpm)
+                {
+                    focSpeed.SetPoint(ToRadiansPerSecond(static_cast<float>(rpm)));
+
+                    focSpeed.SetSpeedTunings(foc::Volts{ powerSupplyVoltage },
+                        controllers::PidTunings<float>{ pidParameters.speedKp, pidParameters.speedKi, pidParameters.speedKd });
+                    focSpeed.SetCurrentTunings(foc::Volts{ powerSupplyVoltage },
+                        foc::IdAndIqTunings{
+                            { pidParameters.currentKp, pidParameters.currentKi, pidParameters.currentKd },
+                            { pidParameters.currentKp, pidParameters.currentKi, pidParameters.currentKd } });
+
+                    gui.UpdatePidParameters(pidParameters);
+                });
+
+            return simulation.Run();
+        }
+
+        simulator::HeadlessSimulation simulation{ model, focRunner, eventDispatcher,
+            "FOC Speed Control", "foc_speed_results", std::format("{}/output/simulator/speed_control", PROJECT_ROOT_DIR),
+            timeStep, simulationTime };
+        simulation.Run();
     }
     catch (const std::exception& ex)
     {
