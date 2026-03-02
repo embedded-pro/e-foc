@@ -26,6 +26,7 @@ namespace foc
         controllers::PidIncrementalSynchronous<float> qPid{ { 0.0f, 0.0f, 0.0f }, { -1.0f, 1.0f } };
         [[no_unique_address]] SpaceVectorModulation spaceVectorModulator;
         float polePairs;
+        IdAndIqPoint lastSetPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
     };
 
     class FocSpeedImpl
@@ -55,5 +56,6 @@ namespace foc
         float previousPosition = 0.0f;
         float dt;
         float polePairs;
+        RadiansPerSecond lastSpeedSetPoint{ 0.0f };
     };
 }
