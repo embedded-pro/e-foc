@@ -47,7 +47,7 @@ namespace foc
         virtual std::pair<HallState, Direction> Read() const = 0;
     };
 
-    class MotorDriver
+    class ThreePhaseInverter
     {
     public:
         virtual void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(PhaseCurrents currentPhases)>& onDone) = 0;
@@ -55,5 +55,15 @@ namespace foc
         virtual void Start() = 0;
         virtual void Stop() = 0;
         virtual hal::Hertz BaseFrequency() const = 0;
+    };
+
+    class Controllable
+    {
+    public:
+        virtual void Start() = 0;
+        virtual void Stop() = 0;
+
+    protected:
+        ~Controllable() = default;
     };
 }

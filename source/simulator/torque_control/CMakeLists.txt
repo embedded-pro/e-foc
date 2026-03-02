@@ -6,7 +6,7 @@ target_link_libraries(e_foc.simulator.torque_control PUBLIC
     e_foc.simulator.view
     e_foc.simulator.view.gui
     e_foc.simulator.headless
-    e_foc.foc.implementations
+    e_foc.foc.instantiations
     infra.event
     args
 )

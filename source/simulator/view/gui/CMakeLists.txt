@@ -8,7 +8,7 @@ target_include_directories(e_foc.simulator.view.gui PUBLIC
 target_link_libraries(e_foc.simulator.view.gui PUBLIC
     Qt6::Widgets
     e_foc.simulator.model
-    e_foc.foc.implementations
+    e_foc.foc.interfaces
     infra.event
 )
 

@@ -14,7 +14,7 @@ namespace services
         : public ElectricalParametersIdentification
     {
     public:
-        ElectricalParametersIdentificationImpl(foc::MotorDriver& driver, foc::Encoder& encoder, foc::Volts vdc);
+        ElectricalParametersIdentificationImpl(foc::ThreePhaseInverter& driver, foc::Encoder& encoder, foc::Volts vdc);
 
         void EstimateResistanceAndInductance(const ResistanceAndInductanceConfig& config, const infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)>& onDone) override;
         void EstimateNumberOfPolePairs(const PolePairsConfig& config, const infra::Function<void(std::optional<std::size_t>)>& onDone) override;
@@ -30,7 +30,7 @@ namespace services
         constexpr static std::size_t inductanceSamplesSize = 128;
         constexpr static std::size_t averageFilter = 5;
 
-        foc::MotorDriver& driver;
+        foc::ThreePhaseInverter& driver;
         foc::Encoder& encoder;
         foc::Volts vdc;
         [[no_unique_address]] foc::ClarkePark transforms;

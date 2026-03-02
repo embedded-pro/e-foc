@@ -1,12 +1,11 @@
 #include "source/simulator/headless/HeadlessSimulation.hpp"
-#include "foc/implementations/Runner.hpp"
 
 namespace simulator
 {
-    HeadlessSimulation::HeadlessSimulation(ThreePhaseMotorModel& model, foc::Runner& runner, infra::EventDispatcherWithWeakPtr& eventDispatcher,
+    HeadlessSimulation::HeadlessSimulation(ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
         const std::string& title, const std::string& filename, const std::string& outputDirectory,
         std::chrono::microseconds timeStep, std::chrono::milliseconds simulationTime)
-        : runner(runner)
+        : controller(controller)
         , eventDispatcher(eventDispatcher)
         , plotter(model, title, filename, outputDirectory, timeStep, simulationTime)
         , finishedObserver(model, [this]()
@@ -17,7 +16,7 @@ namespace simulator
 
     void HeadlessSimulation::Run()
     {
-        runner.Enable();
+        controller.Start();
 
         eventDispatcher.ExecuteUntil([this]()
             {

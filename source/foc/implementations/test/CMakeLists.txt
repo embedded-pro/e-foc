@@ -4,7 +4,7 @@ emil_add_test(e_foc.foc_test)
 
 target_link_libraries(e_foc.foc_test PUBLIC
     gmock_main
-    e_foc.foc.implementations
+    e_foc.foc.instantiations
     numerical.math_test_helper
     infra.timer_test_helper
     e_foc.foc_mock

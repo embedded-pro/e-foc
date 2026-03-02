@@ -34,7 +34,7 @@ namespace foc
         [[no_unique_address]] SpaceVectorModulation spaceVectorModulator;
         float previousPosition = 0.0f;
         float dt;
-        float polePairs;
+        float polePairs = 0.0f;
         RadiansPerSecond lastSpeedSetPoint{ 0.0f };
     };
 }

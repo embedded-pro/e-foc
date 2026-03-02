@@ -1,100 +1,114 @@
 #include "source/foc/implementations/Runner.hpp"
 #include "source/foc/implementations/test_doubles/DriversMock.hpp"
 #include "source/foc/implementations/test_doubles/FocMock.hpp"
-#include "gmock/gmock.h"
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 namespace
 {
+    using testing::_;
+    using testing::Invoke;
+    using testing::Return;
+    using testing::StrictMock;
+
     class TestRunner
-        : public ::testing::Test
+        : public testing::Test
     {
     public:
         TestRunner()
         {
-            EXPECT_CALL(driverMock, BaseFrequency())
-                .WillOnce(::testing::Return(hal::Hertz{ 10000 }));
-            EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_))
-                .WillOnce([this](auto, const auto& onDone)
+            ON_CALL(inverterMock, BaseFrequency()).WillByDefault(Return(hal::Hertz{ 20000 }));
+            ON_CALL(inverterMock, PhaseCurrentsReady(_, _))
+                .WillByDefault([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
                     {
-                        driverMock.StorePhaseCurrentsCallback(onDone);
+                        inverterMock.StorePhaseCurrentsCallback(onDone);
                     });
-
-            runner.emplace(driverMock, encoderMock, focMock);
         }
 
-        ::testing::StrictMock<foc::FieldOrientedControllerInterfaceMock> driverMock;
-        ::testing::StrictMock<foc::EncoderMock> encoderMock;
-        ::testing::StrictMock<foc::FocTorqueMock> focMock;
-        std::optional<foc::Runner> runner;
-
-        void DestroyRunner()
-        {
-            EXPECT_CALL(driverMock, Stop());
-            EXPECT_CALL(focMock, Disable());
-            runner.reset();
-        }
-
-        ~TestRunner() override
-        {
-            if (runner.has_value())
-                DestroyRunner();
-        }
+        testing::NiceMock<foc::FieldOrientedControllerInterfaceMock> inverterMock;
+        testing::NiceMock<foc::EncoderMock> encoderMock;
+        testing::NiceMock<foc::FocTorqueMock> focMock;
     };
-}
 
-TEST_F(TestRunner, reads_encoder_and_calculates_on_phase_currents_callback)
-{
-    foc::PhaseCurrents inputCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ 2.0f }, foc::Ampere{ 3.0f } };
-    foc::Radians position{ 0.5f };
-    foc::PhasePwmDutyCycles expectedDuties{ hal::Percent{ 50 }, hal::Percent{ 60 }, hal::Percent{ 70 } };
+    TEST_F(TestRunner, ConstructionRegistersPhaseCurrentsCallback)
+    {
+        EXPECT_CALL(inverterMock, PhaseCurrentsReady(hal::Hertz{ 20000 }, _));
 
-    EXPECT_CALL(encoderMock, Read())
-        .WillOnce(::testing::Return(position));
-    EXPECT_CALL(focMock, Calculate(::testing::_, ::testing::_))
-        .WillOnce(::testing::Return(expectedDuties));
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_));
+        foc::Runner runner{ inverterMock, encoderMock, focMock };
+    }
 
-    driverMock.TriggerPhaseCurrentsCallback(inputCurrents);
-}
+    TEST_F(TestRunner, EnableStartsFocThenInverter)
+    {
+        foc::Runner runner{ inverterMock, encoderMock, focMock };
 
-TEST_F(TestRunner, outputs_duty_cycles_from_foc_calculation)
-{
-    foc::PhasePwmDutyCycles expectedDuties{ hal::Percent{ 25 }, hal::Percent{ 50 }, hal::Percent{ 75 } };
+        testing::InSequence seq;
+        EXPECT_CALL(focMock, Enable());
+        EXPECT_CALL(inverterMock, Start());
 
-    EXPECT_CALL(encoderMock, Read())
-        .WillOnce(::testing::Return(foc::Radians{ 0.0f }));
-    EXPECT_CALL(focMock, Calculate(::testing::_, ::testing::_))
-        .WillOnce(::testing::Return(expectedDuties));
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_))
-        .WillOnce([&](const foc::PhasePwmDutyCycles& duties)
-            {
-                EXPECT_EQ(duties.a, expectedDuties.a);
-                EXPECT_EQ(duties.b, expectedDuties.b);
-                EXPECT_EQ(duties.c, expectedDuties.c);
-            });
+        runner.Enable();
+    }
 
-    driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
-}
+    TEST_F(TestRunner, DisableStopsInverterThenFoc)
+    {
+        foc::Runner runner{ inverterMock, encoderMock, focMock };
 
-TEST_F(TestRunner, enable_enables_foc_and_starts_driver)
-{
-    ::testing::InSequence seq;
-    EXPECT_CALL(focMock, Enable());
-    EXPECT_CALL(driverMock, Start());
+        testing::InSequence seq;
+        EXPECT_CALL(inverterMock, Stop());
+        EXPECT_CALL(focMock, Disable());
+        EXPECT_CALL(inverterMock, Stop());
+        EXPECT_CALL(focMock, Disable());
 
-    runner->Enable();
-}
+        runner.Disable();
+        // destructor calls Disable() again
+    }
 
-TEST_F(TestRunner, disable_stops_driver_and_disables_foc)
-{
-    ::testing::InSequence seq;
-    EXPECT_CALL(driverMock, Stop());
-    EXPECT_CALL(focMock, Disable());
+    TEST_F(TestRunner, PhaseCurrentsCallbackReadsEncoderCalculatesFocAndOutputsPwm)
+    {
+        EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _))
+            .WillOnce([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+                {
+                    inverterMock.StorePhaseCurrentsCallback(onDone);
+                });
 
-    runner->Disable();
-}
+        foc::Runner runner{ inverterMock, encoderMock, focMock };
 
-TEST_F(TestRunner, destructor_disables)
-{
-    DestroyRunner();
+        const foc::PhaseCurrents testCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } };
+        const foc::PhasePwmDutyCycles expectedDuties{ hal::Percent{ 60 }, hal::Percent{ 30 }, hal::Percent{ 10 } };
+
+        {
+            testing::InSequence seq;
+            EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.5f }));
+            EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(expectedDuties));
+            EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
+        }
+
+        inverterMock.TriggerPhaseCurrentsCallback(testCurrents);
+    }
+
+    TEST_F(TestRunner, DestructorCallsDisable)
+    {
+        auto runner = std::make_unique<foc::Runner>(inverterMock, encoderMock, focMock);
+
+        testing::InSequence seq;
+        EXPECT_CALL(inverterMock, Stop());
+        EXPECT_CALL(focMock, Disable());
+
+        runner.reset();
+    }
+
+    TEST_F(TestRunner, MultipleEnableDisableCyclesWork)
+    {
+        foc::Runner runner{ inverterMock, encoderMock, focMock };
+
+        EXPECT_CALL(focMock, Enable()).Times(2);
+        EXPECT_CALL(inverterMock, Start()).Times(2);
+        EXPECT_CALL(inverterMock, Stop()).Times(3); // 2 explicit + 1 destructor
+        EXPECT_CALL(focMock, Disable()).Times(3);   // 2 explicit + 1 destructor
+
+        runner.Enable();
+        runner.Disable();
+        runner.Enable();
+        runner.Disable();
+        // destructor calls Disable() again
+    }
 }

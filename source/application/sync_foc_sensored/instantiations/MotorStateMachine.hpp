@@ -1,10 +1,10 @@
 #pragma once
 
 #include "foc/implementations/TrigonometricImpl.hpp"
+#include "foc/instantiations/FocController.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "services/alignment/TerminalMotorAlignment.hpp"
 #include "services/parameter_identification/TerminalElectricalParametersIdentification.hpp"
-#include "source/foc/implementations/Runner.hpp"
 #include "source/foc/implementations/WithAutomaticCurrentPidGains.hpp"
 #include "source/foc/interfaces/Foc.hpp"
 #include "source/services/alignment/MotorAlignmentImpl.hpp"
@@ -25,7 +25,7 @@ namespace application
 
     struct MotorDriverAndEncoder
     {
-        foc::MotorDriver& driver;
+        foc::ThreePhaseInverter& driver;
         foc::Encoder& encoder;
     };
 
@@ -47,12 +47,11 @@ namespace application
     private:
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
-        foc::MotorDriver& driver;
+        foc::ThreePhaseInverter& driver;
         foc::Encoder& encoder;
         foc::Volts vdc;
-        FocImpl focImpl;
-        foc::WithAutomaticCurrentPidGains focController{ focImpl };
-        foc::Runner focRunner{ driver, encoder, focImpl };
+        foc::FocController<FocImpl> focController;
+        foc::WithAutomaticCurrentPidGains pidAutoTuner{ focController };
         std::variant<std::monostate, services::MotorAlignmentImpl, services::ElectricalParametersIdentificationImpl> motorStates;
         std::variant<std::monostate, services::TerminalMotorAlignment, services::TerminalElectricalParametersIdentification, TerminalImpl> terminalStates;
     };
@@ -67,7 +66,7 @@ namespace application
         , driver(motorDriverAndEncoder.driver)
         , encoder(motorDriverAndEncoder.encoder)
         , vdc(vdc)
-        , focImpl{ std::forward<FocArgs>(focArgs)... }
+        , focController{ driver, encoder, std::forward<FocArgs>(focArgs)... }
     {
         terminal.AddCommand({ { "ident_par", "ip", "Identify Parameters, which are resistance, inductance and number of pole pairs." },
             [this](const auto&)
@@ -94,9 +93,9 @@ namespace application
                 if (!args.has_value())
                     return;
 
-                focController.SetPidBasedOnResistanceAndInductance(this->vdc, std::get<0>(*args), std::get<1>(*args), driver.BaseFrequency(), nyquistFactor);
-                terminalStates.template emplace<TerminalImpl>(this->terminal, this->vdc, this->focImpl);
-                this->focRunner.Enable();
+                pidAutoTuner.SetPidBasedOnResistanceAndInductance(this->vdc, std::get<0>(*args), std::get<1>(*args), driver.BaseFrequency(), nyquistFactor);
+                terminalStates.template emplace<TerminalImpl>(this->terminal, this->vdc, this->focController);
+                this->focController.Start();
             } });
     }
 

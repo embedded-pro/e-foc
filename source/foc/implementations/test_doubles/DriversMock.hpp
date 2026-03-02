@@ -22,7 +22,7 @@ namespace foc
     };
 
     class FieldOrientedControllerInterfaceMock
-        : public MotorDriver
+        : public ThreePhaseInverter
     {
     public:
         MOCK_METHOD(void, PhaseCurrentsReady, (hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents phaseCurrents)>& onDone), (override));

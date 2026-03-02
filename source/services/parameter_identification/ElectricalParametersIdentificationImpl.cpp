@@ -78,7 +78,7 @@ namespace
 
 namespace services
 {
-    ElectricalParametersIdentificationImpl::ElectricalParametersIdentificationImpl(foc::MotorDriver& driver, foc::Encoder& encoder, foc::Volts vdc)
+    ElectricalParametersIdentificationImpl::ElectricalParametersIdentificationImpl(foc::ThreePhaseInverter& driver, foc::Encoder& encoder, foc::Volts vdc)
         : driver(driver)
         , encoder(encoder)
         , vdc(vdc)

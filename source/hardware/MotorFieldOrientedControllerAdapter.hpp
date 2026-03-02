@@ -7,13 +7,13 @@
 namespace application
 {
     class HardwareAdapter
-        : public foc::MotorDriver
+        : public foc::ThreePhaseInverter
         , public foc::Encoder
     {
     public:
         explicit HardwareAdapter(HardwareFactory& hardware);
 
-        // Implementation of MotorDriver
+        // Implementation of ThreePhaseInverter
         OPTIMIZE_FOR_SPEED
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         OPTIMIZE_FOR_SPEED

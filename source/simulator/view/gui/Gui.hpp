@@ -1,7 +1,7 @@
 #pragma once
 
-#include "foc/implementations/Runner.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "source/foc/interfaces/Driver.hpp"
 #include "source/simulator/model/Model.hpp"
 #include "source/simulator/view/gui/ControlPanel.hpp"
 #include "source/simulator/view/gui/ParametersPanel.hpp"
@@ -17,7 +17,7 @@ namespace simulator
         Q_OBJECT
 
     public:
-        Gui(ThreePhaseMotorModel& model, foc::Runner& runner, infra::EventDispatcherWithWeakPtr& eventDispatcher,
+        Gui(ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
             const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters, QWidget* parent = nullptr);
 
         // ThreePhaseMotorModelObserver
@@ -33,7 +33,7 @@ namespace simulator
 
     private:
         ThreePhaseMotorModel& model;
-        foc::Runner& runner;
+        foc::Controllable& controller;
         infra::EventDispatcherWithWeakPtr& eventDispatcher;
 
         ControlPanel* controlPanel;
