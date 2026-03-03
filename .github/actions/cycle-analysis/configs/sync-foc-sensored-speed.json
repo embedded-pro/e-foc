@@ -1,6 +1,6 @@
 {
     "target": "EK-TM4C1294XL",
-    "build_config": "Debug",
+    "build_config": "RelWithDebInfo",
     "clock_mhz": 120,
     "cortex": "m4",
     "loop_rates_khz": [
