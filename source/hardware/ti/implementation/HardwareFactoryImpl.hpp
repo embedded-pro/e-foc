@@ -37,6 +37,7 @@ namespace application
         hal::Hertz SystemClock() const override;
         foc::Volts PowerSupplyVoltage() override;
         foc::Ampere MaxCurrentSupported() override;
+        foc::LowPriorityInterrupt& LowPriorityInterrupt() override;
         infra::CreatorBase<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)>& SynchronousThreeChannelsPwmCreator() override;
         infra::CreatorBase<AdcPhaseCurrentMeasurement, void(SampleAndHold)>& AdcMultiChannelCreator() override;
         infra::CreatorBase<QuadratureEncoderDecorator, void()>& SynchronousQuadratureEncoderCreator() override;
@@ -46,6 +47,15 @@ namespace application
         uint32_t ElapsedCycles() override;
 
     private:
+        struct PendSvLowPriorityInterrupt
+            : public foc::LowPriorityInterrupt
+        {
+            void Trigger() override;
+            void Register(const infra::Function<void()>& handler) override;
+
+            infra::Function<void()> onLowPriorityInterrupt;
+        };
+
         struct Cortex
         {
             infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
@@ -134,6 +144,7 @@ namespace application
 
     private:
         infra::Function<void()> onInitialized;
+        PendSvLowPriorityInterrupt pendSvLowPriorityInterrupt;
         std::optional<Peripherals> peripherals;
     };
 }

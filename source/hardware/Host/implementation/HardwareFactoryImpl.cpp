@@ -47,6 +47,11 @@ namespace application
         return foc::Ampere(5.0f);
     }
 
+    foc::LowPriorityInterrupt& HardwareFactoryImpl::LowPriorityInterrupt()
+    {
+        return simpleLowPriorityInterrupt;
+    }
+
     void HardwareFactoryImpl::Start()
     {
     }

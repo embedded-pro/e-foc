@@ -15,6 +15,7 @@ target_sources(e_foc.foc.implementations PRIVATE
     FocSpeedImpl.hpp
     FocTorqueImpl.cpp
     FocTorqueImpl.hpp
+    LowPriorityInterruptImpl.hpp
     NormalizedAngles.hpp
     Runner.cpp
     Runner.hpp

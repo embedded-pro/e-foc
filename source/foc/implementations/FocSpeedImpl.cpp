@@ -29,15 +29,26 @@ namespace
 namespace foc
 {
     OPTIMIZE_FOR_SPEED
-    FocSpeedImpl::FocSpeedImpl(foc::Ampere maxCurrent, std::chrono::system_clock::duration timeStep)
+    FocSpeedImpl::FocSpeedImpl(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)
         : speedPid{ { 0.0f, 0.0f, 0.0f }, { -maxCurrent.Value(), maxCurrent.Value() } }
-        , dt{ std::chrono::duration_cast<std::chrono::duration<float>>(timeStep).count() }
+        , lowPriorityInterrupt(lowPriorityInterrupt)
+        , dt{ 1.0f / static_cast<float>(baseFrequency.Value()) }
+        , speedDt{ 1.0f / static_cast<float>(lowPriorityFrequency.Value()) }
+        , prescaler{ baseFrequency.Value() / lowPriorityFrequency.Value() }
     {
         really_assert(maxCurrent.Value() > 0);
+        really_assert(lowPriorityFrequency.Value() > 0);
+        really_assert(lowPriorityFrequency.Value() <= baseFrequency.Value());
+        really_assert(baseFrequency.Value() % lowPriorityFrequency.Value() == 0);
 
         speedPid.Enable();
         dPid.Enable();
         qPid.Enable();
+
+        lowPriorityInterrupt.Register([this]()
+            {
+                LowPriorityHandler();
+            });
     }
 
     void FocSpeedImpl::SetPolePairs(std::size_t pole)
@@ -78,7 +89,7 @@ namespace foc
         const float ki = speedTuning.ki;
         const float kd = speedTuning.kd;
 
-        speedPid.SetTunings({ kp, ki * dt, kd / dt });
+        speedPid.SetTunings({ kp, ki * speedDt, kd / speedDt });
     }
 
     OPTIMIZE_FOR_SPEED
@@ -88,7 +99,10 @@ namespace foc
         dPid.Enable();
         qPid.Enable();
 
-        previousPosition = 0.0f;
+        currentMechanicalAngle = 0.0f;
+        previousSpeedPosition = 0.0f;
+        lastSpeedPidOutput = 0.0f;
+        triggerCounter = 0;
         SetPoint(lastSpeedSetPoint);
     }
 
@@ -101,13 +115,11 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    float FocSpeedImpl::CalculateFilteredSpeed(float mechanicalPosition)
+    void FocSpeedImpl::LowPriorityHandler()
     {
-        auto mechanicalSpeed = PositionWithWrapAround(mechanicalPosition - previousPosition) / dt;
-
-        previousPosition = mechanicalPosition;
-
-        return mechanicalSpeed;
+        auto mechanicalSpeed = PositionWithWrapAround(currentMechanicalAngle - previousSpeedPosition) / speedDt;
+        previousSpeedPosition = currentMechanicalAngle;
+        lastSpeedPidOutput = speedPid.Process(mechanicalSpeed);
     }
 
     OPTIMIZE_FOR_SPEED
@@ -119,14 +131,22 @@ namespace foc
 
         auto mechanicalAngle = position.Value();
         auto electricalAngle = mechanicalAngle * polePairs;
+        currentMechanicalAngle = mechanicalAngle;
 
         auto cosTheta = FastTrigonometry::Cosine(electricalAngle);
         auto sinTheta = FastTrigonometry::Sine(electricalAngle);
 
-        qPid.SetPoint(speedPid.Process(CalculateFilteredSpeed(mechanicalAngle)));
+        qPid.SetPoint(lastSpeedPidOutput);
 
         auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
         auto output = spaceVectorModulator.Generate(park.Inverse(RotatingFrame{ dPid.Process(idAndIq.d), qPid.Process(idAndIq.q) }, cosTheta, sinTheta));
+
+        ++triggerCounter;
+        if (triggerCounter >= prescaler)
+        {
+            triggerCounter = 0;
+            lowPriorityInterrupt.Trigger();
+        }
 
         return PhasePwmDutyCycles{ hal::Percent(static_cast<uint8_t>(output.a * 100.0f + 0.5f)),
             hal::Percent(static_cast<uint8_t>(output.b * 100.0f + 0.5f)),

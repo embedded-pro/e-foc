@@ -1,4 +1,5 @@
 #include "args.hxx"
+#include "foc/implementations/LowPriorityInterruptImpl.hpp"
 #include "foc/instantiations/FocController.hpp"
 #include "foc/interfaces/Units.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
@@ -93,11 +94,13 @@ int main(int argc, char* argv[])
         const auto baseFrequency = hal::Hertz{ static_cast<uint32_t>(microsecondsPerSecond / timeStepUs) };
         const auto steps = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::duration<float>>(simulationTime).count() / std::chrono::duration_cast<std::chrono::duration<float>>(timeStep).count());
 
+        constexpr uint32_t lowPriorityFrequencyHz = 10000;
         simulator::ThreePhaseMotorModel model{ simulator::JK42BLS01_X038ED::parameters, foc::Volts{ powerSupplyVoltage }, baseFrequency, enableGui ? std::optional<std::size_t>{} : std::optional<std::size_t>{ steps } };
         if (loadTorque > 0.0f)
             model.SetLoad(foc::NewtonMeter{ loadTorque });
 
-        foc::FocSpeedController controller{ model, model, foc::Ampere{ maxCurrent }, timeStep };
+        foc::LowPriorityInterruptImpl lowPriorityInterrupt;
+        foc::FocSpeedController controller{ model, model, foc::Ampere{ maxCurrent }, baseFrequency, lowPriorityInterrupt, hal::Hertz{ lowPriorityFrequencyHz } };
 
         controller.SetSpeedTunings(foc::Volts{ powerSupplyVoltage },
             controllers::PidTunings<float>{ args::get(kpSpeedArgument), args::get(kiSpeedArgument), args::get(kdSpeedArgument) });

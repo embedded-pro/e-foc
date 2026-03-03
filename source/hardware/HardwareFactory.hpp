@@ -11,6 +11,7 @@
 #include "source/hardware/AdcPhaseCurrentMeasurement.hpp"
 #include "source/hardware/QuadratureEncoderDecorator.hpp"
 #include <chrono>
+#include <cstdint>
 
 namespace hal
 {
@@ -44,6 +45,7 @@ namespace application
         virtual hal::Hertz SystemClock() const = 0;
         virtual foc::Volts PowerSupplyVoltage() = 0;
         virtual foc::Ampere MaxCurrentSupported() = 0;
+        virtual foc::LowPriorityInterrupt& LowPriorityInterrupt() = 0;
         virtual infra::CreatorBase<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)>& SynchronousThreeChannelsPwmCreator() = 0;
         virtual infra::CreatorBase<AdcPhaseCurrentMeasurement, void(SampleAndHold)>& AdcMultiChannelCreator() = 0;
         virtual infra::CreatorBase<QuadratureEncoderDecorator, void()>& SynchronousQuadratureEncoderCreator() = 0;

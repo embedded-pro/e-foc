@@ -1,15 +1,17 @@
 #include "numerical/math/Tolerance.hpp"
 #include "source/foc/implementations/FocSpeedImpl.hpp"
-#include <chrono>
+#include "source/foc/implementations/test_doubles/DriversMock.hpp"
 #include <gmock/gmock.h>
 #include <numbers>
 
 namespace
 {
-    using namespace std::chrono_literals;
+    using namespace testing;
 
+    constexpr uint32_t baseFrequencyValue = 20000;
+    const hal::Hertz baseFrequency{ baseFrequencyValue };
+    const hal::Hertz lowPriorityFrequency{ 2000 };
     constexpr float tolerance = 1.0f;
-    constexpr auto timeStep = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::microseconds(50));
 
     class TestFocSpeedImpl
         : public ::testing::Test
@@ -17,12 +19,15 @@ namespace
     public:
         void SetUp() override
         {
-            focSpeed.emplace(foc::Ampere{ 10.0f }, timeStep);
+            EXPECT_CALL(lowPriorityInterruptMock, Register(_)).WillOnce(Invoke(&lowPriorityInterruptMock, &foc::LowPriorityInterruptMock::StoreHandler));
+
+            focSpeed.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterruptMock, lowPriorityFrequency);
             focSpeed->SetPolePairs(polePairs);
             focSpeed->SetCurrentTunings(foc::Volts{ 24.0f }, { { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } });
             focSpeed->SetSpeedTunings(foc::Volts{ 24.0f }, { 1.0f, 0.0f, 0.0f });
         }
 
+        foc::LowPriorityInterruptMock lowPriorityInterruptMock;
         std::optional<foc::FocSpeedImpl> focSpeed;
         std::size_t polePairs = 7;
     };
@@ -96,6 +101,8 @@ TEST_F(TestFocSpeedImpl, different_positions_produce_different_outputs)
     foc::Radians position1{ 0.0f };
     auto result1 = focSpeed->Calculate(ZeroCurrents(), position1);
 
+    lowPriorityInterruptMock.TriggerHandler();
+
     foc::Radians position2{ 1.0f };
     auto result2 = focSpeed->Calculate(ZeroCurrents(), position2);
 
@@ -112,6 +119,8 @@ TEST_F(TestFocSpeedImpl, consecutive_calls_update_speed_estimation)
 
     foc::Radians position1{ 0.0f };
     auto result1 = focSpeed->Calculate(ZeroCurrents(), position1);
+
+    lowPriorityInterruptMock.TriggerHandler();
 
     foc::Radians position2{ 0.01f };
     auto result2 = focSpeed->Calculate(ZeroCurrents(), position2);
