@@ -26,6 +26,7 @@ namespace application
         hal::Hertz SystemClock() const override;
         foc::Volts PowerSupplyVoltage() override;
         foc::Ampere MaxCurrentSupported() override;
+        foc::LowPriorityInterrupt& LowPriorityInterrupt() override;
 
         infra::CreatorBase<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)>& SynchronousThreeChannelsPwmCreator() override;
         infra::CreatorBase<AdcPhaseCurrentMeasurement, void(SampleAndHold)>& AdcMultiChannelCreator() override;
@@ -36,6 +37,25 @@ namespace application
         uint32_t ElapsedCycles() override;
 
     private:
+        class SimpleLowPriorityInterrupt
+            : public foc::LowPriorityInterrupt
+        {
+        public:
+            void Trigger() override
+            {
+                if (handler)
+                    handler();
+            }
+
+            void Register(const infra::Function<void()>& handler) override
+            {
+                this->handler = handler;
+            }
+
+        private:
+            infra::Function<void()> handler;
+        };
+
         class AdcMultiChannelStub
             : public hal::AdcMultiChannel
         {
@@ -116,6 +136,7 @@ namespace application
 
     private:
         infra::Function<void()> onInitialized;
+        SimpleLowPriorityInterrupt simpleLowPriorityInterrupt;
         GpioPinStub pin;
         SerialCommunicationStub serial;
         TerminalAndTracer terminalAndTracer{ serial };

@@ -1,5 +1,5 @@
 #include "args.hxx"
-#include "foc/implementations/Runner.hpp"
+#include "foc/instantiations/FocController.hpp"
 #include "foc/interfaces/Units.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "simulator/headless/HeadlessSimulation.hpp"
@@ -7,7 +7,6 @@
 #include "simulator/model/Model.hpp"
 #include "simulator/view/gui/GuiSimulation.hpp"
 #include "simulator/view/gui/ParametersPanel.hpp"
-#include "source/foc/instantiations/FocImpl.hpp"
 #include <chrono>
 #include <format>
 #include <iostream>
@@ -84,15 +83,14 @@ int main(int argc, char* argv[])
         if (loadTorque > 0.0f)
             model.SetLoad(foc::NewtonMeter{ loadTorque });
 
-        foc::FocTorqueImpl focTorque;
-        foc::Runner focRunner{ model, model, focTorque };
+        foc::FocTorqueController controller{ model, model };
 
-        focTorque.SetCurrentTunings(foc::Volts{ powerSupplyVoltage },
+        controller.SetCurrentTunings(foc::Volts{ powerSupplyVoltage },
             foc::IdAndIqTunings{
                 { args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument) },
                 { args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument) } });
-        focTorque.SetPolePairs(simulator::JK42BLS01_X038ED::parameters.p);
-        focTorque.SetPoint(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ args::get(currentSetPointArgument) } });
+        controller.SetPolePairs(simulator::JK42BLS01_X038ED::parameters.p);
+        controller.SetPoint(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ args::get(currentSetPointArgument) } });
 
         if (enableGui)
         {
@@ -101,11 +99,11 @@ int main(int argc, char* argv[])
                 0.0f, 0.0f, 0.0f
             };
 
-            simulator::GuiSimulation simulation{ argc, argv, model, focRunner, eventDispatcher, simulator::JK42BLS01_X038ED::parameters, pidParameters };
+            simulator::GuiSimulation simulation{ argc, argv, model, controller, eventDispatcher, simulator::JK42BLS01_X038ED::parameters, pidParameters };
             return simulation.Run();
         }
 
-        simulator::HeadlessSimulation simulation{ model, focRunner, eventDispatcher,
+        simulator::HeadlessSimulation simulation{ model, controller, eventDispatcher,
             "FOC Torque Control", "foc_torque_results", std::format("{}/output/simulator/torque_control", PROJECT_ROOT_DIR),
             timeStep, simulationTime };
         simulation.Run();

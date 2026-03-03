@@ -7,14 +7,22 @@ target_include_directories(e_foc.foc.implementations PUBLIC
 
 target_link_libraries(e_foc.foc.implementations PUBLIC
     e_foc.foc.interfaces
+    numerical.controllers.implementations
 )
 
 target_sources(e_foc.foc.implementations PRIVATE
+    FocSpeedImpl.cpp
+    FocSpeedImpl.hpp
+    FocTorqueImpl.cpp
+    FocTorqueImpl.hpp
+    LowPriorityInterruptImpl.hpp
     NormalizedAngles.hpp
     Runner.cpp
     Runner.hpp
     SpaceVectorModulation.cpp
     SpaceVectorModulation.hpp
+    TrigonometricImpl.cpp
+    TrigonometricImpl.hpp
     WithAutomaticCurrentPidGains.cpp
     WithAutomaticCurrentPidGains.hpp
     TransformsClarkePark.cpp

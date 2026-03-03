@@ -5,7 +5,7 @@
 #include "infra/util/BoundedDeque.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
-#include "source/foc/instantiations/FocImpl.hpp"
+#include "source/foc/implementations/FocSpeedImpl.hpp"
 #include "source/foc/interfaces/Driver.hpp"
 #include "source/hardware/HardwareFactory.hpp"
 

@@ -2,16 +2,16 @@
 
 namespace foc
 {
-    Runner::Runner(MotorDriver& driver, Encoder& encoder, FocBase& foc)
-        : driver{ driver }
+    Runner::Runner(ThreePhaseInverter& inverter, Encoder& encoder, FocBase& foc)
+        : inverter{ inverter }
         , encoder{ encoder }
         , foc{ foc }
     {
-        driver.PhaseCurrentsReady(driver.BaseFrequency(), [this](auto currentPhases)
+        inverter.PhaseCurrentsReady(inverter.BaseFrequency(), [this](auto currentPhases)
             {
                 auto position = this->encoder.Read();
                 auto dutyCycles = this->foc.Calculate(currentPhases, position);
-                this->driver.ThreePhasePwmOutput(dutyCycles);
+                this->inverter.ThreePhasePwmOutput(dutyCycles);
             });
     }
 
@@ -23,12 +23,12 @@ namespace foc
     void Runner::Enable()
     {
         foc.Enable();
-        driver.Start();
+        inverter.Start();
     }
 
     void Runner::Disable()
     {
-        driver.Stop();
+        inverter.Stop();
         foc.Disable();
     }
 }

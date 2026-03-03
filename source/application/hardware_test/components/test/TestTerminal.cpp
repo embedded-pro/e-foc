@@ -36,6 +36,7 @@ namespace
         MOCK_METHOD(hal::Hertz, SystemClock, (), (const, override));
         MOCK_METHOD(foc::Volts, PowerSupplyVoltage, (), (override));
         MOCK_METHOD(foc::Ampere, MaxCurrentSupported, (), (override));
+        MOCK_METHOD((foc::LowPriorityInterrupt&), LowPriorityInterrupt, (), (override));
         MOCK_METHOD((infra::CreatorBase<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds, hal::Hertz)>&), SynchronousThreeChannelsPwmCreator, (), (override));
         MOCK_METHOD((infra::CreatorBase<application::AdcPhaseCurrentMeasurement, void(SampleAndHold)>&), AdcMultiChannelCreator, (), (override));
         MOCK_METHOD((infra::CreatorBase<application::QuadratureEncoderDecorator, void()>&), SynchronousQuadratureEncoderCreator, (), (override));
@@ -91,6 +92,25 @@ namespace
         MOCK_METHOD(uint32_t, ElapsedCycles, (), (override));
     };
 
+    class SimpleLowPriorityInterrupt
+        : public foc::LowPriorityInterrupt
+    {
+    public:
+        void Trigger() override
+        {
+            if (handler)
+                handler();
+        }
+
+        void Register(const infra::Function<void()>& handler) override
+        {
+            this->handler = handler;
+        }
+
+    private:
+        infra::Function<void()> handler;
+    };
+
     class TestHardwareTerminal
         : public testing::Test
         , public infra::EventDispatcherWithWeakPtrFixture
@@ -107,6 +127,7 @@ namespace
             EXPECT_CALL(hardwareFactoryMock, PowerSupplyVoltage()).WillRepeatedly(testing::Return(foc::Volts{ 24.0f }));
             EXPECT_CALL(hardwareFactoryMock, MaxCurrentSupported()).WillRepeatedly(testing::Return(foc::Ampere{ 5.0f }));
             EXPECT_CALL(hardwareFactoryMock, SystemClock()).WillRepeatedly(testing::Return(hal::Hertz{ 10000 }));
+            EXPECT_CALL(hardwareFactoryMock, LowPriorityInterrupt()).WillRepeatedly(testing::ReturnRef(simpleLowPriorityInterrupt));
 
             EXPECT_CALL(encoderCreator, Constructed());
             EXPECT_CALL(pwmCreator, Constructed(std::chrono::nanoseconds{ 500 }, hal::Hertz{ 10000 }));
@@ -125,6 +146,7 @@ namespace
         }
 
         testing::StrictMock<HardwareFactoryMock> hardwareFactoryMock;
+        SimpleLowPriorityInterrupt simpleLowPriorityInterrupt;
         testing::StrictMock<StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };

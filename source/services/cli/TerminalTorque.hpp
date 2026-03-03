@@ -1,7 +1,7 @@
 #pragma once
 
 #include "services/util/TerminalWithStorage.hpp"
-#include "source/foc/instantiations/FocImpl.hpp"
+#include "source/foc/interfaces/Foc.hpp"
 #include "source/services/cli/TerminalBase.hpp"
 
 namespace services

@@ -8,14 +8,14 @@ namespace foc
     class Runner
     {
     public:
-        Runner(MotorDriver& driver, Encoder& encoder, FocBase& foc);
+        Runner(ThreePhaseInverter& inverter, Encoder& encoder, FocBase& foc);
         ~Runner();
 
         void Enable();
         void Disable();
 
     private:
-        MotorDriver& driver;
+        ThreePhaseInverter& inverter;
         Encoder& encoder;
         FocBase& foc;
     };

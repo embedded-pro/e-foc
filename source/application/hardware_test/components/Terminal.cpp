@@ -74,7 +74,7 @@ namespace application
         , performanceTimer{ hardware.PerformanceTimer() }
         , Vdc{ hardware.PowerSupplyVoltage() }
         , systemClock{ hardware.SystemClock() }
-        , foc{ hardware.MaxCurrentSupported(), std::chrono::microseconds(static_cast<std::size_t>(1e6f / 1000.0f)) }
+        , foc{ hardware.MaxCurrentSupported(), hal::Hertz{ 1000 }, hardware.LowPriorityInterrupt() }
     {
         terminal.AddCommand({ { "enc", "e", "Read encoder. stop. Ex: enc" },
             [this](const auto&)

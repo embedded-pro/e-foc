@@ -8,7 +8,7 @@ target_include_directories(e_foc.simulator.headless PUBLIC
 target_link_libraries(e_foc.simulator.headless PUBLIC
     e_foc.simulator.model
     e_foc.simulator.view
-    e_foc.foc.implementations
+    e_foc.foc.interfaces
     infra.event
 )
 

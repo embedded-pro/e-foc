@@ -14,7 +14,7 @@ namespace services
         : public MechanicalParametersIdentification
     {
     public:
-        MechanicalParametersIdentificationImpl(foc::FocSpeed& controller, foc::MotorDriver& driver, foc::Encoder& encoder);
+        MechanicalParametersIdentificationImpl(foc::FocSpeed& controller, foc::ThreePhaseInverter& driver, foc::Encoder& encoder);
 
         void EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone) override;
 
@@ -22,7 +22,7 @@ namespace services
         void OnSamplingUpdate(foc::PhaseCurrents currentPhases, const foc::NewtonMeter& torqueConstant);
 
         foc::FocSpeed& controller;
-        foc::MotorDriver& driver;
+        foc::ThreePhaseInverter& driver;
         foc::Encoder& encoder;
 
         float samplingPeriod;

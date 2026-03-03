@@ -8,32 +8,11 @@
 
 namespace foc
 {
-    class FocTorqueImpl
-        : public FocTorque
-    {
-    public:
-        void SetPolePairs(std::size_t polePairs) override;
-        void SetPoint(IdAndIqPoint setPoint) override;
-        void SetCurrentTunings(Volts Vdc, const IdAndIqTunings& tunings) override;
-        void Enable() override;
-        void Disable() override;
-        PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
-
-    private:
-        [[no_unique_address]] Park park;
-        [[no_unique_address]] Clarke clarke;
-        controllers::PidIncrementalSynchronous<float> dPid{ { 0.0f, 0.0f, 0.0f }, { -1.0f, 1.0f } };
-        controllers::PidIncrementalSynchronous<float> qPid{ { 0.0f, 0.0f, 0.0f }, { -1.0f, 1.0f } };
-        [[no_unique_address]] SpaceVectorModulation spaceVectorModulator;
-        float polePairs;
-        IdAndIqPoint lastSetPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
-    };
-
     class FocSpeedImpl
         : public FocSpeed
     {
     public:
-        explicit FocSpeedImpl(foc::Ampere maxCurrent, std::chrono::system_clock::duration timeStep);
+        explicit FocSpeedImpl(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency = hal::Hertz{ 1000 });
 
         void SetPolePairs(std::size_t polePairs) override;
         void SetPoint(RadiansPerSecond point) override;
@@ -44,7 +23,7 @@ namespace foc
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
 
     private:
-        float CalculateFilteredSpeed(float currentPosition);
+        void LowPriorityHandler();
 
     private:
         [[no_unique_address]] Park park;
@@ -53,9 +32,15 @@ namespace foc
         controllers::PidIncrementalSynchronous<float> dPid{ { 0.0f, 0.0f, 0.0f }, { -1.0f, 1.0f } };
         controllers::PidIncrementalSynchronous<float> qPid{ { 0.0f, 0.0f, 0.0f }, { -1.0f, 1.0f } };
         [[no_unique_address]] SpaceVectorModulation spaceVectorModulator;
-        float previousPosition = 0.0f;
+        LowPriorityInterrupt& lowPriorityInterrupt;
+        float currentMechanicalAngle = 0.0f;
+        float previousSpeedPosition = 0.0f;
+        float lastSpeedPidOutput = 0.0f;
         float dt;
-        float polePairs;
+        float speedDt;
+        uint32_t prescaler;
+        uint32_t triggerCounter = 0;
+        float polePairs = 0.0f;
         RadiansPerSecond lastSpeedSetPoint{ 0.0f };
     };
 }

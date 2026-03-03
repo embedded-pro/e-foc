@@ -9,7 +9,7 @@ target_include_directories(e_foc.hardware_test.instantiations PUBLIC
 target_link_libraries(e_foc.hardware_test.instantiations PUBLIC
     e_foc.hardware
     e_foc.hardware_test.components
-    e_foc.foc.instantiations
+    e_foc.foc.implementations
     e_foc.services.cli
     numerical.controllers.implementations
 )

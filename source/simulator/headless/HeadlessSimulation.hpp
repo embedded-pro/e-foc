@@ -1,7 +1,7 @@
 #pragma once
 
-#include "foc/implementations/Runner.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "source/foc/interfaces/Driver.hpp"
 #include "source/simulator/model/Model.hpp"
 #include "source/simulator/view/plot/Plot.hpp"
 #include <chrono>
@@ -12,14 +12,14 @@ namespace simulator
     class HeadlessSimulation
     {
     public:
-        HeadlessSimulation(ThreePhaseMotorModel& model, foc::Runner& runner, infra::EventDispatcherWithWeakPtr& eventDispatcher,
+        HeadlessSimulation(ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
             const std::string& title, const std::string& filename, const std::string& outputDirectory,
             std::chrono::microseconds timeStep, std::chrono::milliseconds simulationTime);
 
         void Run();
 
     private:
-        foc::Runner& runner;
+        foc::Controllable& controller;
         infra::EventDispatcherWithWeakPtr& eventDispatcher;
 
         Plot plotter;

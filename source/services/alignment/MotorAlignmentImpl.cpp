@@ -15,7 +15,7 @@ namespace
 
 namespace services
 {
-    MotorAlignmentImpl::MotorAlignmentImpl(foc::MotorDriver& driver, foc::Encoder& encoder)
+    MotorAlignmentImpl::MotorAlignmentImpl(foc::ThreePhaseInverter& driver, foc::Encoder& encoder)
         : driver(driver)
         , encoder(encoder)
     {

@@ -1,5 +1,4 @@
 #include "source/simulator/view/gui/Gui.hpp"
-#include "foc/implementations/Runner.hpp"
 #include <QHBoxLayout>
 #include <array>
 #include <memory>
@@ -21,12 +20,12 @@ namespace simulator
         }
     }
 
-    Gui::Gui(ThreePhaseMotorModel& model, foc::Runner& runner, infra::EventDispatcherWithWeakPtr& eventDispatcher,
+    Gui::Gui(ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
         const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters, QWidget* parent)
         : QMainWindow(parent)
         , ThreePhaseMotorModelObserver(model)
         , model(model)
-        , runner(runner)
+        , controller(controller)
         , eventDispatcher(eventDispatcher)
     {
         setWindowTitle("e-foc Simulator");
@@ -49,12 +48,12 @@ namespace simulator
                 while (!this->eventDispatcher.IsIdle())
                     this->eventDispatcher.ExecuteFirstAction();
 
-                this->runner.Enable();
+                this->controller.Start();
             });
 
         connect(controlPanel, &ControlPanel::stopClicked, this, [this]()
             {
-                this->runner.Disable();
+                this->controller.Stop();
             });
 
         connect(controlPanel, &ControlPanel::speedChanged, this, &Gui::speedChanged);

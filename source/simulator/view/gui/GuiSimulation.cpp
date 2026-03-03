@@ -1,5 +1,4 @@
 #include "source/simulator/view/gui/GuiSimulation.hpp"
-#include "foc/implementations/Runner.hpp"
 #include <cstdlib>
 #include <iostream>
 
@@ -14,10 +13,10 @@ namespace simulator
         }
     }
 
-    GuiSimulation::GuiSimulation(int& argc, char** argv, ThreePhaseMotorModel& model, foc::Runner& runner, infra::EventDispatcherWithWeakPtr& eventDispatcher,
+    GuiSimulation::GuiSimulation(int& argc, char** argv, ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
         const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters)
         : app(InitAndPassArgc(argc), argv)
-        , gui(model, runner, eventDispatcher, motorParameters, pidParameters)
+        , gui(model, controller, eventDispatcher, motorParameters, pidParameters)
     {
         gui.show();
 

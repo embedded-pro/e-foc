@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "infra/util/Function.hpp"
@@ -25,7 +24,7 @@ namespace simulator
     };
 
     class ThreePhaseMotorModel
-        : public foc::MotorDriver
+        : public foc::ThreePhaseInverter
         , public foc::Encoder
         , public infra::Subject<ThreePhaseMotorModelObserver>
     {
@@ -48,7 +47,7 @@ namespace simulator
 
         void SetLoad(foc::NewtonMeter load);
 
-        // Implementation of foc::MotorDriver
+        // Implementation of foc::ThreePhaseInverter
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
         void Start() override;

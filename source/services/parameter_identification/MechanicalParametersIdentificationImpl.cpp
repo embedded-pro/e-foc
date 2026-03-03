@@ -1,5 +1,5 @@
 #include "source/services/parameter_identification/MechanicalParametersIdentificationImpl.hpp"
-#include "source/foc/instantiations/TrigonometricImpl.hpp"
+#include "source/foc/implementations/TrigonometricImpl.hpp"
 #include "source/foc/interfaces/Units.hpp"
 #include <cmath>
 #include <numbers>
@@ -14,7 +14,7 @@ namespace
 
 namespace services
 {
-    MechanicalParametersIdentificationImpl::MechanicalParametersIdentificationImpl(foc::FocSpeed& controller, foc::MotorDriver& driver, foc::Encoder& encoder)
+    MechanicalParametersIdentificationImpl::MechanicalParametersIdentificationImpl(foc::FocSpeed& controller, foc::ThreePhaseInverter& driver, foc::Encoder& encoder)
         : controller(controller)
         , driver(driver)
         , encoder(encoder)

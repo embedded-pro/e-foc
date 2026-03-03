@@ -11,7 +11,7 @@ namespace services
         : public MotorAlignment
     {
     public:
-        MotorAlignmentImpl(foc::MotorDriver& driver, foc::Encoder& encoder);
+        MotorAlignmentImpl(foc::ThreePhaseInverter& driver, foc::Encoder& encoder);
 
         void ForceAlignment(std::size_t polePairs, const AlignmentConfig& config, const infra::Function<void(std::optional<foc::Radians>)>& onDone) override;
 
@@ -24,7 +24,7 @@ namespace services
         constexpr static uint8_t neutralDuty = 50;
         constexpr static float alignmentAngle = 0.0f;
 
-        foc::MotorDriver& driver;
+        foc::ThreePhaseInverter& driver;
         foc::Encoder& encoder;
         [[no_unique_address]] foc::ClarkePark transforms;
         AlignmentConfig alignmentConfig;

@@ -1,5 +1,6 @@
 #include "args.hxx"
-#include "foc/implementations/Runner.hpp"
+#include "foc/implementations/LowPriorityInterruptImpl.hpp"
+#include "foc/instantiations/FocController.hpp"
 #include "foc/interfaces/Units.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "simulator/headless/HeadlessSimulation.hpp"
@@ -7,7 +8,6 @@
 #include "simulator/model/Model.hpp"
 #include "simulator/view/gui/GuiSimulation.hpp"
 #include "simulator/view/gui/ParametersPanel.hpp"
-#include "source/foc/instantiations/FocImpl.hpp"
 #include <chrono>
 #include <format>
 #include <iostream>
@@ -94,21 +94,22 @@ int main(int argc, char* argv[])
         const auto baseFrequency = hal::Hertz{ static_cast<uint32_t>(microsecondsPerSecond / timeStepUs) };
         const auto steps = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::duration<float>>(simulationTime).count() / std::chrono::duration_cast<std::chrono::duration<float>>(timeStep).count());
 
+        constexpr uint32_t lowPriorityFrequencyHz = 10000;
         simulator::ThreePhaseMotorModel model{ simulator::JK42BLS01_X038ED::parameters, foc::Volts{ powerSupplyVoltage }, baseFrequency, enableGui ? std::optional<std::size_t>{} : std::optional<std::size_t>{ steps } };
         if (loadTorque > 0.0f)
             model.SetLoad(foc::NewtonMeter{ loadTorque });
 
-        foc::FocSpeedImpl focSpeed{ foc::Ampere{ maxCurrent }, timeStep };
-        foc::Runner focRunner{ model, model, focSpeed };
+        foc::LowPriorityInterruptImpl lowPriorityInterrupt;
+        foc::FocSpeedController controller{ model, model, foc::Ampere{ maxCurrent }, baseFrequency, lowPriorityInterrupt, hal::Hertz{ lowPriorityFrequencyHz } };
 
-        focSpeed.SetSpeedTunings(foc::Volts{ powerSupplyVoltage },
+        controller.SetSpeedTunings(foc::Volts{ powerSupplyVoltage },
             controllers::PidTunings<float>{ args::get(kpSpeedArgument), args::get(kiSpeedArgument), args::get(kdSpeedArgument) });
-        focSpeed.SetCurrentTunings(foc::Volts{ powerSupplyVoltage },
+        controller.SetCurrentTunings(foc::Volts{ powerSupplyVoltage },
             foc::IdAndIqTunings{
                 { args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument) },
                 { args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument) } });
-        focSpeed.SetPolePairs(simulator::JK42BLS01_X038ED::parameters.p);
-        focSpeed.SetPoint(ToRadiansPerSecond(args::get(speedSetPointArgument)));
+        controller.SetPolePairs(simulator::JK42BLS01_X038ED::parameters.p);
+        controller.SetPoint(ToRadiansPerSecond(args::get(speedSetPointArgument)));
 
         if (enableGui)
         {
@@ -117,16 +118,16 @@ int main(int argc, char* argv[])
                 args::get(kpSpeedArgument), args::get(kiSpeedArgument), args::get(kdSpeedArgument)
             };
 
-            simulator::GuiSimulation simulation{ argc, argv, model, focRunner, eventDispatcher, simulator::JK42BLS01_X038ED::parameters, pidParameters };
+            simulator::GuiSimulation simulation{ argc, argv, model, controller, eventDispatcher, simulator::JK42BLS01_X038ED::parameters, pidParameters };
 
             auto& gui = simulation.GetGui();
-            QObject::connect(&gui, &simulator::Gui::speedChanged, [&focSpeed, &gui, powerSupplyVoltage, &pidParameters](int rpm)
+            QObject::connect(&gui, &simulator::Gui::speedChanged, [&controller, &gui, powerSupplyVoltage, &pidParameters](int rpm)
                 {
-                    focSpeed.SetPoint(ToRadiansPerSecond(static_cast<float>(rpm)));
+                    controller.SetPoint(ToRadiansPerSecond(static_cast<float>(rpm)));
 
-                    focSpeed.SetSpeedTunings(foc::Volts{ powerSupplyVoltage },
+                    controller.SetSpeedTunings(foc::Volts{ powerSupplyVoltage },
                         controllers::PidTunings<float>{ pidParameters.speedKp, pidParameters.speedKi, pidParameters.speedKd });
-                    focSpeed.SetCurrentTunings(foc::Volts{ powerSupplyVoltage },
+                    controller.SetCurrentTunings(foc::Volts{ powerSupplyVoltage },
                         foc::IdAndIqTunings{
                             { pidParameters.currentKp, pidParameters.currentKi, pidParameters.currentKd },
                             { pidParameters.currentKp, pidParameters.currentKi, pidParameters.currentKd } });
@@ -137,7 +138,7 @@ int main(int argc, char* argv[])
             return simulation.Run();
         }
 
-        simulator::HeadlessSimulation simulation{ model, focRunner, eventDispatcher,
+        simulator::HeadlessSimulation simulation{ model, controller, eventDispatcher,
             "FOC Speed Control", "foc_speed_results", std::format("{}/output/simulator/speed_control", PROJECT_ROOT_DIR),
             timeStep, simulationTime };
         simulation.Run();

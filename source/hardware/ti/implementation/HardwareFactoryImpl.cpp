@@ -2,6 +2,18 @@
 #include "infra/util/MemoryRange.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include "source/hardware/HardwareFactory.hpp"
+#include DEVICE_HEADER
+
+namespace
+{
+    infra::Function<void()>* pendSvHandlerCallback = nullptr;
+}
+
+extern "C" void PendSV_Handler()
+{
+    if (pendSvHandlerCallback != nullptr && *pendSvHandlerCallback)
+        (*pendSvHandlerCallback)();
+}
 
 namespace application
 {
@@ -56,6 +68,22 @@ namespace application
     foc::Ampere HardwareFactoryImpl::MaxCurrentSupported()
     {
         return foc::Ampere(15.0f);
+    }
+
+    foc::LowPriorityInterrupt& HardwareFactoryImpl::LowPriorityInterrupt()
+    {
+        return pendSvLowPriorityInterrupt;
+    }
+
+    void HardwareFactoryImpl::PendSvLowPriorityInterrupt::Trigger()
+    {
+        SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
+    }
+
+    void HardwareFactoryImpl::PendSvLowPriorityInterrupt::Register(const infra::Function<void()>& handler)
+    {
+        onLowPriorityInterrupt = handler;
+        pendSvHandlerCallback = &onLowPriorityInterrupt;
     }
 
     void HardwareFactoryImpl::Start()
