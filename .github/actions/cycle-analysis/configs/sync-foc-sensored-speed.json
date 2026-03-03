@@ -1,0 +1,71 @@
+{
+    "target": "EK-TM4C1294XL",
+    "build_config": "Debug",
+    "clock_mhz": 120,
+    "cortex": "m4",
+    "loop_rates_khz": [
+        10,
+        20,
+        40
+    ],
+    "path_stages": [
+        {
+            "label": "ISR Entry (exception overhead)",
+            "type": "exception_entry"
+        },
+        {
+            "label": "ADC ISR + Callback Dispatch",
+            "patterns": [
+                "Adc0Sequence.*Handler",
+                "InterruptTable::Invoke",
+                "ImmediateInterruptHandler::Invoke"
+            ]
+        },
+        {
+            "label": "Encoder Read",
+            "patterns": [
+                "HardwareAdapter::Read",
+                "QuadratureEncoderDecorator.*::Read",
+                "QuadratureEncoder::Position",
+                "QuadratureEncoder::Resolution"
+            ]
+        },
+        {
+            "label": "FOC Calculate",
+            "entry": "FocSpeedImpl::Calculate",
+            "patterns": [
+                "FocSpeedImpl::Calculate",
+                "FocSpeedImpl::CalculateFilteredSpeed",
+                "Clarke::Forward",
+                "Park::Forward",
+                "Park::Inverse",
+                "SpaceVectorModulation::Generate",
+                "SpaceVectorModulation::Clip",
+                "FastTrigonometry::Sine",
+                "FastTrigonometry::Cosine",
+                "PidIncrementalBase.*::Process",
+                "PidIncrementalBase.*::Clamp",
+                "PidIncrementalSynchronous.*::Process",
+                "PidIncrementalSynchronous.*::SetPoint",
+                "PositionWithWrapAround",
+                "std::array<float.*>::operator\\[\\]",
+                "std::clamp",
+                "std::max<float>",
+                "std::min<float>"
+            ]
+        },
+        {
+            "label": "PWM Output",
+            "patterns": [
+                "HardwareAdapter::ThreePhasePwmOutput",
+                "SynchronousPwm::Start.*Percent.*Percent.*Percent",
+                "SynchronousPwm::SetComparator",
+                "SynchronousPwm::Sync"
+            ]
+        },
+        {
+            "label": "ISR Exit (exception return)",
+            "type": "exception_exit"
+        }
+    ]
+}

@@ -1,0 +1,130 @@
+name: 'Control Loop Cycle Analysis'
+description: >
+  Estimates CPU cycle consumption for the full ISR-to-PWM control loop path
+  by parsing ARM Cortex-M disassembly. Reports cycle counts, CPU utilization
+  budget, and per-function breakdown.
+
+inputs:
+  elf-path:
+    description: 'Path to the ELF binary to analyze'
+    required: true
+  config-path:
+    description: 'Path to the JSON configuration file defining the path stages'
+    required: true
+  objdump-tool:
+    description: 'Path to the objdump binary (default: arm-none-eabi-objdump)'
+    required: false
+    default: 'arm-none-eabi-objdump'
+  size-tool:
+    description: 'Path to the size binary (default: arm-none-eabi-size)'
+    required: false
+    default: 'arm-none-eabi-size'
+  output-dir:
+    description: 'Directory for generated reports'
+    required: false
+    default: 'cycle-analysis-output'
+  post-pr-comment:
+    description: 'Post a PR comment with the summary (true/false)'
+    required: false
+    default: 'true'
+
+outputs:
+  min-cycles:
+    description: 'Minimum estimated cycles for the full path'
+    value: ${{ steps.extract.outputs.min_cycles }}
+  max-cycles:
+    description: 'Maximum estimated cycles for the full path'
+    value: ${{ steps.extract.outputs.max_cycles }}
+  report-path:
+    description: 'Path to the full Markdown report'
+    value: ${{ steps.analyze.outputs.report_path }}
+  metrics-path:
+    description: 'Path to the JSON metrics file'
+    value: ${{ steps.analyze.outputs.metrics_path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+      shell: bash
+
+    - name: Run cycle analysis
+      id: analyze
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p "${{ inputs.output-dir }}"
+
+        python3 "${{ github.action_path }}/analyze_cycles.py" \
+          "${{ inputs.config-path }}" \
+          --elf "${{ inputs.elf-path }}" \
+          --output-dir "${{ inputs.output-dir }}" \
+          --objdump "${{ inputs.objdump-tool }}" \
+          --size-tool "${{ inputs.size-tool }}"
+
+        echo "report_path=${{ inputs.output-dir }}/cycle_estimation_report.md" >> "$GITHUB_OUTPUT"
+        echo "metrics_path=${{ inputs.output-dir }}/cycle_metrics.json" >> "$GITHUB_OUTPUT"
+
+    - name: Extract metrics
+      id: extract
+      shell: bash
+      run: |
+        set -euo pipefail
+        json="${{ inputs.output-dir }}/cycle_metrics.json"
+
+        min_cycles=$(python3 -c "import json; d=json.load(open('$json')); print(d['summary']['estimated_min_cycles'])")
+        max_cycles=$(python3 -c "import json; d=json.load(open('$json')); print(d['summary']['estimated_max_cycles'])")
+
+        echo "min_cycles=${min_cycles}" >> "$GITHUB_OUTPUT"
+        echo "max_cycles=${max_cycles}" >> "$GITHUB_OUTPUT"
+
+    - name: Upload analysis artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: cycle-analysis
+        path: |
+          ${{ inputs.output-dir }}/cycle_estimation_report.md
+          ${{ inputs.output-dir }}/annotated_disassembly.md
+          ${{ inputs.output-dir }}/cycle_metrics.json
+          ${{ inputs.output-dir }}/size_report.txt
+
+    - name: Post PR comment
+      if: inputs.post-pr-comment == 'true' && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const body = fs.readFileSync(
+            '${{ inputs.output-dir }}/pr_comment.md', 'utf8'
+          );
+
+          const marker = '<!-- cycle-analysis-comment -->';
+          const fullBody = `${marker}\n${body}`;
+
+          // Find & update or create comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          const existing = comments.find(c => c.body.includes(marker));
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body: fullBody,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: fullBody,
+            });
+          }
