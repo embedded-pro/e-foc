@@ -138,7 +138,11 @@ jobs:
         id: cycles
         with:
           elf-path: build/${{ matrix.target }}/source/application/sync_foc_sensored/speed/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.speed.main.elf
-          config-path: .github/actions/cycle-analysis/configs/sync-foc-sensored-speed.json
+          config-path: source/application/sync_foc_sensored/speed/cycle-analysis.json
+          target: ${{ matrix.target }}
+          build-config: ${{ matrix.configuration }}
+          clock-mhz: '120'
+          cortex: 'm4'
           output-dir: cycle-analysis-output
       - name: Cycle analysis summary
         if: matrix.target == 'EK-TM4C1294XL'

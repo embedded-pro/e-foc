@@ -1,8 +1,8 @@
-name: 'Control Loop Cycle Analysis'
+name: 'Cycle Analysis'
 description: >
-  Estimates CPU cycle consumption for the full ISR-to-PWM control loop path
-  by parsing ARM Cortex-M disassembly. Reports cycle counts, CPU utilization
-  budget, and per-function breakdown.
+  Estimates CPU cycle consumption for a user-defined critical path through
+  an ARM Cortex-M binary.  Path stages are fully driven by a JSON config
+  file — no application-specific knowledge is hard-coded.
 
 inputs:
   elf-path:
@@ -11,6 +11,19 @@ inputs:
   config-path:
     description: 'Path to the JSON configuration file defining the path stages'
     required: true
+  target:
+    description: 'Target board identifier (e.g. EK-TM4C1294XL)'
+    required: true
+  build-config:
+    description: 'Build configuration (e.g. RelWithDebInfo, Debug)'
+    required: true
+  clock-mhz:
+    description: 'CPU clock frequency in MHz (e.g. 120)'
+    required: true
+  cortex:
+    description: 'Cortex-M variant for timing model (e.g. m4, m33)'
+    required: false
+    default: 'm4'
   objdump-tool:
     description: 'Path to the objdump binary (default: arm-none-eabi-objdump)'
     required: false
@@ -60,6 +73,10 @@ runs:
         python3 "${{ github.action_path }}/analyze_cycles.py" \
           "${{ inputs.config-path }}" \
           --elf "${{ inputs.elf-path }}" \
+          --target "${{ inputs.target }}" \
+          --build-config "${{ inputs.build-config }}" \
+          --clock-mhz "${{ inputs.clock-mhz }}" \
+          --cortex "${{ inputs.cortex }}" \
           --output-dir "${{ inputs.output-dir }}" \
           --objdump "${{ inputs.objdump-tool }}" \
           --size-tool "${{ inputs.size-tool }}"

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-ARM Cortex-M Cycle Estimation — Full ISR-to-Output Path Analysis.
+ARM Cortex-M Cycle Estimation — Configurable Critical-Path Analysis.
 
-Parses arm-none-eabi-objdump disassembly and estimates machine cycles for the
-complete interrupt-driven control loop: from the ADC ISR entry through the
-FOC algorithm to the PWM register write.
+Parses arm-none-eabi-objdump disassembly and estimates machine cycles for a
+user-defined critical path through an ARM Cortex-M binary.  The path stages
+are fully driven by a JSON configuration file — no application-specific
+knowledge is hard-coded in this script.
 
 Timing model: Cortex-M4 (ARMv7E-M, FPv4-SP-D16) based on the ARM DDI0439D TRM.
 Configurable via JSON for any application / MCU combination.
@@ -198,7 +199,7 @@ class Function:
 
 @dataclass
 class PathStage:
-    """One stage in the ISR→output path (e.g. 'ISR Entry', 'ADC Read', …)."""
+    """One stage in the configured critical path."""
     label: str
     functions: list[str] = field(default_factory=list)   # resolved demangled names
     min_cycles: int = 0
@@ -207,84 +208,6 @@ class PathStage:
     code_size: int = 0
     fpu_ops: int = 0
     is_overhead: bool = False    # True for ISR entry/exit (no disasm)
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Configuration schema
-# ──────────────────────────────────────────────────────────────────────────────
-
-DEFAULT_CONFIG = {
-    "target": "EK-TM4C1294XL",
-    "build_config": "Debug",
-    "clock_mhz": 120,
-    "cortex": "m4",
-    "loop_rates_khz": [10, 20, 40],
-    "path_stages": [
-        {
-            "label": "ISR Entry (exception overhead)",
-            "type": "exception_entry"
-        },
-        {
-            "label": "ADC ISR + Callback dispatch",
-            "patterns": [
-                "Adc.*Sequence.*Handler",
-                "InterruptTable::Invoke",
-                "ImmediateInterruptHandler::Invoke",
-                "StaticInvoke.*PhaseCurrents",
-                "AdcPhaseCurrentMeasurement.*Measure.*lambda",
-                "operator\\(\\).*PhaseCurrents"
-            ]
-        },
-        {
-            "label": "Encoder Read",
-            "patterns": [
-                "HardwareAdapter::Read",
-                "QuadratureEncoderDecorator.*::Read",
-                "QuadratureEncoder::Position",
-                "QuadratureEncoder::Resolution"
-            ]
-        },
-        {
-            "label": "FOC Calculate",
-            "entry": "FocSpeedImpl::Calculate",
-            "patterns": [
-                "FocSpeedImpl::Calculate",
-                "FocSpeedImpl::CalculateFilteredSpeed",
-                "Clarke::Forward",
-                "Park::Forward",
-                "Park::Inverse",
-                "ClarkePark::Forward",
-                "ClarkePark::Inverse",
-                "SpaceVectorModulation::Generate",
-                "SpaceVectorModulation::Clip",
-                "FastTrigonometry::Sine",
-                "FastTrigonometry::Cosine",
-                "PidIncrementalBase.*::Process",
-                "PidIncrementalBase.*::Clamp",
-                "PidIncrementalSynchronous.*::Process",
-                "PidIncrementalSynchronous.*::SetPoint",
-                "PositionWithWrapAround",
-                "std::array<float.*>::operator\\[\\]",
-                "std::clamp",
-                "std::max<float>",
-                "std::min<float>"
-            ]
-        },
-        {
-            "label": "PWM Output",
-            "patterns": [
-                "HardwareAdapter::ThreePhasePwmOutput",
-                "SynchronousPwm::Start.*Percent.*Percent.*Percent",
-                "SynchronousPwm::SetComparator",
-                "SynchronousPwm::Sync"
-            ]
-        },
-        {
-            "label": "ISR Exit (exception return)",
-            "type": "exception_exit"
-        }
-    ]
-}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -471,17 +394,74 @@ def walk_call_graph(entry_fn: Function, lookup: dict[str, Function]) -> dict[str
 # Stage analysis  — maps config stages to disassembled functions
 # ──────────────────────────────────────────────────────────────────────────────
 
+class StageMatchError(RuntimeError):
+    """Raised when a path stage matches no functions in the binary."""
+
+
+class ConfigError(RuntimeError):
+    """Raised when the configuration file is invalid."""
+
+
+def _validate_config(config: dict) -> None:
+    """Validate required config fields and value ranges."""
+    errors: list[str] = []
+
+    for field in ("path_stages",):
+        if field not in config:
+            errors.append(f"Missing required field '{field}'")
+
+    if "path_stages" in config:
+        if not isinstance(config["path_stages"], list) or len(config["path_stages"]) == 0:
+            errors.append("'path_stages' must be a non-empty list")
+        else:
+            for i, stage in enumerate(config["path_stages"]):
+                if "label" not in stage:
+                    errors.append(f"path_stages[{i}]: missing 'label'")
+                stage_type = stage.get("type")
+                if stage_type is None and not stage.get("patterns"):
+                    errors.append(
+                        f"path_stages[{i}] ('{stage.get('label', '?')}'): "
+                        f"must have 'type' or 'patterns'"
+                    )
+                # Validate regex patterns are compilable
+                for j, pat in enumerate(stage.get("patterns", [])):
+                    try:
+                        re.compile(pat)
+                    except re.error as exc:
+                        errors.append(
+                            f"path_stages[{i}] ('{stage.get('label', '?')}'): "
+                            f"pattern[{j}] '{pat}' is not valid regex: {exc}"
+                        )
+
+
+
+    if "loop_rates_khz" in config:
+        for rate in config["loop_rates_khz"]:
+            if not isinstance(rate, (int, float)) or rate <= 0:
+                errors.append(f"'loop_rates_khz' contains invalid rate: {rate}")
+
+    if errors:
+        raise ConfigError(
+            "Configuration validation failed:\n" +
+            "\n".join(f"  • {e}" for e in errors)
+        )
+
+
 def analyze_stages(
     config: dict,
     all_fns: list[Function],
     lookup: dict[str, Function],
+    *,
+    strict: bool = True,
 ) -> list[PathStage]:
     cortex = config.get("cortex", "m4")
     overhead = EXCEPTION_OVERHEAD.get(cortex, EXCEPTION_OVERHEAD["m4"])
     stages: list[PathStage] = []
+    errors: list[str] = []
 
     for stage_cfg in config["path_stages"]:
         stage_type = stage_cfg.get("type")
+        required = stage_cfg.get("required", True)
 
         if stage_type == "exception_entry":
             stages.append(PathStage(
@@ -508,8 +488,15 @@ def analyze_stages(
         matched: dict[str, Function] = {}
         for fn in all_fns:
             for pat in patterns:
-                if re.search(pat, fn.demangled):
-                    matched[fn.demangled] = fn
+                try:
+                    if re.search(pat, fn.demangled):
+                        matched[fn.demangled] = fn
+                        break
+                except re.error as exc:
+                    msg = (f"Stage '{stage_cfg['label']}': invalid regex "
+                           f"pattern '{pat}': {exc}")
+                    errors.append(msg)
+                    log(f"  ERROR: {msg}")
                     break
 
         stage = PathStage(label=stage_cfg["label"])
@@ -530,8 +517,17 @@ def analyze_stages(
                 stage.fpu_ops = sum(v["fpu_ops"] for v in breakdown.values())
                 stage.functions = sorted(breakdown.keys())
             else:
-                log(f"  WARNING: entry '{entry_pattern}' not found for stage '{stage_cfg['label']}'")
+                msg = (f"Stage '{stage_cfg['label']}': entry function matching "
+                       f"'{entry_pattern}' not found in binary")
+                if required:
+                    errors.append(msg)
+                log(f"  ERROR: {msg}")
         else:
+            if not matched and required:
+                msg = (f"Stage '{stage_cfg['label']}': no functions matched any "
+                       f"of the {len(patterns)} configured patterns")
+                errors.append(msg)
+                log(f"  ERROR: {msg}")
             # Sum matched functions directly (each counted once)
             for name, fn in matched.items():
                 stage.min_cycles += fn.total_min_cycles
@@ -542,6 +538,21 @@ def analyze_stages(
             stage.functions = sorted(matched.keys())
 
         stages.append(stage)
+
+    if strict and errors:
+        log("")
+        log("Stage matching failed — the configuration does not align with the binary.")
+        log("Unmatched stages:")
+        for e in errors:
+            log(f"  • {e}")
+        log("")
+        log("Ensure the path_stages patterns in your config JSON match the ")
+        log("demangled symbol names in the ELF. You can inspect them with:")
+        log("  arm-none-eabi-objdump -d -C <elf> | grep '^[0-9a-f].*<.*>:$'")
+        raise StageMatchError(
+            f"{len(errors)} path stage(s) matched no functions in the binary. "
+            f"See stderr for details."
+        )
 
     return stages
 
@@ -568,10 +579,11 @@ def generate_report(
     total_fpu = sum(s.fpu_ops for s in stages)
 
     lines: list[str] = []
-    lines.append("# Control Loop Cycle Estimation Report")
+    path_name = config.get("path_name", "Critical Path")
+    lines.append("# Cycle Estimation Report")
     lines.append("")
     lines.append(f"**Target**: `{target}` | **Build**: `{build_config}` | **Clock**: {clock} MHz")
-    lines.append(f"**Path**: Full ISR-to-PWM (ADC interrupt → FOC algorithm → PWM register write)")
+    lines.append(f"**Path**: {path_name}")
     lines.append("")
 
     # ── Executive Summary ─────────────────────────────────────────────────
@@ -609,8 +621,8 @@ def generate_report(
         )
     lines.append("")
 
-    # ── ISR-to-PWM Path Breakdown ─────────────────────────────────────────
-    lines.append("## ISR-to-PWM Path Breakdown")
+    # ── Path Breakdown ────────────────────────────────────────────────────
+    lines.append("## Path Breakdown")
     lines.append("")
     lines.append("```")
     max_label = max(len(s.label) for s in stages)
@@ -641,15 +653,11 @@ def generate_report(
                  f"| **{total_instructions}** | **{total_code_size} B** | **{total_fpu}** | |")
     lines.append("")
 
-    # ── Per-Function Detail (for the FOC Calculate stage) ─────────────────
-    foc_stage = None
+    # ── Per-Function Detail (for stages with an entry point) ──────────────
     for scfg in config["path_stages"]:
-        if scfg.get("entry"):
-            foc_stage = scfg
-            break
-
-    if foc_stage:
-        entry_pattern = foc_stage["entry"]
+        if not scfg.get("entry"):
+            continue
+        entry_pattern = scfg["entry"]
         entry_fn = None
         for fn in all_fns:
             if re.search(entry_pattern, fn.demangled):
@@ -657,7 +665,7 @@ def generate_report(
                 break
         if entry_fn:
             breakdown = walk_call_graph(entry_fn, lookup)
-            lines.append(f"## Per-Function Detail — {foc_stage['label']}")
+            lines.append(f"## Per-Function Detail — {scfg['label']}")
             lines.append("")
             lines.append("| Function | Calls | Min Cycles | Max Cycles | FPU | Load/Store | Branch | ALU |")
             lines.append("|----------|-------|-----------|-----------|-----|------------|--------|-----|")
@@ -756,10 +764,11 @@ def generate_pr_comment(config: dict, stages: list[PathStage]) -> str:
     total_code_size = sum(s.code_size for s in stages)
 
     lines: list[str] = []
-    lines.append("## 🏎️ Control Loop — Cycle Estimation")
+    path_name = config.get("path_name", "Critical Path")
+    lines.append("## 🏎️ Cycle Estimation")
     lines.append("")
     lines.append(f"**Target**: `{target}` | **Build**: `{build_config}` | **Clock**: {clock} MHz")
-    lines.append(f"**Path**: ADC ISR → FOC → PWM Output")
+    lines.append(f"**Path**: {path_name}")
     lines.append("")
 
     # ── Executive Summary table ───────────────────────────────────────────
@@ -796,7 +805,7 @@ def generate_pr_comment(config: dict, stages: list[PathStage]) -> str:
     lines.append("")
 
     # ── Path timeline ─────────────────────────────────────────────────────
-    lines.append("### ISR → PWM Path")
+    lines.append("### Path Breakdown")
     lines.append("")
     for i, stage in enumerate(stages):
         pct = stage.max_cycles / max(total_max, 1) * 100
@@ -816,7 +825,8 @@ def generate_annotated_disasm(
 ) -> str:
     """Generate annotated disassembly for all functions in the path."""
     lines: list[str] = []
-    lines.append("# Annotated Disassembly — Full ISR-to-PWM Path")
+    path_name = config.get("path_name", "Critical Path")
+    lines.append(f"# Annotated Disassembly — {path_name}")
     lines.append("")
 
     seen: set[str] = set()
@@ -887,7 +897,7 @@ def generate_json_metrics(
         "build_config": config["build_config"],
         "clock_mhz": clock,
         "cortex": config.get("cortex", "m4"),
-        "path": "ISR-to-PWM",
+        "path": config.get("path_name", "Critical Path"),
         "summary": {
             "estimated_min_cycles": total_min,
             "estimated_max_cycles": total_max,
@@ -954,20 +964,87 @@ def main():
     parser.add_argument("--objdump", default="arm-none-eabi-objdump")
     parser.add_argument("--size-tool", default="arm-none-eabi-size")
     parser.add_argument("--disasm-file", help="Pre-generated disassembly file")
+    parser.add_argument(
+        "--no-strict", action="store_true",
+        help="Do not fail when path stages match no functions",
+    )
+    parser.add_argument(
+        "--target", required=True,
+        help="Target board identifier (e.g. EK-TM4C1294XL)",
+    )
+    parser.add_argument(
+        "--build-config", required=True,
+        help="Build configuration (e.g. RelWithDebInfo, Debug)",
+    )
+    parser.add_argument(
+        "--clock-mhz", required=True, type=int,
+        help="CPU clock frequency in MHz (e.g. 120)",
+    )
+    parser.add_argument(
+        "--cortex", default="m4",
+        help="Cortex-M variant for timing model (default: m4)",
+    )
     args = parser.parse_args()
 
     # Load config
-    with open(args.config) as f:
-        config = json.load(f)
+    config_path = args.config
+    elf_path = args.elf
+
+    if not os.path.isfile(config_path):
+        log(f"ERROR: Config file not found: {config_path}")
+        sys.exit(1)
+
+    if not os.path.isfile(elf_path):
+        log(f"ERROR: ELF file not found: {elf_path}")
+        sys.exit(1)
+
+    try:
+        with open(config_path) as f:
+            config = json.load(f)
+    except json.JSONDecodeError as exc:
+        log(f"ERROR: Failed to parse config JSON: {exc}")
+        sys.exit(1)
+
+    # Merge hardware parameters from CLI into config
+    config["target"] = args.target
+    config["build_config"] = args.build_config
+    config["clock_mhz"] = args.clock_mhz
+    config["cortex"] = args.cortex
+
+    # Validate hardware parameters
+    if config["clock_mhz"] <= 0:
+        log(f"ERROR: --clock-mhz must be a positive integer, got {config['clock_mhz']}")
+        sys.exit(1)
+    if config["cortex"] not in EXCEPTION_OVERHEAD:
+        valid = ", ".join(sorted(EXCEPTION_OVERHEAD))
+        log(f"ERROR: --cortex '{config['cortex']}' is not supported. Valid values: {valid}")
+        sys.exit(1)
+
+    try:
+        _validate_config(config)
+    except ConfigError as exc:
+        log(f"ERROR: {exc}")
+        sys.exit(1)
 
     os.makedirs(args.output_dir, exist_ok=True)
 
     # Disassembly
     if args.disasm_file:
+        if not os.path.isfile(args.disasm_file):
+            log(f"ERROR: Disassembly file not found: {args.disasm_file}")
+            sys.exit(1)
         with open(args.disasm_file) as f:
             disasm = f.read()
     else:
-        disasm = run_objdump(args.elf, args.objdump)
+        try:
+            disasm = run_objdump(elf_path, args.objdump)
+        except FileNotFoundError:
+            log(f"ERROR: objdump tool not found: '{args.objdump}'")
+            log("Install the ARM toolchain or pass --objdump with the correct path.")
+            sys.exit(1)
+        except subprocess.CalledProcessError as exc:
+            log(f"ERROR: objdump failed (exit {exc.returncode}): {exc.stderr}")
+            sys.exit(1)
 
     disasm_path = os.path.join(args.output_dir, "full_disassembly.txt")
     with open(disasm_path, "w") as f:
@@ -975,7 +1052,7 @@ def main():
     log(f"Full disassembly: {disasm_path}")
 
     # Size report
-    size_out = run_size(args.elf, args.size_tool)
+    size_out = run_size(elf_path, args.size_tool)
     if size_out:
         with open(os.path.join(args.output_dir, "size_report.txt"), "w") as f:
             f.write(size_out)
@@ -985,8 +1062,13 @@ def main():
     lookup = {fn.demangled: fn for fn in all_fns}
     log(f"Parsed {len(all_fns)} functions")
 
+    if len(all_fns) == 0:
+        log("ERROR: No functions found in the disassembly.")
+        log("The ELF may be stripped, empty, or not an ARM binary.")
+        sys.exit(1)
+
     # Analyze stages
-    stages = analyze_stages(config, all_fns, lookup)
+    stages = analyze_stages(config, all_fns, lookup, strict=not args.no_strict)
     log("Path stages:")
     for s in stages:
         log(f"  {s.label}: {s.min_cycles}–{s.max_cycles} cycles, "
@@ -1016,9 +1098,10 @@ def main():
     clock = config["clock_mhz"]
     avail_20k = clock * 1_000_000 // 20_000
     print(f"\n{'='*65}")
-    print(f" Control Loop Cycle Estimation ({config['target']} {config['build_config']})")
+    path_name = config.get("path_name", "Critical Path")
+    print(f" Cycle Estimation ({config['target']} {config['build_config']})")
     print(f"{'='*65}")
-    print(f" Path: ADC ISR → FOC → PWM Output")
+    print(f" Path: {path_name}")
     print(f" Estimated cycles: {total_min} — {total_max}")
     print(f" Budget @ 20 kHz / {clock} MHz: {avail_20k} cycles "
           f"({total_max / avail_20k * 100:.1f}% max)")

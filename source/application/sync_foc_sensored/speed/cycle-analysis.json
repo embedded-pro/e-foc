@@ -1,8 +1,5 @@
 {
-    "target": "EK-TM4C1294XL",
-    "build_config": "RelWithDebInfo",
-    "clock_mhz": 120,
-    "cortex": "m4",
+    "path_name": "ADC ISR → FOC → PWM Output",
     "loop_rates_khz": [
         10,
         20,
