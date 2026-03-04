@@ -35,4 +35,13 @@ namespace foc
         virtual void SetPoint(RadiansPerSecond setPoint) = 0;
         virtual void SetSpeedTunings(Volts Vdc, const SpeedTunings& speedTuning) = 0;
     };
+
+    class FocPosition
+        : public FocBase
+    {
+    public:
+        virtual void SetPoint(Radians setPoint) = 0;
+        virtual void SetSpeedTunings(Volts Vdc, const SpeedTunings& speedTuning) = 0;
+        virtual void SetPositionTunings(const PositionTunings& positionTuning) = 0;
+    };
 }
