@@ -807,10 +807,12 @@ def generate_pr_comment(config: dict, stages: list[PathStage]) -> str:
     # ── Path timeline ─────────────────────────────────────────────────────
     lines.append("### Path Breakdown")
     lines.append("")
+    lines.append("| Stage | Cycles | % |")
+    lines.append("|-------|--------|---|")
     for i, stage in enumerate(stages):
         pct = stage.max_cycles / max(total_max, 1) * 100
-        lines.append(f"| {stage.label} | {stage.min_cycles}–{stage.max_cycles} cycles ({pct:.0f}%) |")
-    lines.append(f"| **Total** | **{total_min}–{total_max} cycles** |")
+        lines.append(f"| {stage.label} | {stage.min_cycles}–{stage.max_cycles} | {pct:.0f}% |")
+    lines.append(f"| **Total** | **{total_min}–{total_max}** | |")
     lines.append("")
 
     lines.append("> 📦 Full report, annotated disassembly and JSON metrics available in workflow artifacts.")
