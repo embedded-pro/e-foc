@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
@@ -91,7 +92,7 @@ jobs:
   embedded_build:
     name: Embedded Build
     runs-on: ubuntu-latest
-    needs: [host_build_test]
+    needs: [host_build_test_ubuntu, host_build_test]
     strategy:
       matrix:
         configuration: ["RelWithDebInfo"]
@@ -131,3 +132,26 @@ jobs:
           configurePreset: ${{ matrix.target }}
           buildPreset: ${{ matrix.target }}-${{ matrix.configuration }}
           configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
+      - name: Run cycle analysis
+        if: matrix.target == 'EK-TM4C1294XL'
+        uses: ./.github/actions/cycle-analysis
+        id: cycles
+        with:
+          elf-path: build/${{ matrix.target }}/source/application/sync_foc_sensored/speed/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.speed.main.elf
+          config-path: source/application/sync_foc_sensored/speed/cycle-analysis.json
+          target: ${{ matrix.target }}
+          build-config: ${{ matrix.configuration }}
+          clock-mhz: '120'
+          cortex: 'm4'
+          output-dir: cycle-analysis-output
+      - name: Cycle analysis summary
+        if: matrix.target == 'EK-TM4C1294XL'
+        run: |
+          {
+            echo "## Cycle Analysis Results"
+            echo ""
+            echo "- **Min cycles**: ${{ steps.cycles.outputs.min-cycles }}"
+            echo "- **Max cycles**: ${{ steps.cycles.outputs.max-cycles }}"
+            echo ""
+            cat cycle-analysis-output/cycle_estimation_report.md
+          } | tee -a "$GITHUB_STEP_SUMMARY"
