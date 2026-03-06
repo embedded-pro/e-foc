@@ -26,7 +26,7 @@ namespace services
         void SendBusVoltage(float voltage) override;
         void SendHeartbeat() override;
         void SendFaultEvent(CanFaultCode fault) override;
-        void SendCommandAck(CanMessageType commandType, CanAckStatus status) override;
+        void SendCommandAck(CanCategory category, CanMessageType commandType, CanAckStatus status) override;
 
         void ResetRateCounter() override;
         bool IsRateLimited() const override;

@@ -28,7 +28,7 @@ namespace services
         virtual void SendBusVoltage(float voltage) = 0;
         virtual void SendHeartbeat() = 0;
         virtual void SendFaultEvent(CanFaultCode fault) = 0;
-        virtual void SendCommandAck(CanMessageType commandType, CanAckStatus status) = 0;
+        virtual void SendCommandAck(CanCategory category, CanMessageType commandType, CanAckStatus status) = 0;
 
         virtual void ResetRateCounter() = 0;
         virtual bool IsRateLimited() const = 0;

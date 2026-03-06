@@ -75,7 +75,7 @@ Lower numerical values have higher CAN bus arbitration priority.
 | 0x2   | Motor Parameters  | Pole pairs, R, L, flux linkage       |
 | 0x3   | System Parameters | Supply voltage, max current          |
 | 0x4   | Telemetry         | Status, measurements, faults         |
-| 0x5   | System            | Heartbeat, command acknowledgement   |
+| 0x5   | System            | Heartbeat, command acknowledgement, status query |
 
 ## 7. Message Catalog
 
@@ -277,10 +277,26 @@ Sent at CanPriority::heartbeat. No sequence validation.
 
 Sent at CanPriority::response.
 
-| Byte | Field   | Type  | Description                            |
-|------|---------|-------|----------------------------------------|
-| 0    | Command | uint8 | CanMessageType of acknowledged command |
-| 1    | Status  | uint8 | See acknowledgement status table       |
+| Byte | Field    | Type  | Description                                   |
+|------|----------|-------|-----------------------------------------------|
+| 0    | Category | uint8 | CanCategory of the acknowledged command        |
+| 1    | Command  | uint8 | CanMessageType of the acknowledged command     |
+| 2    | Status   | uint8 | See acknowledgement status table              |
+
+The category byte ensures the receiver can uniquely identify which command
+is being acknowledged, since message type values are reused across categories.
+
+#### 7.6.3 Request Status (Type 0x03)
+
+Sent at CanPriority::command. No sequence validation. Empty payload.
+
+When received, the node notifies the application observer via `OnStatusRequested()`.
+The observer is expected to respond by calling `SendMotorStatus()`, which sends a
+telemetry frame (Category 0x4, Type 0x01) containing the current motor state,
+active control mode, and fault code.
+
+This message is used by the CAN Commander tool to query the active control mode
+on connection and adapt the GUI accordingly.
 
 ## 8. Data Encoding
 
@@ -369,8 +385,10 @@ sequenceDiagram
 - The node accepts the first sequenced command received regardless of sequence value and records it as the reference.
 - For commands where sequence validation is enabled, each subsequent command should have sequence = (previous + 1) mod 256.
 - When sequence validation is enabled and a command is out-of-order or duplicated, the node may reject it and send a `sequenceError` acknowledgement.
-- Some command types (for example, emergency stop) bypass sequence validation entirely by design.
+- Emergency stop (category motorControl, type 0x03) bypasses sequence validation entirely by design. The bypass is keyed on both category and message type to avoid false matches with types reusing value 0x03 in other categories.
+- When sequence validation is required and the payload is empty (no sequence byte present), the frame is rejected with `invalidPayload`.
 - Heartbeat and telemetry frames do not use sequence numbers and are never subject to sequence validation.
+- Unrecognized message types within a supported category are rejected with an `unknownCommand` acknowledgement.
 - Sequence numbers are not an authentication or security mechanism and MUST NOT be relied upon to prevent malicious replay on an untrusted CAN bus.
 
 ## 11. Rate Limiting
@@ -455,4 +473,4 @@ sequenceDiagram
 - Observer pattern uses `infra::SingleObserver` / `infra::Subject` from embedded-infra-lib.
 - Category-based dispatch uses a polymorphic handler hierarchy (`CanCategoryHandler`).
 - All encoding uses `CanFrameCodec` with saturation clamping.
-- The implementation is fully covered by 45 GoogleTest unit tests.
+- The implementation is fully covered by 67 GoogleTest unit tests.

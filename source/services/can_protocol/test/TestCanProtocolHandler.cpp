@@ -37,6 +37,7 @@ namespace
         MOCK_METHOD(void, OnMaxCurrentChanged, (float currentAmps), (override));
 
         MOCK_METHOD(void, OnHeartbeatReceived, (uint8_t protocolVersion), (override));
+        MOCK_METHOD(void, OnStatusRequested, (), (override));
     };
 
     class CanProtocolHandlerTest
@@ -342,6 +343,15 @@ namespace
         handler.ProcessReceivedMessage(id, MakeMessage({ canProtocolVersion }));
     }
 
+    TEST_F(CanProtocolHandlerTest, RequestStatus_NotifiesObserver)
+    {
+        auto id = MakeSystemId(CanMessageType::requestStatus);
+
+        EXPECT_CALL(observerMock, OnStatusRequested());
+
+        handler.ProcessReceivedMessage(id, MakeMessage({}));
+    }
+
     TEST_F(CanProtocolHandlerTest, RejectsMessageForDifferentNode)
     {
         auto id = MakeCommandId(CanCategory::motorControl, CanMessageType::startMotor, 99);
@@ -532,16 +542,17 @@ namespace
         handler.SendFaultEvent(CanFaultCode::overCurrent);
     }
 
-    TEST_F(CanProtocolHandlerTest, SendCommandAck_IncludesCommandTypeAndStatus)
+    TEST_F(CanProtocolHandlerTest, SendCommandAck_IncludesCategoryCommandTypeAndStatus)
     {
         EXPECT_CALL(canMock, SendData(_, _, _)).WillOnce([](hal::Can::Id, const hal::Can::Message& data, const auto&)
             {
-                ASSERT_GE(data.size(), 2u);
-                EXPECT_EQ(data[0], static_cast<uint8_t>(CanMessageType::startMotor));
-                EXPECT_EQ(data[1], static_cast<uint8_t>(CanAckStatus::success));
+                ASSERT_GE(data.size(), 3u);
+                EXPECT_EQ(data[0], static_cast<uint8_t>(CanCategory::motorControl));
+                EXPECT_EQ(data[1], static_cast<uint8_t>(CanMessageType::startMotor));
+                EXPECT_EQ(data[2], static_cast<uint8_t>(CanAckStatus::success));
             });
 
-        handler.SendCommandAck(CanMessageType::startMotor, CanAckStatus::success);
+        handler.SendCommandAck(CanCategory::motorControl, CanMessageType::startMotor, CanAckStatus::success);
     }
 
     TEST_F(CanProtocolHandlerTest, CanIdRoundTrip)
@@ -762,6 +773,67 @@ namespace
         hal::Can::Message msg;
         CanFrameCodec::WriteInt32(msg, 0, -987654);
         EXPECT_EQ(CanFrameCodec::ReadInt32(msg, 0), -987654);
+    }
+
+    TEST(CanFrameCodecTest, FloatToFixed16_RoundsToNearest)
+    {
+        auto result = CanFrameCodec::FloatToFixed16(1.2345f, 1000);
+        EXPECT_EQ(result, 1235);
+    }
+
+    TEST(CanFrameCodecTest, FloatToFixed32_RoundsToNearest)
+    {
+        auto result = CanFrameCodec::FloatToFixed32(1.2345f, 1000);
+        EXPECT_EQ(result, 1235);
+    }
+
+    TEST_F(CanProtocolHandlerTest, UnknownSystemCommand_AcksUnknown)
+    {
+        auto id = MakeSystemId(static_cast<CanMessageType>(0xFF));
+
+        EXPECT_CALL(canMock, SendData(_, _, _));
+
+        handler.ProcessReceivedMessage(id, MakeMessage({ 1 }));
+    }
+
+    TEST_F(CanProtocolHandlerTest, SequenceBypass_OnlyAppliesToMotorControlEmergencyStop)
+    {
+        auto id1 = MakeCommandId(CanCategory::motorControl, CanMessageType::startMotor);
+
+        EXPECT_CALL(observerMock, OnMotorStart());
+        EXPECT_CALL(canMock, SendData(_, _, _));
+
+        handler.ProcessReceivedMessage(id1, MakeMessage({ 1 }));
+
+        auto pidId = MakeCommandId(CanCategory::pidTuning, CanMessageType::setSpeedPid);
+        hal::Can::Message msg;
+        msg.push_back(1);
+        for (int i = 0; i < 6; ++i)
+            msg.push_back(0);
+
+        EXPECT_CALL(canMock, SendData(_, _, _));
+
+        handler.ProcessReceivedMessage(pidId, msg);
+    }
+
+    TEST_F(CanProtocolHandlerTest, EmptyPayload_SequenceProtectedCommand_Rejected)
+    {
+        auto id = MakeCommandId(CanCategory::motorControl, CanMessageType::startMotor);
+
+        EXPECT_CALL(observerMock, OnMotorStart()).Times(0);
+        EXPECT_CALL(canMock, SendData(_, _, _));
+
+        handler.ProcessReceivedMessage(id, MakeMessage({}));
+    }
+
+    TEST_F(CanProtocolHandlerTest, EmptyPayload_EmergencyStop_StillProcessed)
+    {
+        auto id = MakeEmergencyId(CanMessageType::emergencyStop);
+
+        EXPECT_CALL(observerMock, OnEmergencyStop());
+        EXPECT_CALL(canMock, SendData(_, _, _));
+
+        handler.ProcessReceivedMessage(id, MakeMessage({}));
     }
 
 }

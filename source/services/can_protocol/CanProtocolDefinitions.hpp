@@ -61,7 +61,8 @@ namespace services
         faultEvent = 0x05,
 
         heartbeat = 0x01,
-        commandAck = 0x02
+        commandAck = 0x02,
+        requestStatus = 0x03
     };
 
     enum class CanControlMode : uint8_t

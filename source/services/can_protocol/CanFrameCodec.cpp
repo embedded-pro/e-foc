@@ -1,10 +1,11 @@
 #include "source/services/can_protocol/CanFrameCodec.hpp"
+#include <cmath>
 
 namespace services
 {
     int16_t CanFrameCodec::FloatToFixed16(float value, int32_t scale)
     {
-        float scaled = value * static_cast<float>(scale);
+        float scaled = std::roundf(value * static_cast<float>(scale));
         if (scaled > static_cast<float>(std::numeric_limits<int16_t>::max()))
             return std::numeric_limits<int16_t>::max();
         if (scaled < static_cast<float>(std::numeric_limits<int16_t>::min()))
@@ -19,7 +20,7 @@ namespace services
 
     int32_t CanFrameCodec::FloatToFixed32(float value, int32_t scale)
     {
-        float scaled = value * static_cast<float>(scale);
+        float scaled = std::roundf(value * static_cast<float>(scale));
         if (scaled > static_cast<float>(std::numeric_limits<int32_t>::max()))
             return std::numeric_limits<int32_t>::max();
         if (scaled < static_cast<float>(std::numeric_limits<int32_t>::min()))

@@ -42,16 +42,19 @@ namespace services
         if (handler == nullptr)
             return;
 
-        if (handler->RequiresSequenceValidation() && messageType != CanMessageType::emergencyStop)
+        if (handler->RequiresSequenceValidation() && !(category == CanCategory::motorControl && messageType == CanMessageType::emergencyStop))
         {
-            if (!data.empty())
+            if (data.empty())
             {
-                uint8_t sequenceNumber = data[0];
-                if (!ValidateSequence(sequenceNumber))
-                {
-                    SendCommandAck(messageType, CanAckStatus::sequenceError);
-                    return;
-                }
+                SendCommandAck(category, messageType, CanAckStatus::invalidPayload);
+                return;
+            }
+
+            uint8_t sequenceNumber = data[0];
+            if (!ValidateSequence(sequenceNumber))
+            {
+                SendCommandAck(category, messageType, CanAckStatus::sequenceError);
+                return;
             }
         }
 
@@ -121,9 +124,10 @@ namespace services
         SendFrame(CanPriority::emergency, CanCategory::telemetry, CanMessageType::faultEvent, msg);
     }
 
-    void CanProtocolHandlerImpl::SendCommandAck(CanMessageType commandType, CanAckStatus status)
+    void CanProtocolHandlerImpl::SendCommandAck(CanCategory category, CanMessageType commandType, CanAckStatus status)
     {
         hal::Can::Message msg;
+        msg.push_back(static_cast<uint8_t>(category));
         msg.push_back(static_cast<uint8_t>(commandType));
         msg.push_back(static_cast<uint8_t>(status));
 

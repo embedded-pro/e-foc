@@ -35,5 +35,6 @@ namespace services
         virtual void OnMaxCurrentChanged(float currentAmps) = 0;
 
         virtual void OnHeartbeatReceived(uint8_t protocolVersion) = 0;
+        virtual void OnStatusRequested() = 0;
     };
 }

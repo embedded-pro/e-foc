@@ -33,7 +33,7 @@ namespace services
         else if (messageType == CanMessageType::setPositionSetpoint)
             HandleSetPositionSetpoint(data);
         else
-            protocol.SendCommandAck(messageType, CanAckStatus::unknownCommand);
+            protocol.SendCommandAck(CanCategory::motorControl, messageType, CanAckStatus::unknownCommand);
     }
 
     void CanMotorControlHandler::HandleStartMotor()
@@ -42,7 +42,7 @@ namespace services
             {
                 observer.OnMotorStart();
             });
-        protocol.SendCommandAck(CanMessageType::startMotor, CanAckStatus::success);
+        protocol.SendCommandAck(CanCategory::motorControl, CanMessageType::startMotor, CanAckStatus::success);
     }
 
     void CanMotorControlHandler::HandleStopMotor()
@@ -51,7 +51,7 @@ namespace services
             {
                 observer.OnMotorStop();
             });
-        protocol.SendCommandAck(CanMessageType::stopMotor, CanAckStatus::success);
+        protocol.SendCommandAck(CanCategory::motorControl, CanMessageType::stopMotor, CanAckStatus::success);
     }
 
     void CanMotorControlHandler::HandleEmergencyStop()
@@ -60,21 +60,21 @@ namespace services
             {
                 observer.OnEmergencyStop();
             });
-        protocol.SendCommandAck(CanMessageType::emergencyStop, CanAckStatus::success);
+        protocol.SendCommandAck(CanCategory::motorControl, CanMessageType::emergencyStop, CanAckStatus::success);
     }
 
     void CanMotorControlHandler::HandleSetControlMode(const hal::Can::Message& data)
     {
         if (data.size() < 2)
         {
-            protocol.SendCommandAck(CanMessageType::setControlMode, CanAckStatus::invalidPayload);
+            protocol.SendCommandAck(CanCategory::motorControl, CanMessageType::setControlMode, CanAckStatus::invalidPayload);
             return;
         }
 
         auto mode = static_cast<CanControlMode>(data[1]);
         if (static_cast<uint8_t>(mode) > static_cast<uint8_t>(CanControlMode::position))
         {
-            protocol.SendCommandAck(CanMessageType::setControlMode, CanAckStatus::invalidPayload);
+            protocol.SendCommandAck(CanCategory::motorControl, CanMessageType::setControlMode, CanAckStatus::invalidPayload);
             return;
         }
 
@@ -82,14 +82,14 @@ namespace services
             {
                 observer.OnControlModeChanged(mode);
             });
-        protocol.SendCommandAck(CanMessageType::setControlMode, CanAckStatus::success);
+        protocol.SendCommandAck(CanCategory::motorControl, CanMessageType::setControlMode, CanAckStatus::success);
     }
 
     void CanMotorControlHandler::HandleSetTorqueSetpoint(const hal::Can::Message& data)
     {
         if (data.size() < 5)
         {
-            protocol.SendCommandAck(CanMessageType::setTorqueSetpoint, CanAckStatus::invalidPayload);
+            protocol.SendCommandAck(CanCategory::motorControl, CanMessageType::setTorqueSetpoint, CanAckStatus::invalidPayload);
             return;
         }
 
@@ -100,14 +100,14 @@ namespace services
             {
                 observer.OnTorqueSetpoint(id, iq);
             });
-        protocol.SendCommandAck(CanMessageType::setTorqueSetpoint, CanAckStatus::success);
+        protocol.SendCommandAck(CanCategory::motorControl, CanMessageType::setTorqueSetpoint, CanAckStatus::success);
     }
 
     void CanMotorControlHandler::HandleSetSpeedSetpoint(const hal::Can::Message& data)
     {
         if (data.size() < 5)
         {
-            protocol.SendCommandAck(CanMessageType::setSpeedSetpoint, CanAckStatus::invalidPayload);
+            protocol.SendCommandAck(CanCategory::motorControl, CanMessageType::setSpeedSetpoint, CanAckStatus::invalidPayload);
             return;
         }
 
@@ -117,14 +117,14 @@ namespace services
             {
                 observer.OnSpeedSetpoint(speed);
             });
-        protocol.SendCommandAck(CanMessageType::setSpeedSetpoint, CanAckStatus::success);
+        protocol.SendCommandAck(CanCategory::motorControl, CanMessageType::setSpeedSetpoint, CanAckStatus::success);
     }
 
     void CanMotorControlHandler::HandleSetPositionSetpoint(const hal::Can::Message& data)
     {
         if (data.size() < 5)
         {
-            protocol.SendCommandAck(CanMessageType::setPositionSetpoint, CanAckStatus::invalidPayload);
+            protocol.SendCommandAck(CanCategory::motorControl, CanMessageType::setPositionSetpoint, CanAckStatus::invalidPayload);
             return;
         }
 
@@ -134,7 +134,7 @@ namespace services
             {
                 observer.OnPositionSetpoint(position);
             });
-        protocol.SendCommandAck(CanMessageType::setPositionSetpoint, CanAckStatus::success);
+        protocol.SendCommandAck(CanCategory::motorControl, CanMessageType::setPositionSetpoint, CanAckStatus::success);
     }
 
     CanPidTuningHandler::CanPidTuningHandler(CanProtocolHandler& protocol)
@@ -150,7 +150,7 @@ namespace services
     {
         if (data.size() < 7)
         {
-            protocol.SendCommandAck(messageType, CanAckStatus::invalidPayload);
+            protocol.SendCommandAck(CanCategory::pidTuning, messageType, CanAckStatus::invalidPayload);
             return;
         }
 
@@ -180,11 +180,11 @@ namespace services
                 });
         else
         {
-            protocol.SendCommandAck(messageType, CanAckStatus::unknownCommand);
+            protocol.SendCommandAck(CanCategory::pidTuning, messageType, CanAckStatus::unknownCommand);
             return;
         }
 
-        protocol.SendCommandAck(messageType, CanAckStatus::success);
+        protocol.SendCommandAck(CanCategory::pidTuning, messageType, CanAckStatus::success);
     }
 
     CanMotorParametersHandler::CanMotorParametersHandler(CanProtocolHandler& protocol)
@@ -207,14 +207,14 @@ namespace services
         else if (messageType == CanMessageType::setFluxLinkage)
             HandleSetFluxLinkage(data);
         else
-            protocol.SendCommandAck(messageType, CanAckStatus::unknownCommand);
+            protocol.SendCommandAck(CanCategory::motorParameters, messageType, CanAckStatus::unknownCommand);
     }
 
     void CanMotorParametersHandler::HandleSetPolePairs(const hal::Can::Message& data)
     {
         if (data.size() < 2)
         {
-            protocol.SendCommandAck(CanMessageType::setPolePairs, CanAckStatus::invalidPayload);
+            protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setPolePairs, CanAckStatus::invalidPayload);
             return;
         }
 
@@ -223,14 +223,14 @@ namespace services
             {
                 observer.OnPolePairsChanged(polePairs);
             });
-        protocol.SendCommandAck(CanMessageType::setPolePairs, CanAckStatus::success);
+        protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setPolePairs, CanAckStatus::success);
     }
 
     void CanMotorParametersHandler::HandleSetResistance(const hal::Can::Message& data)
     {
         if (data.size() < 5)
         {
-            protocol.SendCommandAck(CanMessageType::setResistance, CanAckStatus::invalidPayload);
+            protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setResistance, CanAckStatus::invalidPayload);
             return;
         }
 
@@ -239,14 +239,14 @@ namespace services
             {
                 observer.OnResistanceChanged(value);
             });
-        protocol.SendCommandAck(CanMessageType::setResistance, CanAckStatus::success);
+        protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setResistance, CanAckStatus::success);
     }
 
     void CanMotorParametersHandler::HandleSetInductance(const hal::Can::Message& data)
     {
         if (data.size() < 5)
         {
-            protocol.SendCommandAck(CanMessageType::setInductance, CanAckStatus::invalidPayload);
+            protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setInductance, CanAckStatus::invalidPayload);
             return;
         }
 
@@ -255,14 +255,14 @@ namespace services
             {
                 observer.OnInductanceChanged(value);
             });
-        protocol.SendCommandAck(CanMessageType::setInductance, CanAckStatus::success);
+        protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setInductance, CanAckStatus::success);
     }
 
     void CanMotorParametersHandler::HandleSetFluxLinkage(const hal::Can::Message& data)
     {
         if (data.size() < 5)
         {
-            protocol.SendCommandAck(CanMessageType::setFluxLinkage, CanAckStatus::invalidPayload);
+            protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setFluxLinkage, CanAckStatus::invalidPayload);
             return;
         }
 
@@ -271,7 +271,7 @@ namespace services
             {
                 observer.OnFluxLinkageChanged(value);
             });
-        protocol.SendCommandAck(CanMessageType::setFluxLinkage, CanAckStatus::success);
+        protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setFluxLinkage, CanAckStatus::success);
     }
 
     CanSystemParametersHandler::CanSystemParametersHandler(CanProtocolHandler& protocol)
@@ -287,7 +287,7 @@ namespace services
     {
         if (data.size() < 3)
         {
-            protocol.SendCommandAck(messageType, CanAckStatus::invalidPayload);
+            protocol.SendCommandAck(CanCategory::systemParameters, messageType, CanAckStatus::invalidPayload);
             return;
         }
 
@@ -309,11 +309,11 @@ namespace services
         }
         else
         {
-            protocol.SendCommandAck(messageType, CanAckStatus::unknownCommand);
+            protocol.SendCommandAck(CanCategory::systemParameters, messageType, CanAckStatus::unknownCommand);
             return;
         }
 
-        protocol.SendCommandAck(messageType, CanAckStatus::success);
+        protocol.SendCommandAck(CanCategory::systemParameters, messageType, CanAckStatus::success);
     }
 
     CanSystemHandler::CanSystemHandler(CanProtocolHandler& protocol)
@@ -342,5 +342,14 @@ namespace services
                     observer.OnHeartbeatReceived(version);
                 });
         }
+        else if (messageType == CanMessageType::requestStatus)
+        {
+            protocol.NotifyObservers([](auto& observer)
+                {
+                    observer.OnStatusRequested();
+                });
+        }
+        else
+            protocol.SendCommandAck(CanCategory::system, messageType, CanAckStatus::unknownCommand);
     }
 }
