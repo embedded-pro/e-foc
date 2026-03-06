@@ -329,25 +329,25 @@ Values are saturated (clamped) to the target integer range to prevent overflow.
 
 ### 9.3 Fault Codes
 
-| Value | Fault |
-|---|---|
-| 0 | None |
-| 1 | Over-current |
-| 2 | Over-voltage |
-| 3 | Over-temperature |
-| 4 | Sensor fault |
-| 5 | Communication timeout |
+| Value | Fault                 |
+|-------|-----------------------|
+| 0     | None                  |
+| 1     | Over-current          |
+| 2     | Over-voltage          |
+| 3     | Over-temperature      |
+| 4     | Sensor fault          |
+| 5     | Communication timeout |
 
 ### 9.4 Acknowledgement Status
 
-| Value | Status | Description |
-|---|---|---|
-| 0 | Success | Command accepted and processed |
-| 1 | Unknown Command | Message type not recognized for category |
-| 2 | Invalid Payload | Payload too short or field out of range |
-| 3 | Invalid State | Command not valid in current motor state |
-| 4 | Sequence Error | Sequence number not (previous + 1) mod 256 |
-| 5 | Rate Limited | Message rate limit exceeded |
+| Value | Status          | Description                                |
+|-------|-----------------|--------------------------------------------|
+| 0     | Success         | Command accepted and processed             |
+| 1     | Unknown Command | Message type not recognized for category   |
+| 2     | Invalid Payload | Payload too short or field out of range    |
+| 3     | Invalid State   | Command not valid in current motor state   |
+| 4     | Sequence Error  | Sequence number not (previous + 1) mod 256 |
+| 5     | Rate Limited    | Message rate limit exceeded                |
 
 ## 10. Sequence Number Protocol
 
