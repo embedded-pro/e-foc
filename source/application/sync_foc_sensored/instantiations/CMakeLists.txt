@@ -12,5 +12,6 @@ target_link_libraries(e_foc.sync_foc_sensored.instantiations INTERFACE
 )
 
 target_sources(e_foc.sync_foc_sensored.instantiations INTERFACE
+    LogicWithOuterLoop.hpp
     MotorStateMachine.hpp
 )

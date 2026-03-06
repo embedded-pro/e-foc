@@ -11,6 +11,7 @@ target_link_libraries(e_foc.foc.implementations PUBLIC
 )
 
 target_sources(e_foc.foc.implementations PRIVATE
+    FocHelpers.hpp
     FocPositionImpl.cpp
     FocPositionImpl.hpp
     FocSpeedImpl.cpp

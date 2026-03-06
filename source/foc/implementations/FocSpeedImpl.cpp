@@ -1,30 +1,13 @@
 #include "source/foc/implementations/FocSpeedImpl.hpp"
 #include "infra/util/ReallyAssert.hpp"
-#include "numerical/math/CompilerOptimizations.hpp"
+#include "source/foc/implementations/FocHelpers.hpp"
 #include "source/foc/implementations/TrigonometricImpl.hpp"
-#include <numbers>
 
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC optimize("O3", "fast-math")
 #endif
 
-namespace
-{
-    constexpr float invSqrt3 = 0.577350269189625f;
-    constexpr float pi = std::numbers::pi_v<float>;
-    constexpr float two_pi = 2.0f * pi;
-
-    OPTIMIZE_FOR_SPEED
-    float PositionWithWrapAround(float position)
-    {
-        if (position > pi)
-            position -= two_pi;
-        else if (position < -pi)
-            position += two_pi;
-
-        return position;
-    }
-}
+using namespace foc::detail;
 
 namespace foc
 {
