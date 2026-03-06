@@ -1,0 +1,304 @@
+- id: REQ-CAN-001
+  title: CAN bus transport
+  shall: >
+    The system shall use the CAN bus as the sole communication channel
+    for all motor control commands and telemetry data exchange between
+    the host and the motor controller.
+
+- id: REQ-CAN-002
+  title: Extended CAN identifiers
+  shall: >
+    The system shall use exclusively 29-bit extended CAN identifiers
+    for all transmitted and received frames, and shall silently
+    discard any frame using an 11-bit standard identifier.
+
+- id: REQ-CAN-003
+  title: CAN identifier structure
+  shall: >
+    The 29-bit CAN identifier shall encode four fields: a 5-bit
+    priority field (bits 28-24), a 4-bit category field (bits 23-20),
+    an 8-bit message type field (bits 19-12), and a 12-bit node
+    address field (bits 11-0).
+
+- id: REQ-CAN-004
+  title: Motor start command
+  shall: >
+    The system shall accept a start motor command over CAN and shall
+    acknowledge it with a success status response frame.
+
+- id: REQ-CAN-005
+  title: Motor stop command
+  shall: >
+    The system shall accept a stop motor command over CAN and shall
+    acknowledge it with a success status response frame.
+
+- id: REQ-CAN-006
+  title: Emergency stop command
+  shall: >
+    The system shall accept an emergency stop command transmitted at
+    the highest CAN priority level. The emergency stop shall bypass
+    sequence number validation to ensure it is never rejected due
+    to protocol state.
+
+- id: REQ-CAN-007
+  title: Control mode selection
+  shall: >
+    The system shall accept a command to select the active control
+    mode from torque, speed, or position. The system shall reject
+    the command with an invalid-payload error if the requested mode
+    is not one of the three defined modes.
+
+- id: REQ-CAN-008
+  title: Torque setpoint command
+  shall: >
+    The system shall accept a torque setpoint command containing
+    an Id current and an Iq current, each encoded as a signed 16-bit
+    fixed-point value with 0.001 A resolution. The system shall
+    recover the original value with an accuracy of at least 0.01 A.
+
+- id: REQ-CAN-009
+  title: Speed setpoint command
+  shall: >
+    The system shall accept a speed setpoint command containing a
+    rotational speed encoded as a signed 32-bit fixed-point value
+    with 0.001 rad/s resolution. The system shall recover the
+    original value with an accuracy of at least 0.01 rad/s.
+
+- id: REQ-CAN-010
+  title: Position setpoint command
+  shall: >
+    The system shall accept a position setpoint command containing
+    an angular position encoded as a signed 32-bit fixed-point value
+    with 0.0001 rad resolution. The system shall recover the
+    original value with an accuracy of at least 0.001 rad.
+
+- id: REQ-CAN-011
+  title: Current loop PID tuning
+  shall: >
+    The system shall accept separate PID tuning commands for the
+    d-axis and q-axis current control loops. Each command shall
+    contain Kp, Ki, and Kd gains encoded as signed 16-bit
+    fixed-point values with 0.001 resolution.
+
+- id: REQ-CAN-012
+  title: Speed loop PID tuning
+  shall: >
+    The system shall accept a PID tuning command for the speed
+    control loop containing Kp, Ki, and Kd gains encoded as
+    signed 16-bit fixed-point values with 0.001 resolution.
+
+- id: REQ-CAN-013
+  title: Position loop PID tuning
+  shall: >
+    The system shall accept a PID tuning command for the position
+    control loop containing Kp, Ki, and Kd gains encoded as
+    signed 16-bit fixed-point values with 0.001 resolution.
+
+- id: REQ-CAN-014
+  title: PID command payload validation
+  shall: >
+    The system shall reject any PID tuning command whose payload
+    is shorter than the minimum required length with an
+    invalid-payload error, without applying any gain changes.
+
+- id: REQ-CAN-015
+  title: Motor pole pairs configuration
+  shall: >
+    The system shall accept a command to set the motor pole pair
+    count as an unsigned 8-bit integer. The system shall reject the
+    command with an invalid-payload error if the payload is too short.
+
+- id: REQ-CAN-016
+  title: Stator resistance configuration
+  shall: >
+    The system shall accept a command to set the stator resistance
+    encoded as a signed 32-bit fixed-point value with 0.00001 ohm
+    resolution. The system shall recover the original value with
+    an accuracy of at least 0.001 ohm.
+
+- id: REQ-CAN-017
+  title: Stator inductance configuration
+  shall: >
+    The system shall accept a command to set the stator inductance
+    encoded as a signed 32-bit fixed-point value with 0.0000001 H
+    resolution. The system shall recover the original value with
+    an accuracy of at least 0.00001 H.
+
+- id: REQ-CAN-018
+  title: Flux linkage configuration
+  shall: >
+    The system shall accept a command to set the flux linkage
+    encoded as a signed 32-bit fixed-point value with 0.000001 Wb
+    resolution. The system shall recover the original value with
+    an accuracy of at least 0.0001 Wb.
+
+- id: REQ-CAN-019
+  title: Supply voltage configuration
+  shall: >
+    The system shall accept a command to set the supply voltage
+    encoded as a signed 16-bit fixed-point value with 0.01 V
+    resolution. The system shall recover the original value with
+    an accuracy of at least 0.1 V.
+
+- id: REQ-CAN-020
+  title: Maximum current limit configuration
+  shall: >
+    The system shall accept a command to set the maximum current
+    limit encoded as a signed 16-bit fixed-point value with 0.001 A
+    resolution. The system shall recover the original value with
+    an accuracy of at least 0.1 A.
+
+- id: REQ-CAN-021
+  title: Motor status telemetry
+  shall: >
+    The system shall transmit a motor status telemetry frame
+    containing the current motor state, active control mode, and
+    active fault code in a 3-byte payload at the telemetry
+    priority level.
+
+- id: REQ-CAN-022
+  title: Current measurement telemetry
+  shall: >
+    The system shall transmit a current measurement telemetry frame
+    containing the measured d-axis and q-axis currents, each
+    encoded as a signed 16-bit fixed-point value with 0.001 A
+    resolution.
+
+- id: REQ-CAN-023
+  title: Speed and position telemetry
+  shall: >
+    The system shall transmit a telemetry frame containing the
+    measured rotor speed and angular position, each encoded as
+    a signed 16-bit fixed-point value, in a payload of at least
+    4 bytes.
+
+- id: REQ-CAN-024
+  title: Bus voltage telemetry
+  shall: >
+    The system shall transmit a bus voltage telemetry frame
+    containing the measured DC bus voltage encoded as a signed
+    16-bit fixed-point value with 0.01 V resolution.
+
+- id: REQ-CAN-025
+  title: Heartbeat mechanism
+  shall: >
+    The system shall transmit a periodic heartbeat frame containing
+    a 1-byte protocol version identifier at the lowest CAN priority
+    level. When a heartbeat frame is received, the system shall
+    report the received protocol version.
+
+- id: REQ-CAN-026
+  title: Command acknowledgement
+  shall: >
+    The system shall transmit an acknowledgement frame for every
+    processed command, containing the original command identifier
+    and a status code indicating success or the specific error
+    condition (unknown command, invalid payload, invalid state,
+    sequence error, or rate limited).
+
+- id: REQ-CAN-027
+  title: Fault event notification
+  shall: >
+    The system shall transmit fault events (over-current,
+    over-voltage, over-temperature, sensor fault, communication
+    timeout) as CAN frames at the highest priority level to
+    ensure timely delivery.
+
+- id: REQ-CAN-028
+  title: Message rate limiting
+  shall: >
+    The system shall enforce a configurable maximum number of
+    received messages per rate-limiting period. Messages exceeding
+    this limit shall be silently discarded until the rate counter
+    is reset.
+
+- id: REQ-CAN-029
+  title: Node address filtering
+  shall: >
+    The system shall process only CAN frames whose node address
+    matches the configured local address or the broadcast address
+    (0x000), and shall silently discard all other frames.
+
+- id: REQ-CAN-030
+  title: Unknown message category handling
+  shall: >
+    The system shall silently discard any received frame whose
+    category field does not correspond to a supported message
+    category, without generating any response.
+
+- id: REQ-CAN-031
+  title: Unknown message type handling
+  shall: >
+    The system shall respond with an unknown-command error when
+    a frame is received with a supported category but an
+    unrecognized message type.
+
+- id: REQ-CAN-032
+  title: Sequence number validation
+  shall: >
+    The system shall validate command frames using an 8-bit
+    sequence counter in the first payload byte. The first received
+    command shall be accepted regardless of its sequence value.
+    Subsequent commands shall be accepted only if their sequence
+    number equals the previous sequence number plus one, modulo 256.
+    Out-of-sequence commands shall be rejected with a sequence
+    error response.
+
+- id: REQ-CAN-033
+  title: Sequence number wrap-around
+  shall: >
+    The sequence counter shall wrap from 255 to 0 without error,
+    allowing continuous operation without sequence resets.
+
+- id: REQ-CAN-034
+  title: No dynamic memory allocation
+  shall: >
+    The CAN protocol subsystem shall not perform any dynamic memory
+    allocation and shall use only statically-sized data structures.
+
+- id: REQ-CAN-035
+  title: Fixed-point data encoding
+  shall: >
+    All floating-point values transmitted over CAN shall be encoded
+    as big-endian signed fixed-point integers with defined per-quantity
+    scale factors, with saturation clamping to prevent integer overflow.
+
+- id: REQ-CAN-036
+  title: Short payload rejection
+  shall: >
+    The system shall reject any command frame whose payload is shorter
+    than the minimum required length for the given message type, and
+    shall respond with an invalid-payload error without applying
+    any state changes.
+
+- id: REQ-CAN-037
+  title: Motor control command coverage
+  shall: >
+    The protocol shall define distinct command messages for motor
+    start, motor stop, emergency stop, control mode selection,
+    torque setpoint, speed setpoint, position setpoint, d-axis
+    current PID tuning, q-axis current PID tuning, speed PID tuning,
+    position PID tuning, pole pairs, resistance, inductance,
+    flux linkage, supply voltage, and maximum current — totaling
+    at least 17 command types.
+
+- id: REQ-CAN-038
+  title: Telemetry coverage
+  shall: >
+    The protocol shall define distinct telemetry messages for motor
+    status, current measurement, speed and position, bus voltage,
+    and fault events — totaling at least 5 telemetry types.
+
+- id: REQ-CAN-039
+  title: Protocol version identification
+  shall: >
+    The heartbeat frame shall carry a protocol version byte that
+    allows the host to verify wire-format compatibility with the
+    motor controller.
+
+- id: REQ-CAN-040
+  title: Broadcast message support
+  shall: >
+    The system shall accept commands addressed to the broadcast
+    node address (0x000) regardless of the locally configured
+    node address, enabling simultaneous control of multiple nodes.
