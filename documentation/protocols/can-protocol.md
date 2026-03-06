@@ -15,11 +15,11 @@ with a host-side ROS2 bridge.
 
 ## 2. Terminology
 
-| Term | Definition |
-|---|---|
-| Node | A single e-foc motor controller on the CAN bus |
-| Master | The host system issuing commands (e.g., ROS2 bridge) |
-| Broadcast | A message addressed to all nodes (node ID 0x000) |
+| Term            | Definition                                                          |
+|-----------------|---------------------------------------------------------------------|
+| Node            | A single e-foc motor controller on the CAN bus                      |
+| Master          | The host system issuing commands (e.g., ROS2 bridge)                |
+| Broadcast       | A message addressed to all nodes (node ID 0x000)                    |
 | Sequence Number | An 8-bit counter in byte[0] of command frames for replay protection |
 | Scale Factor    | Integer multiplier used to convert floats to fixed-point integers   |
 
@@ -312,11 +312,11 @@ Values are saturated (clamped) to the target integer range to prevent overflow.
 
 ### 9.1 Control Modes
 
-| Value | Mode |
-|---|---|
-| 0 | Torque (current control) |
-| 1 | Speed |
-| 2 | Position |
+| Value | Mode                     |
+|-------|--------------------------|
+| 0     | Torque (current control) |
+| 1     | Speed                    |
+| 2     | Position                 |
 
 ### 9.2 Motor States
 
