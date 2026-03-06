@@ -21,7 +21,8 @@ namespace simulator
     }
 
     Gui::Gui(ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
-        const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters, QWidget* parent)
+        const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
+        const ControlPanel::SetpointConfig& setpointConfig, QWidget* parent)
         : QMainWindow(parent)
         , ThreePhaseMotorModelObserver(model)
         , model(model)
@@ -34,7 +35,7 @@ namespace simulator
         auto* centralWidget = QtOwned<QWidget>(this);
         setCentralWidget(centralWidget);
 
-        controlPanel = QtOwned<ControlPanel>(this);
+        controlPanel = QtOwned<ControlPanel>(setpointConfig, this);
         parametersPanel = QtOwned<ParametersPanel>(motorParameters, pidParameters, this);
         scopesPanel = QtOwned<ScopesPanel>(this);
 
@@ -56,7 +57,7 @@ namespace simulator
                 this->controller.Stop();
             });
 
-        connect(controlPanel, &ControlPanel::speedChanged, this, &Gui::speedChanged);
+        connect(controlPanel, &ControlPanel::setpointChanged, this, &Gui::setpointChanged);
 
         connect(controlPanel, &ControlPanel::loadChanged, this, [this](double torqueNm)
             {

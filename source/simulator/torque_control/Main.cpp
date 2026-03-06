@@ -95,11 +95,19 @@ int main(int argc, char* argv[])
         if (enableGui)
         {
             const simulator::ParametersPanel::PidParameters pidParameters{
-                args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument),
-                0.0f, 0.0f, 0.0f
+                .current = { args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument) }
             };
 
-            simulator::GuiSimulation simulation{ argc, argv, model, controller, eventDispatcher, simulator::JK42BLS01_X038ED::parameters, pidParameters };
+            const simulator::ControlPanel::SetpointConfig torqueSetpointConfig{
+                .label = "Current Setpoint:",
+                .unit = "A",
+                .min = -15,
+                .max = 15,
+                .tickInterval = 1,
+                .defaultValue = 0
+            };
+
+            simulator::GuiSimulation simulation{ argc, argv, model, controller, eventDispatcher, simulator::JK42BLS01_X038ED::parameters, pidParameters, torqueSetpointConfig };
             return simulation.Run();
         }
 

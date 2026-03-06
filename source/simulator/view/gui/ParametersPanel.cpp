@@ -73,27 +73,55 @@ namespace simulator
         currentPidGroup->setLayout(currentPidLayout);
         layout->addWidget(currentPidGroup);
 
-        // Speed controller gains
-        auto* speedPidGroup = QtOwned<QGroupBox>("Speed Controller (PID)", this);
-        auto* speedPidLayout = QtOwned<QGridLayout>();
+        // Speed controller gains (optional)
+        if (pidParameters.speed)
+        {
+            auto* speedPidGroup = QtOwned<QGroupBox>("Speed Controller (PID)", this);
+            auto* speedPidLayout = QtOwned<QGridLayout>();
 
-        speedPidLayout->addWidget(QtOwned<QLabel>("Kp:", this), 0, 0);
-        speedKpLabel = QtOwned<QLabel>("---", this);
-        speedKpLabel->setAlignment(Qt::AlignRight);
-        speedPidLayout->addWidget(speedKpLabel, 0, 1);
+            speedPidLayout->addWidget(QtOwned<QLabel>("Kp:", this), 0, 0);
+            speedKpLabel = QtOwned<QLabel>("---", this);
+            speedKpLabel->setAlignment(Qt::AlignRight);
+            speedPidLayout->addWidget(speedKpLabel, 0, 1);
 
-        speedPidLayout->addWidget(QtOwned<QLabel>("Ki:", this), 1, 0);
-        speedKiLabel = QtOwned<QLabel>("---", this);
-        speedKiLabel->setAlignment(Qt::AlignRight);
-        speedPidLayout->addWidget(speedKiLabel, 1, 1);
+            speedPidLayout->addWidget(QtOwned<QLabel>("Ki:", this), 1, 0);
+            speedKiLabel = QtOwned<QLabel>("---", this);
+            speedKiLabel->setAlignment(Qt::AlignRight);
+            speedPidLayout->addWidget(speedKiLabel, 1, 1);
 
-        speedPidLayout->addWidget(QtOwned<QLabel>("Kd:", this), 2, 0);
-        speedKdLabel = QtOwned<QLabel>("---", this);
-        speedKdLabel->setAlignment(Qt::AlignRight);
-        speedPidLayout->addWidget(speedKdLabel, 2, 1);
+            speedPidLayout->addWidget(QtOwned<QLabel>("Kd:", this), 2, 0);
+            speedKdLabel = QtOwned<QLabel>("---", this);
+            speedKdLabel->setAlignment(Qt::AlignRight);
+            speedPidLayout->addWidget(speedKdLabel, 2, 1);
 
-        speedPidGroup->setLayout(speedPidLayout);
-        layout->addWidget(speedPidGroup);
+            speedPidGroup->setLayout(speedPidLayout);
+            layout->addWidget(speedPidGroup);
+        }
+
+        // Position controller gains (optional)
+        if (pidParameters.position)
+        {
+            auto* positionPidGroup = QtOwned<QGroupBox>("Position Controller (PID)", this);
+            auto* positionPidLayout = QtOwned<QGridLayout>();
+
+            positionPidLayout->addWidget(QtOwned<QLabel>("Kp:", this), 0, 0);
+            positionKpLabel = QtOwned<QLabel>("---", this);
+            positionKpLabel->setAlignment(Qt::AlignRight);
+            positionPidLayout->addWidget(positionKpLabel, 0, 1);
+
+            positionPidLayout->addWidget(QtOwned<QLabel>("Ki:", this), 1, 0);
+            positionKiLabel = QtOwned<QLabel>("---", this);
+            positionKiLabel->setAlignment(Qt::AlignRight);
+            positionPidLayout->addWidget(positionKiLabel, 1, 1);
+
+            positionPidLayout->addWidget(QtOwned<QLabel>("Kd:", this), 2, 0);
+            positionKdLabel = QtOwned<QLabel>("---", this);
+            positionKdLabel->setAlignment(Qt::AlignRight);
+            positionPidLayout->addWidget(positionKdLabel, 2, 1);
+
+            positionPidGroup->setLayout(positionPidLayout);
+            layout->addWidget(positionPidGroup);
+        }
 
         layout->addStretch();
 
@@ -103,19 +131,26 @@ namespace simulator
         frictionLabel->setText(QString::number(static_cast<double>(motorParameters.B.Value()), 'g', 4) + QString::fromUtf8(" N\xC2\xB7m\xC2\xB7s/rad"));
         inertiaLabel->setText(QString::number(static_cast<double>(motorParameters.J.Value()), 'g', 4) + QString::fromUtf8(" kg\xC2\xB7m\xC2\xB2"));
 
-        currentKpLabel->setText(QString::number(static_cast<double>(pidParameters.currentKp), 'g', 6));
-        currentKiLabel->setText(QString::number(static_cast<double>(pidParameters.currentKi), 'g', 6));
-        speedKpLabel->setText(QString::number(static_cast<double>(pidParameters.speedKp), 'g', 6));
-        speedKiLabel->setText(QString::number(static_cast<double>(pidParameters.speedKi), 'g', 6));
-        speedKdLabel->setText(QString::number(static_cast<double>(pidParameters.speedKd), 'g', 6));
+        UpdatePidParameters(pidParameters);
     }
 
     void ParametersPanel::UpdatePidParameters(const PidParameters& pidParameters)
     {
-        currentKpLabel->setText(QString::number(static_cast<double>(pidParameters.currentKp), 'g', 6));
-        currentKiLabel->setText(QString::number(static_cast<double>(pidParameters.currentKi), 'g', 6));
-        speedKpLabel->setText(QString::number(static_cast<double>(pidParameters.speedKp), 'g', 6));
-        speedKiLabel->setText(QString::number(static_cast<double>(pidParameters.speedKi), 'g', 6));
-        speedKdLabel->setText(QString::number(static_cast<double>(pidParameters.speedKd), 'g', 6));
+        currentKpLabel->setText(QString::number(static_cast<double>(pidParameters.current.kp), 'g', 6));
+        currentKiLabel->setText(QString::number(static_cast<double>(pidParameters.current.ki), 'g', 6));
+
+        if (speedKpLabel && pidParameters.speed)
+        {
+            speedKpLabel->setText(QString::number(static_cast<double>(pidParameters.speed->kp), 'g', 6));
+            speedKiLabel->setText(QString::number(static_cast<double>(pidParameters.speed->ki), 'g', 6));
+            speedKdLabel->setText(QString::number(static_cast<double>(pidParameters.speed->kd), 'g', 6));
+        }
+
+        if (positionKpLabel && pidParameters.position)
+        {
+            positionKpLabel->setText(QString::number(static_cast<double>(pidParameters.position->kp), 'g', 6));
+            positionKiLabel->setText(QString::number(static_cast<double>(pidParameters.position->ki), 'g', 6));
+            positionKdLabel->setText(QString::number(static_cast<double>(pidParameters.position->kd), 'g', 6));
+        }
     }
 }

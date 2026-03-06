@@ -1,5 +1,4 @@
 #include "source/services/cli/TerminalSpeed.hpp"
-#include "infra/util/Tokenizer.hpp"
 #include "source/services/cli/TerminalHelper.hpp"
 
 namespace services
@@ -24,25 +23,13 @@ namespace services
 
     TerminalFocSpeedInteractor::StatusWithMessage TerminalFocSpeedInteractor::SetSpeedPid(const infra::BoundedConstString& input)
     {
-        infra::Tokenizer tokenizer(input, ' ');
-
-        if (tokenizer.Size() != 3)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments" };
-
-        auto kp = ParseInput(tokenizer.Token(0));
-        if (!kp.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
-        auto ki = ParseInput(tokenizer.Token(1));
-        if (!ki.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
-        auto kd = ParseInput(tokenizer.Token(2));
-        if (!kd.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
-
-        auto pid = controllers::PidTunings<float>{ (*kp), (*ki), (*kd) };
+        controllers::PidTunings<float> pid{};
+        auto result = ParsePidTunings(input, pid);
+        if (result.result != services::TerminalWithStorage::Status::success)
+            return result;
 
         foc.SetSpeedTunings(vdc, pid);
-        return TerminalFocSpeedInteractor::StatusWithMessage();
+        return StatusWithMessage();
     }
 
     TerminalFocSpeedInteractor::StatusWithMessage TerminalFocSpeedInteractor::SetSpeed(const infra::BoundedConstString& input)

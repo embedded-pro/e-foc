@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/foc/implementations/FocPositionImpl.hpp"
 #include "source/foc/implementations/FocSpeedImpl.hpp"
 #include "source/foc/implementations/FocTorqueImpl.hpp"
 #include "source/foc/implementations/Runner.hpp"
@@ -37,4 +38,5 @@ namespace foc
 
     using FocTorqueController = FocController<FocTorqueImpl>;
     using FocSpeedController = FocController<FocSpeedImpl>;
+    using FocPositionController = FocController<FocPositionImpl>;
 }

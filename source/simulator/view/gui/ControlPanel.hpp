@@ -6,6 +6,7 @@
 #include <QPushButton>
 #include <QSlider>
 #include <QWidget>
+#include <QString>
 
 namespace simulator
 {
@@ -15,7 +16,17 @@ namespace simulator
         Q_OBJECT
 
     public:
-        explicit ControlPanel(QWidget* parent = nullptr);
+        struct SetpointConfig
+        {
+            QString label;
+            QString unit;
+            int min;
+            int max;
+            int tickInterval;
+            int defaultValue;
+        };
+
+        explicit ControlPanel(const SetpointConfig& config, QWidget* parent = nullptr);
 
         void SetEditable(bool editable);
         void SetStatus(const QString& status);
@@ -23,18 +34,21 @@ namespace simulator
     signals:
         void startClicked();
         void stopClicked();
-        void speedChanged(int rpm);
+        void setpointChanged(int value);
         void loadChanged(double torqueNm);
 
     private:
+        void Build(const SetpointConfig& config);
+
         QPushButton* alignButton;
         QPushButton* identifyElectricalButton;
         QPushButton* identifyMechanicalButton;
         QPushButton* startButton;
         QPushButton* stopButton;
-        QSlider* speedSlider;
-        QLabel* speedValueLabel;
+        QSlider* setpointSlider;
+        QLabel* setpointValueLabel;
         QDoubleSpinBox* loadSpinBox;
         QLabel* statusLabel;
+        QString setpointUnit;
     };
 }

@@ -14,9 +14,10 @@ namespace simulator
     }
 
     GuiSimulation::GuiSimulation(int& argc, char** argv, ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
-        const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters)
+        const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
+        const ControlPanel::SetpointConfig& setpointConfig)
         : app(InitAndPassArgc(argc), argv)
-        , gui(model, controller, eventDispatcher, motorParameters, pidParameters)
+        , gui(model, controller, eventDispatcher, motorParameters, pidParameters, setpointConfig)
     {
         gui.show();
 

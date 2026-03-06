@@ -14,7 +14,8 @@ namespace simulator
     {
     public:
         GuiSimulation(int& argc, char** argv, ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
-            const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters);
+            const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
+            const ControlPanel::SetpointConfig& setpointConfig);
 
         Gui& GetGui();
         int Run() const;

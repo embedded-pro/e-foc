@@ -10,10 +10,6 @@ namespace simulator
 {
     namespace
     {
-        constexpr int speedSliderMin = -3000;
-        constexpr int speedSliderMax = 3000;
-        constexpr int speedSliderTickInterval = 500;
-
         template<typename T, typename... Args>
         T* QtOwned(Args&&... args)
         {
@@ -21,9 +17,16 @@ namespace simulator
         }
     }
 
-    ControlPanel::ControlPanel(QWidget* parent)
+    ControlPanel::ControlPanel(const SetpointConfig& config, QWidget* parent)
         : QWidget(parent)
     {
+        Build(config);
+    }
+
+    void ControlPanel::Build(const SetpointConfig& config)
+    {
+        setpointUnit = config.unit;
+
         auto* layout = QtOwned<QVBoxLayout>(this);
 
         // Calibration group
@@ -53,23 +56,23 @@ namespace simulator
         stopButton->setEnabled(false);
         controlLayout->addWidget(stopButton);
 
-        auto* speedLabel = QtOwned<QLabel>("Speed Setpoint:", this);
-        controlLayout->addWidget(speedLabel);
+        auto* setpointLabel = QtOwned<QLabel>(config.label, this);
+        controlLayout->addWidget(setpointLabel);
 
-        speedValueLabel = QtOwned<QLabel>("0 RPM", this);
-        speedValueLabel->setAlignment(Qt::AlignCenter);
+        setpointValueLabel = QtOwned<QLabel>(QString("%1 %2").arg(config.defaultValue).arg(config.unit), this);
+        setpointValueLabel->setAlignment(Qt::AlignCenter);
         QFont boldFont;
         boldFont.setBold(true);
-        speedValueLabel->setFont(boldFont);
-        controlLayout->addWidget(speedValueLabel);
+        setpointValueLabel->setFont(boldFont);
+        controlLayout->addWidget(setpointValueLabel);
 
-        speedSlider = QtOwned<QSlider>(Qt::Horizontal, this);
-        speedSlider->setMinimum(speedSliderMin);
-        speedSlider->setMaximum(speedSliderMax);
-        speedSlider->setValue(0);
-        speedSlider->setTickPosition(QSlider::TicksBelow);
-        speedSlider->setTickInterval(speedSliderTickInterval);
-        controlLayout->addWidget(speedSlider);
+        setpointSlider = QtOwned<QSlider>(Qt::Horizontal, this);
+        setpointSlider->setMinimum(config.min);
+        setpointSlider->setMaximum(config.max);
+        setpointSlider->setValue(config.defaultValue);
+        setpointSlider->setTickPosition(QSlider::TicksBelow);
+        setpointSlider->setTickInterval(config.tickInterval);
+        controlLayout->addWidget(setpointSlider);
 
         controlGroup->setLayout(controlLayout);
         layout->addWidget(controlGroup);
@@ -117,10 +120,10 @@ namespace simulator
                 emit stopClicked();
             });
 
-        connect(speedSlider, &QSlider::valueChanged, this, [this](int value)
+        connect(setpointSlider, &QSlider::valueChanged, this, [this](int value)
             {
-                speedValueLabel->setText(QString("%1 RPM").arg(value));
-                emit speedChanged(value);
+                setpointValueLabel->setText(QString("%1 %2").arg(value).arg(setpointUnit));
+                emit setpointChanged(value);
             });
 
         connect(loadSpinBox, &QDoubleSpinBox::valueChanged, this, [this](double value)

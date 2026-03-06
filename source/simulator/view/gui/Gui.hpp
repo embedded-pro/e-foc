@@ -18,7 +18,8 @@ namespace simulator
 
     public:
         Gui(ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
-            const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters, QWidget* parent = nullptr);
+            const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
+            const ControlPanel::SetpointConfig& setpointConfig, QWidget* parent = nullptr);
 
         // ThreePhaseMotorModelObserver
         void Started() override;
@@ -26,7 +27,7 @@ namespace simulator
         void Finished() override;
 
     signals:
-        void speedChanged(int rpm);
+        void setpointChanged(int value);
 
     public:
         void UpdatePidParameters(const ParametersPanel::PidParameters& pidParameters);
