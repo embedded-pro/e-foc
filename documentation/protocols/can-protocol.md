@@ -21,7 +21,7 @@ with a host-side ROS2 bridge.
 | Master | The host system issuing commands (e.g., ROS2 bridge) |
 | Broadcast | A message addressed to all nodes (node ID 0x000) |
 | Sequence Number | An 8-bit counter in byte[0] of command frames for replay protection |
-| Scale Factor | Integer multiplier used to convert floats to fixed-point integers |
+| Scale Factor    | Integer multiplier used to convert floats to fixed-point integers   |
 
 ## 3. Transport
 
@@ -56,26 +56,26 @@ raw_id = (priority << 24) | (category << 20) | (message_type << 12) | node_id
 
 ## 5. Priority Levels
 
-| Value | Name | Usage |
-|---|---|---|
-| 0 | Emergency | Emergency stop, fault events |
-| 4 | Command | Motor commands, parameter writes |
-| 8 | Response | Command acknowledgements |
-| 12 | Telemetry | Periodic measurements |
-| 16 | Heartbeat | Node liveness |
+| Value | Name      | Usage                            |
+|-------|-----------|----------------------------------|
+| 0     | Emergency | Emergency stop, fault events     |
+| 4     | Command   | Motor commands, parameter writes |
+| 8     | Response  | Command acknowledgements         |
+| 12    | Telemetry | Periodic measurements            |
+| 16    | Heartbeat | Node liveness                    |
 
 Lower numerical values have higher CAN bus arbitration priority.
 
 ## 6. Message Categories
 
-| Value | Name | Description |
-|---|---|---|
-| 0x0 | Motor Control | Start, stop, e-stop, mode, setpoints |
-| 0x1 | PID Tuning | Current/speed/position loop gains |
-| 0x2 | Motor Parameters | Pole pairs, R, L, flux linkage |
-| 0x3 | System Parameters | Supply voltage, max current |
-| 0x4 | Telemetry | Status, measurements, faults |
-| 0x5 | System | Heartbeat, command acknowledgement |
+| Value | Name              | Description                          |
+|-------|-------------------|--------------------------------------|
+| 0x0   | Motor Control     | Start, stop, e-stop, mode, setpoints |
+| 0x1   | PID Tuning        | Current/speed/position loop gains    |
+| 0x2   | Motor Parameters  | Pole pairs, R, L, flux linkage       |
+| 0x3   | System Parameters | Supply voltage, max current          |
+| 0x4   | Telemetry         | Status, measurements, faults         |
+| 0x5   | System            | Heartbeat, command acknowledgement   |
 
 ## 7. Message Catalog
 
@@ -85,63 +85,63 @@ All motor control command frames carry a sequence number in byte[0].
 
 #### 7.1.1 Start Motor (Type 0x01)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Sequence | uint8 | Rolling sequence counter |
+| Byte | Field    | Type  | Description              |
+|------|----------|-------|--------------------------|
+| 0    | Sequence | uint8 | Rolling sequence counter |
 
 Response: commandAck with success.
 
 #### 7.1.2 Stop Motor (Type 0x02)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Sequence | uint8 | Rolling sequence counter |
+| Byte | Field    | Type  | Description              |
+|------|----------|-------|--------------------------|
+| 0    | Sequence | uint8 | Rolling sequence counter |
 
 Response: commandAck with success.
 
 #### 7.1.3 Emergency Stop (Type 0x03)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | (any) | uint8 | Not validated (no sequence check) |
+| Byte | Field | Type  | Description                       |
+|------|-------|-------|-----------------------------------|
+| 0    | (any) | uint8 | Not validated (no sequence check) |
 
 Sent at CanPriority::emergency. Bypasses sequence validation.
 Response: commandAck with success.
 
 #### 7.1.4 Set Control Mode (Type 0x04)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Sequence | uint8 | Rolling sequence counter |
-| 1 | Mode | uint8 | 0=torque, 1=speed, 2=position |
+| Byte | Field    | Type  | Description                   |
+|------|----------|-------|-------------------------------|
+| 0    | Sequence | uint8 | Rolling sequence counter      |
+| 1    | Mode     | uint8 | 0=torque, 1=speed, 2=position |
 
 Response: commandAck with success, or invalidPayload if mode > 2.
 
 #### 7.1.5 Set Torque Setpoint (Type 0x05)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Sequence | uint8 | Rolling sequence counter |
-| 1-2 | Id Current | int16 BE | Id setpoint × 1000 (amperes) |
-| 3-4 | Iq Current | int16 BE | Iq setpoint × 1000 (amperes) |
+| Byte | Field      | Type     | Description                  |
+|------|------------|----------|------------------------------|
+| 0    | Sequence   | uint8    | Rolling sequence counter     |
+| 1-2  | Id Current | int16 BE | Id setpoint × 1000 (amperes) |
+| 3-4  | Iq Current | int16 BE | Iq setpoint × 1000 (amperes) |
 
 Minimum payload: 5 bytes.
 
 #### 7.1.6 Set Speed Setpoint (Type 0x06)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Sequence | uint8 | Rolling sequence counter |
-| 1-4 | Speed | int32 BE | Speed × 1000 (rad/s) |
+| Byte | Field    | Type     | Description              |
+|------|----------|----------|--------------------------|
+| 0    | Sequence | uint8    | Rolling sequence counter |
+| 1-4  | Speed    | int32 BE | Speed × 1000 (rad/s)     |
 
 Minimum payload: 5 bytes.
 
 #### 7.1.7 Set Position Setpoint (Type 0x07)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Sequence | uint8 | Rolling sequence counter |
-| 1-4 | Position | int32 BE | Position × 10000 (radians) |
+| Byte | Field    | Type     | Description                |
+|------|----------|----------|----------------------------|
+| 0    | Sequence | uint8    | Rolling sequence counter   |
+| 1-4  | Position | int32 BE | Position × 10000 (radians) |
 
 Minimum payload: 5 bytes.
 
@@ -149,57 +149,57 @@ Minimum payload: 5 bytes.
 
 All PID frames share the same payload layout.
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Sequence | uint8 | Rolling sequence counter |
-| 1-2 | Kp | int16 BE | Proportional gain × 1000 |
-| 3-4 | Ki | int16 BE | Integral gain × 1000 |
-| 5-6 | Kd | int16 BE | Derivative gain × 1000 |
+| Byte | Field    | Type     | Description              |
+|------|----------|----------|--------------------------|
+| 0    | Sequence | uint8    | Rolling sequence counter |
+| 1-2  | Kp       | int16 BE | Proportional gain × 1000 |
+| 3-4  | Ki       | int16 BE | Integral gain × 1000     |
+| 5-6  | Kd       | int16 BE | Derivative gain × 1000   |
 
 Minimum payload: 7 bytes.
 
-| Type | Loop |
-|---|---|
+| Type | Loop       |
+|------|------------|
 | 0x01 | Current Id |
 | 0x02 | Current Iq |
-| 0x03 | Speed |
-| 0x04 | Position |
+| 0x03 | Speed      |
+| 0x04 | Position   |
 
 ### 7.3 Motor Parameters (Category 0x2)
 
 #### 7.3.1 Set Pole Pairs (Type 0x01)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Sequence | uint8 | Rolling sequence counter |
-| 1 | Pole Pairs | uint8 | Number of pole pairs |
+| Byte | Field      | Type  | Description              |
+|------|------------|-------|--------------------------|
+| 0    | Sequence   | uint8 | Rolling sequence counter |
+| 1    | Pole Pairs | uint8 | Number of pole pairs     |
 
 Minimum payload: 2 bytes.
 
 #### 7.3.2 Set Resistance (Type 0x02)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Sequence | uint8 | Rolling sequence counter |
-| 1-4 | Resistance | int32 BE | Resistance × 100000 (ohms) |
+| Byte | Field      | Type     | Description                |
+|------|------------|----------|----------------------------|
+| 0    | Sequence   | uint8    | Rolling sequence counter   |
+| 1-4  | Resistance | int32 BE | Resistance × 100000 (ohms) |
 
 Minimum payload: 5 bytes.
 
 #### 7.3.3 Set Inductance (Type 0x03)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Sequence | uint8 | Rolling sequence counter |
-| 1-4 | Inductance | int32 BE | Inductance × 10000000 (henries) |
+| Byte | Field      | Type     | Description                     |
+|------|------------|----------|---------------------------------|
+| 0    | Sequence   | uint8    | Rolling sequence counter        |
+| 1-4  | Inductance | int32 BE | Inductance × 10000000 (henries) |
 
 Minimum payload: 5 bytes.
 
 #### 7.3.4 Set Flux Linkage (Type 0x04)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Sequence | uint8 | Rolling sequence counter |
-| 1-4 | Flux | int32 BE | Flux linkage × 1000000 (webers) |
+| Byte | Field    | Type     | Description                     |
+|------|----------|----------|---------------------------------|
+| 0    | Sequence | uint8    | Rolling sequence counter        |
+| 1-4  | Flux     | int32 BE | Flux linkage × 1000000 (webers) |
 
 Minimum payload: 5 bytes.
 
@@ -207,19 +207,19 @@ Minimum payload: 5 bytes.
 
 #### 7.4.1 Set Supply Voltage (Type 0x01)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Sequence | uint8 | Rolling sequence counter |
-| 1-2 | Voltage | int16 BE | Voltage × 100 (volts) |
+| Byte | Field    | Type     | Description              |
+|------|----------|----------|--------------------------|
+| 0    | Sequence | uint8    | Rolling sequence counter |
+| 1-2  | Voltage  | int16 BE | Voltage × 100 (volts)    |
 
 Minimum payload: 3 bytes.
 
 #### 7.4.2 Set Max Current (Type 0x02)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Sequence | uint8 | Rolling sequence counter |
-| 1-2 | Current | int16 BE | Current × 1000 (amperes) |
+| Byte | Field    | Type     | Description              |
+|------|----------|----------|--------------------------|
+| 0    | Sequence | uint8    | Rolling sequence counter |
+| 1-2  | Current  | int16 BE | Current × 1000 (amperes) |
 
 Minimum payload: 3 bytes.
 
@@ -229,39 +229,39 @@ Telemetry frames are sent by the node at CanPriority::telemetry.
 
 #### 7.5.1 Motor Status (Type 0x01)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | State | uint8 | 0=idle, 1=running, 2=fault, 3=aligning |
-| 1 | Mode | uint8 | 0=torque, 1=speed, 2=position |
-| 2 | Fault Code | uint8 | See fault codes table |
+| Byte | Field      | Type  | Description                            |
+|------|------------|-------|----------------------------------------|
+| 0    | State      | uint8 | 0=idle, 1=running, 2=fault, 3=aligning |
+| 1    | Mode       | uint8 | 0=torque, 1=speed, 2=position          |
+| 2    | Fault Code | uint8 | See fault codes table                  |
 
 #### 7.5.2 Current Measurement (Type 0x02)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0-1 | Id Current | int16 BE | Measured Id × 1000 (amperes) |
-| 2-3 | Iq Current | int16 BE | Measured Iq × 1000 (amperes) |
+| Byte | Field      | Type     | Description                  |
+|------|------------|----------|------------------------------|
+| 0-1  | Id Current | int16 BE | Measured Id × 1000 (amperes) |
+| 2-3  | Iq Current | int16 BE | Measured Iq × 1000 (amperes) |
 
 #### 7.5.3 Speed and Position (Type 0x03)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0-1 | Speed | int16 BE | Speed × 1000 (rad/s) |
-| 2-3 | Position | int16 BE | Position × 10000 (radians) |
+| Byte | Field    | Type     | Description                |
+|------|----------|----------|----------------------------|
+| 0-1  | Speed    | int16 BE | Speed × 1000 (rad/s)       |
+| 2-3  | Position | int16 BE | Position × 10000 (radians) |
 
 #### 7.5.4 Bus Voltage (Type 0x04)
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0-1 | Voltage | int16 BE | Voltage × 100 (volts) |
+| Byte | Field   | Type     | Description           |
+|------|---------|----------|-----------------------|
+| 0-1  | Voltage | int16 BE | Voltage × 100 (volts) |
 
 #### 7.5.5 Fault Event (Type 0x05)
 
 Sent at CanPriority::emergency.
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Fault Code | uint8 | See fault codes table |
+| Byte | Field      | Type  | Description           |
+|------|------------|-------|-----------------------|
+| 0    | Fault Code | uint8 | See fault codes table |
 
 ### 7.6 System (Category 0x5)
 
@@ -269,18 +269,18 @@ Sent at CanPriority::emergency.
 
 Sent at CanPriority::heartbeat. No sequence validation.
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Version | uint8 | Protocol version (currently 1) |
+| Byte | Field   | Type  | Description                    |
+|------|---------|-------|--------------------------------|
+| 0    | Version | uint8 | Protocol version (currently 1) |
 
 #### 7.6.2 Command Acknowledgement (Type 0x02)
 
 Sent at CanPriority::response.
 
-| Byte | Field | Type | Description |
-|---|---|---|---|
-| 0 | Command | uint8 | CanMessageType of acknowledged command |
-| 1 | Status | uint8 | See acknowledgement status table |
+| Byte | Field   | Type  | Description                            |
+|------|---------|-------|----------------------------------------|
+| 0    | Command | uint8 | CanMessageType of acknowledged command |
+| 1    | Status  | uint8 | See acknowledgement status table       |
 
 ## 8. Data Encoding
 
@@ -288,16 +288,16 @@ All multi-byte integers are encoded **big-endian** (network byte order).
 
 ### 8.1 Scale Factors
 
-| Quantity | Type | Scale Factor | Resolution | Range |
-|---|---|---|---|---|
-| Current (A) | int16 | 1000 | 0.001 A | ±32.767 A |
-| Voltage (V) | int16 | 100 | 0.01 V | ±327.67 V |
-| Speed (rad/s) | int16/int32 | 1000 | 0.001 rad/s | ±32.767 or ±2147483.647 rad/s |
-| Position (rad) | int16/int32 | 10000 | 0.0001 rad | ±3.2767 or ±214748.3647 rad |
-| PID Gain | int16 | 1000 | 0.001 | ±32.767 |
-| Resistance (Ω) | int32 | 100000 | 0.00001 Ω | ±21474.83647 Ω |
-| Inductance (H) | int32 | 10000000 | 0.0000001 H | ±214.7483647 H |
-| Flux (Wb) | int32 | 1000000 | 0.000001 Wb | ±2147.483647 Wb |
+| Quantity       | Type        | Scale Factor | Resolution  | Range                         |
+|----------------|-------------|--------------|-------------|-------------------------------|
+| Current (A)    | int16       | 1000         | 0.001 A     | ±32.767 A                     |
+| Voltage (V)    | int16       | 100          | 0.01 V      | ±327.67 V                     |
+| Speed (rad/s)  | int16/int32 | 1000         | 0.001 rad/s | ±32.767 or ±2147483.647 rad/s |
+| Position (rad) | int16/int32 | 10000        | 0.0001 rad  | ±3.2767 or ±214748.3647 rad   |
+| PID Gain       | int16       | 1000         | 0.001       | ±32.767                       |
+| Resistance (Ω) | int32       | 100000       | 0.00001 Ω   | ±21474.83647 Ω                |
+| Inductance (H) | int32       | 10000000     | 0.0000001 H | ±214.7483647 H                |
+| Flux (Wb)      | int32       | 1000000      | 0.000001 Wb | ±2147.483647 Wb               |
 
 ### 8.2 Encoding Algorithm
 
@@ -320,12 +320,12 @@ Values are saturated (clamped) to the target integer range to prevent overflow.
 
 ### 9.2 Motor States
 
-| Value | State |
-|---|---|
-| 0 | Idle |
-| 1 | Running |
-| 2 | Fault |
-| 3 | Aligning |
+| Value | State    |
+|-------|----------|
+| 0     | Idle     |
+| 1     | Running  |
+| 2     | Fault    |
+| 3     | Aligning |
 
 ### 9.3 Fault Codes
 
@@ -365,12 +365,13 @@ sequenceDiagram
     Node->>Master: Ack (success)
 ```
 
-- Byte[0] of every command frame is an unsigned 8-bit sequence counter.
-- The node accepts the first command received regardless of sequence value.
-- Each subsequent command must have sequence = (previous + 1) mod 256.
-- Out-of-order or duplicate commands receive a sequenceError acknowledgement.
-- Emergency stop messages bypass sequence validation entirely.
-- Heartbeat and telemetry frames do not use sequence numbers.
+- For most command frames that carry a payload, Byte[0] is an unsigned 8-bit sequence counter used for best-effort in-order processing.
+- The node accepts the first sequenced command received regardless of sequence value and records it as the reference.
+- For commands where sequence validation is enabled, each subsequent command should have sequence = (previous + 1) mod 256.
+- When sequence validation is enabled and a command is out-of-order or duplicated, the node may reject it and send a `sequenceError` acknowledgement.
+- Some command types (for example, emergency stop) bypass sequence validation entirely by design.
+- Heartbeat and telemetry frames do not use sequence numbers and are never subject to sequence validation.
+- Sequence numbers are not an authentication or security mechanism and MUST NOT be relied upon to prevent malicious replay on an untrusted CAN bus.
 
 ## 11. Rate Limiting
 
