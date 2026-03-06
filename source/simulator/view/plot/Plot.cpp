@@ -8,12 +8,14 @@
 
 namespace simulator
 {
-    Plot::Plot(ThreePhaseMotorModel& model, const std::string& title, const std::string& filename, const std::filesystem::path& outputDirectory, std::chrono::microseconds timeStep, std::chrono::milliseconds simulationTime)
+    Plot::Plot(ThreePhaseMotorModel& model, const std::string& title, const std::string& filename, const std::filesystem::path& outputDirectory,
+        std::chrono::microseconds timeStep, std::chrono::milliseconds simulationTime, const AngleUnit& angleUnit)
         : ThreePhaseMotorModelObserver(model)
         , title(title)
         , filename(filename)
         , outputDirectory(outputDirectory)
         , timeStep(timeStep)
+        , angleUnit(angleUnit)
     {
         const auto steps = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::duration<float>>(simulationTime).count() / std::chrono::duration_cast<std::chrono::duration<float>>(timeStep).count());
 
@@ -42,7 +44,7 @@ namespace simulator
         this->i_a.push_back(i_a.Value());
         this->i_b.push_back(i_b.Value());
         this->i_c.push_back(i_c.Value());
-        this->theta.push_back(theta.Value());
+        this->theta.push_back(theta.Value() * angleUnit.scaleFactor);
     }
 
     void Plot::Finished()
@@ -76,7 +78,7 @@ namespace simulator
 
         sciplot::Plot plot2;
         plot2.xlabel("Time [s]");
-        plot2.ylabel("Electrical Angle [rad]");
+        plot2.ylabel(angleUnit.label);
         plot2.xrange(0.0, time.back());
         constexpr auto angleRangeMargin = 1.1;
         plot2.yrange(0.0, 2.0 * std::numbers::pi * angleRangeMargin);

@@ -30,7 +30,7 @@
             "name": "Simulator GUI",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/host/source/simulator/speed_control/Debug/e_foc.simulator.speed_control",
+            "program": "${workspaceFolder}/build/host/source/simulator/${input:simulatorMode}_control/Debug/e_foc.simulator.${input:simulatorMode}_control",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -55,7 +55,7 @@
             "name": "Simulator Headless",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/host/source/simulator/speed_control/Debug/e_foc.simulator.speed_control",
+            "program": "${workspaceFolder}/build/host/source/simulator/${input:simulatorMode}_control/Debug/e_foc.simulator.${input:simulatorMode}_control",
             "args": [
                 "--no-gui"
             ],
@@ -91,6 +91,19 @@
             "overrideRestartCommands": [
                 "monitor reset"
             ]
+        }
+    ],
+    "inputs": [
+        {
+            "id": "simulatorMode",
+            "type": "pickString",
+            "description": "Select simulation mode",
+            "options": [
+                "torque",
+                "speed",
+                "position"
+            ],
+            "default": "speed"
         }
     ]
 }

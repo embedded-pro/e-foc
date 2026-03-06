@@ -14,7 +14,7 @@ namespace simulator
     public:
         HeadlessSimulation(ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
             const std::string& title, const std::string& filename, const std::string& outputDirectory,
-            std::chrono::microseconds timeStep, std::chrono::milliseconds simulationTime);
+            std::chrono::microseconds timeStep, std::chrono::milliseconds simulationTime, const AngleUnit& angleUnit = {});
 
         void Run();
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "infra/util/ReallyAssert.hpp"
 #include "numerical/controllers/implementations/PidIncremental.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "source/foc/implementations/FocHelpers.hpp"
@@ -8,7 +9,6 @@
 #include "source/foc/implementations/TrigonometricImpl.hpp"
 #include "source/foc/interfaces/Driver.hpp"
 #include "source/foc/interfaces/Foc.hpp"
-#include "infra/util/ReallyAssert.hpp"
 
 namespace foc
 {
@@ -120,6 +120,42 @@ namespace foc
         }
 
     protected:
+        controllers::PidIncrementalSynchronous<float>& SpeedPid()
+        {
+            return speedPid;
+        }
+
+        controllers::PidIncrementalSynchronous<float>& DPid()
+        {
+            return dPid;
+        }
+
+        float CurrentMechanicalAngle() const
+        {
+            return currentMechanicalAngle;
+        }
+
+        float& PreviousSpeedPosition()
+        {
+            return previousSpeedPosition;
+        }
+
+        float& LastSpeedPidOutput()
+        {
+            return lastSpeedPidOutput;
+        }
+
+        float SpeedDt() const
+        {
+            return speedDt;
+        }
+
+        LowPriorityInterrupt& GetLowPriorityInterrupt()
+        {
+            return lowPriorityInterrupt;
+        }
+
+    private:
         [[no_unique_address]] Park park;
         [[no_unique_address]] Clarke clarke;
         controllers::PidIncrementalSynchronous<float> speedPid;

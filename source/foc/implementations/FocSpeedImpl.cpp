@@ -10,7 +10,7 @@ namespace foc
     FocSpeedImpl::FocSpeedImpl(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)
         : FocWithSpeedLoop(maxCurrent, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency)
     {
-        lowPriorityInterrupt.Register([this]()
+        GetLowPriorityInterrupt().Register([this]()
             {
                 LowPriorityHandler();
             });
@@ -25,8 +25,8 @@ namespace foc
     void FocSpeedImpl::SetPoint(RadiansPerSecond point)
     {
         lastSpeedSetPoint = point;
-        speedPid.SetPoint(point.Value());
-        dPid.SetPoint(0.0f);
+        SpeedPid().SetPoint(point.Value());
+        DPid().SetPoint(0.0f);
     }
 
     OPTIMIZE_FOR_SPEED
@@ -57,9 +57,9 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     void FocSpeedImpl::LowPriorityHandler()
     {
-        auto mechanicalSpeed = detail::PositionWithWrapAround(currentMechanicalAngle - previousSpeedPosition) / speedDt;
-        previousSpeedPosition = currentMechanicalAngle;
-        lastSpeedPidOutput = speedPid.Process(mechanicalSpeed);
+        auto mechanicalSpeed = detail::PositionWithWrapAround(CurrentMechanicalAngle() - PreviousSpeedPosition()) / SpeedDt();
+        PreviousSpeedPosition() = CurrentMechanicalAngle();
+        LastSpeedPidOutput() = SpeedPid().Process(mechanicalSpeed);
     }
 
     OPTIMIZE_FOR_SPEED

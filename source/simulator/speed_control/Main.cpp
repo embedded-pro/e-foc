@@ -114,23 +114,32 @@ int main(int argc, char* argv[])
         if (enableGui)
         {
             const simulator::ParametersPanel::PidParameters pidParameters{
-                args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument),
-                args::get(kpSpeedArgument), args::get(kiSpeedArgument), args::get(kdSpeedArgument)
+                .current = { args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument) },
+                .speed = simulator::ParametersPanel::LoopPid{ args::get(kpSpeedArgument), args::get(kiSpeedArgument), args::get(kdSpeedArgument) }
             };
 
-            simulator::GuiSimulation simulation{ argc, argv, model, controller, eventDispatcher, simulator::JK42BLS01_X038ED::parameters, pidParameters };
+            const simulator::ControlPanel::SetpointConfig speedSetpointConfig{
+                .label = "Speed Setpoint:",
+                .unit = "RPM",
+                .min = -3000,
+                .max = 3000,
+                .tickInterval = 500,
+                .defaultValue = 0
+            };
+
+            simulator::GuiSimulation simulation{ argc, argv, model, controller, eventDispatcher, simulator::JK42BLS01_X038ED::parameters, pidParameters, speedSetpointConfig };
 
             auto& gui = simulation.GetGui();
-            QObject::connect(&gui, &simulator::Gui::speedChanged, [&controller, &gui, powerSupplyVoltage, &pidParameters](int rpm)
+            QObject::connect(&gui, &simulator::Gui::setpointChanged, [&controller, &gui, powerSupplyVoltage, &pidParameters](int rpm)
                 {
                     controller.SetPoint(ToRadiansPerSecond(static_cast<float>(rpm)));
 
                     controller.SetSpeedTunings(foc::Volts{ powerSupplyVoltage },
-                        controllers::PidTunings<float>{ pidParameters.speedKp, pidParameters.speedKi, pidParameters.speedKd });
+                        controllers::PidTunings<float>{ pidParameters.speed->kp, pidParameters.speed->ki, pidParameters.speed->kd });
                     controller.SetCurrentTunings(foc::Volts{ powerSupplyVoltage },
                         foc::IdAndIqTunings{
-                            { pidParameters.currentKp, pidParameters.currentKi, pidParameters.currentKd },
-                            { pidParameters.currentKp, pidParameters.currentKi, pidParameters.currentKd } });
+                            { pidParameters.current.kp, pidParameters.current.ki, pidParameters.current.kd },
+                            { pidParameters.current.kp, pidParameters.current.ki, pidParameters.current.kd } });
 
                     gui.UpdatePidParameters(pidParameters);
                 });

@@ -25,7 +25,7 @@ namespace foc
         void LowPriorityHandler();
 
     private:
-        controllers::PidIncrementalSynchronous<float> positionPid;
+        controllers::PidIncrementalSynchronous<float> positionPid{ { 0.0f, 0.0f, 0.0f }, { -1000.0f, 1000.0f } };
         Radians lastPositionSetPoint{ 0.0f };
     };
 }

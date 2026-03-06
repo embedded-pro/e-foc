@@ -39,7 +39,7 @@ int main(int argc, char* argv[])
 {
     args::ArgumentParser parser(std::format("{} is a tool to simulate FOC position control.", argv[0]));
     args::Group positionals(parser, "Positional arguments:");
-    args::Positional positionSetPointArgument(positionals, "positionSetPoint", "position set point for the simulation (in radians) [default = 3.14]", 3.14f, args::Options::Single);
+    args::Positional positionSetPointArgument(positionals, "positionSetPoint", "position set point for the simulation (in degrees) [default = 180.0]", 180.0f, args::Options::Single);
     args::Positional kpTorqueArgument(positionals, "kpTorque", "proportional gain for the torque controller [default = 15.0]", 15.0f, args::Options::Single);
     args::Positional kiTorqueArgument(positionals, "kiTorque", "integral gain for the torque controller [default = 2000.0]", 2000.0f, args::Options::Single);
     args::Positional kdTorqueArgument(positionals, "kdTorque", "derivative gain for the torque controller [default = 0.0]", 0.0f, args::Options::Single);
@@ -108,28 +108,39 @@ int main(int argc, char* argv[])
                 { args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument) },
                 { args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument) } });
         controller.SetPolePairs(simulator::JK42BLS01_X038ED::parameters.p);
-        controller.SetPoint(foc::Radians{ args::get(positionSetPointArgument) });
+        constexpr auto degreesToRadians = std::numbers::pi_v<float> / 180.0f;
+        controller.SetPoint(foc::Radians{ args::get(positionSetPointArgument) * degreesToRadians });
 
         if (enableGui)
         {
             const simulator::ParametersPanel::PidParameters pidParameters{
-                args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument),
-                args::get(kpSpeedArgument), args::get(kiSpeedArgument), args::get(kdSpeedArgument)
+                .current = { args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument) },
+                .speed = simulator::ParametersPanel::LoopPid{ args::get(kpSpeedArgument), args::get(kiSpeedArgument), args::get(kdSpeedArgument) },
+                .position = simulator::ParametersPanel::LoopPid{ args::get(kpPositionArgument), args::get(kiPositionArgument), args::get(kdPositionArgument) }
             };
 
-            simulator::GuiSimulation simulation{ argc, argv, model, controller, eventDispatcher, simulator::JK42BLS01_X038ED::parameters, pidParameters };
+            const simulator::ControlPanel::SetpointConfig positionSetpointConfig{
+                .label = "Position Setpoint:",
+                .unit = QString::fromUtf8("\xC2\xB0"),
+                .min = -360,
+                .max = 360,
+                .tickInterval = 45,
+                .defaultValue = 0
+            };
+
+            simulator::GuiSimulation simulation{ argc, argv, model, controller, eventDispatcher, simulator::JK42BLS01_X038ED::parameters, pidParameters, positionSetpointConfig };
 
             auto& gui = simulation.GetGui();
-            QObject::connect(&gui, &simulator::Gui::speedChanged, [&controller, &gui, powerSupplyVoltage, &pidParameters](int rpm)
+            QObject::connect(&gui, &simulator::Gui::setpointChanged, [&controller, &gui, powerSupplyVoltage, &pidParameters, degreesToRadians](int degrees)
                 {
-                    controller.SetPoint(foc::Radians{ static_cast<float>(rpm) * std::numbers::pi_v<float> / 30.0f });
+                    controller.SetPoint(foc::Radians{ static_cast<float>(degrees) * degreesToRadians });
 
                     controller.SetSpeedTunings(foc::Volts{ powerSupplyVoltage },
-                        controllers::PidTunings<float>{ pidParameters.speedKp, pidParameters.speedKi, pidParameters.speedKd });
+                        controllers::PidTunings<float>{ pidParameters.speed->kp, pidParameters.speed->ki, pidParameters.speed->kd });
                     controller.SetCurrentTunings(foc::Volts{ powerSupplyVoltage },
                         foc::IdAndIqTunings{
-                            { pidParameters.currentKp, pidParameters.currentKi, pidParameters.currentKd },
-                            { pidParameters.currentKp, pidParameters.currentKi, pidParameters.currentKd } });
+                            { pidParameters.current.kp, pidParameters.current.ki, pidParameters.current.kd },
+                            { pidParameters.current.kp, pidParameters.current.ki, pidParameters.current.kd } });
 
                     gui.UpdatePidParameters(pidParameters);
                 });
@@ -137,9 +148,12 @@ int main(int argc, char* argv[])
             return simulation.Run();
         }
 
+        constexpr auto radiansToDegrees = 180.0f / std::numbers::pi_v<float>;
+        const simulator::AngleUnit degreeAngleUnit{ "Position [deg]", radiansToDegrees };
+
         simulator::HeadlessSimulation simulation{ model, controller, eventDispatcher,
             "FOC Position Control", "foc_position_results", std::format("{}/output/simulator/position_control", PROJECT_ROOT_DIR),
-            timeStep, simulationTime };
+            timeStep, simulationTime, degreeAngleUnit };
         simulation.Run();
     }
     catch (const std::exception& ex)

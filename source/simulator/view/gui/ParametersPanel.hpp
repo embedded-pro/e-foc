@@ -3,6 +3,7 @@
 #include "source/simulator/model/Model.hpp"
 #include <QLabel>
 #include <QWidget>
+#include <optional>
 
 namespace simulator
 {
@@ -12,14 +13,18 @@ namespace simulator
         Q_OBJECT
 
     public:
+        struct LoopPid
+        {
+            float kp;
+            float ki;
+            float kd;
+        };
+
         struct PidParameters
         {
-            float currentKp;
-            float currentKi;
-            float currentKd;
-            float speedKp;
-            float speedKi;
-            float speedKd;
+            LoopPid current;
+            std::optional<LoopPid> speed;
+            std::optional<LoopPid> position;
         };
 
         ParametersPanel(const ThreePhaseMotorModel::Parameters& motorParameters, const PidParameters& pidParameters, QWidget* parent = nullptr);
@@ -34,8 +39,11 @@ namespace simulator
 
         QLabel* currentKpLabel;
         QLabel* currentKiLabel;
-        QLabel* speedKpLabel;
-        QLabel* speedKiLabel;
-        QLabel* speedKdLabel;
+        QLabel* speedKpLabel = nullptr;
+        QLabel* speedKiLabel = nullptr;
+        QLabel* speedKdLabel = nullptr;
+        QLabel* positionKpLabel = nullptr;
+        QLabel* positionKiLabel = nullptr;
+        QLabel* positionKdLabel = nullptr;
     };
 }
