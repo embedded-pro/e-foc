@@ -68,13 +68,13 @@ Lower numerical values have higher CAN bus arbitration priority.
 
 ## 6. Message Categories
 
-| Value | Name              | Description                          |
-|-------|-------------------|--------------------------------------|
-| 0x0   | Motor Control     | Start, stop, e-stop, mode, setpoints |
-| 0x1   | PID Tuning        | Current/speed/position loop gains    |
-| 0x2   | Motor Parameters  | Pole pairs, R, L, flux linkage       |
-| 0x3   | System Parameters | Supply voltage, max current          |
-| 0x4   | Telemetry         | Status, measurements, faults         |
+| Value | Name              | Description                                      |
+|-------|-------------------|--------------------------------------------------|
+| 0x0   | Motor Control     | Start, stop, e-stop, mode, setpoints             |
+| 0x1   | PID Tuning        | Current/speed/position loop gains                |
+| 0x2   | Motor Parameters  | Pole pairs, R, L, flux linkage                   |
+| 0x3   | System Parameters | Supply voltage, max current                      |
+| 0x4   | Telemetry         | Status, measurements, faults                     |
 | 0x5   | System            | Heartbeat, command acknowledgement, status query |
 
 ## 7. Message Catalog
@@ -277,11 +277,11 @@ Sent at CanPriority::heartbeat. No sequence validation.
 
 Sent at CanPriority::response.
 
-| Byte | Field    | Type  | Description                                   |
-|------|----------|-------|-----------------------------------------------|
-| 0    | Category | uint8 | CanCategory of the acknowledged command        |
-| 1    | Command  | uint8 | CanMessageType of the acknowledged command     |
-| 2    | Status   | uint8 | See acknowledgement status table              |
+| Byte | Field    | Type  | Description                                |
+|------|----------|-------|--------------------------------------------|
+| 0    | Category | uint8 | CanCategory of the acknowledged command    |
+| 1    | Command  | uint8 | CanMessageType of the acknowledged command |
+| 2    | Status   | uint8 | See acknowledgement status table           |
 
 The category byte ensures the receiver can uniquely identify which command
 is being acknowledged, since message type values are reused across categories.
