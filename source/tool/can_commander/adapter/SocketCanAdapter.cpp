@@ -1,6 +1,7 @@
 #ifdef __linux__
 
 #include "source/tool/can_commander/adapter/SocketCanAdapter.hpp"
+#include <algorithm>
 #include <cstring>
 #include <linux/can.h>
 #include <linux/can/raw.h>
@@ -11,16 +12,12 @@
 
 namespace tool
 {
-    SocketCanAdapter::SocketCanAdapter(QObject* parent)
-        : CanBusAdapter(parent)
-    {}
-
     SocketCanAdapter::~SocketCanAdapter()
     {
         Disconnect();
     }
 
-    bool SocketCanAdapter::Connect(const QString& interface, uint32_t /*bitrate*/)
+    bool SocketCanAdapter::Connect(infra::BoundedConstString interfaceName, uint32_t /*bitrate*/)
     {
         if (IsConnected())
             Disconnect();
@@ -28,19 +25,28 @@ namespace tool
         socketDescriptor = socket(PF_CAN, SOCK_RAW, CAN_RAW);
         if (socketDescriptor < 0)
         {
-            emit ErrorOccurred("Failed to create CAN socket");
+            NotifyObservers([](auto& observer)
+                {
+                    observer.OnError("Failed to create CAN socket");
+                });
             return false;
         }
 
         struct ifreq ifr;
         std::memset(&ifr, 0, sizeof(ifr));
-        std::strncpy(ifr.ifr_name, interface.toStdString().c_str(), IFNAMSIZ - 1);
+
+        auto nameLength = std::min(interfaceName.size(), static_cast<std::size_t>(IFNAMSIZ - 1));
+        std::memcpy(ifr.ifr_name, interfaceName.data(), nameLength);
+        ifr.ifr_name[nameLength] = '\0';
 
         if (ioctl(socketDescriptor, SIOCGIFINDEX, &ifr) < 0)
         {
             close(socketDescriptor);
             socketDescriptor = -1;
-            emit ErrorOccurred("CAN interface '" + interface + "' not found");
+            NotifyObservers([](auto& observer)
+                {
+                    observer.OnError("CAN interface not found");
+                });
             return false;
         }
 
@@ -53,33 +59,32 @@ namespace tool
         {
             close(socketDescriptor);
             socketDescriptor = -1;
-            emit ErrorOccurred("Failed to bind CAN socket to '" + interface + "'");
+            NotifyObservers([](auto& observer)
+                {
+                    observer.OnError("Failed to bind CAN socket");
+                });
             return false;
         }
 
-        readNotifier = new QSocketNotifier(socketDescriptor, QSocketNotifier::Read, this);
-        connect(readNotifier, &QSocketNotifier::activated, this, &SocketCanAdapter::OnReadyRead);
-
-        emit ConnectionChanged(true);
+        NotifyObservers([](auto& observer)
+            {
+                observer.OnConnectionChanged(true);
+            });
         return true;
     }
 
     void SocketCanAdapter::Disconnect()
     {
-        if (readNotifier != nullptr)
-        {
-            readNotifier->setEnabled(false);
-            delete readNotifier;
-            readNotifier = nullptr;
-        }
-
         if (socketDescriptor >= 0)
         {
             close(socketDescriptor);
             socketDescriptor = -1;
         }
 
-        emit ConnectionChanged(false);
+        NotifyObservers([](auto& observer)
+            {
+                observer.OnConnectionChanged(false);
+            });
     }
 
     bool SocketCanAdapter::IsConnected() const
@@ -87,7 +92,7 @@ namespace tool
         return socketDescriptor >= 0;
     }
 
-    bool SocketCanAdapter::Send(uint32_t id, const QByteArray& data)
+    bool SocketCanAdapter::Send(uint32_t id, const CanFrame& data)
     {
         if (!IsConnected())
             return false;
@@ -95,20 +100,28 @@ namespace tool
         struct can_frame frame;
         std::memset(&frame, 0, sizeof(frame));
         frame.can_id = id | CAN_EFF_FLAG;
-        frame.can_dlc = static_cast<uint8_t>(std::min(static_cast<int>(data.size()), 8));
-        std::memcpy(frame.data, data.constData(), frame.can_dlc);
+        frame.can_dlc = static_cast<uint8_t>(std::min(data.size(), static_cast<std::size_t>(8)));
+        std::memcpy(frame.data, data.data(), frame.can_dlc);
 
         auto bytesWritten = write(socketDescriptor, &frame, sizeof(frame));
         if (bytesWritten != sizeof(frame))
         {
-            emit ErrorOccurred("Failed to send CAN frame");
+            NotifyObservers([](auto& observer)
+                {
+                    observer.OnError("Failed to send CAN frame");
+                });
             return false;
         }
 
         return true;
     }
 
-    void SocketCanAdapter::OnReadyRead()
+    int SocketCanAdapter::FileDescriptor() const
+    {
+        return socketDescriptor;
+    }
+
+    void SocketCanAdapter::ProcessReadEvent()
     {
         struct can_frame frame;
         auto bytesRead = read(socketDescriptor, &frame, sizeof(frame));
@@ -116,8 +129,14 @@ namespace tool
         if (bytesRead == sizeof(frame))
         {
             uint32_t id = frame.can_id & CAN_EFF_MASK;
-            QByteArray data(reinterpret_cast<const char*>(frame.data), frame.can_dlc);
-            emit FrameReceived(id, data);
+            CanFrame data;
+            for (uint8_t i = 0; i < frame.can_dlc && i < 8; ++i)
+                data.push_back(frame.data[i]);
+
+            NotifyObservers([id, &data](auto& observer)
+                {
+                    observer.OnFrameReceived(id, data);
+                });
         }
     }
 }

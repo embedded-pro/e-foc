@@ -1,19 +1,45 @@
 #pragma once
 
+#include "infra/util/Observer.hpp"
 #include "source/services/can_protocol/CanFrameCodec.hpp"
 #include "source/services/can_protocol/CanProtocolDefinitions.hpp"
 #include "source/tool/can_commander/adapter/CanBusAdapter.hpp"
-#include <QObject>
-#include <QTimer>
+#include <cstdint>
 
 namespace tool
 {
-    class CanCommandClient : public QObject
-    {
-        Q_OBJECT
+    class CanCommandClient;
 
+    class CanCommandClientObserver
+        : public infra::SingleObserver<CanCommandClientObserver, CanCommandClient>
+    {
     public:
-        explicit CanCommandClient(CanBusAdapter& adapter, QObject* parent = nullptr);
+        using infra::SingleObserver<CanCommandClientObserver, CanCommandClient>::SingleObserver;
+
+        virtual void OnCommandAckReceived(services::CanCategory category, services::CanMessageType command, services::CanAckStatus status) = 0;
+        virtual void OnCommandTimeout() = 0;
+        virtual void OnBusyChanged(bool busy) = 0;
+
+        virtual void OnMotorStatusReceived(services::CanMotorState state, services::CanControlMode mode, services::CanFaultCode fault) = 0;
+        virtual void OnControlModeReceived(services::CanControlMode mode) = 0;
+        virtual void OnCurrentMeasurementReceived(float idCurrent, float iqCurrent) = 0;
+        virtual void OnSpeedPositionReceived(float speed, float position) = 0;
+        virtual void OnBusVoltageReceived(float voltage) = 0;
+        virtual void OnFaultEventReceived(services::CanFaultCode fault) = 0;
+        virtual void OnHeartbeatReceived(uint8_t protocolVersion) = 0;
+
+        virtual void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) = 0;
+
+        virtual void OnConnectionChanged(bool connected) = 0;
+        virtual void OnAdapterError(infra::BoundedConstString message) = 0;
+    };
+
+    class CanCommandClient
+        : public infra::Subject<CanCommandClientObserver>
+        , private CanBusAdapterObserver
+    {
+    public:
+        explicit CanCommandClient(CanBusAdapter& adapter);
 
         void SetNodeId(uint16_t nodeId);
         uint16_t NodeId() const;
@@ -43,40 +69,25 @@ namespace tool
         void SendHeartbeat();
         void SendRequestStatus();
 
-    signals:
-        void CommandAckReceived(services::CanCategory category, services::CanMessageType command, services::CanAckStatus status);
-        void CommandTimeout();
-        void BusyChanged(bool busy);
-
-        void MotorStatusReceived(services::CanMotorState state, services::CanControlMode mode, services::CanFaultCode fault);
-        void ControlModeReceived(services::CanControlMode mode);
-        void CurrentMeasurementReceived(float idCurrent, float iqCurrent);
-        void SpeedPositionReceived(float speed, float position);
-        void BusVoltageReceived(float voltage);
-        void FaultEventReceived(services::CanFaultCode fault);
-        void HeartbeatReceived(uint8_t protocolVersion);
-
-        void FrameSent(uint32_t id, QByteArray data);
-        void FrameLog(QString direction, uint32_t id, QByteArray data);
+        void HandleTimeout();
 
     private:
-        void OnFrameReceived(uint32_t id, QByteArray data);
-        void OnTimeout();
+        void OnFrameReceived(uint32_t id, const CanFrame& data) override;
+        void OnError(infra::BoundedConstString message) override;
+        void OnConnectionChanged(bool connected) override;
+
         void SendCommand(services::CanPriority priority, services::CanCategory category,
-            services::CanMessageType type, const QByteArray& payload);
+            services::CanMessageType type, const CanFrame& payload);
         void SetBusy(bool busy);
 
-        void HandleTelemetry(services::CanMessageType type, const QByteArray& data);
-        void HandleSystemMessage(services::CanMessageType type, const QByteArray& data);
+        void HandleTelemetry(services::CanMessageType type, const CanFrame& data);
+        void HandleSystemMessage(services::CanMessageType type, const CanFrame& data);
 
         uint8_t NextSequence();
 
         CanBusAdapter& adapter;
-        QTimer timeoutTimer;
         uint16_t nodeId = 1;
         uint8_t sequenceCounter = 0;
         bool busy = false;
-
-        static constexpr int commandTimeoutMs = 2000;
     };
 }

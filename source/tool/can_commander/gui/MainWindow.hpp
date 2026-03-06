@@ -7,11 +7,15 @@
 #include "source/tool/can_commander/logic/CanCommandClient.hpp"
 #include <QMainWindow>
 #include <QPlainTextEdit>
+#include <QSocketNotifier>
 #include <QSpinBox>
+#include <QTimer>
 
 namespace tool
 {
-    class MainWindow : public QMainWindow
+    class MainWindow
+        : public QMainWindow
+        , private CanCommandClientObserver
     {
         Q_OBJECT
 
@@ -21,13 +25,25 @@ namespace tool
     private slots:
         void OnConnect();
         void OnDisconnect();
-        void OnBusyChanged(bool busy);
-        void OnConnectionChanged(bool connected);
-        void OnCommandTimeout();
-        void OnError(QString message);
-        void OnFrameLog(QString direction, uint32_t id, QByteArray data);
 
     private:
+        void OnCommandAckReceived(services::CanCategory category, services::CanMessageType command, services::CanAckStatus status) override;
+        void OnCommandTimeout() override;
+        void OnBusyChanged(bool busy) override;
+        void OnMotorStatusReceived(services::CanMotorState state, services::CanControlMode mode, services::CanFaultCode fault) override;
+        void OnControlModeReceived(services::CanControlMode mode) override;
+        void OnCurrentMeasurementReceived(float idCurrent, float iqCurrent) override;
+        void OnSpeedPositionReceived(float speed, float position) override;
+        void OnBusVoltageReceived(float voltage) override;
+        void OnFaultEventReceived(services::CanFaultCode fault) override;
+        void OnHeartbeatReceived(uint8_t protocolVersion) override;
+        void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) override;
+        void OnConnectionChanged(bool connected) override;
+        void OnAdapterError(infra::BoundedConstString message) override;
+
+        void SetupSocketNotifier();
+        void TeardownSocketNotifier();
+
         CanBusAdapter& adapter;
         CanCommandClient client;
 
@@ -37,6 +53,7 @@ namespace tool
         TelemetryPanel* telemetryPanel;
         QPlainTextEdit* logView;
 
-        void ConnectSignals();
+        QTimer timeoutTimer;
+        QSocketNotifier* socketNotifier = nullptr;
     };
 }

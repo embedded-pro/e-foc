@@ -77,7 +77,7 @@
             "name": "CAN Commander (Docker)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/host/source/tool/can_commander/Debug/e_foc.tool.can_commander",
+            "program": "${workspaceFolder}/build/host/source/tool/can_commander/main/Debug/e_foc.tool.can_commander",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

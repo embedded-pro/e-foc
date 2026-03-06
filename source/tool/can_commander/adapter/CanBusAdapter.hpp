@@ -1,31 +1,43 @@
 #pragma once
 
-#include <QByteArray>
-#include <QObject>
-#include <QString>
+#include "infra/util/BoundedString.hpp"
+#include "infra/util/BoundedVector.hpp"
+#include "infra/util/Observer.hpp"
 #include <cstdint>
 
 namespace tool
 {
-    class CanBusAdapter : public QObject
-    {
-        Q_OBJECT
+    using CanFrame = infra::BoundedVector<uint8_t>::WithMaxSize<8>;
 
+    class CanBusAdapter;
+
+    class CanBusAdapterObserver
+        : public infra::SingleObserver<CanBusAdapterObserver, CanBusAdapter>
+    {
     public:
-        using QObject::QObject;
-        ~CanBusAdapter() override = default;
+        using infra::SingleObserver<CanBusAdapterObserver, CanBusAdapter>::SingleObserver;
+
+        virtual void OnFrameReceived(uint32_t id, const CanFrame& data) = 0;
+        virtual void OnError(infra::BoundedConstString message) = 0;
+        virtual void OnConnectionChanged(bool connected) = 0;
+    };
+
+    class CanBusAdapter
+        : public infra::Subject<CanBusAdapterObserver>
+    {
+    public:
+        CanBusAdapter() = default;
+        virtual ~CanBusAdapter() = default;
 
         CanBusAdapter(const CanBusAdapter&) = delete;
         CanBusAdapter& operator=(const CanBusAdapter&) = delete;
 
-        virtual bool Connect(const QString& interface, uint32_t bitrate) = 0;
+        virtual bool Connect(infra::BoundedConstString interfaceName, uint32_t bitrate) = 0;
         virtual void Disconnect() = 0;
         virtual bool IsConnected() const = 0;
-        virtual bool Send(uint32_t id, const QByteArray& data) = 0;
+        virtual bool Send(uint32_t id, const CanFrame& data) = 0;
 
-    signals:
-        void FrameReceived(uint32_t id, QByteArray data);
-        void ErrorOccurred(QString message);
-        void ConnectionChanged(bool connected);
+        virtual int FileDescriptor() const = 0;
+        virtual void ProcessReadEvent() = 0;
     };
 }

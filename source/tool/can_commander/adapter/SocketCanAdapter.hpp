@@ -4,28 +4,24 @@
 
 #ifdef __linux__
 
-#include <QSocketNotifier>
-
 namespace tool
 {
     class SocketCanAdapter : public CanBusAdapter
     {
-        Q_OBJECT
-
     public:
-        explicit SocketCanAdapter(QObject* parent = nullptr);
+        SocketCanAdapter() = default;
         ~SocketCanAdapter() override;
 
-        bool Connect(const QString& interface, uint32_t bitrate) override;
+        bool Connect(infra::BoundedConstString interfaceName, uint32_t bitrate) override;
         void Disconnect() override;
         bool IsConnected() const override;
-        bool Send(uint32_t id, const QByteArray& data) override;
+        bool Send(uint32_t id, const CanFrame& data) override;
+
+        int FileDescriptor() const override;
+        void ProcessReadEvent() override;
 
     private:
-        void OnReadyRead();
-
         int socketDescriptor = -1;
-        QSocketNotifier* readNotifier = nullptr;
     };
 }
 

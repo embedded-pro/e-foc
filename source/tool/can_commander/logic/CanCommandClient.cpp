@@ -4,14 +4,10 @@ namespace tool
 {
     using namespace services;
 
-    CanCommandClient::CanCommandClient(CanBusAdapter& adapter, QObject* parent)
-        : QObject(parent)
+    CanCommandClient::CanCommandClient(CanBusAdapter& adapter)
+        : CanBusAdapterObserver(adapter)
         , adapter(adapter)
-    {
-        timeoutTimer.setSingleShot(true);
-        connect(&timeoutTimer, &QTimer::timeout, this, &CanCommandClient::OnTimeout);
-        connect(&adapter, &CanBusAdapter::FrameReceived, this, &CanCommandClient::OnFrameReceived);
-    }
+    {}
 
     void CanCommandClient::SetNodeId(uint16_t id)
     {
@@ -38,47 +34,52 @@ namespace tool
         if (busy != newBusy)
         {
             busy = newBusy;
-            emit BusyChanged(busy);
+            NotifyObservers([newBusy](auto& observer)
+                {
+                    observer.OnBusyChanged(newBusy);
+                });
         }
     }
 
     void CanCommandClient::SendCommand(CanPriority priority, CanCategory category,
-        CanMessageType type, const QByteArray& payload)
+        CanMessageType type, const CanFrame& payload)
     {
         uint32_t rawId = MakeCanId(priority, category, type, nodeId);
         adapter.Send(rawId, payload);
-        emit FrameLog("TX", rawId, payload);
+        NotifyObservers([rawId, &payload](auto& observer)
+            {
+                observer.OnFrameLog(true, rawId, payload);
+            });
 
         SetBusy(true);
-        timeoutTimer.start(commandTimeoutMs);
     }
 
     void CanCommandClient::SendStartMotor()
     {
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
+        CanFrame payload;
+        payload.push_back(NextSequence());
         SendCommand(CanPriority::command, CanCategory::motorControl, CanMessageType::startMotor, payload);
     }
 
     void CanCommandClient::SendStopMotor()
     {
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
+        CanFrame payload;
+        payload.push_back(NextSequence());
         SendCommand(CanPriority::command, CanCategory::motorControl, CanMessageType::stopMotor, payload);
     }
 
     void CanCommandClient::SendEmergencyStop()
     {
-        QByteArray payload;
-        payload.append(static_cast<char>(0));
+        CanFrame payload;
+        payload.push_back(0);
         SendCommand(CanPriority::emergency, CanCategory::motorControl, CanMessageType::emergencyStop, payload);
     }
 
     void CanCommandClient::SendSetControlMode(CanControlMode mode)
     {
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
-        payload.append(static_cast<char>(static_cast<uint8_t>(mode)));
+        CanFrame payload;
+        payload.push_back(NextSequence());
+        payload.push_back(static_cast<uint8_t>(mode));
         SendCommand(CanPriority::command, CanCategory::motorControl, CanMessageType::setControlMode, payload);
     }
 
@@ -87,12 +88,12 @@ namespace tool
         int16_t idFixed = CanFrameCodec::FloatToFixed16(idCurrent, canCurrentScale);
         int16_t iqFixed = CanFrameCodec::FloatToFixed16(iqCurrent, canCurrentScale);
 
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
-        payload.append(static_cast<char>(static_cast<uint8_t>(idFixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(idFixed & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(iqFixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(iqFixed & 0xFF)));
+        CanFrame payload;
+        payload.push_back(NextSequence());
+        payload.push_back(static_cast<uint8_t>(idFixed >> 8));
+        payload.push_back(static_cast<uint8_t>(idFixed & 0xFF));
+        payload.push_back(static_cast<uint8_t>(iqFixed >> 8));
+        payload.push_back(static_cast<uint8_t>(iqFixed & 0xFF));
         SendCommand(CanPriority::command, CanCategory::motorControl, CanMessageType::setTorqueSetpoint, payload);
     }
 
@@ -100,12 +101,12 @@ namespace tool
     {
         int32_t fixed = CanFrameCodec::FloatToFixed32(speedRadPerSec, canSpeedScale);
 
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
-        payload.append(static_cast<char>(static_cast<uint8_t>((fixed >> 24) & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>((fixed >> 16) & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>((fixed >> 8) & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(fixed & 0xFF)));
+        CanFrame payload;
+        payload.push_back(NextSequence());
+        payload.push_back(static_cast<uint8_t>((fixed >> 24) & 0xFF));
+        payload.push_back(static_cast<uint8_t>((fixed >> 16) & 0xFF));
+        payload.push_back(static_cast<uint8_t>((fixed >> 8) & 0xFF));
+        payload.push_back(static_cast<uint8_t>(fixed & 0xFF));
         SendCommand(CanPriority::command, CanCategory::motorControl, CanMessageType::setSpeedSetpoint, payload);
     }
 
@@ -113,12 +114,12 @@ namespace tool
     {
         int32_t fixed = CanFrameCodec::FloatToFixed32(positionRad, canPositionScale);
 
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
-        payload.append(static_cast<char>(static_cast<uint8_t>((fixed >> 24) & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>((fixed >> 16) & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>((fixed >> 8) & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(fixed & 0xFF)));
+        CanFrame payload;
+        payload.push_back(NextSequence());
+        payload.push_back(static_cast<uint8_t>((fixed >> 24) & 0xFF));
+        payload.push_back(static_cast<uint8_t>((fixed >> 16) & 0xFF));
+        payload.push_back(static_cast<uint8_t>((fixed >> 8) & 0xFF));
+        payload.push_back(static_cast<uint8_t>(fixed & 0xFF));
         SendCommand(CanPriority::command, CanCategory::motorControl, CanMessageType::setPositionSetpoint, payload);
     }
 
@@ -128,14 +129,14 @@ namespace tool
         int16_t kiFixed = CanFrameCodec::FloatToFixed16(ki, canPidGainScale);
         int16_t kdFixed = CanFrameCodec::FloatToFixed16(kd, canPidGainScale);
 
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kpFixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kpFixed & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kiFixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kiFixed & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kdFixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kdFixed & 0xFF)));
+        CanFrame payload;
+        payload.push_back(NextSequence());
+        payload.push_back(static_cast<uint8_t>(kpFixed >> 8));
+        payload.push_back(static_cast<uint8_t>(kpFixed & 0xFF));
+        payload.push_back(static_cast<uint8_t>(kiFixed >> 8));
+        payload.push_back(static_cast<uint8_t>(kiFixed & 0xFF));
+        payload.push_back(static_cast<uint8_t>(kdFixed >> 8));
+        payload.push_back(static_cast<uint8_t>(kdFixed & 0xFF));
         SendCommand(CanPriority::command, CanCategory::pidTuning, CanMessageType::setCurrentIdPid, payload);
     }
 
@@ -145,14 +146,14 @@ namespace tool
         int16_t kiFixed = CanFrameCodec::FloatToFixed16(ki, canPidGainScale);
         int16_t kdFixed = CanFrameCodec::FloatToFixed16(kd, canPidGainScale);
 
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kpFixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kpFixed & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kiFixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kiFixed & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kdFixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kdFixed & 0xFF)));
+        CanFrame payload;
+        payload.push_back(NextSequence());
+        payload.push_back(static_cast<uint8_t>(kpFixed >> 8));
+        payload.push_back(static_cast<uint8_t>(kpFixed & 0xFF));
+        payload.push_back(static_cast<uint8_t>(kiFixed >> 8));
+        payload.push_back(static_cast<uint8_t>(kiFixed & 0xFF));
+        payload.push_back(static_cast<uint8_t>(kdFixed >> 8));
+        payload.push_back(static_cast<uint8_t>(kdFixed & 0xFF));
         SendCommand(CanPriority::command, CanCategory::pidTuning, CanMessageType::setCurrentIqPid, payload);
     }
 
@@ -162,14 +163,14 @@ namespace tool
         int16_t kiFixed = CanFrameCodec::FloatToFixed16(ki, canPidGainScale);
         int16_t kdFixed = CanFrameCodec::FloatToFixed16(kd, canPidGainScale);
 
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kpFixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kpFixed & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kiFixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kiFixed & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kdFixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kdFixed & 0xFF)));
+        CanFrame payload;
+        payload.push_back(NextSequence());
+        payload.push_back(static_cast<uint8_t>(kpFixed >> 8));
+        payload.push_back(static_cast<uint8_t>(kpFixed & 0xFF));
+        payload.push_back(static_cast<uint8_t>(kiFixed >> 8));
+        payload.push_back(static_cast<uint8_t>(kiFixed & 0xFF));
+        payload.push_back(static_cast<uint8_t>(kdFixed >> 8));
+        payload.push_back(static_cast<uint8_t>(kdFixed & 0xFF));
         SendCommand(CanPriority::command, CanCategory::pidTuning, CanMessageType::setSpeedPid, payload);
     }
 
@@ -179,22 +180,22 @@ namespace tool
         int16_t kiFixed = CanFrameCodec::FloatToFixed16(ki, canPidGainScale);
         int16_t kdFixed = CanFrameCodec::FloatToFixed16(kd, canPidGainScale);
 
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kpFixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kpFixed & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kiFixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kiFixed & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kdFixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(kdFixed & 0xFF)));
+        CanFrame payload;
+        payload.push_back(NextSequence());
+        payload.push_back(static_cast<uint8_t>(kpFixed >> 8));
+        payload.push_back(static_cast<uint8_t>(kpFixed & 0xFF));
+        payload.push_back(static_cast<uint8_t>(kiFixed >> 8));
+        payload.push_back(static_cast<uint8_t>(kiFixed & 0xFF));
+        payload.push_back(static_cast<uint8_t>(kdFixed >> 8));
+        payload.push_back(static_cast<uint8_t>(kdFixed & 0xFF));
         SendCommand(CanPriority::command, CanCategory::pidTuning, CanMessageType::setPositionPid, payload);
     }
 
     void CanCommandClient::SendSetPolePairs(uint8_t polePairs)
     {
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
-        payload.append(static_cast<char>(polePairs));
+        CanFrame payload;
+        payload.push_back(NextSequence());
+        payload.push_back(polePairs);
         SendCommand(CanPriority::command, CanCategory::motorParameters, CanMessageType::setPolePairs, payload);
     }
 
@@ -202,12 +203,12 @@ namespace tool
     {
         int32_t fixed = CanFrameCodec::FloatToFixed32(ohms, canResistanceScale);
 
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
-        payload.append(static_cast<char>(static_cast<uint8_t>((fixed >> 24) & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>((fixed >> 16) & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>((fixed >> 8) & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(fixed & 0xFF)));
+        CanFrame payload;
+        payload.push_back(NextSequence());
+        payload.push_back(static_cast<uint8_t>((fixed >> 24) & 0xFF));
+        payload.push_back(static_cast<uint8_t>((fixed >> 16) & 0xFF));
+        payload.push_back(static_cast<uint8_t>((fixed >> 8) & 0xFF));
+        payload.push_back(static_cast<uint8_t>(fixed & 0xFF));
         SendCommand(CanPriority::command, CanCategory::motorParameters, CanMessageType::setResistance, payload);
     }
 
@@ -215,12 +216,12 @@ namespace tool
     {
         int32_t fixed = CanFrameCodec::FloatToFixed32(henries, canInductanceScale);
 
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
-        payload.append(static_cast<char>(static_cast<uint8_t>((fixed >> 24) & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>((fixed >> 16) & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>((fixed >> 8) & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(fixed & 0xFF)));
+        CanFrame payload;
+        payload.push_back(NextSequence());
+        payload.push_back(static_cast<uint8_t>((fixed >> 24) & 0xFF));
+        payload.push_back(static_cast<uint8_t>((fixed >> 16) & 0xFF));
+        payload.push_back(static_cast<uint8_t>((fixed >> 8) & 0xFF));
+        payload.push_back(static_cast<uint8_t>(fixed & 0xFF));
         SendCommand(CanPriority::command, CanCategory::motorParameters, CanMessageType::setInductance, payload);
     }
 
@@ -228,12 +229,12 @@ namespace tool
     {
         int32_t fixed = CanFrameCodec::FloatToFixed32(webers, canFluxScale);
 
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
-        payload.append(static_cast<char>(static_cast<uint8_t>((fixed >> 24) & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>((fixed >> 16) & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>((fixed >> 8) & 0xFF)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(fixed & 0xFF)));
+        CanFrame payload;
+        payload.push_back(NextSequence());
+        payload.push_back(static_cast<uint8_t>((fixed >> 24) & 0xFF));
+        payload.push_back(static_cast<uint8_t>((fixed >> 16) & 0xFF));
+        payload.push_back(static_cast<uint8_t>((fixed >> 8) & 0xFF));
+        payload.push_back(static_cast<uint8_t>(fixed & 0xFF));
         SendCommand(CanPriority::command, CanCategory::motorParameters, CanMessageType::setFluxLinkage, payload);
     }
 
@@ -241,10 +242,10 @@ namespace tool
     {
         int16_t fixed = CanFrameCodec::FloatToFixed16(volts, canVoltageScale);
 
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
-        payload.append(static_cast<char>(static_cast<uint8_t>(fixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(fixed & 0xFF)));
+        CanFrame payload;
+        payload.push_back(NextSequence());
+        payload.push_back(static_cast<uint8_t>(fixed >> 8));
+        payload.push_back(static_cast<uint8_t>(fixed & 0xFF));
         SendCommand(CanPriority::command, CanCategory::systemParameters, CanMessageType::setSupplyVoltage, payload);
     }
 
@@ -252,35 +253,53 @@ namespace tool
     {
         int16_t fixed = CanFrameCodec::FloatToFixed16(amps, canCurrentScale);
 
-        QByteArray payload;
-        payload.append(static_cast<char>(NextSequence()));
-        payload.append(static_cast<char>(static_cast<uint8_t>(fixed >> 8)));
-        payload.append(static_cast<char>(static_cast<uint8_t>(fixed & 0xFF)));
+        CanFrame payload;
+        payload.push_back(NextSequence());
+        payload.push_back(static_cast<uint8_t>(fixed >> 8));
+        payload.push_back(static_cast<uint8_t>(fixed & 0xFF));
         SendCommand(CanPriority::command, CanCategory::systemParameters, CanMessageType::setMaxCurrent, payload);
     }
 
     void CanCommandClient::SendHeartbeat()
     {
-        QByteArray payload;
-        payload.append(static_cast<char>(canProtocolVersion));
+        CanFrame payload;
+        payload.push_back(canProtocolVersion);
 
         uint32_t rawId = MakeCanId(CanPriority::heartbeat, CanCategory::system, CanMessageType::heartbeat, nodeId);
         adapter.Send(rawId, payload);
-        emit FrameLog("TX", rawId, payload);
+        NotifyObservers([rawId, &payload](auto& observer)
+            {
+                observer.OnFrameLog(true, rawId, payload);
+            });
     }
 
     void CanCommandClient::SendRequestStatus()
     {
-        QByteArray payload;
+        CanFrame payload;
 
         uint32_t rawId = MakeCanId(CanPriority::command, CanCategory::system, CanMessageType::requestStatus, nodeId);
         adapter.Send(rawId, payload);
-        emit FrameLog("TX", rawId, payload);
+        NotifyObservers([rawId, &payload](auto& observer)
+            {
+                observer.OnFrameLog(true, rawId, payload);
+            });
     }
 
-    void CanCommandClient::OnFrameReceived(uint32_t id, QByteArray data)
+    void CanCommandClient::HandleTimeout()
     {
-        emit FrameLog("RX", id, data);
+        SetBusy(false);
+        NotifyObservers([](auto& observer)
+            {
+                observer.OnCommandTimeout();
+            });
+    }
+
+    void CanCommandClient::OnFrameReceived(uint32_t id, const CanFrame& data)
+    {
+        NotifyObservers([id, &data](auto& observer)
+            {
+                observer.OnFrameLog(false, id, data);
+            });
 
         auto category = ExtractCanCategory(id);
         auto messageType = ExtractCanMessageType(id);
@@ -291,65 +310,100 @@ namespace tool
             HandleSystemMessage(messageType, data);
     }
 
-    void CanCommandClient::HandleTelemetry(CanMessageType type, const QByteArray& data)
+    void CanCommandClient::OnError(infra::BoundedConstString message)
+    {
+        NotifyObservers([message](auto& observer)
+            {
+                observer.OnAdapterError(message);
+            });
+    }
+
+    void CanCommandClient::OnConnectionChanged(bool connected)
+    {
+        NotifyObservers([connected](auto& observer)
+            {
+                observer.OnConnectionChanged(connected);
+            });
+    }
+
+    void CanCommandClient::HandleTelemetry(CanMessageType type, const CanFrame& data)
     {
         if (type == CanMessageType::motorStatus && data.size() >= 3)
         {
-            auto mode = static_cast<CanControlMode>(static_cast<uint8_t>(data[1]));
-            emit MotorStatusReceived(
-                static_cast<CanMotorState>(static_cast<uint8_t>(data[0])),
-                mode,
-                static_cast<CanFaultCode>(static_cast<uint8_t>(data[2])));
-            emit ControlModeReceived(mode);
+            auto state = static_cast<CanMotorState>(data[0]);
+            auto mode = static_cast<CanControlMode>(data[1]);
+            auto fault = static_cast<CanFaultCode>(data[2]);
+            NotifyObservers([state, mode, fault](auto& observer)
+                {
+                    observer.OnMotorStatusReceived(state, mode, fault);
+                });
+            NotifyObservers([mode](auto& observer)
+                {
+                    observer.OnControlModeReceived(mode);
+                });
         }
         else if (type == CanMessageType::currentMeasurement && data.size() >= 4)
         {
-            int16_t idRaw = static_cast<int16_t>((static_cast<uint16_t>(static_cast<uint8_t>(data[0])) << 8) | static_cast<uint8_t>(data[1]));
-            int16_t iqRaw = static_cast<int16_t>((static_cast<uint16_t>(static_cast<uint8_t>(data[2])) << 8) | static_cast<uint8_t>(data[3]));
-            emit CurrentMeasurementReceived(
-                CanFrameCodec::Fixed16ToFloat(idRaw, canCurrentScale),
-                CanFrameCodec::Fixed16ToFloat(iqRaw, canCurrentScale));
+            int16_t idRaw = static_cast<int16_t>((static_cast<uint16_t>(data[0]) << 8) | data[1]);
+            int16_t iqRaw = static_cast<int16_t>((static_cast<uint16_t>(data[2]) << 8) | data[3]);
+            float id = CanFrameCodec::Fixed16ToFloat(idRaw, canCurrentScale);
+            float iq = CanFrameCodec::Fixed16ToFloat(iqRaw, canCurrentScale);
+            NotifyObservers([id, iq](auto& observer)
+                {
+                    observer.OnCurrentMeasurementReceived(id, iq);
+                });
         }
         else if (type == CanMessageType::speedPosition && data.size() >= 4)
         {
-            int16_t speedRaw = static_cast<int16_t>((static_cast<uint16_t>(static_cast<uint8_t>(data[0])) << 8) | static_cast<uint8_t>(data[1]));
-            int16_t posRaw = static_cast<int16_t>((static_cast<uint16_t>(static_cast<uint8_t>(data[2])) << 8) | static_cast<uint8_t>(data[3]));
-            emit SpeedPositionReceived(
-                CanFrameCodec::Fixed16ToFloat(speedRaw, canSpeedScale),
-                CanFrameCodec::Fixed16ToFloat(posRaw, canPositionScale));
+            int16_t speedRaw = static_cast<int16_t>((static_cast<uint16_t>(data[0]) << 8) | data[1]);
+            int16_t posRaw = static_cast<int16_t>((static_cast<uint16_t>(data[2]) << 8) | data[3]);
+            float speed = CanFrameCodec::Fixed16ToFloat(speedRaw, canSpeedScale);
+            float pos = CanFrameCodec::Fixed16ToFloat(posRaw, canPositionScale);
+            NotifyObservers([speed, pos](auto& observer)
+                {
+                    observer.OnSpeedPositionReceived(speed, pos);
+                });
         }
         else if (type == CanMessageType::busVoltage && data.size() >= 2)
         {
-            int16_t raw = static_cast<int16_t>((static_cast<uint16_t>(static_cast<uint8_t>(data[0])) << 8) | static_cast<uint8_t>(data[1]));
-            emit BusVoltageReceived(CanFrameCodec::Fixed16ToFloat(raw, canVoltageScale));
+            int16_t raw = static_cast<int16_t>((static_cast<uint16_t>(data[0]) << 8) | data[1]);
+            float voltage = CanFrameCodec::Fixed16ToFloat(raw, canVoltageScale);
+            NotifyObservers([voltage](auto& observer)
+                {
+                    observer.OnBusVoltageReceived(voltage);
+                });
         }
         else if (type == CanMessageType::faultEvent && data.size() >= 1)
         {
-            emit FaultEventReceived(static_cast<CanFaultCode>(static_cast<uint8_t>(data[0])));
+            auto fault = static_cast<CanFaultCode>(data[0]);
+            NotifyObservers([fault](auto& observer)
+                {
+                    observer.OnFaultEventReceived(fault);
+                });
         }
     }
 
-    void CanCommandClient::HandleSystemMessage(CanMessageType type, const QByteArray& data)
+    void CanCommandClient::HandleSystemMessage(CanMessageType type, const CanFrame& data)
     {
         if (type == CanMessageType::commandAck && data.size() >= 3)
         {
-            timeoutTimer.stop();
             SetBusy(false);
 
-            auto category = static_cast<CanCategory>(static_cast<uint8_t>(data[0]));
-            auto command = static_cast<CanMessageType>(static_cast<uint8_t>(data[1]));
-            auto status = static_cast<CanAckStatus>(static_cast<uint8_t>(data[2]));
-            emit CommandAckReceived(category, command, status);
+            auto category = static_cast<CanCategory>(data[0]);
+            auto command = static_cast<CanMessageType>(data[1]);
+            auto status = static_cast<CanAckStatus>(data[2]);
+            NotifyObservers([category, command, status](auto& observer)
+                {
+                    observer.OnCommandAckReceived(category, command, status);
+                });
         }
         else if (type == CanMessageType::heartbeat && data.size() >= 1)
         {
-            emit HeartbeatReceived(static_cast<uint8_t>(data[0]));
+            uint8_t version = data[0];
+            NotifyObservers([version](auto& observer)
+                {
+                    observer.OnHeartbeatReceived(version);
+                });
         }
-    }
-
-    void CanCommandClient::OnTimeout()
-    {
-        SetBusy(false);
-        emit CommandTimeout();
     }
 }

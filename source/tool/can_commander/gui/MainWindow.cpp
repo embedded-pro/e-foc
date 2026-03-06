@@ -13,6 +13,7 @@ namespace tool
         , adapter(adapter)
         , client(adapter)
     {
+        CanCommandClientObserver::Attach(client);
         setWindowTitle("e-foc CAN Commander");
         resize(1000, 700);
 
@@ -53,55 +54,112 @@ namespace tool
         logView->setFont(QFont("Monospace", 9));
         mainLayout->addWidget(logView);
 
-        ConnectSignals();
-    }
+        timeoutTimer.setSingleShot(true);
+        connect(&timeoutTimer, &QTimer::timeout, [this]()
+            {
+                client.HandleTimeout();
+            });
 
-    void MainWindow::ConnectSignals()
-    {
         connect(connectionPanel, &ConnectionPanel::ConnectRequested, this, &MainWindow::OnConnect);
         connect(connectionPanel, &ConnectionPanel::DisconnectRequested, this, &MainWindow::OnDisconnect);
 
-        connect(&adapter, &CanBusAdapter::ConnectionChanged, this, &MainWindow::OnConnectionChanged);
-        connect(&adapter, &CanBusAdapter::ErrorOccurred, this, &MainWindow::OnError);
+        connect(commandPanel, &CommandPanel::StartMotorRequested, [this]()
+            {
+                client.SendStartMotor();
+                timeoutTimer.start(2000);
+            });
+        connect(commandPanel, &CommandPanel::StopMotorRequested, [this]()
+            {
+                client.SendStopMotor();
+                timeoutTimer.start(2000);
+            });
+        connect(commandPanel, &CommandPanel::EmergencyStopRequested, [this]()
+            {
+                client.SendEmergencyStop();
+                timeoutTimer.start(2000);
+            });
+        connect(commandPanel, &CommandPanel::SetControlModeRequested, [this](services::CanControlMode mode)
+            {
+                client.SendSetControlMode(mode);
+                timeoutTimer.start(2000);
+            });
+        connect(commandPanel, &CommandPanel::SetTorqueSetpointRequested, [this](float id, float iq)
+            {
+                client.SendSetTorqueSetpoint(id, iq);
+                timeoutTimer.start(2000);
+            });
+        connect(commandPanel, &CommandPanel::SetSpeedSetpointRequested, [this](float speed)
+            {
+                client.SendSetSpeedSetpoint(speed);
+                timeoutTimer.start(2000);
+            });
+        connect(commandPanel, &CommandPanel::SetPositionSetpointRequested, [this](float pos)
+            {
+                client.SendSetPositionSetpoint(pos);
+                timeoutTimer.start(2000);
+            });
 
-        connect(&client, &CanCommandClient::BusyChanged, this, &MainWindow::OnBusyChanged);
-        connect(&client, &CanCommandClient::CommandTimeout, this, &MainWindow::OnCommandTimeout);
-        connect(&client, &CanCommandClient::FrameLog, this, &MainWindow::OnFrameLog);
+        connect(commandPanel, &CommandPanel::SetCurrentIdPidRequested, [this](float kp, float ki, float kd)
+            {
+                client.SendSetCurrentIdPid(kp, ki, kd);
+                timeoutTimer.start(2000);
+            });
+        connect(commandPanel, &CommandPanel::SetCurrentIqPidRequested, [this](float kp, float ki, float kd)
+            {
+                client.SendSetCurrentIqPid(kp, ki, kd);
+                timeoutTimer.start(2000);
+            });
+        connect(commandPanel, &CommandPanel::SetSpeedPidRequested, [this](float kp, float ki, float kd)
+            {
+                client.SendSetSpeedPid(kp, ki, kd);
+                timeoutTimer.start(2000);
+            });
+        connect(commandPanel, &CommandPanel::SetPositionPidRequested, [this](float kp, float ki, float kd)
+            {
+                client.SendSetPositionPid(kp, ki, kd);
+                timeoutTimer.start(2000);
+            });
 
-        connect(&client, &CanCommandClient::MotorStatusReceived, telemetryPanel, &TelemetryPanel::OnMotorStatus);
-        connect(&client, &CanCommandClient::CurrentMeasurementReceived, telemetryPanel, &TelemetryPanel::OnCurrentMeasurement);
-        connect(&client, &CanCommandClient::SpeedPositionReceived, telemetryPanel, &TelemetryPanel::OnSpeedPosition);
-        connect(&client, &CanCommandClient::BusVoltageReceived, telemetryPanel, &TelemetryPanel::OnBusVoltage);
-        connect(&client, &CanCommandClient::FaultEventReceived, telemetryPanel, &TelemetryPanel::OnFaultEvent);
-        connect(&client, &CanCommandClient::HeartbeatReceived, telemetryPanel, &TelemetryPanel::OnHeartbeat);
-        connect(&client, &CanCommandClient::CommandAckReceived, telemetryPanel, &TelemetryPanel::OnCommandAck);
+        connect(commandPanel, &CommandPanel::SetPolePairsRequested, [this](uint8_t pp)
+            {
+                client.SendSetPolePairs(pp);
+                timeoutTimer.start(2000);
+            });
+        connect(commandPanel, &CommandPanel::SetResistanceRequested, [this](float r)
+            {
+                client.SendSetResistance(r);
+                timeoutTimer.start(2000);
+            });
+        connect(commandPanel, &CommandPanel::SetInductanceRequested, [this](float l)
+            {
+                client.SendSetInductance(l);
+                timeoutTimer.start(2000);
+            });
+        connect(commandPanel, &CommandPanel::SetFluxLinkageRequested, [this](float f)
+            {
+                client.SendSetFluxLinkage(f);
+                timeoutTimer.start(2000);
+            });
 
-        connect(commandPanel, &CommandPanel::StartMotorRequested, &client, &CanCommandClient::SendStartMotor);
-        connect(commandPanel, &CommandPanel::StopMotorRequested, &client, &CanCommandClient::SendStopMotor);
-        connect(commandPanel, &CommandPanel::EmergencyStopRequested, &client, &CanCommandClient::SendEmergencyStop);
-        connect(commandPanel, &CommandPanel::SetControlModeRequested, &client, &CanCommandClient::SendSetControlMode);
-        connect(commandPanel, &CommandPanel::SetTorqueSetpointRequested, &client, &CanCommandClient::SendSetTorqueSetpoint);
-        connect(commandPanel, &CommandPanel::SetSpeedSetpointRequested, &client, &CanCommandClient::SendSetSpeedSetpoint);
-        connect(commandPanel, &CommandPanel::SetPositionSetpointRequested, &client, &CanCommandClient::SendSetPositionSetpoint);
+        connect(commandPanel, &CommandPanel::SetSupplyVoltageRequested, [this](float v)
+            {
+                client.SendSetSupplyVoltage(v);
+                timeoutTimer.start(2000);
+            });
+        connect(commandPanel, &CommandPanel::SetMaxCurrentRequested, [this](float a)
+            {
+                client.SendSetMaxCurrent(a);
+                timeoutTimer.start(2000);
+            });
 
-        connect(commandPanel, &CommandPanel::SetCurrentIdPidRequested, &client, &CanCommandClient::SendSetCurrentIdPid);
-        connect(commandPanel, &CommandPanel::SetCurrentIqPidRequested, &client, &CanCommandClient::SendSetCurrentIqPid);
-        connect(commandPanel, &CommandPanel::SetSpeedPidRequested, &client, &CanCommandClient::SendSetSpeedPid);
-        connect(commandPanel, &CommandPanel::SetPositionPidRequested, &client, &CanCommandClient::SendSetPositionPid);
-
-        connect(commandPanel, &CommandPanel::SetPolePairsRequested, &client, &CanCommandClient::SendSetPolePairs);
-        connect(commandPanel, &CommandPanel::SetResistanceRequested, &client, &CanCommandClient::SendSetResistance);
-        connect(commandPanel, &CommandPanel::SetInductanceRequested, &client, &CanCommandClient::SendSetInductance);
-        connect(commandPanel, &CommandPanel::SetFluxLinkageRequested, &client, &CanCommandClient::SendSetFluxLinkage);
-
-        connect(commandPanel, &CommandPanel::SetSupplyVoltageRequested, &client, &CanCommandClient::SendSetSupplyVoltage);
-        connect(commandPanel, &CommandPanel::SetMaxCurrentRequested, &client, &CanCommandClient::SendSetMaxCurrent);
-
-        connect(commandPanel, &CommandPanel::SendHeartbeatRequested, &client, &CanCommandClient::SendHeartbeat);
-
-        connect(commandPanel, &CommandPanel::RequestStatusRequested, &client, &CanCommandClient::SendRequestStatus);
-
-        connect(&client, &CanCommandClient::ControlModeReceived, commandPanel, &CommandPanel::SetActiveControlMode);
+        connect(commandPanel, &CommandPanel::SendHeartbeatRequested, [this]()
+            {
+                client.SendHeartbeat();
+            });
+        connect(commandPanel, &CommandPanel::RequestStatusRequested, [this]()
+            {
+                client.SendRequestStatus();
+            });
 
         connect(nodeIdSpin, &QSpinBox::valueChanged, [this](int value)
             {
@@ -111,11 +169,13 @@ namespace tool
 
     void MainWindow::OnConnect()
     {
-        adapter.Connect(connectionPanel->InterfaceName(), connectionPanel->Bitrate());
+        auto name = connectionPanel->InterfaceName().toStdString();
+        adapter.Connect(infra::BoundedConstString(name.data(), name.size()), connectionPanel->Bitrate());
     }
 
     void MainWindow::OnDisconnect()
     {
+        TeardownSocketNotifier();
         adapter.Disconnect();
     }
 
@@ -125,12 +185,21 @@ namespace tool
         commandPanel->SetCommandsEnabled(connected);
 
         if (connected)
+        {
+            SetupSocketNotifier();
             client.SendRequestStatus();
+        }
+        else
+        {
+            TeardownSocketNotifier();
+        }
     }
 
     void MainWindow::OnBusyChanged(bool busy)
     {
         commandPanel->SetCommandsEnabled(!busy && adapter.IsConnected());
+        if (!busy)
+            timeoutTimer.stop();
     }
 
     void MainWindow::OnCommandTimeout()
@@ -138,28 +207,88 @@ namespace tool
         logView->appendPlainText("TIMEOUT: No response received");
     }
 
-    void MainWindow::OnError(QString message)
+    void MainWindow::OnAdapterError(infra::BoundedConstString message)
     {
-        logView->appendPlainText("ERROR: " + message);
+        logView->appendPlainText(QString("ERROR: %1").arg(QString::fromUtf8(message.data(), static_cast<int>(message.size()))));
     }
 
-    void MainWindow::OnFrameLog(QString direction, uint32_t id, QByteArray data)
+    void MainWindow::OnCommandAckReceived(services::CanCategory category, services::CanMessageType command, services::CanAckStatus status)
+    {
+        timeoutTimer.stop();
+        telemetryPanel->OnCommandAck(category, command, status);
+    }
+
+    void MainWindow::OnMotorStatusReceived(services::CanMotorState state, services::CanControlMode mode, services::CanFaultCode fault)
+    {
+        telemetryPanel->OnMotorStatus(state, mode, fault);
+    }
+
+    void MainWindow::OnControlModeReceived(services::CanControlMode mode)
+    {
+        commandPanel->SetActiveControlMode(mode);
+    }
+
+    void MainWindow::OnCurrentMeasurementReceived(float idCurrent, float iqCurrent)
+    {
+        telemetryPanel->OnCurrentMeasurement(idCurrent, iqCurrent);
+    }
+
+    void MainWindow::OnSpeedPositionReceived(float speed, float position)
+    {
+        telemetryPanel->OnSpeedPosition(speed, position);
+    }
+
+    void MainWindow::OnBusVoltageReceived(float voltage)
+    {
+        telemetryPanel->OnBusVoltage(voltage);
+    }
+
+    void MainWindow::OnFaultEventReceived(services::CanFaultCode fault)
+    {
+        telemetryPanel->OnFaultEvent(fault);
+    }
+
+    void MainWindow::OnHeartbeatReceived(uint8_t protocolVersion)
+    {
+        telemetryPanel->OnHeartbeat(protocolVersion);
+    }
+
+    void MainWindow::OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data)
     {
         QString hex;
-        for (int i = 0; i < data.size(); ++i)
+        for (std::size_t i = 0; i < data.size(); ++i)
         {
             if (i > 0)
                 hex += " ";
-            hex += QString("%1").arg(static_cast<uint8_t>(data[i]), 2, 16, QChar('0')).toUpper();
+            hex += QString("%1").arg(data[i], 2, 16, QChar('0')).toUpper();
         }
 
         logView->appendPlainText(
             QString("[%1] ID: 0x%2  Data: [%3]")
-                .arg(direction, -2)
+                .arg(transmitted ? "TX" : "RX", -2)
                 .arg(id, 8, 16, QChar('0'))
                 .arg(hex));
 
         auto* scrollBar = logView->verticalScrollBar();
         scrollBar->setValue(scrollBar->maximum());
+    }
+
+    void MainWindow::SetupSocketNotifier()
+    {
+        int fd = adapter.FileDescriptor();
+        if (fd >= 0)
+        {
+            socketNotifier = new QSocketNotifier(fd, QSocketNotifier::Read, this);
+            connect(socketNotifier, &QSocketNotifier::activated, [this]()
+                {
+                    adapter.ProcessReadEvent();
+                });
+        }
+    }
+
+    void MainWindow::TeardownSocketNotifier()
+    {
+        delete socketNotifier;
+        socketNotifier = nullptr;
     }
 }
