@@ -58,7 +58,6 @@ namespace services
 
         uint8_t NextSequence();
 
-        hal::Can& can;
         CanFrameTransport transport;
         uint8_t sequenceCounter = 0;
     };

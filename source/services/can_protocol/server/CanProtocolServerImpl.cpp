@@ -3,8 +3,7 @@
 namespace services
 {
     CanProtocolServerImpl::CanProtocolServerImpl(hal::Can& can, const Config& config, Handlers& handlers)
-        : can(can)
-        , config(config)
+        : config(config)
         , transport(can, config.nodeId)
         , handlers(handlers)
     {

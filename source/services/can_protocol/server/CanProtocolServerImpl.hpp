@@ -40,7 +40,6 @@ namespace services
         void SendBusVoltage(float voltage);
         void SendFaultEvent(CanFaultCode fault);
 
-        hal::Can& can;
         Config config;
         CanFrameTransport transport;
         uint16_t messageCountThisPeriod = 0;

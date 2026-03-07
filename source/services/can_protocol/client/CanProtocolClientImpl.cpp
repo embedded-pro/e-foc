@@ -3,8 +3,7 @@
 namespace services
 {
     CanProtocolClientImpl::CanProtocolClientImpl(hal::Can& can, const Config& config)
-        : can(can)
-        , transport(can, config.nodeId)
+        : transport(can, config.nodeId)
     {
         can.ReceiveData([this](hal::Can::Id id, const hal::Can::Message& data)
             {
