@@ -25,7 +25,6 @@ namespace services
     {
         motorControl = 0x0,
         pidTuning = 0x1,
-        motorParameters = 0x2,
         systemParameters = 0x3,
         telemetry = 0x4,
         system = 0x5
@@ -46,11 +45,6 @@ namespace services
         setSpeedPid = 0x03,
         setPositionPid = 0x04,
 
-        setPolePairs = 0x01,
-        setResistance = 0x02,
-        setInductance = 0x03,
-        setFluxLinkage = 0x04,
-
         setSupplyVoltage = 0x01,
         setMaxCurrent = 0x02,
 
@@ -62,8 +56,34 @@ namespace services
 
         heartbeat = 0x01,
         commandAck = 0x02,
-        requestStatus = 0x03
+        requestData = 0x03
     };
+
+    enum class DataRequestFlags : uint8_t
+    {
+        none = 0x00,
+        motorStatus = 0x01,
+        currentMeasurement = 0x02,
+        speedPosition = 0x04,
+        busVoltage = 0x08,
+        faultEvent = 0x10,
+        all = 0x1F
+    };
+
+    inline constexpr DataRequestFlags operator|(DataRequestFlags a, DataRequestFlags b)
+    {
+        return static_cast<DataRequestFlags>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+    }
+
+    inline constexpr DataRequestFlags operator&(DataRequestFlags a, DataRequestFlags b)
+    {
+        return static_cast<DataRequestFlags>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
+    }
+
+    inline constexpr bool HasFlag(DataRequestFlags flags, DataRequestFlags flag)
+    {
+        return (flags & flag) != DataRequestFlags::none;
+    }
 
     enum class CanControlMode : uint8_t
     {
@@ -100,6 +120,18 @@ namespace services
         rateLimited = 5
     };
 
+    struct DataResponse
+    {
+        CanMotorState motorState = CanMotorState::idle;
+        CanControlMode controlMode = CanControlMode::torque;
+        CanFaultCode faultCode = CanFaultCode::none;
+        float idCurrent = 0.0f;
+        float iqCurrent = 0.0f;
+        float speed = 0.0f;
+        float position = 0.0f;
+        float busVoltage = 0.0f;
+    };
+
     static constexpr uint32_t MakeCanId(CanPriority priority, CanCategory category, CanMessageType messageType, uint16_t nodeId)
     {
         return (static_cast<uint32_t>(priority) << canIdPriorityShift) |
@@ -133,7 +165,4 @@ namespace services
     static constexpr int32_t canSpeedScale = 1000;
     static constexpr int32_t canPositionScale = 10000;
     static constexpr int32_t canPidGainScale = 1000;
-    static constexpr int32_t canResistanceScale = 100000;
-    static constexpr int32_t canInductanceScale = 10000000;
-    static constexpr int32_t canFluxScale = 1000000;
 }

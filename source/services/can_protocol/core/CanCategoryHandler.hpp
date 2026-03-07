@@ -1,7 +1,7 @@
 #pragma once
 
 #include "hal/interfaces/Can.hpp"
-#include "source/services/can_protocol/CanProtocolDefinitions.hpp"
+#include "source/services/can_protocol/core/CanProtocolDefinitions.hpp"
 
 namespace services
 {

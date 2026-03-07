@@ -1,0 +1,72 @@
+#pragma once
+
+#include "hal/interfaces/Can.hpp"
+#include "infra/util/BoundedDeque.hpp"
+#include "infra/util/Function.hpp"
+#include "source/services/can_protocol/client/CanProtocolClient.hpp"
+#include "source/services/can_protocol/core/CanFrameCodec.hpp"
+#include <cstdint>
+
+namespace services
+{
+    class CanProtocolClientImpl
+        : public CanProtocolClient
+    {
+    public:
+        CanProtocolClientImpl(hal::Can& can, const Config& config);
+
+        void SetNodeId(uint16_t nodeId) override;
+        uint16_t NodeId() const override;
+
+        void SendStartMotor(const infra::Function<void()>& onDone) override;
+        void SendStopMotor(const infra::Function<void()>& onDone) override;
+        void SendEmergencyStop(const infra::Function<void()>& onDone) override;
+        void SendSetControlMode(CanControlMode mode, const infra::Function<void()>& onDone) override;
+        void SendSetTorqueSetpoint(float idCurrent, float iqCurrent, const infra::Function<void()>& onDone) override;
+        void SendSetSpeedSetpoint(float speedRadPerSec, const infra::Function<void()>& onDone) override;
+        void SendSetPositionSetpoint(float positionRad, const infra::Function<void()>& onDone) override;
+
+        void SendSetCurrentIdPid(float kp, float ki, float kd, const infra::Function<void()>& onDone) override;
+        void SendSetCurrentIqPid(float kp, float ki, float kd, const infra::Function<void()>& onDone) override;
+        void SendSetSpeedPid(float kp, float ki, float kd, const infra::Function<void()>& onDone) override;
+        void SendSetPositionPid(float kp, float ki, float kd, const infra::Function<void()>& onDone) override;
+
+        void SendSetSupplyVoltage(float volts, const infra::Function<void()>& onDone) override;
+        void SendSetMaxCurrent(float amps, const infra::Function<void()>& onDone) override;
+
+        void RequestData(DataRequestFlags flags, const infra::Function<void()>& onDone) override;
+
+    private:
+        void ProcessReceivedMessage(hal::Can::Id id, const hal::Can::Message& data);
+
+        struct PendingFrame
+        {
+            hal::Can::Id id;
+            hal::Can::Message data;
+            infra::Function<void()> onDone;
+        };
+
+        void SendFrame(CanPriority priority, CanCategory category, CanMessageType type,
+            const hal::Can::Message& data, const infra::Function<void()>& onDone);
+        void SendNextQueued();
+
+        void HandleTelemetry(CanMessageType type, const hal::Can::Message& data);
+        void HandleMotorStatusTelemetry(const hal::Can::Message& data);
+        void HandleCurrentMeasurementTelemetry(const hal::Can::Message& data);
+        void HandleSpeedPositionTelemetry(const hal::Can::Message& data);
+        void HandleBusVoltageTelemetry(const hal::Can::Message& data);
+        void HandleFaultEventTelemetry(const hal::Can::Message& data);
+
+        void HandleSystemMessage(CanMessageType type, const hal::Can::Message& data);
+        void HandleCommandAck(const hal::Can::Message& data);
+
+        uint8_t NextSequence();
+
+        hal::Can& can;
+        Config config;
+        uint8_t sequenceCounter = 0;
+        bool sendInProgress = false;
+        infra::Function<void()> currentOnDone;
+        infra::BoundedDeque<PendingFrame>::WithMaxSize<8> sendQueue;
+    };
+}

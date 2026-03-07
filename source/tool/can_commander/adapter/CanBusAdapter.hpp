@@ -1,5 +1,6 @@
 #pragma once
 
+#include "hal/interfaces/Can.hpp"
 #include "infra/util/BoundedString.hpp"
 #include "infra/util/BoundedVector.hpp"
 #include "infra/util/Observer.hpp"
@@ -20,13 +21,14 @@ namespace tool
     public:
         using infra::SingleObserver<CanBusAdapterObserver, CanBusAdapter>::SingleObserver;
 
-        virtual void OnFrameReceived(uint32_t id, const CanFrame& data) = 0;
+        virtual void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) = 0;
         virtual void OnError(infra::BoundedConstString message) = 0;
         virtual void OnConnectionChanged(bool connected) = 0;
     };
 
     class CanBusAdapter
-        : public infra::Subject<CanBusAdapterObserver>
+        : public hal::Can
+        , public infra::Subject<CanBusAdapterObserver>
     {
     public:
         CanBusAdapter() = default;
@@ -38,21 +40,15 @@ namespace tool
         virtual bool Connect(infra::BoundedConstString interfaceName, uint32_t bitrate) = 0;
         virtual void Disconnect() = 0;
         virtual bool IsConnected() const = 0;
-        virtual bool Send(uint32_t id, const CanFrame& data) = 0;
 
         virtual int FileDescriptor() const = 0;
         virtual void ProcessReadEvent() = 0;
 
-        // Returns a list of available adapter interfaces on this platform.
-        // Returns an empty list on platforms that don't support enumeration.
         virtual std::vector<std::string> AvailableInterfaces() const
         {
             return {};
         }
 
-        // Throws std::runtime_error if the platform CAN driver infrastructure
-        // is not available (e.g. no SocketCAN kernel module on Linux, no
-        // PCAN/Kvaser DLL and no COM ports on Windows).
         virtual void ValidateDriverAvailability() const
         {}
     };

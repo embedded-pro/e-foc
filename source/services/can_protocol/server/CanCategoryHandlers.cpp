@@ -1,8 +1,8 @@
-#include "source/services/can_protocol/CanCategoryHandlers.hpp"
+#include "source/services/can_protocol/server/CanCategoryHandlers.hpp"
 
 namespace services
 {
-    CanMotorControlHandler::CanMotorControlHandler(CanProtocolHandler& protocol)
+    CanMotorControlHandler::CanMotorControlHandler(CanProtocolServer& protocol)
         : protocol(protocol)
     {}
 
@@ -137,7 +137,7 @@ namespace services
         protocol.SendCommandAck(CanCategory::motorControl, CanMessageType::setPositionSetpoint, CanAckStatus::success);
     }
 
-    CanPidTuningHandler::CanPidTuningHandler(CanProtocolHandler& protocol)
+    CanPidTuningHandler::CanPidTuningHandler(CanProtocolServer& protocol)
         : protocol(protocol)
     {}
 
@@ -187,94 +187,7 @@ namespace services
         protocol.SendCommandAck(CanCategory::pidTuning, messageType, CanAckStatus::success);
     }
 
-    CanMotorParametersHandler::CanMotorParametersHandler(CanProtocolHandler& protocol)
-        : protocol(protocol)
-    {}
-
-    CanCategory CanMotorParametersHandler::Category() const
-    {
-        return CanCategory::motorParameters;
-    }
-
-    void CanMotorParametersHandler::Handle(CanMessageType messageType, const hal::Can::Message& data)
-    {
-        if (messageType == CanMessageType::setPolePairs)
-            HandleSetPolePairs(data);
-        else if (messageType == CanMessageType::setResistance)
-            HandleSetResistance(data);
-        else if (messageType == CanMessageType::setInductance)
-            HandleSetInductance(data);
-        else if (messageType == CanMessageType::setFluxLinkage)
-            HandleSetFluxLinkage(data);
-        else
-            protocol.SendCommandAck(CanCategory::motorParameters, messageType, CanAckStatus::unknownCommand);
-    }
-
-    void CanMotorParametersHandler::HandleSetPolePairs(const hal::Can::Message& data)
-    {
-        if (data.size() < 2)
-        {
-            protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setPolePairs, CanAckStatus::invalidPayload);
-            return;
-        }
-
-        uint8_t polePairs = data[1];
-        protocol.NotifyObservers([polePairs](auto& observer)
-            {
-                observer.OnPolePairsChanged(polePairs);
-            });
-        protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setPolePairs, CanAckStatus::success);
-    }
-
-    void CanMotorParametersHandler::HandleSetResistance(const hal::Can::Message& data)
-    {
-        if (data.size() < 5)
-        {
-            protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setResistance, CanAckStatus::invalidPayload);
-            return;
-        }
-
-        float value = CanFrameCodec::Fixed32ToFloat(CanFrameCodec::ReadInt32(data, 1), canResistanceScale);
-        protocol.NotifyObservers([value](auto& observer)
-            {
-                observer.OnResistanceChanged(value);
-            });
-        protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setResistance, CanAckStatus::success);
-    }
-
-    void CanMotorParametersHandler::HandleSetInductance(const hal::Can::Message& data)
-    {
-        if (data.size() < 5)
-        {
-            protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setInductance, CanAckStatus::invalidPayload);
-            return;
-        }
-
-        float value = CanFrameCodec::Fixed32ToFloat(CanFrameCodec::ReadInt32(data, 1), canInductanceScale);
-        protocol.NotifyObservers([value](auto& observer)
-            {
-                observer.OnInductanceChanged(value);
-            });
-        protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setInductance, CanAckStatus::success);
-    }
-
-    void CanMotorParametersHandler::HandleSetFluxLinkage(const hal::Can::Message& data)
-    {
-        if (data.size() < 5)
-        {
-            protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setFluxLinkage, CanAckStatus::invalidPayload);
-            return;
-        }
-
-        float value = CanFrameCodec::Fixed32ToFloat(CanFrameCodec::ReadInt32(data, 1), canFluxScale);
-        protocol.NotifyObservers([value](auto& observer)
-            {
-                observer.OnFluxLinkageChanged(value);
-            });
-        protocol.SendCommandAck(CanCategory::motorParameters, CanMessageType::setFluxLinkage, CanAckStatus::success);
-    }
-
-    CanSystemParametersHandler::CanSystemParametersHandler(CanProtocolHandler& protocol)
+    CanSystemParametersHandler::CanSystemParametersHandler(CanProtocolServer& protocol)
         : protocol(protocol)
     {}
 
@@ -316,7 +229,7 @@ namespace services
         protocol.SendCommandAck(CanCategory::systemParameters, messageType, CanAckStatus::success);
     }
 
-    CanSystemHandler::CanSystemHandler(CanProtocolHandler& protocol)
+    CanSystemHandler::CanSystemHandler(CanProtocolServer& protocol)
         : protocol(protocol)
     {}
 
@@ -334,20 +247,14 @@ namespace services
     {
         if (messageType == CanMessageType::heartbeat)
         {
-            uint8_t version = 0;
-            if (!data.empty())
-                version = data[0];
-            protocol.NotifyObservers([version](auto& observer)
-                {
-                    observer.OnHeartbeatReceived(version);
-                });
+            // Heartbeat handled internally - no observer notification
         }
-        else if (messageType == CanMessageType::requestStatus)
+        else if (messageType == CanMessageType::requestData)
         {
-            protocol.NotifyObservers([](auto& observer)
-                {
-                    observer.OnStatusRequested();
-                });
+            auto flags = DataRequestFlags::all;
+            if (!data.empty())
+                flags = static_cast<DataRequestFlags>(data[0]);
+            protocol.HandleDataRequest(flags);
         }
         else
             protocol.SendCommandAck(CanCategory::system, messageType, CanAckStatus::unknownCommand);

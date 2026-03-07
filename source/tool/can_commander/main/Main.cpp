@@ -17,7 +17,7 @@ int main(int argc, char* argv[])
         qputenv("DISPLAY", "host.docker.internal:0.0");
 
     QApplication app(argc, argv);
-    app.setApplicationName("e-foc CAN Commander");
+    QApplication::setApplicationName("e-foc CAN Commander");
 
 #ifdef __linux__
     tool::SocketCanAdapter adapter;

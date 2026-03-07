@@ -47,7 +47,9 @@ namespace tool
         bool Connect(infra::BoundedConstString interfaceName, uint32_t bitrate) override;
         void Disconnect() override;
         bool IsConnected() const override;
-        bool Send(uint32_t id, const CanFrame& data) override;
+
+        void SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion) override;
+        void ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction) override;
 
         int FileDescriptor() const override
         {
@@ -125,6 +127,7 @@ namespace tool
 
         std::mutex eventMutex;
         std::queue<Event> eventQueue;
+        infra::Function<void(Id, const Message&)> receiveCallback;
     };
 }
 

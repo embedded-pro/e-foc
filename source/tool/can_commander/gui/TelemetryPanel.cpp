@@ -37,9 +37,7 @@ namespace tool
 
         auto* systemGroup = new QGroupBox("System");
         auto* systemLayout = new QFormLayout(systemGroup);
-        heartbeatLabel = new QLabel("---");
         lastAckLabel = new QLabel("---");
-        systemLayout->addRow("Heartbeat:", heartbeatLabel);
         systemLayout->addRow("Last Ack:", lastAckLabel);
         layout->addWidget(systemGroup);
 
@@ -74,11 +72,6 @@ namespace tool
     {
         faultLabel->setText(FaultCodeName(fault));
         faultLabel->setStyleSheet("color: red; font-weight: bold;");
-    }
-
-    void TelemetryPanel::OnHeartbeat(uint8_t protocolVersion)
-    {
-        heartbeatLabel->setText("v" + QString::number(protocolVersion));
     }
 
     void TelemetryPanel::OnCommandAck(CanCategory category, CanMessageType command, CanAckStatus status)
@@ -177,8 +170,6 @@ namespace tool
                 return "Motor Control";
             case CanCategory::pidTuning:
                 return "PID Tuning";
-            case CanCategory::motorParameters:
-                return "Motor Params";
             case CanCategory::systemParameters:
                 return "System Params";
             case CanCategory::telemetry:

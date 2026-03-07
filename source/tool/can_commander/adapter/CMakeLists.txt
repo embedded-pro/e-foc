@@ -7,6 +7,7 @@ target_include_directories(e_foc.tool.can_commander.adapter PUBLIC
 
 target_link_libraries(e_foc.tool.can_commander.adapter PUBLIC
     infra.util
+    hal.interfaces
 )
 
 target_sources(e_foc.tool.can_commander.adapter PRIVATE

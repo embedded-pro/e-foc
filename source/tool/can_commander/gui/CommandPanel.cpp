@@ -132,7 +132,7 @@ namespace tool
         auto* queryButton = new QPushButton("Query Controller Status");
         layout->addWidget(queryButton);
         commandButtons.push_back(queryButton);
-        connect(queryButton, &QPushButton::clicked, this, &CommandPanel::RequestStatusRequested);
+        connect(queryButton, &QPushButton::clicked, this, &CommandPanel::RequestDataRequested);
 
         layout->addStretch();
         return page;
@@ -222,66 +222,6 @@ namespace tool
         auto* page = new QWidget();
         auto* layout = new QVBoxLayout(page);
 
-        auto* motorGroup = new QGroupBox("Motor Parameters");
-        auto* motorLayout = new QFormLayout(motorGroup);
-
-        auto* polePairsSpin = new QSpinBox();
-        polePairsSpin->setRange(1, 255);
-        polePairsSpin->setValue(7);
-        motorLayout->addRow("Pole Pairs:", polePairsSpin);
-        auto* polePairsButton = new QPushButton("Set");
-        motorLayout->addRow(polePairsButton);
-
-        commandButtons.push_back(polePairsButton);
-        connect(polePairsButton, &QPushButton::clicked, [this, polePairsSpin]()
-            {
-                emit SetPolePairsRequested(static_cast<uint8_t>(polePairsSpin->value()));
-            });
-
-        auto* resistanceSpin = new QDoubleSpinBox();
-        resistanceSpin->setRange(0.0, 100.0);
-        resistanceSpin->setDecimals(5);
-        resistanceSpin->setSuffix(" Ω");
-        motorLayout->addRow("Resistance:", resistanceSpin);
-        auto* resistanceButton = new QPushButton("Set");
-        motorLayout->addRow(resistanceButton);
-
-        commandButtons.push_back(resistanceButton);
-        connect(resistanceButton, &QPushButton::clicked, [this, resistanceSpin]()
-            {
-                emit SetResistanceRequested(static_cast<float>(resistanceSpin->value()));
-            });
-
-        auto* inductanceSpin = new QDoubleSpinBox();
-        inductanceSpin->setRange(0.0, 1.0);
-        inductanceSpin->setDecimals(7);
-        inductanceSpin->setSuffix(" H");
-        motorLayout->addRow("Inductance:", inductanceSpin);
-        auto* inductanceButton = new QPushButton("Set");
-        motorLayout->addRow(inductanceButton);
-
-        commandButtons.push_back(inductanceButton);
-        connect(inductanceButton, &QPushButton::clicked, [this, inductanceSpin]()
-            {
-                emit SetInductanceRequested(static_cast<float>(inductanceSpin->value()));
-            });
-
-        auto* fluxSpin = new QDoubleSpinBox();
-        fluxSpin->setRange(0.0, 10.0);
-        fluxSpin->setDecimals(6);
-        fluxSpin->setSuffix(" Wb");
-        motorLayout->addRow("Flux Linkage:", fluxSpin);
-        auto* fluxButton = new QPushButton("Set");
-        motorLayout->addRow(fluxButton);
-
-        commandButtons.push_back(fluxButton);
-        connect(fluxButton, &QPushButton::clicked, [this, fluxSpin]()
-            {
-                emit SetFluxLinkageRequested(static_cast<float>(fluxSpin->value()));
-            });
-
-        layout->addWidget(motorGroup);
-
         auto* systemGroup = new QGroupBox("System Parameters");
         auto* systemLayout = new QFormLayout(systemGroup);
 
@@ -316,11 +256,6 @@ namespace tool
             });
 
         layout->addWidget(systemGroup);
-
-        auto* heartbeatButton = new QPushButton("Send Heartbeat");
-        layout->addWidget(heartbeatButton);
-        commandButtons.push_back(heartbeatButton);
-        connect(heartbeatButton, &QPushButton::clicked, this, &CommandPanel::SendHeartbeatRequested);
 
         layout->addStretch();
         return page;

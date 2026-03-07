@@ -36,7 +36,6 @@ namespace tool
         void OnSpeedPositionReceived(float speed, float position) override;
         void OnBusVoltageReceived(float voltage) override;
         void OnFaultEventReceived(services::CanFaultCode fault) override;
-        void OnHeartbeatReceived(uint8_t protocolVersion) override;
         void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) override;
         void OnConnectionChanged(bool connected) override;
         void OnAdapterError(infra::BoundedConstString message) override;

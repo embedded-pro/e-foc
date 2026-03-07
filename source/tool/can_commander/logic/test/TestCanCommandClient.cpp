@@ -1,5 +1,5 @@
-#include "source/services/can_protocol/CanFrameCodec.hpp"
-#include "source/services/can_protocol/CanProtocolDefinitions.hpp"
+#include "source/services/can_protocol/core/CanFrameCodec.hpp"
+#include "source/services/can_protocol/core/CanProtocolDefinitions.hpp"
 #include "source/tool/can_commander/logic/test/CanBusAdapterMock.hpp"
 #include "source/tool/can_commander/logic/test/CanCommandClientObserverMock.hpp"
 #include "gmock/gmock.h"
@@ -10,41 +10,54 @@ namespace
     using namespace tool;
     using namespace services;
     using testing::_;
-    using testing::Eq;
+    using testing::Invoke;
     using testing::NiceMock;
 
     class TestCanCommandClient : public testing::Test
     {
     public:
-        TestCanCommandClient()
-            : client(adapter)
-            , observer(client)
-        {}
-
-        void SimulateRx(uint32_t id, const CanFrame& data)
+        struct FixtureInit
         {
-            adapter.NotifyObservers([id, &data](auto& obs)
-                {
-                    obs.OnFrameReceived(id, data);
-                });
+            FixtureInit(NiceMock<CanBusAdapterMock>& adapter,
+                infra::Function<void(hal::Can::Id, const hal::Can::Message&)>& receiveCallback)
+            {
+                EXPECT_CALL(adapter, ReceiveData(_)).WillOnce([&receiveCallback](const auto& callback)
+                    {
+                        receiveCallback = callback;
+                    });
+                ON_CALL(adapter, SendData(_, _, _))
+                    .WillByDefault(Invoke([](hal::Can::Id, const hal::Can::Message&, const infra::Function<void(bool)>& cb)
+                        {
+                            cb(true);
+                        }));
+            }
+        };
+
+        void SimulateRx(uint32_t rawId, const CanFrame& data)
+        {
+            if (receiveCallback)
+                receiveCallback(hal::Can::Id::Create29BitId(rawId), data);
         }
 
         NiceMock<CanBusAdapterMock> adapter;
-        CanCommandClient client;
-        NiceMock<CanCommandClientObserverMock> observer;
+        infra::Function<void(hal::Can::Id, const hal::Can::Message&)> receiveCallback;
+        FixtureInit fixtureInit{ adapter, receiveCallback };
+        CanCommandClient client{ adapter };
+        NiceMock<CanCommandClientObserverMock> observer{ client };
     };
 
     // ---------- SendStartMotor ----------
 
     TEST_F(TestCanCommandClient, send_start_motor_sends_correct_frame)
     {
-        uint32_t expectedId = MakeCanId(CanPriority::command, CanCategory::motorControl, CanMessageType::startMotor, 1);
+        uint32_t expectedRawId = MakeCanId(CanPriority::command, CanCategory::motorControl, CanMessageType::startMotor, 1);
 
-        EXPECT_CALL(adapter, Send(Eq(expectedId), _)).WillOnce([](uint32_t, const CanFrame& data)
+        EXPECT_CALL(adapter, SendData(_, _, _)).WillOnce([expectedRawId](hal::Can::Id id, const hal::Can::Message& data, const infra::Function<void(bool)>& cb)
             {
+                EXPECT_EQ(id.Get29BitId(), expectedRawId);
                 EXPECT_EQ(data.size(), 1u);
                 EXPECT_EQ(data[0], 1);
-                return true;
+                cb(true);
             });
 
         client.SendStartMotor();
@@ -57,22 +70,17 @@ namespace
         EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClient, send_start_motor_logs_tx_frame)
-    {
-        EXPECT_CALL(observer, OnFrameLog(true, _, _));
-        client.SendStartMotor();
-    }
-
     // ---------- SendStopMotor ----------
 
     TEST_F(TestCanCommandClient, send_stop_motor_sends_correct_frame)
     {
-        uint32_t expectedId = MakeCanId(CanPriority::command, CanCategory::motorControl, CanMessageType::stopMotor, 1);
+        uint32_t expectedRawId = MakeCanId(CanPriority::command, CanCategory::motorControl, CanMessageType::stopMotor, 1);
 
-        EXPECT_CALL(adapter, Send(Eq(expectedId), _)).WillOnce([](uint32_t, const CanFrame& data)
+        EXPECT_CALL(adapter, SendData(_, _, _)).WillOnce([expectedRawId](hal::Can::Id id, const hal::Can::Message& data, const infra::Function<void(bool)>& cb)
             {
+                EXPECT_EQ(id.Get29BitId(), expectedRawId);
                 EXPECT_EQ(data.size(), 1u);
-                return true;
+                cb(true);
             });
 
         client.SendStopMotor();
@@ -82,13 +90,14 @@ namespace
 
     TEST_F(TestCanCommandClient, send_emergency_stop_uses_emergency_priority)
     {
-        uint32_t expectedId = MakeCanId(CanPriority::emergency, CanCategory::motorControl, CanMessageType::emergencyStop, 1);
+        uint32_t expectedRawId = MakeCanId(CanPriority::emergency, CanCategory::motorControl, CanMessageType::emergencyStop, 1);
 
-        EXPECT_CALL(adapter, Send(Eq(expectedId), _)).WillOnce([](uint32_t, const CanFrame& data)
+        EXPECT_CALL(adapter, SendData(_, _, _)).WillOnce([expectedRawId](hal::Can::Id id, const hal::Can::Message& data, const infra::Function<void(bool)>& cb)
             {
+                EXPECT_EQ(id.Get29BitId(), expectedRawId);
                 EXPECT_EQ(data.size(), 1u);
                 EXPECT_EQ(data[0], 0);
-                return true;
+                cb(true);
             });
 
         client.SendEmergencyStop();
@@ -98,11 +107,11 @@ namespace
 
     TEST_F(TestCanCommandClient, send_set_control_mode_encodes_mode_byte)
     {
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([](uint32_t, const CanFrame& data)
+        EXPECT_CALL(adapter, SendData(_, _, _)).WillOnce([](hal::Can::Id, const hal::Can::Message& data, const infra::Function<void(bool)>& cb)
             {
                 EXPECT_EQ(data.size(), 2u);
                 EXPECT_EQ(data[1], static_cast<uint8_t>(CanControlMode::speed));
-                return true;
+                cb(true);
             });
 
         client.SendSetControlMode(CanControlMode::speed);
@@ -115,7 +124,7 @@ namespace
         float idCurrent = 1.5f;
         float iqCurrent = -2.0f;
 
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([idCurrent, iqCurrent](uint32_t, const CanFrame& data)
+        EXPECT_CALL(adapter, SendData(_, _, _)).WillOnce([idCurrent, iqCurrent](hal::Can::Id, const hal::Can::Message& data, const infra::Function<void(bool)>& cb)
             {
                 EXPECT_EQ(data.size(), 5u);
 
@@ -126,7 +135,7 @@ namespace
                 EXPECT_EQ(data[2], static_cast<uint8_t>(idFixed & 0xFF));
                 EXPECT_EQ(data[3], static_cast<uint8_t>(iqFixed >> 8));
                 EXPECT_EQ(data[4], static_cast<uint8_t>(iqFixed & 0xFF));
-                return true;
+                cb(true);
             });
 
         client.SendSetTorqueSetpoint(idCurrent, iqCurrent);
@@ -138,7 +147,7 @@ namespace
     {
         float speed = 10.5f;
 
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([speed](uint32_t, const CanFrame& data)
+        EXPECT_CALL(adapter, SendData(_, _, _)).WillOnce([speed](hal::Can::Id, const hal::Can::Message& data, const infra::Function<void(bool)>& cb)
             {
                 EXPECT_EQ(data.size(), 5u);
 
@@ -147,7 +156,7 @@ namespace
                 EXPECT_EQ(data[2], static_cast<uint8_t>((fixed >> 16) & 0xFF));
                 EXPECT_EQ(data[3], static_cast<uint8_t>((fixed >> 8) & 0xFF));
                 EXPECT_EQ(data[4], static_cast<uint8_t>(fixed & 0xFF));
-                return true;
+                cb(true);
             });
 
         client.SendSetSpeedSetpoint(speed);
@@ -159,7 +168,7 @@ namespace
     {
         float pos = 3.14f;
 
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([pos](uint32_t, const CanFrame& data)
+        EXPECT_CALL(adapter, SendData(_, _, _)).WillOnce([pos](hal::Can::Id, const hal::Can::Message& data, const infra::Function<void(bool)>& cb)
             {
                 EXPECT_EQ(data.size(), 5u);
 
@@ -168,7 +177,7 @@ namespace
                 EXPECT_EQ(data[2], static_cast<uint8_t>((fixed >> 16) & 0xFF));
                 EXPECT_EQ(data[3], static_cast<uint8_t>((fixed >> 8) & 0xFF));
                 EXPECT_EQ(data[4], static_cast<uint8_t>(fixed & 0xFF));
-                return true;
+                cb(true);
             });
 
         client.SendSetPositionSetpoint(pos);
@@ -178,12 +187,12 @@ namespace
 
     TEST_F(TestCanCommandClient, send_set_current_id_pid_encodes_three_gains)
     {
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([](uint32_t id, const CanFrame& data)
+        EXPECT_CALL(adapter, SendData(_, _, _)).WillOnce([](hal::Can::Id id, const hal::Can::Message& data, const infra::Function<void(bool)>& cb)
             {
-                EXPECT_EQ(ExtractCanCategory(id), CanCategory::pidTuning);
-                EXPECT_EQ(ExtractCanMessageType(id), CanMessageType::setCurrentIdPid);
+                EXPECT_EQ(ExtractCanCategory(id.Get29BitId()), CanCategory::pidTuning);
+                EXPECT_EQ(ExtractCanMessageType(id.Get29BitId()), CanMessageType::setCurrentIdPid);
                 EXPECT_EQ(data.size(), 7u);
-                return true;
+                cb(true);
             });
 
         client.SendSetCurrentIdPid(1.0f, 0.5f, 0.1f);
@@ -191,10 +200,10 @@ namespace
 
     TEST_F(TestCanCommandClient, send_set_current_iq_pid_sends_correct_type)
     {
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([](uint32_t id, const CanFrame&)
+        EXPECT_CALL(adapter, SendData(_, _, _)).WillOnce([](hal::Can::Id id, const hal::Can::Message&, const infra::Function<void(bool)>& cb)
             {
-                EXPECT_EQ(ExtractCanMessageType(id), CanMessageType::setCurrentIqPid);
-                return true;
+                EXPECT_EQ(ExtractCanMessageType(id.Get29BitId()), CanMessageType::setCurrentIqPid);
+                cb(true);
             });
 
         client.SendSetCurrentIqPid(1.0f, 0.5f, 0.1f);
@@ -202,10 +211,10 @@ namespace
 
     TEST_F(TestCanCommandClient, send_set_speed_pid_sends_correct_type)
     {
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([](uint32_t id, const CanFrame&)
+        EXPECT_CALL(adapter, SendData(_, _, _)).WillOnce([](hal::Can::Id id, const hal::Can::Message&, const infra::Function<void(bool)>& cb)
             {
-                EXPECT_EQ(ExtractCanMessageType(id), CanMessageType::setSpeedPid);
-                return true;
+                EXPECT_EQ(ExtractCanMessageType(id.Get29BitId()), CanMessageType::setSpeedPid);
+                cb(true);
             });
 
         client.SendSetSpeedPid(1.0f, 0.5f, 0.1f);
@@ -213,75 +222,24 @@ namespace
 
     TEST_F(TestCanCommandClient, send_set_position_pid_sends_correct_type)
     {
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([](uint32_t id, const CanFrame&)
+        EXPECT_CALL(adapter, SendData(_, _, _)).WillOnce([](hal::Can::Id id, const hal::Can::Message&, const infra::Function<void(bool)>& cb)
             {
-                EXPECT_EQ(ExtractCanMessageType(id), CanMessageType::setPositionPid);
-                return true;
+                EXPECT_EQ(ExtractCanMessageType(id.Get29BitId()), CanMessageType::setPositionPid);
+                cb(true);
             });
 
         client.SendSetPositionPid(1.0f, 0.5f, 0.1f);
-    }
-
-    // ---------- Motor parameters ----------
-
-    TEST_F(TestCanCommandClient, send_set_pole_pairs_encodes_byte)
-    {
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([](uint32_t id, const CanFrame& data)
-            {
-                EXPECT_EQ(ExtractCanMessageType(id), CanMessageType::setPolePairs);
-                EXPECT_EQ(data.size(), 2u);
-                EXPECT_EQ(data[1], 7);
-                return true;
-            });
-
-        client.SendSetPolePairs(7);
-    }
-
-    TEST_F(TestCanCommandClient, send_set_resistance_encodes_32bit)
-    {
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([](uint32_t id, const CanFrame& data)
-            {
-                EXPECT_EQ(ExtractCanMessageType(id), CanMessageType::setResistance);
-                EXPECT_EQ(data.size(), 5u);
-                return true;
-            });
-
-        client.SendSetResistance(0.5f);
-    }
-
-    TEST_F(TestCanCommandClient, send_set_inductance_encodes_32bit)
-    {
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([](uint32_t id, const CanFrame& data)
-            {
-                EXPECT_EQ(ExtractCanMessageType(id), CanMessageType::setInductance);
-                EXPECT_EQ(data.size(), 5u);
-                return true;
-            });
-
-        client.SendSetInductance(0.001f);
-    }
-
-    TEST_F(TestCanCommandClient, send_set_flux_linkage_encodes_32bit)
-    {
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([](uint32_t id, const CanFrame& data)
-            {
-                EXPECT_EQ(ExtractCanMessageType(id), CanMessageType::setFluxLinkage);
-                EXPECT_EQ(data.size(), 5u);
-                return true;
-            });
-
-        client.SendSetFluxLinkage(0.01f);
     }
 
     // ---------- System parameters ----------
 
     TEST_F(TestCanCommandClient, send_set_supply_voltage_encodes_16bit)
     {
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([](uint32_t id, const CanFrame& data)
+        EXPECT_CALL(adapter, SendData(_, _, _)).WillOnce([](hal::Can::Id id, const hal::Can::Message& data, const infra::Function<void(bool)>& cb)
             {
-                EXPECT_EQ(ExtractCanMessageType(id), CanMessageType::setSupplyVoltage);
+                EXPECT_EQ(ExtractCanMessageType(id.Get29BitId()), CanMessageType::setSupplyVoltage);
                 EXPECT_EQ(data.size(), 3u);
-                return true;
+                cb(true);
             });
 
         client.SendSetSupplyVoltage(24.0f);
@@ -289,49 +247,29 @@ namespace
 
     TEST_F(TestCanCommandClient, send_set_max_current_encodes_16bit)
     {
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([](uint32_t id, const CanFrame& data)
+        EXPECT_CALL(adapter, SendData(_, _, _)).WillOnce([](hal::Can::Id id, const hal::Can::Message& data, const infra::Function<void(bool)>& cb)
             {
-                EXPECT_EQ(ExtractCanMessageType(id), CanMessageType::setMaxCurrent);
+                EXPECT_EQ(ExtractCanMessageType(id.Get29BitId()), CanMessageType::setMaxCurrent);
                 EXPECT_EQ(data.size(), 3u);
-                return true;
+                cb(true);
             });
 
         client.SendSetMaxCurrent(10.0f);
     }
 
-    // ---------- Heartbeat and RequestStatus ----------
+    // ---------- RequestData ----------
 
-    TEST_F(TestCanCommandClient, send_heartbeat_uses_heartbeat_priority)
+    TEST_F(TestCanCommandClient, request_data_sends_flags_payload)
     {
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([](uint32_t id, const CanFrame& data)
+        EXPECT_CALL(adapter, SendData(_, _, _)).WillOnce([](hal::Can::Id id, const hal::Can::Message& data, const infra::Function<void(bool)>& cb)
             {
-                EXPECT_EQ(ExtractCanPriority(id), CanPriority::heartbeat);
-                EXPECT_EQ(ExtractCanCategory(id), CanCategory::system);
+                EXPECT_EQ(ExtractCanMessageType(id.Get29BitId()), CanMessageType::requestData);
                 EXPECT_EQ(data.size(), 1u);
-                EXPECT_EQ(data[0], canProtocolVersion);
-                return true;
+                EXPECT_EQ(data[0], static_cast<uint8_t>(DataRequestFlags::all));
+                cb(true);
             });
 
-        client.SendHeartbeat();
-    }
-
-    TEST_F(TestCanCommandClient, send_heartbeat_does_not_set_busy)
-    {
-        EXPECT_CALL(observer, OnBusyChanged(_)).Times(0);
-        client.SendHeartbeat();
-        EXPECT_FALSE(client.IsBusy());
-    }
-
-    TEST_F(TestCanCommandClient, send_request_status_sends_empty_payload)
-    {
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([](uint32_t id, const CanFrame& data)
-            {
-                EXPECT_EQ(ExtractCanMessageType(id), CanMessageType::requestStatus);
-                EXPECT_EQ(data.size(), 0u);
-                return true;
-            });
-
-        client.SendRequestStatus();
+        client.RequestData(DataRequestFlags::all);
     }
 
     // ---------- Node ID ----------
@@ -341,10 +279,10 @@ namespace
         client.SetNodeId(42);
         EXPECT_EQ(client.NodeId(), 42);
 
-        EXPECT_CALL(adapter, Send(_, _)).WillOnce([](uint32_t id, const CanFrame&)
+        EXPECT_CALL(adapter, SendData(_, _, _)).WillOnce([](hal::Can::Id id, const hal::Can::Message&, const infra::Function<void(bool)>& cb)
             {
-                EXPECT_EQ(ExtractCanNodeId(id), 42);
-                return true;
+                EXPECT_EQ(ExtractCanNodeId(id.Get29BitId()), 42);
+                cb(true);
             });
 
         client.SendStartMotor();
@@ -356,10 +294,10 @@ namespace
     {
         std::vector<uint8_t> sequences;
 
-        EXPECT_CALL(adapter, Send(_, _)).Times(3).WillRepeatedly([&sequences](uint32_t, const CanFrame& data)
+        EXPECT_CALL(adapter, SendData(_, _, _)).Times(3).WillRepeatedly([&sequences](hal::Can::Id, const hal::Can::Message& data, const infra::Function<void(bool)>& cb)
             {
                 sequences.push_back(data[0]);
-                return true;
+                cb(true);
             });
 
         client.SendStartMotor();
@@ -504,32 +442,19 @@ namespace
         SimulateRx(id, data);
     }
 
-    // ---------- System: heartbeat received ----------
+    // ---------- Frame log relay ----------
 
-    TEST_F(TestCanCommandClient, heartbeat_received_decoded)
-    {
-        CanFrame data;
-        data.push_back(canProtocolVersion);
-
-        uint32_t id = MakeCanId(CanPriority::heartbeat, CanCategory::system, CanMessageType::heartbeat, 1);
-
-        EXPECT_CALL(observer, OnHeartbeatReceived(canProtocolVersion));
-
-        SimulateRx(id, data);
-    }
-
-    // ---------- Rx frame log ----------
-
-    TEST_F(TestCanCommandClient, received_frames_are_logged)
+    TEST_F(TestCanCommandClient, frame_log_relayed_from_adapter)
     {
         CanFrame data;
         data.push_back(0x42);
 
-        uint32_t id = MakeCanId(CanPriority::telemetry, CanCategory::telemetry, CanMessageType::busVoltage, 1);
+        EXPECT_CALL(observer, OnFrameLog(false, 0x12345u, _));
 
-        EXPECT_CALL(observer, OnFrameLog(false, id, _));
-
-        SimulateRx(id, data);
+        adapter.NotifyObservers([&data](auto& obs)
+            {
+                obs.OnFrameLog(false, 0x12345u, data);
+            });
     }
 
     // ---------- Adapter event relay ----------

@@ -1,4 +1,4 @@
-#include "source/services/can_protocol/CanFrameCodec.hpp"
+#include "source/services/can_protocol/core/CanFrameCodec.hpp"
 #include <cmath>
 
 namespace services

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/services/can_protocol/CanProtocolDefinitions.hpp"
+#include "source/services/can_protocol/core/CanProtocolDefinitions.hpp"
 #include <QGroupBox>
 #include <QLabel>
 #include <QWidget>
@@ -20,7 +20,6 @@ namespace tool
         void OnSpeedPosition(float speed, float position);
         void OnBusVoltage(float voltage);
         void OnFaultEvent(services::CanFaultCode fault);
-        void OnHeartbeat(uint8_t protocolVersion);
         void OnCommandAck(services::CanCategory category, services::CanMessageType command, services::CanAckStatus status);
 
     private:
@@ -38,7 +37,6 @@ namespace tool
         QLabel* speedLabel;
         QLabel* positionLabel;
         QLabel* busVoltageLabel;
-        QLabel* heartbeatLabel;
         QLabel* lastAckLabel;
     };
 }

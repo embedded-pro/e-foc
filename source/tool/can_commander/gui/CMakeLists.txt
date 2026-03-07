@@ -7,7 +7,7 @@ target_include_directories(e_foc.tool.can_commander.gui PUBLIC
 
 target_link_libraries(e_foc.tool.can_commander.gui PUBLIC
     Qt6::Widgets
-    e_foc.services.can_protocol
+    e_foc.services.can_protocol.core
     e_foc.tool.can_commander.adapter
     e_foc.tool.can_commander.logic
 )

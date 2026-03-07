@@ -242,22 +242,46 @@ namespace tool
     // -----------------------------------------------------------------------
     // Send
     // -----------------------------------------------------------------------
-    bool WindowsCanAdapter::Send(uint32_t id, const CanFrame& data)
+    void WindowsCanAdapter::SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion)
     {
         if (!IsConnected())
-            return false;
+        {
+            actionOnCompletion(false);
+            return;
+        }
+
+        uint32_t rawId = id.Get29BitId();
+        bool success = false;
 
         switch (backend)
         {
             case WindowsCanBackend::pcan:
-                return SendPcan(id, data);
+                success = SendPcan(rawId, data);
+                break;
             case WindowsCanBackend::kvaser:
-                return SendKvaser(id, data);
+                success = SendKvaser(rawId, data);
+                break;
             case WindowsCanBackend::canable:
-                return SendCanable(id, data);
+                success = SendCanable(rawId, data);
+                break;
             default:
-                return false;
+                break;
         }
+
+        if (success)
+        {
+            NotifyObservers([rawId, &data](auto& observer)
+                {
+                    observer.OnFrameLog(true, rawId, data);
+                });
+        }
+
+        actionOnCompletion(success);
+    }
+
+    void WindowsCanAdapter::ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction)
+    {
+        receiveCallback = receivedAction;
     }
 
     // -----------------------------------------------------------------------
@@ -280,8 +304,11 @@ namespace tool
             {
                 NotifyObservers([&ev](auto& obs)
                     {
-                        obs.OnFrameReceived(ev.id, ev.data);
+                        obs.OnFrameLog(false, ev.id, ev.data);
                     });
+
+                if (receiveCallback)
+                    receiveCallback(hal::Can::Id::Create29BitId(ev.id), ev.data);
             }
             else
             {

@@ -125,27 +125,6 @@ namespace tool
                 timeoutTimer.start(2000);
             });
 
-        connect(commandPanel, &CommandPanel::SetPolePairsRequested, [this](uint8_t pp)
-            {
-                client.SendSetPolePairs(pp);
-                timeoutTimer.start(2000);
-            });
-        connect(commandPanel, &CommandPanel::SetResistanceRequested, [this](float r)
-            {
-                client.SendSetResistance(r);
-                timeoutTimer.start(2000);
-            });
-        connect(commandPanel, &CommandPanel::SetInductanceRequested, [this](float l)
-            {
-                client.SendSetInductance(l);
-                timeoutTimer.start(2000);
-            });
-        connect(commandPanel, &CommandPanel::SetFluxLinkageRequested, [this](float f)
-            {
-                client.SendSetFluxLinkage(f);
-                timeoutTimer.start(2000);
-            });
-
         connect(commandPanel, &CommandPanel::SetSupplyVoltageRequested, [this](float v)
             {
                 client.SendSetSupplyVoltage(v);
@@ -157,13 +136,9 @@ namespace tool
                 timeoutTimer.start(2000);
             });
 
-        connect(commandPanel, &CommandPanel::SendHeartbeatRequested, [this]()
+        connect(commandPanel, &CommandPanel::RequestDataRequested, [this]()
             {
-                client.SendHeartbeat();
-            });
-        connect(commandPanel, &CommandPanel::RequestStatusRequested, [this]()
-            {
-                client.SendRequestStatus();
+                client.RequestData(services::DataRequestFlags::all);
             });
 
         connect(nodeIdSpin, &QSpinBox::valueChanged, [this](int value)
@@ -192,7 +167,7 @@ namespace tool
         if (connected)
         {
             SetupSocketNotifier();
-            client.SendRequestStatus();
+            client.RequestData(services::DataRequestFlags::all);
         }
         else
         {
@@ -251,11 +226,6 @@ namespace tool
     void MainWindow::OnFaultEventReceived(services::CanFaultCode fault)
     {
         telemetryPanel->OnFaultEvent(fault);
-    }
-
-    void MainWindow::OnHeartbeatReceived(uint8_t protocolVersion)
-    {
-        telemetryPanel->OnHeartbeat(protocolVersion);
     }
 
     void MainWindow::OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data)

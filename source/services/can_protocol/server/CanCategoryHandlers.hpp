@@ -1,9 +1,9 @@
 #pragma once
 
-#include "source/services/can_protocol/CanCategoryHandler.hpp"
-#include "source/services/can_protocol/CanFrameCodec.hpp"
-#include "source/services/can_protocol/CanProtocolDefinitions.hpp"
-#include "source/services/can_protocol/CanProtocolHandler.hpp"
+#include "source/services/can_protocol/core/CanCategoryHandler.hpp"
+#include "source/services/can_protocol/core/CanFrameCodec.hpp"
+#include "source/services/can_protocol/core/CanProtocolDefinitions.hpp"
+#include "source/services/can_protocol/server/CanProtocolServer.hpp"
 
 namespace services
 {
@@ -11,7 +11,7 @@ namespace services
         : public CanCategoryHandler
     {
     public:
-        explicit CanMotorControlHandler(CanProtocolHandler& protocol);
+        explicit CanMotorControlHandler(CanProtocolServer& protocol);
 
         CanCategory Category() const override;
         bool RequiresSequenceValidation() const override;
@@ -26,64 +26,46 @@ namespace services
         void HandleSetSpeedSetpoint(const hal::Can::Message& data);
         void HandleSetPositionSetpoint(const hal::Can::Message& data);
 
-        CanProtocolHandler& protocol;
+        CanProtocolServer& protocol;
     };
 
     class CanPidTuningHandler
         : public CanCategoryHandler
     {
     public:
-        explicit CanPidTuningHandler(CanProtocolHandler& protocol);
+        explicit CanPidTuningHandler(CanProtocolServer& protocol);
 
         CanCategory Category() const override;
         void Handle(CanMessageType messageType, const hal::Can::Message& data) override;
 
     private:
-        CanProtocolHandler& protocol;
-    };
-
-    class CanMotorParametersHandler
-        : public CanCategoryHandler
-    {
-    public:
-        explicit CanMotorParametersHandler(CanProtocolHandler& protocol);
-
-        CanCategory Category() const override;
-        void Handle(CanMessageType messageType, const hal::Can::Message& data) override;
-
-    private:
-        void HandleSetPolePairs(const hal::Can::Message& data);
-        void HandleSetResistance(const hal::Can::Message& data);
-        void HandleSetInductance(const hal::Can::Message& data);
-        void HandleSetFluxLinkage(const hal::Can::Message& data);
-
-        CanProtocolHandler& protocol;
+        CanProtocolServer& protocol;
     };
 
     class CanSystemParametersHandler
         : public CanCategoryHandler
     {
     public:
-        explicit CanSystemParametersHandler(CanProtocolHandler& protocol);
+        explicit CanSystemParametersHandler(CanProtocolServer& protocol);
 
         CanCategory Category() const override;
         void Handle(CanMessageType messageType, const hal::Can::Message& data) override;
 
     private:
-        CanProtocolHandler& protocol;
+        CanProtocolServer& protocol;
     };
 
     class CanSystemHandler
         : public CanCategoryHandler
     {
     public:
-        explicit CanSystemHandler(CanProtocolHandler& protocol);
+        explicit CanSystemHandler(CanProtocolServer& protocol);
 
         CanCategory Category() const override;
         bool RequiresSequenceValidation() const override;
         void Handle(CanMessageType messageType, const hal::Can::Message& data) override;
 
     private:
-        CanProtocolHandler& protocol;
+        CanProtocolServer& protocol;
     };
 }

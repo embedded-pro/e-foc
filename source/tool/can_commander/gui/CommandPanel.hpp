@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/services/can_protocol/CanProtocolDefinitions.hpp"
+#include "source/services/can_protocol/core/CanProtocolDefinitions.hpp"
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QGroupBox>
@@ -35,16 +35,10 @@ namespace tool
         void SetSpeedPidRequested(float kp, float ki, float kd);
         void SetPositionPidRequested(float kp, float ki, float kd);
 
-        void SetPolePairsRequested(uint8_t polePairs);
-        void SetResistanceRequested(float ohms);
-        void SetInductanceRequested(float henries);
-        void SetFluxLinkageRequested(float webers);
-
         void SetSupplyVoltageRequested(float volts);
         void SetMaxCurrentRequested(float amps);
 
-        void SendHeartbeatRequested();
-        void RequestStatusRequested();
+        void RequestDataRequested();
 
     public slots:
         void SetCommandsEnabled(bool enabled);

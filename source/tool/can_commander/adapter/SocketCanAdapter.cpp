@@ -136,28 +136,45 @@ namespace tool
         return socketDescriptor >= 0;
     }
 
-    bool SocketCanAdapter::Send(uint32_t id, const CanFrame& data)
+    void SocketCanAdapter::SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion)
     {
         if (!IsConnected())
-            return false;
+        {
+            actionOnCompletion(false);
+            return;
+        }
 
         struct can_frame frame;
         std::memset(&frame, 0, sizeof(frame));
-        frame.can_id = id | CAN_EFF_FLAG;
+        frame.can_id = id.Get29BitId() | CAN_EFF_FLAG;
         frame.can_dlc = static_cast<uint8_t>(std::min(data.size(), static_cast<std::size_t>(8)));
         std::memcpy(frame.data, data.data(), frame.can_dlc);
 
         auto bytesWritten = write(socketDescriptor, &frame, sizeof(frame));
-        if (bytesWritten != sizeof(frame))
+        bool success = (bytesWritten == sizeof(frame));
+
+        if (success)
+        {
+            uint32_t rawId = id.Get29BitId();
+            NotifyObservers([rawId, &data](auto& observer)
+                {
+                    observer.OnFrameLog(true, rawId, data);
+                });
+        }
+        else
         {
             NotifyObservers([](auto& observer)
                 {
                     observer.OnError("Failed to send CAN frame");
                 });
-            return false;
         }
 
-        return true;
+        actionOnCompletion(success);
+    }
+
+    void SocketCanAdapter::ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction)
+    {
+        receiveCallback = receivedAction;
     }
 
     int SocketCanAdapter::FileDescriptor() const
@@ -172,15 +189,18 @@ namespace tool
 
         if (bytesRead == sizeof(frame))
         {
-            uint32_t id = frame.can_id & CAN_EFF_MASK;
+            uint32_t rawId = frame.can_id & CAN_EFF_MASK;
             CanFrame data;
             for (uint8_t i = 0; i < frame.can_dlc && i < 8; ++i)
                 data.push_back(frame.data[i]);
 
-            NotifyObservers([id, &data](auto& observer)
+            NotifyObservers([rawId, &data](auto& observer)
                 {
-                    observer.OnFrameReceived(id, data);
+                    observer.OnFrameLog(false, rawId, data);
                 });
+
+            if (receiveCallback)
+                receiveCallback(hal::Can::Id::Create29BitId(rawId), data);
         }
     }
 

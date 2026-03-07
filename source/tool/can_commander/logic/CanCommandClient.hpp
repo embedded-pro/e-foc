@@ -1,8 +1,8 @@
 #pragma once
 
 #include "infra/util/Observer.hpp"
-#include "source/services/can_protocol/CanFrameCodec.hpp"
-#include "source/services/can_protocol/CanProtocolDefinitions.hpp"
+#include "source/services/can_protocol/client/CanProtocolClientImpl.hpp"
+#include "source/services/can_protocol/core/CanProtocolDefinitions.hpp"
 #include "source/tool/can_commander/adapter/CanBusAdapter.hpp"
 #include <cstdint>
 
@@ -26,7 +26,6 @@ namespace tool
         virtual void OnSpeedPositionReceived(float speed, float position) = 0;
         virtual void OnBusVoltageReceived(float voltage) = 0;
         virtual void OnFaultEventReceived(services::CanFaultCode fault) = 0;
-        virtual void OnHeartbeatReceived(uint8_t protocolVersion) = 0;
 
         virtual void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) = 0;
 
@@ -36,10 +35,12 @@ namespace tool
 
     class CanCommandClient
         : public infra::Subject<CanCommandClientObserver>
+        , private services::CanProtocolClientObserver
         , private CanBusAdapterObserver
     {
     public:
         explicit CanCommandClient(CanBusAdapter& adapter);
+        ~CanCommandClient();
 
         void SetNodeId(uint16_t nodeId);
         uint16_t NodeId() const;
@@ -58,36 +59,31 @@ namespace tool
         void SendSetSpeedPid(float kp, float ki, float kd);
         void SendSetPositionPid(float kp, float ki, float kd);
 
-        void SendSetPolePairs(uint8_t polePairs);
-        void SendSetResistance(float ohms);
-        void SendSetInductance(float henries);
-        void SendSetFluxLinkage(float webers);
-
         void SendSetSupplyVoltage(float volts);
         void SendSetMaxCurrent(float amps);
 
-        void SendHeartbeat();
-        void SendRequestStatus();
+        void RequestData(services::DataRequestFlags flags);
 
         void HandleTimeout();
 
     private:
-        void OnFrameReceived(uint32_t id, const CanFrame& data) override;
+        void OnCommandAckReceived(services::CanCategory category, services::CanMessageType command, services::CanAckStatus status) override;
+        void OnMotorStatusReceived(services::CanMotorState state, services::CanControlMode mode, services::CanFaultCode fault) override;
+        void OnControlModeReceived(services::CanControlMode mode) override;
+        void OnCurrentMeasurementReceived(float idCurrent, float iqCurrent) override;
+        void OnSpeedPositionReceived(float speed, float position) override;
+        void OnBusVoltageReceived(float voltage) override;
+        void OnFaultEventReceived(services::CanFaultCode fault) override;
+
+        void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) override;
         void OnError(infra::BoundedConstString message) override;
         void OnConnectionChanged(bool connected) override;
 
-        void SendCommand(services::CanPriority priority, services::CanCategory category,
-            services::CanMessageType type, const CanFrame& payload);
         void SetBusy(bool busy);
 
-        void HandleTelemetry(services::CanMessageType type, const CanFrame& data);
-        void HandleSystemMessage(services::CanMessageType type, const CanFrame& data);
-
-        uint8_t NextSequence();
-
         CanBusAdapter& adapter;
+        services::CanProtocolClientImpl protocolClient;
         uint16_t nodeId = 1;
-        uint8_t sequenceCounter = 0;
         bool busy = false;
     };
 }

@@ -19,7 +19,6 @@ namespace tool
         MOCK_METHOD(void, OnSpeedPositionReceived, (float speed, float position), (override));
         MOCK_METHOD(void, OnBusVoltageReceived, (float voltage), (override));
         MOCK_METHOD(void, OnFaultEventReceived, (services::CanFaultCode fault), (override));
-        MOCK_METHOD(void, OnHeartbeatReceived, (uint8_t protocolVersion), (override));
         MOCK_METHOD(void, OnFrameLog, (bool transmitted, uint32_t id, const CanFrame& data), (override));
         MOCK_METHOD(void, OnConnectionChanged, (bool connected), (override));
         MOCK_METHOD(void, OnAdapterError, (infra::BoundedConstString message), (override));
