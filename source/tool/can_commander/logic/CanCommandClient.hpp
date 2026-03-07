@@ -81,7 +81,6 @@ namespace tool
 
         void SetBusy(bool busy);
 
-        CanBusAdapter& adapter;
         services::CanProtocolClientImpl protocolClient;
         uint16_t nodeId = 1;
         bool busy = false;

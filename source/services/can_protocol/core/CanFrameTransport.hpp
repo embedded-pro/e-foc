@@ -25,6 +25,17 @@ namespace services
             hal::Can::Id id;
             hal::Can::Message data;
             infra::Function<void()> onDone;
+
+            PendingFrame(hal::Can::Id id, const hal::Can::Message& data, const infra::Function<void()>& onDone)
+                : id(id)
+                , data(data)
+                , onDone(onDone)
+            {}
+
+            PendingFrame(PendingFrame&&) noexcept = default;
+            PendingFrame& operator=(PendingFrame&&) noexcept = default;
+            PendingFrame(const PendingFrame&) = default;
+            PendingFrame& operator=(const PendingFrame&) = default;
         };
 
         void SendNextQueued();

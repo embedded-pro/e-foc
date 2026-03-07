@@ -15,6 +15,11 @@ namespace services
     public:
         CanProtocolClientImpl(hal::Can& can, const Config& config);
 
+        CanProtocolClientImpl(const CanProtocolClientImpl&) = delete;
+        CanProtocolClientImpl& operator=(const CanProtocolClientImpl&) = delete;
+        CanProtocolClientImpl(CanProtocolClientImpl&&) = delete;
+        CanProtocolClientImpl& operator=(CanProtocolClientImpl&&) = delete;
+
         void SetNodeId(uint16_t nodeId) override;
         uint16_t NodeId() const override;
 
@@ -39,15 +44,15 @@ namespace services
     private:
         void ProcessReceivedMessage(hal::Can::Id id, const hal::Can::Message& data);
 
-        void HandleTelemetry(CanMessageType type, const hal::Can::Message& data);
-        void HandleMotorStatusTelemetry(const hal::Can::Message& data);
-        void HandleCurrentMeasurementTelemetry(const hal::Can::Message& data);
-        void HandleSpeedPositionTelemetry(const hal::Can::Message& data);
-        void HandleBusVoltageTelemetry(const hal::Can::Message& data);
-        void HandleFaultEventTelemetry(const hal::Can::Message& data);
+        void HandleTelemetry(CanMessageType type, const hal::Can::Message& data) const;
+        void HandleMotorStatusTelemetry(const hal::Can::Message& data) const;
+        void HandleCurrentMeasurementTelemetry(const hal::Can::Message& data) const;
+        void HandleSpeedPositionTelemetry(const hal::Can::Message& data) const;
+        void HandleBusVoltageTelemetry(const hal::Can::Message& data) const;
+        void HandleFaultEventTelemetry(const hal::Can::Message& data) const;
 
-        void HandleSystemMessage(CanMessageType type, const hal::Can::Message& data);
-        void HandleCommandAck(const hal::Can::Message& data);
+        void HandleSystemMessage(CanMessageType type, const hal::Can::Message& data) const;
+        void HandleCommandAck(const hal::Can::Message& data) const;
 
         void SendPidGains(CanMessageType type, float kp, float ki, float kd, const infra::Function<void()>& onDone);
 

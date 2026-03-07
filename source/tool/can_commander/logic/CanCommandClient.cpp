@@ -5,8 +5,7 @@ namespace tool
     using namespace services;
 
     CanCommandClient::CanCommandClient(CanBusAdapter& adapter)
-        : adapter(adapter)
-        , protocolClient(adapter, CanProtocolClient::Config{ 1 })
+        : protocolClient(adapter, CanProtocolClient::Config{ 1 })
     {
         CanProtocolClientObserver::Attach(protocolClient);
         CanBusAdapterObserver::Attach(adapter);

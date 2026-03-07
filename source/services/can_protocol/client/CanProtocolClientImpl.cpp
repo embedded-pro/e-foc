@@ -149,7 +149,7 @@ namespace services
             HandleSystemMessage(messageType, data);
     }
 
-    void CanProtocolClientImpl::HandleTelemetry(CanMessageType type, const hal::Can::Message& data)
+    void CanProtocolClientImpl::HandleTelemetry(CanMessageType type, const hal::Can::Message& data) const
     {
         if (type == CanMessageType::motorStatus)
             HandleMotorStatusTelemetry(data);
@@ -163,7 +163,7 @@ namespace services
             HandleFaultEventTelemetry(data);
     }
 
-    void CanProtocolClientImpl::HandleMotorStatusTelemetry(const hal::Can::Message& data)
+    void CanProtocolClientImpl::HandleMotorStatusTelemetry(const hal::Can::Message& data) const
     {
         if (data.size() < 3)
             return;
@@ -181,7 +181,7 @@ namespace services
             });
     }
 
-    void CanProtocolClientImpl::HandleCurrentMeasurementTelemetry(const hal::Can::Message& data)
+    void CanProtocolClientImpl::HandleCurrentMeasurementTelemetry(const hal::Can::Message& data) const
     {
         if (data.size() < 4)
             return;
@@ -194,7 +194,7 @@ namespace services
             });
     }
 
-    void CanProtocolClientImpl::HandleSpeedPositionTelemetry(const hal::Can::Message& data)
+    void CanProtocolClientImpl::HandleSpeedPositionTelemetry(const hal::Can::Message& data) const
     {
         if (data.size() < 4)
             return;
@@ -207,7 +207,7 @@ namespace services
             });
     }
 
-    void CanProtocolClientImpl::HandleBusVoltageTelemetry(const hal::Can::Message& data)
+    void CanProtocolClientImpl::HandleBusVoltageTelemetry(const hal::Can::Message& data) const
     {
         if (data.size() < 2)
             return;
@@ -219,7 +219,7 @@ namespace services
             });
     }
 
-    void CanProtocolClientImpl::HandleFaultEventTelemetry(const hal::Can::Message& data)
+    void CanProtocolClientImpl::HandleFaultEventTelemetry(const hal::Can::Message& data) const
     {
         if (data.size() < 1)
             return;
@@ -231,13 +231,13 @@ namespace services
             });
     }
 
-    void CanProtocolClientImpl::HandleSystemMessage(CanMessageType type, const hal::Can::Message& data)
+    void CanProtocolClientImpl::HandleSystemMessage(CanMessageType type, const hal::Can::Message& data) const
     {
         if (type == CanMessageType::commandAck)
             HandleCommandAck(data);
     }
 
-    void CanProtocolClientImpl::HandleCommandAck(const hal::Can::Message& data)
+    void CanProtocolClientImpl::HandleCommandAck(const hal::Can::Message& data) const
     {
         if (data.size() < 3)
             return;

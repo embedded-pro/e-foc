@@ -75,17 +75,17 @@ namespace services
         all = 0x1F
     };
 
-    inline constexpr DataRequestFlags operator|(DataRequestFlags a, DataRequestFlags b)
+    constexpr DataRequestFlags operator|(DataRequestFlags a, DataRequestFlags b)
     {
         return static_cast<DataRequestFlags>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
     }
 
-    inline constexpr DataRequestFlags operator&(DataRequestFlags a, DataRequestFlags b)
+    constexpr DataRequestFlags operator&(DataRequestFlags a, DataRequestFlags b)
     {
         return static_cast<DataRequestFlags>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
     }
 
-    inline constexpr bool HasFlag(DataRequestFlags flags, DataRequestFlags flag)
+    constexpr bool HasFlag(DataRequestFlags flags, DataRequestFlags flag)
     {
         return (flags & flag) != DataRequestFlags::none;
     }
