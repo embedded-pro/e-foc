@@ -9,7 +9,8 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
   - `source/services/` — Application-level services (coordination, scheduling, helpers).
   - `numerical-toolbox/` — Generic numerical algorithms (PID, filters, fixed-point helpers).
   - `embedded-infra-lib/` — Infrastructure: bounded containers, build helpers, toolchain cmake pieces.
-  - `simulator/` — Host simulation models for validation.
+  - `source/tool/simulator/` — Host simulation models for validation.
+  - `source/tool/can_commander/` — CAN bus command interface tool.
 - Interaction: `source/` implements control logic and uses `hal/` adapters from `embedded-infra-lib` and algorithms from `numerical-toolbox`.
 
 2) Critical developer workflows (exact commands)

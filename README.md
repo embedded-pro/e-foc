@@ -76,17 +76,17 @@ cmake --build --preset EK-TM4C1294XL-Debug
 │   │   ├── ti/                 # TI Tiva C-specific adapters
 │   │   └── Host/               # Host simulation adapters
 │   ├── services/               # Application-level services
-│   └── application/            # Motor-specific implementations
-│       ├── sync_foc_sensored/  # Synchronous FOC with sensors
-│       └── hardware_test/      # Hardware validation tests
+│   ├── application/            # Motor-specific implementations
+│   │   ├── sync_foc_sensored/  # Synchronous FOC with sensors
+│   │   └── hardware_test/      # Hardware validation tests
+│   └── tool/                   # Host tooling
+│       ├── simulator/          # C++ simulators for motor models
+│       └── can_commander/      # CAN bus command interface
 ├── embedded-infra-lib/         # Submodule: infrastructure and utilities
 ├── numerical-toolbox/          # Generic algorithms (PID, filters, etc.)
 ├── hal/                        # Hardware Abstraction Layer
 │   ├── st/                     # ST microcontroller HAL
 │   └── ti/                     # TI microcontroller HAL
-├── simulator/                  # C++ simulators for motor models
-│   ├── pmsm/                   # PMSM mathematical models
-│   └── speed_control/          # Speed control simulation
 └── build/                      # Build artifacts (host, windows targets)
 ```
 
@@ -144,17 +144,17 @@ cmake --build --preset host-Debug
 
 Run the speed control simulator:
 ```bash
-./build/host/bin/Debug/e_foc.simulator.speed_control
+./build/host/bin/Debug/e_foc.tool.simulator.speed_control
 ```
 
 Run the torque control simulator:
 ```bash
-./build/host/bin/Debug/e_foc.simulator.torque_control
+./build/host/bin/Debug/e_foc.tool.simulator.torque_control
 ```
 
 Run with custom parameters (example):
 ```bash
-./build/host/bin/Debug/e_foc.simulator.speed_control --help
+./build/host/bin/Debug/e_foc.tool.simulator.speed_control --help
 ```
 
 ### Troubleshooting

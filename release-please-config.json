@@ -6,7 +6,7 @@
   "packages": {
     ".": {
       "release-type": "simple",
-      "package-name": "control-toolbox",
+      "package-name": "e-foc",
       "extra-files": [
         "CMakeLists.txt"
       ]
