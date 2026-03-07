@@ -16,6 +16,8 @@ target_sources(e_foc.services.can_protocol.core PRIVATE
     CanProtocolDefinitions.hpp
     CanFrameCodec.cpp
     CanFrameCodec.hpp
+    CanFrameTransport.cpp
+    CanFrameTransport.hpp
 )
 
 add_subdirectory(test)

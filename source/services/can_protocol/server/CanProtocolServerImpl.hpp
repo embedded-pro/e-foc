@@ -1,13 +1,12 @@
 #pragma once
 
 #include "hal/interfaces/Can.hpp"
-#include "infra/util/BoundedDeque.hpp"
+#include "infra/util/BoundedVector.hpp"
 #include "source/services/can_protocol/core/CanCategoryHandler.hpp"
 #include "source/services/can_protocol/core/CanFrameCodec.hpp"
+#include "source/services/can_protocol/core/CanFrameTransport.hpp"
 #include "source/services/can_protocol/core/CanProtocolDefinitions.hpp"
-#include "source/services/can_protocol/server/CanCategoryHandlers.hpp"
 #include "source/services/can_protocol/server/CanProtocolServer.hpp"
-#include <array>
 #include <cstdint>
 
 namespace services
@@ -16,7 +15,9 @@ namespace services
         : public CanProtocolServer
     {
     public:
-        CanProtocolServerImpl(hal::Can& can, const Config& config);
+        using Handlers = infra::BoundedVector<CanCategoryHandler*>::WithMaxSize<8>;
+
+        CanProtocolServerImpl(hal::Can& can, const Config& config, Handlers& handlers);
 
         using CanProtocolServer::SendCommandAck;
 
@@ -39,30 +40,13 @@ namespace services
         void SendBusVoltage(float voltage);
         void SendFaultEvent(CanFaultCode fault);
 
-        struct PendingFrame
-        {
-            hal::Can::Id id;
-            hal::Can::Message data;
-            infra::Function<void()> onDone;
-        };
-
-        void SendFrame(CanPriority priority, CanCategory category, CanMessageType type,
-            const hal::Can::Message& data, const infra::Function<void()>& onDone);
-        void SendNextQueued();
-
         hal::Can& can;
         Config config;
+        CanFrameTransport transport;
         uint16_t messageCountThisPeriod = 0;
         uint8_t lastSequenceNumber = 0;
         bool sequenceInitialized = false;
-        bool sendInProgress = false;
-        infra::Function<void()> currentOnDone;
-        infra::BoundedDeque<PendingFrame>::WithMaxSize<8> sendQueue;
 
-        CanMotorControlHandler motorControlHandler;
-        CanPidTuningHandler pidTuningHandler;
-        CanSystemParametersHandler systemParametersHandler;
-        CanSystemHandler systemHandler;
-        std::array<CanCategoryHandler*, 4> handlers;
+        Handlers& handlers;
     };
 }

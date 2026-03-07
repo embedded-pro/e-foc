@@ -1,5 +1,6 @@
+#include "source/services/can_protocol/core/test/CanMock.hpp"
+#include "source/services/can_protocol/server/CanCategoryHandlers.hpp"
 #include "source/services/can_protocol/server/CanProtocolServerImpl.hpp"
-#include "source/services/can_protocol/server/test/CanMock.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -107,8 +108,24 @@ namespace
         StrictMock<hal::CanMock> canMock;
         infra::Function<void(hal::Can::Id, const hal::Can::Message&)> receiveCallback;
         FixtureInit fixtureInit{ canMock, receiveCallback };
-        CanProtocolServerImpl server{ canMock, config };
+
+        CanProtocolServerImpl::Handlers handlers;
+        CanProtocolServerImpl server{ canMock, config, handlers };
+
+        CanMotorControlHandler motorControlHandler{ server };
+        CanPidTuningHandler pidTuningHandler{ server };
+        CanSystemParametersHandler systemParametersHandler{ server };
+        CanSystemHandler systemHandler{ server };
+
         StrictMock<CanProtocolServerObserverMock> observerMock{ server };
+
+        void SetUp() override
+        {
+            handlers.push_back(&motorControlHandler);
+            handlers.push_back(&pidTuningHandler);
+            handlers.push_back(&systemParametersHandler);
+            handlers.push_back(&systemHandler);
+        }
     };
 
     TEST_F(CanProtocolServerTest, StartMotor_NotifiesObserver)
@@ -385,7 +402,12 @@ namespace
                     cb(true);
                 }));
 
-        CanProtocolServerImpl limitedServer(limitedCan, limitedConfig);
+        CanProtocolServerImpl::Handlers limitedHandlers;
+        CanProtocolServerImpl limitedServer(limitedCan, limitedConfig, limitedHandlers);
+
+        CanMotorControlHandler limitedMotorHandler(limitedServer);
+        limitedHandlers.push_back(&limitedMotorHandler);
+
         StrictMock<CanProtocolServerObserverMock> limitedObserver(limitedServer);
 
         auto id = MakeEmergencyId(CanMessageType::emergencyStop);
@@ -418,7 +440,12 @@ namespace
                     cb(true);
                 }));
 
-        CanProtocolServerImpl limitedServer(limitedCan, limitedConfig);
+        CanProtocolServerImpl::Handlers limitedHandlers;
+        CanProtocolServerImpl limitedServer(limitedCan, limitedConfig, limitedHandlers);
+
+        CanMotorControlHandler limitedMotorHandler(limitedServer);
+        limitedHandlers.push_back(&limitedMotorHandler);
+
         StrictMock<CanProtocolServerObserverMock> limitedObserver(limitedServer);
 
         auto id = MakeEmergencyId(CanMessageType::emergencyStop);
@@ -527,7 +554,8 @@ namespace
                     cb(true);
                 }));
 
-        CanProtocolServerImpl testServer(testCan, config);
+        CanProtocolServerImpl::Handlers testHandlers;
+        CanProtocolServerImpl testServer(testCan, config, testHandlers);
     }
 
     TEST_F(CanProtocolServerTest, ConstructorCallback_DispatchesMessage)

@@ -32,6 +32,7 @@ namespace services
 
     enum class CanMessageType : uint8_t
     {
+        // Motor control (category 0x0)
         startMotor = 0x01,
         stopMotor = 0x02,
         emergencyStop = 0x03,
@@ -40,23 +41,27 @@ namespace services
         setSpeedSetpoint = 0x06,
         setPositionSetpoint = 0x07,
 
-        setCurrentIdPid = 0x01,
-        setCurrentIqPid = 0x02,
-        setSpeedPid = 0x03,
-        setPositionPid = 0x04,
+        // PID tuning (category 0x1)
+        setCurrentIdPid = 0x11,
+        setCurrentIqPid = 0x12,
+        setSpeedPid = 0x13,
+        setPositionPid = 0x14,
 
-        setSupplyVoltage = 0x01,
-        setMaxCurrent = 0x02,
+        // System parameters (category 0x3)
+        setSupplyVoltage = 0x31,
+        setMaxCurrent = 0x32,
 
-        motorStatus = 0x01,
-        currentMeasurement = 0x02,
-        speedPosition = 0x03,
-        busVoltage = 0x04,
-        faultEvent = 0x05,
+        // Telemetry (category 0x4)
+        motorStatus = 0x41,
+        currentMeasurement = 0x42,
+        speedPosition = 0x43,
+        busVoltage = 0x44,
+        faultEvent = 0x45,
 
-        heartbeat = 0x01,
-        commandAck = 0x02,
-        requestData = 0x03
+        // System (category 0x5)
+        heartbeat = 0x51,
+        commandAck = 0x52,
+        requestData = 0x53
     };
 
     enum class DataRequestFlags : uint8_t

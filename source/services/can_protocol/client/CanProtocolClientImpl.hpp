@@ -1,10 +1,10 @@
 #pragma once
 
 #include "hal/interfaces/Can.hpp"
-#include "infra/util/BoundedDeque.hpp"
 #include "infra/util/Function.hpp"
 #include "source/services/can_protocol/client/CanProtocolClient.hpp"
 #include "source/services/can_protocol/core/CanFrameCodec.hpp"
+#include "source/services/can_protocol/core/CanFrameTransport.hpp"
 #include <cstdint>
 
 namespace services
@@ -39,17 +39,6 @@ namespace services
     private:
         void ProcessReceivedMessage(hal::Can::Id id, const hal::Can::Message& data);
 
-        struct PendingFrame
-        {
-            hal::Can::Id id;
-            hal::Can::Message data;
-            infra::Function<void()> onDone;
-        };
-
-        void SendFrame(CanPriority priority, CanCategory category, CanMessageType type,
-            const hal::Can::Message& data, const infra::Function<void()>& onDone);
-        void SendNextQueued();
-
         void HandleTelemetry(CanMessageType type, const hal::Can::Message& data);
         void HandleMotorStatusTelemetry(const hal::Can::Message& data);
         void HandleCurrentMeasurementTelemetry(const hal::Can::Message& data);
@@ -60,13 +49,12 @@ namespace services
         void HandleSystemMessage(CanMessageType type, const hal::Can::Message& data);
         void HandleCommandAck(const hal::Can::Message& data);
 
+        void SendPidGains(CanMessageType type, float kp, float ki, float kd, const infra::Function<void()>& onDone);
+
         uint8_t NextSequence();
 
         hal::Can& can;
-        Config config;
+        CanFrameTransport transport;
         uint8_t sequenceCounter = 0;
-        bool sendInProgress = false;
-        infra::Function<void()> currentOnDone;
-        infra::BoundedDeque<PendingFrame>::WithMaxSize<8> sendQueue;
     };
 }

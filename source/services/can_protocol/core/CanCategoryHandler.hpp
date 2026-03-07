@@ -7,12 +7,6 @@ namespace services
 {
     class CanCategoryHandler
     {
-    protected:
-        CanCategoryHandler() = default;
-        CanCategoryHandler(const CanCategoryHandler&) = delete;
-        CanCategoryHandler& operator=(const CanCategoryHandler&) = delete;
-        ~CanCategoryHandler() = default;
-
     public:
         virtual CanCategory Category() const = 0;
         virtual bool RequiresSequenceValidation() const;

@@ -1,6 +1,6 @@
 #include "source/services/can_protocol/client/CanProtocolClientImpl.hpp"
-#include "source/services/can_protocol/client/test/CanMock.hpp"
 #include "source/services/can_protocol/core/CanFrameCodec.hpp"
+#include "source/services/can_protocol/core/test/CanMock.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

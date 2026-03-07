@@ -2,14 +2,11 @@
 
 namespace services
 {
-    CanProtocolServerImpl::CanProtocolServerImpl(hal::Can& can, const Config& config)
+    CanProtocolServerImpl::CanProtocolServerImpl(hal::Can& can, const Config& config, Handlers& handlers)
         : can(can)
         , config(config)
-        , motorControlHandler(*this)
-        , pidTuningHandler(*this)
-        , systemParametersHandler(*this)
-        , systemHandler(*this)
-        , handlers{ { &motorControlHandler, &pidTuningHandler, &systemParametersHandler, &systemHandler } }
+        , transport(can, config.nodeId)
+        , handlers(handlers)
     {
         can.ReceiveData([this](hal::Can::Id id, const hal::Can::Message& data)
             {
@@ -95,7 +92,7 @@ namespace services
         msg.push_back(static_cast<uint8_t>(mode));
         msg.push_back(static_cast<uint8_t>(fault));
 
-        SendFrame(CanPriority::telemetry, CanCategory::telemetry, CanMessageType::motorStatus, msg, [] {});
+        transport.SendFrame(CanPriority::telemetry, CanCategory::telemetry, CanMessageType::motorStatus, msg, [] {});
     }
 
     void CanProtocolServerImpl::SendCurrentMeasurement(float idCurrent, float iqCurrent)
@@ -104,7 +101,7 @@ namespace services
         CanFrameCodec::WriteInt16(msg, 0, CanFrameCodec::FloatToFixed16(idCurrent, canCurrentScale));
         CanFrameCodec::WriteInt16(msg, 2, CanFrameCodec::FloatToFixed16(iqCurrent, canCurrentScale));
 
-        SendFrame(CanPriority::telemetry, CanCategory::telemetry, CanMessageType::currentMeasurement, msg, [] {});
+        transport.SendFrame(CanPriority::telemetry, CanCategory::telemetry, CanMessageType::currentMeasurement, msg, [] {});
     }
 
     void CanProtocolServerImpl::SendSpeedPosition(float speed, float position)
@@ -113,7 +110,7 @@ namespace services
         CanFrameCodec::WriteInt16(msg, 0, CanFrameCodec::FloatToFixed16(speed, canSpeedScale));
         CanFrameCodec::WriteInt16(msg, 2, CanFrameCodec::FloatToFixed16(position, canPositionScale));
 
-        SendFrame(CanPriority::telemetry, CanCategory::telemetry, CanMessageType::speedPosition, msg, [] {});
+        transport.SendFrame(CanPriority::telemetry, CanCategory::telemetry, CanMessageType::speedPosition, msg, [] {});
     }
 
     void CanProtocolServerImpl::SendBusVoltage(float voltage)
@@ -121,7 +118,7 @@ namespace services
         hal::Can::Message msg;
         CanFrameCodec::WriteInt16(msg, 0, CanFrameCodec::FloatToFixed16(voltage, canVoltageScale));
 
-        SendFrame(CanPriority::telemetry, CanCategory::telemetry, CanMessageType::busVoltage, msg, [] {});
+        transport.SendFrame(CanPriority::telemetry, CanCategory::telemetry, CanMessageType::busVoltage, msg, [] {});
     }
 
     void CanProtocolServerImpl::SendFaultEvent(CanFaultCode fault)
@@ -129,7 +126,7 @@ namespace services
         hal::Can::Message msg;
         msg.push_back(static_cast<uint8_t>(fault));
 
-        SendFrame(CanPriority::emergency, CanCategory::telemetry, CanMessageType::faultEvent, msg, [] {});
+        transport.SendFrame(CanPriority::emergency, CanCategory::telemetry, CanMessageType::faultEvent, msg, [] {});
     }
 
     void CanProtocolServerImpl::SendCommandAck(CanCategory category, CanMessageType commandType, CanAckStatus status, const infra::Function<void()>& onDone)
@@ -139,7 +136,7 @@ namespace services
         msg.push_back(static_cast<uint8_t>(commandType));
         msg.push_back(static_cast<uint8_t>(status));
 
-        SendFrame(CanPriority::response, CanCategory::system, CanMessageType::commandAck, msg, onDone);
+        transport.SendFrame(CanPriority::response, CanCategory::system, CanMessageType::commandAck, msg, onDone);
     }
 
     void CanProtocolServerImpl::ResetRateCounter()
@@ -176,48 +173,5 @@ namespace services
 
         lastSequenceNumber = sequenceNumber;
         return true;
-    }
-
-    void CanProtocolServerImpl::SendFrame(CanPriority priority, CanCategory category, CanMessageType type,
-        const hal::Can::Message& data, const infra::Function<void()>& onDone)
-    {
-        auto rawId = MakeCanId(priority, category, type, config.nodeId);
-        auto canId = hal::Can::Id::Create29BitId(rawId);
-
-        if (!sendInProgress)
-        {
-            sendInProgress = true;
-            currentOnDone = onDone;
-            can.SendData(canId, data, [this](bool)
-                {
-                    auto done = currentOnDone;
-                    SendNextQueued();
-                    done();
-                });
-        }
-        else if (!sendQueue.full())
-        {
-            sendQueue.push_back(PendingFrame{ canId, data, onDone });
-        }
-    }
-
-    void CanProtocolServerImpl::SendNextQueued()
-    {
-        if (sendQueue.empty())
-        {
-            sendInProgress = false;
-            return;
-        }
-
-        auto frame = sendQueue.front();
-        sendQueue.pop_front();
-        currentOnDone = frame.onDone;
-
-        can.SendData(frame.id, frame.data, [this](bool)
-            {
-                auto done = currentOnDone;
-                SendNextQueued();
-                done();
-            });
     }
 }
