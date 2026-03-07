@@ -163,6 +163,20 @@
     ],
     "buildPresets": [
         {
+            "name": "host-Release",
+            "configuration": "Release",
+            "configurePreset": "host"
+        },
+        {
+            "name": "host-Release-WithPackage",
+            "configuration": "Release",
+            "configurePreset": "host",
+            "targets": [
+                "all",
+                "package"
+            ]
+        },
+        {
             "name": "host-RelWithDebInfo",
             "configuration": "RelWithDebInfo",
             "configurePreset": "host"

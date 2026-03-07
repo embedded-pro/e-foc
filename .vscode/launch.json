@@ -30,7 +30,7 @@
             "name": "Simulator GUI",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/host/source/simulator/${input:simulatorMode}_control/Debug/e_foc.simulator.${input:simulatorMode}_control",
+            "program": "${workspaceFolder}/build/host/source/tool/simulator/${input:simulatorMode}_control/Debug/e_foc.tool.simulator.${input:simulatorMode}_control",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -55,7 +55,7 @@
             "name": "Simulator Headless",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/host/source/simulator/${input:simulatorMode}_control/Debug/e_foc.simulator.${input:simulatorMode}_control",
+            "program": "${workspaceFolder}/build/host/source/tool/simulator/${input:simulatorMode}_control/Debug/e_foc.tool.simulator.${input:simulatorMode}_control",
             "args": [
                 "--no-gui"
             ],
