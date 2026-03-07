@@ -54,6 +54,7 @@ namespace tool
         QPlainTextEdit* logView;
 
         QTimer timeoutTimer;
+        QTimer rxPollTimer;
         QSocketNotifier* socketNotifier = nullptr;
     };
 }

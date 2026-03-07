@@ -3,21 +3,62 @@
 #include "source/tool/can_commander/adapter/SocketCanAdapter.hpp"
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <linux/can.h>
 #include <linux/can/raw.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 namespace tool
 {
+    namespace
+    {
+        // Run a command using fork+execvp without a shell (avoids injection risk).
+        // Errors are silently ignored — the caller handles failures at the socket level.
+        void ExecCommand(const char* prog, const char* const* args)
+        {
+            pid_t pid = fork();
+            if (pid == 0)
+            {
+                execvp(prog, const_cast<char**>(args));
+                _exit(1);
+            }
+            if (pid > 0)
+                waitpid(pid, nullptr, 0);
+        }
+
+        // Apply the requested bitrate to a SocketCAN interface by running:
+        //   ip link set <iface> down
+        //   ip link set <iface> type can bitrate <rate>
+        //   ip link set <iface> up
+        // This requires CAP_NET_ADMIN (root/sudo).  The function fails silently so
+        // that Connect() can still attempt to bind to a pre-configured interface.
+        void ApplyBitrate(const char* iface, uint32_t bitrate)
+        {
+            std::string bitrateStr = std::to_string(bitrate);
+
+            const char* downArgs[] = { "ip", "link", "set", iface, "down", nullptr };
+            ExecCommand("ip", downArgs);
+
+            const char* configArgs[] = { "ip", "link", "set", iface, "type", "can",
+                "bitrate", bitrateStr.c_str(), nullptr };
+            ExecCommand("ip", configArgs);
+
+            const char* upArgs[] = { "ip", "link", "set", iface, "up", nullptr };
+            ExecCommand("ip", upArgs);
+        }
+    }
+
     SocketCanAdapter::~SocketCanAdapter()
     {
         Disconnect();
     }
 
-    bool SocketCanAdapter::Connect(infra::BoundedConstString interfaceName, uint32_t /*bitrate*/)
+    bool SocketCanAdapter::Connect(infra::BoundedConstString interfaceName, uint32_t bitrate)
     {
         if (IsConnected())
             Disconnect();
@@ -38,6 +79,9 @@ namespace tool
         auto nameLength = std::min(interfaceName.size(), static_cast<std::size_t>(IFNAMSIZ - 1));
         std::memcpy(ifr.ifr_name, interfaceName.data(), nameLength);
         ifr.ifr_name[nameLength] = '\0';
+
+        // Configure bitrate before binding (requires CAP_NET_ADMIN; no-op if lacking privilege)
+        ApplyBitrate(ifr.ifr_name, bitrate);
 
         if (ioctl(socketDescriptor, SIOCGIFINDEX, &ifr) < 0)
         {
@@ -138,6 +182,38 @@ namespace tool
                     observer.OnFrameReceived(id, data);
                 });
         }
+    }
+
+    void SocketCanAdapter::ValidateDriverAvailability() const
+    {
+        int fd = socket(PF_CAN, SOCK_RAW, CAN_RAW);
+        if (fd < 0)
+            throw std::runtime_error(
+                "SocketCAN is not available on this system.\n\n"
+                "Make sure the CAN kernel modules are loaded:\n"
+                "  sudo modprobe can\n"
+                "  sudo modprobe can_raw\n"
+                "  sudo modprobe vcan     (for virtual CAN)");
+        close(fd);
+    }
+
+    std::vector<std::string> SocketCanAdapter::AvailableInterfaces() const
+    {
+        // ARPHRD_CAN = 280 identifies CAN network interfaces in /sys/class/net/<iface>/type
+        static constexpr int arphrdCan = 280;
+
+        std::vector<std::string> result;
+        std::error_code ec;
+        for (const auto& entry : std::filesystem::directory_iterator("/sys/class/net", ec))
+        {
+            if (ec)
+                break;
+            std::ifstream typeFile(entry.path() / "type");
+            int type = 0;
+            if (typeFile >> type && type == arphrdCan)
+                result.push_back(entry.path().filename().string());
+        }
+        return result;
     }
 }
 

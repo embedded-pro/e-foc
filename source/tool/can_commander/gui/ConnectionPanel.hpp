@@ -4,7 +4,6 @@
 #include <QComboBox>
 #include <QGroupBox>
 #include <QLabel>
-#include <QLineEdit>
 #include <QPushButton>
 #include <QSpinBox>
 
@@ -15,7 +14,7 @@ namespace tool
         Q_OBJECT
 
     public:
-        explicit ConnectionPanel(QWidget* parent = nullptr);
+        explicit ConnectionPanel(CanBusAdapter& adapter, QWidget* parent = nullptr);
 
         QString InterfaceName() const;
         uint32_t Bitrate() const;
@@ -27,8 +26,13 @@ namespace tool
     public slots:
         void OnConnectionChanged(bool connected);
 
+    private slots:
+        void RefreshInterfaces();
+
     private:
-        QLineEdit* interfaceEdit;
+        CanBusAdapter& adapter;
+        QComboBox* interfaceCombo;
+        QPushButton* refreshButton;
         QComboBox* bitrateCombo;
         QPushButton* connectButton;
         QPushButton* disconnectButton;

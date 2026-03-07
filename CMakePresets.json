@@ -47,6 +47,11 @@
             "cacheVariables": {
                 "CMAKE_COMPILE_WARNING_AS_ERROR": "Off",
                 "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo;MinSizeRel",
+                "CMAKE_PREFIX_PATH": "/opt/qt6-windows/6.4.2/msvc2019_64",
+                "CMAKE_CXX_FLAGS": "/EHsc -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH",
+                "CMAKE_C_FLAGS": "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH",
+                "QT_HOST_PATH": "/usr",
+                "QT_HOST_PATH_CMAKE_DIR": "/usr/lib/x86_64-linux-gnu/cmake",
                 "E_FOC_TARGET_PLATFORM": "Host",
                 "E_FOC_BUILD_TESTS": true,
                 "E_FOC_BUILD_SIMULATOR": true,

@@ -22,7 +22,7 @@ namespace tool
         auto* mainLayout = new QVBoxLayout(centralWidget);
 
         auto* topBar = new QHBoxLayout();
-        connectionPanel = new ConnectionPanel();
+        connectionPanel = new ConnectionPanel(adapter);
         topBar->addWidget(connectionPanel);
 
         auto* nodeGroup = new QGroupBox("Node");
@@ -58,6 +58,11 @@ namespace tool
         connect(&timeoutTimer, &QTimer::timeout, [this]()
             {
                 client.HandleTimeout();
+            });
+
+        connect(&rxPollTimer, &QTimer::timeout, [this]()
+            {
+                this->adapter.ProcessReadEvent();
             });
 
         connect(connectionPanel, &ConnectionPanel::ConnectRequested, this, &MainWindow::OnConnect);
@@ -284,10 +289,15 @@ namespace tool
                     adapter.ProcessReadEvent();
                 });
         }
+        else
+        {
+            rxPollTimer.start(1); // 1 ms polling for adapters without a file descriptor (e.g. Windows)
+        }
     }
 
     void MainWindow::TeardownSocketNotifier()
     {
+        rxPollTimer.stop();
         delete socketNotifier;
         socketNotifier = nullptr;
     }

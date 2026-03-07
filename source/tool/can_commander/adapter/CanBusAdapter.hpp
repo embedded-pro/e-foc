@@ -4,6 +4,9 @@
 #include "infra/util/BoundedVector.hpp"
 #include "infra/util/Observer.hpp"
 #include <cstdint>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 namespace tool
 {
@@ -39,5 +42,18 @@ namespace tool
 
         virtual int FileDescriptor() const = 0;
         virtual void ProcessReadEvent() = 0;
+
+        // Returns a list of available adapter interfaces on this platform.
+        // Returns an empty list on platforms that don't support enumeration.
+        virtual std::vector<std::string> AvailableInterfaces() const
+        {
+            return {};
+        }
+
+        // Throws std::runtime_error if the platform CAN driver infrastructure
+        // is not available (e.g. no SocketCAN kernel module on Linux, no
+        // PCAN/Kvaser DLL and no COM ports on Windows).
+        virtual void ValidateDriverAvailability() const
+        {}
     };
 }
