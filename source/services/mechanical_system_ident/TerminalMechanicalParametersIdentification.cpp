@@ -1,7 +1,7 @@
-#include "source/services/parameter_identification/TerminalMechanicalParametersIdentification.hpp"
+#include "source/services/mechanical_system_ident/TerminalMechanicalParametersIdentification.hpp"
 #include "infra/stream/StringInputStream.hpp"
 #include "infra/util/Tokenizer.hpp"
-#include "source/services/parameter_identification/MechanicalParametersIdentification.hpp"
+#include "source/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include <numbers>
 
 namespace

@@ -1,0 +1,19 @@
+add_executable(e_foc.services.mechanical_system_ident_test)
+emil_build_for(e_foc.services.mechanical_system_ident_test HOST All BOOL E_FOC_BUILD_TESTS)
+emil_add_test(e_foc.services.mechanical_system_ident_test)
+
+target_link_libraries(e_foc.services.mechanical_system_ident_test PUBLIC
+    gmock_main
+    e_foc.services.mechanical_system_ident
+    e_foc.foc.implementations
+    hal.interfaces_test_doubles
+    infra.timer_test_helper
+    infra.event_test_helper
+    e_foc.foc_mock
+)
+
+target_sources(e_foc.services.mechanical_system_ident_test PRIVATE
+    TestRealTimeFrictionAndInertiaEstimator.cpp
+    TestMechanicalParametersIdentification.cpp
+    TestTerminalMechanicalParametersIdentification.cpp
+)

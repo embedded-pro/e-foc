@@ -3,8 +3,8 @@
 #include "infra/util/ByteRange.hpp"
 #include "infra/util/test_helper/MockHelpers.hpp"
 #include "services/util/TerminalWithStorage.hpp"
-#include "source/services/parameter_identification/MechanicalParametersIdentification.hpp"
-#include "source/services/parameter_identification/TerminalMechanicalParametersIdentification.hpp"
+#include "source/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
+#include "source/services/mechanical_system_ident/TerminalMechanicalParametersIdentification.hpp"
 #include "gmock/gmock.h"
 
 namespace

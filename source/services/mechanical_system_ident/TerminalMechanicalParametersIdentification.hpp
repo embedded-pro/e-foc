@@ -1,7 +1,7 @@
 #pragma once
 
 #include "services/util/TerminalWithStorage.hpp"
-#include "source/services/parameter_identification/MechanicalParametersIdentification.hpp"
+#include "source/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 
 namespace services
 {

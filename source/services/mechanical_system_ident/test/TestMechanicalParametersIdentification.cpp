@@ -1,7 +1,7 @@
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "source/foc/implementations/test_doubles/DriversMock.hpp"
 #include "source/foc/implementations/test_doubles/FocMock.hpp"
-#include "source/services/parameter_identification/MechanicalParametersIdentificationImpl.hpp"
+#include "source/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
 

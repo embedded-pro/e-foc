@@ -35,7 +35,7 @@ $$ \tau = \frac{L}{R} \implies L = R \times \tau $$
 
 ## Implementation Details
 
-The implementation is located in [source/services/parameter_identification/MotorIdentificationImpl.cpp](../../source/services/parameter_identification/MotorIdentificationImpl.cpp).
+The implementation is located in [source/services/electrical_system_ident/ElectricalParametersIdentificationImpl.cpp](../../source/services/electrical_system_ident/ElectricalParametersIdentificationImpl.cpp).
 
 ### Process
 

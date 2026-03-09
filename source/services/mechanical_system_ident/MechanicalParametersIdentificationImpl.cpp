@@ -1,4 +1,4 @@
-#include "source/services/parameter_identification/MechanicalParametersIdentificationImpl.hpp"
+#include "source/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "source/foc/implementations/TrigonometricImpl.hpp"
 #include "source/foc/interfaces/Units.hpp"
 #include <cmath>

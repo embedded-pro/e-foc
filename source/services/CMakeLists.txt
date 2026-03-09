@@ -1,4 +1,5 @@
 add_subdirectory(alignment)
 add_subdirectory(can_protocol)
 add_subdirectory(cli)
-add_subdirectory(parameter_identification)
+add_subdirectory(electrical_system_ident)
+add_subdirectory(mechanical_system_ident)

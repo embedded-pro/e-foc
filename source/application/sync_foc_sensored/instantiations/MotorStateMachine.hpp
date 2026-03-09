@@ -4,13 +4,13 @@
 #include "foc/instantiations/FocController.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "services/alignment/TerminalMotorAlignment.hpp"
-#include "services/parameter_identification/TerminalElectricalParametersIdentification.hpp"
+#include "services/electrical_system_ident/TerminalElectricalParametersIdentification.hpp"
 #include "source/foc/implementations/WithAutomaticCurrentPidGains.hpp"
 #include "source/foc/interfaces/Foc.hpp"
 #include "source/services/alignment/MotorAlignmentImpl.hpp"
 #include "source/services/cli/TerminalBase.hpp"
 #include "source/services/cli/TerminalHelper.hpp"
-#include "source/services/parameter_identification/ElectricalParametersIdentificationImpl.hpp"
+#include "source/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include <optional>
 #include <type_traits>
 #include <variant>
