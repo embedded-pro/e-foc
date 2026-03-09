@@ -5,7 +5,7 @@
 namespace services
 {
     RealTimeFrictionAndInertiaEstimator::RealTimeFrictionAndInertiaEstimator(float forgettingFactor, hal::Hertz samplingFrequency)
-        : samplingFrequency(samplingFrequency)
+        : samplingFrequency(static_cast<float>(samplingFrequency.Value()))
         , rls(MotorRLS{ 1000.0f, forgettingFactor })
     {
     }
@@ -13,7 +13,7 @@ namespace services
     RealTimeFrictionAndInertiaEstimator::Result RealTimeFrictionAndInertiaEstimator::Update(foc::PhaseCurrents currentPhases, foc::RadiansPerSecond speed, foc::Radians electricalAngle, foc::NewtonMeter targetTorque)
     {
         auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle.Value()), foc::FastTrigonometry::Sine(electricalAngle.Value()));
-        auto acceleration = (speed.Value() - previousSpeed.Value()) * samplingFrequency.Value();
+        auto acceleration = (speed.Value() - previousSpeed.Value()) * samplingFrequency;
         MotorRLS::MakeRegressor(regressor, acceleration, speed.Value());
 
         torque.at(0, 0) = rotatingFrame.q * targetTorque.Value();

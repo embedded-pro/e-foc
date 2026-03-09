@@ -74,7 +74,7 @@ namespace services
         return TerminalElectricalParametersIdentification::StatusWithMessage();
     }
 
-    TerminalElectricalParametersIdentification::StatusWithMessage TerminalElectricalParametersIdentification::EstimateNumberOfPolePairs(const infra::BoundedConstString& param)
+    TerminalElectricalParametersIdentification::StatusWithMessage TerminalElectricalParametersIdentification::EstimateNumberOfPolePairs(const infra::BoundedConstString&)
     {
         ElectricalParametersIdentification::PolePairsConfig config;
 

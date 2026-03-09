@@ -6,10 +6,8 @@
 
 namespace
 {
-    const hal::Hertz samplingFrequency{ 10000 };
     constexpr float pi = std::numbers::pi_v<float>;
     constexpr float twoPi = 2.0f * pi;
-
 }
 
 namespace services
@@ -18,7 +16,7 @@ namespace services
         : controller(controller)
         , driver(driver)
         , encoder(encoder)
-        , samplingPeriod(1.0f / static_cast<float>(samplingFrequency.Value()))
+        , samplingPeriod(1.0f / static_cast<float>(controller.OuterLoopFrequency().Value()))
     {
     }
 

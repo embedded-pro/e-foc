@@ -17,6 +17,10 @@ namespace
         StrictMock<foc::FocSpeedMock> controllerMock;
         StrictMock<foc::FieldOrientedControllerInterfaceMock> driverMock;
         StrictMock<foc::EncoderMock> encoderMock;
+        infra::Execute setOuterLoopFrequency{ [this]()
+            {
+                EXPECT_CALL(controllerMock, OuterLoopFrequency()).WillRepeatedly(Return(hal::Hertz{ 10000 }));
+            } };
         services::MechanicalParametersIdentificationImpl identification{ controllerMock, driverMock, encoderMock };
 
         infra::Function<void(foc::PhaseCurrents)> phaseCurrentsCallback;

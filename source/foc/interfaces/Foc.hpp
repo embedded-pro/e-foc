@@ -34,6 +34,7 @@ namespace foc
     public:
         virtual void SetPoint(RadiansPerSecond setPoint) = 0;
         virtual void SetSpeedTunings(Volts Vdc, const SpeedTunings& speedTuning) = 0;
+        virtual hal::Hertz OuterLoopFrequency() const = 0;
     };
 
     class FocPosition

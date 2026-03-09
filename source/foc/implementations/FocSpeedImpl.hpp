@@ -17,6 +17,7 @@ namespace foc
         void SetSpeedTunings(Volts Vdc, const SpeedTunings& speedTuning) override;
         void Enable() override;
         void Disable() override;
+        hal::Hertz OuterLoopFrequency() const override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
 
     private:
@@ -24,5 +25,6 @@ namespace foc
 
     private:
         RadiansPerSecond lastSpeedSetPoint{ 0.0f };
+        hal::Hertz outerLoopFrequency;
     };
 }

@@ -57,7 +57,7 @@ namespace services
         if (!torqueConstant.has_value() || *torqueConstant <= 0.0f)
             return { services::TerminalWithStorage::Status::error, "invalid torque constant. Must be > 0 Nm/A" };
 
-        if (!numberOfPolePairs.has_value() || *numberOfPolePairs <= 0.0f)
+        if (!numberOfPolePairs.has_value())
             return { services::TerminalWithStorage::Status::error, "invalid number of pole pairs. Must be > 0" };
 
         config.targetSpeed = ToRadiansPerSecond(*targetSpeedRpm);

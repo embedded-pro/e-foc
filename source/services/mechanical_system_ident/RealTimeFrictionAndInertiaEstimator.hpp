@@ -18,7 +18,7 @@ namespace services
 
     private:
         using MotorRLS = estimators::RecursiveLeastSquares<float, 3>;
-        hal::Hertz samplingFrequency;
+        float samplingFrequency;
         std::optional<MotorRLS> rls;
         [[no_unique_address]] foc::ClarkePark transform;
         MotorRLS::InputMatrix regressor;

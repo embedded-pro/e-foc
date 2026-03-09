@@ -27,6 +27,7 @@ namespace foc
         MOCK_METHOD(void, SetPoint, (RadiansPerSecond), (override));
         MOCK_METHOD(void, SetCurrentTunings, (Volts Vdc, const IdAndIqTunings& torqueTunings), (override));
         MOCK_METHOD(void, SetSpeedTunings, (Volts Vdc, const SpeedTunings& speedTuning), (override));
+        MOCK_METHOD(hal::Hertz, OuterLoopFrequency, (), (const, override));
         MOCK_METHOD(PhasePwmDutyCycles, Calculate, (const PhaseCurrents& currentPhases, Radians& position), (override));
     };
 
