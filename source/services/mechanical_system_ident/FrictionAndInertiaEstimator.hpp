@@ -11,8 +11,8 @@ namespace services
     public:
         struct Result
         {
-            foc::NewtonMeterSecondPerRadian inertia;
-            foc::NewtonMeterSecondSquared friction;
+            foc::NewtonMeterSecondSquared inertia;
+            foc::NewtonMeterSecondPerRadian friction;
             estimators::OnlineEstimator<float, 3>::EstimationMetrics metrics;
         };
 

@@ -23,8 +23,8 @@ namespace services
         previousSpeed = speed;
 
         return Result{
-            foc::NewtonMeterSecondPerRadian{ rls->Coefficients().at(2, 0) },
             foc::NewtonMeterSecondSquared{ rls->Coefficients().at(1, 0) },
+            foc::NewtonMeterSecondPerRadian{ rls->Coefficients().at(2, 0) },
             metrics
         };
     }

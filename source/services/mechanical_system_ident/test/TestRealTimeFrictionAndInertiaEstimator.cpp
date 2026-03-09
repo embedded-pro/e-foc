@@ -49,8 +49,8 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, result_units_are_correct_types)
 
     auto result = estimator.Update(currents, speed, angle, torque);
 
-    foc::NewtonMeterSecondPerRadian inertia = result.inertia;
-    foc::NewtonMeterSecondSquared friction = result.friction;
+    foc::NewtonMeterSecondSquared inertia = result.inertia;
+    foc::NewtonMeterSecondPerRadian friction = result.friction;
 
     EXPECT_TRUE(std::isfinite(inertia.Value()));
     EXPECT_TRUE(std::isfinite(friction.Value()));
