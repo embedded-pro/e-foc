@@ -6,7 +6,7 @@
 #include "source/foc/implementations/TransformsClarkePark.hpp"
 #include "source/foc/interfaces/Driver.hpp"
 #include "source/foc/interfaces/Foc.hpp"
-#include "source/services/parameter_identification/MechanicalParametersIdentification.hpp"
+#include "source/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 
 namespace services
 {

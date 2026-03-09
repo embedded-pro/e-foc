@@ -1,7 +1,7 @@
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "source/foc/implementations/test_doubles/DriversMock.hpp"
 #include "source/foc/implementations/test_doubles/FocMock.hpp"
-#include "source/services/parameter_identification/MechanicalParametersIdentificationImpl.hpp"
+#include "source/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
 
@@ -17,6 +17,10 @@ namespace
         StrictMock<foc::FocSpeedMock> controllerMock;
         StrictMock<foc::FieldOrientedControllerInterfaceMock> driverMock;
         StrictMock<foc::EncoderMock> encoderMock;
+        infra::Execute setOuterLoopFrequency{ [this]()
+            {
+                EXPECT_CALL(controllerMock, OuterLoopFrequency()).WillRepeatedly(Return(hal::Hertz{ 10000 }));
+            } };
         services::MechanicalParametersIdentificationImpl identification{ controllerMock, driverMock, encoderMock };
 
         infra::Function<void(foc::PhaseCurrents)> phaseCurrentsCallback;

@@ -1,6 +1,6 @@
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "source/foc/implementations/test_doubles/DriversMock.hpp"
-#include "source/services/parameter_identification/ElectricalParametersIdentificationImpl.hpp"
+#include "source/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
 

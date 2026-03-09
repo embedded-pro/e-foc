@@ -6,7 +6,7 @@
 #include "infra/util/BoundedVector.hpp"
 #include "source/foc/implementations/TransformsClarkePark.hpp"
 #include "source/foc/interfaces/Driver.hpp"
-#include "source/services/parameter_identification/ElectricalParametersIdentification.hpp"
+#include "source/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 
 namespace services
 {
