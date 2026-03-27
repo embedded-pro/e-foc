@@ -1,6 +1,6 @@
 #pragma once
 
-#include "numerical/estimators/RecursiveLeastSquares.hpp"
+#include "numerical/estimators/online/RecursiveLeastSquares.hpp"
 #include "source/foc/implementations/TransformsClarkePark.hpp"
 #include "source/foc/interfaces/Driver.hpp"
 #include "source/foc/interfaces/Units.hpp"
