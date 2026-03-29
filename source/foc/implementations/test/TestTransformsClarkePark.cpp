@@ -1,9 +1,14 @@
 #include "numerical/math/Tolerance.hpp"
 #include "source/foc/implementations/TransformsClarkePark.hpp"
 #include <gmock/gmock.h>
+#include <numbers>
 
 namespace
 {
+    constexpr auto pi = std::numbers::pi_v<float>;
+    constexpr auto pi_2 = pi / 2.0f;
+    constexpr auto pi_4 = pi / 4.0f;
+
     foc::ThreePhase CreateThreePhase(float a, float b, float c)
     {
         return { a, b, c };
@@ -80,8 +85,8 @@ TEST_F(TestTransforms, park_zero_angle)
 
 TEST_F(TestTransforms, park_ninety_degrees)
 {
-    auto cos = std::cos(M_PI_2);
-    auto sin = std::sin(M_PI_2);
+    auto cos = std::cos(pi_2);
+    auto sin = std::sin(pi_2);
     auto input = CreateTwoPhase(0.1f, 0.0f);
     auto result = park->Forward(input, cos, sin);
 
@@ -93,8 +98,8 @@ TEST_F(TestTransforms, park_ninety_degrees)
 
 TEST_F(TestTransforms, park_inverse_recovers_original)
 {
-    auto cos = std::cos(M_PI / 4);
-    auto sin = std::sin(M_PI / 4);
+    auto cos = std::cos(pi_4);
+    auto sin = std::sin(pi_4);
     auto input = CreateTwoPhase(0.5f, 0.3f);
 
     auto dq = park->Forward(input, cos, sin);
@@ -108,8 +113,8 @@ TEST_F(TestTransforms, park_inverse_recovers_original)
 
 TEST_F(TestTransforms, clarke_park_full_transform)
 {
-    auto cos = std::cos(M_PI / 6);
-    auto sin = std::sin(M_PI / 6);
+    auto cos = std::cos(pi / 6.0f);
+    auto sin = std::sin(pi / 6.0f);
     auto input = CreateThreePhase(0.4f, -0.2f, -0.2f);
 
     auto dq = clarkePark->Forward(input, cos, sin);
@@ -125,7 +130,7 @@ TEST_F(TestTransforms, clarke_park_full_transform)
 TEST_F(TestTransforms, clarke_park_multiple_angles)
 {
     auto input = CreateThreePhase(0.5f, -0.25f, -0.25f);
-    std::vector<float> angles = { 0.0f, M_PI_4, M_PI_2, 3 * M_PI_4, M_PI };
+    std::vector<float> angles = { 0.0f, pi_4, pi_2, 3.0f * pi_4, pi };
 
     float tolerance = math::Tolerance<float>();
 
@@ -156,16 +161,16 @@ TEST_F(TestTransforms, clarke_unbalanced_system)
 
 TEST_F(TestTransforms, park_negative_angles)
 {
-    auto cos = std::cos(-M_PI_4);
-    auto sin = std::sin(-M_PI_4);
+    auto cos = std::cos(-pi_4);
+    auto sin = std::sin(-pi_4);
 
     auto input = CreateTwoPhase(0.3f, 0.2f);
     auto result = park->Forward(input, cos, sin);
 
     float tolerance = math::Tolerance<float>();
 
-    float cos45 = std::cos(-M_PI_4);
-    float sin45 = std::sin(-M_PI_4);
+    float cos45 = std::cos(-pi_4);
+    float sin45 = std::sin(-pi_4);
 
     EXPECT_NEAR(result.d, 0.3f * cos45 + 0.2f * sin45, tolerance);
     EXPECT_NEAR(result.q, -0.3f * sin45 + 0.2f * cos45, tolerance);
@@ -173,8 +178,8 @@ TEST_F(TestTransforms, park_negative_angles)
 
 TEST_F(TestTransforms, clarke_park_near_limits)
 {
-    auto cos = std::cos(M_PI / 3);
-    auto sin = std::sin(M_PI / 3);
+    auto cos = std::cos(pi / 3.0f);
+    auto sin = std::sin(pi / 3.0f);
 
     float max_val = 0.5f;
     auto input = CreateThreePhase(max_val, -max_val / 2, -max_val / 2);
@@ -202,8 +207,8 @@ TEST_F(TestTransforms, clarke_dc_offset)
 
 TEST_F(TestTransforms, park_harmonic_angle)
 {
-    float base_rads = M_PI / 6;
-    float harmonic_rads = std::fmod(base_rads + 2 * M_PI, 2 * M_PI);
+    float base_rads = pi / 6.0f;
+    float harmonic_rads = std::fmod(base_rads + 2.0f * pi, 2.0f * pi);
 
     auto base_cos = std::cos(base_rads);
     auto base_sin = std::sin(base_rads);
@@ -228,8 +233,8 @@ TEST_F(TestTransforms, clarke_park_small_values)
 
     auto input = CreateThreePhase(small_val, -small_val / 2, -small_val / 2);
 
-    auto cos = std::cos(M_PI / 4);
-    auto sin = std::sin(M_PI / 4);
+    auto cos = std::cos(pi_4);
+    auto sin = std::sin(pi_4);
 
     auto dq = clarkePark->Forward(input, cos, sin);
     auto result = clarkePark->Inverse(dq, cos, sin);

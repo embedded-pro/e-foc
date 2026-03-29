@@ -31,9 +31,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          errors=0
-
-          git submodule foreach --quiet 'echo "$sm_path"' | while read -r submodule_path; do
+          git submodule foreach --quiet "echo \$sm_path" | while read -r submodule_path; do
             echo "::group::Checking $submodule_path"
 
             pushd "$submodule_path" > /dev/null
