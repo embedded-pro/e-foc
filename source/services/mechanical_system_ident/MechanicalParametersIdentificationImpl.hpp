@@ -2,7 +2,7 @@
 
 #include "infra/timer/Timer.hpp"
 #include "infra/util/AutoResetFunction.hpp"
-#include "numerical/estimators/RecursiveLeastSquares.hpp"
+#include "numerical/estimators/online/RecursiveLeastSquares.hpp"
 #include "source/foc/implementations/TransformsClarkePark.hpp"
 #include "source/foc/interfaces/Driver.hpp"
 #include "source/foc/interfaces/Foc.hpp"

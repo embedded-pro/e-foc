@@ -1,0 +1,79 @@
+---
+name: Submodule Main Branch Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  check_submodules:
+    name: Verify submodules point to main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure Git
+        run: |
+          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: true
+          fetch-depth: 0
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+
+      - name: Verify submodules are on main
+        run: |
+          set -euo pipefail
+
+          git submodule foreach --quiet "echo \$sm_path" | while read -r submodule_path; do
+            echo "::group::Checking $submodule_path"
+
+            pushd "$submodule_path" > /dev/null
+
+            pinned_commit=$(git rev-parse HEAD)
+            remote_url=$(git remote get-url origin)
+
+            echo "  Remote:         $remote_url"
+            echo "  Pinned commit:  $pinned_commit"
+
+            git fetch origin main --quiet 2>/dev/null || {
+              echo "::error::[$submodule_path] Failed to fetch 'main' branch from $remote_url"
+              echo "1" > /tmp/submodule_errors
+              popd > /dev/null
+              echo "::endgroup::"
+              continue
+            }
+
+            main_commit=$(git rev-parse origin/main)
+            echo "  main HEAD:      $main_commit"
+
+            if [ "$pinned_commit" = "$main_commit" ]; then
+              echo "  ✅ Pinned exactly at main HEAD"
+            elif git merge-base --is-ancestor "$pinned_commit" origin/main 2>/dev/null; then
+              echo "  ⚠️  Pinned commit is an ancestor of main (not the latest)"
+              echo "::warning::[$submodule_path] Submodule is behind main. Pinned: ${pinned_commit:0:12}, main: ${main_commit:0:12}"
+            else
+              echo "  ❌ Pinned commit is NOT on main branch"
+              echo "::error::[$submodule_path] Submodule commit $pinned_commit is not reachable from main ($main_commit). The submodule may point to a dangling commit or a different branch."
+              echo "1" > /tmp/submodule_errors
+            fi
+
+            popd > /dev/null
+            echo "::endgroup::"
+          done
+
+          if [ -f /tmp/submodule_errors ]; then
+            echo ""
+            echo "❌ One or more submodules are not pointing to a commit on main."
+            echo "   Please update them with: git submodule update --remote <path>"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All submodules reference commits on their respective main branches."

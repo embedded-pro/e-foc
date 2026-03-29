@@ -9,6 +9,7 @@ target_link_libraries(e_foc.sync_foc_sensored.instantiations INTERFACE
     e_foc.foc.instantiations
     e_foc.services.electrical_system_ident
     e_foc.services.alignment
+    services.peripheral
 )
 
 target_sources(e_foc.sync_foc_sensored.instantiations INTERFACE

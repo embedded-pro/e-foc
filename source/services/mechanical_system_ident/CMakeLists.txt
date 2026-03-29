@@ -10,7 +10,7 @@ target_link_libraries(e_foc.services.mechanical_system_ident PUBLIC
     e_foc.hardware
     e_foc.foc.interfaces
     e_foc.foc.implementations
-    numerical.estimators
+    numerical.estimators.online
 )
 
 target_sources(e_foc.services.mechanical_system_ident PRIVATE

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "services/util/DebugLed.hpp"
+#include "services/peripheral/DebugLed.hpp"
 #include "source/application/hardware_test/components/Terminal.hpp"
 #include "source/hardware/HardwareFactory.hpp"
 #include "source/services/cli/TerminalWithBanner.hpp"
