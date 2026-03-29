@@ -1,7 +1,7 @@
 #pragma once
 
 #include "foc/implementations/WithAutomaticCurrentPidGains.hpp"
-#include "services/util/DebugLed.hpp"
+#include "services/peripheral/DebugLed.hpp"
 #include "source/application/sync_foc_sensored/instantiations/MotorStateMachine.hpp"
 #include "source/hardware/HardwareFactory.hpp"
 #include "source/hardware/MotorFieldOrientedControllerAdapter.hpp"

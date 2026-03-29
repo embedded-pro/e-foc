@@ -11,6 +11,7 @@ target_link_libraries(e_foc.sync_foc_sensored.torque.inst PUBLIC
     e_foc.services.cli
     e_foc.sync_foc_sensored.instantiations
     numerical.controllers.implementations
+    services.peripheral
 )
 
 target_sources(e_foc.sync_foc_sensored.torque.inst PRIVATE

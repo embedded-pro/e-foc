@@ -12,6 +12,7 @@ target_link_libraries(e_foc.hardware_test.instantiations PUBLIC
     e_foc.foc.implementations
     e_foc.services.cli
     numerical.controllers.implementations
+    services.peripheral
 )
 
 target_sources(e_foc.hardware_test.instantiations PRIVATE
