@@ -35,6 +35,9 @@ namespace application
         static hal::tiva::GpioPin uartTx{ hal::tiva::Port::A, 0 };
         static hal::tiva::GpioPin uartRx{ hal::tiva::Port::A, 1 };
 
+        static hal::tiva::GpioPin canRx{ hal::tiva::Port::F, 0 };
+        static hal::tiva::GpioPin canTx{ hal::tiva::Port::F, 3 };
+
         static hal::tiva::GpioPin performance{ hal::tiva::Port::A, 2 };
     }
 
@@ -47,6 +50,7 @@ namespace application
         constexpr static uint8_t AdcSequencerIndex = 0;
         constexpr static uint8_t UartIndex = 0;
         constexpr static uint8_t PwmIndex = 0;
+        constexpr static uint8_t CanIndex = 0;
 
         static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator0;
 

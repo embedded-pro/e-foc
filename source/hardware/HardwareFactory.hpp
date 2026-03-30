@@ -9,6 +9,7 @@
 #include "services/util/Terminal.hpp"
 #include "source/foc/interfaces/Driver.hpp"
 #include "source/hardware/AdcPhaseCurrentMeasurement.hpp"
+#include "source/hardware/CanBusAdapter.hpp"
 #include "source/hardware/QuadratureEncoderDecorator.hpp"
 #include <chrono>
 #include <cstdint>
@@ -49,5 +50,6 @@ namespace application
         virtual infra::CreatorBase<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)>& SynchronousThreeChannelsPwmCreator() = 0;
         virtual infra::CreatorBase<AdcPhaseCurrentMeasurement, void(SampleAndHold)>& AdcMultiChannelCreator() = 0;
         virtual infra::CreatorBase<QuadratureEncoderDecorator, void()>& SynchronousQuadratureEncoderCreator() = 0;
+        virtual infra::CreatorBase<CanBusAdapter, void(uint32_t bitRate, bool testMode)>& CanBusCreator() = 0;
     };
 }

@@ -40,6 +40,7 @@ namespace
         MOCK_METHOD((infra::CreatorBase<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds, hal::Hertz)>&), SynchronousThreeChannelsPwmCreator, (), (override));
         MOCK_METHOD((infra::CreatorBase<application::AdcPhaseCurrentMeasurement, void(SampleAndHold)>&), AdcMultiChannelCreator, (), (override));
         MOCK_METHOD((infra::CreatorBase<application::QuadratureEncoderDecorator, void()>&), SynchronousQuadratureEncoderCreator, (), (override));
+        MOCK_METHOD((infra::CreatorBase<application::CanBusAdapter, void(uint32_t, bool)>&), CanBusCreator, (), (override));
     };
 
     class PwmMock
@@ -84,6 +85,15 @@ namespace
         MOCK_METHOD(foc::Radians, Read, (), (override));
     };
 
+    class CanBusAdapterMock
+        : public application::CanBusAdapter
+    {
+    public:
+        MOCK_METHOD(void, SendData, (Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion), (override));
+        MOCK_METHOD(void, ReceiveData, (const infra::Function<void(Id id, const Message& data)>& receivedAction), (override));
+        MOCK_METHOD(void, SetOnError, (const infra::Function<void(CanError)>& handler), (override));
+    };
+
     class PerformanceTrackerMock
         : public hal::PerformanceTracker
     {
@@ -123,6 +133,7 @@ namespace
             EXPECT_CALL(hardwareFactoryMock, SynchronousThreeChannelsPwmCreator()).WillRepeatedly(testing::ReturnRef(pwmCreator));
             EXPECT_CALL(hardwareFactoryMock, AdcMultiChannelCreator()).WillRepeatedly(testing::ReturnRef(adcCreator));
             EXPECT_CALL(hardwareFactoryMock, SynchronousQuadratureEncoderCreator()).WillRepeatedly(testing::ReturnRef(encoderCreator));
+            EXPECT_CALL(hardwareFactoryMock, CanBusCreator()).WillRepeatedly(testing::ReturnRef(canCreator));
             EXPECT_CALL(hardwareFactoryMock, PerformanceTimer()).WillRepeatedly(testing::ReturnRef(performanceTrackerMock));
             EXPECT_CALL(hardwareFactoryMock, PowerSupplyVoltage()).WillRepeatedly(testing::Return(foc::Volts{ 24.0f }));
             EXPECT_CALL(hardwareFactoryMock, MaxCurrentSupported()).WillRepeatedly(testing::Return(foc::Ampere{ 5.0f }));
@@ -156,7 +167,7 @@ namespace
                 EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<10> terminal{ terminalWithCommands, tracer };
+        services::TerminalWithStorage::WithMaxSize<14> terminal{ terminalWithCommands, tracer };
 
         testing::StrictMock<PwmMock> pwmMock;
         testing::StrictMock<AdcMock> adcMock;
@@ -168,6 +179,8 @@ namespace
         infra::CreatorMock<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds, hal::Hertz)> pwmCreator{ pwmMock };
         infra::CreatorMock<application::AdcPhaseCurrentMeasurement, void(application::HardwareFactory::SampleAndHold)> adcCreator{ adcDecoratorMock };
         infra::CreatorMock<application::QuadratureEncoderDecorator, void()> encoderCreator{ encoderDecoratorMock };
+        testing::NiceMock<CanBusAdapterMock> canAdapterMock;
+        infra::CreatorMock<application::CanBusAdapter, void(uint32_t, bool)> canCreator{ canAdapterMock };
 
         std::optional<application::TerminalInteractor> terminalInteractor;
         infra::Function<void(foc::Ampere, foc::Ampere, foc::Ampere)> onAdcMeasurementDone;

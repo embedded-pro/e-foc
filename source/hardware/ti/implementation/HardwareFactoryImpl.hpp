@@ -8,6 +8,7 @@
 #include "hal/ti/hal_tiva/synchronous_tiva/SynchronousPwm.hpp"
 #include "hal/ti/hal_tiva/synchronous_tiva/SynchronousQuadratureEncoder.hpp"
 #include "hal/ti/hal_tiva/tiva/Adc.hpp"
+#include "hal/ti/hal_tiva/tiva/Can.hpp"
 #include "hal/ti/hal_tiva/tiva/Uart.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousAdc.hpp"
 #include "hal_tiva/tiva/Gpio.hpp"
@@ -41,6 +42,7 @@ namespace application
         infra::CreatorBase<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)>& SynchronousThreeChannelsPwmCreator() override;
         infra::CreatorBase<AdcPhaseCurrentMeasurement, void(SampleAndHold)>& AdcMultiChannelCreator() override;
         infra::CreatorBase<QuadratureEncoderDecorator, void()>& SynchronousQuadratureEncoderCreator() override;
+        infra::CreatorBase<CanBusAdapter, void(uint32_t bitRate, bool testMode)>& CanBusCreator() override;
 
         // Implementation of hal::PerformanceTracker
         void Start() override;
@@ -131,6 +133,45 @@ namespace application
                 } };
         };
 
+        struct CanImpl
+        {
+            hal::tiva::Can::Config canConfig;
+            infra::Function<void(CanBusAdapter::CanError)> onCanError;
+
+            infra::Creator<CanBusAdapter, CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<32>>, void(uint32_t bitRate, bool testMode)> canCreator{ [this](auto& object, uint32_t bitRate, bool testMode)
+                {
+                    canConfig.bitRate = bitRate;
+                    canConfig.testMode = testMode;
+
+                    object.Emplace(Peripheral::CanIndex, Pins::canRx, Pins::canTx, canConfig, infra::Function<void(hal::tiva::Can::Error)>([this](hal::tiva::Can::Error error)
+                                                                                                  {
+                                                                                                      if (onCanError)
+                                                                                                      {
+                                                                                                          CanBusAdapter::CanError mapped;
+                                                                                                          switch (error)
+                                                                                                          {
+                                                                                                              case hal::tiva::Can::Error::busOff:
+                                                                                                                  mapped = CanBusAdapter::CanError::busOff;
+                                                                                                                  break;
+                                                                                                              case hal::tiva::Can::Error::errorPassive:
+                                                                                                                  mapped = CanBusAdapter::CanError::errorPassive;
+                                                                                                                  break;
+                                                                                                              case hal::tiva::Can::Error::errorWarning:
+                                                                                                                  mapped = CanBusAdapter::CanError::errorWarning;
+                                                                                                                  break;
+                                                                                                              case hal::tiva::Can::Error::messageLost:
+                                                                                                                  mapped = CanBusAdapter::CanError::messageLost;
+                                                                                                                  break;
+                                                                                                              default:
+                                                                                                                  mapped = CanBusAdapter::CanError::other;
+                                                                                                                  break;
+                                                                                                          }
+                                                                                                          onCanError(mapped);
+                                                                                                      }
+                                                                                                  }));
+                } };
+        };
+
         struct Peripherals
         {
             Peripherals() {};
@@ -139,6 +180,7 @@ namespace application
             Cortex cortex;
             TerminalAndTracer terminalAndTracer;
             EncoderImpl encoderImpl;
+            CanImpl canImpl;
             MotorFieldOrientedControllerInterfaceImpl motorFieldOrientedController;
         };
 

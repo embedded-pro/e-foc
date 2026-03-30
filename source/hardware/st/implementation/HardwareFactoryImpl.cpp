@@ -102,6 +102,11 @@ namespace application
         return synchronousQuadratureEncoderCreator;
     }
 
+    infra::CreatorBase<CanBusAdapter, void(uint32_t bitRate, bool testMode)>& HardwareFactoryImpl::CanBusCreator()
+    {
+        return canCreator;
+    }
+
     void HardwareFactoryImpl::SerialCommunicationStub::SendData(infra::ConstByteRange data, infra::Function<void()> actionOnCompletion)
     {}
 
@@ -183,5 +188,14 @@ namespace application
     uint32_t HardwareFactoryImpl::SynchronousQuadratureEncoderStub::Speed()
     {
         return 0;
+    }
+
+    void HardwareFactoryImpl::CanStub::SendData(Id, const Message&, const infra::Function<void(bool success)>& actionOnCompletion)
+    {
+        actionOnCompletion(true);
+    }
+
+    void HardwareFactoryImpl::CanStub::ReceiveData(const infra::Function<void(Id id, const Message& data)>&)
+    {
     }
 }
