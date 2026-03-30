@@ -8,6 +8,7 @@
 #include "hal/ti/hal_tiva/synchronous_tiva/SynchronousPwm.hpp"
 #include "hal/ti/hal_tiva/synchronous_tiva/SynchronousQuadratureEncoder.hpp"
 #include "hal/ti/hal_tiva/tiva/Adc.hpp"
+#include "hal/ti/hal_tiva/tiva/Can.hpp"
 #include "hal/ti/hal_tiva/tiva/Uart.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousAdc.hpp"
 #include "hal_tiva/tiva/Gpio.hpp"
@@ -41,6 +42,7 @@ namespace application
         infra::CreatorBase<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)>& SynchronousThreeChannelsPwmCreator() override;
         infra::CreatorBase<AdcPhaseCurrentMeasurement, void(SampleAndHold)>& AdcMultiChannelCreator() override;
         infra::CreatorBase<QuadratureEncoderDecorator, void()>& SynchronousQuadratureEncoderCreator() override;
+        infra::CreatorBase<CanBusAdapter, void(uint32_t bitRate, bool testMode)>& CanBusCreator() override;
 
         // Implementation of hal::PerformanceTracker
         void Start() override;
@@ -131,6 +133,39 @@ namespace application
                 } };
         };
 
+        static CanBusAdapter::CanError ToAdapterError(hal::tiva::Can::Error error)
+        {
+            switch (error)
+            {
+                case hal::tiva::Can::Error::busOff:
+                    return CanBusAdapter::CanError::busOff;
+                case hal::tiva::Can::Error::errorPassive:
+                    return CanBusAdapter::CanError::errorPassive;
+                case hal::tiva::Can::Error::errorWarning:
+                    return CanBusAdapter::CanError::errorWarning;
+                case hal::tiva::Can::Error::messageLost:
+                    return CanBusAdapter::CanError::messageLost;
+                default:
+                    return CanBusAdapter::CanError::other;
+            }
+        }
+
+        struct CanImpl
+        {
+            hal::tiva::Can::Config canConfig;
+
+            infra::Creator<CanBusAdapter, CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<32>>, void(uint32_t bitRate, bool testMode)> canCreator{ [this](auto& object, uint32_t bitRate, bool testMode)
+                {
+                    canConfig.bitRate = bitRate;
+                    canConfig.testMode = testMode;
+
+                    object.Emplace(Peripheral::CanIndex, Pins::canRx, Pins::canTx, canConfig, infra::Function<void(hal::tiva::Can::Error)>([&object](hal::tiva::Can::Error error)
+                                                                                                  {
+                                                                                                      static_cast<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<32>>&>(*object).InvokeErrorHandler(ToAdapterError(error));
+                                                                                                  }));
+                } };
+        };
+
         struct Peripherals
         {
             Peripherals() {};
@@ -139,6 +174,7 @@ namespace application
             Cortex cortex;
             TerminalAndTracer terminalAndTracer;
             EncoderImpl encoderImpl;
+            CanImpl canImpl;
             MotorFieldOrientedControllerInterfaceImpl motorFieldOrientedController;
         };
 

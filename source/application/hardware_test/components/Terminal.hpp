@@ -28,6 +28,10 @@ namespace application
         void ProcessAdcSamples();
         StatusWithMessage SetPwmDuty(const infra::BoundedConstString& param);
         StatusWithMessage SetMotorParameters(const infra::BoundedConstString& param);
+        StatusWithMessage CanStart(const infra::BoundedConstString& param);
+        StatusWithMessage CanStop();
+        StatusWithMessage CanSend(const infra::BoundedConstString& param);
+        StatusWithMessage CanListen();
 
     private:
         static constexpr std::size_t averageSampleSize = 100;
@@ -45,6 +49,8 @@ namespace application
         infra::DelayedProxyCreator<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds, hal::Hertz)> pwmCreator;
         infra::DelayedProxyCreator<AdcPhaseCurrentMeasurement, void(HardwareFactory::SampleAndHold)> adcCreator;
         infra::DelayedProxyCreator<QuadratureEncoderDecorator, void()> encoderCreator;
+        infra::DelayedProxyCreator<CanBusAdapter, void(uint32_t, bool)> canCreator;
+        bool canStarted = false;
         QueueOfPhaseCurrents queueOfPhaseCurrents;
         hal::PerformanceTracker& performanceTimer;
         foc::Volts Vdc;

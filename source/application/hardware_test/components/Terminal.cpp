@@ -71,6 +71,7 @@ namespace application
         , pwmCreator{ hardware.SynchronousThreeChannelsPwmCreator() }
         , adcCreator{ hardware.AdcMultiChannelCreator() }
         , encoderCreator{ hardware.SynchronousQuadratureEncoderCreator() }
+        , canCreator{ hardware.CanBusCreator() }
         , performanceTimer{ hardware.PerformanceTimer() }
         , Vdc{ hardware.PowerSupplyVoltage() }
         , systemClock{ hardware.SystemClock() }
@@ -122,6 +123,30 @@ namespace application
             [this](const infra::BoundedConstString& param)
             {
                 this->terminal.ProcessResult(SetMotorParameters(param));
+            } });
+
+        terminal.AddCommand({ { "can_start", "cs", "Start CAN bus [bitrate [125000;1000000]] [test]. Ex: can_start 500000" },
+            [this](const infra::BoundedConstString& param)
+            {
+                this->terminal.ProcessResult(CanStart(param));
+            } });
+
+        terminal.AddCommand({ { "can_stop", "cx", "Stop CAN bus. Ex: can_stop" },
+            [this](const auto&)
+            {
+                this->terminal.ProcessResult(CanStop());
+            } });
+
+        terminal.AddCommand({ { "can_send", "ct", "Send CAN frame [id] [b0] ... [b7]. Ex: can_send 256 1 2 3" },
+            [this](const infra::BoundedConstString& param)
+            {
+                this->terminal.ProcessResult(CanSend(param));
+            } });
+
+        terminal.AddCommand({ { "can_listen", "cl", "Listen for CAN messages. Ex: can_listen" },
+            [this](const auto&)
+            {
+                this->terminal.ProcessResult(CanListen());
             } });
 
         encoderCreator.Emplace();
@@ -337,5 +362,100 @@ namespace application
                 else
                     ProcessAdcSamples();
             });
+    }
+
+    TerminalInteractor::StatusWithMessage TerminalInteractor::CanStart(const infra::BoundedConstString& param)
+    {
+        infra::Tokenizer tokenizer(param, ' ');
+
+        if (tokenizer.Size() < 1 || tokenizer.Size() > 2)
+            return { services::TerminalWithStorage::Status::error, "invalid number of arguments" };
+
+        auto bitRate = ParseInput<uint32_t>(tokenizer.Token(0), 125000, 1000000);
+        if (!bitRate.has_value())
+            return { services::TerminalWithStorage::Status::error, "invalid bitrate. It should be between 125000 and 1000000." };
+
+        bool testMode = false;
+        if (tokenizer.Size() == 2)
+        {
+            if (tokenizer.Token(1) == "test")
+                testMode = true;
+            else
+                return { services::TerminalWithStorage::Status::error, "invalid option. Use 'test' for loopback mode." };
+        }
+
+        canCreator.Destroy();
+        canCreator.Emplace(*bitRate, testMode);
+        canStarted = true;
+
+        canCreator->SetOnError([this](CanBusAdapter::CanError error)
+            {
+                tracer.Trace() << "  CAN Error: " << error;
+            });
+
+        tracer.Trace() << "  CAN started at " << *bitRate << " bps" << (testMode ? " (loopback)" : "");
+
+        return { services::TerminalWithStorage::Status::success };
+    }
+
+    TerminalInteractor::StatusWithMessage TerminalInteractor::CanStop()
+    {
+        canCreator.Destroy();
+        canStarted = false;
+        tracer.Trace() << "  CAN stopped";
+        return { services::TerminalWithStorage::Status::success };
+    }
+
+    TerminalInteractor::StatusWithMessage TerminalInteractor::CanSend(const infra::BoundedConstString& param)
+    {
+        if (!canStarted)
+            return { services::TerminalWithStorage::Status::error, "CAN not started. Run 'can_start' first." };
+
+        infra::Tokenizer tokenizer(param, ' ');
+
+        if (tokenizer.Size() < 2 || tokenizer.Size() > 9)
+            return { services::TerminalWithStorage::Status::error, "invalid number of arguments. Usage: can_send <id> <b0> ... <b7>" };
+
+        auto id = ParseInput<uint32_t>(tokenizer.Token(0), 0, 0x1FFFFFFF);
+        if (!id.has_value())
+            return { services::TerminalWithStorage::Status::error, "invalid CAN ID. It should be between 0 and 0x1FFFFFFF." };
+
+        hal::Can::Message message;
+        for (std::size_t i = 1; i < tokenizer.Size(); ++i)
+        {
+            auto byte = ParseInput<uint32_t>(tokenizer.Token(i), 0, 255);
+            if (!byte.has_value())
+                return { services::TerminalWithStorage::Status::error, "invalid data byte. It should be between 0 and 255." };
+            message.push_back(static_cast<uint8_t>(*byte));
+        }
+
+        hal::Can::Id canId = *id > 0x7FF ? hal::Can::Id::Create29BitId(*id) : hal::Can::Id::Create11BitId(*id);
+
+        canCreator->SendData(canId, message, [this](bool success)
+            {
+                if (success)
+                    tracer.Trace() << "  CAN frame sent";
+                else
+                    tracer.Trace() << "  CAN frame send failed";
+            });
+
+        return { services::TerminalWithStorage::Status::success };
+    }
+
+    TerminalInteractor::StatusWithMessage TerminalInteractor::CanListen()
+    {
+        if (!canStarted)
+            return { services::TerminalWithStorage::Status::error, "CAN not started. Run 'can_start' first." };
+
+        canCreator->ReceiveData([this](hal::Can::Id id, const hal::Can::Message& data)
+            {
+                uint32_t idValue = id.Is29BitId() ? id.Get29BitId() : id.Get11BitId();
+                tracer.Trace() << "  CAN RX [" << (id.Is29BitId() ? "29b" : "11b") << " ID:" << idValue << "] data:";
+                for (std::size_t i = 0; i < data.size(); ++i)
+                    tracer.Trace() << "    [" << i << "] = " << data[i];
+            });
+
+        tracer.Trace() << "  CAN listening for messages";
+        return { services::TerminalWithStorage::Status::success };
     }
 }

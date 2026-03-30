@@ -29,6 +29,7 @@ namespace application
         infra::CreatorBase<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)>& SynchronousThreeChannelsPwmCreator() override;
         infra::CreatorBase<AdcPhaseCurrentMeasurement, void(SampleAndHold)>& AdcMultiChannelCreator() override;
         infra::CreatorBase<QuadratureEncoderDecorator, void()>& SynchronousQuadratureEncoderCreator() override;
+        infra::CreatorBase<CanBusAdapter, void(uint32_t bitRate, bool testMode)>& CanBusCreator() override;
 
         // Implementation of hal::PerformanceTracker
         void Start() override;
@@ -97,6 +98,14 @@ namespace application
             uint32_t Speed() override;
         };
 
+        class CanStub
+            : public hal::Can
+        {
+        public:
+            void SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion) override;
+            void ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction) override;
+        };
+
         struct TerminalAndTracer
         {
             explicit TerminalAndTracer(hal::SerialCommunication& com)
@@ -130,6 +139,10 @@ namespace application
         infra::Creator<QuadratureEncoderDecorator, QuadratureEncoderDecoratorImpl<SynchronousQuadratureEncoderStub>, void()> synchronousQuadratureEncoderCreator{ [this](auto& object)
             {
                 object.Emplace(0);
+            } };
+        infra::Creator<CanBusAdapter, CanBusAdapterImpl<CanStub>, void(uint32_t bitRate, bool testMode)> canCreator{ [this](auto& object, auto, auto)
+            {
+                object.Emplace();
             } };
     };
 }

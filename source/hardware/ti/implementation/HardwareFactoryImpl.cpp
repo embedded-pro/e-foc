@@ -112,4 +112,9 @@ namespace application
     {
         return peripherals->encoderImpl.synchronousQuadratureEncoderCreator;
     }
+
+    infra::CreatorBase<CanBusAdapter, void(uint32_t bitRate, bool testMode)>& HardwareFactoryImpl::CanBusCreator()
+    {
+        return peripherals->canImpl.canCreator;
+    }
 }
