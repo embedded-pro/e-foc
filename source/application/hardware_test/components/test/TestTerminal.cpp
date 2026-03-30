@@ -1452,3 +1452,222 @@ TEST_F(TestHardwareTerminal, can_send_after_stop_returns_error)
 
     ExecuteAllActions();
 }
+
+TEST_F(TestHardwareTerminal, can_send_invalid_id_returns_error)
+{
+    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
+
+    InvokeCommand("can_start 500000", [this]()
+        {
+            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    InvokeCommand("can_send abc 1", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid CAN ID. It should be between 0 and 0x1FFFFFFF." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, can_send_invalid_data_byte_returns_error)
+{
+    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
+
+    InvokeCommand("can_start 500000", [this]()
+        {
+            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    InvokeCommand("can_send 100 999", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid data byte. It should be between 0 and 255." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, can_send_success_callback_traces_message)
+{
+    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
+
+    InvokeCommand("can_start 500000", [this]()
+        {
+            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    infra::Function<void(bool)> sendCallback;
+
+    InvokeCommand("can_send 100 1 2", [this, &sendCallback]()
+        {
+            EXPECT_CALL(canAdapterMock, SendData(testing::_, testing::_, testing::_))
+                .WillOnce(testing::SaveArg<2>(&sendCallback));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+    sendCallback(true);
+}
+
+TEST_F(TestHardwareTerminal, can_send_failure_callback_traces_message)
+{
+    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
+
+    InvokeCommand("can_start 500000", [this]()
+        {
+            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    infra::Function<void(bool)> sendCallback;
+
+    InvokeCommand("can_send 100 1 2", [this, &sendCallback]()
+        {
+            EXPECT_CALL(canAdapterMock, SendData(testing::_, testing::_, testing::_))
+                .WillOnce(testing::SaveArg<2>(&sendCallback));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+    sendCallback(false);
+}
+
+TEST_F(TestHardwareTerminal, can_listen_receive_callback_traces_11bit_message)
+{
+    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
+
+    InvokeCommand("can_start 500000", [this]()
+        {
+            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    infra::Function<void(hal::Can::Id, const hal::Can::Message&)> receiveCallback;
+
+    InvokeCommand("can_listen", [this, &receiveCallback]()
+        {
+            EXPECT_CALL(canAdapterMock, ReceiveData(testing::_))
+                .WillOnce(testing::SaveArg<0>(&receiveCallback));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    hal::Can::Message msg;
+    msg.push_back(0xAA);
+    msg.push_back(0xBB);
+
+    EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+    receiveCallback(hal::Can::Id::Create11BitId(0x100), msg);
+}
+
+TEST_F(TestHardwareTerminal, can_listen_receive_callback_traces_29bit_message)
+{
+    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
+
+    InvokeCommand("can_start 500000", [this]()
+        {
+            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    infra::Function<void(hal::Can::Id, const hal::Can::Message&)> receiveCallback;
+
+    InvokeCommand("can_listen", [this, &receiveCallback]()
+        {
+            EXPECT_CALL(canAdapterMock, ReceiveData(testing::_))
+                .WillOnce(testing::SaveArg<0>(&receiveCallback));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    hal::Can::Message msg;
+    msg.push_back(0xCC);
+
+    EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+    receiveCallback(hal::Can::Id::Create29BitId(0x1ABCDEF), msg);
+}
+
+TEST_F(TestHardwareTerminal, can_error_callback_traces_error)
+{
+    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
+
+    infra::Function<void(application::CanBusAdapter::CanError)> errorCallback;
+
+    InvokeCommand("can_start 500000", [this, &errorCallback]()
+        {
+            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(canAdapterMock, SetOnError(testing::_))
+                .WillOnce(testing::SaveArg<0>(&errorCallback));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+    errorCallback(application::CanBusAdapter::CanError::busOff);
+}
+
+TEST_F(TestHardwareTerminal, can_send_with_29bit_id)
+{
+    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
+
+    InvokeCommand("can_start 500000", [this]()
+        {
+            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    InvokeCommand("can_send 2048 1", [this]()
+        {
+            EXPECT_CALL(canAdapterMock, SendData(hal::Can::Id::Create29BitId(2048), testing::_, testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+}
