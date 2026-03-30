@@ -35,10 +35,8 @@ namespace application
         CanBusAdapterImpl() = default;
 
         template<typename... Args>
-            requires(sizeof...(Args) > 0 && (!std::same_as<std::remove_cvref_t<Args>, CanBusAdapterImpl> && ...))
-        explicit CanBusAdapterImpl(Args&&... args)
-            : can(std::forward<Args>(args)...)
-        {}
+        requires(sizeof...(Args) > 0 && (!std::same_as<std::remove_cvref_t<Args>, CanBusAdapterImpl> && ...))
+        explicit CanBusAdapterImpl(Args&&... args);
 
         void SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion) override;
         void ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction) override;
@@ -51,6 +49,14 @@ namespace application
     };
 
     // Implementation
+
+    template<std::derived_from<hal::Can> Impl>
+    template<typename... Args>
+    requires(sizeof...(Args) > 0 && (!std::same_as<std::remove_cvref_t<Args>, CanBusAdapterImpl<Impl>> && ...))
+    CanBusAdapterImpl<Impl>::CanBusAdapterImpl(Args&&... args)
+        : can(std::forward<Args>(args)...)
+    {
+    }
 
     template<std::derived_from<hal::Can> Impl>
     void CanBusAdapterImpl<Impl>::SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion)
