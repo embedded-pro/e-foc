@@ -1202,3 +1202,253 @@ TEST_F(TestHardwareTerminal, encoder_returns_negative_position)
 
     ExecuteAllActions();
 }
+
+// CAN command tests
+
+TEST_F(TestHardwareTerminal, can_start_command)
+{
+    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
+
+    InvokeCommand("can_start 500000", [this]()
+        {
+            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, can_start_with_test_mode)
+{
+    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
+
+    InvokeCommand("can_start 250000 test", [this]()
+        {
+            EXPECT_CALL(canCreator, Constructed(250000u, true));
+            EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, can_start_invalid_argument_count)
+{
+    InvokeCommand("can_start", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid number of arguments" };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, can_start_invalid_bitrate)
+{
+    InvokeCommand("can_start 50000", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid bitrate. It should be between 125000 and 1000000." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, can_start_invalid_option)
+{
+    InvokeCommand("can_start 500000 invalid", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid option. Use 'test' for loopback mode." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, can_stop_command)
+{
+    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
+
+    InvokeCommand("can_start 500000", [this]()
+        {
+            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    InvokeCommand("can_stop", [this]()
+        {
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, can_send_without_start_returns_error)
+{
+    InvokeCommand("can_send 100 0x01 0x02", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "CAN not started. Run 'can_start' first." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, can_listen_without_start_returns_error)
+{
+    InvokeCommand("can_listen", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "CAN not started. Run 'can_start' first." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, can_send_calls_send_data)
+{
+    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
+
+    InvokeCommand("can_start 500000", [this]()
+        {
+            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    InvokeCommand("can_send 100 1 2 3", [this]()
+        {
+            EXPECT_CALL(canAdapterMock, SendData(testing::_, testing::_, testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, can_send_invalid_argument_count)
+{
+    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
+
+    InvokeCommand("can_start 500000", [this]()
+        {
+            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    InvokeCommand("can_send", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid number of arguments. Usage: can_send <id> <b0> ... <b7>" };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, can_listen_calls_receive_data)
+{
+    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
+
+    InvokeCommand("can_start 500000", [this]()
+        {
+            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    InvokeCommand("can_listen", [this]()
+        {
+            EXPECT_CALL(canAdapterMock, ReceiveData(testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, can_send_after_stop_returns_error)
+{
+    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
+
+    InvokeCommand("can_start 500000", [this]()
+        {
+            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    InvokeCommand("can_stop", [this]()
+        {
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    InvokeCommand("can_send 100 1", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "CAN not started. Run 'can_start' first." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}

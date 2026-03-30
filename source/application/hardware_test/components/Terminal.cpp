@@ -386,30 +386,11 @@ namespace application
 
         canCreator.Destroy();
         canCreator.Emplace(*bitRate, testMode);
+        canStarted = true;
 
         canCreator->SetOnError([this](CanBusAdapter::CanError error)
             {
-                switch (error)
-                {
-                    case CanBusAdapter::CanError::busOff:
-                        tracer.Trace() << "  CAN Error: bus off";
-                        break;
-                    case CanBusAdapter::CanError::errorPassive:
-                        tracer.Trace() << "  CAN Error: error passive";
-                        break;
-                    case CanBusAdapter::CanError::errorWarning:
-                        tracer.Trace() << "  CAN Error: error warning";
-                        break;
-                    case CanBusAdapter::CanError::messageLost:
-                        tracer.Trace() << "  CAN Error: message lost";
-                        break;
-                    case CanBusAdapter::CanError::rxBufferOverflow:
-                        tracer.Trace() << "  CAN Error: rx buffer overflow";
-                        break;
-                    default:
-                        tracer.Trace() << "  CAN Error: unknown";
-                        break;
-                }
+                tracer.Trace() << "  CAN Error: " << error;
             });
 
         tracer.Trace() << "  CAN started at " << *bitRate << " bps" << (testMode ? " (loopback)" : "");
@@ -420,12 +401,16 @@ namespace application
     TerminalInteractor::StatusWithMessage TerminalInteractor::CanStop()
     {
         canCreator.Destroy();
+        canStarted = false;
         tracer.Trace() << "  CAN stopped";
         return { services::TerminalWithStorage::Status::success };
     }
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::CanSend(const infra::BoundedConstString& param)
     {
+        if (!canStarted)
+            return { services::TerminalWithStorage::Status::error, "CAN not started. Run 'can_start' first." };
+
         infra::Tokenizer tokenizer(param, ' ');
 
         if (tokenizer.Size() < 2 || tokenizer.Size() > 9)
@@ -459,6 +444,9 @@ namespace application
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::CanListen()
     {
+        if (!canStarted)
+            return { services::TerminalWithStorage::Status::error, "CAN not started. Run 'can_start' first." };
+
         canCreator->ReceiveData([this](hal::Can::Id id, const hal::Can::Message& data)
             {
                 uint32_t idValue = id.Is29BitId() ? id.Get29BitId() : id.Get11BitId();

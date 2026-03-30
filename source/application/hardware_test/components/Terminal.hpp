@@ -50,6 +50,7 @@ namespace application
         infra::DelayedProxyCreator<AdcPhaseCurrentMeasurement, void(HardwareFactory::SampleAndHold)> adcCreator;
         infra::DelayedProxyCreator<QuadratureEncoderDecorator, void()> encoderCreator;
         infra::DelayedProxyCreator<CanBusAdapter, void(uint32_t, bool)> canCreator;
+        bool canStarted = false;
         QueueOfPhaseCurrents queueOfPhaseCurrents;
         hal::PerformanceTracker& performanceTimer;
         foc::Volts Vdc;

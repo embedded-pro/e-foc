@@ -133,41 +133,35 @@ namespace application
                 } };
         };
 
+        static CanBusAdapter::CanError ToAdapterError(hal::tiva::Can::Error error)
+        {
+            switch (error)
+            {
+                case hal::tiva::Can::Error::busOff:
+                    return CanBusAdapter::CanError::busOff;
+                case hal::tiva::Can::Error::errorPassive:
+                    return CanBusAdapter::CanError::errorPassive;
+                case hal::tiva::Can::Error::errorWarning:
+                    return CanBusAdapter::CanError::errorWarning;
+                case hal::tiva::Can::Error::messageLost:
+                    return CanBusAdapter::CanError::messageLost;
+                default:
+                    return CanBusAdapter::CanError::other;
+            }
+        }
+
         struct CanImpl
         {
             hal::tiva::Can::Config canConfig;
-            infra::Function<void(CanBusAdapter::CanError)> onCanError;
 
             infra::Creator<CanBusAdapter, CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<32>>, void(uint32_t bitRate, bool testMode)> canCreator{ [this](auto& object, uint32_t bitRate, bool testMode)
                 {
                     canConfig.bitRate = bitRate;
                     canConfig.testMode = testMode;
 
-                    object.Emplace(Peripheral::CanIndex, Pins::canRx, Pins::canTx, canConfig, infra::Function<void(hal::tiva::Can::Error)>([this](hal::tiva::Can::Error error)
+                    object.Emplace(Peripheral::CanIndex, Pins::canRx, Pins::canTx, canConfig, infra::Function<void(hal::tiva::Can::Error)>([&object](hal::tiva::Can::Error error)
                                                                                                   {
-                                                                                                      if (onCanError)
-                                                                                                      {
-                                                                                                          CanBusAdapter::CanError mapped;
-                                                                                                          switch (error)
-                                                                                                          {
-                                                                                                              case hal::tiva::Can::Error::busOff:
-                                                                                                                  mapped = CanBusAdapter::CanError::busOff;
-                                                                                                                  break;
-                                                                                                              case hal::tiva::Can::Error::errorPassive:
-                                                                                                                  mapped = CanBusAdapter::CanError::errorPassive;
-                                                                                                                  break;
-                                                                                                              case hal::tiva::Can::Error::errorWarning:
-                                                                                                                  mapped = CanBusAdapter::CanError::errorWarning;
-                                                                                                                  break;
-                                                                                                              case hal::tiva::Can::Error::messageLost:
-                                                                                                                  mapped = CanBusAdapter::CanError::messageLost;
-                                                                                                                  break;
-                                                                                                              default:
-                                                                                                                  mapped = CanBusAdapter::CanError::other;
-                                                                                                                  break;
-                                                                                                          }
-                                                                                                          onCanError(mapped);
-                                                                                                      }
+                                                                                                      static_cast<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<32>>&>(*object).InvokeErrorHandler(ToAdapterError(error));
                                                                                                   }));
                 } };
         };
