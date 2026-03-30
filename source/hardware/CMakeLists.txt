@@ -18,7 +18,6 @@ target_link_libraries(e_foc.hardware PUBLIC
 target_sources(e_foc.hardware PRIVATE
     AdcPhaseCurrentMeasurement.hpp
     CanBusAdapter.hpp
-    CanBusAdapter.cpp
     HardwareFactory.hpp
     MotorFieldOrientedControllerAdapter.hpp
     MotorFieldOrientedControllerAdapter.cpp

@@ -25,6 +25,33 @@ namespace application
         };
 
         virtual void SetOnError(const infra::Function<void(CanError)>& handler) = 0;
+
+        friend infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, CanError error)
+        {
+            switch (error)
+            {
+                case CanError::busOff:
+                    stream << "bus off";
+                    break;
+                case CanError::errorPassive:
+                    stream << "error passive";
+                    break;
+                case CanError::errorWarning:
+                    stream << "error warning";
+                    break;
+                case CanError::messageLost:
+                    stream << "message lost";
+                    break;
+                case CanError::rxBufferOverflow:
+                    stream << "rx buffer overflow";
+                    break;
+                default:
+                    stream << "unknown";
+                    break;
+            }
+
+            return stream;
+        }
     };
 
     template<std::derived_from<hal::Can> Impl>
@@ -43,7 +70,7 @@ namespace application
         void SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion) override;
         void ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction) override;
         void SetOnError(const infra::Function<void(CanError)>& handler) override;
-        void InvokeErrorHandler(CanError error);
+        void InvokeErrorHandler(CanError error) const;
 
     private:
         Impl can;
@@ -71,14 +98,9 @@ namespace application
     }
 
     template<std::derived_from<hal::Can> Impl>
-    void CanBusAdapterImpl<Impl>::InvokeErrorHandler(CanError error)
+    void CanBusAdapterImpl<Impl>::InvokeErrorHandler(CanError error) const
     {
         if (onError)
             onError(error);
     }
-}
-
-namespace infra
-{
-    infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, const application::CanBusAdapter::CanError& error);
 }
