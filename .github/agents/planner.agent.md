@@ -110,14 +110,15 @@ Before finalizing, verify the plan against these constraints:
 
 ## Critical Constraints Checklist
 
-### Memory — NO HEAP ALLOCATION
-- [ ] No `new`, `delete`, `malloc`, `free`, `std::make_unique`, `std::make_shared`
-- [ ] No `std::vector` → use `infra::BoundedVector<T>::WithMaxSize<N>`
-- [ ] No `std::string` → use `infra::BoundedString::WithStorage<N>`
-- [ ] No `std::deque`, `std::list`, `std::map`, `std::set` — use bounded alternatives
-- [ ] All memory statically allocated or on the stack
-- [ ] No recursion (stack usage must be predictable)
+Scope note: The memory and realtime constraints below apply to embedded/runtime motor-control code and hot paths (for example `source/foc/`, embedded `source/hardware/`, ISR-driven services, and other deterministic control-loop code). Host-side tools, simulators, test infrastructure, and GUI code may use normal host-side STL/heap patterns unless the task explicitly targets embedded/runtime code.
 
+### Memory — NO HEAP ALLOCATION IN EMBEDDED / REALTIME RUNTIME CODE
+- [ ] In embedded/runtime FOC code, no `new`, `delete`, `malloc`, `free`, `std::make_unique`, `std::make_shared`
+- [ ] In embedded/runtime FOC code, no `std::vector` → use `infra::BoundedVector<T>::WithMaxSize<N>`
+- [ ] In embedded/runtime FOC code, no `std::string` → use `infra::BoundedString::WithStorage<N>`
+- [ ] In embedded/runtime FOC code, no `std::deque`, `std::list`, `std::map`, `std::set` — use bounded alternatives
+- [ ] In embedded/runtime paths, all memory is statically allocated or on the stack
+- [ ] No recursion in embedded/runtime control paths (stack usage must be predictable)
 ### Real-Time — FOC LOOP CONSTRAINTS
 - [ ] `Calculate()` hot path is free of virtual dispatch (use concrete types or templates)
 - [ ] No blocking calls (no `sleep`, no busy-wait) in ISR/FOC context

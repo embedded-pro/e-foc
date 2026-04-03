@@ -54,15 +54,16 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 
 ## Review Checklist
 
-### 1. Memory Safety (CRITICAL)
+### 1. Memory Safety — Embedded Runtime / Hot Path (CRITICAL)
 
-- [ ] No `new`, `delete`, `malloc`, `free` anywhere
-- [ ] No `std::make_unique`, `std::make_shared`
-- [ ] No `std::vector` — must use `infra::BoundedVector<T>::WithMaxSize<N>`
-- [ ] No `std::string` — must use `infra::BoundedString::WithStorage<N>`
-- [ ] No `std::deque`, `std::list`, `std::map`, `std::set` — find bounded alternatives
-- [ ] All memory is statically allocated or stack-allocated
-- [ ] No recursion (stack usage must be predictable)
+- [ ] In embedded runtime code (`source/foc/`, `source/hardware/`, ISR-reachable paths, and other control-loop/hot-path code), no `new`, `delete`, `malloc`, `free`
+- [ ] In embedded runtime code, no `std::make_unique`, `std::make_shared`
+- [ ] In embedded runtime code, no `std::vector` — must use `infra::BoundedVector<T>::WithMaxSize<N>`
+- [ ] In embedded runtime code, no `std::string` — must use `infra::BoundedString::WithStorage<N>`
+- [ ] In embedded runtime code, no `std::deque`, `std::list`, `std::map`, `std::set` — find bounded alternatives
+- [ ] Embedded runtime memory is statically allocated or stack-allocated with predictable bounds
+- [ ] No recursion in embedded runtime / ISR / hot-path code (stack usage must be predictable)
+- [ ] For host-side tools, simulators, and tests, do not raise a CRITICAL finding solely for STL/heap usage; instead assess whether the choice is appropriate for that module and consistent with existing patterns
 
 ### 2. Real-Time Safety — FOC Loop (CRITICAL)
 

@@ -155,7 +155,7 @@ TEST_F(TestTransformsClarkePark, clarke_transform_produces_correct_alpha_beta)
 
 Use `TYPED_TEST` if code is templated across numeric types (see `numerical-toolbox` patterns).
 
-**Never use plain `TEST()` macro** — cppcheck will report `syntaxError`.
+Prefer `TEST_F` for FOC test suites that share setup/fixtures, and use `TYPED_TEST` for coverage across numeric types. Plain `TEST()` is acceptable for simple, stateless cases when it matches existing repository patterns.
 
 Rules:
 - Verify transform correctness against known mathematical reference values
