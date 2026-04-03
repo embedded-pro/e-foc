@@ -1,0 +1,89 @@
+---
+description: "e-foc testing guidelines: TEST_F for fixture tests, TYPED_TEST for multi-type tests, no plain TEST() macro, FOC transform correctness tests, PID anti-windup tests, SVM sector tests, host simulation for integration, Arrange-Act-Assert pattern."
+applyTo: "**/test/**"
+---
+
+# e-foc Testing Guidelines
+
+## File Structure
+
+- Unit test files: `source/foc/implementations/test/Test{ComponentName}.cpp`
+- Hardware stubs for unit tests: `source/hardware/Host/`
+- Host simulation models for integration: `source/tool/simulator/`
+- CMake: tests added via `add_subdirectory(test)` in `CMakeLists.txt`
+
+## Framework
+
+- GoogleTest for assertions (`TEST_F`, `TYPED_TEST`)
+- GoogleMock for mocking hardware interfaces (`testing::StrictMock<>`)
+- No heap allocation in tests — same rules as production code
+- **NEVER use plain `TEST()` macro** — cppcheck reports `syntaxError`
+
+## Fixture Test Pattern (single type — most FOC tests)
+
+```cpp
+#include "source/foc/implementations/TransformsClarkePark.hpp"
+#include <gtest/gtest.h>
+
+namespace
+{
+    class TestTransformsClarkePark : public ::testing::Test
+    {
+    protected:
+        foc::TransformsClarkePark transforms;
+    };
+}
+
+TEST_F(TestTransformsClarkePark, clarke_produces_correct_alpha_from_balanced_currents)
+{
+    // Arrange
+    // Act
+    // Assert
+}
+```
+
+## Typed Test Pattern (multiple numeric types — for templated algorithms)
+
+```cpp
+#include "numerical/filters/passive/FirFilter.hpp"
+#include <gtest/gtest.h>
+
+namespace
+{
+    template<typename T>
+    class TestFirFilter : public ::testing::Test {};
+
+    using TestTypes = ::testing::Types<float, math::Q15, math::Q31>;
+    TYPED_TEST_SUITE(TestFirFilter, TestTypes);
+}
+
+TYPED_TEST(TestFirFilter, produces_correct_output)
+{
+    // Arrange, Act, Assert
+}
+```
+
+## Rules
+
+- Fixture class inside anonymous `namespace {}`
+- Test macros (`TEST_F`, `TYPED_TEST`) **outside** the anonymous namespace
+- Include `<gtest/gtest.h>` (not `<gmock/gmock.h>`) unless gmock matchers are needed
+- Use `testing::StrictMock<MockType>` for hardware interface mocks
+
+## FOC-Specific Test Requirements
+
+- **Clarke/Park transforms**: Verify against known analytical values (e.g., balanced symmetrical currents give known Iα, Iβ, Id, Iq)
+- **SVM**: Test duty cycles for all 6 sectors and sector boundaries
+- **PID anti-windup**: Verify that integrator is clamped and does not accumulate past output limits
+- **Electrical angle conversion**: Verify `θe = θm · pole_pairs` for multiple pole-pair counts
+- **Control loop integration**: Use host simulation models in `source/tool/simulator/` for end-to-end validation
+- Test edge cases: zero current, maximum current, zero speed, maximum speed, angle wraparound at ±π
+
+## Test Quality
+
+- Use descriptive test names that state the scenario and expected outcome
+- Keep tests focused — one behavior per test
+- Use `EXPECT_NEAR` with explicit tolerance for floating-point assertions (not `EXPECT_EQ`)
+- Tests must not require hardware — use stubs from `source/hardware/Host/`
+- Follow Arrange-Act-Assert pattern
+- Allman brace style applies to test code too
