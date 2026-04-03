@@ -1,5 +1,5 @@
 ---
-description: "e-foc testing guidelines: TEST_F for fixture tests, TYPED_TEST for multi-type tests, no plain TEST() macro, FOC transform correctness tests, PID anti-windup tests, SVM sector tests, host simulation for integration, Arrange-Act-Assert pattern."
+description: "e-foc testing guidelines: prefer TEST_F for fixture-based tests, TYPED_TEST for multi-type tests, FOC transform correctness tests, PID anti-windup tests, SVM sector tests, host simulation for integration, Arrange-Act-Assert pattern."
 applyTo: "**/test/**"
 ---
 
@@ -14,10 +14,9 @@ applyTo: "**/test/**"
 
 ## Framework
 
-- GoogleTest for assertions (`TEST_F`, `TYPED_TEST`)
+- GoogleTest for assertions (`TEST_F`, `TYPED_TEST`, `TEST`)
 - GoogleMock for mocking hardware interfaces (`testing::StrictMock<>`)
-- No heap allocation in tests — same rules as production code
-- **NEVER use plain `TEST()` macro** — cppcheck reports `syntaxError`
+- Heap allocation (`std::make_unique`, `std::vector`, etc.) is permitted in host-side unit tests; the no-heap rule applies only to embedded target code and ISR-reachable paths
 
 ## Fixture Test Pattern (single type — most FOC tests)
 
@@ -65,8 +64,10 @@ TYPED_TEST(TestFirFilter, produces_correct_output)
 
 ## Rules
 
+- Prefer `TEST_F` when tests share fixture state or setup/teardown logic
+- Use plain `TEST()` for simple, stateless tests without shared setup — it is acceptable and used throughout the codebase
 - Fixture class inside anonymous `namespace {}`
-- Test macros (`TEST_F`, `TYPED_TEST`) **outside** the anonymous namespace
+- Test macros (`TEST_F`, `TEST`, `TYPED_TEST`) **outside** the anonymous namespace
 - Include `<gtest/gtest.h>` (not `<gmock/gmock.h>`) unless gmock matchers are needed
 - Use `testing::StrictMock<MockType>` for hardware interface mocks
 

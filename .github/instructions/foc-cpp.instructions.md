@@ -1,11 +1,13 @@
 ---
-description: "e-foc C++ coding rules: no heap allocation, bounded containers, real-time determinism, FOC theory correctness (Clarke/Park/SVM), motor control best practices, embedded compiler optimizations, Allman brace style, PascalCase naming, SOLID principles, const correctness, documentation alignment."
-applyTo: "**/*.{hpp,cpp,h}"
+description: "e-foc C++ coding rules for embedded/real-time code: no heap allocation, bounded containers, real-time determinism, FOC theory correctness (Clarke/Park/SVM), motor control best practices, embedded compiler optimizations, Allman brace style, PascalCase naming, SOLID principles, const correctness, documentation alignment."
+applyTo: "source/{foc,hardware,application}/**"
 ---
 
 # e-foc C++ Rules
 
-This project is a Field-Oriented Control (FOC) implementation for BLDC/PMSM motors targeting resource-constrained embedded microcontrollers. Follow these rules strictly.
+> **Scope**: These rules apply to the embedded and real-time code paths (`source/foc/`, `source/hardware/`, `source/application/`). Host-side tooling (`source/tool/`, `source/services/`) may use standard library heap allocation where appropriate for a host environment.
+
+This project is a Field-Oriented Control (FOC) implementation for BLDC/PMSM motors targeting resource-constrained embedded microcontrollers. Follow these rules strictly within the scoped paths.
 
 ## Memory — No Heap Allocation
 
