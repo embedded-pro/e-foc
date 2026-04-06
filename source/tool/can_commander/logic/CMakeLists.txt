@@ -6,7 +6,7 @@ target_include_directories(e_foc.tool.can_commander.logic PUBLIC
 )
 
 target_link_libraries(e_foc.tool.can_commander.logic PUBLIC
-    e_foc.services.can_protocol.client
+    can_lite.categories.foc_motor
     e_foc.tool.can_commander.adapter
 )
 

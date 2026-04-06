@@ -52,6 +52,15 @@ set(EMIL_INCLUDE_MBEDTLS Off CACHE BOOL "" FORCE)
 
 add_subdirectory(embedded-infra-lib)
 
+include(FetchContent)
+
+FetchContent_Declare(
+    can-lite
+    GIT_REPOSITORY https://github.com/embedded-pro/can-lite.git
+    GIT_TAG        main
+)
+FetchContent_MakeAvailable(can-lite)
+
 if (E_FOC_BUILD_TESTS)
     include(CTest)
     emil_enable_testing()

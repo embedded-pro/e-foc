@@ -83,14 +83,15 @@ namespace tool
                 client.SendEmergencyStop();
                 timeoutTimer.start(2000);
             });
-        connect(commandPanel, &CommandPanel::SetControlModeRequested, [this](services::CanControlMode mode)
+        connect(commandPanel, &CommandPanel::SetControlModeRequested, [this](services::FocMotorMode mode)
             {
                 client.SendSetControlMode(mode);
+                commandPanel->SetActiveControlMode(mode);
                 timeoutTimer.start(2000);
             });
-        connect(commandPanel, &CommandPanel::SetTorqueSetpointRequested, [this](float id, float iq)
+        connect(commandPanel, &CommandPanel::SetTorqueSetpointRequested, [this](float iq)
             {
-                client.SendSetTorqueSetpoint(id, iq);
+                client.SendSetTorqueSetpoint(iq);
                 timeoutTimer.start(2000);
             });
         connect(commandPanel, &CommandPanel::SetSpeedSetpointRequested, [this](float speed)
@@ -109,11 +110,6 @@ namespace tool
                 client.SendSetCurrentIdPid(kp, ki, kd);
                 timeoutTimer.start(2000);
             });
-        connect(commandPanel, &CommandPanel::SetCurrentIqPidRequested, [this](float kp, float ki, float kd)
-            {
-                client.SendSetCurrentIqPid(kp, ki, kd);
-                timeoutTimer.start(2000);
-            });
         connect(commandPanel, &CommandPanel::SetSpeedPidRequested, [this](float kp, float ki, float kd)
             {
                 client.SendSetSpeedPid(kp, ki, kd);
@@ -128,17 +124,15 @@ namespace tool
         connect(commandPanel, &CommandPanel::SetSupplyVoltageRequested, [this](float v)
             {
                 client.SendSetSupplyVoltage(v);
-                timeoutTimer.start(2000);
             });
         connect(commandPanel, &CommandPanel::SetMaxCurrentRequested, [this](float a)
             {
                 client.SendSetMaxCurrent(a);
-                timeoutTimer.start(2000);
             });
 
         connect(commandPanel, &CommandPanel::RequestDataRequested, [this]()
             {
-                client.RequestData(services::DataRequestFlags::all);
+                client.RequestData();
             });
 
         connect(nodeIdSpin, &QSpinBox::valueChanged, [this](int value)
@@ -167,7 +161,7 @@ namespace tool
         if (connected)
         {
             SetupSocketNotifier();
-            client.RequestData(services::DataRequestFlags::all);
+            client.RequestData();
         }
         else
         {
@@ -192,20 +186,9 @@ namespace tool
         logView->appendPlainText(QString("ERROR: %1").arg(QString::fromUtf8(message.data(), static_cast<int>(message.size()))));
     }
 
-    void MainWindow::OnCommandAckReceived(services::CanCategory category, services::CanMessageType command, services::CanAckStatus status)
+    void MainWindow::OnMotorStatusReceived(services::FocMotorState state, services::FocFaultCode fault)
     {
-        timeoutTimer.stop();
-        telemetryPanel->OnCommandAck(category, command, status);
-    }
-
-    void MainWindow::OnMotorStatusReceived(services::CanMotorState state, services::CanControlMode mode, services::CanFaultCode fault)
-    {
-        telemetryPanel->OnMotorStatus(state, mode, fault);
-    }
-
-    void MainWindow::OnControlModeReceived(services::CanControlMode mode)
-    {
-        commandPanel->SetActiveControlMode(mode);
+        telemetryPanel->OnMotorStatus(state, fault);
     }
 
     void MainWindow::OnCurrentMeasurementReceived(float idCurrent, float iqCurrent)
@@ -223,7 +206,7 @@ namespace tool
         telemetryPanel->OnBusVoltage(voltage);
     }
 
-    void MainWindow::OnFaultEventReceived(services::CanFaultCode fault)
+    void MainWindow::OnFaultEventReceived(services::FocFaultCode fault)
     {
         telemetryPanel->OnFaultEvent(fault);
     }

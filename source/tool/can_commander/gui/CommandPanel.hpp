@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/services/can_protocol/core/CanProtocolDefinitions.hpp"
+#include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QGroupBox>
@@ -25,13 +25,12 @@ namespace tool
         void StartMotorRequested();
         void StopMotorRequested();
         void EmergencyStopRequested();
-        void SetControlModeRequested(services::CanControlMode mode);
-        void SetTorqueSetpointRequested(float idCurrent, float iqCurrent);
+        void SetControlModeRequested(services::FocMotorMode mode);
+        void SetTorqueSetpointRequested(float iqCurrent);
         void SetSpeedSetpointRequested(float speedRadPerSec);
         void SetPositionSetpointRequested(float positionRad);
 
         void SetCurrentIdPidRequested(float kp, float ki, float kd);
-        void SetCurrentIqPidRequested(float kp, float ki, float kd);
         void SetSpeedPidRequested(float kp, float ki, float kd);
         void SetPositionPidRequested(float kp, float ki, float kd);
 
@@ -42,7 +41,7 @@ namespace tool
 
     public slots:
         void SetCommandsEnabled(bool enabled);
-        void SetActiveControlMode(services::CanControlMode mode);
+        void SetActiveControlMode(services::FocMotorMode mode);
 
     private:
         QWidget* CreateMotorControlTab();

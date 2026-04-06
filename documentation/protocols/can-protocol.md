@@ -37,7 +37,7 @@ All 29 bits of the extended CAN ID are structured as follows:
 ```
 Bit:  28  27  26  25  24  23  22  21  20  19  18  17  16  15  14  13  12  11  10  9   8   7   6   5   4   3   2   1   0
      |----  Priority  ----|-- Category --|------  Message Type  ------|----------------- Node ID -------------------|
-     |     5 bits (0-31)  |  4 bits (0-F)|       8 bits (0-FF)       |             12 bits (0-FFF)                  |
+     |     5 bits (0-31)  |  4 bits (0-F)|       8 bits (0-FF)        |             12 bits (0-FFF)                 |
 ```
 
 ```mermaid
@@ -469,8 +469,8 @@ sequenceDiagram
 
 ## 15. Implementation Notes
 
-- The protocol is implemented in `source/services/can_protocol/`.
+- The protocol is implemented by the external `can-lite` library (https://github.com/embedded-pro/can-lite).
 - Observer pattern uses `infra::SingleObserver` / `infra::Subject` from embedded-infra-lib.
-- Category-based dispatch uses a polymorphic handler hierarchy (`CanCategoryHandler`).
-- All encoding uses `CanFrameCodec` with saturation clamping.
+- Category-based dispatch uses `FocMotorCategoryClient`, which routes decoded frames to `FocMotorCategoryClientObserver` callbacks.
+- All encoding and saturation clamping is handled internally by can-lite.
 - The implementation is fully covered by 67 GoogleTest unit tests.

@@ -1,8 +1,11 @@
 #pragma once
 
+#include "can-lite/categories/foc_motor/FocMotorCategoryClient.hpp"
+#include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
+#include "can-lite/client/CanProtocolClient.hpp"
+#include "can-lite/core/CanFrameTransport.hpp"
+#include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "infra/util/Observer.hpp"
-#include "source/services/can_protocol/client/CanProtocolClientImpl.hpp"
-#include "source/services/can_protocol/core/CanProtocolDefinitions.hpp"
 #include "source/tool/can_commander/adapter/CanBusAdapter.hpp"
 #include <cstdint>
 
@@ -16,16 +19,14 @@ namespace tool
     public:
         using infra::SingleObserver<CanCommandClientObserver, CanCommandClient>::SingleObserver;
 
-        virtual void OnCommandAckReceived(services::CanCategory category, services::CanMessageType command, services::CanAckStatus status) = 0;
         virtual void OnCommandTimeout() = 0;
         virtual void OnBusyChanged(bool busy) = 0;
 
-        virtual void OnMotorStatusReceived(services::CanMotorState state, services::CanControlMode mode, services::CanFaultCode fault) = 0;
-        virtual void OnControlModeReceived(services::CanControlMode mode) = 0;
+        virtual void OnMotorStatusReceived(services::FocMotorState state, services::FocFaultCode fault) = 0;
         virtual void OnCurrentMeasurementReceived(float idCurrent, float iqCurrent) = 0;
         virtual void OnSpeedPositionReceived(float speed, float position) = 0;
         virtual void OnBusVoltageReceived(float voltage) = 0;
-        virtual void OnFaultEventReceived(services::CanFaultCode fault) = 0;
+        virtual void OnFaultEventReceived(services::FocFaultCode fault) = 0;
 
         virtual void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) = 0;
 
@@ -36,6 +37,7 @@ namespace tool
     class CanCommandClient
         : public infra::Subject<CanCommandClientObserver>
         , private services::CanProtocolClientObserver
+        , private services::FocMotorCategoryClientObserver
         , private CanBusAdapterObserver
     {
     public:
@@ -49,8 +51,8 @@ namespace tool
         void SendStartMotor();
         void SendStopMotor();
         void SendEmergencyStop();
-        void SendSetControlMode(services::CanControlMode mode);
-        void SendSetTorqueSetpoint(float idCurrent, float iqCurrent);
+        void SendSetControlMode(services::FocMotorMode mode);
+        void SendSetTorqueSetpoint(float iqCurrent);
         void SendSetSpeedSetpoint(float speedRadPerSec);
         void SendSetPositionSetpoint(float positionRad);
 
@@ -62,26 +64,32 @@ namespace tool
         void SendSetSupplyVoltage(float volts);
         void SendSetMaxCurrent(float amps);
 
-        void RequestData(services::DataRequestFlags flags);
+        void RequestData();
 
         void HandleTimeout();
 
     private:
-        void OnCommandAckReceived(services::CanCategory category, services::CanMessageType command, services::CanAckStatus status) override;
-        void OnMotorStatusReceived(services::CanMotorState state, services::CanControlMode mode, services::CanFaultCode fault) override;
-        void OnControlModeReceived(services::CanControlMode mode) override;
-        void OnCurrentMeasurementReceived(float idCurrent, float iqCurrent) override;
-        void OnSpeedPositionReceived(float speed, float position) override;
-        void OnBusVoltageReceived(float voltage) override;
-        void OnFaultEventReceived(services::CanFaultCode fault) override;
+        void SetBusy(bool newBusy);
 
+        // CanProtocolClientObserver
+        void OnServerOnline(uint16_t nodeId) override;
+        void OnServerOffline(uint16_t nodeId) override;
+
+        // FocMotorCategoryClientObserver
+        void OnMotorTypeResponse(services::FocMotorMode mode) override;
+        void OnElectricalParamsResponse(const services::FocElectricalParams& params) override;
+        void OnMechanicalParamsResponse(const services::FocMechanicalParams& params) override;
+        void OnTelemetryElectricalResponse(const services::FocTelemetryElectrical& telemetry) override;
+        void OnTelemetryStatusResponse(const services::FocTelemetryStatus& status) override;
+
+        // CanBusAdapterObserver
         void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) override;
         void OnError(infra::BoundedConstString message) override;
         void OnConnectionChanged(bool connected) override;
 
-        void SetBusy(bool busy);
-
-        services::CanProtocolClientImpl protocolClient;
+        services::CanFrameTransport focTransport;
+        services::CanProtocolClient protocolClient;
+        services::FocMotorCategoryClient focCategory;
         uint16_t nodeId = 1;
         bool busy = false;
     };
