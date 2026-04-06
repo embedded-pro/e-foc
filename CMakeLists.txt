@@ -50,16 +50,8 @@ set(EMIL_BUILD_ECHO_COMPILERS Off CACHE BOOL "" FORCE)
 set(EMIL_ENABLE_DOCKER_TOOLS Off CACHE BOOL "" FORCE)
 set(EMIL_INCLUDE_MBEDTLS Off CACHE BOOL "" FORCE)
 
-add_subdirectory(embedded-infra-lib)
-
-include(FetchContent)
-
-FetchContent_Declare(
-    can-lite
-    GIT_REPOSITORY https://github.com/embedded-pro/can-lite.git
-    GIT_TAG        main
-)
-FetchContent_MakeAvailable(can-lite)
+add_subdirectory(infra/embedded-infra-lib)
+add_subdirectory(infra/can-lite)
 
 if (E_FOC_BUILD_TESTS)
     include(CTest)
@@ -71,12 +63,12 @@ if (DEFINED TARGET_MCU_VENDOR)
     emil_exclude_directory_from_coverage(hal/${TARGET_MCU_VENDOR})
 endif()
 
-add_subdirectory(numerical-toolbox)
+add_subdirectory(infra/numerical-toolbox)
 add_subdirectory(source)
 
 emil_clangformat_directories(e_foc DIRECTORIES source)
 emil_folderize_all_targets()
-emil_exclude_directory_from_coverage(embedded-infra-lib)
+emil_exclude_directory_from_coverage(infra/embedded-infra-lib)
 emil_coverage_targets(DIRECTORIES .)
 
 include(scripts/development_environment.cmake)

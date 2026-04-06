@@ -70,7 +70,7 @@ Use unit-typed aliases throughout: `Ampere`, `Radians`, `Volts`, `Rpm`, `PhasePw
 - SOLID principles — constructor injection, one class = one control concern
 - Hardware dependencies injected via constructor and `HardwareFactory`
 - New FOC modes implement `FocTorque`, `FocSpeed`, or `FocPosition` interfaces
-- Reuse `numerical-toolbox/` for PID, filters, and math — do not duplicate
+- Reuse `infra/numerical-toolbox/` for PID, filters, and math — do not duplicate
 - RAII for resource management
 
 ## Documentation — MANDATORY

@@ -1,5 +1,5 @@
 [submodule "embedded-infra-lib"]
-	path = embedded-infra-lib
+	path = infra/embedded-infra-lib
 	url = https://github.com/embedded-pro/embedded-infra-lib.git
 [submodule "hal/st"]
 	path = hal/st
@@ -8,5 +8,8 @@
 	path = hal/ti
 	url = https://github.com/embedded-pro/hal-ti.git
 [submodule "numerical-toolbox"]
-	path = numerical-toolbox
+	path = infra/numerical-toolbox
 	url = https://github.com/embedded-pro/embedded-numerical-toolbox.git
+[submodule "infra/can-lite"]
+	path = infra/can-lite
+	url = https://github.com/embedded-pro/can-lite.git

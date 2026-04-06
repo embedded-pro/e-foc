@@ -43,7 +43,7 @@
             "name": "windows",
             "displayName": "Windows cross compilation",
             "inherits": "defaults",
-            "toolchainFile": "${sourceDir}/embedded-infra-lib/cmake/toolchain-clang-x86_64-pc-windows-msvc.cmake",
+            "toolchainFile": "${sourceDir}/infra/embedded-infra-lib/cmake/toolchain-clang-x86_64-pc-windows-msvc.cmake",
             "cacheVariables": {
                 "CMAKE_COMPILE_WARNING_AS_ERROR": "Off",
                 "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo;MinSizeRel",
@@ -113,7 +113,7 @@
             "displayName": "EK-TM4C1294XL",
             "description": "Build for tm4c1294ncpdt",
             "inherits": "tiva",
-            "toolchainFile": "${sourceDir}/embedded-infra-lib/cmake/toolchain-arm-gcc-m4-fpv4-sp-d16.cmake",
+            "toolchainFile": "${sourceDir}/infra/embedded-infra-lib/cmake/toolchain-arm-gcc-m4-fpv4-sp-d16.cmake",
             "cacheVariables": {
                 "TARGET_CORTEX": "m4",
                 "TARGET_MCU_FAMILY": "TM4C129",
@@ -126,7 +126,7 @@
             "displayName": "EK-TM4C123GXL",
             "description": "Build for tm4c123gh6pm",
             "inherits": "tiva",
-            "toolchainFile": "${sourceDir}/embedded-infra-lib/cmake/toolchain-arm-gcc-m4-fpv4-sp-d16.cmake",
+            "toolchainFile": "${sourceDir}/infra/embedded-infra-lib/cmake/toolchain-arm-gcc-m4-fpv4-sp-d16.cmake",
             "cacheVariables": {
                 "TARGET_CORTEX": "m4",
                 "TARGET_MCU_FAMILY": "TM4C123",
@@ -139,7 +139,7 @@
             "displayName": "STM32F407G-DISC1",
             "description": "Build for stm32f407",
             "inherits": "stm32",
-            "toolchainFile": "${sourceDir}/embedded-infra-lib/cmake/toolchain-arm-gcc-m4-fpv4-sp-d16.cmake",
+            "toolchainFile": "${sourceDir}/infra/embedded-infra-lib/cmake/toolchain-arm-gcc-m4-fpv4-sp-d16.cmake",
             "cacheVariables": {
                 "TARGET_CORTEX": "m4",
                 "TARGET_MCU_FAMILY": "stm32f4xx",
@@ -152,7 +152,7 @@
             "displayName": "NUCLEO-H563ZI",
             "description": "Build for STM32H563ZI",
             "inherits": "stm32",
-            "toolchainFile": "${sourceDir}/embedded-infra-lib/cmake/toolchain-arm-gcc-m33-fpv5-sp-d16.cmake",
+            "toolchainFile": "${sourceDir}/infra/embedded-infra-lib/cmake/toolchain-arm-gcc-m33-fpv5-sp-d16.cmake",
             "cacheVariables": {
                 "TARGET_CORTEX": "m33",
                 "TARGET_MCU_FAMILY": "stm32h5xx",

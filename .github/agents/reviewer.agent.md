@@ -133,7 +133,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 - [ ] **LSP**: New FOC implementations are fully substitutable for their base interface
 - [ ] **ISP**: Interfaces are small and focused
 - [ ] **DIP**: Hardware injected via constructor, not accessed directly
-- [ ] **DRY**: No reimplementation of PID, transforms, or SVM from `numerical-toolbox/`
+- [ ] **DRY**: No reimplementation of PID, transforms, or SVM from `infra/numerical-toolbox/`
 
 ### 10. Error Handling (WARNING)
 
