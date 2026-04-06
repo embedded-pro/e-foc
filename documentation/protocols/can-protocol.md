@@ -473,4 +473,4 @@ sequenceDiagram
 - Observer pattern uses `infra::SingleObserver` / `infra::Subject` from embedded-infra-lib.
 - Category-based dispatch uses `FocMotorCategoryClient`, which routes decoded frames to `FocMotorCategoryClientObserver` callbacks.
 - All encoding and saturation clamping is handled internally by can-lite.
-- The implementation is fully covered by 67 GoogleTest unit tests.
+- Implementation tests are maintained in the external `can-lite` repository; refer there for the current unit test suite and coverage details.
