@@ -67,7 +67,7 @@ namespace application
 
         struct TerminalAndTracer
         {
-            hal::tiva::Uart::Config uartConfig{ true, true, hal::tiva::Uart::Baudrate::_921000_bps, hal::tiva::Uart::FlowControl::none, hal::tiva::Uart::Parity::none, hal::tiva::Uart::StopBits::one, hal::tiva::Uart::NumberOfBytes::_8_bytes, infra::none };
+            hal::tiva::Uart::Config uartConfig{ true, true, hal::tiva::Uart::Baudrate::_921000_bps, hal::tiva::Uart::FlowControl::none, hal::tiva::Uart::Parity::none, hal::tiva::Uart::StopBits::one, hal::tiva::Uart::NumberOfBytes::_8_bytes, std::nullopt };
             hal::tiva::Uart uart{ Peripheral::UartIndex, Pins::uartTx, Pins::uartRx, uartConfig };
             services::SerialCommunicationOnSeggerRtt serialCommunicationOnSeggerRtt;
             services::StreamWriterOnSerialCommunication::WithStorage<2048> streamWriterOnSerialCommunication{ serialCommunicationOnSeggerRtt };
@@ -98,7 +98,7 @@ namespace application
                 {
                     adcConfig.sampleAndHold = toSampleAndHold.at(static_cast<std::size_t>(sampleAndHold));
 
-                    object.Emplace(adcToAmpereSlope, adcToAmpereOffset, Peripheral::AdcIndex, Peripheral::AdcSequencerIndex, currentPhaseAnalogPins, adcConfig);
+                    object.emplace(adcToAmpereSlope, adcToAmpereOffset, Peripheral::AdcIndex, Peripheral::AdcSequencerIndex, currentPhaseAnalogPins, adcConfig);
                 } };
             hal::tiva::SynchronousPwm::Config::ClockDivisor clockDivisor{ hal::tiva::SynchronousPwm::Config::ClockDivisor::divisor8 };
             hal::tiva::SynchronousPwm::Config::Control controlConfig{ hal::tiva::SynchronousPwm::Config::Control::Mode::centerAligned, hal::tiva::SynchronousPwm::Config::Control::UpdateMode::globally, false };
@@ -111,7 +111,7 @@ namespace application
 
                     pwmConfig.deadTime = std::make_optional(deadTimeConfig);
 
-                    object.Emplace(Peripheral::PwmIndex, Peripheral::pwmPhases, pwmConfig);
+                    object.emplace(Peripheral::PwmIndex, Peripheral::pwmPhases, pwmConfig);
                     object->SetBaseFrequency(frequency);
                 } };
             infra::Function<void(std::tuple<infra::Ampere, infra::Ampere, infra::Ampere> voltagePhases)> phaseCurrentsReady;
@@ -129,7 +129,7 @@ namespace application
             hal::tiva::QuadratureEncoder::Config qeiConfig{ resolution, 0, false, false, false, Conf::ResetMode::onMaxPosition, Conf::CaptureMode::phaseAandPhaseB, Conf::SignalMode::quadrature };
             infra::Creator<QuadratureEncoderDecorator, QuadratureEncoderDecoratorImpl<hal::tiva::QuadratureEncoder>, void()> synchronousQuadratureEncoderCreator{ [this](auto& object)
                 {
-                    object.Emplace(resolution, Peripheral::QeiIndex, Pins::encoderA, Pins::encoderB, Pins::encoderZ, qeiConfig);
+                    object.emplace(resolution, Peripheral::QeiIndex, Pins::encoderA, Pins::encoderB, Pins::encoderZ, qeiConfig);
                 } };
         };
 
@@ -159,7 +159,7 @@ namespace application
                     canConfig.bitRate = bitRate;
                     canConfig.testMode = testMode;
 
-                    object.Emplace(Peripheral::CanIndex, Pins::canRx, Pins::canTx, canConfig, infra::Function<void(hal::tiva::Can::Error)>([&object](hal::tiva::Can::Error error)
+                    object.emplace(Peripheral::CanIndex, Pins::canRx, Pins::canTx, canConfig, infra::Function<void(hal::tiva::Can::Error)>([&object](hal::tiva::Can::Error error)
                                                                                                   {
                                                                                                       static_cast<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<32>>&>(*object).InvokeErrorHandler(ToAdapterError(error));
                                                                                                   }));

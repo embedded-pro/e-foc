@@ -151,19 +151,19 @@ namespace application
         TerminalAndTracer terminalAndTracer{ serial };
         infra::Creator<AdcPhaseCurrentMeasurement, AdcPhaseCurrentMeasurementImpl<AdcMultiChannelStub>, void(SampleAndHold)> adcCurrentPhases{ [this](auto& object, auto)
             {
-                object.Emplace(1.0f, 0.0f);
+                object.emplace(1.0f, 0.0f);
             } };
         infra::Creator<hal::SynchronousThreeChannelsPwm, SynchronousThreeChannelsPwmStub, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)> pwmBrushless{ [this](auto& object, auto, auto)
             {
-                object.Emplace();
+                object.emplace();
             } };
         infra::Creator<QuadratureEncoderDecorator, QuadratureEncoderDecoratorImpl<SynchronousQuadratureEncoderStub>, void()> synchronousQuadratureEncoderCreator{ [this](auto& object)
             {
-                object.Emplace(1);
+                object.emplace(1);
             } };
         infra::Creator<CanBusAdapter, CanBusAdapterImpl<CanStub>, void(uint32_t bitRate, bool testMode)> canCreator{ [this](auto& object, auto, auto)
             {
-                object.Emplace();
+                object.emplace();
             } };
     };
 }
