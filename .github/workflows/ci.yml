@@ -96,7 +96,7 @@ jobs:
     strategy:
       matrix:
         configuration: ["RelWithDebInfo"]
-        gcc: ["10.3-2021.10"]
+        gcc: ["13.2.Rel1"]
         target:
           [
             "EK-TM4C1294XL",
