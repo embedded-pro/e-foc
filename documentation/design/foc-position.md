@@ -50,11 +50,11 @@ date: 2026-04-07
 
 Position control extends the speed control design by adding a third outermost loop. All three loops share the same `LowPriorityInterrupt` trigger; the outer two loops execute sequentially within a single LPI callback, while the innermost loop executes in the high-priority 20 kHz ISR.
 
-| Loop         | Rate   | Context                 | Input                        | Output                      |
-|--------------|--------|-------------------------|------------------------------|-----------------------------|
-| Inner loop   | 20 kHz | High-priority FOC ISR   | Phase currents, θm           | PWM duty cycles             |
-| Middle loop  | 1 kHz  | Low-priority interrupt  | θm from last inner cycle     | Iq setpoint (Ampere)        |
-| Outer loop   | 1 kHz  | Low-priority interrupt  | θm (position), position SP   | Speed setpoint (rad/s)      |
+| Loop        | Rate   | Context                | Input                      | Output                 |
+|-------------|--------|------------------------|----------------------------|------------------------|
+| Inner loop  | 20 kHz | High-priority FOC ISR  | Phase currents, θm         | PWM duty cycles        |
+| Middle loop | 1 kHz  | Low-priority interrupt | θm from last inner cycle   | Iq setpoint (Ampere)   |
+| Outer loop  | 1 kHz  | Low-priority interrupt | θm (position), position SP | Speed setpoint (rad/s) |
 
 The position loop fires **before** the speed loop within the same LPI callback. This ensures the speed setpoint written by the position PID is immediately consumed by the speed PID in the same interrupt invocation, keeping both derived setpoints in step.
 
@@ -126,40 +126,40 @@ This ordering guarantees that the speed setpoint used by the speed PID in any gi
 
 ### Provided
 
-| Interface           | Purpose                                                                           | Contract                                                                                                        |
-|---------------------|-----------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
-| SetPolePairs        | Configures the pole-pair count for electrical angle calculation.                  | Must be called before the first `Calculate()`. Must not be changed while Enabled.                              |
-| Enable              | Arms all four PIDs and resets their integrator state.                             | Safe to call repeatedly. Position setpoint is preserved.                                                       |
-| Disable             | Disarms all PIDs and forces zero duty cycle output.                               | Safe to call from any context.                                                                                  |
-| SetCurrentTunings   | Sets P, I, D gains for d-axis and q-axis current PIDs.                           | Gains normalised by 1/(√3·Vdc) internally.                                                                    |
-| SetSpeedTunings     | Sets P, I, D gains for the speed PID, including the current clamp limit.         | Speed PID output clamped to ± maxCurrent.                                                                      |
-| SetPositionTunings  | Sets P, I, D gains for the position PID.                                         | Position PID output clamped to ± 1000 rad/s.                                                                  |
-| SetPoint            | Sets the target position in mechanical radians.                                   | Written atomically; used on the next outer-loop cycle.                                                         |
-| Calculate           | Executes the inner 20 kHz FOC torque loop for one cycle.                         | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                        |
+| Interface          | Purpose                                                                  | Contract                                                                          |
+|--------------------|--------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| SetPolePairs       | Configures the pole-pair count for electrical angle calculation.         | Must be called before the first `Calculate()`. Must not be changed while Enabled. |
+| Enable             | Arms all four PIDs and resets their integrator state.                    | Safe to call repeatedly. Position setpoint is preserved.                          |
+| Disable            | Disarms all PIDs and forces zero duty cycle output.                      | Safe to call from any context.                                                    |
+| SetCurrentTunings  | Sets P, I, D gains for d-axis and q-axis current PIDs.                   | Gains normalised by 1/(√3·Vdc) internally.                                        |
+| SetSpeedTunings    | Sets P, I, D gains for the speed PID, including the current clamp limit. | Speed PID output clamped to ± maxCurrent.                                         |
+| SetPositionTunings | Sets P, I, D gains for the position PID.                                 | Position PID output clamped to ± 1000 rad/s.                                      |
+| SetPoint           | Sets the target position in mechanical radians.                          | Written atomically; used on the next outer-loop cycle.                            |
+| Calculate          | Executes the inner 20 kHz FOC torque loop for one cycle.                 | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.            |
 
 ### Required
 
-| Interface             | Purpose                                                                          | Contract                                                                                                      |
-|-----------------------|----------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
-| LowPriorityInterrupt  | Provides the callback registration point for the combined position + speed outer loops. | The inner-loop ISR triggers the LPI at the 1 kHz prescale ratio. Both outer-loop stages execute sequentially in one LPI invocation. |
+| Interface            | Purpose                                                                                 | Contract                                                                                                                            |
+|----------------------|-----------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| LowPriorityInterrupt | Provides the callback registration point for the combined position + speed outer loops. | The inner-loop ISR triggers the LPI at the 1 kHz prescale ratio. Both outer-loop stages execute sequentially in one LPI invocation. |
 
 ---
 
 ## Data Model
 
-| Entity                | Field         | Type / Unit              | Range                     | Notes                                                            |
-|-----------------------|---------------|--------------------------|---------------------------|------------------------------------------------------------------|
-| Position setpoint     | θ_sp          | Radians (float)          | Application-defined       | Not wrapped — application must supply single-turn-compatible target |
-| Actual position       | θm            | Radians (float)          | [0, 2π)                   | Mechanical angle from encoder                                    |
-| Position PID output   | ω_sp          | RadiansPerSecond (float) | [−1000, +1000] rad/s      | Clamped speed setpoint for middle loop                           |
-| Estimated speed       | ω             | RadiansPerSecond (float) | computed from Δθ/Δt       | Finite difference with ±π wrap correction                       |
-| Speed PID output      | Iq_sp         | Ampere (float)           | ± maxCurrent              | Written to inner loop                                            |
-| d-axis setpoint       | Id_sp         | Ampere (float)           | 0 A fixed                 | SPMSM maximum torque per ampere                                  |
-| Previous angle        | θm_prev       | Radians (float)          | [0, 2π)                   | Saved each outer cycle for speed estimator                       |
-| Outer loop period     | Δt            | Seconds (float)          | 1 / outer_frequency       | Constant after construction                                      |
-| Pole pairs            | P             | Integer (unsigned)       | ≥ 1                       | Motor property                                                   |
-| Max current           | maxCurrent    | Ampere (float)           | > 0                       | Upper bound on Iq setpoint from speed PID                        |
-| Speed clamp           | ± 1000 rad/s  | RadiansPerSecond (float) | fixed                     | Position PID output saturation; determines approach speed cap    |
+| Entity              | Field        | Type / Unit              | Range                | Notes                                                               |
+|---------------------|--------------|--------------------------|----------------------|---------------------------------------------------------------------|
+| Position setpoint   | θ_sp         | Radians (float)          | Application-defined  | Not wrapped — application must supply single-turn-compatible target |
+| Actual position     | θm           | Radians (float)          | [0, 2π)              | Mechanical angle from encoder                                       |
+| Position PID output | ω_sp         | RadiansPerSecond (float) | [−1000, +1000] rad/s | Clamped speed setpoint for middle loop                              |
+| Estimated speed     | ω            | RadiansPerSecond (float) | computed from Δθ/Δt  | Finite difference with ±π wrap correction                           |
+| Speed PID output    | Iq_sp        | Ampere (float)           | ± maxCurrent         | Written to inner loop                                               |
+| d-axis setpoint     | Id_sp        | Ampere (float)           | 0 A fixed            | SPMSM maximum torque per ampere                                     |
+| Previous angle      | θm_prev      | Radians (float)          | [0, 2π)              | Saved each outer cycle for speed estimator                          |
+| Outer loop period   | Δt           | Seconds (float)          | 1 / outer_frequency  | Constant after construction                                         |
+| Pole pairs          | P            | Integer (unsigned)       | ≥ 1                  | Motor property                                                      |
+| Max current         | maxCurrent   | Ampere (float)           | > 0                  | Upper bound on Iq setpoint from speed PID                           |
+| Speed clamp         | ± 1000 rad/s | RadiansPerSecond (float) | fixed                | Position PID output saturation; determines approach speed cap       |
 
 ---
 
@@ -207,15 +207,15 @@ graph LR
 
 ## Constraints & Limitations
 
-| Constraint                          | Value / Description                                                                                             |
-|-------------------------------------|-----------------------------------------------------------------------------------------------------------------|
-| Inner loop rate                     | 20 kHz — called from the FOC ISR once per PWM period.                                                         |
-| Outer loop rate                     | 1 kHz (same for both position and speed stages). Must be an integer divisor of 20 kHz.                       |
-| Position PID speed clamp            | ± 1000 rad/s. This hard limit governs maximum approach speed at any position error.                           |
-| No multi-turn tracking              | Position setpoint is in single-turn radians. Multi-turn logic must be handled externally.                     |
-| No position wrap-around correction  | A large step in position setpoint that crosses the encoder wrap boundary may cause a transient. Applications must avoid such steps. |
-| LPI callback order                  | Position PID must always execute before the speed PID within the same LPI callback. Reversing the order yields stale speed setpoints. |
-| No flux weakening                   | Id = 0 is invariant. High-speed flux-weakening operation is out of scope.                                     |
-| Cycle budget (inner loop)           | `Calculate()` must complete in < 400 cycles at 120 MHz.                                                       |
-| PID state at Enable                 | All four integrators are zeroed on Enable; position setpoint is preserved.                                    |
-| Setpoint atomicity                  | Speed and Iq setpoints written by outer loops must be read atomically by downstream loops on 32-bit ARM.     |
+| Constraint                         | Value / Description                                                                                                                   |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| Inner loop rate                    | 20 kHz — called from the FOC ISR once per PWM period.                                                                                 |
+| Outer loop rate                    | 1 kHz (same for both position and speed stages). Must be an integer divisor of 20 kHz.                                                |
+| Position PID speed clamp           | ± 1000 rad/s. This hard limit governs maximum approach speed at any position error.                                                   |
+| No multi-turn tracking             | Position setpoint is in single-turn radians. Multi-turn logic must be handled externally.                                             |
+| No position wrap-around correction | A large step in position setpoint that crosses the encoder wrap boundary may cause a transient. Applications must avoid such steps.   |
+| LPI callback order                 | Position PID must always execute before the speed PID within the same LPI callback. Reversing the order yields stale speed setpoints. |
+| No flux weakening                  | Id = 0 is invariant. High-speed flux-weakening operation is out of scope.                                                             |
+| Cycle budget (inner loop)          | `Calculate()` must complete in < 400 cycles at 120 MHz.                                                                               |
+| PID state at Enable                | All four integrators are zeroed on Enable; position setpoint is preserved.                                                            |
+| Setpoint atomicity                 | Speed and Iq setpoints written by outer loops must be read atomically by downstream loops on 32-bit ARM.                              |

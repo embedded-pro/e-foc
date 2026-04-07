@@ -82,6 +82,6 @@ Use unit-typed aliases throughout: `Ampere`, `Radians`, `Volts`, `Rpm`, `PhasePw
 
 For every FOC algorithm or motor model change, update the corresponding `documentation/theory/{topic}.md`. For timing-critical changes, update `documentation/performance-optimization/README.md`.
 
-Within documentation files: all visuals must be Mermaid code blocks (` ```mermaid `) or ASCII art. External image references (`![alt](path)`) are **not allowed**.
+Within architecture and design documentation files, all visuals must be Mermaid code blocks (` 
 
 Full details: [copilot-instructions.md](../../.github/copilot-instructions.md), [documentation/theory/foc.md](../../documentation/theory/foc.md)

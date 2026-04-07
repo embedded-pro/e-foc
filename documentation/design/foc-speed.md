@@ -51,10 +51,10 @@ date: 2026-04-07
 
 Speed control builds on the torque control loop by adding a supervisory outer loop. The two loops operate at different rates and in different interrupt contexts:
 
-| Loop       | Rate   | Context                  | Input                     | Output              |
-|------------|--------|--------------------------|---------------------------|---------------------|
-| Inner loop | 20 kHz | High-priority FOC ISR    | Phase currents, θm        | PWM duty cycles     |
-| Outer loop | 1 kHz  | Low-priority interrupt   | θm from last inner cycle  | Iq setpoint (Ampere)|
+| Loop       | Rate   | Context                | Input                    | Output               |
+|------------|--------|------------------------|--------------------------|----------------------|
+| Inner loop | 20 kHz | High-priority FOC ISR  | Phase currents, θm       | PWM duty cycles      |
+| Outer loop | 1 kHz  | Low-priority interrupt | θm from last inner cycle | Iq setpoint (Ampere) |
 
 The inner loop is identical to the torque control loop described in the FOC Torque Control design document. The outer loop adds the speed PID and the speed estimation step.
 
@@ -116,37 +116,37 @@ stateDiagram-v2
 
 ### Provided
 
-| Interface          | Purpose                                                                        | Contract                                                                                                    |
-|--------------------|--------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|
-| SetPolePairs       | Configures the pole-pair count for the electrical angle calculation.           | Must be called before the first `Calculate()`. Must not be changed while Enabled.                          |
-| Enable             | Arms all three PIDs and resets their integrator state.                         | Safe to call repeatedly. Speed setpoint is preserved.                                                      |
-| Disable            | Disarms all PIDs and forces zero duty cycle output.                            | Safe to call from any context.                                                                              |
-| SetCurrentTunings  | Sets P, I, D gains for the d-axis and q-axis current PIDs.                    | Gains normalised by 1/(√3·Vdc) internally. Takes effect on the next `Calculate()`.                        |
-| SetSpeedTunings    | Sets P, I, D gains for the outer speed PID.                                    | Output of speed PID is clamped to ± maxCurrent. Takes effect on the next outer-loop cycle.                 |
-| SetPoint           | Sets the speed setpoint in radians per second.                                 | Written atomically; used on the next outer-loop cycle.                                                     |
-| Calculate          | Executes the inner 20 kHz FOC torque loop for one cycle.                      | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                     |
-| OuterLoopFrequency | Returns the configured outer-loop frequency in Hz.                             | Pure query; no side effects. Can be called before Enable.                                                  |
+| Interface          | Purpose                                                              | Contract                                                                                   |
+|--------------------|----------------------------------------------------------------------|--------------------------------------------------------------------------------------------|
+| SetPolePairs       | Configures the pole-pair count for the electrical angle calculation. | Must be called before the first `Calculate()`. Must not be changed while Enabled.          |
+| Enable             | Arms all three PIDs and resets their integrator state.               | Safe to call repeatedly. Speed setpoint is preserved.                                      |
+| Disable            | Disarms all PIDs and forces zero duty cycle output.                  | Safe to call from any context.                                                             |
+| SetCurrentTunings  | Sets P, I, D gains for the d-axis and q-axis current PIDs.           | Gains normalised by 1/(√3·Vdc) internally. Takes effect on the next `Calculate()`.         |
+| SetSpeedTunings    | Sets P, I, D gains for the outer speed PID.                          | Output of speed PID is clamped to ± maxCurrent. Takes effect on the next outer-loop cycle. |
+| SetPoint           | Sets the speed setpoint in radians per second.                       | Written atomically; used on the next outer-loop cycle.                                     |
+| Calculate          | Executes the inner 20 kHz FOC torque loop for one cycle.             | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                     |
+| OuterLoopFrequency | Returns the configured outer-loop frequency in Hz.                   | Pure query; no side effects. Can be called before Enable.                                  |
 
 ### Required
 
-| Interface             | Purpose                                                                         | Contract                                                                                                |
-|-----------------------|---------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| LowPriorityInterrupt  | Provides the callback registration point for the outer-loop speed PID handler. | The inner-loop ISR triggers the LPI at the correct prescale ratio. The outer-loop handler must execute within its own interrupt context, not the 20 kHz ISR context. |
+| Interface            | Purpose                                                                        | Contract                                                                                                                                                             |
+|----------------------|--------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| LowPriorityInterrupt | Provides the callback registration point for the outer-loop speed PID handler. | The inner-loop ISR triggers the LPI at the correct prescale ratio. The outer-loop handler must execute within its own interrupt context, not the 20 kHz ISR context. |
 
 ---
 
 ## Data Model
 
-| Entity               | Field           | Type / Unit              | Range                    | Notes                                                      |
-|----------------------|-----------------|--------------------------|--------------------------|------------------------------------------------------------|
-| Speed setpoint       | ω_sp            | RadiansPerSecond (float) | ± mechanical max         | Written by application; applied on next outer-loop tick    |
-| Estimated speed      | ω               | RadiansPerSecond (float) | computed from Δθ/Δt      | Computed each outer-loop cycle                             |
-| Speed PID output     | Iq_sp           | Ampere (float)           | ± maxCurrent             | Written to inner loop; clamped by speed PID output limit   |
-| d-axis setpoint      | Id_sp           | Ampere (float)           | 0 A fixed                | SPMSM maximum torque per ampere                            |
-| Previous angle       | θm_prev         | Radians (float)          | [0, 2π)                  | Saved each outer cycle for finite-difference estimator     |
-| Outer loop period    | Δt              | Seconds (float)          | 1 / outer_frequency      | Constant after construction                                |
-| Pole pairs           | P               | Integer (unsigned)       | ≥ 1                      | Motor property                                             |
-| Max current          | maxCurrent      | Ampere (float)           | > 0                      | Upper bound on Iq setpoint from speed PID                  |
+| Entity            | Field      | Type / Unit              | Range               | Notes                                                    |
+|-------------------|------------|--------------------------|---------------------|----------------------------------------------------------|
+| Speed setpoint    | ω_sp       | RadiansPerSecond (float) | ± mechanical max    | Written by application; applied on next outer-loop tick  |
+| Estimated speed   | ω          | RadiansPerSecond (float) | computed from Δθ/Δt | Computed each outer-loop cycle                           |
+| Speed PID output  | Iq_sp      | Ampere (float)           | ± maxCurrent        | Written to inner loop; clamped by speed PID output limit |
+| d-axis setpoint   | Id_sp      | Ampere (float)           | 0 A fixed           | SPMSM maximum torque per ampere                          |
+| Previous angle    | θm_prev    | Radians (float)          | [0, 2π)             | Saved each outer cycle for finite-difference estimator   |
+| Outer loop period | Δt         | Seconds (float)          | 1 / outer_frequency | Constant after construction                              |
+| Pole pairs        | P          | Integer (unsigned)       | ≥ 1                 | Motor property                                           |
+| Max current       | maxCurrent | Ampere (float)           | > 0                 | Upper bound on Iq setpoint from speed PID                |
 
 ---
 
@@ -176,13 +176,13 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint                         | Value / Description                                                                                           |
-|------------------------------------|---------------------------------------------------------------------------------------------------------------|
-| Inner loop rate                    | 20 kHz — called from the FOC ISR once per PWM period.                                                        |
-| Outer loop rate                    | Configurable; default 1 kHz. Must be a integer divisor of 20 kHz.                                           |
-| Iq saturation                      | Speed PID output clamped to ± maxCurrent (Ampere). This limits peak torque.                                 |
-| Speed estimator wrap threshold     | Assumes physical speed below π / Δt rad/s (half the Nyquist limit of the outer-loop sampling rate).        |
-| No flux weakening                  | Id = 0 is fixed. Operating above base speed without flux weakening is the application's responsibility.      |
-| LPI scheduling                     | The outer loop does not use an RTOS. The inner loop ISR triggers the LPI — no timer or task involved.        |
-| Cycle budget                       | Inner loop `Calculate()` must complete in < 400 cycles at 120 MHz.                                          |
-| Setpoint atomicity                 | The Iq setpoint written by the outer loop must be read atomically by the inner loop on 32-bit ARM targets.  |
+| Constraint                     | Value / Description                                                                                        |
+|--------------------------------|------------------------------------------------------------------------------------------------------------|
+| Inner loop rate                | 20 kHz — called from the FOC ISR once per PWM period.                                                      |
+| Outer loop rate                | Configurable; default 1 kHz. Must be a integer divisor of 20 kHz.                                          |
+| Iq saturation                  | Speed PID output clamped to ± maxCurrent (Ampere). This limits peak torque.                                |
+| Speed estimator wrap threshold | Assumes physical speed below π / Δt rad/s (half the Nyquist limit of the outer-loop sampling rate).        |
+| No flux weakening              | Id = 0 is fixed. Operating above base speed without flux weakening is the application's responsibility.    |
+| LPI scheduling                 | The outer loop does not use an RTOS. The inner loop ISR triggers the LPI — no timer or task involved.      |
+| Cycle budget                   | Inner loop `Calculate()` must complete in < 400 cycles at 120 MHz.                                         |
+| Setpoint atomicity             | The Iq setpoint written by the outer loop must be read atomically by the inner loop on 32-bit ARM targets. |

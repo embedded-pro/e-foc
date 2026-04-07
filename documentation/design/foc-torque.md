@@ -117,47 +117,47 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 
 ### Provided
 
-| Interface         | Purpose                                                               | Contract                                                                                                  |
-|-------------------|-----------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
-| SetPolePairs      | Configures the motor's pole-pair count used in the θe calculation.    | Must be called before the first `Calculate()`. Must not be changed while Enabled.                        |
-| Enable            | Arms both PID controllers and resets their integrator state.          | Safe to call repeatedly. PIDs start from a clean state each time. Last setpoints are preserved.          |
-| Disable           | Disarms both PID controllers and forces zero duty cycle output.       | Safe to call from any context. `Calculate()` returns zero while disabled.                                |
-| SetCurrentTunings | Provides proportional, integral, and derivative gains for both PIDs.  | Gains are internally normalised by 1/(√3·Vdc). Takes effect on the next `Calculate()` call.             |
-| SetPoint          | Sets the (Id, Iq) current setpoint in Ampere.                         | New setpoint is used on the next `Calculate()` invocation. Can be called while Enabled.                  |
-| Calculate         | Executes the full 11-step FOC torque loop for one control cycle.      | Must be called at 20 kHz from ISR context. Returns `PhasePwmDutyCycles`. Must not block.                 |
+| Interface         | Purpose                                                              | Contract                                                                                        |
+|-------------------|----------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
+| SetPolePairs      | Configures the motor's pole-pair count used in the θe calculation.   | Must be called before the first `Calculate()`. Must not be changed while Enabled.               |
+| Enable            | Arms both PID controllers and resets their integrator state.         | Safe to call repeatedly. PIDs start from a clean state each time. Last setpoints are preserved. |
+| Disable           | Disarms both PID controllers and forces zero duty cycle output.      | Safe to call from any context. `Calculate()` returns zero while disabled.                       |
+| SetCurrentTunings | Provides proportional, integral, and derivative gains for both PIDs. | Gains are internally normalised by 1/(√3·Vdc). Takes effect on the next `Calculate()` call.     |
+| SetPoint          | Sets the (Id, Iq) current setpoint in Ampere.                        | New setpoint is used on the next `Calculate()` invocation. Can be called while Enabled.         |
+| Calculate         | Executes the full 11-step FOC torque loop for one control cycle.     | Must be called at 20 kHz from ISR context. Returns `PhasePwmDutyCycles`. Must not block.        |
 
 ### Required
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
-| None      | The inverter and encoder are managed externally by the Runner; they are not accessed directly by the torque control component. | — |
+| Interface | Purpose                                                                                                                        | Contract |
+|-----------|--------------------------------------------------------------------------------------------------------------------------------|----------|
+| None      | The inverter and encoder are managed externally by the Runner; they are not accessed directly by the torque control component. | —        |
 
 ---
 
 ## Data Model
 
-| Entity            | Field          | Type / Unit             | Range              | Notes                                                            |
-|-------------------|----------------|-------------------------|--------------------|------------------------------------------------------------------|
-| Phase currents    | Ia, Ib, Ic     | Ampere (float)          | ± motor rated A    | Ic derived; passed in from ADC callback                         |
-| Synchronous frame | Id, Iq         | Ampere (float)          | ± motor rated A    | Regulated quantities                                             |
-| Current setpoint  | Id_sp, Iq_sp   | Ampere (float)          | ± motor rated A    | Id_sp = 0 for SPMSM MTPA; Iq_sp from application               |
-| Voltage demands   | Vd, Vq         | Dimensionless (float)   | [−1, +1]           | PID output; normalised to DC bus                                |
-| Duty cycles       | Da, Db, Dc     | Dimensionless (float)   | [0.0, 1.0]         | Returned to Runner for PWM register write                       |
-| Mechanical angle  | θm             | Radians (float)         | [0, 2π)            | Supplied by Runner; pole-pairs multiply to θe                   |
-| Electrical angle  | θe             | Radians (float)         | [0, 2π)            | θm × pole_pairs; used for Park and inverse Park                 |
-| Pole pairs        | P              | Integer (unsigned)      | ≥ 1                | Motor property; configured once at startup                      |
+| Entity            | Field        | Type / Unit           | Range           | Notes                                            |
+|-------------------|--------------|-----------------------|-----------------|--------------------------------------------------|
+| Phase currents    | Ia, Ib, Ic   | Ampere (float)        | ± motor rated A | Ic derived; passed in from ADC callback          |
+| Synchronous frame | Id, Iq       | Ampere (float)        | ± motor rated A | Regulated quantities                             |
+| Current setpoint  | Id_sp, Iq_sp | Ampere (float)        | ± motor rated A | Id_sp = 0 for SPMSM MTPA; Iq_sp from application |
+| Voltage demands   | Vd, Vq       | Dimensionless (float) | [−1, +1]        | PID output; normalised to DC bus                 |
+| Duty cycles       | Da, Db, Dc   | Dimensionless (float) | [0.0, 1.0]      | Returned to Runner for PWM register write        |
+| Mechanical angle  | θm           | Radians (float)       | [0, 2π)         | Supplied by Runner; pole-pairs multiply to θe    |
+| Electrical angle  | θe           | Radians (float)       | [0, 2π)         | θm × pole_pairs; used for Park and inverse Park  |
+| Pole pairs        | P            | Integer (unsigned)    | ≥ 1             | Motor property; configured once at startup       |
 
 ---
 
 ## Constraints & Limitations
 
-| Constraint                         | Value / Description                                                                                        |
-|------------------------------------|------------------------------------------------------------------------------------------------------------|
-| Control loop rate                  | 20 kHz — must be called once per PWM switching period from the FOC interrupt.                              |
-| Cycle budget                       | < 400 cycles at 120 MHz for the full `Calculate()` execution.                                              |
-| No virtual dispatch in hot path    | `Calculate()` must not incur virtual function call overhead.                                               |
-| Output duty cycle format           | Normalised floating-point [0.0, 1.0]; conversion to PWM timer counts is the Runner's responsibility.      |
-| Electrical angle wrapping          | Handled by the LUT normalisation within FastTrigonometry — no explicit modulo operation required in loop. |
-| Gain normalisation dependency      | `SetCurrentTunings()` requires the DC bus voltage (Vdc) to be known at configuration time.                |
-| No flux weakening                  | Id_setpoint ≠ 0 is structurally accepted but operational flux-weakening strategy is not yet defined.      |
-| PID state at Enable                | Integrators are always zeroed on Enable, regardless of previous state.                                    |
+| Constraint                      | Value / Description                                                                                       |
+|---------------------------------|-----------------------------------------------------------------------------------------------------------|
+| Control loop rate               | 20 kHz — must be called once per PWM switching period from the FOC interrupt.                             |
+| Cycle budget                    | < 400 cycles at 120 MHz for the full `Calculate()` execution.                                             |
+| No virtual dispatch in hot path | `Calculate()` must not incur virtual function call overhead.                                              |
+| Output duty cycle format        | Normalised floating-point [0.0, 1.0]; conversion to PWM timer counts is the Runner's responsibility.      |
+| Electrical angle wrapping       | Handled by the LUT normalisation within FastTrigonometry — no explicit modulo operation required in loop. |
+| Gain normalisation dependency   | `SetCurrentTunings()` requires the DC bus voltage (Vdc) to be known at configuration time.                |
+| No flux weakening               | Id_setpoint ≠ 0 is structurally accepted but operational flux-weakening strategy is not yet defined.      |
+| PID state at Enable             | Integrators are always zeroed on Enable, regardless of previous state.                                    |
