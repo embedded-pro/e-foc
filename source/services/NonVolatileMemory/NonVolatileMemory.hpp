@@ -18,6 +18,8 @@ namespace services
     class NonVolatileMemory
     {
     public:
+        virtual ~NonVolatileMemory() = default;
+
         virtual void SaveCalibration(const CalibrationData& data, infra::Function<void(NvmStatus)> onDone) = 0;
         virtual void LoadCalibration(CalibrationData& data, infra::Function<void(NvmStatus)> onDone) = 0;
         virtual void InvalidateCalibration(infra::Function<void(NvmStatus)> onDone) = 0;

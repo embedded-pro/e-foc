@@ -1,11 +1,45 @@
 #include "source/services/NonVolatileMemory/NonVolatileMemoryImpl.hpp"
 #include "infra/util/Crc.hpp"
+#include <cassert>
 #include <cstring>
 
 namespace services
 {
-    NonVolatileMemoryImpl::NonVolatileMemoryImpl(hal::Flash& flash)
-        : flash(flash)
+    namespace
+    {
+        // Storage records are private to this translation unit.
+        // Layout: [magic:4][version:1][crc32:4][data:N]
+        // The data structs are padding-free by design (see static_asserts in their headers),
+        // so no #pragma pack is needed — every byte stored is a meaningful field byte.
+#pragma pack(push, 1)
+
+        struct CalibrationStorageRecord
+        {
+            uint32_t magic;
+            uint8_t version;
+            uint32_t crc32;
+            CalibrationData data;
+        };
+
+        struct ConfigStorageRecord
+        {
+            uint32_t magic;
+            uint8_t version;
+            uint32_t crc32;
+            ConfigData data;
+        };
+
+#pragma pack(pop)
+
+        static_assert(sizeof(CalibrationStorageRecord) == NonVolatileMemoryImpl::calibrationRecordSize,
+            "calibrationRecordSize must match the packed record — check CalibrationData for implicit padding");
+        static_assert(sizeof(ConfigStorageRecord) == NonVolatileMemoryImpl::configRecordSize,
+            "configRecordSize must match the packed record — check ConfigData for implicit padding");
+    }
+
+    NonVolatileMemoryImpl::NonVolatileMemoryImpl(NvmRegion& calibrationRegion, NvmRegion& configRegion)
+        : calibrationRegion(calibrationRegion)
+        , configRegion(configRegion)
     {
     }
 
@@ -19,6 +53,9 @@ namespace services
     void NonVolatileMemoryImpl::SaveCalibration(const CalibrationData& data,
         infra::Function<void(NvmStatus)> onDone)
     {
+        if (onCalibrationDone)
+            return;
+
         auto& record = *reinterpret_cast<CalibrationStorageRecord*>(calibrationBuffer.data());
         record.magic = CalibrationMagic;
         record.version = CalibrationLayoutVersion;
@@ -26,8 +63,7 @@ namespace services
         record.crc32 = ComputeCrc(infra::MakeConstByteRange(record.data));
 
         onCalibrationDone = std::move(onDone);
-        flash.EraseSectors(calibrationSectorIndex, calibrationSectorIndex + 1,
-            [this]
+        calibrationRegion.Erase([this]
             {
                 OnCalibrationErased();
             });
@@ -35,9 +71,8 @@ namespace services
 
     void NonVolatileMemoryImpl::OnCalibrationErased()
     {
-        flash.WriteBuffer(
-            infra::MakeConstByteRange(*reinterpret_cast<const CalibrationStorageRecord*>(calibrationBuffer.data())),
-            flash.AddressOfSector(calibrationSectorIndex),
+        calibrationRegion.Write(
+            infra::ConstByteRange(calibrationBuffer),
             [this]
             {
                 OnCalibrationWritten();
@@ -46,9 +81,8 @@ namespace services
 
     void NonVolatileMemoryImpl::OnCalibrationWritten()
     {
-        flash.ReadBuffer(
-            infra::MakeByteRange(*reinterpret_cast<CalibrationStorageRecord*>(calibrationReadBackBuffer.data())),
-            flash.AddressOfSector(calibrationSectorIndex),
+        calibrationRegion.Read(
+            infra::ByteRange(calibrationReadBackBuffer),
             [this]
             {
                 OnCalibrationReadBack();
@@ -66,12 +100,14 @@ namespace services
     void NonVolatileMemoryImpl::LoadCalibration(CalibrationData& data,
         infra::Function<void(NvmStatus)> onDone)
     {
+        if (onCalibrationDone)
+            return;
+
         pendingCalibrationOutput = &data;
         onCalibrationDone = std::move(onDone);
 
-        flash.ReadBuffer(
-            infra::MakeByteRange(*reinterpret_cast<CalibrationStorageRecord*>(calibrationReadBackBuffer.data())),
-            flash.AddressOfSector(calibrationSectorIndex),
+        calibrationRegion.Read(
+            infra::ByteRange(calibrationReadBackBuffer),
             [this]
             {
                 const auto& record = *reinterpret_cast<const CalibrationStorageRecord*>(
@@ -89,7 +125,7 @@ namespace services
                     return;
                 }
 
-                const auto computed = ComputeCrc(infra::MakeConstByteRange(record.data));
+                const uint32_t computed = ComputeCrc(infra::MakeConstByteRange(record.data));
                 if (computed != record.crc32)
                 {
                     onCalibrationDone(NvmStatus::InvalidData);
@@ -103,9 +139,11 @@ namespace services
 
     void NonVolatileMemoryImpl::InvalidateCalibration(infra::Function<void(NvmStatus)> onDone)
     {
+        if (onCalibrationDone)
+            return;
+
         onCalibrationDone = std::move(onDone);
-        flash.EraseSectors(calibrationSectorIndex, calibrationSectorIndex + 1,
-            [this]
+        calibrationRegion.Erase([this]
             {
                 onCalibrationDone(NvmStatus::Ok);
             });
@@ -113,12 +151,14 @@ namespace services
 
     void NonVolatileMemoryImpl::IsCalibrationValid(infra::Function<void(bool)> onDone)
     {
+        if (onIsCalibrationValidDone)
+            return;
+
         onIsCalibrationValidDone = std::move(onDone);
 
-        flash.ReadBuffer(
-            infra::MakeByteRange(*reinterpret_cast<CalibrationStorageRecord*>(calibrationReadBackBuffer.data())),
-            flash.AddressOfSector(calibrationSectorIndex),
-            [this]()
+        calibrationRegion.Read(
+            infra::ByteRange(calibrationReadBackBuffer),
+            [this]
             {
                 const auto& record = *reinterpret_cast<const CalibrationStorageRecord*>(
                     calibrationReadBackBuffer.data());
@@ -129,7 +169,7 @@ namespace services
                     return;
                 }
 
-                const auto computed = ComputeCrc(infra::MakeConstByteRange(record.data));
+                const uint32_t computed = ComputeCrc(infra::MakeConstByteRange(record.data));
                 onIsCalibrationValidDone(computed == record.crc32);
             });
     }
@@ -137,6 +177,9 @@ namespace services
     void NonVolatileMemoryImpl::SaveConfig(const ConfigData& data,
         infra::Function<void(NvmStatus)> onDone)
     {
+        if (onConfigDone)
+            return;
+
         auto& record = *reinterpret_cast<ConfigStorageRecord*>(configBuffer.data());
         record.magic = ConfigMagic;
         record.version = ConfigLayoutVersion;
@@ -144,8 +187,7 @@ namespace services
         record.crc32 = ComputeCrc(infra::MakeConstByteRange(record.data));
 
         onConfigDone = std::move(onDone);
-        flash.EraseSectors(configSectorIndex, configSectorIndex + 1,
-            [this]
+        configRegion.Erase([this]
             {
                 OnConfigErased();
             });
@@ -153,9 +195,8 @@ namespace services
 
     void NonVolatileMemoryImpl::OnConfigErased()
     {
-        flash.WriteBuffer(
-            infra::MakeConstByteRange(*reinterpret_cast<const ConfigStorageRecord*>(configBuffer.data())),
-            flash.AddressOfSector(configSectorIndex),
+        configRegion.Write(
+            infra::ConstByteRange(configBuffer),
             [this]
             {
                 OnConfigWritten();
@@ -164,9 +205,8 @@ namespace services
 
     void NonVolatileMemoryImpl::OnConfigWritten()
     {
-        flash.ReadBuffer(
-            infra::MakeByteRange(*reinterpret_cast<ConfigStorageRecord*>(configReadBackBuffer.data())),
-            flash.AddressOfSector(configSectorIndex),
+        configRegion.Read(
+            infra::ByteRange(configReadBackBuffer),
             [this]
             {
                 OnConfigReadBack();
@@ -184,12 +224,14 @@ namespace services
     void NonVolatileMemoryImpl::LoadConfig(ConfigData& data,
         infra::Function<void(NvmStatus)> onDone)
     {
+        if (onConfigDone)
+            return;
+
         pendingConfigOutput = &data;
         onConfigDone = std::move(onDone);
 
-        flash.ReadBuffer(
-            infra::MakeByteRange(*reinterpret_cast<ConfigStorageRecord*>(configReadBackBuffer.data())),
-            flash.AddressOfSector(configSectorIndex),
+        configRegion.Read(
+            infra::ByteRange(configReadBackBuffer),
             [this]
             {
                 const auto& record = *reinterpret_cast<const ConfigStorageRecord*>(
@@ -202,7 +244,7 @@ namespace services
                     return;
                 }
 
-                const auto computed = ComputeCrc(infra::MakeConstByteRange(record.data));
+                const uint32_t computed = ComputeCrc(infra::MakeConstByteRange(record.data));
                 if (computed != record.crc32)
                 {
                     *pendingConfigOutput = MakeDefaultConfigData();
@@ -222,9 +264,11 @@ namespace services
 
     void NonVolatileMemoryImpl::Format(infra::Function<void(NvmStatus)> onDone)
     {
+        if (onFormatDone)
+            return;
+
         onFormatDone = std::move(onDone);
-        flash.EraseSectors(calibrationSectorIndex, calibrationSectorIndex + 1,
-            [this]
+        calibrationRegion.Erase([this]
             {
                 OnCalibrationSectorFormattedDuringFormat();
             });
@@ -232,8 +276,7 @@ namespace services
 
     void NonVolatileMemoryImpl::OnCalibrationSectorFormattedDuringFormat()
     {
-        flash.EraseSectors(configSectorIndex, configSectorIndex + 1,
-            [this]
+        configRegion.Erase([this]
             {
                 onFormatDone(NvmStatus::Ok);
             });

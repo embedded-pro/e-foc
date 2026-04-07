@@ -14,6 +14,9 @@ target_sources(e_foc.services.non_volatile_memory PRIVATE
     CalibrationData.hpp
     ConfigData.hpp
     NonVolatileMemory.hpp
+    NvmRegion.hpp
+    NvmFlashRegion.hpp
+    NvmFlashRegion.cpp
     NonVolatileMemoryImpl.hpp
     NonVolatileMemoryImpl.cpp
 )

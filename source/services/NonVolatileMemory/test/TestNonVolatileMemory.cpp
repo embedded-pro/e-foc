@@ -1,29 +1,127 @@
-#include "hal/interfaces/test_doubles/FlashStub.hpp"
+#include "infra/event/EventDispatcher.hpp"
 #include "infra/event/test_helper/EventDispatcherFixture.hpp"
 #include "infra/util/Crc.hpp"
 #include "source/services/NonVolatileMemory/NonVolatileMemoryImpl.hpp"
+#include <algorithm>
 #include <cstring>
 #include <gmock/gmock.h>
+#include <vector>
 
 namespace
 {
     using namespace testing;
 
-    static constexpr uint32_t sectorSize =
-        std::max(sizeof(services::CalibrationStorageRecord),
-            sizeof(services::ConfigStorageRecord)) +
-        64u;
+    // ---------------------------------------------------------------------------
+    // NvmRegionStub — in-memory region that dispatches callbacks via the event loop,
+    // matching the async behaviour of real flash and EEPROM implementations.
+    // ---------------------------------------------------------------------------
+    class NvmRegionStub
+        : public services::NvmRegion
+    {
+    public:
+        explicit NvmRegionStub(std::size_t size)
+            : storage(size, 0xFF)
+        {}
 
-    static_assert(sectorSize >= sizeof(services::CalibrationStorageRecord));
-    static_assert(sectorSize >= sizeof(services::ConfigStorageRecord));
+        void Write(infra::ConstByteRange data, infra::Function<void()> onDone) override
+        {
+            std::copy(data.begin(), data.end(), storage.begin());
+            infra::EventDispatcher::Instance().Schedule(onDone);
+        }
 
+        void Read(infra::ByteRange data, infra::Function<void()> onDone) override
+        {
+            std::copy(storage.begin(), storage.begin() + data.size(), data.begin());
+            infra::EventDispatcher::Instance().Schedule(onDone);
+        }
+
+        void Erase(infra::Function<void()> onDone) override
+        {
+            std::fill(storage.begin(), storage.end(), 0xFF);
+            infra::EventDispatcher::Instance().Schedule(onDone);
+        }
+
+        std::size_t Size() const override
+        {
+            return storage.size();
+        }
+
+        std::vector<uint8_t> storage;
+    };
+
+    // ---------------------------------------------------------------------------
+    // Helper: build a calibration record directly into a region's storage buffer.
+    // Record layout: [magic:4][version:1][crc32:4][data:sizeof(CalibrationData)]
+    // ---------------------------------------------------------------------------
+    static constexpr std::size_t recordMagicOffset = 0;
+    static constexpr std::size_t recordVersionOffset = 4;
+    static constexpr std::size_t recordCrc32Offset = 5;
+    static constexpr std::size_t recordDataOffset = 9;
+
+    void WriteCalibrationRecord(NvmRegionStub& region, uint32_t magic, uint8_t version,
+        const services::CalibrationData& data)
+    {
+        std::memcpy(region.storage.data() + recordMagicOffset, &magic, sizeof(magic));
+        std::memcpy(region.storage.data() + recordVersionOffset, &version, sizeof(version));
+        std::memcpy(region.storage.data() + recordDataOffset, &data, sizeof(data));
+        infra::Crc32 crc;
+        crc.Update(infra::ConstByteRange(
+            region.storage.data() + recordDataOffset,
+            region.storage.data() + recordDataOffset + sizeof(data)));
+        uint32_t crcValue = crc.Result();
+        std::memcpy(region.storage.data() + recordCrc32Offset, &crcValue, sizeof(crcValue));
+    }
+
+    // ---------------------------------------------------------------------------
+    // Field-by-field equality helpers — avoids relying on memcmp over padding bytes.
+    // ---------------------------------------------------------------------------
+    void ExpectCalibrationDataEqual(const services::CalibrationData& actual,
+        const services::CalibrationData& expected)
+    {
+        EXPECT_EQ(actual.rPhase, expected.rPhase);
+        EXPECT_EQ(actual.lD, expected.lD);
+        EXPECT_EQ(actual.lQ, expected.lQ);
+        EXPECT_EQ(actual.currentOffsetA, expected.currentOffsetA);
+        EXPECT_EQ(actual.currentOffsetB, expected.currentOffsetB);
+        EXPECT_EQ(actual.currentOffsetC, expected.currentOffsetC);
+        EXPECT_EQ(actual.inertia, expected.inertia);
+        EXPECT_EQ(actual.frictionCoulomb, expected.frictionCoulomb);
+        EXPECT_EQ(actual.frictionViscous, expected.frictionViscous);
+        EXPECT_EQ(actual.encoderZeroOffset, expected.encoderZeroOffset);
+        EXPECT_EQ(actual.kpCurrent, expected.kpCurrent);
+        EXPECT_EQ(actual.kiCurrent, expected.kiCurrent);
+        EXPECT_EQ(actual.kpVelocity, expected.kpVelocity);
+        EXPECT_EQ(actual.kiVelocity, expected.kiVelocity);
+        EXPECT_EQ(actual.encoderDirection, expected.encoderDirection);
+        EXPECT_EQ(actual.polePairs, expected.polePairs);
+    }
+
+    void ExpectConfigDataEqual(const services::ConfigData& actual,
+        const services::ConfigData& expected)
+    {
+        EXPECT_EQ(actual.maxCurrent, expected.maxCurrent);
+        EXPECT_EQ(actual.maxVelocity, expected.maxVelocity);
+        EXPECT_EQ(actual.maxTorque, expected.maxTorque);
+        EXPECT_EQ(actual.canNodeId, expected.canNodeId);
+        EXPECT_EQ(actual.canBaudrate, expected.canBaudrate);
+        EXPECT_EQ(actual.telemetryRateHz, expected.telemetryRateHz);
+        EXPECT_EQ(actual.overTempThreshold, expected.overTempThreshold);
+        EXPECT_EQ(actual.underVoltageThreshold, expected.underVoltageThreshold);
+        EXPECT_EQ(actual.overVoltageThreshold, expected.overVoltageThreshold);
+        EXPECT_EQ(actual.defaultControlMode, expected.defaultControlMode);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Fixture
+    // ---------------------------------------------------------------------------
     class NonVolatileMemoryTest
         : public ::testing::Test
         , public infra::EventDispatcherFixture
     {
     protected:
-        hal::FlashStub flash{ 2, sectorSize };
-        services::NonVolatileMemoryImpl nvm{ flash };
+        NvmRegionStub calibrationRegion{ services::NonVolatileMemoryImpl::calibrationRecordSize };
+        NvmRegionStub configRegion{ services::NonVolatileMemoryImpl::configRecordSize };
+        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion };
 
         services::CalibrationData MakeTestCalibration()
         {
@@ -65,8 +163,14 @@ namespace
 
         void RunUntilDone(bool& done)
         {
-            while (!done)
+            constexpr int maxIterations = 1000;
+            for (int i = 0; i < maxIterations; ++i)
+            {
+                if (done)
+                    return;
                 ExecuteAllActions();
+            }
+            FAIL() << "Async callback was not invoked within " << maxIterations << " iterations";
         }
     };
 }
@@ -107,7 +211,7 @@ TEST_F(NonVolatileMemoryTest, load_calibration_returns_ok_with_correct_data_afte
 
     RunUntilDone(loadDone);
     EXPECT_EQ(result, services::NvmStatus::Ok);
-    EXPECT_EQ(std::memcmp(&loaded, &written, sizeof(services::CalibrationData)), 0);
+    ExpectCalibrationDataEqual(loaded, written);
 }
 
 TEST_F(NonVolatileMemoryTest, load_calibration_returns_invalid_data_on_blank_flash)
@@ -128,16 +232,8 @@ TEST_F(NonVolatileMemoryTest, load_calibration_returns_invalid_data_on_blank_fla
 
 TEST_F(NonVolatileMemoryTest, load_calibration_returns_version_mismatch_on_wrong_version)
 {
-    services::CalibrationStorageRecord record{};
-    record.magic = services::CalibrationMagic;
-    record.version = services::CalibrationLayoutVersion + 1;
-    record.data = MakeTestCalibration();
-    infra::Crc32 crc;
-    crc.Update(infra::MakeConstByteRange(record.data));
-    record.crc32 = crc.Result();
-
-    auto bytes = infra::MakeConstByteRange(record);
-    std::copy(bytes.begin(), bytes.end(), flash.sectors[0].begin());
+    WriteCalibrationRecord(calibrationRegion, services::CalibrationMagic,
+        services::CalibrationLayoutVersion + 1, MakeTestCalibration());
 
     services::CalibrationData out{};
     bool done = false;
@@ -162,8 +258,8 @@ TEST_F(NonVolatileMemoryTest, load_calibration_returns_invalid_data_on_crc_corru
         });
     RunUntilDone(saveDone);
 
-    constexpr std::size_t crcOffset = offsetof(services::CalibrationStorageRecord, crc32);
-    flash.sectors[0][crcOffset] ^= 0xFF;
+    // Corrupt one byte of the CRC field (record layout: [magic:4][version:1][crc32:4]...)
+    calibrationRegion.storage[recordCrc32Offset] ^= 0xFF;
 
     services::CalibrationData out{};
     bool done = false;
@@ -279,7 +375,7 @@ TEST_F(NonVolatileMemoryTest, load_config_returns_ok_with_correct_data_after_sav
 
     RunUntilDone(done);
     EXPECT_EQ(result, services::NvmStatus::Ok);
-    EXPECT_EQ(std::memcmp(&loaded, &written, sizeof(services::ConfigData)), 0);
+    ExpectConfigDataEqual(loaded, written);
 }
 
 TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_when_flash_is_blank)
@@ -297,7 +393,7 @@ TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_when_flash_is_blank)
 
     RunUntilDone(done);
     EXPECT_EQ(result, services::NvmStatus::Ok);
-    EXPECT_EQ(std::memcmp(&loaded, &defaults, sizeof(services::ConfigData)), 0);
+    ExpectConfigDataEqual(loaded, defaults);
 }
 
 TEST_F(NonVolatileMemoryTest, reset_config_to_defaults_stores_default_values)
@@ -326,7 +422,7 @@ TEST_F(NonVolatileMemoryTest, reset_config_to_defaults_stores_default_values)
         });
     RunUntilDone(done);
 
-    EXPECT_EQ(std::memcmp(&loaded, &defaults, sizeof(services::ConfigData)), 0);
+    ExpectConfigDataEqual(loaded, defaults);
 }
 
 TEST_F(NonVolatileMemoryTest, format_erases_all_regions)
@@ -352,8 +448,8 @@ TEST_F(NonVolatileMemoryTest, format_erases_all_regions)
         });
     RunUntilDone(done);
 
-    for (auto byte : flash.sectors[0])
+    for (auto byte : calibrationRegion.storage)
         EXPECT_EQ(byte, 0xFF);
-    for (auto byte : flash.sectors[1])
+    for (auto byte : configRegion.storage)
         EXPECT_EQ(byte, 0xFF);
 }
