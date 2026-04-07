@@ -6,7 +6,7 @@ inputs:
     description: Directory to search for documentation files
     required: true
   doc-type:
-    description: "Filter by document type: architecture, design, or all"
+    description: "Filter by document type: architecture, design, theory, or all"
     required: false
     default: all
 

@@ -1,122 +1,153 @@
-# Performance Optimization Guide for Embedded Systems
+---
+title: "Embedded Performance Optimization"
+type: theory
+status: approved
+version: 1.0.0
+component: "foc"
+date: 2026-04-07
+---
 
-This guide documents best practices for writing high-performance code targeting ARM Cortex-M microcontrollers, with specific focus on real-time motor control applications.
+| Field     | Value                              |
+|-----------|------------------------------------|
+| Title     | Embedded Performance Optimization  |
+| Type      | theory                             |
+| Status    | approved                           |
+| Version   | 1.0.0                              |
+| Component | foc                                |
+| Date      | 2026-04-07                         |
 
-## Table of Contents
+## Overview
 
-1. [Compiler Optimization Fundamentals](#compiler-optimization-fundamentals)
-2. [Writing Optimization-Friendly Code](#writing-optimization-friendly-code)
-3. [Debug Mode Performance](#debug-mode-performance)
-4. [Analyzing Generated Code](#analyzing-generated-code)
-5. [Measuring Performance](#measuring-performance)
-6. [Common Pitfalls](#common-pitfalls)
+Real-time motor control firmware must meet strict cycle-count deadlines at every control-loop iteration.
+On an ARM Cortex-M4F running at 120 MHz with a 20 kHz FOC loop, the complete ISR computation budget is
+6 000 cycles — fewer than 400 of which should be consumed by the FOC core (Clarke, Park, two PI
+controllers, inverse Park, SVM). Violating this budget causes PWM update skips, current ripple, and
+control instability.
+
+This document describes the compiler and code-level techniques used to keep the FOC path within budget,
+how to measure and verify cycle usage, and the common patterns that silently erode performance.
 
 ---
 
-## Compiler Optimization Fundamentals
+## Prerequisites
 
-### Optimization Levels
+| Symbol   | Meaning                              | Unit   |
+|----------|--------------------------------------|--------|
+| $f_{cpu}$| CPU clock frequency                  | Hz     |
+| $f_{sw}$ | Switching (PWM) frequency            | Hz     |
+| $N_{cyc}$| Cycles available per control period  | cycles |
+| CPI      | Cycles Per Instruction (pipeline)    | —      |
+| FMA      | Fused Multiply-Accumulate            | —      |
+| LTO      | Link-Time Optimisation               | —      |
 
-| Flag  | Description                 | Use Case                          |
-|-------|-----------------------------|-----------------------------------|
-| `-O0` | No optimization             | Default debug, full debuggability |
-| `-Og` | Debug-friendly optimization | **Recommended for debug builds**  |
-| `-O1` | Basic optimization          | Faster compile, moderate speed    |
-| `-O2` | Standard optimization       | Good balance of speed/size        |
-| `-O3` | Aggressive optimization     | Maximum speed, may increase size  |
-| `-Os` | Size optimization           | Flash-constrained systems         |
-
-### Critical Flags for Embedded
-
-```cmake
-# Recommended flags for ARM Cortex-M4F
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-    -mcpu=cortex-m4 \
-    -mfpu=fpv4-sp-d16 \
-    -mfloat-abi=hard \
-    -mthumb \
-    -ffunction-sections \
-    -fdata-sections")
-
-# Linker flags to remove unused code
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections")
-```
-
-### Fast-Math Considerations
-
-```cpp
-// Enables aggressive floating-point optimizations
-// WARNING: May change numerical behavior slightly
-#pragma GCC optimize("fast-math")
-```
-
-Effects of `-ffast-math`:
-- Assumes no NaN or Infinity
-- Allows reordering of operations
-- Enables FMA (Fused Multiply-Add) instructions
-- May break IEEE 754 compliance
-
-**Use only when**: You control all inputs and don't need strict IEEE behavior.
+$$
+N_{cyc} = \frac{f_{cpu}}{f_{sw}} = \frac{120\,\text{MHz}}{20\,\text{kHz}} = 6000\ \text{cycles}
+$$
 
 ---
 
-## Writing Optimization-Friendly Code
+## Mathematical Foundation
+
+### ARM Cortex-M4 Instruction Pipeline
+
+The Cortex-M4 uses a 3-stage pipeline (fetch, decode, execute) with a dual-issue capability for
+certain instruction pairs.  The FPU (FPv4-SP) adds a separate pipelined floating-point execution
+unit.  Key throughput properties:
+
+| Instruction          | Description               | Latency (cycles) | Throughput (cycles/inst) |
+|----------------------|---------------------------|-----------------|--------------------------|
+| `vfma.f32`           | Fused multiply-add        | 1               | 1                        |
+| `vmul.f32`           | Float multiply            | 1               | 1                        |
+| `vadd.f32`           | Float add                 | 1               | 1                        |
+| `vdiv.f32`           | Float divide              | 14              | 14                       |
+| `vsqrt.f32`          | Float sqrt                | 14              | 14                       |
+| `vcmpe.f32`          | Float compare             | 1               | 1                        |
+| `blx rN`             | Indirect call (virtual)   | 3+              | 3+                       |
+| `bl <addr>`          | Direct call               | 1+N             | 1+N                      |
+| `push/pop (4 regs)`  | Stack save/restore        | 2               | 2                        |
+
+**Implication for FOC**: All hot-path arithmetic should use FMA-capable patterns. Division and sqrt
+must be avoided in the ISR where possible; use reciprocals or LUT-based approximations instead.
+
+### Compiler Optimisation Theory
+
+The GCC/Clang compiler applies transformations that can drastically change cycle count:
+
+1. **Inlining**: For short functions called in tight loops, inlining eliminates the call overhead
+   (branch, stack frame setup/teardown), and enables cross-function optimisations such as constant
+   propagation and dead-code elimination.
+
+2. **Loop unrolling**: The compiler repeats loop body $k$ times to reduce branch overhead and expose
+   more instruction-level parallelism.  Controlled by `-funroll-loops` or `#pragma GCC optimize("O3")`.
+
+3. **Constant propagation / folding**: Compile-time evaluation of constant expressions eliminates
+   runtime computation.  Use `constexpr` aggressively for lookup tables and configuration constants.
+
+4. **Auto-vectorisation**: Cortex-M4 SIMD (DSP extensions) can process two 16-bit or four 8-bit
+   operands per cycle.  Q15/Q31 fixed-point code benefits; floating-point does not (no NEON on M4).
+
+5. **Fast-math transformations** (`-ffast-math`, `#pragma GCC optimize("fast-math")`):
+   - Allows re-association of floating-point expressions.
+   - Enables FMA generation (avoids separate multiply + add).
+   - Assumes no NaN/Inf inputs.
+   - **May change numerical results slightly** — verify with tests.
+
+### Virtual Dispatch Cost Model
+
+A virtual function call requires:
+1. Load vtable pointer from `this` (1 load, possible cache miss).
+2. Load function pointer from vtable (1 load, possible i-cache miss).
+3. Indirect branch `blx rN` (3+ cycles, branch predictor cannot speculate).
+4. Callee setup/teardown (push/pop, stack frame).
+
+Total overhead: 6–20+ cycles per call depending on cache state.  At 40 ns per virtual call (120 MHz),
+10 virtual calls per FOC iteration consume 400 ns — approximately 6.7 % of the 20 kHz budget.
+
+For the FOC path, prefer static dispatch (non-virtual, `inline`, `constexpr`) for all computation
+that occurs inside the ISR.
+
+---
+
+## Optimisation Techniques
 
 ### 1. Avoid Virtual Functions in Hot Paths
 
-**Bad** (virtual dispatch overhead):
+**Avoid** (virtual dispatch overhead):
 ```cpp
 class ITrigonometry {
 public:
     virtual float Sine(float angle) const = 0;
 };
-
-// In hot path:
-float sin_val = trig->Sine(angle);  // vtable lookup + indirect call
+// In hot path: vtable lookup + indirect call
+float sin_val = trig->Sine(angle);
 ```
 
-**Good** (static dispatch):
+**Prefer** (static dispatch, inlinable):
 ```cpp
 struct FastTrigonometry {
     static inline float Sine(float angle) noexcept {
-        // Direct call, can be inlined
-        return LookupTable[index];
+        return LookupTable[index];  // Direct access, fully inlined
     }
 };
-
-// In hot path:
-float sin_val = FastTrigonometry::Sine(angle);  // Inlined
+float sin_val = FastTrigonometry::Sine(angle);
 ```
 
 ### 2. Avoid `std::optional` in Performance-Critical Code
 
-**Bad** (generates has_value() checks):
 ```cpp
+// Avoid: generates has_value() checks and extra memory access
 std::optional<float> setPoint;
 
-void Process(float input) {
-    if (!setPoint.has_value())  // Extra branch + memory access
-        return;
-    // ...
-}
-```
-
-**Good** (simple flag):
-```cpp
+// Prefer: simple flag
 float setPointValue = 0.0f;
 bool hasSetPoint = false;
-
-void Process(float input) {
-    if (!hasSetPoint) [[unlikely]]
-        return;
-    // ...
-}
+if (!hasSetPoint) [[unlikely]] return;
 ```
 
 ### 3. Use `constexpr` and `inline` Aggressively
 
 ```cpp
-// Computed at compile time
+// Computed entirely at compile time — zero runtime cost
 inline constexpr std::array<float, 512> sineLUT = []() {
     std::array<float, 512> table{};
     for (size_t i = 0; i < 512; ++i)
@@ -128,125 +159,118 @@ inline constexpr std::array<float, 512> sineLUT = []() {
 ### 4. Use Compiler Attributes
 
 ```cpp
-// Force inlining even without optimization
-#define ALWAYS_INLINE __attribute__((always_inline)) inline
+#define ALWAYS_INLINE  __attribute__((always_inline)) inline
+#define HOT_FUNCTION   __attribute__((hot))
 
-// Mark hot functions for better code placement
-#define HOT_FUNCTION __attribute__((hot))
-
-// Combined macro for critical functions
-#define OPTIMIZE_FOR_SPEED \
-    __attribute__((always_inline, hot, optimize("-O3"), optimize("-ffast-math"))) inline
+// Combined: force inlining + speed-optimised
+__attribute__((always_inline, hot)) inline
+void FocStep(FocState& s) { /* ... */ }
 ```
 
-### 5. Prefer Fixed-Size Types
+### 5. Prefer Fixed-Size Integer Types
 
 ```cpp
-// Good: Explicit sizes, portable
+// Good: Explicit widths, portable
 uint32_t counter;
-int16_t current_mA;
-float voltage_V;
+int16_t  current_mA;
+float    voltage_V;
 
-// Avoid: Implementation-defined sizes
+// Avoid: Implementation-defined widths
 int counter;
 short current;
 ```
 
-### 6. Minimize Stack Usage
+### 6. Minimise Stack Usage
 
 ```cpp
-// Bad: Large stack allocation
+// Avoid: 4 KB on stack inside a function
 void Calculate() {
-    float buffer[1024];  // 4KB on stack!
-    // ...
+    float buffer[1024];
 }
 
-// Good: Static or class member
+// Prefer: static member in .bss
 class Calculator {
-    static float buffer[1024];  // In .bss section
-    // ...
+    static float buffer[1024];  // Zero-init, no stack cost
 };
 ```
 
-### 7. Use FMA When Possible
+### 7. Enable FMA Patterns
 
-The compiler generates FMA (Fused Multiply-Add) instructions with `-ffast-math`:
+With `-ffast-math`, the compiler emits `vfma.f32` for `a * b + c` patterns:
 
 ```cpp
-// This pattern:
+// This single expression:
 result = a * b + c;
-
-// Becomes single instruction:
-// vfma.f32 s0, s1, s2  (1 cycle instead of 2)
+// Becomes: vfma.f32 s0, s1, s2  (1 cycle, full precision)
 ```
 
----
+### 8. Per-File Optimisation Pragmas
 
-## Debug Mode Performance
-
-### Problem
-
-By default, Debug builds (`-O0`) disable all optimizations, making code 3-10x slower than Release. This is problematic for:
-- Real-time control loops (FOC, PID)
-- Interrupt service routines
-- Communication protocols with timing requirements
-
-### Solution 1: Use `-Og` for Debug Builds
-
-```cmake
-# In CMakeLists.txt
-set(CMAKE_CXX_FLAGS_DEBUG "-Og -g" CACHE STRING "Debug flags" FORCE)
-```
-
-`-Og` provides:
-- Basic inlining
-- Dead code elimination
-- Register allocation
-- Still debuggable (variable inspection works)
-
-### Solution 2: Per-File Optimization Pragmas
+For performance-critical translation units (FOC implementations, SVM, transforms):
 
 ```cpp
-// At the top of performance-critical .cpp files
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC optimize("O3", "fast-math")
 #endif
-
-// Rest of implementation...
 ```
 
-### Solution 3: Per-Function Attributes
+Place at the top of the `.cpp` file, before any includes that define affected functions.
+
+### 9. Per-Function Attributes
 
 ```cpp
 __attribute__((optimize("-O3")))
 void CriticalFunction() {
-    // This function is always optimized
+    // Always compiled at -O3 regardless of TU-level flags
 }
 ```
 
-**Note**: Function-level attributes don't propagate to callees. Use file-level pragmas for better results.
+Note: function attributes do not propagate to callees.  Use file-level pragmas for transitive effect.
 
 ---
 
-## Analyzing Generated Code
+## Debug Builds
+
+By default, Debug builds (`-O0`) disable all optimisations, making code 3–10× slower than Release.
+This breaks real-time deadlines for FOC ISRs during debugging sessions.
+
+**Solution 1 — Use `-Og` for debug builds** (recommended):
+
+```cmake
+set(CMAKE_CXX_FLAGS_DEBUG "-Og -g" CACHE STRING "Debug flags" FORCE)
+```
+
+`-Og` provides: basic inlining, dead-code elimination, register allocation — while keeping full
+debuggability (variable inspection, correct stack trace).
+
+**Solution 2 — File-level pragma** (when specific files must remain fast even at -O0):
+
+```cpp
+#pragma GCC optimize("O3", "fast-math")
+```
+
+**Solution 3 — Function attribute** (for a single bottleneck function):
+
+```cpp
+__attribute__((optimize("-O3")))
+void CriticalFunction() { /* ... */ }
+```
+
+---
+
+## Analysing Generated Code
 
 ### Disassembly with objdump
 
 ```bash
-# Basic disassembly
-arm-none-eabi-objdump -d firmware.elf > disassembly.txt
-
-# With C++ demangling
-arm-none-eabi-objdump -d -C firmware.elf > disassembly.txt
-
-# Specific function (grep pattern)
-arm-none-eabi-objdump -d -C firmware.elf | grep -A 100 "FunctionName"
-
-# From static library
-arm-none-eabi-objdump -d -C libfoo.a | grep -A 50 "ClassName::Method"
-
-# Include source interleaved (requires -g)
+# With C++ demangling + source interleave (requires -g)
 arm-none-eabi-objdump -d -S -C firmware.elf > disassembly_with_source.txt
+
+# Just one section
+arm-none-eabi-objdump -d -j .text file.elf
+
+# Specific function (grep)
+arm-none-eabi-objdump -d -C firmware.elf | grep -A 100 "FunctionName"
 ```
 
 ### Size Analysis
@@ -255,66 +279,41 @@ arm-none-eabi-objdump -d -S -C firmware.elf > disassembly_with_source.txt
 # Section sizes
 arm-none-eabi-size firmware.elf
 
-# Detailed symbol sizes (sorted by size)
-arm-none-eabi-nm --size-sort -C firmware.elf
-
 # Top 20 largest symbols
 arm-none-eabi-nm --size-sort -C firmware.elf | tail -20
 ```
 
-### Reading Assembly Output
-
-Key ARM Cortex-M4F instructions to look for:
-
-| Instruction | Meaning                 | Cycles |
-|-------------|-------------------------|--------|
-| `vfma.f32`  | Fused multiply-add      | 1      |
-| `vmul.f32`  | Multiply                | 1      |
-| `vadd.f32`  | Add                     | 1      |
-| `vdiv.f32`  | Division                | 14     |
-| `vsqrt.f32` | Square root             | 14     |
-| `blx r3`    | Indirect call (virtual) | 3+     |
-| `bl <addr>` | Direct call             | 1+N    |
-| `push/pop`  | Stack operations        | 1-2    |
-
-### Signs of Poor Optimization
+### Signs of Poor Optimisation
 
 ```asm
-; Bad: Excessive stack operations
-push    {r4, r5, r6, r7, r8, r9, r10, r11, lr}
-sub     sp, #104        ; Large stack frame
+; Virtual dispatch footprint
+ldr    r3, [r0, #0]   ; Load vtable pointer
+ldr    r3, [r3, #4]   ; Load function pointer
+blx    r3             ; Indirect call — 3+ cycles, unpredictable branch
 
-; Bad: Virtual dispatch
-ldr     r3, [r0, #0]    ; Load vtable pointer
-ldr     r3, [r3, #4]    ; Load function pointer
-blx     r3              ; Indirect call
+; Division (avoid in ISR)
+vdiv.f32  s0, s1, s2  ; 14 cycles
 
-; Bad: Repeated memory loads
-ldr     r3, [r7, #4]    ; Same address loaded
+; Repeated memory loads (register allocation failure)
+ldr    r3, [r7, #4]
 ; ... some code ...
-ldr     r3, [r7, #4]    ; Again!
+ldr    r3, [r7, #4]   ; Same address loaded again
 ```
 
-### Signs of Good Optimization
+### Signs of Good Optimisation
 
 ```asm
-; Good: Minimal stack usage
-push    {r4, r5, lr}
-sub     sp, #16
+; Minimal stack frame
+push   {r4, r5, lr}
+sub    sp, #16
 
-; Good: FMA instructions
-vfma.f32  s0, s1, s2
+; FMA instruction
+vfma.f32  s0, s1, s2   ; 1 cycle
 
-; Good: Conditional execution (no branches)
-vcmpe.f32 s0, s1
-it        gt
+; Conditional execution — no branch
+vcmpe.f32  s0, s1
+it         gt
 vmovgt.f32 s0, s1
-
-; Good: Loop unrolling
-vldr    s0, [r0, #0]
-vldr    s1, [r0, #4]
-vldr    s2, [r0, #8]
-vldr    s3, [r0, #12]
 ```
 
 ---
@@ -324,156 +323,103 @@ vldr    s3, [r0, #12]
 ### Cycle Counter (DWT)
 
 ```cpp
-// Enable cycle counter (do once at startup)
+// Enable at startup (once)
 CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
 DWT->CYCCNT = 0;
-DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+DWT->CTRL   |= DWT_CTRL_CYCCNTENA_Msk;
 
-// Measure cycles
-uint32_t start = DWT->CYCCNT;
-CriticalFunction();
+// Measure
+uint32_t start  = DWT->CYCCNT;
+FocCoreStep();
 uint32_t cycles = DWT->CYCCNT - start;
 ```
 
-### GPIO Toggle Method
+### GPIO Toggle (requires oscilloscope)
 
 ```cpp
-// Simple but requires oscilloscope
 GPIO_SetPin(DEBUG_PIN);
-CriticalFunction();
+FocCoreStep();
 GPIO_ClearPin(DEBUG_PIN);
-// Measure pulse width on scope
-```
-
-### Timer-Based Measurement
-
-```cpp
-// Using SysTick or hardware timer
-uint32_t start = SysTick->VAL;
-CriticalFunction();
-uint32_t elapsed = start - SysTick->VAL;  // SysTick counts down
-```
-
-### Typical Cycle Budgets (120 MHz Cortex-M4)
-
-| Control Loop Rate | Available Cycles |
-|-------------------|------------------|
-| 10 kHz            | 12,000 cycles    |
-| 20 kHz            | 6,000 cycles     |
-| 40 kHz            | 3,000 cycles     |
-| 100 kHz           | 1,200 cycles     |
-
-**FOC typical requirements**: 200-400 cycles (optimized), 800-1500 cycles (unoptimized)
-
----
-
-## Common Pitfalls
-
-### 1. Heap Allocation
-
-```cpp
-// NEVER in embedded hot paths
-auto ptr = std::make_unique<Data>();  // malloc!
-std::vector<float> buffer;            // malloc!
-std::string message;                  // malloc!
-```
-
-### 2. Exception Handling Overhead
-
-```cpp
-// Compile with: -fno-exceptions -fno-rtti
-// Avoid try/catch in embedded code
-```
-
-### 3. printf/iostream in ISR
-
-```cpp
-// NEVER in interrupt handlers
-void ISR_Handler() {
-    printf("Debug: %f\n", value);  // ~10,000+ cycles!
-}
-```
-
-### 4. Floating-Point in Integer-Only Code
-
-```cpp
-// Bad: Promotes to float
-int result = value * 1.5;
-
-// Good: Integer-only
-int result = value * 3 / 2;
-```
-
-### 5. Unaligned Access
-
-```cpp
-// Potential unaligned access (may cause fault or slow access)
-struct __attribute__((packed)) BadStruct {
-    uint8_t a;
-    uint32_t b;  // Unaligned!
-};
-
-// Good: Natural alignment
-struct GoodStruct {
-    uint32_t b;
-    uint8_t a;
-    uint8_t padding[3];
-};
+// Measure pulse width on scope → cycles = width × f_cpu
 ```
 
 ---
 
-## Quick Reference Card
+## Numerical Properties
 
-### GCC Optimization Pragmas
+### Control Loop Cycle Budgets — ARM Cortex-M4 at 120 MHz
+
+| Control Rate | Cycles/Period | FOC Budget (< 7 %) | Notes                          |
+|-------------|--------------|---------------------|--------------------------------|
+| 10 kHz      | 12 000       | 840                 | Low-frequency, conservative    |
+| 20 kHz      | 6 000        | **420**             | Target rate for this project   |
+| 40 kHz      | 3 000        | 210                 | High performance, tight budget |
+| 100 kHz     | 1 200        | 84                  | Requires fixed-point or DSP    |
+
+**FOC core typical requirements**:
+- Optimised (`-O3`, `fast-math`, LUT sin/cos): **200–400 cycles**
+- Non-optimised (`-O0`, `sinf/cosf` calls): **800–1500 cycles**
+
+### Key Performance Sensitivities
+
+| Code Pattern             | Cycle Impact       | Recommendation                         |
+|--------------------------|--------------------|-----------------------------------------|
+| `sinf()` / `cosf()`      | 50–200 cycles each | Replace with 512-entry LUT              |
+| Virtual call in ISR      | 6–20 cycles each   | Use static dispatch / inline            |
+| `vdiv.f32`               | 14 cycles          | Use precomputed reciprocal              |
+| `vsqrt.f32`              | 14 cycles          | Use fast inverse sqrt approximation     |
+| Stack frame > 64 bytes   | 2–4 cycles extra   | Reduce local variables                  |
+| Cache miss (data)        | 3–10 cycles        | Keep hot data in registers or TCM       |
+
+### Common Pitfalls
+
+| Problem                    | Symptom                         | Fix                                     |
+|----------------------------|---------------------------------|-----------------------------------------|
+| Heap allocation in ISR     | Non-deterministic latency spike | Use static/stack allocation only        |
+| `printf` in ISR            | 10 000+ cycles, UART block      | Use DWT counter or GPIO toggle instead  |
+| Exception handling overhead| Increased code size, slow paths | Compile with `-fno-exceptions -fno-rtti`|
+| Float in integer-only code | Unnecessary FPU state save      | Use integer arithmetic or explicit cast |
+| Packed struct with uint32  | Unaligned access fault or stall | Align struct members on natural boundary|
+
+---
+
+## Quick Reference
+
+### GCC Optimisation Pragmas
+
 ```cpp
-#pragma GCC optimize("O3")           // Maximum speed
-#pragma GCC optimize("Os")           // Minimum size  
-#pragma GCC optimize("fast-math")    // Aggressive FP
-#pragma GCC push_options             // Save current options
-#pragma GCC pop_options              // Restore options
+#pragma GCC optimize("O3")        // Maximum speed
+#pragma GCC optimize("Os")        // Minimum size
+#pragma GCC optimize("fast-math") // Aggressive FP
+#pragma GCC push_options          // Save current options
+#pragma GCC pop_options           // Restore options
 ```
 
 ### Function Attributes
+
 ```cpp
-__attribute__((always_inline))       // Force inline
-__attribute__((noinline))            // Prevent inline
-__attribute__((hot))                 // Optimize for speed
-__attribute__((cold))                // Optimize for size
-__attribute__((pure))                // No side effects
-__attribute__((const))               // Pure + no memory reads
-__attribute__((flatten))             // Inline all callees
+__attribute__((always_inline))   // Force inline
+__attribute__((noinline))        // Prevent inline
+__attribute__((hot))             // Optimise for speed
+__attribute__((cold))            // Optimise for size
+__attribute__((pure))            // No side effects
+__attribute__((const))           // Pure + no memory reads
+__attribute__((flatten))         // Inline all callees
 ```
 
 ### Branch Hints
+
 ```cpp
-if (condition) [[likely]] { }        // C++20
-if (condition) [[unlikely]] { }      // C++20
-if (__builtin_expect(condition, 1))  // GCC
-```
-
-### Useful objdump Commands
-```bash
-# Full disassembly with source
-arm-none-eabi-objdump -d -S -C file.elf
-
-# Just .text section
-arm-none-eabi-objdump -d -j .text file.elf
-
-# Show relocations
-arm-none-eabi-objdump -d -r file.o
-
-# Section headers
-arm-none-eabi-objdump -h file.elf
+if (condition) [[likely]]   { }   // C++20
+if (condition) [[unlikely]] { }   // C++20
 ```
 
 ---
 
 ## References
 
-- [ARM Cortex-M4 Technical Reference Manual](https://developer.arm.com/documentation/100166/latest/)
-- [GCC Optimization Options](https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html)
-- [ARM Compiler armasm User Guide](https://developer.arm.com/documentation/dui0473/latest)
-- [Embedded Artistry - Embedded C++ Guidelines](https://embeddedartistry.com/)
-
----
+1. ARM — *Cortex-M4 Technical Reference Manual*, ARM DDI 0439B.
+2. ARM — *Cortex-M4 Devices Generic User Guide*, ARM DUI 0553A.
+3. Fog, A. — *Optimizing software in C++*, Technical University of Denmark, 2023.
+4. GCC Project — *Optimize Options*, GCC Manual, https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
+5. Texas Instruments — *AM335x ARM Cortex-A8 Microprocessors Technical Reference Manual*, 2019.

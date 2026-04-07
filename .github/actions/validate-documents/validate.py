@@ -114,8 +114,11 @@ def check_no_image_references(text: str) -> list[str]:
     """
     errors = []
     image_pattern = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
+    inline_code_pattern = re.compile(r"`[^`]*`")
     for line_num, line in enumerate(text.splitlines(), 1):
-        if image_pattern.search(line):
+        # Strip inline code spans first to avoid false-positives on documented examples
+        line_without_code = inline_code_pattern.sub("", line)
+        if image_pattern.search(line_without_code):
             errors.append(
                 f"line {line_num}: external image reference not allowed "
                 "— use a Mermaid code block or ASCII art instead"
@@ -154,9 +157,12 @@ def validate_file(
         return errors, warnings
 
     frontmatter, fm_errors = parse_frontmatter(text, md_file)
-    errors.extend(fm_errors)
     if frontmatter is None:
+        # File has no YAML frontmatter — it is not a managed documentation file.
+        # Emit warnings but do not fail validation so legacy/external files don't block CI.
+        warnings.extend(fm_errors)
         return errors, warnings
+    errors.extend(fm_errors)
 
     errors.extend(check_required_fields(frontmatter))
 

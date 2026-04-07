@@ -48,3 +48,17 @@ jobs:
         with:
           documents-dir: documentation
           doc-type: design
+
+  validate-theory:
+    name: Validate Theory Documents
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Validate theory documents
+        uses: ./.github/actions/validate-documents
+        with:
+          documents-dir: documentation
+          doc-type: theory
