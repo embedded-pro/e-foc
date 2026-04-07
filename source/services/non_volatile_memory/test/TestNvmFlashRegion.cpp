@@ -1,6 +1,6 @@
 #include "hal/interfaces/test_doubles/FlashStub.hpp"
 #include "infra/event/test_helper/EventDispatcherFixture.hpp"
-#include "source/services/NonVolatileMemory/NvmFlashRegion.hpp"
+#include "source/services/non_volatile_memory/NvmFlashRegion.hpp"
 #include <gmock/gmock.h>
 
 namespace

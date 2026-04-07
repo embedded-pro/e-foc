@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 
 namespace services
@@ -25,7 +26,7 @@ namespace services
         float kiVelocity = 0.0f;
         uint8_t encoderDirection = 0;
         uint8_t polePairs = 0;
-        uint8_t reserved[2] = {};
+        std::array<uint8_t, 2> reserved = {};
     };
 
     static_assert(sizeof(CalibrationData) == 60, "CalibrationData layout must be free of implicit padding");

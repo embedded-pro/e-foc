@@ -1,4 +1,4 @@
-#include "source/services/NonVolatileMemory/NonVolatileMemoryImpl.hpp"
+#include "source/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "infra/util/Crc.hpp"
 #include <cassert>
 #include <cstring>
@@ -56,13 +56,14 @@ namespace services
         if (onCalibrationDone)
             return;
 
-        auto& record = *reinterpret_cast<CalibrationStorageRecord*>(calibrationBuffer.data());
+        CalibrationStorageRecord record{};
         record.magic = CalibrationMagic;
         record.version = CalibrationLayoutVersion;
         record.data = data;
         record.crc32 = ComputeCrc(infra::MakeConstByteRange(record.data));
+        std::memcpy(calibrationBuffer.data(), &record, sizeof(record));
 
-        onCalibrationDone = std::move(onDone);
+        onCalibrationDone = onDone;
         calibrationRegion.Erase([this]
             {
                 OnCalibrationErased();
@@ -104,37 +105,42 @@ namespace services
             return;
 
         pendingCalibrationOutput = &data;
-        onCalibrationDone = std::move(onDone);
+        onCalibrationDone = onDone;
 
         calibrationRegion.Read(
             infra::ByteRange(calibrationReadBackBuffer),
             [this]
             {
-                const auto& record = *reinterpret_cast<const CalibrationStorageRecord*>(
-                    calibrationReadBackBuffer.data());
-
-                if (record.magic != CalibrationMagic)
-                {
-                    onCalibrationDone(NvmStatus::InvalidData);
-                    return;
-                }
-
-                if (record.version != CalibrationLayoutVersion)
-                {
-                    onCalibrationDone(NvmStatus::VersionMismatch);
-                    return;
-                }
-
-                const uint32_t computed = ComputeCrc(infra::MakeConstByteRange(record.data));
-                if (computed != record.crc32)
-                {
-                    onCalibrationDone(NvmStatus::InvalidData);
-                    return;
-                }
-
-                *pendingCalibrationOutput = record.data;
-                onCalibrationDone(NvmStatus::Ok);
+                OnCalibrationReadForLoad();
             });
+    }
+
+    void NonVolatileMemoryImpl::OnCalibrationReadForLoad()
+    {
+        CalibrationStorageRecord record{};
+        std::memcpy(&record, calibrationReadBackBuffer.data(), sizeof(record));
+
+        if (record.magic != CalibrationMagic)
+        {
+            onCalibrationDone(NvmStatus::InvalidData);
+            return;
+        }
+
+        if (record.version != CalibrationLayoutVersion)
+        {
+            onCalibrationDone(NvmStatus::VersionMismatch);
+            return;
+        }
+
+        const uint32_t computed = ComputeCrc(infra::MakeConstByteRange(record.data));
+        if (computed != record.crc32)
+        {
+            onCalibrationDone(NvmStatus::InvalidData);
+            return;
+        }
+
+        *pendingCalibrationOutput = record.data;
+        onCalibrationDone(NvmStatus::Ok);
     }
 
     void NonVolatileMemoryImpl::InvalidateCalibration(infra::Function<void(NvmStatus)> onDone)
@@ -142,7 +148,7 @@ namespace services
         if (onCalibrationDone)
             return;
 
-        onCalibrationDone = std::move(onDone);
+        onCalibrationDone = onDone;
         calibrationRegion.Erase([this]
             {
                 onCalibrationDone(NvmStatus::Ok);
@@ -154,24 +160,29 @@ namespace services
         if (onIsCalibrationValidDone)
             return;
 
-        onIsCalibrationValidDone = std::move(onDone);
+        onIsCalibrationValidDone = onDone;
 
         calibrationRegion.Read(
             infra::ByteRange(calibrationReadBackBuffer),
             [this]
             {
-                const auto& record = *reinterpret_cast<const CalibrationStorageRecord*>(
-                    calibrationReadBackBuffer.data());
-
-                if (record.magic != CalibrationMagic || record.version != CalibrationLayoutVersion)
-                {
-                    onIsCalibrationValidDone(false);
-                    return;
-                }
-
-                const uint32_t computed = ComputeCrc(infra::MakeConstByteRange(record.data));
-                onIsCalibrationValidDone(computed == record.crc32);
+                OnCalibrationReadForIsValid();
             });
+    }
+
+    void NonVolatileMemoryImpl::OnCalibrationReadForIsValid()
+    {
+        CalibrationStorageRecord record{};
+        std::memcpy(&record, calibrationReadBackBuffer.data(), sizeof(record));
+
+        if (record.magic != CalibrationMagic || record.version != CalibrationLayoutVersion)
+        {
+            onIsCalibrationValidDone(false);
+            return;
+        }
+
+        const uint32_t computed = ComputeCrc(infra::MakeConstByteRange(record.data));
+        onIsCalibrationValidDone(computed == record.crc32);
     }
 
     void NonVolatileMemoryImpl::SaveConfig(const ConfigData& data,
@@ -180,13 +191,14 @@ namespace services
         if (onConfigDone)
             return;
 
-        auto& record = *reinterpret_cast<ConfigStorageRecord*>(configBuffer.data());
+        ConfigStorageRecord record{};
         record.magic = ConfigMagic;
         record.version = ConfigLayoutVersion;
         record.data = data;
         record.crc32 = ComputeCrc(infra::MakeConstByteRange(record.data));
+        std::memcpy(configBuffer.data(), &record, sizeof(record));
 
-        onConfigDone = std::move(onDone);
+        onConfigDone = onDone;
         configRegion.Erase([this]
             {
                 OnConfigErased();
@@ -228,38 +240,43 @@ namespace services
             return;
 
         pendingConfigOutput = &data;
-        onConfigDone = std::move(onDone);
+        onConfigDone = onDone;
 
         configRegion.Read(
             infra::ByteRange(configReadBackBuffer),
             [this]
             {
-                const auto& record = *reinterpret_cast<const ConfigStorageRecord*>(
-                    configReadBackBuffer.data());
-
-                if (record.magic != ConfigMagic || record.version != ConfigLayoutVersion)
-                {
-                    *pendingConfigOutput = MakeDefaultConfigData();
-                    onConfigDone(NvmStatus::Ok);
-                    return;
-                }
-
-                const uint32_t computed = ComputeCrc(infra::MakeConstByteRange(record.data));
-                if (computed != record.crc32)
-                {
-                    *pendingConfigOutput = MakeDefaultConfigData();
-                    onConfigDone(NvmStatus::Ok);
-                    return;
-                }
-
-                *pendingConfigOutput = record.data;
-                onConfigDone(NvmStatus::Ok);
+                OnConfigReadForLoad();
             });
+    }
+
+    void NonVolatileMemoryImpl::OnConfigReadForLoad()
+    {
+        ConfigStorageRecord record{};
+        std::memcpy(&record, configReadBackBuffer.data(), sizeof(record));
+
+        if (record.magic != ConfigMagic || record.version != ConfigLayoutVersion)
+        {
+            *pendingConfigOutput = MakeDefaultConfigData();
+            onConfigDone(NvmStatus::Ok);
+            return;
+        }
+
+        const uint32_t computed = ComputeCrc(infra::MakeConstByteRange(record.data));
+        if (computed != record.crc32)
+        {
+            *pendingConfigOutput = MakeDefaultConfigData();
+            onConfigDone(NvmStatus::Ok);
+            return;
+        }
+
+        *pendingConfigOutput = record.data;
+        onConfigDone(NvmStatus::Ok);
     }
 
     void NonVolatileMemoryImpl::ResetConfigToDefaults(infra::Function<void(NvmStatus)> onDone)
     {
-        SaveConfig(MakeDefaultConfigData(), std::move(onDone));
+        SaveConfig(MakeDefaultConfigData(), onDone);
     }
 
     void NonVolatileMemoryImpl::Format(infra::Function<void(NvmStatus)> onDone)
@@ -267,7 +284,7 @@ namespace services
         if (onFormatDone)
             return;
 
-        onFormatDone = std::move(onDone);
+        onFormatDone = onDone;
         calibrationRegion.Erase([this]
             {
                 OnCalibrationSectorFormattedDuringFormat();

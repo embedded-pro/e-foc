@@ -1,8 +1,8 @@
 #pragma once
 
 #include "infra/util/Function.hpp"
-#include "source/services/NonVolatileMemory/CalibrationData.hpp"
-#include "source/services/NonVolatileMemory/ConfigData.hpp"
+#include "source/services/non_volatile_memory/CalibrationData.hpp"
+#include "source/services/non_volatile_memory/ConfigData.hpp"
 
 namespace services
 {

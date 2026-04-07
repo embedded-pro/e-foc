@@ -1,4 +1,4 @@
-#include "source/services/NonVolatileMemory/NvmFlashRegion.hpp"
+#include "source/services/non_volatile_memory/NvmFlashRegion.hpp"
 
 namespace services
 {
@@ -10,17 +10,17 @@ namespace services
 
     void NvmFlashRegion::Write(infra::ConstByteRange data, infra::Function<void()> onDone)
     {
-        flash.WriteBuffer(data, flash.AddressOfSector(sectorIndex), std::move(onDone));
+        flash.WriteBuffer(data, flash.AddressOfSector(sectorIndex), onDone);
     }
 
     void NvmFlashRegion::Read(infra::ByteRange data, infra::Function<void()> onDone)
     {
-        flash.ReadBuffer(data, flash.AddressOfSector(sectorIndex), std::move(onDone));
+        flash.ReadBuffer(data, flash.AddressOfSector(sectorIndex), onDone);
     }
 
     void NvmFlashRegion::Erase(infra::Function<void()> onDone)
     {
-        flash.EraseSectors(sectorIndex, sectorIndex + 1, std::move(onDone));
+        flash.EraseSectors(sectorIndex, sectorIndex + 1, onDone);
     }
 
     std::size_t NvmFlashRegion::Size() const

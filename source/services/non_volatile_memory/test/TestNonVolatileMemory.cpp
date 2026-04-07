@@ -1,7 +1,7 @@
 #include "infra/event/EventDispatcher.hpp"
 #include "infra/event/test_helper/EventDispatcherFixture.hpp"
 #include "infra/util/Crc.hpp"
-#include "source/services/NonVolatileMemory/NonVolatileMemoryImpl.hpp"
+#include "source/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include <algorithm>
 #include <cstring>
 #include <gmock/gmock.h>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "hal/interfaces/Flash.hpp"
-#include "source/services/NonVolatileMemory/NvmRegion.hpp"
+#include "source/services/non_volatile_memory/NvmRegion.hpp"
 
 namespace services
 {

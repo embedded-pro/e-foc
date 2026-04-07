@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 
 namespace services
@@ -19,7 +20,7 @@ namespace services
         float underVoltageThreshold = 10.0f;
         float overVoltageThreshold = 28.0f;
         uint8_t defaultControlMode = 0;
-        uint8_t reserved[3] = {};
+        std::array<uint8_t, 3> reserved = {};
     };
 
     static_assert(sizeof(ConfigData) == 40, "ConfigData layout must be free of implicit padding");
