@@ -118,6 +118,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 - [ ] Consistent with `.clang-format` rules
 - [ ] `public:` before `private:` in class declarations
 - [ ] No trailing whitespace
+- [ ] `{}` initialization used over `()` for variables and member data (e.g., `float x{0.0f}` not `float x(0.0f)`)
 
 ### 8. Function Size (WARNING)
 

@@ -112,6 +112,8 @@ namespace foc
 }
 ```
 
+- Prefer `{}` initialization over `()` for all variables and member data (e.g., `float x{0.0f}`, `std::size_t n{0}`)
+
 ### Design Principles
 
 - **Single Responsibility**: One class = one control concern (current loop, speed loop, position loop)
@@ -177,16 +179,20 @@ Rules:
 
 ## Implementation Workflow
 
-1. **Read the plan or task** carefully. Understand the FOC theory context before writing code.
-2. **Search for existing patterns** in `source/foc/` — follow them exactly
-3. **Reuse `numerical-toolbox/` algorithms** (PID, filters) rather than reimplementing
-4. **Implement changes** one file at a time, following all rules above
-5. **Add `#pragma GCC optimize` and `OPTIMIZE_FOR_SPEED`** to all hot-path code
-6. **Create or update tests** for every change
-7. **Update `CMakeLists.txt`** if new files were added
-8. **Update documentation** in `documentation/` for every algorithm or procedure added or changed
-9. **Build and test** (host): `cmake --build --preset host-Debug` and `ctest --preset host-Debug`
-10. **Hand off to reviewer** using the handoff button
+Follow the TDD Red-Green-Refactor cycle. **Ask clarifying questions before writing any code.**
+
+1. **Clarify requirements** — Ask the user focused questions to understand expected inputs/outputs, use cases, edge cases, control mode (torque/speed/position), hardware target, and acceptance criteria. Do not write any code until the requirements are clear.
+2. **Read the plan or task** carefully. Understand the FOC theory context.
+3. **Search for existing patterns** in `source/foc/` — follow them exactly
+4. **Reuse `numerical-toolbox/` algorithms** (PID, filters) rather than reimplementing
+5. **Red** — Write failing tests first in `source/foc/implementations/test/Test{ComponentName}.cpp` for every behavior. Tests must fail before writing any production code.
+6. **Green** — Implement the minimum production code needed to make all tests pass, one file at a time, following all rules above.
+7. **Add `#pragma GCC optimize` and `OPTIMIZE_FOR_SPEED`** to all hot-path code
+8. **Refactor** — Clean up the implementation (naming, single responsibility, DRY, extract helpers) while keeping all tests green.
+9. **Update `CMakeLists.txt`** if new files were added
+10. **Update documentation** in `documentation/` for every algorithm or procedure added or changed
+11. **Build and test** (host): `cmake --build --preset host-Debug` and `ctest --preset host-Debug`
+12. **Hand off to reviewer** using the handoff button
 
 ## What NOT to Do
 

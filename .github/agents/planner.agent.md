@@ -20,6 +20,18 @@ You produce detailed, actionable implementation plans. You MUST NOT write or edi
 
 ## Planning Process
 
+### 0. Clarify Requirements First
+
+**Before researching or planning**, ask the user targeted questions to clarify:
+- Expected use cases, inputs, and outputs for the new feature or change
+- Edge cases that must be handled (zero current, maximum speed, angle wraparound, fault conditions)
+- Control mode: torque / speed / position loop
+- Hardware target (EK-TM4C1294XL, STM32, or host simulation only)
+- Real-time timing requirements and whether this touches the FOC hot path
+- What "done" looks like — explicit acceptance criteria
+
+Do not begin the research or planning phase until the requirements are sufficiently clear.
+
 ### 1. Research Phase
 
 Before planning, thoroughly investigate:
@@ -73,6 +85,12 @@ For each file to create or modify, specify:
 - Hot-path methods marked for `#pragma GCC optimize("O3", "fast-math")` and `OPTIMIZE_FOR_SPEED`
 
 #### Test Strategy
+
+Tests are designed **before** implementation (TDD Red-Green-Refactor):
+- **Red**: Describe each behavior as a failing test first (input, expected output, edge case)
+- **Green**: Implementation follows only to make the failing tests pass
+- **Refactor**: Clean up after all tests are green
+
 - Unit test files: `source/foc/implementations/test/Test{ComponentName}.cpp`
 - Host simulation models for validation: `source/tool/simulator/`
 - Host hardware stubs: `source/hardware/Host/`
