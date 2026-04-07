@@ -22,6 +22,12 @@ DESIGN_REQUIRED_SECTIONS = [
     "Interfaces",
 ]
 
+THEORY_REQUIRED_SECTIONS = [
+    "Overview",
+    "Mathematical Foundation",
+    "Numerical Properties",
+]
+
 REQUIRED_FRONTMATTER_FIELDS = ["title", "type", "status", "version", "component"]
 
 FORBIDDEN_CODE_LANGUAGES = {
@@ -126,6 +132,7 @@ def is_template_file(path: Path, documents_dir: Path) -> bool:
     return len(parts) >= 2 and parts[-2] == "templates" and path.name in (
         "architecture.md",
         "design.md",
+        "theory.md",
     )
 
 
@@ -166,6 +173,9 @@ def validate_file(
         errors.extend(check_required_sections(text, DESIGN_REQUIRED_SECTIONS))
         errors.extend(check_implementation_blindness(text))
         errors.extend(check_no_image_references(text))
+    elif doc_type == "theory":
+        errors.extend(check_required_sections(text, THEORY_REQUIRED_SECTIONS))
+        # Image references are allowed in theory documents (generated plots from documentation/tools/)
     else:
         warnings.append(f"unknown document type '{doc_type}' — skipped type-specific checks")
 
@@ -185,7 +195,7 @@ def main() -> int:
     parser.add_argument(
         "--doc-type",
         default="all",
-        choices=["architecture", "design", "all"],
+        choices=["architecture", "design", "theory", "all"],
         help="Filter validation to a specific document type (default: all).",
     )
     args = parser.parse_args()

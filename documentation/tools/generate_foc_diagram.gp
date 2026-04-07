@@ -1,145 +1,182 @@
-# FOC Block Diagram - Improved Layout
-set terminal svg size 1000,600 fixed enhanced font 'Arial,12'
+# =============================================================================
+# e-foc FOC Block Diagram Generator
+# Usage: gnuplot documentation/tools/generate_foc_diagram.gp
+# Output: documentation/theory/images/foc_block_diagram.svg
+#
+# Draws the complete FOC control loop as a block diagram using gnuplot
+# boxes and arrow objects.  The diagram is accurate to the actual signal
+# flow: Sensors → Clarke → Park → PI(d/q) → InvPark → SVM → Inverter → Motor.
+# Outer speed/position loops are shown with lighter styling.
+# =============================================================================
+
+set terminal svg size 900,480 fixed enhanced font 'Arial,11'
 set output 'documentation/theory/images/foc_block_diagram.svg'
 
-unset border
+set xrange [0:90]
+set yrange [0:48]
+set border 0
 unset tics
-unset key
+unset xlabel
+unset ylabel
+set key off
 set size ratio -1
-set xrange [0:20]
-set yrange [0:12]
 
-# Styles
-set style line 1 lc rgb 'black' lw 2
-set style arrow 1 head filled size screen 0.02,15,45 ls 1
+# ---------------------------------------------------------------------------
+# Helper: draw a labelled box
+#  Usage:  call 'drawbox' x_centre y_centre half_width half_height "Label" color
+# ---------------------------------------------------------------------------
+# We use gnuplot objects (rectangles) + labels.
 
-# --- Macros for Boxes ---
-# Rect (x1, y1, x2, y2)
-# PI Regulators (Top-Middle)
-set object 1 rect from 6,8 to 9,10 fc rgb "white" lw 2
-set label "Iq\nPI Regulator" at 7.5,9 center
+# ---- Color scheme ---------------------------------------------------------
+# Main path:   fill #dceeff, border #3366aa
+# Outer loops: fill #e8ffe8, border #338844
+# Motor/Sensor: fill #fff3dd, border #997700
 
-set object 2 rect from 6,5 to 9,7 fc rgb "white" lw 2
-set label "Id\nPI Regulator" at 7.5,6 center
+# ===========================================================================
+# ROW 1 (y ≈ 32):  Position/Speed outer loops
+# ===========================================================================
+# Position PI  [4,30] to [14,34]
+set object 1  rect from  4,30 to 14,34 fc rgb '#e8ffe8' fillstyle solid border lc rgb '#338844' lw 1.5
+set label 1   "Position\nController" at  9,32 center font 'Arial,10'
 
-# Inverse Park (Top-Right)
-set object 3 rect from 11,6.5 to 13,8.5 fc rgb "white" lw 2
-set label "Inverse\nPark" at 12,7.5 center
+# Speed PI  [18,30] to [28,34]
+set object 2  rect from 18,30 to 28,34 fc rgb '#e8ffe8' fillstyle solid border lc rgb '#338844' lw 1.5
+set label 2   "Speed\nController" at 23,32 center font 'Arial,10'
 
-# SVPWM (Right)
-set object 4 rect from 14,6.5 to 16,8.5 fc rgb "white" lw 2
-set label "SVPWM" at 15,7.5 center
+# ===========================================================================
+# ROW 2 (y ≈ 20):  Inner current control loop
+# ===========================================================================
+# Summing junction d-axis  [32,18] circle
+set object 3  circle at 35,20 size 1.5 fc rgb '#ffffff' fillstyle solid border lc rgb '#333333' lw 1.5
+set label 3   "Σ" at 35,20 center font 'Arial,13'
 
-# Inverter/Motor (Far Right/Bottom)
-set object 5 rect from 17,5 to 19,9 fc rgb "white" lw 2
-set label "MOSFET\nBridges" at 18,7 center
+# Summing junction q-axis  [32,14]
+set object 4  circle at 35,14 size 1.5 fc rgb '#ffffff' fillstyle solid border lc rgb '#333333' lw 1.5
+set label 4   "Σ" at 35,14 center font 'Arial,13'
 
-set object 6 circle at 18,2 size 1.5 fc rgb "white" lw 2
-set label "Motor" at 18,0.2 center
+# PI d-axis  [38,17] to [48,23]
+set object 5  rect from 38,17 to 48,23 fc rgb '#dceeff' fillstyle solid border lc rgb '#3366aa' lw 1.5
+set label 5   "PI\nid" at 43,20 center font 'Arial,10'
 
-# Sensor (Bottom Right)
-set object 7 circle at 15,2 size 1 fc rgb "white" lw 2
-set label "Sensor" at 15,0.7 center
+# PI q-axis  [38,11] to [48,17]
+set object 6  rect from 38,11 to 48,17 fc rgb '#dceeff' fillstyle solid border lc rgb '#3366aa' lw 1.5
+set label 6   "PI\niq" at 43,14 center font 'Arial,10'
 
-# Angle Capture (Bottom Middle)
-set object 8 rect from 11,1 to 13,3 fc rgb "white" lw 2
-set label "Angle\nCapture" at 12,2 center
+# ===========================================================================
+# ROW 2 (cont.): Inverse Park → SVM → Inverter
+# ===========================================================================
+# Inverse Park  [50,13] to [60,21]
+set object 7  rect from 50,14 to 60,22 fc rgb '#dceeff' fillstyle solid border lc rgb '#3366aa' lw 1.5
+set label 7   "Inv. Park\ndq→αβ" at 55,18 center font 'Arial,10'
 
-# Clarke (Bottom-Middle-Right)
-set object 9 rect from 14,3.5 to 16,5.5 fc rgb "white" lw 2
-set label "Clarke" at 15,4.5 center
+# SVM  [62,14] to [72,22]
+set object 8  rect from 62,14 to 72,22 fc rgb '#dceeff' fillstyle solid border lc rgb '#3366aa' lw 1.5
+set label 8   "SVM\nCommon-mode\ninjection" at 67,18 center font 'Arial,9'
 
-# Park (Middle)
-set object 10 rect from 11,3.5 to 13,5.5 fc rgb "white" lw 2
-set label "Park" at 12,4.5 center
+# Inverter  [74,14] to [82,22]
+set object 9  rect from 74,14 to 82,22 fc rgb '#fff3dd' fillstyle solid border lc rgb '#997700' lw 1.5
+set label 9   "Inverter\n3-Ph" at 78,18 center font 'Arial,10'
 
-# --- Summing Junctions (Circles) - Left ---
-set object 11 circle at 4,9 size 0.3 fc rgb "white" lw 2
-set object 12 circle at 4,6 size 0.3 fc rgb "white" lw 2
+# Motor  [84,14] to [90,22]
+set object 10 rect from 84,14 to 90,22 fc rgb '#fff3dd' fillstyle solid border lc rgb '#997700' lw 1.5
+set label 10  "PMSM" at 87,18 center font 'Arial,10'
 
-# Signs for junctions
-set label "+" at 3.5,9.3
-set label "-" at 4.2,8.5
-set label "+" at 3.5,6.3
-set label "-" at 4.2,5.5
+# ===========================================================================
+# ROW 3 (y ≈ 6):  Sensors → Clarke → Park
+# ===========================================================================
+# ADC / Sensors  [1,3] to [11,9]
+set object 11 rect from  1, 3 to 11, 9 fc rgb '#fff3dd' fillstyle solid border lc rgb '#997700' lw 1.5
+set label 11  "ADC\nia, ib" at  6, 6 center font 'Arial,10'
 
-# --- Connections ---
+# Clarke  [13,3] to [23,9]
+set object 12 rect from 13, 3 to 23, 9 fc rgb '#dceeff' fillstyle solid border lc rgb '#3366aa' lw 1.5
+set label 12  "Clarke\nabc→αβ" at 18, 6 center font 'Arial,10'
 
-# 1. References to PIs
-# Iq Ref
-set arrow from 1,9 to 3.7,9 as 1
-set label "Desired Torque\nCurrent (Iq*)" at 2.5,9.5 center
+# Park  [25,3] to [35,9]
+set object 13 rect from 25, 3 to 35, 9 fc rgb '#dceeff' fillstyle solid border lc rgb '#3366aa' lw 1.5
+set label 13  "Park\nαβ→dq" at 30, 6 center font 'Arial,10'
 
-# Id Ref
-set arrow from 1,6 to 3.7,6 as 1
-set label "Desired Flux\nCurrent (Id*)" at 2.5,6.5 center
+# Encoder  [74,3] to [84,9]
+set object 14 rect from 74, 3 to 84, 9 fc rgb '#fff3dd' fillstyle solid border lc rgb '#997700' lw 1.5
+set label 14  "Encoder\nθ_m" at 79, 6 center font 'Arial,10'
 
-# Junctions to PIs
-set arrow from 4.3,9 to 6,9 as 1
-set arrow from 4.3,6 to 6,6 as 1
+# Angle calc  [55,3] to [65,9]
+set object 15 rect from 55, 3 to 65, 9 fc rgb '#f5f5f5' fillstyle solid border lc rgb '#888888' lw 1.2
+set label 15  "θ_e = p·θ_m\n−θ_offset" at 60, 6 center font 'Arial,9'
 
-# 2. PIs to Inv Park (Vq, Vd)
-set arrow from 9,9 to 11,8 as 1
-set label "Vq" at 10,8.8 center
-set arrow from 9,6 to 11,7 as 1
-set label "Vd" at 10,6.2 center
+# ===========================================================================
+# ARROWS — main data flow path
+# ===========================================================================
+# ADC → Clarke
+set arrow 1  from 11,6 to 13,6 lc rgb '#2244aa' lw 1.5 filled
+# Clarke → Park
+set arrow 2  from 23,6 to 25,6 lc rgb '#2244aa' lw 1.5 filled
+# Park → Σ_d  (id up to row2)
+set arrow 3  from 30,9 to 30,15 nohead lc rgb '#2244aa' lw 1.2
+set arrow 4  from 30,15 to 33.5,20 lc rgb '#2244aa' lw 1.2 filled
+# Park → Σ_q
+set arrow 5  from 30,15 to 33.5,14 lc rgb '#2244aa' lw 1.2 filled
+# Σ_d → PI_d
+set arrow 6  from 36.5,20 to 38,20 lc rgb '#2244aa' lw 1.5 filled
+# Σ_q → PI_q
+set arrow 7  from 36.5,14 to 38,14 lc rgb '#2244aa' lw 1.5 filled
+# PI_d → InvPark
+set arrow 8  from 48,20 to 50,20 lc rgb '#2244aa' lw 1.5 filled
+# PI_q → InvPark
+set arrow 9  from 48,14 to 50,14 lc rgb '#2244aa' lw 1.5 filled
+# InvPark → SVM
+set arrow 10 from 60,18 to 62,18 lc rgb '#2244aa' lw 1.5 filled
+# SVM → Inverter
+set arrow 11 from 72,18 to 74,18 lc rgb '#2244aa' lw 1.5 filled
+# Inverter → Motor
+set arrow 12 from 82,18 to 84,18 lc rgb '#2244aa' lw 1.5 filled
 
-# 3. Inv Park to SVPWM (Valpha, Vbeta)
-set arrow from 13,7.8 to 14,7.8 as 1
-set label "V{/Symbol a}" at 13.5,8.1 center
-set arrow from 13,7.2 to 14,7.2 as 1
-set label "V{/Symbol b}" at 13.5,6.9 center
+# Encoder → angle calc
+set arrow 13 from 74,6 to 65,6 lc rgb '#997700' lw 1.5 filled
+# Angle calc → Park (θ_e feedback)
+set arrow 14 from 55,6 to 35,6 lc rgb '#997700' lw 1.5 filled
+# Angle calc → InvPark  (θ_e up)
+set arrow 15 from 60,9 to 60,14 lc rgb '#997700' lw 1.2 filled
 
-# 4. SVPWM to Inverter
-set arrow from 16,8 to 17,8 as 1
-set arrow from 16,7.5 to 17,7.5 as 1
-set arrow from 16,7 to 17,7 as 1
+# Motor mechanical → Encoder feedback
+set arrow 16 from 87,14 to 87,9 nohead lc rgb '#997700' lw 1.2
+set arrow 17 from 87,9  to 84,6  lc rgb '#997700' lw 1.2 filled
 
-# 5. Inverter to Motor (3 Phase)
-set arrow from 18,5 to 18,3.5 as 1
+# Motor current feedback → ADC
+set arrow 18 from 84,20 to 84,24 nohead lc rgb '#448844' lw 1.2 dt 2
+set arrow 19 from 84,24 to  6,24 nohead lc rgb '#448844' lw 1.2 dt 2
+set arrow 20 from  6,24 to  6, 9 lc rgb '#448844' lw 1.2 dt 2 filled
 
-# 6. Current Feedback (Motor -> Clarke)
-set arrow from 18,4.5 to 19.5,4.5 nohead ls 1
-set arrow from 19.5,4.5 to 19.5,4 nohead ls 1
-set arrow from 19.5,4 to 16,4 as 1
-set label "Ia, Ib" at 17,4.3 center
-# (Simpler visual representation: pulling lines from motor line)
+# ===========================================================================
+# ARROWS — outer loop
+# ===========================================================================
+# Position ref → Position PI
+set arrow 21 from  1,32 to  4,32 lc rgb '#228844' lw 1.5 filled
+# Position PI → Speed PI
+set arrow 22 from 14,32 to 18,32 lc rgb '#228844' lw 1.5 filled
+# Speed PI → Σ_q  (iq* reference)
+set arrow 23 from 28,32 to 35,32 nohead lc rgb '#228844' lw 1.2 filled
+set arrow 24 from 35,32 to 35,15.5 lc rgb '#228844' lw 1.2 filled
 
-# 7. Clarke to Park (Ialpha, Ibeta)
-set arrow from 14,4.8 to 13,4.8 as 1
-set label "I{/Symbol a}" at 13.5,5.1 center
-set arrow from 14,4.2 to 13,4.2 as 1
-set label "I{/Symbol b}" at 13.5,3.9 center
+# id* reference (zero for MTPA)
+set arrow 25 from 28,22 to 33.5,21 lc rgb '#888888' lw 1.0 filled
 
-# 8. Park to Summing Junctions (Feedback)
-# Park -> iq (Feedback to top junction)
-set arrow from 11,4.8 to 10,4.8 nohead ls 1
-set arrow from 10,4.8 to 10,7.5 nohead ls 1
-set arrow from 10,7.5 to 4,7.5 nohead ls 1
-set arrow from 4,7.5 to 4,8.7 as 1
-set label "Iq" at 5,7.8 center
-
-# Park -> id (Feedback to bottom junction)
-set arrow from 11,4.2 to 10.5,4.2 nohead ls 1
-set arrow from 10.5,4.2 to 10.5,5 nohead ls 1
-set arrow from 10.5,5 to 4,5 nohead ls 1
-set arrow from 4,5 to 4,5.7 as 1
-set label "Id" at 5,4.8 center
-
-# 9. Angle Feedback (Theta)
-# Sensor -> Capture
-set arrow from 14,2 to 13,2 as 1
-# Capture -> Park & Inv Park
-set arrow from 11,2 to 10.5,2 nohead ls 1
-set arrow from 10.5,2 to 10.5,3.2 nohead ls 1
-set arrow from 10.5,3.2 to 12.5,3.2 nohead ls 1
-set arrow from 12.5,3.2 to 12,3.5 as 1 # To Park
-set arrow from 10.5,3.2 to 10.5,6 nohead ls 1
-set arrow from 10.5,6 to 12,6 nohead ls 1
-set arrow from 12,6 to 12,6.5 as 1 # To Inv Park
-set label "{/Symbol q}" at 10.3, 2.5 center
-
-# Mechanical linkage
-set arrow from 18,2 to 16,2 nohead ls 1
+# ===========================================================================
+# LABELS — signal names
+# ===========================================================================
+set label 20 "i_a, i_b" at 12,6.5 font 'Arial,9' tc rgb '#2244aa'
+set label 21 "iα, iβ"   at 24,6.5 font 'Arial,9' tc rgb '#2244aa'
+set label 22 "i_d, i_q" at 31,11  font 'Arial,9' tc rgb '#2244aa'
+set label 23 "v_d"       at 49,21  font 'Arial,9' tc rgb '#2244aa'
+set label 24 "v_q"       at 49,14.5 font 'Arial,9' tc rgb '#2244aa'
+set label 25 "vα, vβ"   at 61,18.8 font 'Arial,9' tc rgb '#2244aa'
+set label 26 "d_A,B,C"  at 73,18.8 font 'Arial,9' tc rgb '#2244aa'
+set label 27 "v_abc"     at 83,18.8 font 'Arial,9' tc rgb '#997700'
+set label 28 "θ_e"       at 57,10.5 font 'Arial,9' tc rgb '#997700'
+set label 29 "θ_m"       at 72,5    font 'Arial,9' tc rgb '#997700'
+set label 30 "i_q*"      at 36,30   font 'Arial,9' tc rgb '#228844'
+set label 31 "i_d* = 0"  at 24,22.5 font 'Arial,9' tc rgb '#888888'
+set label 32 "θ* / ω*"  at -1,32   font 'Arial,9' tc rgb '#228844'
+set label 33 "Current\nfeedback" at 40,25 font 'Arial,8' tc rgb '#448844'
 
 plot NaN notitle
