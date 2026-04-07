@@ -18,8 +18,12 @@ date: YYYY-MM-DD
 
 > **Note — Implementation-blind document**: This document describes *what exists and why*, not how it is coded.
 > Code must follow architecture, not the opposite. Do not reference source files, class names, or implementation
-> details here. Diagrams (Mermaid block diagrams, component diagrams, sequence diagrams, state machines) are
-> allowed and encouraged.
+> details here.
+>
+> **Diagrams**: All visuals must be either a Mermaid fenced code block (` ```mermaid `) or ASCII art inline
+> in the document. External image references (`![alt](path)`) are **not allowed**.
+>
+> Sequence diagrams, block diagrams, component diagrams, and state machines (Mermaid syntax) are allowed and encouraged.
 
 ---
 

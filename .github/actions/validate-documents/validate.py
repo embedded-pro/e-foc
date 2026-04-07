@@ -101,6 +101,22 @@ def check_implementation_blindness(text: str) -> list[str]:
     return errors
 
 
+def check_no_image_references(text: str) -> list[str]:
+    """Check that no external image references (![alt](src)) are used.
+
+    All visuals must be Mermaid code blocks or ASCII art.
+    """
+    errors = []
+    image_pattern = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
+    for line_num, line in enumerate(text.splitlines(), 1):
+        if image_pattern.search(line):
+            errors.append(
+                f"line {line_num}: external image reference not allowed "
+                "— use a Mermaid code block or ASCII art instead"
+            )
+    return errors
+
+
 def is_template_file(path: Path, documents_dir: Path) -> bool:
     """Return True if the file is a template (skipped during validation)."""
     try:
@@ -145,9 +161,11 @@ def validate_file(
 
     if doc_type == "architecture":
         errors.extend(check_required_sections(text, ARCHITECTURE_REQUIRED_SECTIONS))
+        errors.extend(check_no_image_references(text))
     elif doc_type == "design":
         errors.extend(check_required_sections(text, DESIGN_REQUIRED_SECTIONS))
         errors.extend(check_implementation_blindness(text))
+        errors.extend(check_no_image_references(text))
     else:
         warnings.append(f"unknown document type '{doc_type}' — skipped type-specific checks")
 

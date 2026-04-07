@@ -18,8 +18,11 @@ date: YYYY-MM-DD
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
-> Python, CMake, shell, etc.) are allowed.** Use Mermaid, PlantUML, or WaveDrom diagrams to express
-> behavior instead. Prose descriptions of algorithms are encouraged; source-level details are not.
+> Python, CMake, shell, etc.) are allowed.** Use Mermaid diagrams to express behavior instead.
+> Prose descriptions of algorithms are encouraged; source-level details are not.
+>
+> **Diagrams**: All visuals must be either a Mermaid fenced code block (` ```mermaid `) or ASCII art inline
+> in the document. External image references (`![alt](path)`) are **not allowed**.
 
 ---
 

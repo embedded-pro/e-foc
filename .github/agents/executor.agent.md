@@ -94,6 +94,14 @@ Reuse `TransformsClarkePark` and `SpaceVectorModulation` from `source/foc/implem
 - **Namespaces**: lowercase — `foc`, `hardware`
 - **Unit type aliases**: explicit units (e.g., `Ampere`, `Radians`, `Volts`) — not plain `float`
 
+### Documentation-First — BEHAVIORAL CHANGES
+
+**Before implementing any change that alters a component's observable behavior**, verify that the corresponding architecture or design document in `documentation/` reflects the new behavior. **Code must follow documentation, not the opposite.**
+
+- If an architecture (`type: architecture`) or design (`type: design`) document already exists for the affected component, update it BEFORE writing the production code.
+- If no such document exists yet, create one using `documentation/templates/architecture.md` or `documentation/templates/design.md` as a template, filling in the new behavior, BEFORE writing production code.
+- Within documentation files: all visuals must be Mermaid code blocks (` ```mermaid `) or ASCII art. External image references (`![alt](path)`) are **not allowed**.
+
 ### Brace Style — Allman, 4-Space Indent
 
 ```cpp

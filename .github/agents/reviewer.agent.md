@@ -173,6 +173,8 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 - [ ] Documentation includes implementation details and hardware dependencies
 - [ ] Documentation includes tuning guidance where applicable
 - [ ] README updated if user-visible behavior or interfaces change
+- [ ] No markdown image references (`![alt](path)`) in architecture or design documents — all visuals must use Mermaid code blocks or ASCII art
+- [ ] If this change alters any component's observable behavior, the corresponding architecture or design document in `documentation/` exists and has been updated to reflect the new behavior — **code must follow documentation, not the opposite**; a behavioral code change with no matching doc update is a CRITICAL violation
 
 ### 14. Build Integration (WARNING)
 
