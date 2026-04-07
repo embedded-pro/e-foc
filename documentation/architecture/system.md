@@ -138,25 +138,23 @@ Higher-level, non-real-time services that support commissioning and runtime oper
 
 Services communicate via asynchronous callbacks using `infra::Function<void(result)>`, not return values. This allows long-running operations (identification, alignment) to yield the CPU and complete asynchronously without blocking.
 
-### 3. Platform Abstraction Layer (`source/hardware/`)
+### 3. Platform Abstraction Layer
 
-> **Rename note**: This layer is currently named `hardware` in the repository layout but is architecturally a Platform Abstraction Layer. It should be renamed to `pal` in a future refactoring.
+The PAL provides a single platform-facing abstraction that groups creation and access to the hardware services needed by the control system:
 
-The PAL defines a single `HardwareFactory` abstract interface that groups all peripheral creators:
-
-| Peripheral                                  | Abstraction                                                             |
-|---------------------------------------------|-------------------------------------------------------------------------|
-| Three-phase PWM + ADC triggered measurement | `ThreePhaseInverter` — controls switching and triggers current sampling |
-| Quadrature encoder                          | `Encoder` — reads and calibrates rotor position                         |
-| Low-priority interrupt                      | `LowPriorityInterrupt` — schedules the speed/position outer loop        |
-| CAN bus                                     | `CanBusAdapter` — CAN 2.0B communication                                |
-| Performance timer                           | `PerformanceTracker` — cycle-accurate timing for profiling              |
-| Serial terminal                             | Tracer + TerminalWithCommands                                           |
+| Peripheral | Abstraction |
+|------------|-------------|
+| Three-phase PWM + ADC triggered measurement | Power-stage drive and synchronised current-sampling interface |
+| Quadrature encoder | Rotor-position sensing and calibration interface |
+| Low-priority interrupt | Deferred scheduling interface for the speed/position outer loop |
+| CAN bus | CAN 2.0B communication interface |
+| Performance timer | Cycle/timestamp measurement interface for profiling |
+| Serial terminal | Diagnostic trace and command-line interaction interface |
 
 Concrete implementations exist for:
-- **TI Tiva (EK-TM4C1294XL)**: uses `hal/ti` vendor drivers.
-- **ST STM32 (STM32F407G-DISC1)**: uses `hal/st` vendor drivers.
-- **Host / Simulator**: provides a software motor model that implements the same `ThreePhaseInverter` and `Encoder` contracts. The simulator can run the complete closed-loop control algorithm on the development machine.
+- **TI Tiva (EK-TM4C1294XL)**: platform-specific peripheral adapters for this MCU family.
+- **ST STM32 (STM32F407G-DISC1)**: platform-specific peripheral adapters for this MCU family.
+- **Host / Simulator**: a software-backed platform implementation that emulates the motor-control I/O needed to run the closed-loop algorithm on a development machine.
 
 ```mermaid
 graph LR
