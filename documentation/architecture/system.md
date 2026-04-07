@@ -7,14 +7,14 @@ component: system
 date: 2026-04-07
 ---
 
-| Field     | Value                      |
-|-----------|----------------------------|
-| Title     | e-foc System Architecture  |
-| Type      | architecture               |
-| Status    | draft                      |
-| Version   | 0.1.0                      |
-| Component | system                     |
-| Date      | 2026-04-07                 |
+| Field     | Value                     |
+|-----------|---------------------------|
+| Title     | e-foc System Architecture |
+| Type      | architecture              |
+| Status    | draft                     |
+| Version   | 0.1.0                     |
+| Component | system                    |
+| Date      | 2026-04-07                |
 
 > **Note — Implementation-blind document**: This document describes *what exists and why*, not how it is coded.
 > Code must follow architecture, not the opposite. Do not reference source files, class names, or implementation
@@ -102,11 +102,11 @@ The simulator implements the same PAL contracts as real hardware. Control logic 
 
 The heart of the system. Decomposed into three sub-layers following a strict separation of contract, algorithm, and wiring:
 
-| Sub-component | Responsibility |
-|---------------|----------------|
-| Interfaces    | Define abstract contracts for control modes (Torque, Speed, Position) and driver peripherals (inverter, encoder, interrupt). No algorithms, no data. |
-| Implementations | Concrete algorithm implementations for Clarke/Park transforms, Space Vector Modulation, trigonometric helpers, PID wrappers, and control loops. |
-| Instantiations | Template-based wiring that combines a control-mode implementation with the Runner to produce a ready-to-use `FocController<Mode>`. |
+| Sub-component   | Responsibility                                                                                                                                       |
+|-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Interfaces      | Define abstract contracts for control modes (Torque, Speed, Position) and driver peripherals (inverter, encoder, interrupt). No algorithms, no data. |
+| Implementations | Concrete algorithm implementations for Clarke/Park transforms, Space Vector Modulation, trigonometric helpers, PID wrappers, and control loops.      |
+| Instantiations  | Template-based wiring that combines a control-mode implementation with the Runner to produce a ready-to-use `FocController<Mode>`.                   |
 
 The three control modes are deliberately independent and composable. A given product binary includes only the mode(s) it needs:
 
@@ -128,13 +128,13 @@ The `Runner` is the only component that interacts with the PAL inverter and enco
 
 Higher-level, non-real-time services that support commissioning and runtime operation. Each service is independently usable:
 
-| Service | Responsibility |
-|---------|----------------|
-| Alignment | Forces a known electrical angle on the rotor at startup so the FOC reference frame is correctly initialised before normal operation. |
-| Electrical System Identification | Estimates phase resistance, d/q inductances, and pole pairs by injecting test signals and measuring the response. |
-| Mechanical System Identification | Estimates rotor inertia and viscous friction coefficient from closed-loop speed response data. |
-| Non-Volatile Memory (NVM) | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration across power cycles using flash. |
-| CLI | A terminal-based command interface for triggering services, querying state, and setting parameters from a serial console. |
+| Service                          | Responsibility                                                                                                                       |
+|----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| Alignment                        | Forces a known electrical angle on the rotor at startup so the FOC reference frame is correctly initialised before normal operation. |
+| Electrical System Identification | Estimates phase resistance, d/q inductances, and pole pairs by injecting test signals and measuring the response.                    |
+| Mechanical System Identification | Estimates rotor inertia and viscous friction coefficient from closed-loop speed response data.                                       |
+| Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration across power cycles using flash.           |
+| CLI                              | A terminal-based command interface for triggering services, querying state, and setting parameters from a serial console.            |
 
 Services communicate via asynchronous callbacks using `infra::Function<void(result)>`, not return values. This allows long-running operations (identification, alignment) to yield the CPU and complete asynchronously without blocking.
 
@@ -144,14 +144,14 @@ Services communicate via asynchronous callbacks using `infra::Function<void(resu
 
 The PAL defines a single `HardwareFactory` abstract interface that groups all peripheral creators:
 
-| Peripheral | Abstraction |
-|------------|-------------|
+| Peripheral                                  | Abstraction                                                             |
+|---------------------------------------------|-------------------------------------------------------------------------|
 | Three-phase PWM + ADC triggered measurement | `ThreePhaseInverter` — controls switching and triggers current sampling |
-| Quadrature encoder | `Encoder` — reads and calibrates rotor position |
-| Low-priority interrupt | `LowPriorityInterrupt` — schedules the speed/position outer loop |
-| CAN bus | `CanBusAdapter` — CAN 2.0B communication |
-| Performance timer | `PerformanceTracker` — cycle-accurate timing for profiling |
-| Serial terminal | Tracer + TerminalWithCommands |
+| Quadrature encoder                          | `Encoder` — reads and calibrates rotor position                         |
+| Low-priority interrupt                      | `LowPriorityInterrupt` — schedules the speed/position outer loop        |
+| CAN bus                                     | `CanBusAdapter` — CAN 2.0B communication                                |
+| Performance timer                           | `PerformanceTracker` — cycle-accurate timing for profiling              |
+| Serial terminal                             | Tracer + TerminalWithCommands                                           |
 
 Concrete implementations exist for:
 - **TI Tiva (EK-TM4C1294XL)**: uses `hal/ti` vendor drivers.
@@ -179,29 +179,29 @@ A `MotorStateMachine` template manages the lifecycle: it holds the `FocControlle
 
 Host-only tools that do not run on the embedded target:
 
-| Tool | Responsibility |
-|------|----------------|
-| Simulator | Closed-loop software simulation: real FOC control code drives a physics-based PMSM model (Euler integration of the dq electrical equations). Used for validating control loops without hardware. |
-| CAN Commander | Desktop application for sending CAN commands and logging motor telemetry. |
+| Tool          | Responsibility                                                                                                                                                                                   |
+|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Simulator     | Closed-loop software simulation: real FOC control code drives a physics-based PMSM model (Euler integration of the dq electrical equations). Used for validating control loops without hardware. |
+| CAN Commander | Desktop application for sending CAN commands and logging motor telemetry.                                                                                                                        |
 
 ### 6. Infrastructure (`infra/`)
 
 External repositories consumed as Git submodules. This project does not modify them.
 
-| Submodule | Purpose |
-|-----------|---------|
+| Submodule                         | Purpose                                                                                                                                                                                                                                                               |
+|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `infra/embedded-infra-lib` (emIL) | Heap-free C++ infrastructure: bounded containers (`BoundedVector`, `BoundedString`, `BoundedDeque`), `infra::Function<>` (zero-allocation closures), `infra::Observer`/`Subject` (type-safe observer pattern), timers, memory utilities, and build toolchain helpers. |
-| `infra/numerical-toolbox` | Numerical algorithms for control: incremental PID controllers with anti-windup, digital filters (FIR, IIR, Kalman), recursive least-squares estimators, and compiler-optimisation helpers (`OPTIMIZE_FOR_SPEED`). |
-| `infra/can-lite` | Lightweight CAN 2.0B protocol stack: client-server model, category-based message dispatch, ISO-TP segmentation. Zero heap allocation. |
+| `infra/numerical-toolbox`         | Numerical algorithms for control: incremental PID controllers with anti-windup, digital filters (FIR, IIR, Kalman), recursive least-squares estimators, and compiler-optimisation helpers (`OPTIMIZE_FOR_SPEED`).                                                     |
+| `infra/can-lite`                  | Lightweight CAN 2.0B protocol stack: client-server model, category-based message dispatch, ISO-TP segmentation. Zero heap allocation.                                                                                                                                 |
 
 ### 7. Vendor HAL (`hal/`)
 
 Vendor-provided hardware abstraction libraries consumed as Git submodules. They supply the low-level peripheral register access and interrupt management that the PAL concrete implementations use.
 
-| Directory | Vendor / Board |
-|-----------|----------------|
+| Directory | Vendor / Board                      |
+|-----------|-------------------------------------|
 | `hal/ti`  | Texas Instruments Tiva (Cortex-M4F) |
-| `hal/st`  | STMicroelectronics STM32 |
+| `hal/st`  | STMicroelectronics STM32            |
 
 These are never used directly by the FOC core or services — only by the PAL concrete implementations.
 
@@ -211,21 +211,21 @@ These are never used directly by the FOC core or services — only by the PAL co
 
 ### Provided Interfaces (exported by this system)
 
-| Interface | Direction | Purpose | Invariants |
-|-----------|-----------|---------|------------|
-| `FocTorque` | provided | Torque control mode — accepts Id/Iq current setpoints, yields PWM duty cycles each FOC cycle | Must be called from the PWM/ADC interrupt context only. `Calculate()` must return within the worst-case cycle budget. |
-| `FocSpeed` | provided | Speed control mode — accepts an angular-velocity setpoint in rad/s, cascades into the torque loop | Outer loop runs at a separate lower-priority interrupt. `OuterLoopFrequency()` must be queried by the caller to configure that interrupt. |
-| `FocPosition` | provided | Position control mode — accepts a rotor angle setpoint in radians, cascades into speed, then torque | Requires speed loop to be configured and running. |
-| `Controllable` | provided | Start/Stop lifecycle for a `FocController` | `Start()` arms the interrupt-driven loop. `Stop()` disarms it and leaves the motor coasting. |
+| Interface      | Direction | Purpose                                                                                             | Invariants                                                                                                                                |
+|----------------|-----------|-----------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| `FocTorque`    | provided  | Torque control mode — accepts Id/Iq current setpoints, yields PWM duty cycles each FOC cycle        | Must be called from the PWM/ADC interrupt context only. `Calculate()` must return within the worst-case cycle budget.                     |
+| `FocSpeed`     | provided  | Speed control mode — accepts an angular-velocity setpoint in rad/s, cascades into the torque loop   | Outer loop runs at a separate lower-priority interrupt. `OuterLoopFrequency()` must be queried by the caller to configure that interrupt. |
+| `FocPosition`  | provided  | Position control mode — accepts a rotor angle setpoint in radians, cascades into speed, then torque | Requires speed loop to be configured and running.                                                                                         |
+| `Controllable` | provided  | Start/Stop lifecycle for a `FocController`                                                          | `Start()` arms the interrupt-driven loop. `Stop()` disarms it and leaves the motor coasting.                                              |
 
 ### Required Interfaces (consumed from the PAL)
 
-| Interface | Direction | Purpose | Invariants |
-|-----------|-----------|---------|------------|
-| `ThreePhaseInverter` | required | Triggers ADC phase-current sampling and applies PWM duty cycles to the three-phase bridge | `PhaseCurrentsReady()` installs the callback invoked by the ADC interrupt. Must be called before `Start()`. |
-| `Encoder` | required | Reads rotor mechanical angle and supports zero-offset calibration | Read must be non-blocking and complete in ≤ a few cycles. |
-| `LowPriorityInterrupt` | required | Schedules periodic execution of the speed and position outer loops at a lower rate than the FOC inner loop | `Register()` installs the callback. `Trigger()` is called from the FOC inner loop at the configured prescale ratio. |
-| `NonVolatileMemory` | required | Persists and retrieves calibration and configuration data | All operations are asynchronous and invoke a callback on completion. |
+| Interface              | Direction | Purpose                                                                                                    | Invariants                                                                                                          |
+|------------------------|-----------|------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
+| `ThreePhaseInverter`   | required  | Triggers ADC phase-current sampling and applies PWM duty cycles to the three-phase bridge                  | `PhaseCurrentsReady()` installs the callback invoked by the ADC interrupt. Must be called before `Start()`.         |
+| `Encoder`              | required  | Reads rotor mechanical angle and supports zero-offset calibration                                          | Read must be non-blocking and complete in ≤ a few cycles.                                                           |
+| `LowPriorityInterrupt` | required  | Schedules periodic execution of the speed and position outer loops at a lower rate than the FOC inner loop | `Register()` installs the callback. `Trigger()` is called from the FOC inner loop at the configured prescale ratio. |
+| `NonVolatileMemory`    | required  | Persists and retrieves calibration and configuration data                                                  | All operations are asynchronous and invoke a callback on completion.                                                |
 
 ### SOLID Principles Applied
 
@@ -307,22 +307,22 @@ These patterns eliminate polling, decouple producers from consumers, and allow t
 
 ## Cross-Cutting Concerns
 
-| Concern | Policy / Approach |
-|---------|-------------------|
-| Memory | Absolutely no heap on the embedded target. All objects are statically or stack-allocated. `infra::BoundedVector` and related containers replace STL heap-based containers. Host-side tools and tests may use the standard heap freely. |
-| Real-time determinism | The FOC `Calculate()` path contains no virtual dispatch, no blocking calls, and no unpredictable branches. The outer loops run at lower-priority interrupts on a deterministic prescale ratio. |
-| Unit safety | All physical quantities use typed unit aliases (`Ampere`, `Radians`, `Volts`, `RadiansPerSecond`, …) derived from `infra::Quantity`. Raw floating-point with no unit context is not used for motor quantities. |
-| Compiler optimisation | Critical paths are annotated with `OPTIMIZE_FOR_SPEED` (expands to GCC/Clang `O3` + `fast-math` pragmas). Debug builds use `-Og` for debuggability. |
-| Error handling | No C++ exceptions. Synchronous errors use `std::optional` (absent = error). Asynchronous errors are delivered as status codes in callbacks (`NvmStatus`). |
-| Portability | The control core has no knowledge of the underlying MCU. Portability to a new board is achieved by implementing `HardwareFactory` for that board and providing the PAL concrete implementations. |
-| Testability | All modules depend on abstract interfaces, enabling host-build unit tests with mock or stub implementations. The simulator provides closed-loop integration testing without hardware. |
+| Concern               | Policy / Approach                                                                                                                                                                                                                      |
+|-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Memory                | Absolutely no heap on the embedded target. All objects are statically or stack-allocated. `infra::BoundedVector` and related containers replace STL heap-based containers. Host-side tools and tests may use the standard heap freely. |
+| Real-time determinism | The FOC `Calculate()` path contains no virtual dispatch, no blocking calls, and no unpredictable branches. The outer loops run at lower-priority interrupts on a deterministic prescale ratio.                                         |
+| Unit safety           | All physical quantities use typed unit aliases (`Ampere`, `Radians`, `Volts`, `RadiansPerSecond`, …) derived from `infra::Quantity`. Raw floating-point with no unit context is not used for motor quantities.                         |
+| Compiler optimisation | Critical paths are annotated with `OPTIMIZE_FOR_SPEED` (expands to GCC/Clang `O3` + `fast-math` pragmas). Debug builds use `-Og` for debuggability.                                                                                    |
+| Error handling        | No C++ exceptions. Synchronous errors use `std::optional` (absent = error). Asynchronous errors are delivered as status codes in callbacks (`NvmStatus`).                                                                              |
+| Portability           | The control core has no knowledge of the underlying MCU. Portability to a new board is achieved by implementing `HardwareFactory` for that board and providing the PAL concrete implementations.                                       |
+| Testability           | All modules depend on abstract interfaces, enabling host-build unit tests with mock or stub implementations. The simulator provides closed-loop integration testing without hardware.                                                  |
 
 ---
 
 ## Open Questions & Decisions
 
-| # | Question / Decision | Status | Options Considered | Rationale |
-|---|---------------------|--------|--------------------|-----------|
-| 1 | Rename `source/hardware/` to `source/pal/` | open | Keep current name vs rename to PAL | The architectural role is a Platform Abstraction Layer, not just "hardware". Renaming would make the intent explicit.  Deferred to avoid breaking existing include paths without a migration plan. |
-| 2 | Multi-motor support | open | Single instantiation per motor vs shared PAL with multiple FOC controllers | Current architecture supports one motor per binary. A shared PAL with multiple `FocController` instances is architecturally feasible but not yet required. |
-| 3 | Field-weakening | open | Extend `FocTorque` interface with flux-weakening setpoint vs separate `FocTorqueFieldWeakening` interface | Required for operation above base speed. Separate interface preferred (ISP) but not yet scoped. |
+| # | Question / Decision                        | Status | Options Considered                                                                                        | Rationale                                                                                                                                                                                          |
+|---|--------------------------------------------|--------|-----------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | Rename `source/hardware/` to `source/pal/` | open   | Keep current name vs rename to PAL                                                                        | The architectural role is a Platform Abstraction Layer, not just "hardware". Renaming would make the intent explicit.  Deferred to avoid breaking existing include paths without a migration plan. |
+| 2 | Multi-motor support                        | open   | Single instantiation per motor vs shared PAL with multiple FOC controllers                                | Current architecture supports one motor per binary. A shared PAL with multiple `FocController` instances is architecturally feasible but not yet required.                                         |
+| 3 | Field-weakening                            | open   | Extend `FocTorque` interface with flux-weakening setpoint vs separate `FocTorqueFieldWeakening` interface | Required for operation above base speed. Separate interface preferred (ISP) but not yet scoped.                                                                                                    |
