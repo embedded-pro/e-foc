@@ -64,6 +64,7 @@ Use unit-typed aliases throughout: `Ampere`, `Radians`, `Volts`, `Rpm`, `PhasePw
 - Self-documenting code — avoid unnecessary comments
 - `const` on all non-mutating methods, `constexpr` where possible
 - Fixed-size types: `uint8_t`, `int32_t`, etc.
+- Prefer `{}` initialization over `()` for variables and member data (e.g., `float x{0.0f}`, `std::size_t n{0}`)
 
 ## Design
 

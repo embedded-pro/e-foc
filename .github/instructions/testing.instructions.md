@@ -18,6 +18,17 @@ applyTo: "**/test/**"
 - GoogleMock for mocking hardware interfaces (`testing::StrictMock<>`)
 - Heap allocation (`std::make_unique`, `std::vector`, etc.) is permitted in host-side unit tests; the no-heap rule applies only to embedded target code and ISR-reachable paths
 
+## TDD — Red-Green-Refactor
+
+Follow the TDD cycle for every new behavior:
+
+1. **Red** — Write a failing test that describes one specific behavior (input, expected output, edge case). The test must fail before writing any production code.
+2. **Green** — Write the minimum production code needed to make the test pass. Nothing more.
+3. **Refactor** — Clean up code and test (naming, duplication, structure) while keeping all tests green.
+4. Repeat for the next behavior.
+
+Tests act as executable specifications. Write tests **before** implementation, not after.
+
 ## Fixture Test Pattern (single type — most FOC tests)
 
 ```cpp
