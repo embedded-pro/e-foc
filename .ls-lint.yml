@@ -9,7 +9,6 @@ ignore:
   - .vscode
   - .gitlab
   - megalinter-reports
-  - embedded-infra-lib
-  - numerical-toolbox
+  - infra
   - hal
   - source/hardware/Host

@@ -44,7 +44,7 @@ Before planning, thoroughly investigate:
   - `Driver` — hardware adapter abstractions
 - **Timing constraints**: Assess whether each step stays within the FOC loop budget (<400 cycles at 120 MHz for a 20 kHz control rate)
 - **Hardware adapters**: Check `source/hardware/HardwareFactory.hpp` for peripheral creation and injection patterns
-- **Numerical tools**: Identify if `numerical-toolbox/` algorithms (PID, filters, transforms) can be reused or need extension
+- **Numerical tools**: Identify if `infra/numerical-toolbox/` algorithms (PID, filters, transforms) can be reused or need extension
 - **Test infrastructure**: Find existing test files in `source/foc/implementations/test/` and simulation models in `source/tool/simulator/`
 - **Documentation**: Consult `documentation/` for domain guidance:
   - `documentation/theory/foc.md` — FOC algorithm theory
@@ -159,7 +159,7 @@ Scope note: The memory and realtime constraints below apply to embedded/runtime 
 - [ ] Open/Closed: extend via new implementations, not modification of existing interfaces
 - [ ] Liskov Substitution: new `FocBase`/`FocTorque`/`FocSpeed`/`FocPosition` implementations fully substitutable
 - [ ] Dependency Inversion: hardware dependencies injected via constructor
-- [ ] DRY: no duplicated transform or PID logic — reuse from `numerical-toolbox/`
+- [ ] DRY: no duplicated transform or PID logic — reuse from `infra/numerical-toolbox/`
 
 ### Naming — PascalCase
 - [ ] Classes: `PascalCase` (e.g., `FocSpeedImpl`, `TransformsClarkePark`)

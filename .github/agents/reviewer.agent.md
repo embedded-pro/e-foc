@@ -63,6 +63,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 - [ ] In embedded runtime code, no `std::deque`, `std::list`, `std::map`, `std::set` — find bounded alternatives
 - [ ] Embedded runtime memory is statically allocated or stack-allocated with predictable bounds
 - [ ] No recursion in embedded runtime / ISR / hot-path code (stack usage must be predictable)
+- [ ] No `virtual ~Dtor() = 0` (pure virtual destructors) — adds flash/RAM overhead via `__cxa_pure_virtual` and vtable entries. Default is **no pure virtual destructor**
 - [ ] For host-side tools, simulators, and tests, do not raise a CRITICAL finding solely for STL/heap usage; instead assess whether the choice is appropriate for that module and consistent with existing patterns
 
 ### 2. Real-Time Safety — FOC Loop (CRITICAL)
@@ -134,7 +135,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 - [ ] **LSP**: New FOC implementations are fully substitutable for their base interface
 - [ ] **ISP**: Interfaces are small and focused
 - [ ] **DIP**: Hardware injected via constructor, not accessed directly
-- [ ] **DRY**: No reimplementation of PID, transforms, or SVM from `numerical-toolbox/`
+- [ ] **DRY**: No reimplementation of PID, transforms, or SVM from `infra/numerical-toolbox/`
 
 ### 10. Error Handling (WARNING)
 
@@ -152,6 +153,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 
 ### 12. Testing (WARNING)
 
+- [ ] All mocks use `testing::StrictMock<>` — `NiceMock` and `NaggyMock` are **FORBIDDEN**
 - [ ] **No plain `TEST()` macro** — use `TEST_F` or `TYPED_TEST`
 - [ ] Test files exist at `source/foc/implementations/test/Test{ComponentName}.cpp`
 - [ ] Fixture class inside anonymous `namespace {}`

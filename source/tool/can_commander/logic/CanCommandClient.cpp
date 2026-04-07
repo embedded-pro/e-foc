@@ -1,26 +1,33 @@
 #include "source/tool/can_commander/logic/CanCommandClient.hpp"
+#include <algorithm>
+#include <limits>
 
 namespace tool
 {
     using namespace services;
 
     CanCommandClient::CanCommandClient(CanBusAdapter& adapter)
-        : protocolClient(adapter, CanProtocolClient::Config{ 1 })
+        : focTransport(adapter, 0)
+        , protocolClient(adapter)
+        , focCategory(focTransport, protocolClient)
     {
+        protocolClient.RegisterCategory(focCategory);
         CanProtocolClientObserver::Attach(protocolClient);
+        FocMotorCategoryClientObserver::Attach(focCategory);
         CanBusAdapterObserver::Attach(adapter);
     }
 
     CanCommandClient::~CanCommandClient()
     {
+        FocMotorCategoryClientObserver::Detach();
         CanProtocolClientObserver::Detach();
         CanBusAdapterObserver::Detach();
+        protocolClient.UnregisterCategory(focCategory);
     }
 
     void CanCommandClient::SetNodeId(uint16_t id)
     {
         nodeId = id;
-        protocolClient.SetNodeId(id);
     }
 
     uint16_t CanCommandClient::NodeId() const
@@ -48,84 +55,97 @@ namespace tool
     void CanCommandClient::SendStartMotor()
     {
         SetBusy(true);
-        protocolClient.SendStartMotor([] {});
+        if (focCategory.SendStart(nodeId))
+            SetBusy(false);
     }
 
     void CanCommandClient::SendStopMotor()
     {
         SetBusy(true);
-        protocolClient.SendStopMotor([] {});
+        if (focCategory.SendStop(nodeId))
+            SetBusy(false);
     }
 
     void CanCommandClient::SendEmergencyStop()
     {
         SetBusy(true);
-        protocolClient.SendEmergencyStop([] {});
+        if (focCategory.SendEmergencyStop(nodeId))
+            SetBusy(false);
     }
 
-    void CanCommandClient::SendSetControlMode(CanControlMode mode)
+    void CanCommandClient::SendSetControlMode(FocMotorMode mode)
     {
         SetBusy(true);
-        protocolClient.SendSetControlMode(mode, [] {});
+        if (focCategory.SendSetTarget(nodeId, FocSetpoint{ mode, 0 }))
+            SetBusy(false);
     }
 
-    void CanCommandClient::SendSetTorqueSetpoint(float idCurrent, float iqCurrent)
+    void CanCommandClient::SendSetTorqueSetpoint(float iqCurrent)
     {
         SetBusy(true);
-        protocolClient.SendSetTorqueSetpoint(idCurrent, iqCurrent, [] {});
+        if (focCategory.SendSetTarget(nodeId, FocSetpoint{ FocMotorMode::torque, static_cast<int16_t>(iqCurrent * focCurrentScale) }))
+            SetBusy(false);
     }
 
     void CanCommandClient::SendSetSpeedSetpoint(float speedRadPerSec)
     {
         SetBusy(true);
-        protocolClient.SendSetSpeedSetpoint(speedRadPerSec, [] {});
+        const auto scaled = std::clamp(static_cast<int32_t>(speedRadPerSec * focSpeedScale),
+            static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
+            static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
+        if (focCategory.SendSetTarget(nodeId, FocSetpoint{ FocMotorMode::speed, static_cast<int16_t>(scaled) }))
+            SetBusy(false);
     }
 
     void CanCommandClient::SendSetPositionSetpoint(float positionRad)
     {
         SetBusy(true);
-        protocolClient.SendSetPositionSetpoint(positionRad, [] {});
+        const auto scaled = std::clamp(static_cast<int32_t>(positionRad * focPositionScale),
+            static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
+            static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
+        if (focCategory.SendSetTarget(nodeId, FocSetpoint{ FocMotorMode::position, static_cast<int16_t>(scaled) }))
+            SetBusy(false);
     }
 
     void CanCommandClient::SendSetCurrentIdPid(float kp, float ki, float kd)
     {
         SetBusy(true);
-        protocolClient.SendSetCurrentIdPid(kp, ki, kd, [] {});
+        if (focCategory.SendSetPidCurrent(nodeId, FocPidGains{ static_cast<int16_t>(kp * focPidScale), static_cast<int16_t>(ki * focPidScale), static_cast<int16_t>(kd * focPidScale) }))
+            SetBusy(false);
     }
 
     void CanCommandClient::SendSetCurrentIqPid(float kp, float ki, float kd)
     {
-        SetBusy(true);
-        protocolClient.SendSetCurrentIqPid(kp, ki, kd, [] {});
+        SendSetCurrentIdPid(kp, ki, kd);
     }
 
     void CanCommandClient::SendSetSpeedPid(float kp, float ki, float kd)
     {
         SetBusy(true);
-        protocolClient.SendSetSpeedPid(kp, ki, kd, [] {});
+        if (focCategory.SendSetPidSpeed(nodeId, FocPidGains{ static_cast<int16_t>(kp * focPidScale), static_cast<int16_t>(ki * focPidScale), static_cast<int16_t>(kd * focPidScale) }))
+            SetBusy(false);
     }
 
     void CanCommandClient::SendSetPositionPid(float kp, float ki, float kd)
     {
         SetBusy(true);
-        protocolClient.SendSetPositionPid(kp, ki, kd, [] {});
+        if (focCategory.SendSetPidPosition(nodeId, FocPidGains{ static_cast<int16_t>(kp * focPidScale), static_cast<int16_t>(ki * focPidScale), static_cast<int16_t>(kd * focPidScale) }))
+            SetBusy(false);
     }
 
-    void CanCommandClient::SendSetSupplyVoltage(float volts)
+    void CanCommandClient::SendSetSupplyVoltage(float /*volts*/)
     {
-        SetBusy(true);
-        protocolClient.SendSetSupplyVoltage(volts, [] {});
+        // No equivalent in can-lite FocMotorCategoryClient; intentional no-op
     }
 
-    void CanCommandClient::SendSetMaxCurrent(float amps)
+    void CanCommandClient::SendSetMaxCurrent(float /*amps*/)
     {
-        SetBusy(true);
-        protocolClient.SendSetMaxCurrent(amps, [] {});
+        // No equivalent in can-lite FocMotorCategoryClient; intentional no-op
     }
 
-    void CanCommandClient::RequestData(DataRequestFlags flags)
+    void CanCommandClient::RequestData()
     {
-        protocolClient.RequestData(flags, [] {});
+        focCategory.SendRequestTelemetry(nodeId);
     }
 
     void CanCommandClient::HandleTimeout()
@@ -137,60 +157,64 @@ namespace tool
             });
     }
 
-    void CanCommandClient::OnCommandAckReceived(CanCategory category, CanMessageType command, CanAckStatus status)
+    void CanCommandClient::OnServerOnline(uint16_t /*nodeId*/)
     {
-        SetBusy(false);
-        NotifyObservers([category, command, status](auto& observer)
+        NotifyObservers([](auto& observer)
             {
-                observer.OnCommandAckReceived(category, command, status);
+                observer.OnConnectionChanged(true);
             });
     }
 
-    void CanCommandClient::OnMotorStatusReceived(CanMotorState state, CanControlMode mode, CanFaultCode fault)
+    void CanCommandClient::OnServerOffline(uint16_t /*nodeId*/)
     {
-        NotifyObservers([state, mode, fault](auto& observer)
+        NotifyObservers([](auto& observer)
             {
-                observer.OnMotorStatusReceived(state, mode, fault);
+                observer.OnConnectionChanged(false);
             });
     }
 
-    void CanCommandClient::OnControlModeReceived(CanControlMode mode)
-    {
-        NotifyObservers([mode](auto& observer)
-            {
-                observer.OnControlModeReceived(mode);
-            });
-    }
+    void CanCommandClient::OnMotorTypeResponse(FocMotorMode /*mode*/) {}
 
-    void CanCommandClient::OnCurrentMeasurementReceived(float idCurrent, float iqCurrent)
-    {
-        NotifyObservers([idCurrent, iqCurrent](auto& observer)
-            {
-                observer.OnCurrentMeasurementReceived(idCurrent, iqCurrent);
-            });
-    }
+    void CanCommandClient::OnElectricalParamsResponse(const FocElectricalParams& /*params*/) {}
 
-    void CanCommandClient::OnSpeedPositionReceived(float speed, float position)
+    void CanCommandClient::OnMechanicalParamsResponse(const FocMechanicalParams& /*params*/) {}
+
+    void CanCommandClient::OnTelemetryStatusResponse(const FocTelemetryStatus& status)
     {
+        NotifyObservers([&status](auto& observer)
+            {
+                observer.OnMotorStatusReceived(status.state, status.fault);
+            });
+
+        const float speed = static_cast<float>(status.speed) / focSpeedScale;
+        const float position = static_cast<float>(status.position) / focPositionScale;
         NotifyObservers([speed, position](auto& observer)
             {
                 observer.OnSpeedPositionReceived(speed, position);
             });
+
+        if (status.fault != FocFaultCode::none)
+        {
+            NotifyObservers([&status](auto& observer)
+                {
+                    observer.OnFaultEventReceived(status.fault);
+                });
+        }
     }
 
-    void CanCommandClient::OnBusVoltageReceived(float voltage)
+    void CanCommandClient::OnTelemetryElectricalResponse(const FocTelemetryElectrical& telemetry)
     {
+        const float id = static_cast<float>(telemetry.id) / focCurrentScale;
+        const float iq = static_cast<float>(telemetry.iq) / focCurrentScale;
+        NotifyObservers([id, iq](auto& observer)
+            {
+                observer.OnCurrentMeasurementReceived(id, iq);
+            });
+
+        const float voltage = static_cast<float>(telemetry.voltage) / focVoltageScale;
         NotifyObservers([voltage](auto& observer)
             {
                 observer.OnBusVoltageReceived(voltage);
-            });
-    }
-
-    void CanCommandClient::OnFaultEventReceived(CanFaultCode fault)
-    {
-        NotifyObservers([fault](auto& observer)
-            {
-                observer.OnFaultEventReceived(fault);
             });
     }
 
@@ -204,7 +228,7 @@ namespace tool
 
     void CanCommandClient::OnError(infra::BoundedConstString message)
     {
-        NotifyObservers([message](auto& observer)
+        NotifyObservers([&message](auto& observer)
             {
                 observer.OnAdapterError(message);
             });
@@ -218,3 +242,4 @@ namespace tool
             });
     }
 }
+

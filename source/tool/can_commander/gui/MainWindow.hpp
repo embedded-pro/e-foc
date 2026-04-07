@@ -27,15 +27,13 @@ namespace tool
         void OnDisconnect();
 
     private:
-        void OnCommandAckReceived(services::CanCategory category, services::CanMessageType command, services::CanAckStatus status) override;
         void OnCommandTimeout() override;
         void OnBusyChanged(bool busy) override;
-        void OnMotorStatusReceived(services::CanMotorState state, services::CanControlMode mode, services::CanFaultCode fault) override;
-        void OnControlModeReceived(services::CanControlMode mode) override;
+        void OnMotorStatusReceived(services::FocMotorState state, services::FocFaultCode fault) override;
         void OnCurrentMeasurementReceived(float idCurrent, float iqCurrent) override;
         void OnSpeedPositionReceived(float speed, float position) override;
         void OnBusVoltageReceived(float voltage) override;
-        void OnFaultEventReceived(services::CanFaultCode fault) override;
+        void OnFaultEventReceived(services::FocFaultCode fault) override;
         void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) override;
         void OnConnectionChanged(bool connected) override;
         void OnAdapterError(infra::BoundedConstString message) override;

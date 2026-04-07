@@ -82,8 +82,10 @@ cmake --build --preset EK-TM4C1294XL-Debug
 │   └── tool/                   # Host tooling
 │       ├── simulator/          # C++ simulators for motor models
 │       └── can_commander/      # CAN bus command interface
-├── embedded-infra-lib/         # Submodule: infrastructure and utilities
-├── numerical-toolbox/          # Generic algorithms (PID, filters, etc.)
+├── infra/                      # Infrastructure submodules
+│   ├── embedded-infra-lib/     # Submodule: infrastructure and utilities
+│   ├── numerical-toolbox/      # Generic algorithms (PID, filters, etc.)
+│   └── can-lite/               # Submodule: CAN protocol library
 ├── hal/                        # Hardware Abstraction Layer
 │   ├── st/                     # ST microcontroller HAL
 │   └── ti/                     # TI microcontroller HAL
@@ -173,8 +175,8 @@ For detailed information about the project structure and coding guidelines, see:
 - [Parameter Estimation](documentation/theory/resistance-inductance-estimation.md) - Resistance and inductance estimation theory
 - [Copilot Instructions](/.github/copilot-instructions.md) - Development guidelines and patterns
 - [Performance Optimization Guide](documentation/performance-optimization/README.md) - Writing high-performance embedded code, analyzing assembly, measuring cycles
-- [embedded-infra-lib Documentation](embedded-infra-lib/README.md) - Infrastructure library reference
-- [numerical-toolbox Documentation](numerical-toolbox/README.md) - Reusable algorithms
+- [embedded-infra-lib Documentation](infra/embedded-infra-lib/README.md) - Infrastructure library reference
+- [numerical-toolbox Documentation](infra/numerical-toolbox/README.md) - Reusable algorithms
 
 ## Contributing
 

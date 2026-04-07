@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/services/can_protocol/core/CanProtocolDefinitions.hpp"
+#include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
 #include <QGroupBox>
 #include <QLabel>
 #include <QWidget>
@@ -15,28 +15,22 @@ namespace tool
         explicit TelemetryPanel(QWidget* parent = nullptr);
 
     public slots:
-        void OnMotorStatus(services::CanMotorState state, services::CanControlMode mode, services::CanFaultCode fault);
+        void OnMotorStatus(services::FocMotorState state, services::FocFaultCode fault);
         void OnCurrentMeasurement(float idCurrent, float iqCurrent);
         void OnSpeedPosition(float speed, float position);
         void OnBusVoltage(float voltage);
-        void OnFaultEvent(services::CanFaultCode fault);
-        void OnCommandAck(services::CanCategory category, services::CanMessageType command, services::CanAckStatus status);
+        void OnFaultEvent(services::FocFaultCode fault);
 
     private:
-        static QString MotorStateName(services::CanMotorState state);
-        static QString ControlModeName(services::CanControlMode mode);
-        static QString FaultCodeName(services::CanFaultCode fault);
-        static QString AckStatusName(services::CanAckStatus status);
-        static QString CategoryName(services::CanCategory category);
+        static QString MotorStateName(services::FocMotorState state);
+        static QString FaultCodeName(services::FocFaultCode fault);
 
         QLabel* motorStateLabel;
-        QLabel* controlModeLabel;
         QLabel* faultLabel;
         QLabel* idCurrentLabel;
         QLabel* iqCurrentLabel;
         QLabel* speedLabel;
         QLabel* positionLabel;
         QLabel* busVoltageLabel;
-        QLabel* lastAckLabel;
     };
 }

@@ -4,6 +4,7 @@ emil_add_test(e_foc.tool.can_commander.logic_test)
 
 target_link_libraries(e_foc.tool.can_commander.logic_test PUBLIC
     gmock_main
+    infra.timer_test_helper
     e_foc.tool.can_commander.logic
 )
 

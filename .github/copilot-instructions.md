@@ -7,8 +7,8 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 - Major components:
   - `source/` — FOC implementations, hardware adapters, application code (formerly `application/motors`).
   - `source/services/` — Application-level services (coordination, scheduling, helpers).
-  - `numerical-toolbox/` — Generic numerical algorithms (PID, filters, fixed-point helpers).
-  - `embedded-infra-lib/` — Infrastructure: bounded containers, build helpers, toolchain cmake pieces.
+  - `numerical-toolbox/` — Generic numerical algorithms (PID, filters, fixed-point helpers). Located at `infra/numerical-toolbox/`.
+  - `embedded-infra-lib/` — Infrastructure: bounded containers, build helpers, toolchain cmake pieces. Located at `infra/embedded-infra-lib/`.
   - `source/tool/simulator/` — Host simulation models for validation.
   - `source/tool/can_commander/` — CAN bus command interface tool.
 - Interaction: `source/` implements control logic and uses `hal/` adapters from `embedded-infra-lib` and algorithms from `numerical-toolbox`.
@@ -29,6 +29,7 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 3) Project-specific constraints and conventions (must follow these)
 - NO HEAP: avoid `new/delete`, `malloc/free`, `std::make_unique`, etc.
 - NO dynamic STL containers in embedded code: use `infra::BoundedVector`, `infra::BoundedString`, etc. (see `embedded-infra-lib`).
+- Avoid `virtual ~Dtor() = 0` (pure virtual destructors) — they add significant flash/RAM overhead. The default is **no pure virtual destructor**.
 - Prefer fixed-size integer types (`uint8_t`, `int32_t`, ...).
 - Avoid recursion and virtual calls in ISR/hot paths.
 - Favor `constexpr`, `inline`, and `const` correctness for performance.
@@ -38,20 +39,21 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
   - Implement code in `source/foc/implementations/` and keep public interfaces in `source/foc/interfaces/`.
   - Motor-specific application code now lives under `source/application/` (renamed from `application/motors`).
 - Hardware abstraction & factory: see `source/hardware/HardwareFactory.hpp` for how peripherals and adapters are created and injected.
-- Numerical algorithms: follow patterns in `numerical-toolbox/` — implement float first, then Q15/Q31 variants, and add typed GoogleTest suites.
+- Numerical algorithms: follow patterns in `infra/numerical-toolbox/` — implement float first, then Q15/Q31 variants, and add typed GoogleTest suites.
 
 5) Testing & CI expectations
 - Unit tests run on host using GoogleTest. Use typed tests for multiple numeric types (float, Q15, Q31).
 - Prefer small, deterministic tests that do not require hardware.
 - If adding platform-specific tests, provide host stubs/mocks in `source/hardware/Host/`.
+- Always use `testing::StrictMock<>` for all mock instances — `NiceMock` and `NaggyMock` are **forbidden**.
 
 6) Build system tips
 - Presets are the primary interface: see `CMakePresets.json` to pick host vs embedded and board presets.
-- Toolchains for embedded boards live under `embedded-infra-lib/cmake/toolchain-*.cmake`.
+- Toolchains for embedded boards live under `infra/embedded-infra-lib/cmake/toolchain-*.cmake`.
 - `compile_commands.json` is generated in build dirs; use it for language server/analysis.
 
 7) What to preserve from existing docs
-- There is an existing, detailed guidance file for the numerical toolbox at `numerical-toolbox/.github/copilot-instructions.md` — preserve algorithm-level constraints from there when editing numerical code.
+- There is an existing, detailed guidance file for the numerical toolbox at `infra/numerical-toolbox/.github/copilot-instructions.md` — preserve algorithm-level constraints from there when editing numerical code.
 
 8) When making changes, be explicit
 - Update corresponding `doc/` entries for algorithms and any example in `examples/`.

@@ -49,9 +49,9 @@ namespace tool
         auto* modeGroup = new QGroupBox("Control Mode");
         auto* modeLayout = new QHBoxLayout(modeGroup);
         auto* modeCombo = new QComboBox();
-        modeCombo->addItem("Torque", static_cast<int>(CanControlMode::torque));
-        modeCombo->addItem("Speed", static_cast<int>(CanControlMode::speed));
-        modeCombo->addItem("Position", static_cast<int>(CanControlMode::position));
+        modeCombo->addItem("Torque", static_cast<int>(FocMotorMode::torque));
+        modeCombo->addItem("Speed", static_cast<int>(FocMotorMode::speed));
+        modeCombo->addItem("Position", static_cast<int>(FocMotorMode::position));
         auto* modeButton = new QPushButton("Set Mode");
         modeLabel = new QLabel("Active: Unknown");
         modeLabel->setStyleSheet("font-weight: bold; color: #555;");
@@ -63,7 +63,7 @@ namespace tool
         commandButtons.push_back(modeButton);
         connect(modeButton, &QPushButton::clicked, [this, modeCombo]()
             {
-                emit SetControlModeRequested(static_cast<CanControlMode>(modeCombo->currentData().toInt()));
+                emit SetControlModeRequested(static_cast<FocMotorMode>(modeCombo->currentData().toInt()));
             });
 
         setpointStack = new QStackedWidget();
@@ -71,31 +71,26 @@ namespace tool
         // Index 0: Torque setpoint
         auto* torqueGroup = new QGroupBox("Torque Setpoint");
         auto* torqueLayout = new QFormLayout(torqueGroup);
-        auto* idSpin = new QDoubleSpinBox();
-        idSpin->setRange(-32.0, 32.0);
-        idSpin->setDecimals(3);
-        idSpin->setSuffix(" A");
         auto* iqSpin = new QDoubleSpinBox();
         iqSpin->setRange(-32.0, 32.0);
         iqSpin->setDecimals(3);
         iqSpin->setSuffix(" A");
-        torqueLayout->addRow("Id:", idSpin);
         torqueLayout->addRow("Iq:", iqSpin);
         auto* torqueButton = new QPushButton("Set Torque");
         torqueLayout->addRow(torqueButton);
         setpointStack->addWidget(torqueGroup);
 
         commandButtons.push_back(torqueButton);
-        connect(torqueButton, &QPushButton::clicked, [this, idSpin, iqSpin]()
+        connect(torqueButton, &QPushButton::clicked, [this, iqSpin]()
             {
-                emit SetTorqueSetpointRequested(static_cast<float>(idSpin->value()), static_cast<float>(iqSpin->value()));
+                emit SetTorqueSetpointRequested(static_cast<float>(iqSpin->value()));
             });
 
         // Index 1: Speed setpoint
         auto* speedGroup = new QGroupBox("Speed Setpoint");
         auto* speedLayout = new QFormLayout(speedGroup);
         auto* speedSpin = new QDoubleSpinBox();
-        speedSpin->setRange(-100000.0, 100000.0);
+        speedSpin->setRange(-32767.0, 32767.0);
         speedSpin->setDecimals(3);
         speedSpin->setSuffix(" rad/s");
         speedLayout->addRow("Speed:", speedSpin);
@@ -113,7 +108,7 @@ namespace tool
         auto* posGroup = new QGroupBox("Position Setpoint");
         auto* posLayout = new QFormLayout(posGroup);
         auto* posSpin = new QDoubleSpinBox();
-        posSpin->setRange(-1000.0, 1000.0);
+        posSpin->setRange(-327.67, 327.67);
         posSpin->setDecimals(4);
         posSpin->setSuffix(" rad");
         posLayout->addRow("Position:", posSpin);
@@ -189,16 +184,14 @@ namespace tool
                 });
         };
 
-        addPidGroup(torquePidLayout, "Current Id PID", &CommandPanel::SetCurrentIdPidRequested);
-        addPidGroup(torquePidLayout, "Current Iq PID", &CommandPanel::SetCurrentIqPidRequested);
+        addPidGroup(torquePidLayout, "Current PID", &CommandPanel::SetCurrentIdPidRequested);
         torquePidLayout->addStretch();
         pidStack->addWidget(torquePidPage);
 
         // Index 1: Speed mode — Current Id + Iq + Speed PID
         auto* speedPidPage = new QWidget();
         auto* speedPidLayout = new QVBoxLayout(speedPidPage);
-        addPidGroup(speedPidLayout, "Current Id PID", &CommandPanel::SetCurrentIdPidRequested);
-        addPidGroup(speedPidLayout, "Current Iq PID", &CommandPanel::SetCurrentIqPidRequested);
+        addPidGroup(speedPidLayout, "Current PID", &CommandPanel::SetCurrentIdPidRequested);
         addPidGroup(speedPidLayout, "Speed PID", &CommandPanel::SetSpeedPidRequested);
         speedPidLayout->addStretch();
         pidStack->addWidget(speedPidPage);
@@ -206,8 +199,7 @@ namespace tool
         // Index 2: Position mode — Current Id + Iq + Speed + Position PID
         auto* positionPidPage = new QWidget();
         auto* positionPidLayout = new QVBoxLayout(positionPidPage);
-        addPidGroup(positionPidLayout, "Current Id PID", &CommandPanel::SetCurrentIdPidRequested);
-        addPidGroup(positionPidLayout, "Current Iq PID", &CommandPanel::SetCurrentIqPidRequested);
+        addPidGroup(positionPidLayout, "Current PID", &CommandPanel::SetCurrentIdPidRequested);
         addPidGroup(positionPidLayout, "Speed PID", &CommandPanel::SetSpeedPidRequested);
         addPidGroup(positionPidLayout, "Position PID", &CommandPanel::SetPositionPidRequested);
         positionPidLayout->addStretch();
@@ -267,7 +259,7 @@ namespace tool
             button->setEnabled(enabled);
     }
 
-    void CommandPanel::SetActiveControlMode(services::CanControlMode mode)
+    void CommandPanel::SetActiveControlMode(services::FocMotorMode mode)
     {
         int index = static_cast<int>(mode);
         setpointStack->setCurrentIndex(index);
