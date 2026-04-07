@@ -201,16 +201,16 @@ Registered command handlers are stored in a fixed-size look-up structure in the 
 
 ### Provided
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
+| Interface                                    | Purpose                                                                                                                                                                                | Contract                                                                              |
+|----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
 | `TerminalFocBaseInteractor` (and subclasses) | Registers common and mode-specific commands on `TerminalWithStorage`; exposes a `Terminal()` accessor for the `MotorStateMachine` to register additional commands on the same terminal | Constructed once per application; exactly one interactor subclass is active at a time |
-| `TerminalWithBanner` | Decorates `TerminalWithStorage` to print a welcome banner on first connection | Transparent to the underlying terminal after the banner has been printed |
+| `TerminalWithBanner`                         | Decorates `TerminalWithStorage` to print a welcome banner on first connection                                                                                                          | Transparent to the underlying terminal after the banner has been printed              |
 
 ### Required
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
-| `TerminalWithStorage` | Receives and dispatches parsed command tokens; writes string responses to the serial output | Must be connected to the physical serial driver before any interactor is constructed |
-| `FocBase` | Provides `Enable()`, `Disable()`, and `SetCurrentTunings()` shared by all control modes | Must remain valid for the lifetime of the interactor |
-| `FocTorque` / `FocSpeed` / `FocPosition` | Provides mode-specific setpoint and tuning methods | The concrete interface must match the constructed interactor subclass |
-| DC bus voltage (`Volts`) | Supplied to the interactor for normalising PID gain inputs before forwarding them to the FOC component | Must reflect the actual DC bus voltage at the time tunings are applied |
+| Interface                                | Purpose                                                                                                | Contract                                                                             |
+|------------------------------------------|--------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
+| `TerminalWithStorage`                    | Receives and dispatches parsed command tokens; writes string responses to the serial output            | Must be connected to the physical serial driver before any interactor is constructed |
+| `FocBase`                                | Provides `Enable()`, `Disable()`, and `SetCurrentTunings()` shared by all control modes                | Must remain valid for the lifetime of the interactor                                 |
+| `FocTorque` / `FocSpeed` / `FocPosition` | Provides mode-specific setpoint and tuning methods                                                     | The concrete interface must match the constructed interactor subclass                |
+| DC bus voltage (`Volts`)                 | Supplied to the interactor for normalising PID gain inputs before forwarding them to the FOC component | Must reflect the actual DC bus voltage at the time tunings are applied               |
