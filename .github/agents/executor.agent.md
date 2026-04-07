@@ -37,6 +37,7 @@ Follow these rules for EVERY change. Violations are unacceptable in this codebas
 - `std::array<T, N>` for fixed-size arrays
 - Stack allocation and static allocation only
 - No recursion (stack must be predictable)
+- **No `virtual ~Dtor() = 0`** (pure virtual destructors) — they pull in `__cxa_pure_virtual` and vtable overhead, increasing flash/RAM usage. The default is **no pure virtual destructor**. Only add one when there is a proven, documented need.
 
 ### Real-Time — FOC LOOP RULES
 
@@ -158,6 +159,7 @@ Use `TYPED_TEST` if code is templated across numeric types (see `numerical-toolb
 Prefer `TEST_F` for FOC test suites that share setup/fixtures, and use `TYPED_TEST` for coverage across numeric types. Plain `TEST()` is acceptable for simple, stateless cases when it matches existing repository patterns.
 
 Rules:
+- Use `testing::StrictMock<MockType>` for ALL mock instances — `NiceMock` and `NaggyMock` are **FORBIDDEN**
 - Verify transform correctness against known mathematical reference values
 - Test PID clamping and anti-windup behavior
 - Test SVM duty cycles for all 6 sectors and edge cases
