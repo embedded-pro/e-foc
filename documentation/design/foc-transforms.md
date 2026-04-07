@@ -7,14 +7,14 @@ component: foc-transforms
 date: 2026-04-07
 ---
 
-| Field     | Value                        |
-|-----------|------------------------------|
-| Title     | FOC Mathematical Transforms  |
-| Type      | design                       |
-| Status    | draft                        |
-| Version   | 0.1.0                        |
-| Component | foc-transforms               |
-| Date      | 2026-04-07                   |
+| Field     | Value                       |
+|-----------|-----------------------------|
+| Title     | FOC Mathematical Transforms |
+| Type      | design                      |
+| Status    | draft                       |
+| Version   | 0.1.0                       |
+| Component | foc-transforms              |
+| Date      | 2026-04-07                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -164,38 +164,38 @@ Direct hardware transcendental functions (`sin`, `cos`) introduce variable laten
 
 ### Provided
 
-| Interface                   | Purpose                                                                 | Contract                                                                                                                  |
-|-----------------------------|-------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------|
-| Clarke — Forward            | Converts (Ia, Ib) to (Iα, Iβ)                                           | Ic is derived internally; inputs must satisfy the balanced-phase assumption. Output is immediately valid.                 |
-| Clarke — Inverse            | Converts (Vα, Vβ) to (Va, Vb, Vc)                                       | Produces all three phase voltages. The sum of outputs is zero.                                                            |
-| Park — Forward              | Converts (Iα, Iβ, θe) to (Id, Iq)                                       | Caller supplies pre-computed or LUT-evaluated cos(θe) and sin(θe). Stateless.                                             |
-| Park — Inverse              | Converts (Vd, Vq, θe) to (Vα, Vβ)                                       | Uses the same θe as the forward Park in the same control cycle.                                                           |
-| ClarkePark — Forward        | Converts (Ia, Ib, θe) to (Id, Iq) in one call                           | Computes cos/sin once; result is identical to chaining Clarke then Park separately.                                       |
-| ClarkePark — Inverse        | Converts (Vd, Vq, θe) to (Vα, Vβ) in one call                          | Computes cos/sin once; result is identical to chaining inverse Park then inverse Clarke separately.                       |
-| SpaceVectorModulation — Generate | Converts (Vα, Vβ) to three duty cycles                            | Inputs must be normalised fractions. Outputs are always in [0.0, 1.0]. Sector detection and null-vector split are internal.|
-| FastTrigonometry — Sine     | Returns an approximation of sin(θ)                                      | θ is normalised to [0, 2π) internally. ROM LUT; no floating-point transcendental at runtime.                              |
-| FastTrigonometry — Cosine   | Returns an approximation of cos(θ)                                      | Derived from the sine LUT via a quarter-period offset. Same ROM, no additional storage.                                   |
+| Interface                        | Purpose                                       | Contract                                                                                                                    |
+|----------------------------------|-----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
+| Clarke — Forward                 | Converts (Ia, Ib) to (Iα, Iβ)                 | Ic is derived internally; inputs must satisfy the balanced-phase assumption. Output is immediately valid.                   |
+| Clarke — Inverse                 | Converts (Vα, Vβ) to (Va, Vb, Vc)             | Produces all three phase voltages. The sum of outputs is zero.                                                              |
+| Park — Forward                   | Converts (Iα, Iβ, θe) to (Id, Iq)             | Caller supplies pre-computed or LUT-evaluated cos(θe) and sin(θe). Stateless.                                               |
+| Park — Inverse                   | Converts (Vd, Vq, θe) to (Vα, Vβ)             | Uses the same θe as the forward Park in the same control cycle.                                                             |
+| ClarkePark — Forward             | Converts (Ia, Ib, θe) to (Id, Iq) in one call | Computes cos/sin once; result is identical to chaining Clarke then Park separately.                                         |
+| ClarkePark — Inverse             | Converts (Vd, Vq, θe) to (Vα, Vβ) in one call | Computes cos/sin once; result is identical to chaining inverse Park then inverse Clarke separately.                         |
+| SpaceVectorModulation — Generate | Converts (Vα, Vβ) to three duty cycles        | Inputs must be normalised fractions. Outputs are always in [0.0, 1.0]. Sector detection and null-vector split are internal. |
+| FastTrigonometry — Sine          | Returns an approximation of sin(θ)            | θ is normalised to [0, 2π) internally. ROM LUT; no floating-point transcendental at runtime.                                |
+| FastTrigonometry — Cosine        | Returns an approximation of cos(θ)            | Derived from the sine LUT via a quarter-period offset. Same ROM, no additional storage.                                     |
 
 ### Required
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
-| None      | All transforms are pure mathematical algorithms with no external dependencies. | — |
+| Interface | Purpose                                                                        | Contract |
+|-----------|--------------------------------------------------------------------------------|----------|
+| None      | All transforms are pure mathematical algorithms with no external dependencies. | —        |
 
 ---
 
 ## Data Model
 
-| Entity               | Field     | Type / Unit           | Range          | Notes                                                    |
-|----------------------|-----------|-----------------------|----------------|----------------------------------------------------------|
-| Three-phase current  | Ia, Ib    | Ampere (float)        | ± rated current | Ic derived; not stored                                  |
-| Stationary frame     | Iα, Iβ   | Ampere (float)        | ± rated current | Output of Clarke forward                                |
-| Synchronous frame    | Id, Iq    | Ampere (float)        | ± rated current | Output of Park forward                                  |
-| Voltage demand       | Vd, Vq   | Dimensionless (float) | [−1, +1]       | Normalised to DC bus                                    |
-| Stationary voltage   | Vα, Vβ   | Dimensionless (float) | [−1, +1]       | Output of inverse Park / input to SVM                  |
-| Phase duty cycles    | Da, Db, Dc| Dimensionless (float) | [0.0, 1.0]     | Clamped; 0 = always low, 1 = always high                |
-| Electrical angle     | θe        | Radians (float)       | [0, 2π)        | θm × pole_pairs; normalised before LUT indexing        |
-| LUT                  | Sine table| float[512]            | [−1.0, +1.0]  | constexpr; 2 KB ROM; 16-byte aligned                    |
+| Entity              | Field      | Type / Unit           | Range           | Notes                                           |
+|---------------------|------------|-----------------------|-----------------|-------------------------------------------------|
+| Three-phase current | Ia, Ib     | Ampere (float)        | ± rated current | Ic derived; not stored                          |
+| Stationary frame    | Iα, Iβ     | Ampere (float)        | ± rated current | Output of Clarke forward                        |
+| Synchronous frame   | Id, Iq     | Ampere (float)        | ± rated current | Output of Park forward                          |
+| Voltage demand      | Vd, Vq     | Dimensionless (float) | [−1, +1]        | Normalised to DC bus                            |
+| Stationary voltage  | Vα, Vβ     | Dimensionless (float) | [−1, +1]        | Output of inverse Park / input to SVM           |
+| Phase duty cycles   | Da, Db, Dc | Dimensionless (float) | [0.0, 1.0]      | Clamped; 0 = always low, 1 = always high        |
+| Electrical angle    | θe         | Radians (float)       | [0, 2π)         | θm × pole_pairs; normalised before LUT indexing |
+| LUT                 | Sine table | float[512]            | [−1.0, +1.0]    | constexpr; 2 KB ROM; 16-byte aligned            |
 
 ---
 
@@ -221,13 +221,13 @@ graph LR
 
 ## Constraints & Limitations
 
-| Constraint                          | Value / Description                                                                                  |
-|-------------------------------------|------------------------------------------------------------------------------------------------------|
-| Two-sensor current topology         | Ic is derived, not measured. Clarke forward is invalid if the three-phase system is unbalanced.      |
-| LUT ROM footprint                   | 2 048 bytes (2 KB) of read-only memory.                                                              |
-| LUT accuracy                        | Approximation error is bounded and below the noise floor of 12-bit ADC current sensing.              |
-| SVM input normalisation             | Vα, Vβ must be dimensionless fractions in [−1, +1] relative to the DC bus, not physical volt values. |
-| SVM output saturation               | Duty cycles are clamped to [0.0, 1.0]. Over-modulation is silently saturated, not flagged.           |
-| Electrical angle responsibility     | The caller is responsible for computing θe = θm × pole_pairs before invoking any Park operation.     |
-| Stateless transforms                | No transform retains state between calls. Every call is independent.                                 |
-| Hot-path constraint                 | All transforms must execute within the cycle budget of the 20 kHz FOC interrupt.                    |
+| Constraint                      | Value / Description                                                                                  |
+|---------------------------------|------------------------------------------------------------------------------------------------------|
+| Two-sensor current topology     | Ic is derived, not measured. Clarke forward is invalid if the three-phase system is unbalanced.      |
+| LUT ROM footprint               | 2 048 bytes (2 KB) of read-only memory.                                                              |
+| LUT accuracy                    | Approximation error is bounded and below the noise floor of 12-bit ADC current sensing.              |
+| SVM input normalisation         | Vα, Vβ must be dimensionless fractions in [−1, +1] relative to the DC bus, not physical volt values. |
+| SVM output saturation           | Duty cycles are clamped to [0.0, 1.0]. Over-modulation is silently saturated, not flagged.           |
+| Electrical angle responsibility | The caller is responsible for computing θe = θm × pole_pairs before invoking any Park operation.     |
+| Stateless transforms            | No transform retains state between calls. Every call is independent.                                 |
+| Hot-path constraint             | All transforms must execute within the cycle budget of the 20 kHz FOC interrupt.                     |

@@ -7,14 +7,14 @@ component: "component-name"
 date: YYYY-MM-DD
 ---
 
-| Field     | Value            |
-|-----------|------------------|
+| Field     | Value                  |
+|-----------|------------------------|
 | Title     | Component Architecture |
-| Type      | architecture     |
-| Status    | draft            |
-| Version   | 0.1.0            |
-| Component | component-name   |
-| Date      | YYYY-MM-DD       |
+| Type      | architecture           |
+| Status    | draft                  |
+| Version   | 0.1.0                  |
+| Component | component-name         |
+| Date      | YYYY-MM-DD             |
 
 > **Note — Implementation-blind document**: This document describes *what exists and why*, not how it is coded.
 > Code must follow architecture, not the opposite. Do not reference source files, class names, or implementation
@@ -122,11 +122,11 @@ sequenceDiagram
 > Document concerns that span multiple sub-components: error handling strategy, logging/tracing policy,
 > timing and scheduling guarantees, power management, safety / fault-tolerance requirements.
 
-| Concern       | Policy / Approach |
-|---------------|-------------------|
-| Error handling | …               |
-| Timing budget  | …               |
-| Safety         | …               |
+| Concern        | Policy / Approach |
+|----------------|-------------------|
+| Error handling | …                 |
+| Timing budget  | …                 |
+| Safety         | …                 |
 
 ---
 

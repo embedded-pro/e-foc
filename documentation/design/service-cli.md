@@ -7,14 +7,14 @@ component: service-cli
 date: 2026-04-07
 ---
 
-| Field     | Value                                    |
-|-----------|------------------------------------------|
-| Title     | Service: Command-Line Interface (CLI)    |
-| Type      | design                                   |
-| Status    | draft                                    |
-| Version   | 0.1.0                                    |
-| Component | service-cli                              |
-| Date      | 2026-04-07                               |
+| Field     | Value                                 |
+|-----------|---------------------------------------|
+| Title     | Service: Command-Line Interface (CLI) |
+| Type      | design                                |
+| Status    | draft                                 |
+| Version   | 0.1.0                                 |
+| Component | service-cli                           |
+| Date      | 2026-04-07                            |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -80,33 +80,33 @@ Only one interactor is active at a time; the application constructs exactly the 
 
 #### `TerminalFocBaseInteractor` — Shared Commands
 
-| Command | Arguments | Action |
-|---------|-----------|--------|
-| `start` | none | Calls `FocBase::Enable()` |
-| `stop` | none | Calls `FocBase::Disable()` |
+| Command   | Arguments          | Action                                                         |
+|-----------|--------------------|----------------------------------------------------------------|
+| `start`   | none               | Calls `FocBase::Enable()`                                      |
+| `stop`    | none               | Calls `FocBase::Disable()`                                     |
 | `set-pid` | kp, ki, kd (float) | Sets current-loop PID gains via `FocBase::SetCurrentTunings()` |
 
 These commands are available in all control modes.
 
 #### `TerminalFocTorqueInteractor` — Torque Mode
 
-| Command | Arguments | Action |
-|---------|-----------|--------|
+| Command      | Arguments      | Action                                                                   |
+|--------------|----------------|--------------------------------------------------------------------------|
 | `set-torque` | Id (A), Iq (A) | Sets the d-axis and q-axis current setpoints via `FocTorque::SetPoint()` |
 
 #### `TerminalFocSpeedInteractor` — Speed Mode
 
-| Command | Arguments | Action |
-|---------|-----------|--------|
-| `set-speed` | ω (rad/s) | Sets the speed setpoint via `FocSpeed::SetPoint()` |
+| Command         | Arguments          | Action                                                      |
+|-----------------|--------------------|-------------------------------------------------------------|
+| `set-speed`     | ω (rad/s)          | Sets the speed setpoint via `FocSpeed::SetPoint()`          |
 | `set-speed-pid` | kp, ki, kd (float) | Sets speed-loop PID gains via `FocSpeed::SetSpeedTunings()` |
 
 #### `TerminalFocPositionInteractor` — Position Mode
 
-| Command | Arguments | Action |
-|---------|-----------|--------|
-| `set-position` | θ (rad) | Sets the position setpoint via `FocPosition::SetPoint()` |
-| `set-speed-pid` | kp, ki, kd (float) | Sets speed-loop PID gains within the position cascade |
+| Command            | Arguments          | Action                                                               |
+|--------------------|--------------------|----------------------------------------------------------------------|
+| `set-position`     | θ (rad)            | Sets the position setpoint via `FocPosition::SetPoint()`             |
+| `set-speed-pid`    | kp, ki, kd (float) | Sets speed-loop PID gains within the position cascade                |
 | `set-position-pid` | kp, ki, kd (float) | Sets position-loop PID gains via `FocPosition::SetPositionTunings()` |
 
 ### `TerminalWithBanner` — Decorator
@@ -133,13 +133,13 @@ After the banner is printed, all subsequent inputs and outputs pass through to t
 
 The `MotorStateMachine` registers additional commands on the same `TerminalWithStorage` instance that are not specific to any particular control mode:
 
-| Command | Service triggered | Response |
-|---------|-------------------|---------|
-| `align` | `MotorAlignmentImpl::ForceAlignment` | Prints `"Aligning…"` immediately; prints result asynchronously when `onDone` fires |
+| Command               | Service triggered                                                         | Response                                                                           |
+|-----------------------|---------------------------------------------------------------------------|------------------------------------------------------------------------------------|
+| `align`               | `MotorAlignmentImpl::ForceAlignment`                                      | Prints `"Aligning…"` immediately; prints result asynchronously when `onDone` fires |
 | `identify-electrical` | `ElectricalParametersIdentificationImpl::EstimateResistanceAndInductance` | Prints `"Identifying…"` immediately; prints R and L (or error) when `onDone` fires |
-| `identify-mechanical` | `MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia` | Prints `"Estimating…"` immediately; prints J and B (or error) when `onDone` fires |
-| `save-calibration` | `NonVolatileMemory::SaveCalibration` | Prints result when write+verify completes |
-| `load-calibration` | `NonVolatileMemory::LoadCalibration` | Prints loaded values or error when read completes |
+| `identify-mechanical` | `MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia`      | Prints `"Estimating…"` immediately; prints J and B (or error) when `onDone` fires  |
+| `save-calibration`    | `NonVolatileMemory::SaveCalibration`                                      | Prints result when write+verify completes                                          |
+| `load-calibration`    | `NonVolatileMemory::LoadCalibration`                                      | Prints loaded values or error when read completes                                  |
 
 ### Response Model — `StatusWithMessage`
 
@@ -201,16 +201,16 @@ Registered command handlers are stored in a fixed-size look-up structure in the 
 
 ### Provided
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
+| Interface                                    | Purpose                                                                                                                                                                                | Contract                                                                              |
+|----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
 | `TerminalFocBaseInteractor` (and subclasses) | Registers common and mode-specific commands on `TerminalWithStorage`; exposes a `Terminal()` accessor for the `MotorStateMachine` to register additional commands on the same terminal | Constructed once per application; exactly one interactor subclass is active at a time |
-| `TerminalWithBanner` | Decorates `TerminalWithStorage` to print a welcome banner on first connection | Transparent to the underlying terminal after the banner has been printed |
+| `TerminalWithBanner`                         | Decorates `TerminalWithStorage` to print a welcome banner on first connection                                                                                                          | Transparent to the underlying terminal after the banner has been printed              |
 
 ### Required
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
-| `TerminalWithStorage` | Receives and dispatches parsed command tokens; writes string responses to the serial output | Must be connected to the physical serial driver before any interactor is constructed |
-| `FocBase` | Provides `Enable()`, `Disable()`, and `SetCurrentTunings()` shared by all control modes | Must remain valid for the lifetime of the interactor |
-| `FocTorque` / `FocSpeed` / `FocPosition` | Provides mode-specific setpoint and tuning methods | The concrete interface must match the constructed interactor subclass |
-| DC bus voltage (`Volts`) | Supplied to the interactor for normalising PID gain inputs before forwarding them to the FOC component | Must reflect the actual DC bus voltage at the time tunings are applied |
+| Interface                                | Purpose                                                                                                | Contract                                                                             |
+|------------------------------------------|--------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
+| `TerminalWithStorage`                    | Receives and dispatches parsed command tokens; writes string responses to the serial output            | Must be connected to the physical serial driver before any interactor is constructed |
+| `FocBase`                                | Provides `Enable()`, `Disable()`, and `SetCurrentTunings()` shared by all control modes                | Must remain valid for the lifetime of the interactor                                 |
+| `FocTorque` / `FocSpeed` / `FocPosition` | Provides mode-specific setpoint and tuning methods                                                     | The concrete interface must match the constructed interactor subclass                |
+| DC bus voltage (`Volts`)                 | Supplied to the interactor for normalising PID gain inputs before forwarding them to the FOC component | Must reflect the actual DC bus voltage at the time tunings are applied               |

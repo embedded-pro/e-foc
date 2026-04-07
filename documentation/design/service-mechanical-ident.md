@@ -7,14 +7,14 @@ component: service-mechanical-ident
 date: 2026-04-07
 ---
 
-| Field     | Value                                        |
-|-----------|----------------------------------------------|
+| Field     | Value                                         |
+|-----------|-----------------------------------------------|
 | Title     | Service: Mechanical Parameters Identification |
-| Type      | design                                       |
-| Status    | draft                                        |
-| Version   | 0.1.0                                        |
-| Component | service-mechanical-ident                     |
-| Date      | 2026-04-07                                   |
+| Type      | design                                        |
+| Status    | draft                                         |
+| Version   | 0.1.0                                         |
+| Component | service-mechanical-ident                      |
+| Date      | 2026-04-07                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -175,14 +175,14 @@ Only one estimation may be in progress at a time. A call to `EstimateFrictionAnd
 
 ### Provided
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
+| Interface                                                               | Purpose                                                                                                                                                              | Contract                                                                                                                         |
+|-------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
 | `EstimateFrictionAndInertia(torqueConstant, polePairs, config, onDone)` | Runs the RLS estimator under active speed control for a configurable duration; delivers `(optional<NewtonMeterSecondPerRadian>, optional<NewtonMeterSecondSquared>)` | Rejected (immediate failure callback) if already Running; fires exactly once; does not stop the speed control loop on completion |
 
 ### Required
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
-| `FocSpeed` | Commands a target speed setpoint to excite the mechanical dynamics | Must already be active and in control of the motor before the procedure begins |
-| `ThreePhaseInverter` | Source of ADC current callbacks that supply the Iq measurement on each computation step | Must not be stopped during the estimation procedure |
-| `Encoder` | Supplies mechanical angle samples for speed and acceleration estimation | Must be tracking position at the configured sampling rate |
+| Interface            | Purpose                                                                                 | Contract                                                                       |
+|----------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| `FocSpeed`           | Commands a target speed setpoint to excite the mechanical dynamics                      | Must already be active and in control of the motor before the procedure begins |
+| `ThreePhaseInverter` | Source of ADC current callbacks that supply the Iq measurement on each computation step | Must not be stopped during the estimation procedure                            |
+| `Encoder`            | Supplies mechanical angle samples for speed and acceleration estimation                 | Must be tracking position at the configured sampling rate                      |

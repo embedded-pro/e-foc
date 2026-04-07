@@ -49,10 +49,10 @@ date: 2026-04-07
 
 The service manages two independent flash regions. Each region holds exactly one record at a time — the latest write replaces any previous record in that sector.
 
-| Region | Magic | Data structure | Data size |
-|--------|-------|----------------|-----------|
-| Calibration | `0xCAFEF00D` | `CalibrationData` | 36 bytes |
-| Configuration | `0xDEADBEEF` | `ConfigData` | 40 bytes |
+| Region        | Magic        | Data structure    | Data size |
+|---------------|--------------|-------------------|-----------|
+| Calibration   | `0xCAFEF00D` | `CalibrationData` | 36 bytes  |
+| Configuration | `0xDEADBEEF` | `ConfigData`      | 40 bytes  |
 
 The two regions use different `NvmRegion` instances (injected at construction) and can be read, written, and erased independently. An operation on the calibration region has no effect on the configuration region and vice versa.
 
@@ -60,12 +60,12 @@ The two regions use different `NvmRegion` instances (injected at construction) a
 
 Each region stores a single record consisting of a fixed-size header followed by the data payload. The header fields, in order, are:
 
-| Field | Size | Description |
-|-------|------|-------------|
-| Magic | 4 bytes | Region identifier (`0xCAFEF00D` or `0xDEADBEEF`) |
-| Version | 1 byte | Layout version constant baked into firmware |
-| CRC-32 | 4 bytes | CRC-32 of the data bytes only (header excluded) |
-| Data | N bytes | Serialised `CalibrationData` or `ConfigData` |
+| Field   | Size    | Description                                      |
+|---------|---------|--------------------------------------------------|
+| Magic   | 4 bytes | Region identifier (`0xCAFEF00D` or `0xDEADBEEF`) |
+| Version | 1 byte  | Layout version constant baked into firmware      |
+| CRC-32  | 4 bytes | CRC-32 of the data bytes only (header excluded)  |
+| Data    | N bytes | Serialised `CalibrationData` or `ConfigData`     |
 
 This layout ensures that a calibration record stored in flash cannot be silently misinterpreted as a configuration record (and vice versa) because any cross-region read will fail the magic check immediately.
 
@@ -136,47 +136,47 @@ stateDiagram-v2
 
 ### Error Codes
 
-| Status | Meaning |
-|--------|---------|
-| `Ok` | Operation completed successfully |
-| `InvalidData` | Magic mismatch or CRC-32 mismatch on read |
-| `VersionMismatch` | Version byte in stored record does not match firmware constant |
-| `WriteFailed` | CRC-32 of read-back data does not match what was written |
-| `HardwareFault` | `NvmRegion` reported a hardware-level error (e.g., erase or program failure) |
+| Status            | Meaning                                                                      |
+|-------------------|------------------------------------------------------------------------------|
+| `Ok`              | Operation completed successfully                                             |
+| `InvalidData`     | Magic mismatch or CRC-32 mismatch on read                                    |
+| `VersionMismatch` | Version byte in stored record does not match firmware constant               |
+| `WriteFailed`     | CRC-32 of read-back data does not match what was written                     |
+| `HardwareFault`   | `NvmRegion` reported a hardware-level error (e.g., erase or program failure) |
 
 ### Calibration and Configuration Data Fields
 
 **CalibrationData** (36 bytes total):
 
-| Field | Physical unit | Description |
-|-------|--------------|-------------|
-| rPhase | Ω | Measured phase resistance |
-| lD | H | Measured d-axis inductance |
-| lQ | H | Measured q-axis inductance |
-| currentOffsetA/B/C | A | ADC current sensor zero offsets per phase |
-| inertia | kg·m² | Estimated rotor inertia |
-| frictionCoulomb | N·m | Coulomb (constant) friction |
-| frictionViscous | N·m·s/rad | Viscous friction coefficient |
-| encoderZeroOffset | rad | Encoder calibration offset (from alignment service) |
-| kpCurrent, kiCurrent | — | Normalised current PID gains |
-| kpVelocity, kiVelocity | — | Normalised velocity PID gains |
-| encoderDirection | — | Polarity correction (+1 or −1) |
-| polePairs | — | Number of motor pole pairs |
+| Field                  | Physical unit | Description                                         |
+|------------------------|---------------|-----------------------------------------------------|
+| rPhase                 | Ω             | Measured phase resistance                           |
+| lD                     | H             | Measured d-axis inductance                          |
+| lQ                     | H             | Measured q-axis inductance                          |
+| currentOffsetA/B/C     | A             | ADC current sensor zero offsets per phase           |
+| inertia                | kg·m²         | Estimated rotor inertia                             |
+| frictionCoulomb        | N·m           | Coulomb (constant) friction                         |
+| frictionViscous        | N·m·s/rad     | Viscous friction coefficient                        |
+| encoderZeroOffset      | rad           | Encoder calibration offset (from alignment service) |
+| kpCurrent, kiCurrent   | —             | Normalised current PID gains                        |
+| kpVelocity, kiVelocity | —             | Normalised velocity PID gains                       |
+| encoderDirection       | —             | Polarity correction (+1 or −1)                      |
+| polePairs              | —             | Number of motor pole pairs                          |
 
 **ConfigData** (40 bytes total):
 
-| Field | Physical unit | Description |
-|-------|--------------|-------------|
-| maxCurrent | A | Peak current limit |
-| maxVelocity | rad/s | Peak speed limit |
-| maxTorque | N·m | Peak torque limit |
-| canNodeId | — | CAN bus node identifier |
-| canBaudrate | bit/s | CAN bus baud rate |
-| telemetryRateHz | Hz | Rate at which telemetry frames are sent |
-| overTempThreshold | °C | Over-temperature trip threshold |
-| underVoltageThreshold | V | DC bus under-voltage trip threshold |
-| overVoltageThreshold | V | DC bus over-voltage trip threshold |
-| defaultControlMode | — | Control mode selected on power-up |
+| Field                 | Physical unit | Description                             |
+|-----------------------|---------------|-----------------------------------------|
+| maxCurrent            | A             | Peak current limit                      |
+| maxVelocity           | rad/s         | Peak speed limit                        |
+| maxTorque             | N·m           | Peak torque limit                       |
+| canNodeId             | —             | CAN bus node identifier                 |
+| canBaudrate           | bit/s         | CAN bus baud rate                       |
+| telemetryRateHz       | Hz            | Rate at which telemetry frames are sent |
+| overTempThreshold     | °C            | Over-temperature trip threshold         |
+| underVoltageThreshold | V             | DC bus under-voltage trip threshold     |
+| overVoltageThreshold  | V             | DC bus over-voltage trip threshold      |
+| defaultControlMode    | —             | Control mode selected on power-up       |
 
 ---
 
@@ -184,20 +184,20 @@ stateDiagram-v2
 
 ### Provided
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
-| `SaveCalibration(data, onDone)` | Erases calibration sector, writes record, verifies read-back | `onDone(NvmStatus)` fires exactly once; rejected if region is busy |
-| `LoadCalibration(onDone)` | Reads and integrity-checks the calibration record | `onDone(NvmStatus, optional<CalibrationData>)` fires exactly once |
-| `InvalidateCalibration(onDone)` | Erases the calibration sector without writing a new record | Makes `IsCalibrationValid` return false; `onDone(NvmStatus)` fires once |
-| `IsCalibrationValid()` | Synchronously returns whether a valid calibration record is present | Based on last known read status; does not perform a flash read |
-| `SaveConfig(data, onDone)` | Same write+verify sequence for the configuration region | `onDone(NvmStatus)` fires exactly once |
-| `LoadConfig(onDone)` | Reads and integrity-checks the configuration record | `onDone(NvmStatus, optional<ConfigData>)` fires exactly once |
-| `ResetConfigToDefaults(onDone)` | Writes a record containing factory-default values to the configuration region | Follows the same erase/write/verify sequence as `SaveConfig` |
-| `Format(onDone)` | Erases both calibration and configuration regions | `onDone(NvmStatus)` fires once, after both regions are erased |
+| Interface                       | Purpose                                                                       | Contract                                                                |
+|---------------------------------|-------------------------------------------------------------------------------|-------------------------------------------------------------------------|
+| `SaveCalibration(data, onDone)` | Erases calibration sector, writes record, verifies read-back                  | `onDone(NvmStatus)` fires exactly once; rejected if region is busy      |
+| `LoadCalibration(onDone)`       | Reads and integrity-checks the calibration record                             | `onDone(NvmStatus, optional<CalibrationData>)` fires exactly once       |
+| `InvalidateCalibration(onDone)` | Erases the calibration sector without writing a new record                    | Makes `IsCalibrationValid` return false; `onDone(NvmStatus)` fires once |
+| `IsCalibrationValid()`          | Synchronously returns whether a valid calibration record is present           | Based on last known read status; does not perform a flash read          |
+| `SaveConfig(data, onDone)`      | Same write+verify sequence for the configuration region                       | `onDone(NvmStatus)` fires exactly once                                  |
+| `LoadConfig(onDone)`            | Reads and integrity-checks the configuration record                           | `onDone(NvmStatus, optional<ConfigData>)` fires exactly once            |
+| `ResetConfigToDefaults(onDone)` | Writes a record containing factory-default values to the configuration region | Follows the same erase/write/verify sequence as `SaveConfig`            |
+| `Format(onDone)`                | Erases both calibration and configuration regions                             | `onDone(NvmStatus)` fires once, after both regions are erased           |
 
 ### Required
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
-| `NvmRegion` (calibration instance) | Abstracts raw flash erase, write, and read for the calibration sector | Must be backed by a dedicated flash sector; must not be shared with any other user |
-| `NvmRegion` (configuration instance) | Abstracts raw flash erase, write, and read for the configuration sector | Must be backed by a dedicated flash sector separate from the calibration sector |
+| Interface                            | Purpose                                                                 | Contract                                                                           |
+|--------------------------------------|-------------------------------------------------------------------------|------------------------------------------------------------------------------------|
+| `NvmRegion` (calibration instance)   | Abstracts raw flash erase, write, and read for the calibration sector   | Must be backed by a dedicated flash sector; must not be shared with any other user |
+| `NvmRegion` (configuration instance) | Abstracts raw flash erase, write, and read for the configuration sector | Must be backed by a dedicated flash sector separate from the calibration sector    |

@@ -5,13 +5,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'documentation/**'
-      - '.github/actions/validate-documents/**'
+      - "documentation/**"
+      - ".github/actions/validate-documents/**"
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
-      - 'documentation/**'
-      - '.github/actions/validate-documents/**'
+      - "documentation/**"
+      - ".github/actions/validate-documents/**"
 
 permissions:
   contents: read

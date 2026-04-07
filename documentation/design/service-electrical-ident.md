@@ -7,14 +7,14 @@ component: service-electrical-ident
 date: 2026-04-07
 ---
 
-| Field     | Value                                       |
-|-----------|---------------------------------------------|
+| Field     | Value                                         |
+|-----------|-----------------------------------------------|
 | Title     | Service: Electrical Parameters Identification |
-| Type      | design                                      |
-| Status    | draft                                       |
-| Version   | 0.1.0                                       |
-| Component | service-electrical-ident                    |
-| Date      | 2026-04-07                                  |
+| Type      | design                                        |
+| Status    | draft                                         |
+| Version   | 0.1.0                                         |
+| Component | service-electrical-ident                      |
+| Date      | 2026-04-07                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -139,10 +139,10 @@ flowchart TD
 
 All internal state is statically allocated:
 
-| Buffer | Container | Capacity | Purpose |
-|--------|-----------|----------|---------|
-| Current samples | `infra::BoundedVector` | 128 entries | Stores filtered current transient for inductance estimation |
-| Moving-average window | `infra::BoundedDeque` | 5 entries | Rolling window for in-flight noise reduction on ADC samples |
+| Buffer                | Container              | Capacity    | Purpose                                                     |
+|-----------------------|------------------------|-------------|-------------------------------------------------------------|
+| Current samples       | `infra::BoundedVector` | 128 entries | Stores filtered current transient for inductance estimation |
+| Moving-average window | `infra::BoundedDeque`  | 5 entries   | Rolling window for in-flight noise reduction on ADC samples |
 
 No heap allocation is used. Buffers are members of the service object and are reused across repeated procedure invocations.
 
@@ -168,15 +168,15 @@ stateDiagram-v2
 
 ### Provided
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
+| Interface                                         | Purpose                                                                                           | Contract                                                                                                                                         |
+|---------------------------------------------------|---------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
 | `EstimateResistanceAndInductance(config, onDone)` | Runs the DC settle and transient-step procedure; delivers `(optional<Ohm>, optional<MilliHenry>)` | Rejected (immediate failure callback) if the pole-pairs procedure is already Running; inverter stopped before callback fires; fires exactly once |
-| `EstimateNumberOfPolePairs(config, onDone)` | Sweeps an open-loop rotating vector and delivers `optional<size_t>` pole pairs | Rejected if the R/L procedure is already Running; inverter stopped before callback fires; fires exactly once |
+| `EstimateNumberOfPolePairs(config, onDone)`       | Sweeps an open-loop rotating vector and delivers `optional<size_t>` pole pairs                    | Rejected if the R/L procedure is already Running; inverter stopped before callback fires; fires exactly once                                     |
 
 ### Required
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
-| `ThreePhaseInverter` | Open-loop voltage application during both procedures; source of ADC sampling callbacks | Must not be concurrently claimed by any other controller |
-| `Encoder` | Reads mechanical angle during pole-pairs sweep to compute accumulated displacement | Must be initialised before `EstimateNumberOfPolePairs` is called |
-| DC bus voltage (`Volts`) | Injected at construction; used to normalise applied voltage and interpret current readings in physical units | Must remain stable throughout any active procedure |
+| Interface                | Purpose                                                                                                      | Contract                                                         |
+|--------------------------|--------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------|
+| `ThreePhaseInverter`     | Open-loop voltage application during both procedures; source of ADC sampling callbacks                       | Must not be concurrently claimed by any other controller         |
+| `Encoder`                | Reads mechanical angle during pole-pairs sweep to compute accumulated displacement                           | Must be initialised before `EstimateNumberOfPolePairs` is called |
+| DC bus voltage (`Volts`) | Injected at construction; used to normalise applied voltage and interpret current readings in physical units | Must remain stable throughout any active procedure               |

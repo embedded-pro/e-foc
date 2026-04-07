@@ -7,14 +7,14 @@ component: service-alignment
 date: 2026-04-07
 ---
 
-| Field     | Value                   |
-|-----------|-------------------------|
+| Field     | Value                    |
+|-----------|--------------------------|
 | Title     | Service: Motor Alignment |
-| Type      | design                  |
-| Status    | draft                   |
-| Version   | 0.1.0                   |
-| Component | service-alignment       |
-| Date      | 2026-04-07              |
+| Type      | design                   |
+| Status    | draft                    |
+| Version   | 0.1.0                    |
+| Component | service-alignment        |
+| Date      | 2026-04-07               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -125,13 +125,13 @@ The callback fires exactly once per `ForceAlignment` invocation. The callback is
 
 ### Provided
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
+| Interface                                            | Purpose                                                                                                                                        | Contract                                                                                                         |
+|------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
 | `ForceAlignment(polePairs, AlignmentConfig, onDone)` | Starts the alignment procedure using the supplied configuration; reports the calibrated encoder offset (or failure) via `onDone` when complete | Silently ignored if already aligning; `onDone` fires exactly once; inverter is stopped before `onDone` is called |
 
 ### Required
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
-| `ThreePhaseInverter` | Open-loop voltage application during alignment; source of ADC sampling callbacks that drive the settlement state machine | Must not be concurrently claimed by any other controller during the alignment procedure |
-| `Encoder` | Reads the current rotor mechanical angle at each sampling tick so that settlement can be detected and the offset can be captured | Must be initialised and tracking position before `ForceAlignment` is called |
+| Interface            | Purpose                                                                                                                          | Contract                                                                                |
+|----------------------|----------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
+| `ThreePhaseInverter` | Open-loop voltage application during alignment; source of ADC sampling callbacks that drive the settlement state machine         | Must not be concurrently claimed by any other controller during the alignment procedure |
+| `Encoder`            | Reads the current rotor mechanical angle at each sampling tick so that settlement can be detected and the offset can be captured | Must be initialised and tracking position before `ForceAlignment` is called             |
