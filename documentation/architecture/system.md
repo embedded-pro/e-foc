@@ -142,14 +142,14 @@ Services communicate via asynchronous callbacks using `infra::Function<void(resu
 
 The PAL provides a single platform-facing abstraction that groups creation and access to the hardware services needed by the control system:
 
-| Peripheral | Abstraction |
-|------------|-------------|
-| Three-phase PWM + ADC triggered measurement | Power-stage drive and synchronised current-sampling interface |
-| Quadrature encoder | Rotor-position sensing and calibration interface |
-| Low-priority interrupt | Deferred scheduling interface for the speed/position outer loop |
-| CAN bus | CAN 2.0B communication interface |
-| Performance timer | Cycle/timestamp measurement interface for profiling |
-| Serial terminal | Diagnostic trace and command-line interaction interface |
+| Peripheral                                  | Abstraction                                                     |
+|---------------------------------------------|-----------------------------------------------------------------|
+| Three-phase PWM + ADC triggered measurement | Power-stage drive and synchronised current-sampling interface   |
+| Quadrature encoder                          | Rotor-position sensing and calibration interface                |
+| Low-priority interrupt                      | Deferred scheduling interface for the speed/position outer loop |
+| CAN bus                                     | CAN 2.0B communication interface                                |
+| Performance timer                           | Cycle/timestamp measurement interface for profiling             |
+| Serial terminal                             | Diagnostic trace and command-line interaction interface         |
 
 Concrete implementations exist for:
 - **TI Tiva (EK-TM4C1294XL)**: platform-specific peripheral adapters for this MCU family.
