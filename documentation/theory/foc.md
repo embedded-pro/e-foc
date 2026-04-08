@@ -7,14 +7,14 @@ component: "foc"
 date: 2025-01-01
 ---
 
-| Field     | Value                            |
-|-----------|----------------------------------|
-| Title     | Field-Oriented Control (FOC)     |
-| Type      | theory                           |
-| Status    | approved                         |
-| Version   | 1.0.0                            |
-| Component | foc                              |
-| Date      | 2025-01-01                       |
+| Field     | Value                        |
+|-----------|------------------------------|
+| Title     | Field-Oriented Control (FOC) |
+| Type      | theory                       |
+| Status    | approved                     |
+| Version   | 1.0.0                        |
+| Component | foc                          |
+| Date      | 2025-01-01                   |
 
 ## Overview
 
@@ -35,18 +35,18 @@ inverter.
 
 ## Prerequisites
 
-| Symbol        | Meaning                                         | Unit       |
-|---------------|-------------------------------------------------|------------|
-| $R_s$         | Stator resistance per phase                     | Ω          |
-| $L_s$         | Stator inductance per phase (assuming $L_d = L_q$) | H       |
-| $\psi_f$      | Permanent magnet flux linkage                   | Wb         |
-| $p$           | Number of pole pairs                            | —          |
-| $\theta_e$    | Electrical rotor angle                          | rad        |
-| $\theta_m$    | Mechanical rotor angle                          | rad        |
-| $\omega_e$    | Electrical angular velocity ($p \cdot \omega_m$)| rad/s      |
-| $V_{dc}$      | DC bus voltage                                  | V          |
-| $\tau_e$      | Electrical torque                               | N·m        |
-| $1/\sqrt{3}$  | Reciprocal of $\sqrt{3}$, ≈ 0.5774             | —          |
+| Symbol       | Meaning                                            | Unit  |
+|--------------|----------------------------------------------------|-------|
+| $R_s$        | Stator resistance per phase                        | Ω     |
+| $L_s$        | Stator inductance per phase (assuming $L_d = L_q$) | H     |
+| $\psi_f$     | Permanent magnet flux linkage                      | Wb    |
+| $p$          | Number of pole pairs                               | —     |
+| $\theta_e$   | Electrical rotor angle                             | rad   |
+| $\theta_m$   | Mechanical rotor angle                             | rad   |
+| $\omega_e$   | Electrical angular velocity ($p \cdot \omega_m$)   | rad/s |
+| $V_{dc}$     | DC bus voltage                                     | V     |
+| $\tau_e$     | Electrical torque                                  | N·m   |
+| $1/\sqrt{3}$ | Reciprocal of $\sqrt{3}$, ≈ 0.5774                 | —     |
 
 The relationship between electrical and mechanical angles is:
 
@@ -242,15 +242,15 @@ SVM synthesises any reference voltage vector $\mathbf{V}_{ref} = V_\alpha + j V_
 the eight inverter states. The three-phase half-bridge inverter produces 8 switching states:
 
 | Vector | Switches (A,B,C) | $V_\alpha$ (normalised) | $V_\beta$ (normalised) |
-|--------|-----------------|------------------------|------------------------|
-| $V_0$  | (0,0,0)         | 0                      | 0                      |
-| $V_1$  | (1,0,0)         | $\tfrac{2}{3}$         | 0                      |
-| $V_2$  | (1,1,0)         | $\tfrac{1}{3}$         | $\tfrac{1}{\sqrt{3}}$  |
-| $V_3$  | (0,1,0)         | $-\tfrac{1}{3}$        | $\tfrac{1}{\sqrt{3}}$  |
-| $V_4$  | (0,1,1)         | $-\tfrac{2}{3}$        | 0                      |
-| $V_5$  | (0,0,1)         | $-\tfrac{1}{3}$        | $-\tfrac{1}{\sqrt{3}}$ |
-| $V_6$  | (1,0,1)         | $\tfrac{1}{3}$         | $-\tfrac{1}{\sqrt{3}}$ |
-| $V_7$  | (1,1,1)         | 0                      | 0                      |
+|--------|------------------|-------------------------|------------------------|
+| $V_0$  | (0,0,0)          | 0                       | 0                      |
+| $V_1$  | (1,0,0)          | $\tfrac{2}{3}$          | 0                      |
+| $V_2$  | (1,1,0)          | $\tfrac{1}{3}$          | $\tfrac{1}{\sqrt{3}}$  |
+| $V_3$  | (0,1,0)          | $-\tfrac{1}{3}$         | $\tfrac{1}{\sqrt{3}}$  |
+| $V_4$  | (0,1,1)          | $-\tfrac{2}{3}$         | 0                      |
+| $V_5$  | (0,0,1)          | $-\tfrac{1}{3}$         | $-\tfrac{1}{\sqrt{3}}$ |
+| $V_6$  | (1,0,1)          | $\tfrac{1}{3}$          | $-\tfrac{1}{\sqrt{3}}$ |
+| $V_7$  | (1,1,1)          | 0                       | 0                      |
 
 The six active vectors ($V_1$–$V_6$) form a regular hexagon. The inscribed circle (maximum linear SVM range)
 has radius $\tfrac{2}{3}$ in normalised units, corresponding to $V_{dc}/\sqrt{3}$ in physical volts.
@@ -386,27 +386,27 @@ See also: `documentation/theory/images/foc_coordinates.svg` and `documentation/t
 
 ## Numerical Properties
 
-| Property            | Value / Condition                                        |
-|---------------------|----------------------------------------------------------|
-| Control rate        | 20 kHz (50 µs period)                                   |
-| Transform latency   | < 20 CPU cycles (Clarke + Park combined)                 |
-| LUT angle error     | ≤ $\pi/512 \approx 0.35°$                               |
-| SVM duty resolution | 16-bit timer → ≈ 0.0015% per step                       |
-| PI output range     | [−1.0, 1.0] normalised; anti-windup at ±1.0             |
-| Torque linearity    | $\tau_e \propto i_q$ within MTPA region                 |
-| Over-modulation     | Clamp-based saturation; duty cycles bounded to [0, 1]   |
-| Gain normalisation  | $K_{p,norm} = K_{p,phys} \cdot \sqrt{3}/V_{dc}$        |
-| LUT memory          | 512 × 4 bytes = 2048 bytes flash                        |
+| Property            | Value / Condition                                     |
+|---------------------|-------------------------------------------------------|
+| Control rate        | 20 kHz (50 µs period)                                 |
+| Transform latency   | < 20 CPU cycles (Clarke + Park combined)              |
+| LUT angle error     | ≤ $\pi/512 \approx 0.35°$                             |
+| SVM duty resolution | 16-bit timer → ≈ 0.0015% per step                     |
+| PI output range     | [−1.0, 1.0] normalised; anti-windup at ±1.0           |
+| Torque linearity    | $\tau_e \propto i_q$ within MTPA region               |
+| Over-modulation     | Clamp-based saturation; duty cycles bounded to [0, 1] |
+| Gain normalisation  | $K_{p,norm} = K_{p,phys} \cdot \sqrt{3}/V_{dc}$       |
+| LUT memory          | 512 × 4 bytes = 2048 bytes flash                      |
 
 ### Sensitivity Analysis
 
-| Parameter         | Effect on Control Quality                                               |
-|-------------------|-------------------------------------------------------------------------|
-| $R_s$ error       | PI steady-state error in d/q current; compensated by integral term     |
-| $L_s$ error       | PI bandwidth deviation; no steady-state error                          |
-| $\theta_e$ error  | Cross-coupling between d and q axes; reduces torque at large error     |
-| $V_{dc}$ variation| Affects gain normalisation; dynamic Vdc measurement recommended        |
-| ADC offset        | Bias on $i_d$, $i_q$; must be calibrated at startup                   |
+| Parameter          | Effect on Control Quality                                          |
+|--------------------|--------------------------------------------------------------------|
+| $R_s$ error        | PI steady-state error in d/q current; compensated by integral term |
+| $L_s$ error        | PI bandwidth deviation; no steady-state error                      |
+| $\theta_e$ error   | Cross-coupling between d and q axes; reduces torque at large error |
+| $V_{dc}$ variation | Affects gain normalisation; dynamic Vdc measurement recommended    |
+| ADC offset         | Bias on $i_d$, $i_q$; must be calibrated at startup                |
 
 ---
 

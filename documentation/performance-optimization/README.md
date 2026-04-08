@@ -7,14 +7,14 @@ component: "foc"
 date: 2026-04-07
 ---
 
-| Field     | Value                              |
-|-----------|------------------------------------|
-| Title     | Embedded Performance Optimization  |
-| Type      | theory                             |
-| Status    | approved                           |
-| Version   | 1.0.0                              |
-| Component | foc                                |
-| Date      | 2026-04-07                         |
+| Field     | Value                             |
+|-----------|-----------------------------------|
+| Title     | Embedded Performance Optimization |
+| Type      | theory                            |
+| Status    | approved                          |
+| Version   | 1.0.0                             |
+| Component | foc                               |
+| Date      | 2026-04-07                        |
 
 ## Overview
 
@@ -31,14 +31,14 @@ how to measure and verify cycle usage, and the common patterns that silently ero
 
 ## Prerequisites
 
-| Symbol   | Meaning                              | Unit   |
-|----------|--------------------------------------|--------|
-| $f_{cpu}$| CPU clock frequency                  | Hz     |
-| $f_{sw}$ | Switching (PWM) frequency            | Hz     |
-| $N_{cyc}$| Cycles available per control period  | cycles |
-| CPI      | Cycles Per Instruction (pipeline)    | —      |
-| FMA      | Fused Multiply-Accumulate            | —      |
-| LTO      | Link-Time Optimisation               | —      |
+| Symbol    | Meaning                             | Unit   |
+|-----------|-------------------------------------|--------|
+| $f_{cpu}$ | CPU clock frequency                 | Hz     |
+| $f_{sw}$  | Switching (PWM) frequency           | Hz     |
+| $N_{cyc}$ | Cycles available per control period | cycles |
+| CPI       | Cycles Per Instruction (pipeline)   | —      |
+| FMA       | Fused Multiply-Accumulate           | —      |
+| LTO       | Link-Time Optimisation              | —      |
 
 $$
 N_{cyc} = \frac{f_{cpu}}{f_{sw}} = \frac{120\,\text{MHz}}{20\,\text{kHz}} = 6000\ \text{cycles}
@@ -54,17 +54,17 @@ The Cortex-M4 uses a 3-stage pipeline (fetch, decode, execute) with a dual-issue
 certain instruction pairs.  The FPU (FPv4-SP) adds a separate pipelined floating-point execution
 unit.  Key throughput properties:
 
-| Instruction          | Description               | Latency (cycles) | Throughput (cycles/inst) |
-|----------------------|---------------------------|-----------------|--------------------------|
-| `vfma.f32`           | Fused multiply-add        | 1               | 1                        |
-| `vmul.f32`           | Float multiply            | 1               | 1                        |
-| `vadd.f32`           | Float add                 | 1               | 1                        |
-| `vdiv.f32`           | Float divide              | 14              | 14                       |
-| `vsqrt.f32`          | Float sqrt                | 14              | 14                       |
-| `vcmpe.f32`          | Float compare             | 1               | 1                        |
-| `blx rN`             | Indirect call (virtual)   | 3+              | 3+                       |
-| `bl <addr>`          | Direct call               | 1+N             | 1+N                      |
-| `push/pop (4 regs)`  | Stack save/restore        | 2               | 2                        |
+| Instruction         | Description             | Latency (cycles) | Throughput (cycles/inst) |
+|---------------------|-------------------------|------------------|--------------------------|
+| `vfma.f32`          | Fused multiply-add      | 1                | 1                        |
+| `vmul.f32`          | Float multiply          | 1                | 1                        |
+| `vadd.f32`          | Float add               | 1                | 1                        |
+| `vdiv.f32`          | Float divide            | 14               | 14                       |
+| `vsqrt.f32`         | Float sqrt              | 14               | 14                       |
+| `vcmpe.f32`         | Float compare           | 1                | 1                        |
+| `blx rN`            | Indirect call (virtual) | 3+               | 3+                       |
+| `bl <addr>`         | Direct call             | 1+N              | 1+N                      |
+| `push/pop (4 regs)` | Stack save/restore      | 2                | 2                        |
 
 **Implication for FOC**: All hot-path arithmetic should use FMA-capable patterns. Division and sqrt
 must be avoided in the ISR where possible; use reciprocals or LUT-based approximations instead.
@@ -350,11 +350,11 @@ GPIO_ClearPin(DEBUG_PIN);
 ### Control Loop Cycle Budgets — ARM Cortex-M4 at 120 MHz
 
 | Control Rate | Cycles/Period | FOC Budget (< 7 %) | Notes                          |
-|-------------|--------------|---------------------|--------------------------------|
-| 10 kHz      | 12 000       | 840                 | Low-frequency, conservative    |
-| 20 kHz      | 6 000        | **420**             | Target rate for this project   |
-| 40 kHz      | 3 000        | 210                 | High performance, tight budget |
-| 100 kHz     | 1 200        | 84                  | Requires fixed-point or DSP    |
+|--------------|---------------|--------------------|--------------------------------|
+| 10 kHz       | 12 000        | 840                | Low-frequency, conservative    |
+| 20 kHz       | 6 000         | **420**            | Target rate for this project   |
+| 40 kHz       | 3 000         | 210                | High performance, tight budget |
+| 100 kHz      | 1 200         | 84                 | Requires fixed-point or DSP    |
 
 **FOC core typical requirements**:
 - Optimised (`-O3`, `fast-math`, LUT sin/cos): **200–400 cycles**
@@ -362,24 +362,24 @@ GPIO_ClearPin(DEBUG_PIN);
 
 ### Key Performance Sensitivities
 
-| Code Pattern             | Cycle Impact       | Recommendation                         |
-|--------------------------|--------------------|-----------------------------------------|
-| `sinf()` / `cosf()`      | 50–200 cycles each | Replace with 512-entry LUT              |
-| Virtual call in ISR      | 6–20 cycles each   | Use static dispatch / inline            |
-| `vdiv.f32`               | 14 cycles          | Use precomputed reciprocal              |
-| `vsqrt.f32`              | 14 cycles          | Use fast inverse sqrt approximation     |
-| Stack frame > 64 bytes   | 2–4 cycles extra   | Reduce local variables                  |
-| Cache miss (data)        | 3–10 cycles        | Keep hot data in registers or TCM       |
+| Code Pattern           | Cycle Impact       | Recommendation                      |
+|------------------------|--------------------|-------------------------------------|
+| `sinf()` / `cosf()`    | 50–200 cycles each | Replace with 512-entry LUT          |
+| Virtual call in ISR    | 6–20 cycles each   | Use static dispatch / inline        |
+| `vdiv.f32`             | 14 cycles          | Use precomputed reciprocal          |
+| `vsqrt.f32`            | 14 cycles          | Use fast inverse sqrt approximation |
+| Stack frame > 64 bytes | 2–4 cycles extra   | Reduce local variables              |
+| Cache miss (data)      | 3–10 cycles        | Keep hot data in registers or TCM   |
 
 ### Common Pitfalls
 
-| Problem                    | Symptom                         | Fix                                     |
-|----------------------------|---------------------------------|-----------------------------------------|
-| Heap allocation in ISR     | Non-deterministic latency spike | Use static/stack allocation only        |
-| `printf` in ISR            | 10 000+ cycles, UART block      | Use DWT counter or GPIO toggle instead  |
-| Exception handling overhead| Increased code size, slow paths | Compile with `-fno-exceptions -fno-rtti`|
-| Float in integer-only code | Unnecessary FPU state save      | Use integer arithmetic or explicit cast |
-| Packed struct with uint32  | Unaligned access fault or stall | Align struct members on natural boundary|
+| Problem                     | Symptom                         | Fix                                      |
+|-----------------------------|---------------------------------|------------------------------------------|
+| Heap allocation in ISR      | Non-deterministic latency spike | Use static/stack allocation only         |
+| `printf` in ISR             | 10 000+ cycles, UART block      | Use DWT counter or GPIO toggle instead   |
+| Exception handling overhead | Increased code size, slow paths | Compile with `-fno-exceptions -fno-rtti` |
+| Float in integer-only code  | Unnecessary FPU state save      | Use integer arithmetic or explicit cast  |
+| Packed struct with uint32   | Unaligned access fault or stall | Align struct members on natural boundary |
 
 ---
 
@@ -421,5 +421,5 @@ if (condition) [[unlikely]] { }   // C++20
 1. ARM — *Cortex-M4 Technical Reference Manual*, ARM DDI 0439B.
 2. ARM — *Cortex-M4 Devices Generic User Guide*, ARM DUI 0553A.
 3. Fog, A. — *Optimizing software in C++*, Technical University of Denmark, 2023.
-4. GCC Project — *Optimize Options*, GCC Manual, https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
+4. GCC Project — *Optimize Options*, GCC Manual, <https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html>
 5. Texas Instruments — *AM335x ARM Cortex-A8 Microprocessors Technical Reference Manual*, 2019.

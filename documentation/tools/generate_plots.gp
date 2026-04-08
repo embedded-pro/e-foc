@@ -122,10 +122,9 @@ plot NaN notitle
 # =============================================================================
 # 4. SVM Hexagon — Voltage Vectors and Sectors
 # =============================================================================
+reset
 set terminal svg size 560,560 fixed enhanced font 'Arial,13'
 set output 'documentation/theory/images/svm_hexagon.svg'
-
-reset
 set title "Space Vector Modulation — Voltage Vectors and Sectors" font 'Arial,14'
 set xrange [-1.25:1.25]
 set yrange [-1.25:1.25]

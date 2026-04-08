@@ -7,14 +7,14 @@ component: "service-alignment"
 date: 2025-01-01
 ---
 
-| Field     | Value                                        |
-|-----------|----------------------------------------------|
+| Field     | Value                                            |
+|-----------|--------------------------------------------------|
 | Title     | Motor Alignment — Encoder Zero-Point Calibration |
-| Type      | theory                                       |
-| Status    | approved                                     |
-| Version   | 1.0.0                                        |
-| Component | service-alignment                            |
-| Date      | 2025-01-01                                   |
+| Type      | theory                                           |
+| Status    | approved                                         |
+| Version   | 1.0.0                                            |
+| Component | service-alignment                                |
+| Date      | 2025-01-01                                       |
 
 ## Overview
 
@@ -37,17 +37,17 @@ $$
 
 ## Prerequisites
 
-| Symbol             | Meaning                                                   | Unit       |
-|--------------------|-----------------------------------------------------------|------------|
-| $p$                | Number of pole pairs                                      | —          |
-| $\theta_m$         | Mechanical angle from encoder (raw counts / 2π or rad)   | rad        |
-| $\theta_e$         | Electrical angle used by FOC                              | rad        |
-| $\theta_{offset}$  | Encoder reading when rotor is at $\theta_e = 0$           | rad        |
-| $\delta$           | Misalignment angle = $\theta_e - \theta_r$ (field vs rotor)| rad       |
-| $K_T$              | Motor torque constant ($\tau = K_T \cdot i_q$)            | N·m/A      |
-| $J$                | Rotor moment of inertia                                   | kg·m²      |
-| $B$                | Viscous friction coefficient                              | N·m·s/rad  |
-| $N_{steps}$        | Number of alignment steps per revolution                  | —          |
+| Symbol            | Meaning                                                     | Unit      |
+|-------------------|-------------------------------------------------------------|-----------|
+| $p$               | Number of pole pairs                                        | —         |
+| $\theta_m$        | Mechanical angle from encoder (raw counts / 2π or rad)      | rad       |
+| $\theta_e$        | Electrical angle used by FOC                                | rad       |
+| $\theta_{offset}$ | Encoder reading when rotor is at $\theta_e = 0$             | rad       |
+| $\delta$          | Misalignment angle = $\theta_e - \theta_r$ (field vs rotor) | rad       |
+| $K_T$             | Motor torque constant ($\tau = K_T \cdot i_q$)              | N·m/A     |
+| $J$               | Rotor moment of inertia                                     | kg·m²     |
+| $B$               | Viscous friction coefficient                                | N·m·s/rad |
+| $N_{steps}$       | Number of alignment steps per revolution                    | —         |
 
 ---
 
@@ -227,15 +227,15 @@ Final step (360°=0°): rotor at θ_m_settled → θ_offset := θ_m_settled.
 
 ## Numerical Properties
 
-| Property               | Value / Condition                                          |
-|------------------------|------------------------------------------------------------|
-| Steps per revolution   | 12 (30° electrical per step)                               |
-| Angular step size      | $2\pi/12 \approx 0.524\ \text{rad}$ electrical            |
-| Detection threshold    | Position change $< \epsilon_{threshold}$ per check        |
-| Consecutive checks     | $M$ samples below threshold before declaring settled       |
-| Offset precision       | Limited by encoder resolution (e.g. ±0.5 count)          |
-| Torque cost            | Alignment uses $i_d$ only → zero torque, no motion intended|
-| Worst-case duration    | $N_{steps} \times T_{settle}$ where $T_{settle} \approx 5/(\zeta\omega_n)$ |
+| Property             | Value / Condition                                                          |
+|----------------------|----------------------------------------------------------------------------|
+| Steps per revolution | 12 (30° electrical per step)                                               |
+| Angular step size    | $2\pi/12 \approx 0.524\ \text{rad}$ electrical                             |
+| Detection threshold  | Position change $< \epsilon_{threshold}$ per check                         |
+| Consecutive checks   | $M$ samples below threshold before declaring settled                       |
+| Offset precision     | Limited by encoder resolution (e.g. ±0.5 count)                            |
+| Torque cost          | Alignment uses $i_d$ only → zero torque, no motion intended                |
+| Worst-case duration  | $N_{steps} \times T_{settle}$ where $T_{settle} \approx 5/(\zeta\omega_n)$ |
 
 ---
 

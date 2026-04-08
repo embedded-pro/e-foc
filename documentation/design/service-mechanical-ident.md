@@ -33,13 +33,13 @@ date: 2026-04-07
 - Computing instantaneous electromagnetic torque from the q-axis current and the caller-supplied torque constant
 - Estimating angular acceleration by finite-differencing successive speed measurements obtained from the encoder
 - Maintaining a real-time Recursive Least Squares (RLS) estimator that continuously refines the parameter vector [J, B, τ_friction] using each new observation
-- Enforcing a configurable estimation timeout via a `TimerSingleShot`, after which the latest RLS estimates are reported and the procedure stops
-- Delivering results via a single completion callback containing typed physical units (`NewtonMeterSecondPerRadian` for friction, `NewtonMeterSecondSquared` for inertia)
+- Enforcing a configurable one-shot estimation timeout, after which the latest RLS estimates are reported and the procedure stops
+- Delivering results through a single completion notification that reports friction and inertia using explicit physical units
 
 **Is NOT responsible for:**
-- Starting or configuring the speed control loop — a `FocSpeed` interface must already be running when the procedure begins
+- Starting or configuring the speed control loop — an external speed-control function must already be active when the procedure begins
 - Persisting the returned parameters — the caller decides what to do with them
-- Auto-tuning the speed PID — this service provides the plant parameters that a separate tuning step may consume
+- Auto-tuning the speed controller — this service provides the plant parameters that a separate tuning step may consume
 - Measuring electrical parameters (R, L, pole pairs) — those are handled by the Electrical Parameters Identification service
 
 ---

@@ -7,14 +7,14 @@ component: "service-electrical-ident"
 date: 2025-01-01
 ---
 
-| Field     | Value                                                  |
-|-----------|--------------------------------------------------------|
-| Title     | Electrical Parameters Identification — R and L         |
-| Type      | theory                                                 |
-| Status    | approved                                               |
-| Version   | 1.0.0                                                  |
-| Component | service-electrical-ident                               |
-| Date      | 2025-01-01                                             |
+| Field     | Value                                          |
+|-----------|------------------------------------------------|
+| Title     | Electrical Parameters Identification — R and L |
+| Type      | theory                                         |
+| Status    | approved                                       |
+| Version   | 1.0.0                                          |
+| Component | service-electrical-ident                       |
+| Date      | 2025-01-01                                     |
 
 ## Overview
 
@@ -33,18 +33,18 @@ steady-state, and inductance from the measured time constant.
 
 ## Prerequisites
 
-| Symbol         | Meaning                                               | Unit    |
-|----------------|-------------------------------------------------------|---------|
-| $R_s$          | Stator resistance per phase                           | Ω       |
-| $L_s$          | Stator inductance (d-axis, $L_d$)                     | H       |
-| $\tau$         | Electrical time constant = $L_s / R_s$               | s       |
-| $V_{step}$     | Applied step voltage (d-axis)                         | V       |
-| $I_{ss}$       | Steady-state current = $V_{step} / R_s$              | A       |
-| $I_\tau$       | Current at time $\tau$: $I_{ss} \cdot (1 - e^{-1})$  | A       |
-| $f_s$          | Sampling frequency                                    | Hz      |
-| $T_s$          | Sampling period = $1/f_s$                             | s       |
-| $N_{avg}$      | Moving average filter length                          | samples |
-| $N_{buf}$      | Total sample buffer size                              | samples |
+| Symbol     | Meaning                                             | Unit    |
+|------------|-----------------------------------------------------|---------|
+| $R_s$      | Stator resistance per phase                         | Ω       |
+| $L_s$      | Stator inductance (d-axis, $L_d$)                   | H       |
+| $\tau$     | Electrical time constant = $L_s / R_s$              | s       |
+| $V_{step}$ | Applied step voltage (d-axis)                       | V       |
+| $I_{ss}$   | Steady-state current = $V_{step} / R_s$             | A       |
+| $I_\tau$   | Current at time $\tau$: $I_{ss} \cdot (1 - e^{-1})$ | A       |
+| $f_s$      | Sampling frequency                                  | Hz      |
+| $T_s$      | Sampling period = $1/f_s$                           | s       |
+| $N_{avg}$  | Moving average filter length                        | samples |
+| $N_{buf}$  | Total sample buffer size                            | samples |
 
 ---
 
@@ -230,27 +230,27 @@ i_d (normalised: I_ss = 1.0)
 
 ## Numerical Properties
 
-| Property             | Value / Condition                                                 |
-|----------------------|-------------------------------------------------------------------|
-| Sampling rate        | $f_s = 10\ \text{kHz}$, $T_s = 100\ \mu\text{s}$                |
-| Filter length        | $N_{avg} = 5$ samples                                            |
-| Filter group delay   | $(N_{avg}-1)/2 = 2$ samples = $200\ \mu\text{s}$                |
-| Threshold            | $0.6321 \cdot I_{ss}$ (i.e. $1 - e^{-1}$)                       |
-| $R_s$ range          | Nominally $0.1\ \Omega$ to $50\ \Omega$ (ADC current range)     |
-| $L_s$ resolution     | $R_s \cdot T_s$ (one sample step) = depends on $R_s$            |
-| $L_s$ min detectable | Approx. $R_s \cdot 2 T_s$ (due to filter delay correction)      |
-| Trigger voltage      | $V_{step}$ must be small enough to avoid magnetic saturation     |
+| Property             | Value / Condition                                            |
+|----------------------|--------------------------------------------------------------|
+| Sampling rate        | $f_s = 10\ \text{kHz}$, $T_s = 100\ \mu\text{s}$             |
+| Filter length        | $N_{avg} = 5$ samples                                        |
+| Filter group delay   | $(N_{avg}-1)/2 = 2$ samples = $200\ \mu\text{s}$             |
+| Threshold            | $0.6321 \cdot I_{ss}$ (i.e. $1 - e^{-1}$)                    |
+| $R_s$ range          | Nominally $0.1\ \Omega$ to $50\ \Omega$ (ADC current range)  |
+| $L_s$ resolution     | $R_s \cdot T_s$ (one sample step) = depends on $R_s$         |
+| $L_s$ min detectable | Approx. $R_s \cdot 2 T_s$ (due to filter delay correction)   |
+| Trigger voltage      | $V_{step}$ must be small enough to avoid magnetic saturation |
 
 ### Sensitivity Analysis
 
-| Source of Error          | Effect on $R_s$           | Effect on $L_s$                  |
-|--------------------------|--------------------------|----------------------------------|
-| ADC current offset       | Directly biases $I_{ss}$ | Indirect via $R_s$ error         |
-| $V_{dc}$ variation       | Biases $V_{step}$        | Indirect via $R_s$ error         |
-| Thermal drift in $R_s$   | Measurement valid at $T_{meas}$ only | — |
-| Filter delay not corrected | —                      | $L_s$ overestimated by $N_{avg}/2$ steps |
-| Insufficient buffer      | $I_{ss}$ underestimated  | $\tau$ underestimated            |
-| Magnetic saturation      | $R_s$ underestimated     | $L_s$ underestimated (nonlinear) |
+| Source of Error            | Effect on $R_s$                      | Effect on $L_s$                          |
+|----------------------------|--------------------------------------|------------------------------------------|
+| ADC current offset         | Directly biases $I_{ss}$             | Indirect via $R_s$ error                 |
+| $V_{dc}$ variation         | Biases $V_{step}$                    | Indirect via $R_s$ error                 |
+| Thermal drift in $R_s$     | Measurement valid at $T_{meas}$ only | —                                        |
+| Filter delay not corrected | —                                    | $L_s$ overestimated by $N_{avg}/2$ steps |
+| Insufficient buffer        | $I_{ss}$ underestimated              | $\tau$ underestimated                    |
+| Magnetic saturation        | $R_s$ underestimated                 | $L_s$ underestimated (nonlinear)         |
 
 ---
 
@@ -269,7 +269,7 @@ At the 63.2% threshold: $i_d[n_\tau] \geq 0.6321 \times 1.667 = 1.054\ \text{A}$
 
 The raw crossing occurs at $n_\tau = 5$. Filter delay correction: $n_\tau^{corr} = 5 - 2 - 1 = 2$.
 
-$$L_s = 1.2 \times 2 \times 100 \times 10^{-6} \times 1000 = 0.24\ \text{mH}$$
+$$L_{s,\mathrm{mH}} = 1.2 \times 2 \times 100 \times 10^{-6} \times 1000 = 0.24\ \text{mH}$$
 
 > The example shows that a very short $\tau$ (5 samples) combined with a 5-tap filter and a
 > 2-sample delay correction can yield significant estimation error. In practice $\tau$ should be

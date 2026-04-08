@@ -7,14 +7,14 @@ component: "component-name"
 date: YYYY-MM-DD
 ---
 
-| Field     | Value           |
-|-----------|-----------------|
-| Title     | Theory Topic    |
-| Type      | theory          |
-| Status    | draft           |
-| Version   | 0.1.0           |
-| Component | component-name  |
-| Date      | YYYY-MM-DD      |
+| Field     | Value          |
+|-----------|----------------|
+| Title     | Theory Topic   |
+| Type      | theory         |
+| Status    | draft          |
+| Version   | 0.1.0          |
+| Component | component-name |
+| Date      | YYYY-MM-DD     |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -83,12 +83,12 @@ graph LR
 
 > Characterise the algorithm's numerical behaviour: stability, precision, complexity, convergence.
 
-| Property    | Value / Condition |
-|-------------|------------------|
-| Complexity  | …                |
-| Precision   | …                |
-| Stability   | …                |
-| Range       | …                |
+| Property   | Value / Condition |
+|------------|-------------------|
+| Complexity | …                 |
+| Precision  | …                 |
+| Stability  | …                 |
+| Range      | …                 |
 
 > Describe sensitivities: what inputs or parameters most affect accuracy and how.
 

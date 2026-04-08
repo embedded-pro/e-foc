@@ -7,14 +7,14 @@ component: "service-mechanical-ident"
 date: 2025-01-01
 ---
 
-| Field     | Value                                                          |
-|-----------|----------------------------------------------------------------|
-| Title     | Mechanical Parameters Identification — Friction and Inertia   |
-| Type      | theory                                                         |
-| Status    | approved                                                       |
-| Version   | 1.0.0                                                          |
-| Component | service-mechanical-ident                                       |
-| Date      | 2025-01-01                                                     |
+| Field     | Value                                                       |
+|-----------|-------------------------------------------------------------|
+| Title     | Mechanical Parameters Identification — Friction and Inertia |
+| Type      | theory                                                      |
+| Status    | approved                                                    |
+| Version   | 1.0.0                                                       |
+| Component | service-mechanical-ident                                    |
+| Date      | 2025-01-01                                                  |
 
 ## Overview
 
@@ -31,20 +31,20 @@ true parameters as the motor is excited with varying speed profiles.
 
 ## Prerequisites
 
-| Symbol       | Meaning                                                    | Unit       |
-|--------------|------------------------------------------------------------|------------|
-| $J$          | Rotor moment of inertia                                    | kg·m²      |
-| $B$          | Viscous friction coefficient                               | N·m·s/rad  |
-| $\tau_0$     | Coulomb friction (static offset)                           | N·m        |
-| $\tau_e$     | Electrical (motor) torque = $\frac{3}{2}p\psi_f i_q$     | N·m        |
-| $\tau_{load}$| External load torque (treated as disturbance)              | N·m        |
-| $\omega$     | Rotor mechanical angular velocity                          | rad/s      |
-| $\alpha$     | Rotor angular acceleration = $\dot\omega$                  | rad/s²     |
-| $\mathbf{\theta}$ | Parameter vector $[J,\ B,\ \tau_0]^T$              | mixed      |
-| $\mathbf{\phi}$   | Regressor vector $[\alpha,\ \omega,\ 1]^T$          | mixed      |
-| $\lambda$    | RLS forgetting factor                                      | —          |
-| $\mathbf{P}$ | Error covariance matrix (3×3)                              | —          |
-| $\mathbf{K}$ | Kalman gain vector (3×1)                                   | —          |
+| Symbol            | Meaning                                              | Unit      |
+|-------------------|------------------------------------------------------|-----------|
+| $J$               | Rotor moment of inertia                              | kg·m²     |
+| $B$               | Viscous friction coefficient                         | N·m·s/rad |
+| $\tau_0$          | Coulomb friction (static offset)                     | N·m       |
+| $\tau_e$          | Electrical (motor) torque = $\frac{3}{2}p\psi_f i_q$ | N·m       |
+| $\tau_{load}$     | External load torque (treated as disturbance)        | N·m       |
+| $\omega$          | Rotor mechanical angular velocity                    | rad/s     |
+| $\alpha$          | Rotor angular acceleration = $\dot\omega$            | rad/s²    |
+| $\mathbf{\theta}$ | Parameter vector $[J,\ B,\ \tau_0]^T$                | mixed     |
+| $\mathbf{\phi}$   | Regressor vector $[\alpha,\ \omega,\ 1]^T$           | mixed     |
+| $\lambda$         | RLS forgetting factor                                | —         |
+| $\mathbf{P}$      | Error covariance matrix (3×3)                        | —         |
+| $\mathbf{K}$      | Kalman gain vector (3×1)                             | —         |
 
 ---
 
@@ -256,28 +256,28 @@ w │
 
 ## Numerical Properties
 
-| Property              | Value / Condition                                           |
-|-----------------------|-------------------------------------------------------------|
-| Parameter vector size | 3: $[J,\ B,\ \tau_0]^T$                                    |
-| Covariance matrix     | $3\times 3$ symmetric positive definite                    |
-| Forgetting factor     | $\lambda = 0.998$                                          |
-| Effective window      | $N_{eff} = 1/(1-\lambda) = 500$ samples                   |
-| Convergence check $\epsilon_e$ | $10^{-4}$ (innovation threshold)               |
-| Convergence check $\epsilon_K$ | $10^{-2}$ (gain trace threshold)               |
-| RLS per-step cost     | $O(n^2) = O(9)$ — 9 multiply-add ops for $n=3$             |
-| Numerical stability   | $\mathbf{P}$ can become indefinite; use regularisation if $\lambda < 1$ for long runs |
-| Initialisation        | $\mathbf{P}_0 = \alpha_0 \mathbf{I}$, $\hat{\mathbf{\theta}}_0 = \mathbf{0}$ |
+| Property                       | Value / Condition                                                                     |
+|--------------------------------|---------------------------------------------------------------------------------------|
+| Parameter vector size          | 3: $[J,\ B,\ \tau_0]^T$                                                               |
+| Covariance matrix              | $3\times 3$ symmetric positive definite                                               |
+| Forgetting factor              | $\lambda = 0.998$                                                                     |
+| Effective window               | $N_{eff} = 1/(1-\lambda) = 500$ samples                                               |
+| Convergence check $\epsilon_e$ | $10^{-4}$ (innovation threshold)                                                      |
+| Convergence check $\epsilon_K$ | $10^{-2}$ (gain trace threshold)                                                      |
+| RLS per-step cost              | $O(n^2) = O(9)$ — 9 multiply-add ops for $n=3$                                        |
+| Numerical stability            | $\mathbf{P}$ can become indefinite; use regularisation if $\lambda < 1$ for long runs |
+| Initialisation                 | $\mathbf{P}_0 = \alpha_0 \mathbf{I}$, $\hat{\mathbf{\theta}}_0 = \mathbf{0}$          |
 
 ### Sensitivity Analysis
 
-| Source of Error                | Effect                                                          |
-|--------------------------------|-----------------------------------------------------------------|
-| $K_T$ error                    | All parameters scaled proportionally ($\tau_e$ is biased)     |
-| Encoder quantisation           | Noise on $\alpha$; use long averaging window                   |
+| Source of Error                | Effect                                                               |
+|--------------------------------|----------------------------------------------------------------------|
+| $K_T$ error                    | All parameters scaled proportionally ($\tau_e$ is biased)            |
+| Encoder quantisation           | Noise on $\alpha$; use long averaging window                         |
 | Constant-speed operation       | $J$ unidentifiable ($\dot\omega = 0$ makes regressor rank-deficient) |
-| Very short identification time | $\mathbf{P}$ not collapsed; noisy estimates                    |
-| $\lambda$ too large            | Slow convergence to parameter changes                          |
-| $\lambda$ too small            | Noisy, unstable estimates at steady state                      |
+| Very short identification time | $\mathbf{P}$ not collapsed; noisy estimates                          |
+| $\lambda$ too large            | Slow convergence to parameter changes                                |
+| $\lambda$ too small            | Noisy, unstable estimates at steady state                            |
 
 ---
 
