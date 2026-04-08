@@ -16,9 +16,7 @@ date: YYYY-MM-DD
 | Component | component-name         |
 | Date      | YYYY-MM-DD             |
 
-> **Note — Implementation-blind document**: This document describes *what exists and why*, not how it is coded.
-> Code must follow architecture, not the opposite. Do not reference source files, class names, or implementation
-> details here.
+> **Note — Architecture-level document**: This document describes *what the component is and why it is structured this way*. Code must follow the architecture, not the opposite. Logical component and interface names are the vocabulary of architecture and belong here. What must be avoided: source file paths, implementation class names (e.g. `FooImpl`), and code-level algorithmic details.
 >
 > **Diagrams**: All visuals must be either a Mermaid fenced code block (` ```mermaid `) or ASCII art inline
 > in the document. External image references (`![alt](path)`) are **not allowed**.

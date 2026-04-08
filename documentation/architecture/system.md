@@ -16,9 +16,7 @@ date: 2026-04-07
 | Component | system                    |
 | Date      | 2026-04-07                |
 
-> **Note — Implementation-blind document**: This document describes *what exists and why*, not how it is coded.
-> Code must follow architecture, not the opposite. Do not reference source files, class names, or implementation
-> details here.
+> **Note — Architecture-level document**: This document describes *what the system is and why it is structured this way*. Code must follow the architecture, not the opposite. Logical component and interface names are the vocabulary of architecture and belong here. What must be avoided: source file paths, implementation class names (e.g. `FooImpl`), and code-level algorithmic details.
 >
 > **Diagrams**: All visuals must be either a Mermaid fenced code block or ASCII art inline in the document.
 > External image references (`![alt](path)`) are **not allowed**.
@@ -98,7 +96,7 @@ The simulator implements the same PAL contracts as real hardware. Control logic 
 
 ## Component Decomposition
 
-### 1. FOC Core (`source/foc/`)
+### 1. FOC Core
 
 The heart of the system. Decomposed into three sub-layers following a strict separation of contract, algorithm, and wiring:
 
@@ -106,7 +104,7 @@ The heart of the system. Decomposed into three sub-layers following a strict sep
 |-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Interfaces      | Define abstract contracts for control modes (Torque, Speed, Position) and driver peripherals (inverter, encoder, interrupt). No algorithms, no data. |
 | Implementations | Concrete algorithm implementations for Clarke/Park transforms, Space Vector Modulation, trigonometric helpers, PID wrappers, and control loops.      |
-| Instantiations  | Template-based wiring that combines a control-mode implementation with the Runner to produce a ready-to-use `FocController<Mode>`.                   |
+| Instantiations  | Wiring that combines a control-mode implementation with the execution runner to produce a ready-to-use FOC controller.                              |
 
 The three control modes are deliberately independent and composable. A given product binary includes only the mode(s) it needs:
 
@@ -124,7 +122,7 @@ graph LR
 
 The `Runner` is the only component that interacts with the PAL inverter and encoder at interrupt time. It registers the ADC-sampling callback and drives the `Calculate()` dispatch into the active control-mode implementation.
 
-### 2. Services (`source/services/`)
+### 2. Services
 
 Higher-level, non-real-time services that support commissioning and runtime operation. Each service is independently usable:
 
@@ -136,7 +134,7 @@ Higher-level, non-real-time services that support commissioning and runtime oper
 | Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration across power cycles using flash.           |
 | CLI                              | A terminal-based command interface for triggering services, querying state, and setting parameters from a serial console.            |
 
-Services communicate via asynchronous callbacks using `infra::Function<void(result)>`, not return values. This allows long-running operations (identification, alignment) to yield the CPU and complete asynchronously without blocking.
+Services communicate via asynchronous callbacks (zero-allocation closures from `embedded-infra-lib`), not return values. This allows long-running operations (identification, alignment) to yield the CPU and complete asynchronously without blocking.
 
 ### 3. Platform Abstraction Layer
 
@@ -167,13 +165,13 @@ graph LR
     HOST --> SIM_MODEL["Motor Model\n(PMSM physics simulation)"]
 ```
 
-### 4. Application / Instantiation (`source/application/`)
+### 4. Application / Instantiation
 
 The wiring layer. Assembles the concrete PAL implementation, the selected FOC mode(s), and the services into a runnable system. This is the only layer that is aware of the specific combination in use — all other layers depend only on abstractions.
 
-A `MotorStateMachine` template manages the lifecycle: it holds the `FocController`, the automatic PID gain tuner, and a variant of active service states (idle, aligning, identifying), routing terminal commands to the correct service or control mode.
+An application controller manages the lifecycle: it holds the active FOC control mode, a PID auto-tuner, and a state variant for commissioning phases (idle, aligning, identifying), routing terminal commands to the correct service or control mode.
 
-### 5. Tools (`source/tool/`)
+### 5. Tools
 
 Host-only tools that do not run on the embedded target:
 
@@ -182,7 +180,7 @@ Host-only tools that do not run on the embedded target:
 | Simulator     | Closed-loop software simulation: real FOC control code drives a physics-based PMSM model (Euler integration of the dq electrical equations). Used for validating control loops without hardware. |
 | CAN Commander | Desktop application for sending CAN commands and logging motor telemetry.                                                                                                                        |
 
-### 6. Infrastructure (`infra/`)
+### 6. Infrastructure
 
 External repositories consumed as Git submodules. This project does not modify them.
 
@@ -192,7 +190,7 @@ External repositories consumed as Git submodules. This project does not modify t
 | `infra/numerical-toolbox`         | Numerical algorithms for control: incremental PID controllers with anti-windup, digital filters (FIR, IIR, Kalman), recursive least-squares estimators, and compiler-optimisation helpers (`OPTIMIZE_FOR_SPEED`).                                                     |
 | `infra/can-lite`                  | Lightweight CAN 2.0B protocol stack: client-server model, category-based message dispatch, ISO-TP segmentation. Zero heap allocation.                                                                                                                                 |
 
-### 7. Vendor HAL (`hal/`)
+### 7. Vendor HAL
 
 Vendor-provided hardware abstraction libraries consumed as Git submodules. They supply the low-level peripheral register access and interrupt management that the PAL concrete implementations use.
 
@@ -230,10 +228,10 @@ These are never used directly by the FOC core or services — only by the PAL co
 The interface design reflects explicit SOLID choices:
 
 - **Single Responsibility**: Each interface (`FocTorque`, `FocSpeed`, `FocPosition`, `ThreePhaseInverter`, `Encoder`, `NonVolatileMemory`, …) is narrowly scoped to one concern. No interface carries unrelated responsibilities.
-- **Open/Closed**: New control modes are added by implementing a new `FocBase`-derived interface, not by modifying existing implementations. The PAL is similarly extended by creating a new concrete `HardwareFactory` implementation for a new board without touching the core.
-- **Liskov Substitution**: Every `FocController<Mode>` (torque, speed, position) is fully substitutable wherever `FocBase` or its control-mode interface is expected. The simulator's motor model is fully substitutable for the real PAL hardware.
+- **Open/Closed**: New control modes are added by implementing a new derived control interface, not by modifying existing implementations. The PAL is similarly extended by creating a new platform factory implementation for a new board without touching the core.
+- **Liskov Substitution**: Every FOC controller instantiation (torque, speed, position) is fully substitutable wherever the base control interface is expected. The simulator's motor model is fully substitutable for the real PAL hardware.
 - **Interface Segregation**: `FocBase` carries only the minimal common contract. Callers that need only torque control depend on `FocTorque`, not on `FocSpeed` or `FocPosition`. The PAL is similarly split — callers that only need an encoder do not depend on the PWM interface.
-- **Dependency Inversion**: The FOC core and all services depend exclusively on abstract interfaces. Concrete implementations are injected at application wiring time via `HardwareFactory` and constructor arguments. No global variables; no direct peripheral access from the control layer.
+- **Dependency Inversion**: The FOC core and all services depend exclusively on abstract interfaces. Concrete implementations are injected at application wiring time via the platform factory and constructor arguments. No global variables; no direct peripheral access from the control layer.
 
 ---
 
@@ -246,7 +244,7 @@ sequenceDiagram
     participant ISR as ADC/PWM ISR
     participant INV as ThreePhaseInverter (PAL)
     participant RUN as Runner
-    participant FOC as FocTorqueImpl
+    participant FOC as FOC Core
     participant ENC as Encoder (PAL)
     participant PWM as PWM Hardware
 
@@ -270,11 +268,11 @@ The commissioning data flow (run once at startup or on command):
 ```mermaid
 sequenceDiagram
     participant CLI as CLI Terminal
-    participant SM as MotorStateMachine
-    participant ELEC as ElectricalSystemIdent
-    participant MECH as MechanicalSystemIdent
+    participant SM as Application Controller
+    participant ELEC as Electrical Identification
+    participant MECH as Mechanical Identification
     participant NVM as NonVolatileMemory
-    participant PID as AutoPidGainTuner
+    participant PID as PID Auto-Tuner
 
     CLI->>SM: identify electrical params
     SM->>ELEC: EstimateResistanceAndInductance(config)
@@ -296,8 +294,8 @@ sequenceDiagram
 
 The system uses two complementary asynchronous communication patterns, both supplied by `infra/embedded-infra-lib`:
 
-- **`infra::Function<void(Args...)>`** — a zero-heap-allocation closure type used for one-shot or single-subscriber callbacks. All service operations (NVM, identification, alignment) deliver their results through this mechanism.
-- **`infra::Observer<Observer, Subject>` / `infra::Subject<T>`** — a type-safe, heap-free observer/subject pattern used where a subject must notify multiple observers. The simulator's motor model is a `Subject`; views and loggers attach as `Observer` instances. No raw event buses or dynamic dispatch lists are used.
+- **Zero-allocation closures** (from `embedded-infra-lib`) — used for one-shot or single-subscriber callbacks. All service operations (NVM, identification, alignment) deliver their results through this mechanism.
+- **Observer/Subject pattern** (from `embedded-infra-lib`) — a type-safe, heap-free mechanism where a subject notifies multiple observers. The simulator's motor model is a subject; views and loggers attach as observers. No raw event buses or dynamic dispatch lists are used.
 
 These patterns eliminate polling, decouple producers from consumers, and allow the application to remain single-threaded and non-blocking.
 
@@ -307,12 +305,12 @@ These patterns eliminate polling, decouple producers from consumers, and allow t
 
 | Concern               | Policy / Approach                                                                                                                                                                                                                      |
 |-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Memory                | Absolutely no heap on the embedded target. All objects are statically or stack-allocated. `infra::BoundedVector` and related containers replace STL heap-based containers. Host-side tools and tests may use the standard heap freely. |
+| Memory                | Absolutely no heap on the embedded target. All objects are statically or stack-allocated. Bounded containers from `embedded-infra-lib` replace STL heap-based containers. Host-side tools and tests may use the standard heap freely.  |
 | Real-time determinism | The FOC `Calculate()` path contains no virtual dispatch, no blocking calls, and no unpredictable branches. The outer loops run at lower-priority interrupts on a deterministic prescale ratio.                                         |
-| Unit safety           | All physical quantities use typed unit aliases (`Ampere`, `Radians`, `Volts`, `RadiansPerSecond`, …) derived from `infra::Quantity`. Raw floating-point with no unit context is not used for motor quantities.                         |
-| Compiler optimisation | Critical paths are annotated with `OPTIMIZE_FOR_SPEED` (expands to GCC/Clang `O3` + `fast-math` pragmas). Debug builds use `-Og` for debuggability.                                                                                    |
-| Error handling        | No C++ exceptions. Synchronous errors use `std::optional` (absent = error). Asynchronous errors are delivered as status codes in callbacks (`NvmStatus`).                                                                              |
-| Portability           | The control core has no knowledge of the underlying MCU. Portability to a new board is achieved by implementing `HardwareFactory` for that board and providing the PAL concrete implementations.                                       |
+| Unit safety           | All physical quantities use typed unit aliases (`Ampere`, `Radians`, `Volts`, `RadiansPerSecond`, …) from `embedded-infra-lib`. Raw floating-point with no unit context is not used for motor quantities.                              |
+| Compiler optimisation | Critical paths use per-file optimisation pragmas (GCC/Clang `O3` + `fast-math`). Debug builds use `-Og` for debuggability.                                                                                                            |
+| Error handling        | No C++ exceptions. Synchronous errors use `std::optional` (absent = error). Asynchronous errors are delivered as typed status codes in callbacks.                                                                                      |
+| Portability           | The control core has no knowledge of the underlying MCU. Portability to a new board is achieved by implementing a platform factory for that board and providing the PAL concrete implementations.                                      |
 | Testability           | All modules depend on abstract interfaces, enabling host-build unit tests with mock or stub implementations. The simulator provides closed-loop integration testing without hardware.                                                  |
 
 ---

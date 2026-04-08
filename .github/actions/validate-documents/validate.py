@@ -92,7 +92,7 @@ def check_required_sections(text: str, required_sections: list[str]) -> list[str
     return errors
 
 
-def check_implementation_blindness(text: str) -> list[str]:
+def check_implementation_blindness(text: str, doc_type: str = "design") -> list[str]:
     """Scan fenced code blocks and report any that use forbidden programming languages."""
     errors = []
     fence_pattern = re.compile(r"^```(\w*)", re.MULTILINE)
@@ -102,7 +102,7 @@ def check_implementation_blindness(text: str) -> list[str]:
             line_number = text[: match.start()].count("\n") + 1
             errors.append(
                 f"forbidden code block language '{lang}' at line {line_number} "
-                "(design documents must not contain programming-language code blocks)"
+                f"({doc_type} documents must not contain programming-language code blocks)"
             )
     return errors
 
@@ -158,9 +158,11 @@ def validate_file(
 
     frontmatter, fm_errors = parse_frontmatter(text, md_file)
     if frontmatter is None:
-        # File has no YAML frontmatter — it is not a managed documentation file.
-        # Emit warnings but do not fail validation so legacy/external files don't block CI.
-        warnings.extend(fm_errors)
+        if doc_type_filter == "all":
+            # When scanning all types, warn about unmanaged files so they are visible.
+            warnings.extend(fm_errors)
+        # When filtering by a specific type, skip silently: unmanaged files (no frontmatter)
+        # do not belong to any managed type and must not pollute filtered CI runs.
         return errors, warnings
     errors.extend(fm_errors)
 
@@ -174,10 +176,11 @@ def validate_file(
 
     if doc_type == "architecture":
         errors.extend(check_required_sections(text, ARCHITECTURE_REQUIRED_SECTIONS))
+        errors.extend(check_implementation_blindness(text, "architecture"))
         errors.extend(check_no_image_references(text))
     elif doc_type == "design":
         errors.extend(check_required_sections(text, DESIGN_REQUIRED_SECTIONS))
-        errors.extend(check_implementation_blindness(text))
+        errors.extend(check_implementation_blindness(text, "design"))
         errors.extend(check_no_image_references(text))
     elif doc_type == "theory":
         errors.extend(check_required_sections(text, THEORY_REQUIRED_SECTIONS))
