@@ -68,11 +68,14 @@ add_subdirectory(infra/numerical-toolbox)
 add_subdirectory(source)
 add_subdirectory(targets)
 
+set(E_FOC_CLANGFORMAT_DIRS source targets)
+
 if (E_FOC_BUILD_SIMULATOR)
     add_subdirectory(tools)
+    list(APPEND E_FOC_CLANGFORMAT_DIRS tools)
 endif()
 
-emil_clangformat_directories(e_foc DIRECTORIES source targets tools)
+emil_clangformat_directories(e_foc DIRECTORIES ${E_FOC_CLANGFORMAT_DIRS})
 emil_folderize_all_targets()
 emil_exclude_directory_from_coverage(infra/embedded-infra-lib)
 emil_coverage_targets(DIRECTORIES .)
