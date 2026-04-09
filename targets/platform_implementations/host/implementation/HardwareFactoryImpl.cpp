@@ -1,4 +1,4 @@
-#include "targets/platform_implementations/Host/implementation/HardwareFactoryImpl.hpp"
+#include "targets/platform_implementations/host/implementation/HardwareFactoryImpl.hpp"
 #include "infra/util/MemoryRange.hpp"
 #include "source/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 
