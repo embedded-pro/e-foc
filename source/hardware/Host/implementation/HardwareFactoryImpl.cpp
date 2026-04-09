@@ -81,6 +81,11 @@ namespace application
         return canCreator;
     }
 
+    hal::Eeprom& HardwareFactoryImpl::Eeprom()
+    {
+        return eepromStub;
+    }
+
     void HardwareFactoryImpl::SerialCommunicationStub::SendData(infra::ConstByteRange data, infra::Function<void()> actionOnCompletion)
     {}
 

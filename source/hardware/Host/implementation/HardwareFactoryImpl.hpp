@@ -7,6 +7,8 @@
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "source/hardware/HardwareFactory.hpp"
+#include <algorithm>
+#include <array>
 
 namespace application
 {
@@ -32,6 +34,7 @@ namespace application
         infra::CreatorBase<AdcPhaseCurrentMeasurement, void(SampleAndHold)>& AdcMultiChannelCreator() override;
         infra::CreatorBase<QuadratureEncoderDecorator, void()>& SynchronousQuadratureEncoderCreator() override;
         infra::CreatorBase<CanBusAdapter, void(uint32_t bitRate, bool testMode)>& CanBusCreator() override;
+        hal::Eeprom& Eeprom() override;
 
         // Implementation of hal::PerformanceTracker
         void Start() override;
@@ -92,6 +95,44 @@ namespace application
         public:
             void SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion) override;
             void ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction) override;
+        };
+
+        class EepromStub
+            : public hal::Eeprom
+        {
+        public:
+            static constexpr uint32_t stubSize = 512;
+
+            EepromStub()
+            {
+                storage.fill(0xFF);
+            }
+
+            uint32_t Size() const override
+            {
+                return stubSize;
+            }
+
+            void WriteBuffer(infra::ConstByteRange buffer, uint32_t address, infra::Function<void()> onDone) override
+            {
+                std::copy(buffer.begin(), buffer.end(), storage.begin() + address);
+                onDone();
+            }
+
+            void ReadBuffer(infra::ByteRange buffer, uint32_t address, infra::Function<void()> onDone) override
+            {
+                std::copy(storage.begin() + address, storage.begin() + address + buffer.size(), buffer.begin());
+                onDone();
+            }
+
+            void Erase(infra::Function<void()> onDone) override
+            {
+                storage.fill(0xFF);
+                onDone();
+            }
+
+        private:
+            std::array<uint8_t, stubSize> storage;
         };
 
         class SynchronousAdcStub
@@ -165,5 +206,6 @@ namespace application
             {
                 object.emplace();
             } };
+        EepromStub eepromStub;
     };
 }

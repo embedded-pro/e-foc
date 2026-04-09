@@ -131,7 +131,7 @@ Higher-level, non-real-time services that support commissioning and runtime oper
 | Alignment                        | Forces a known electrical angle on the rotor at startup so the FOC reference frame is correctly initialised before normal operation. |
 | Electrical System Identification | Estimates phase resistance, d/q inductances, and pole pairs by injecting test signals and measuring the response.                    |
 | Mechanical System Identification | Estimates rotor inertia and viscous friction coefficient from closed-loop speed response data.                                       |
-| Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration across power cycles using flash.           |
+| Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration across power cycles using MCU internal EEPROM.           |
 | CLI                              | A terminal-based command interface for triggering services, querying state, and setting parameters from a serial console.            |
 
 Services communicate via asynchronous callbacks (zero-allocation closures from `embedded-infra-lib`), not return values. This allows long-running operations (identification, alignment) to yield the CPU and complete asynchronously without blocking.

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "hal/interfaces/AdcMultiChannel.hpp"
+#include "hal/interfaces/Eeprom.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/util/BoundedDeque.hpp"
 #include "services/tracer/Tracer.hpp"
@@ -32,6 +33,9 @@ namespace application
         StatusWithMessage CanStop();
         StatusWithMessage CanSend(const infra::BoundedConstString& param);
         StatusWithMessage CanListen();
+        void EepromWrite(const infra::BoundedConstString& param);
+        void EepromRead(const infra::BoundedConstString& param);
+        void EepromErase();
 
     private:
         static constexpr std::size_t averageSampleSize = 100;
@@ -59,5 +63,8 @@ namespace application
         controllers::PidTunings<float> dqPidTunings;
         std::optional<std::size_t> polePairs = 0;
         foc::FocSpeedImpl foc;
+        hal::Eeprom& eeprom;
+        std::array<uint8_t, 64> eepromBuffer{};
+        uint32_t eepromCurrentReadSize{ 0 };
     };
 }

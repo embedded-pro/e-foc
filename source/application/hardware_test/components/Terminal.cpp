@@ -76,6 +76,7 @@ namespace application
         , Vdc{ hardware.PowerSupplyVoltage() }
         , systemClock{ hardware.SystemClock() }
         , foc{ hardware.MaxCurrentSupported(), hal::Hertz{ 1000 }, hardware.LowPriorityInterrupt() }
+        , eeprom{ hardware.Eeprom() }
     {
         terminal.AddCommand({ { "enc", "e", "Read encoder. stop. Ex: enc" },
             [this](const auto&)
@@ -147,6 +148,24 @@ namespace application
             [this](const auto&)
             {
                 this->terminal.ProcessResult(CanListen());
+            } });
+
+        terminal.AddCommand({ { "eeprom_write", "ew", "Write bytes to EEPROM. eeprom_write <addr> <b0> [b1...]. Ex: eeprom_write 0 255 170" },
+            [this](const infra::BoundedConstString& param)
+            {
+                EepromWrite(param);
+            } });
+
+        terminal.AddCommand({ { "eeprom_read", "er", "Read bytes from EEPROM. eeprom_read <addr> <size>. Ex: eeprom_read 0 8" },
+            [this](const infra::BoundedConstString& param)
+            {
+                EepromRead(param);
+            } });
+
+        terminal.AddCommand({ { "eeprom_erase", "ee", "Erase entire EEPROM. Ex: eeprom_erase" },
+            [this](const auto&)
+            {
+                EepromErase();
             } });
 
         encoderCreator.Emplace();
@@ -457,5 +476,99 @@ namespace application
 
         tracer.Trace() << "  CAN listening for messages";
         return { services::TerminalWithStorage::Status::success };
+    }
+
+    void TerminalInteractor::EepromWrite(const infra::BoundedConstString& param)
+    {
+        infra::Tokenizer tokenizer(param, ' ');
+
+        if (tokenizer.Size() < 2)
+        {
+            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "usage: eeprom_write <addr> <b0> [b1...]" });
+            return;
+        }
+
+        auto addr = ParseInput<uint32_t>(tokenizer.Token(0), 0.0f, 65535.0f);
+        if (!addr.has_value())
+        {
+            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "invalid address" });
+            return;
+        }
+
+        const std::size_t byteCount = tokenizer.Size() - 1;
+        if (byteCount > eepromBuffer.size())
+        {
+            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "too many bytes" });
+            return;
+        }
+
+        for (std::size_t i = 0; i < byteCount; ++i)
+        {
+            auto byte = ParseInput<uint32_t>(tokenizer.Token(i + 1), 0.0f, 255.0f);
+            if (!byte.has_value())
+            {
+                terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "invalid byte value" });
+                return;
+            }
+            eepromBuffer[i] = static_cast<uint8_t>(*byte);
+        }
+
+        if (*addr > eeprom.Size() || byteCount > eeprom.Size() - *addr)
+        {
+            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "address out of range" });
+            return;
+        }
+
+        eeprom.WriteBuffer(infra::ConstByteRange{ eepromBuffer.data(), eepromBuffer.data() + byteCount }, *addr, [this]()
+            {
+                this->terminal.ProcessResult({ services::TerminalWithStorage::Status::success });
+            });
+    }
+
+    void TerminalInteractor::EepromRead(const infra::BoundedConstString& param)
+    {
+        infra::Tokenizer tokenizer(param, ' ');
+
+        if (tokenizer.Size() != 2)
+        {
+            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "usage: eeprom_read <addr> <size>" });
+            return;
+        }
+
+        auto addr = ParseInput<uint32_t>(tokenizer.Token(0), 0.0f, 65535.0f);
+        if (!addr.has_value())
+        {
+            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "invalid address" });
+            return;
+        }
+
+        auto size = ParseInput<uint32_t>(tokenizer.Token(1), 1.0f, static_cast<float>(eepromBuffer.size()));
+        if (!size.has_value())
+        {
+            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "invalid size" });
+            return;
+        }
+
+        if (*addr > eeprom.Size() || *size > eeprom.Size() - *addr)
+        {
+            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "address out of range" });
+            return;
+        }
+
+        eepromCurrentReadSize = *size;
+        eeprom.ReadBuffer(infra::ByteRange{ eepromBuffer.data(), eepromBuffer.data() + eepromCurrentReadSize }, *addr, [this]()
+            {
+                for (uint32_t i = 0; i < this->eepromCurrentReadSize; ++i)
+                    this->tracer.Trace() << "  [" << i << "] = " << static_cast<uint32_t>(this->eepromBuffer[i]);
+                this->terminal.ProcessResult({ services::TerminalWithStorage::Status::success });
+            });
+    }
+
+    void TerminalInteractor::EepromErase()
+    {
+        eeprom.Erase([this]()
+            {
+                this->terminal.ProcessResult({ services::TerminalWithStorage::Status::success });
+            });
     }
 }

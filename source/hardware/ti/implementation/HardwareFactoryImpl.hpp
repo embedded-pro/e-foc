@@ -9,6 +9,7 @@
 #include "hal/ti/hal_tiva/synchronous_tiva/SynchronousQuadratureEncoder.hpp"
 #include "hal/ti/hal_tiva/tiva/Adc.hpp"
 #include "hal/ti/hal_tiva/tiva/Can.hpp"
+#include "hal/ti/hal_tiva/tiva/Eeprom.hpp"
 #include "hal/ti/hal_tiva/tiva/Uart.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousAdc.hpp"
 #include "hal_tiva/tiva/Gpio.hpp"
@@ -43,6 +44,7 @@ namespace application
         infra::CreatorBase<AdcPhaseCurrentMeasurement, void(SampleAndHold)>& AdcMultiChannelCreator() override;
         infra::CreatorBase<QuadratureEncoderDecorator, void()>& SynchronousQuadratureEncoderCreator() override;
         infra::CreatorBase<CanBusAdapter, void(uint32_t bitRate, bool testMode)>& CanBusCreator() override;
+        hal::Eeprom& Eeprom() override;
 
         // Implementation of hal::PerformanceTracker
         void Start() override;
@@ -176,6 +178,7 @@ namespace application
             EncoderImpl encoderImpl;
             CanImpl canImpl;
             MotorFieldOrientedControllerInterfaceImpl motorFieldOrientedController;
+            hal::tiva::Eeprom eepromPeripheral;
         };
 
     private:

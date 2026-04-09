@@ -214,3 +214,29 @@ Registered command handlers are stored in a fixed-size look-up structure in the 
 | `FocBase`                                | Provides `Enable()`, `Disable()`, and `SetCurrentTunings()` shared by all control modes                | Must remain valid for the lifetime of the interactor                                 |
 | `FocTorque` / `FocSpeed` / `FocPosition` | Provides mode-specific setpoint and tuning methods                                                     | The concrete interface must match the constructed interactor subclass                |
 | DC bus voltage (`Volts`)                 | Supplied to the interactor for normalising PID gain inputs before forwarding them to the FOC component | Must reflect the actual DC bus voltage at the time tunings are applied               |
+
+---
+
+## Hardware-Test EEPROM Commands
+
+The hardware-test application registers three additional terminal commands that exercise the EEPROM hardware directly through the `hal::Eeprom` interface. These commands are available only in the hardware-test build target and are intended for commissioning, production testing, and EEPROM verification.
+
+### Command Reference
+
+| Command        | Alias | Arguments                     | Action                                                                                              |
+|----------------|-------|-------------------------------|-----------------------------------------------------------------------------------------------------|
+| `eeprom_write` | `ew`  | `<addr> <b0> [b1 … b63]`      | Writes up to 64 bytes to the EEPROM starting at the given byte address. The callback fires when the hardware write completes. |
+| `eeprom_read`  | `er`  | `<addr> <size>`               | Reads `size` bytes (1–64) from the EEPROM starting at `addr` and traces each byte value to the serial output. The callback fires when the hardware read completes. |
+| `eeprom_erase` | `ee`  | none                          | Erases the entire EEPROM to the all-0xFF state. The callback fires when the hardware erase completes. |
+
+### Asynchronous Completion
+
+All three commands are asynchronous. The terminal prompt (`> `) does not appear until the hardware operation completes and `ProcessResult` is called from the completion callback. This correctly models the interrupt-driven behaviour of the TM4C EEPROM peripheral.
+
+### Argument Constraints
+
+- `addr`: unsigned integer in the range 0 to 65535
+- `b0 … b63`: unsigned integer byte values in the range 0 to 255
+- `size`: unsigned integer in the range 1 to 64
+
+Invalid argument count or out-of-range values return an error `StatusWithMessage` immediately without starting the EEPROM operation.
