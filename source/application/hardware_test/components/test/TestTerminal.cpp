@@ -170,7 +170,7 @@ namespace
                 EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<14> terminal{ terminalWithCommands, tracer };
+        services::TerminalWithStorage::WithMaxSize<16> terminal{ terminalWithCommands, tracer };
 
         testing::StrictMock<PwmMock> pwmMock;
         testing::StrictMock<AdcMock> adcMock;
@@ -1757,21 +1757,54 @@ TEST_F(TestHardwareTerminal, eeprom_erase_alias)
 
 TEST_F(TestHardwareTerminal, eeprom_write_missing_data_bytes_returns_error)
 {
-    InvokeCommand("eeprom_write 0", [this]() {});
+    InvokeCommand("eeprom_write 0", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "usage: eeprom_write <addr> <b0> [b1...]" };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
 
     ExecuteAllActions();
 }
 
 TEST_F(TestHardwareTerminal, eeprom_read_missing_size_returns_error)
 {
-    InvokeCommand("eeprom_read 0", [this]() {});
+    InvokeCommand("eeprom_read 0", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "usage: eeprom_read <addr> <size>" };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
 
     ExecuteAllActions();
 }
 
 TEST_F(TestHardwareTerminal, eeprom_write_invalid_address_returns_error)
 {
-    InvokeCommand("eeprom_write abc 170", [this]() {});
+    InvokeCommand("eeprom_write abc 170", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid address" };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
 
     ExecuteAllActions();
 }
@@ -1779,7 +1812,18 @@ TEST_F(TestHardwareTerminal, eeprom_write_invalid_address_returns_error)
 TEST_F(TestHardwareTerminal, eeprom_write_address_out_of_range_returns_error)
 {
     EXPECT_CALL(eepromMock, Size()).WillOnce(testing::Return(512u));
-    InvokeCommand("eeprom_write 600 170", [this]() {});
+    InvokeCommand("eeprom_write 600 170", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "address out of range" };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
 
     ExecuteAllActions();
 }
@@ -1787,7 +1831,18 @@ TEST_F(TestHardwareTerminal, eeprom_write_address_out_of_range_returns_error)
 TEST_F(TestHardwareTerminal, eeprom_read_address_out_of_range_returns_error)
 {
     EXPECT_CALL(eepromMock, Size()).WillOnce(testing::Return(512u));
-    InvokeCommand("eeprom_read 600 2", [this]() {});
+    InvokeCommand("eeprom_read 600 2", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "address out of range" };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
 
     ExecuteAllActions();
 }

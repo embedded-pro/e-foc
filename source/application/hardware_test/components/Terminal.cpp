@@ -513,7 +513,8 @@ namespace application
             eepromBuffer[i] = static_cast<uint8_t>(*byte);
         }
 
-        if (*addr > eeprom.Size() || byteCount > eeprom.Size() - *addr)
+        const std::size_t eepromSize = eeprom.Size();
+        if (*addr > eepromSize || byteCount > eepromSize - *addr)
         {
             terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "address out of range" });
             return;
@@ -549,7 +550,8 @@ namespace application
             return;
         }
 
-        if (*addr > eeprom.Size() || *size > eeprom.Size() - *addr)
+        const std::size_t eepromSize = eeprom.Size();
+        if (*addr > eepromSize || *size > eepromSize - *addr)
         {
             terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "address out of range" });
             return;
