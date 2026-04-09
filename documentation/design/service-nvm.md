@@ -2,7 +2,7 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: service-nvm
 date: 2026-04-07
 ---
@@ -29,7 +29,7 @@ date: 2026-04-07
 ## Responsibilities
 
 **Is responsible for:**
-- Persisting motor calibration data (R, L, pole pairs, encoder offset, PID gains, inertia, friction) and system configuration (current limits, velocity limits, CAN parameters, telemetry rate, voltage thresholds) across power cycles using MCU internal flash
+- Persisting motor calibration data (R, L, pole pairs, encoder offset, PID gains, inertia, friction) and system configuration (current limits, velocity limits, CAN parameters, telemetry rate, voltage thresholds) across power cycles using MCU internal EEPROM
 - Ensuring data integrity on every read through CRC-32 verification and on every write through read-back verification
 - Detecting and signalling version mismatches when a stored record was written by a different firmware version
 - Distinguishing the calibration and configuration regions by per-region magic numbers, preventing cross-region misinterpretation of data
@@ -37,7 +37,7 @@ date: 2026-04-07
 - Providing a `Format` operation that erases both regions to factory state
 
 **Is NOT responsible for:**
-- Raw flash hardware access — all sector erase, read, and write operations are delegated to injected `NvmRegion` instances
+- Raw EEPROM hardware access — all erase, read, and write operations are delegated to injected `NvmRegion` instances
 - Computing the calibration or configuration values themselves — those are produced by the identification services and the application
 - Providing wear-levelling or journaling — a single record per region is maintained without historical versioning
 
@@ -47,11 +47,11 @@ date: 2026-04-07
 
 ### Logical Regions
 
-The service manages two independent flash regions. Each region holds exactly one record at a time — the latest write replaces any previous record in that sector.
+The service manages two independent EEPROM regions. Each region holds exactly one record at a time — the latest write replaces any previous record in that address range.
 
 | Region        | Magic        | Data structure    | Data size |
 |---------------|--------------|-------------------|-----------|
-| Calibration   | `0xCAFEF00D` | `CalibrationData` | 36 bytes  |
+| Calibration   | `0xCAFEF00D` | `CalibrationData` | 60 bytes  |
 | Configuration | `0xDEADBEEF` | `ConfigData`      | 40 bytes  |
 
 The two regions use different `NvmRegion` instances (injected at construction) and can be read, written, and erased independently. An operation on the calibration region has no effect on the configuration region and vice versa.
@@ -67,7 +67,7 @@ Each region stores a single record consisting of a fixed-size header followed by
 | CRC-32  | 4 bytes | CRC-32 of the data bytes only (header excluded)  |
 | Data    | N bytes | Serialised `CalibrationData` or `ConfigData`     |
 
-This layout ensures that a calibration record stored in flash cannot be silently misinterpreted as a configuration record (and vice versa) because any cross-region read will fail the magic check immediately.
+This layout ensures that a calibration record stored in EEPROM cannot be silently misinterpreted as a configuration record (and vice versa) because any cross-region read will fail the magic check immediately.
 
 ### Integrity Checks on Read
 
@@ -104,7 +104,29 @@ sequenceDiagram
     end
 ```
 
-The read-back verification step catches flash hardware faults, programming errors, and marginal cells that pass the erase but corrupt the write. `NvmStatus::WriteFailed` is specifically reserved for this condition.
+The read-back verification step catches EEPROM hardware faults, programming errors, and marginal cells that pass the erase but corrupt the write. `NvmStatus::WriteFailed` is specifically reserved for this condition.
+
+### EEPROM Address-Space Map
+
+The two NVM regions occupy fixed, non-overlapping address ranges within the MCU EEPROM. Addresses are byte offsets from the start of the EEPROM address space.
+
+| Region        | Base address | Size      | Content                  |
+|---------------|--------------|-----------|--------------------------|
+| Calibration   | 0            | 128 B     | One calibration record   |
+| Configuration | 128          | 128 B     | One configuration record |
+| Reserved      | 256+         | remainder | Unused; not accessed     |
+
+Both regions fit comfortably within the 2048-byte EEPROM available on the TM4C1294 target. ST and Host targets use an in-memory stub of identical layout for regression testing.
+
+### Power-Loss Mitigation
+
+EEPROM cells retain data indefinitely once a write word-program cycle completes. The write sequence (erase region → write record → read-back verify) is designed so that power loss at any point leaves the system in a known state:
+
+- **Power loss during erase**: The region contains all-0xFF bytes. On next read, the magic check fails and `NvmStatus::InvalidData` is returned — the application must re-run identification or use factory defaults.
+- **Power loss during write**: The partially-written record will fail either the magic check or the CRC-32 check on next read. The same `InvalidData` result is returned; no silent corruption is possible.
+- **Power loss during read-back**: The write has already completed. On next power-on, the record will re-read correctly. The application may retry the write if the previous session reported `WriteFailed`.
+
+No journaling or wear-levelling is implemented. Each write operation overwrites the same address range (erase-then-write), which is sufficient for infrequent commissioning writes. If frequent writes are required, a wear-levelling strategy must be added at the `NvmRegion` layer.
 
 ### Buffer Management — No Heap
 
@@ -146,7 +168,7 @@ stateDiagram-v2
 
 ### Calibration and Configuration Data Fields
 
-**CalibrationData** (36 bytes total):
+**CalibrationData** (60 bytes total):
 
 | Field                  | Physical unit | Description                                         |
 |------------------------|---------------|-----------------------------------------------------|
@@ -189,7 +211,7 @@ stateDiagram-v2
 | `SaveCalibration(data, onDone)` | Erases calibration sector, writes record, verifies read-back                  | `onDone(NvmStatus)` fires exactly once; rejected if region is busy      |
 | `LoadCalibration(onDone)`       | Reads and integrity-checks the calibration record                             | `onDone(NvmStatus, optional<CalibrationData>)` fires exactly once       |
 | `InvalidateCalibration(onDone)` | Erases the calibration sector without writing a new record                    | Makes `IsCalibrationValid` return false; `onDone(NvmStatus)` fires once |
-| `IsCalibrationValid()`          | Synchronously returns whether a valid calibration record is present           | Based on last known read status; does not perform a flash read          |
+| `IsCalibrationValid()`          | Synchronously returns whether a valid calibration record is present           | Based on last known read status; does not perform an EEPROM read        |
 | `SaveConfig(data, onDone)`      | Same write+verify sequence for the configuration region                       | `onDone(NvmStatus)` fires exactly once                                  |
 | `LoadConfig(onDone)`            | Reads and integrity-checks the configuration record                           | `onDone(NvmStatus, optional<ConfigData>)` fires exactly once            |
 | `ResetConfigToDefaults(onDone)` | Writes a record containing factory-default values to the configuration region | Follows the same erase/write/verify sequence as `SaveConfig`            |
@@ -197,7 +219,7 @@ stateDiagram-v2
 
 ### Required
 
-| Interface                            | Purpose                                                                 | Contract                                                                           |
-|--------------------------------------|-------------------------------------------------------------------------|------------------------------------------------------------------------------------|
-| `NvmRegion` (calibration instance)   | Abstracts raw flash erase, write, and read for the calibration sector   | Must be backed by a dedicated flash sector; must not be shared with any other user |
-| `NvmRegion` (configuration instance) | Abstracts raw flash erase, write, and read for the configuration sector | Must be backed by a dedicated flash sector separate from the calibration sector    |
+| Interface                            | Purpose                                                                 | Contract                                                                                   |
+|--------------------------------------|-------------------------------------------------------------------------|--------------------------------------------------------------------------------------------|
+| `NvmRegion` (calibration instance)   | Abstracts raw EEPROM write and read for the calibration address range   | Must be backed by a dedicated EEPROM address range; must not be shared with any other user |
+| `NvmRegion` (configuration instance) | Abstracts raw EEPROM write and read for the configuration address range | Must be backed by a dedicated EEPROM address range separate from the calibration range     |

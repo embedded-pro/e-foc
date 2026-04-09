@@ -2,6 +2,7 @@
 
 #include "foc/implementations/TrigonometricImpl.hpp"
 #include "foc/instantiations/FocController.hpp"
+#include "hal/interfaces/Eeprom.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "services/alignment/TerminalMotorAlignment.hpp"
 #include "services/electrical_system_ident/TerminalElectricalParametersIdentification.hpp"
@@ -11,6 +12,8 @@
 #include "source/services/cli/TerminalBase.hpp"
 #include "source/services/cli/TerminalHelper.hpp"
 #include "source/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
+#include "source/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
+#include "source/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include <optional>
 #include <type_traits>
 #include <variant>
@@ -39,7 +42,7 @@ namespace application
     {
     public:
         template<typename... FocArgs>
-        MotorStateMachine(const TerminalAndTracer& terminalAndTracer, const MotorDriverAndEncoder& motorDriverAndEncoder, foc::Volts vdc, FocArgs&&... focArgs);
+        MotorStateMachine(const TerminalAndTracer& terminalAndTracer, const MotorDriverAndEncoder& motorDriverAndEncoder, foc::Volts vdc, hal::Eeprom& eeprom, FocArgs&&... focArgs);
 
     private:
         std::optional<std::pair<foc::Ohm, foc::MilliHenry>> ParseArgs(const infra::Tokenizer& tokenizer);
@@ -50,6 +53,10 @@ namespace application
         foc::ThreePhaseInverter& driver;
         foc::Encoder& encoder;
         foc::Volts vdc;
+        hal::Eeprom& eeprom;
+        services::NvmEepromRegion calibrationRegion;
+        services::NvmEepromRegion configRegion;
+        services::NonVolatileMemoryImpl nonVolatileMemory;
         foc::FocController<FocImpl> focController;
         foc::WithAutomaticCurrentPidGains pidAutoTuner{ focController };
         std::variant<std::monostate, services::MotorAlignmentImpl, services::ElectricalParametersIdentificationImpl> motorStates;
@@ -60,12 +67,16 @@ namespace application
 
     template<typename FocImpl, typename TerminalImpl, typename Enable>
     template<typename... FocArgs>
-    MotorStateMachine<FocImpl, TerminalImpl, Enable>::MotorStateMachine(const TerminalAndTracer& terminalAndTracer, const MotorDriverAndEncoder& motorDriverAndEncoder, foc::Volts vdc, FocArgs&&... focArgs)
+    MotorStateMachine<FocImpl, TerminalImpl, Enable>::MotorStateMachine(const TerminalAndTracer& terminalAndTracer, const MotorDriverAndEncoder& motorDriverAndEncoder, foc::Volts vdc, hal::Eeprom& eeprom, FocArgs&&... focArgs)
         : terminal(terminalAndTracer.terminal)
         , tracer(terminalAndTracer.tracer)
         , driver(motorDriverAndEncoder.driver)
         , encoder(motorDriverAndEncoder.encoder)
         , vdc(vdc)
+        , eeprom(eeprom)
+        , calibrationRegion{ eeprom, 0, 128 }
+        , configRegion{ eeprom, 128, 128 }
+        , nonVolatileMemory{ calibrationRegion, configRegion }
         , focController{ driver, encoder, std::forward<FocArgs>(focArgs)... }
     {
         terminal.AddCommand({ { "ident_par", "ip", "Identify Parameters, which are resistance, inductance and number of pole pairs." },

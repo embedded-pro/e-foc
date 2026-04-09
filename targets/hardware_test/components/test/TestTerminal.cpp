@@ -1,4 +1,5 @@
 #include "foc/interfaces/Driver.hpp"
+#include "hal/interfaces/test_doubles/EepromMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
 #include "infra/util/test_helper/MockHelpers.hpp"
@@ -41,6 +42,7 @@ namespace
         MOCK_METHOD((infra::CreatorBase<application::AdcPhaseCurrentMeasurement, void(SampleAndHold)>&), AdcMultiChannelCreator, (), (override));
         MOCK_METHOD((infra::CreatorBase<application::QuadratureEncoderDecorator, void()>&), SynchronousQuadratureEncoderCreator, (), (override));
         MOCK_METHOD((infra::CreatorBase<application::CanBusAdapter, void(uint32_t, bool)>&), CanBusCreator, (), (override));
+        MOCK_METHOD(hal::Eeprom&, Eeprom, (), (override));
     };
 
     class PwmMock
@@ -139,6 +141,7 @@ namespace
             EXPECT_CALL(hardwareFactoryMock, MaxCurrentSupported()).WillRepeatedly(testing::Return(foc::Ampere{ 5.0f }));
             EXPECT_CALL(hardwareFactoryMock, SystemClock()).WillRepeatedly(testing::Return(hal::Hertz{ 10000 }));
             EXPECT_CALL(hardwareFactoryMock, LowPriorityInterrupt()).WillRepeatedly(testing::ReturnRef(simpleLowPriorityInterrupt));
+            EXPECT_CALL(hardwareFactoryMock, Eeprom()).WillRepeatedly(testing::ReturnRef(eepromMock));
 
             EXPECT_CALL(encoderCreator, Constructed());
             EXPECT_CALL(pwmCreator, Constructed(std::chrono::nanoseconds{ 500 }, hal::Hertz{ 10000 }));
@@ -167,19 +170,20 @@ namespace
                 EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<14> terminal{ terminalWithCommands, tracer };
+        services::TerminalWithStorage::WithMaxSize<16> terminal{ terminalWithCommands, tracer };
 
         testing::StrictMock<PwmMock> pwmMock;
         testing::StrictMock<AdcMock> adcMock;
         testing::StrictMock<EncoderMock> encoderMock;
-        testing::NiceMock<PerformanceTrackerMock> performanceTrackerMock;
+        testing::StrictMock<PerformanceTrackerMock> performanceTrackerMock;
         testing::StrictMock<AdcPhaseCurrentMeasurementMock> adcDecoratorMock;
         testing::StrictMock<QuadratureEncoderDecoratorMock> encoderDecoratorMock;
+        testing::StrictMock<hal::CleanEepromMock> eepromMock;
 
         infra::CreatorMock<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds, hal::Hertz)> pwmCreator{ pwmMock };
         infra::CreatorMock<application::AdcPhaseCurrentMeasurement, void(application::HardwareFactory::SampleAndHold)> adcCreator{ adcDecoratorMock };
         infra::CreatorMock<application::QuadratureEncoderDecorator, void()> encoderCreator{ encoderDecoratorMock };
-        testing::NiceMock<CanBusAdapterMock> canAdapterMock;
+        testing::StrictMock<CanBusAdapterMock> canAdapterMock;
         infra::CreatorMock<application::CanBusAdapter, void(uint32_t, bool)> canCreator{ canAdapterMock };
 
         std::optional<application::TerminalInteractor> terminalInteractor;
@@ -1667,6 +1671,177 @@ TEST_F(TestHardwareTerminal, can_send_with_29bit_id)
         {
             EXPECT_CALL(canAdapterMock, SendData(hal::Can::Id::Create29BitId(2048), testing::_, testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, eeprom_write_command)
+{
+    InvokeCommand("eeprom_write 0 170 187", [this]()
+        {
+            EXPECT_CALL(eepromMock, Size()).WillOnce(testing::Return(512u));
+            EXPECT_CALL(eepromMock, WriteBuffer(infra::CheckByteRangeContents(std::vector<uint8_t>{ 0xAA, 0xBB }), 0u, testing::_))
+                .WillOnce(testing::InvokeArgument<2>());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, eeprom_write_alias)
+{
+    InvokeCommand("ew 0 170", [this]()
+        {
+            EXPECT_CALL(eepromMock, Size()).WillOnce(testing::Return(512u));
+            EXPECT_CALL(eepromMock, WriteBuffer(infra::CheckByteRangeContents(std::vector<uint8_t>{ 0xAA }), 0u, testing::_))
+                .WillOnce(testing::InvokeArgument<2>());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, eeprom_read_command)
+{
+    InvokeCommand("eeprom_read 0 2", [this]()
+        {
+            EXPECT_CALL(eepromMock, Size()).WillOnce(testing::Return(512u));
+            EXPECT_CALL(eepromMock, ReadBuffer(testing::_, 0u, testing::_))
+                .WillOnce([](infra::ByteRange buf, uint32_t, infra::Function<void()> done)
+                    {
+                        buf[0] = 0x42;
+                        buf[1] = 0x43;
+                        done();
+                    });
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, eeprom_read_alias)
+{
+    InvokeCommand("er 0 1", [this]()
+        {
+            EXPECT_CALL(eepromMock, Size()).WillOnce(testing::Return(512u));
+            EXPECT_CALL(eepromMock, ReadBuffer(testing::_, 0u, testing::_))
+                .WillOnce([](infra::ByteRange buf, uint32_t, infra::Function<void()> done)
+                    {
+                        buf[0] = 0xFF;
+                        done();
+                    });
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, eeprom_erase_command)
+{
+    InvokeCommand("eeprom_erase", [this]()
+        {
+            EXPECT_CALL(eepromMock, Erase(testing::_))
+                .WillOnce(testing::InvokeArgument<0>());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, eeprom_erase_alias)
+{
+    InvokeCommand("ee", [this]()
+        {
+            EXPECT_CALL(eepromMock, Erase(testing::_))
+                .WillOnce(testing::InvokeArgument<0>());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, eeprom_write_missing_data_bytes_returns_error)
+{
+    InvokeCommand("eeprom_write 0", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "usage: eeprom_write <addr> <b0> [b1...]" };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, eeprom_read_missing_size_returns_error)
+{
+    InvokeCommand("eeprom_read 0", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "usage: eeprom_read <addr> <size>" };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, eeprom_write_invalid_address_returns_error)
+{
+    InvokeCommand("eeprom_write abc 170", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid address" };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, eeprom_write_address_out_of_range_returns_error)
+{
+    EXPECT_CALL(eepromMock, Size()).WillOnce(testing::Return(512u));
+    InvokeCommand("eeprom_write 600 170", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "address out of range" };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, eeprom_read_address_out_of_range_returns_error)
+{
+    EXPECT_CALL(eepromMock, Size()).WillOnce(testing::Return(512u));
+    InvokeCommand("eeprom_read 600 2", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "address out of range" };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
         });
 
     ExecuteAllActions();
