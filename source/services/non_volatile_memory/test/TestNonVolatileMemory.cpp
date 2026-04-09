@@ -13,7 +13,7 @@ namespace
 
     // ---------------------------------------------------------------------------
     // NvmRegionStub — in-memory region that dispatches callbacks via the event loop,
-    // matching the async behaviour of real flash and EEPROM implementations.
+    // matching the async behaviour of real non-volatile memory implementations.
     // ---------------------------------------------------------------------------
     class NvmRegionStub
         : public services::NvmRegion

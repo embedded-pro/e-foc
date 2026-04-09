@@ -117,4 +117,9 @@ namespace application
     {
         return peripherals->canImpl.canCreator;
     }
+
+    hal::Eeprom& HardwareFactoryImpl::Eeprom()
+    {
+        return peripherals->eepromPeripheral;
+    }
 }

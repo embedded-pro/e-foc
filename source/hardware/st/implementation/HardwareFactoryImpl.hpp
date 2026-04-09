@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include HARDWARE_PINS_AND_PERIPHERALS_HEADER
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/interfaces/SerialCommunication.hpp"
@@ -30,6 +32,7 @@ namespace application
         infra::CreatorBase<AdcPhaseCurrentMeasurement, void(SampleAndHold)>& AdcMultiChannelCreator() override;
         infra::CreatorBase<QuadratureEncoderDecorator, void()>& SynchronousQuadratureEncoderCreator() override;
         infra::CreatorBase<CanBusAdapter, void(uint32_t bitRate, bool testMode)>& CanBusCreator() override;
+        hal::Eeprom& Eeprom() override;
 
         // Implementation of hal::PerformanceTracker
         void Start() override;
@@ -106,6 +109,62 @@ namespace application
             void ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction) override;
         };
 
+        class EepromStub
+            : public hal::Eeprom
+        {
+        public:
+            static constexpr uint32_t stubSize = 512;
+
+            EepromStub()
+            {
+                storage.fill(0xFF);
+            }
+
+            uint32_t Size() const override
+            {
+                return stubSize;
+            }
+
+            void WriteBuffer(infra::ConstByteRange buffer, uint32_t address, infra::Function<void()> onDone) override
+            {
+                const auto start = static_cast<decltype(storage.size())>(address);
+                const auto length = buffer.size();
+
+                if (start > storage.size() || length > storage.size() - start)
+                {
+                    onDone();
+                    return;
+                }
+
+                std::copy(buffer.begin(), buffer.end(), storage.begin() + start);
+                onDone();
+            }
+
+            void ReadBuffer(infra::ByteRange buffer, uint32_t address, infra::Function<void()> onDone) override
+            {
+                const auto start = static_cast<decltype(storage.size())>(address);
+                const auto length = buffer.size();
+
+                if (start > storage.size() || length > storage.size() - start)
+                {
+                    onDone();
+                    return;
+                }
+
+                std::copy(storage.begin() + start, storage.begin() + start + length, buffer.begin());
+                onDone();
+            }
+
+            void Erase(infra::Function<void()> onDone) override
+            {
+                storage.fill(0xFF);
+                onDone();
+            }
+
+        private:
+            std::array<uint8_t, stubSize> storage;
+        };
+
         struct TerminalAndTracer
         {
             explicit TerminalAndTracer(hal::SerialCommunication& com)
@@ -144,5 +203,6 @@ namespace application
             {
                 object.emplace();
             } };
+        EepromStub eepromStub;
     };
 }

@@ -10,6 +10,6 @@ namespace application
         , motorStateMachine(
               TerminalAndTracer{ terminalWithStorage, hardware.Tracer() },
               MotorDriverAndEncoder{ hardwareAdapter, hardwareAdapter },
-              vdc)
+              vdc, hardware.Eeprom())
     {}
 }

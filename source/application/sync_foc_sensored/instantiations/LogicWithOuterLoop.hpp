@@ -21,7 +21,7 @@ namespace application
             , motorStateMachine(
                   TerminalAndTracer{ terminalWithStorage, hardware.Tracer() },
                   MotorDriverAndEncoder{ hardwareAdapter, hardwareAdapter },
-                  vdc, hardware.MaxCurrentSupported(), hardwareAdapter.BaseFrequency(), hardware.LowPriorityInterrupt())
+                  vdc, hardware.Eeprom(), hardware.MaxCurrentSupported(), hardwareAdapter.BaseFrequency(), hardware.LowPriorityInterrupt())
         {}
 
     private:

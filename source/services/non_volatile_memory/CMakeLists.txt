@@ -15,8 +15,8 @@ target_sources(e_foc.services.non_volatile_memory PRIVATE
     ConfigData.hpp
     NonVolatileMemory.hpp
     NvmRegion.hpp
-    NvmFlashRegion.hpp
-    NvmFlashRegion.cpp
+    NvmEepromRegion.hpp
+    NvmEepromRegion.cpp
     NonVolatileMemoryImpl.hpp
     NonVolatileMemoryImpl.cpp
 )
