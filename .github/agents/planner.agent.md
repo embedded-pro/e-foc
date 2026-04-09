@@ -52,6 +52,7 @@ Before planning, thoroughly investigate:
   - `documentation/theory/resistance-inductance-estimation.md` — parameter identification
   - `documentation/theory/friction-inertia-estimation.md` — mechanical parameter estimation
   - `documentation/performance-optimization/README.md` — embedded performance techniques
+  - Check for existing architecture/design documents (files with `type: architecture` or `type: design`) under `documentation/` for the affected component. **Any behavioral change must be reflected in these documents. Plans must include updating them before or alongside code changes — code must follow documentation, not the opposite.**
 
 ### 2. Plan Structure
 
@@ -98,9 +99,11 @@ Tests are designed **before** implementation (TDD Red-Green-Refactor):
 - Use `TEST_F` for fixture tests with `float`; `TYPED_TEST` for numeric-type-generic code
 
 #### Documentation Update
-- Documentation to create or update: `documentation/theory/` or `documentation/performance-optimization/`
-- Use `documentation/templates/` as starting template for new theory documents
-- Include: mathematical background, control-loop diagram description, tuning guidance, hardware dependencies
+- **Behavioral changes**: Update the corresponding architecture or design document (`type: architecture` / `type: design`) in `documentation/` **before or alongside** the code changes. If no such document exists, plan to create one using `documentation/templates/architecture.md` or `documentation/templates/design.md`. Code must follow documentation — document updates for behavioral changes are first-class deliverables, not afterthoughts.
+- **Algorithm/theory changes**: Update `documentation/theory/` for FOC algorithm or motor model changes; update `documentation/performance-optimization/README.md` for timing-sensitive changes.
+- Use `documentation/templates/` as starting template for new documents.
+- Include: mathematical background, control-loop diagram description, tuning guidance, hardware dependencies.
+- All visuals in documents must use Mermaid code blocks or ASCII art — external image references (`![alt](path)`) are not allowed.
 
 #### Build Integration
 - `CMakeLists.txt` changes needed in affected layers
