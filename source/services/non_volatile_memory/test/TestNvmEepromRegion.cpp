@@ -1,12 +1,10 @@
 #include "hal/interfaces/test_doubles/EepromStub.hpp"
 #include "infra/event/test_helper/EventDispatcherFixture.hpp"
 #include "source/services/non_volatile_memory/NvmEepromRegion.hpp"
-#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 namespace
 {
-    using namespace testing;
-
     // EepromStub with 1024 bytes; tests use a 128-byte region starting at baseAddress 256.
     class NvmEepromRegionTest
         : public ::testing::Test

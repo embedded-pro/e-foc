@@ -110,11 +110,11 @@ The read-back verification step catches EEPROM hardware faults, programming erro
 
 The two NVM regions occupy fixed, non-overlapping address ranges within the MCU EEPROM. Addresses are byte offsets from the start of the EEPROM address space.
 
-| Region        | Base address | Size     | Content               |
-|---------------|-------------|----------|-----------------------|
-| Calibration   | 0           | 128 B    | One calibration record|
-| Configuration | 128         | 128 B    | One configuration record|
-| Reserved      | 256+        | remainder| Unused; not accessed  |
+| Region        | Base address | Size      | Content                  |
+|---------------|--------------|-----------|--------------------------|
+| Calibration   | 0            | 128 B     | One calibration record   |
+| Configuration | 128          | 128 B     | One configuration record |
+| Reserved      | 256+         | remainder | Unused; not accessed     |
 
 Both regions fit comfortably within the 2048-byte EEPROM available on the TM4C1294 target. ST and Host targets use an in-memory stub of identical layout for regression testing.
 
@@ -211,7 +211,7 @@ stateDiagram-v2
 | `SaveCalibration(data, onDone)` | Erases calibration sector, writes record, verifies read-back                  | `onDone(NvmStatus)` fires exactly once; rejected if region is busy      |
 | `LoadCalibration(onDone)`       | Reads and integrity-checks the calibration record                             | `onDone(NvmStatus, optional<CalibrationData>)` fires exactly once       |
 | `InvalidateCalibration(onDone)` | Erases the calibration sector without writing a new record                    | Makes `IsCalibrationValid` return false; `onDone(NvmStatus)` fires once |
-| `IsCalibrationValid()`          | Synchronously returns whether a valid calibration record is present           | Based on last known read status; does not perform an EEPROM read          |
+| `IsCalibrationValid()`          | Synchronously returns whether a valid calibration record is present           | Based on last known read status; does not perform an EEPROM read        |
 | `SaveConfig(data, onDone)`      | Same write+verify sequence for the configuration region                       | `onDone(NvmStatus)` fires exactly once                                  |
 | `LoadConfig(onDone)`            | Reads and integrity-checks the configuration record                           | `onDone(NvmStatus, optional<ConfigData>)` fires exactly once            |
 | `ResetConfigToDefaults(onDone)` | Writes a record containing factory-default values to the configuration region | Follows the same erase/write/verify sequence as `SaveConfig`            |
@@ -219,7 +219,7 @@ stateDiagram-v2
 
 ### Required
 
-| Interface                            | Purpose                                                                 | Contract                                                                           |
-|--------------------------------------|-------------------------------------------------------------------------|------------------------------------------------------------------------------------|
+| Interface                            | Purpose                                                                 | Contract                                                                                   |
+|--------------------------------------|-------------------------------------------------------------------------|--------------------------------------------------------------------------------------------|
 | `NvmRegion` (calibration instance)   | Abstracts raw EEPROM write and read for the calibration address range   | Must be backed by a dedicated EEPROM address range; must not be shared with any other user |
-| `NvmRegion` (configuration instance) | Abstracts raw EEPROM write and read for the configuration address range | Must be backed by a dedicated EEPROM address range separate from the calibration range    |
+| `NvmRegion` (configuration instance) | Abstracts raw EEPROM write and read for the configuration address range | Must be backed by a dedicated EEPROM address range separate from the calibration range     |

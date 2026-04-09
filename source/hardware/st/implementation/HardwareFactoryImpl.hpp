@@ -127,13 +127,31 @@ namespace application
 
             void WriteBuffer(infra::ConstByteRange buffer, uint32_t address, infra::Function<void()> onDone) override
             {
-                std::copy(buffer.begin(), buffer.end(), storage.begin() + address);
+                const auto start = static_cast<decltype(storage.size())>(address);
+                const auto length = buffer.size();
+
+                if (start > storage.size() || length > storage.size() - start)
+                {
+                    onDone();
+                    return;
+                }
+
+                std::copy(buffer.begin(), buffer.end(), storage.begin() + start);
                 onDone();
             }
 
             void ReadBuffer(infra::ByteRange buffer, uint32_t address, infra::Function<void()> onDone) override
             {
-                std::copy(storage.begin() + address, storage.begin() + address + buffer.size(), buffer.begin());
+                const auto start = static_cast<decltype(storage.size())>(address);
+                const auto length = buffer.size();
+
+                if (start > storage.size() || length > storage.size() - start)
+                {
+                    onDone();
+                    return;
+                }
+
+                std::copy(storage.begin() + start, storage.begin() + start + length, buffer.begin());
                 onDone();
             }
 

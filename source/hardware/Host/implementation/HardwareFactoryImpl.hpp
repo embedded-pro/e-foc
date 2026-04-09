@@ -115,12 +115,17 @@ namespace application
 
             void WriteBuffer(infra::ConstByteRange buffer, uint32_t address, infra::Function<void()> onDone) override
             {
+                really_assert(address <= stubSize);
+                really_assert(buffer.size() <= stubSize - address);
+
                 std::copy(buffer.begin(), buffer.end(), storage.begin() + address);
                 onDone();
             }
 
             void ReadBuffer(infra::ByteRange buffer, uint32_t address, infra::Function<void()> onDone) override
             {
+                really_assert(address <= stubSize);
+                really_assert(buffer.size() <= stubSize - address);
                 std::copy(storage.begin() + address, storage.begin() + address + buffer.size(), buffer.begin());
                 onDone();
             }

@@ -223,15 +223,15 @@ The hardware-test application registers three additional terminal commands that 
 
 ### Command Reference
 
-| Command        | Alias | Arguments                     | Action                                                                                              |
-|----------------|-------|-------------------------------|-----------------------------------------------------------------------------------------------------|
-| `eeprom_write` | `ew`  | `<addr> <b0> [b1 … b63]`      | Writes up to 64 bytes to the EEPROM starting at the given byte address. The callback fires when the hardware write completes. |
-| `eeprom_read`  | `er`  | `<addr> <size>`               | Reads `size` bytes (1–64) from the EEPROM starting at `addr` and traces each byte value to the serial output. The callback fires when the hardware read completes. |
-| `eeprom_erase` | `ee`  | none                          | Erases the entire EEPROM to the all-0xFF state. The callback fires when the hardware erase completes. |
+| Command        | Alias | Arguments                | Action                                                                                                                                                             |
+|----------------|-------|--------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `eeprom_write` | `ew`  | `<addr> <b0> [b1 … b63]` | Writes up to 64 bytes to the EEPROM starting at the given byte address. The callback fires when the hardware write completes.                                      |
+| `eeprom_read`  | `er`  | `<addr> <size>`          | Reads `size` bytes (1–64) from the EEPROM starting at `addr` and traces each byte value to the serial output. The callback fires when the hardware read completes. |
+| `eeprom_erase` | `ee`  | none                     | Erases the entire EEPROM to the all-0xFF state. The callback fires when the hardware erase completes.                                                              |
 
 ### Asynchronous Completion
 
-All three commands are asynchronous. The terminal prompt (`> `) does not appear until the hardware operation completes and `ProcessResult` is called from the completion callback. This correctly models the interrupt-driven behaviour of the TM4C EEPROM peripheral.
+All three commands are asynchronous. The terminal prompt (`>`) does not appear until the hardware operation completes and `ProcessResult` is called from the completion callback. This correctly models the interrupt-driven behaviour of the TM4C EEPROM peripheral.
 
 ### Argument Constraints
 
