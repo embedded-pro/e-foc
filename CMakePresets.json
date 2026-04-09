@@ -22,7 +22,7 @@
             "inherits": "defaults",
             "cacheVariables": {
                 "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo;MinSizeRel",
-                "E_FOC_TARGET_PLATFORM": "Host",
+                "E_FOC_TARGET_PLATFORM": "host",
                 "E_FOC_BUILD_TESTS": true,
                 "E_FOC_BUILD_SIMULATOR": true,
                 "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": false
@@ -35,7 +35,7 @@
             "inherits": "defaults",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "E_FOC_TARGET_PLATFORM": "Host",
+                "E_FOC_TARGET_PLATFORM": "host",
                 "E_FOC_BUILD_TESTS": true
             }
         },
@@ -52,7 +52,7 @@
                 "CMAKE_C_FLAGS": "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH",
                 "QT_HOST_PATH": "/usr",
                 "QT_HOST_PATH_CMAKE_DIR": "/usr/lib/x86_64-linux-gnu/cmake",
-                "E_FOC_TARGET_PLATFORM": "Host",
+                "E_FOC_TARGET_PLATFORM": "host",
                 "E_FOC_BUILD_TESTS": true,
                 "E_FOC_BUILD_SIMULATOR": true,
                 "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": false
