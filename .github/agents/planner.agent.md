@@ -43,9 +43,9 @@ Before planning, thoroughly investigate:
   - `FocTorque`, `FocSpeed`, `FocPosition` — set-point types
   - `Driver` — hardware adapter abstractions
 - **Timing constraints**: Assess whether each step stays within the FOC loop budget (<400 cycles at 120 MHz for a 20 kHz control rate)
-- **Hardware adapters**: Check `source/hardware/HardwareFactory.hpp` for peripheral creation and injection patterns
+- **Hardware adapters**: Check `source/platform_abstraction/HardwareFactory.hpp` for peripheral creation and injection patterns
 - **Numerical tools**: Identify if `infra/numerical-toolbox/` algorithms (PID, filters, transforms) can be reused or need extension
-- **Test infrastructure**: Find existing test files in `source/foc/implementations/test/` and simulation models in `source/tool/simulator/`
+- **Test infrastructure**: Find existing test files in `source/foc/implementations/test/` and simulation models in `tools/simulator/`
 - **Documentation**: Consult `documentation/` for domain guidance:
   - `documentation/theory/foc.md` — FOC algorithm theory
   - `documentation/theory/alignment.md` — motor alignment procedures
@@ -93,8 +93,8 @@ Tests are designed **before** implementation (TDD Red-Green-Refactor):
 - **Refactor**: Clean up after all tests are green
 
 - Unit test files: `source/foc/implementations/test/Test{ComponentName}.cpp`
-- Host simulation models for validation: `source/tool/simulator/`
-- Host hardware stubs: `source/hardware/Host/`
+- Host simulation models for validation: `tools/simulator/`
+- Host hardware stubs: `targets/platform_implementations/Host/`
 - Key test cases: correctness of transforms, PID output under known conditions, SVM duty cycles, edge cases
 - Use `TEST_F` for fixture tests with `float`; `TYPED_TEST` for numeric-type-generic code
 
@@ -131,7 +131,7 @@ Before finalizing, verify the plan against these constraints:
 
 ## Critical Constraints Checklist
 
-Scope note: The memory and realtime constraints below apply to embedded/runtime motor-control code and hot paths (for example `source/foc/`, embedded `source/hardware/`, ISR-driven services, and other deterministic control-loop code). Host-side tools, simulators, test infrastructure, and GUI code may use normal host-side STL/heap patterns unless the task explicitly targets embedded/runtime code.
+Scope note: The memory and realtime constraints below apply to embedded/runtime motor-control code and hot paths (for example `source/foc/`, embedded `source/platform_abstraction/`, `targets/`, ISR-driven services, and other deterministic control-loop code). Host-side tools, simulators, test infrastructure, and GUI code may use normal host-side STL/heap patterns unless the task explicitly targets embedded/runtime code.
 
 ### Memory — NO HEAP ALLOCATION IN EMBEDDED / REALTIME RUNTIME CODE
 - [ ] In embedded/runtime FOC code, no `new`, `delete`, `malloc`, `free`, `std::make_unique`, `std::make_shared`
@@ -174,7 +174,7 @@ Scope note: The memory and realtime constraints below apply to embedded/runtime 
 ### Testing
 - [ ] Unit tests for every new transform, algorithm, or mode
 - [ ] Host simulation model updated if control loop is modified
-- [ ] Hardware stubs in `source/hardware/Host/` if new hardware interfaces are introduced
+- [ ] Hardware stubs in `targets/platform_implementations/Host/` if new hardware interfaces are introduced
 - [ ] Tests use `TEST_F` (fixture) or `TYPED_TEST` (typed)
 - [ ] Tests verify numerical correctness of transforms and control outputs
 

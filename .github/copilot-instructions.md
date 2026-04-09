@@ -5,13 +5,14 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 1) Big-picture architecture (short)
 - Purpose: Field-Oriented Control (FOC) for BLDC/PMSM with strict realtime and memory constraints.
 - Major components:
-  - `source/` — FOC implementations, hardware adapters, application code (formerly `application/motors`).
+  - `source/` — FOC implementations, platform abstraction interfaces, and services (libraries only).
   - `source/services/` — Application-level services (coordination, scheduling, helpers).
+  - `source/platform_abstraction/` — Abstract `HardwareFactory` interface and shared adapters.
+  - `targets/` — Application entry points (`hardware_test`, `sync_foc_sensored`) and platform implementations under `targets/platform_implementations/` (Host, ti, st).
   - `numerical-toolbox/` — Generic numerical algorithms (PID, filters, fixed-point helpers). Located at `infra/numerical-toolbox/`.
   - `embedded-infra-lib/` — Infrastructure: bounded containers, build helpers, toolchain cmake pieces. Located at `infra/embedded-infra-lib/`.
-  - `source/tool/simulator/` — Host simulation models for validation.
-  - `source/tool/can_commander/` — CAN bus command interface tool.
-- Interaction: `source/` implements control logic and uses `hal/` adapters from `embedded-infra-lib` and algorithms from `numerical-toolbox`.
+  - `tools/simulator/` — Host simulation models for validation.
+  - `tools/can_commander/` — CAN bus command interface tool.
 
 2) Critical developer workflows (exact commands)
 - Clone (with submodules):
@@ -37,14 +38,14 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 4) Patterns & code locations (concrete examples)
 - Add a new FOC algorithm:
   - Implement code in `source/foc/implementations/` and keep public interfaces in `source/foc/interfaces/`.
-  - Motor-specific application code now lives under `source/application/` (renamed from `application/motors`).
-- Hardware abstraction & factory: see `source/hardware/HardwareFactory.hpp` for how peripherals and adapters are created and injected.
+  - Motor-specific application code lives under `targets/sync_foc_sensored/` and `targets/hardware_test/`.
+- Hardware abstraction & factory: see `source/platform_abstraction/HardwareFactory.hpp` for how peripherals and adapters are created and injected.
 - Numerical algorithms: follow patterns in `infra/numerical-toolbox/` — implement float first, then Q15/Q31 variants, and add typed GoogleTest suites.
 
 5) Testing & CI expectations
 - Unit tests run on host using GoogleTest. Use typed tests for multiple numeric types (float, Q15, Q31).
 - Prefer small, deterministic tests that do not require hardware.
-- If adding platform-specific tests, provide host stubs/mocks in `source/hardware/Host/`.
+- If adding platform-specific tests, provide host stubs/mocks in `targets/platform_implementations/Host/`.
 - Always use `testing::StrictMock<>` for all mock instances — `NiceMock` and `NaggyMock` are **forbidden**.
 
 6) Build system tips

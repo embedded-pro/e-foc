@@ -8,8 +8,8 @@ applyTo: "**/test/**"
 ## File Structure
 
 - Unit test files: `source/foc/implementations/test/Test{ComponentName}.cpp`
-- Hardware stubs for unit tests: `source/hardware/Host/`
-- Host simulation models for integration: `source/tool/simulator/`
+- Hardware stubs for unit tests: `targets/platform_implementations/Host/`
+- Host simulation models for integration: `tools/simulator/`
 - CMake: tests added via `add_subdirectory(test)` in `CMakeLists.txt`
 
 ## Framework
@@ -88,7 +88,7 @@ TYPED_TEST(TestFirFilter, produces_correct_output)
 - **SVM**: Test duty cycles for all 6 sectors and sector boundaries
 - **PID anti-windup**: Verify that integrator is clamped and does not accumulate past output limits
 - **Electrical angle conversion**: Verify `θe = θm · pole_pairs` for multiple pole-pair counts
-- **Control loop integration**: Use host simulation models in `source/tool/simulator/` for end-to-end validation
+- **Control loop integration**: Use host simulation models in `tools/simulator/` for end-to-end validation
 - Test edge cases: zero current, maximum current, zero speed, maximum speed, angle wraparound at ±π
 
 ## Test Quality
@@ -96,6 +96,6 @@ TYPED_TEST(TestFirFilter, produces_correct_output)
 - Use descriptive test names that state the scenario and expected outcome
 - Keep tests focused — one behavior per test
 - Use `EXPECT_NEAR` with explicit tolerance for floating-point assertions (not `EXPECT_EQ`)
-- Tests must not require hardware — use stubs from `source/hardware/Host/`
+- Tests must not require hardware — use stubs from `targets/platform_implementations/Host/`
 - Follow Arrange-Act-Assert pattern
 - Allman brace style applies to test code too

@@ -1,7 +1,3 @@
 add_subdirectory(foc)
-add_subdirectory(hardware)
-add_subdirectory(application)
+add_subdirectory(platform_abstraction)
 add_subdirectory(services)
-if (E_FOC_BUILD_SIMULATOR)
-    add_subdirectory(tool)
-endif()

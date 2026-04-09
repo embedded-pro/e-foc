@@ -9,6 +9,7 @@ option(E_FOC_INCLUDE_DEFAULT_INIT "Include default initialization code; turn off
 option(E_FOC_BUILD_TESTS "Enable build of the examples" Off)
 option(E_FOC_BUILD_SIMULATOR "Build the host simulator executables" Off)
 
+
 if (E_FOC_BUILD_TESTS)
     set(BUILD_TESTING On)
 endif()
@@ -59,14 +60,19 @@ if (E_FOC_BUILD_TESTS)
 endif()
 
 if (DEFINED TARGET_MCU_VENDOR)
-    add_subdirectory(hal/${TARGET_MCU_VENDOR})
-    emil_exclude_directory_from_coverage(hal/${TARGET_MCU_VENDOR})
+    add_subdirectory(infra/hal/${TARGET_MCU_VENDOR})
+    emil_exclude_directory_from_coverage(infra/hal/${TARGET_MCU_VENDOR})
 endif()
 
 add_subdirectory(infra/numerical-toolbox)
 add_subdirectory(source)
+add_subdirectory(targets)
 
-emil_clangformat_directories(e_foc DIRECTORIES source)
+if (E_FOC_BUILD_SIMULATOR)
+    add_subdirectory(tools)
+endif()
+
+emil_clangformat_directories(e_foc DIRECTORIES source targets tools)
 emil_folderize_all_targets()
 emil_exclude_directory_from_coverage(infra/embedded-infra-lib)
 emil_coverage_targets(DIRECTORIES .)

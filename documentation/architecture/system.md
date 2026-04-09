@@ -44,50 +44,58 @@ date: 2026-04-07
 
 e-foc is a Field-Oriented Control (FOC) firmware for BLDC and PMSM motors. Its purpose is to transform three-phase stator currents into a rotating reference frame so that torque and flux can be regulated independently with standard linear PIDs, then synthesise the three-phase PWM voltages via Space Vector Modulation.
 
-The system is structured in three tiers:
+The system is structured in four tiers:
 
 1. **Infrastructure tier** — external repositories providing general-purpose utilities, numerical algorithms, and vendor HAL drivers. These are consumed as submodules and are never modified by this project.
-2. **Platform Abstraction Layer (PAL)** — a boundary layer that hides all microcontroller-specific peripheral details behind stable, abstract interfaces. Both physical hardware targets and the host simulator implement the same PAL contracts, enabling the control logic to run unchanged in all environments.
-3. **Application tier** — the FOC algorithms, services, and application wiring that implement the motor control system as a whole.
+2. **Source / Library tier** — the FOC algorithm library (`source/foc/`), service library (`source/services/`), and the Platform Abstraction Layer interface (`source/platform_abstraction/`). These are pure, portable libraries with no target-specific knowledge.
+3. **Targets tier** — target-specific code that is NOT reusable across all environments: platform implementations (concrete `HardwareFactory` for TI, ST, and Host) and application entry points (`hardware_test`, `sync_foc_sensored`). Lives under `targets/`.
+4. **Tools tier** — host-only desktop tools (simulator, CAN commander) that run on development machines only. Lives under `tools/`.
 
 ```mermaid
 graph TD
-    subgraph APP["Application Tier"]
+    subgraph TARGETS["Targets Tier"]
         INST["Application / Instantiation"]
-        SVC["Services\n(Alignment · NVM · Ident · CLI)"]
-        FOC["FOC Core\n(Torque / Speed / Position)"]
+        PAL_TI["TI Target\nimplementation"]
+        PAL_ST["ST Target\nimplementation"]
+        PAL_HOST["Host / Simulator\nimplementation"]
     end
 
-    subgraph PAL["Platform Abstraction Layer"]
-        HF["Hardware Factory\n(abstract interface)"]
-        HW_TI["TI Target\nimplementation"]
-        HW_ST["ST Target\nimplementation"]
-        HW_HOST["Host / Simulator\nimplementation"]
+    subgraph SRC["Source / Library Tier"]
+        SVC["Services\n(Alignment · NVM · Ident · CLI)"]
+        FOC["FOC Core\n(Torque / Speed / Position)"]
+        HF["Platform Abstraction\n(HardwareFactory interface + adapters)"]
     end
 
     subgraph INFRA["Infrastructure Tier (submodules)"]
         EMIL["embedded-infra-lib\n(containers · observer · function · timers)"]
         NT["numerical-toolbox\n(PID · filters · estimators)"]
         CAN["can-lite\n(CAN protocol)"]
-        HAL_TI["hal/ti\n(TI vendor drivers)"]
-        HAL_ST["hal/st\n(ST vendor drivers)"]
+        HAL_TI["infra/hal/ti\n(TI vendor drivers)"]
+        HAL_ST["infra/hal/st\n(ST vendor drivers)"]
+    end
+
+    subgraph TOOLS["Tools Tier"]
+        SIM["Simulator"]
+        CANC["CAN Commander"]
     end
 
     INST --> FOC
     INST --> SVC
     INST --> HF
+    INST --> PAL_TI
+    INST --> PAL_ST
+    INST --> PAL_HOST
     FOC --> EMIL
     FOC --> NT
     SVC --> EMIL
-    HF --> HW_TI
-    HF --> HW_ST
-    HF --> HW_HOST
-    HW_TI --> HAL_TI
-    HW_ST --> HAL_ST
-    HW_HOST --> EMIL
-    HW_TI --> EMIL
-    HW_ST --> EMIL
+    HF --> EMIL
+    PAL_TI --> HAL_TI
+    PAL_ST --> HAL_ST
+    PAL_HOST --> EMIL
+    PAL_TI --> EMIL
+    PAL_ST --> EMIL
     CAN --> EMIL
+    TOOLS --> FOC
 ```
 
 The simulator implements the same PAL contracts as real hardware. Control logic never needs to distinguish between running on a microcontroller or on the host; this enables full-fidelity closed-loop validation without hardware.
@@ -150,9 +158,9 @@ The PAL provides a single platform-facing abstraction that groups creation and a
 | Serial terminal                             | Diagnostic trace and command-line interaction interface         |
 
 Concrete implementations exist for:
-- **TI Tiva (EK-TM4C1294XL)**: platform-specific peripheral adapters for this MCU family.
-- **ST STM32 (STM32F407G-DISC1)**: platform-specific peripheral adapters for this MCU family.
-- **Host / Simulator**: a software-backed platform implementation that emulates the motor-control I/O needed to run the closed-loop algorithm on a development machine.
+- **TI Tiva (EK-TM4C1294XL, EK-TM4C123GXL)**: platform-specific peripheral adapters under `targets/platform_implementations/ti/`.
+- **ST STM32 (STM32F407G-DISC1, NUCLEO-H563ZI)**: platform-specific peripheral adapters under `targets/platform_implementations/st/`.
+- **Host / Simulator**: a software-backed platform implementation that emulates the motor-control I/O needed to run the closed-loop algorithm on a development machine, located under `targets/platform_implementations/Host/`.
 
 ```mermaid
 graph LR
@@ -160,8 +168,8 @@ graph LR
     PAL_IF --> TI["TI Target\nimpl"]
     PAL_IF --> ST["ST Target\nimpl"]
     PAL_IF --> HOST["Host / Simulator\nimpl"]
-    TI --> HAL_TI["hal/ti"]
-    ST --> HAL_ST["hal/st"]
+    TI --> HAL_TI["infra/hal/ti"]
+    ST --> HAL_ST["infra/hal/st"]
     HOST --> SIM_MODEL["Motor Model\n(PMSM physics simulation)"]
 ```
 
@@ -196,8 +204,8 @@ Vendor-provided hardware abstraction libraries consumed as Git submodules. They 
 
 | Directory | Vendor / Board                      |
 |-----------|-------------------------------------|
-| `hal/ti`  | Texas Instruments Tiva (Cortex-M4F) |
-| `hal/st`  | STMicroelectronics STM32            |
+| `infra/hal/ti`  | Texas Instruments Tiva (Cortex-M4F) |
+| `infra/hal/st`  | STMicroelectronics STM32            |
 
 These are never used directly by the FOC core or services — only by the PAL concrete implementations.
 
@@ -317,8 +325,8 @@ These patterns eliminate polling, decouple producers from consumers, and allow t
 
 ## Open Questions & Decisions
 
-| # | Question / Decision                        | Status | Options Considered                                                                                        | Rationale                                                                                                                                                                                          |
-|---|--------------------------------------------|--------|-----------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1 | Rename `source/hardware/` to `source/pal/` | open   | Keep current name vs rename to PAL                                                                        | The architectural role is a Platform Abstraction Layer, not just "hardware". Renaming would make the intent explicit.  Deferred to avoid breaking existing include paths without a migration plan. |
-| 2 | Multi-motor support                        | open   | Single instantiation per motor vs shared PAL with multiple FOC controllers                                | Current architecture supports one motor per binary. A shared PAL with multiple `FocController` instances is architecturally feasible but not yet required.                                         |
-| 3 | Field-weakening                            | open   | Extend `FocTorque` interface with flux-weakening setpoint vs separate `FocTorqueFieldWeakening` interface | Required for operation above base speed. Separate interface preferred (ISP) but not yet scoped.                                                                                                    |
+| # | Question / Decision                                           | Status   | Options Considered                                                                                        | Rationale                                                                                                                                                                                                                              |
+|---|---------------------------------------------------------------|----------|-----------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | Rename `source/hardware/` and extract platform targets        | resolved | Keep current name vs rename to PAL vs full extraction                                                     | Renamed to `source/platform_abstraction/` (interface + adapters only). Platform implementations (TI, ST, Host) and application targets moved to top-level `targets/`. Host-only tools moved to top-level `tools/`. Source tier is now purely libraries. |
+| 2 | Multi-motor support                                           | open     | Single instantiation per motor vs shared PAL with multiple FOC controllers                                | Current architecture supports one motor per binary. A shared PAL with multiple `FocController` instances is architecturally feasible but not yet required.                                                                             |
+| 3 | Field-weakening                                               | open     | Extend `FocTorque` interface with flux-weakening setpoint vs separate `FocTorqueFieldWeakening` interface | Required for operation above base speed. Separate interface preferred (ISP) but not yet scoped.                                                                                                                                        |

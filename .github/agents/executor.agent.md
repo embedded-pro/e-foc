@@ -173,8 +173,8 @@ Rules:
 - Verify transform correctness against known mathematical reference values
 - Test PID clamping and anti-windup behavior
 - Test SVM duty cycles for all 6 sectors and edge cases
-- Host simulation models in `source/tool/simulator/` for integration-level tests
-- Hardware stubs in `source/hardware/Host/` for unit tests that need hardware interfaces
+- Host simulation models in `tools/simulator/` for integration-level tests
+- Hardware stubs in `targets/platform_implementations/Host/` for unit tests that need hardware interfaces
 
 ### Documentation — MANDATORY
 

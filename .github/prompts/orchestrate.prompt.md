@@ -5,7 +5,7 @@ argument-hint: "Describe the FOC feature, motor control algorithm, bug fix, or c
 model: "Claude Sonnet 4.6"
 ---
 
-Analyze the following task for the **e-foc** project — a Field-Oriented Control (FOC) implementation for BLDC/PMSM motors targeting resource-constrained embedded microcontrollers. Gather relevant context from the codebase — identify affected layers (`source/foc/interfaces/`, `source/foc/implementations/`, `source/hardware/`, `source/application/`), the control mode (torque/speed/position), real-time timing implications, and documentation requirements. Then provide a brief scope summary and use the handoff buttons to route to the appropriate specialist:
+Analyze the following task for the **e-foc** project — a Field-Oriented Control (FOC) implementation for BLDC/PMSM motors targeting resource-constrained embedded microcontrollers. Gather relevant context from the codebase — identify affected layers (`source/foc/interfaces/`, `source/foc/implementations/`, `source/platform_abstraction/`, `targets/`), the control mode (torque/speed/position), real-time timing implications, and documentation requirements. Then provide a brief scope summary and use the handoff buttons to route to the appropriate specialist:
 
 - **Plan Implementation**: For complex tasks needing detailed upfront design (new FOC modes, new transforms, architectural changes, parameter identification algorithms)
 - **Execute Directly**: For straightforward changes with a clear path (bug fixes, small tuning changes, adding tests)

@@ -37,10 +37,10 @@ You triage incoming development requests and route them to the right specialist 
   - `source/foc/interfaces/` — abstract FOC interfaces (`FocTorque`, `FocSpeed`, `FocPosition`, `FocBase`)
   - `source/foc/implementations/` — Clarke/Park transforms, SVM, current/speed/position control loops
   - `source/foc/instantiations/` — concrete wiring of FOC components for specific targets
-  - `source/hardware/` — hardware adapters (ADC, PWM, encoder, CAN)
-  - `source/application/` — motor application code and FOC runners
+  - `source/platform_abstraction/` — platform abstraction adapters (`HardwareFactory` interface, ADC, encoder, CAN adapters)
+  - `targets/` — platform implementations (Host, TI, ST) and application entry points
   - `source/services/` — application-level services
-  - `source/tool/simulator/` — host simulation models for validation
+  - `tools/simulator/` — host simulation models for validation
   - `numerical-toolbox/` — PID, filters, fixed-point math used by FOC
 - What is the control mode? Torque / speed / position loop
 - What is the timing budget? (FOC loop target: <400 cycles at 120 MHz for 20 kHz rate)
@@ -53,5 +53,5 @@ You triage incoming development requests and route them to the right specialist 
 - Project guidelines: [copilot-instructions.md](../../.github/copilot-instructions.md)
 - FOC theory: [`documentation/theory/foc.md`](../../documentation/theory/foc.md)
 - Performance optimization: [`documentation/performance-optimization/README.md`](../../documentation/performance-optimization/README.md)
-- Hardware factory: [`source/hardware/HardwareFactory.hpp`](../../source/hardware/HardwareFactory.hpp)
+- Hardware factory: [`source/platform_abstraction/HardwareFactory.hpp`](../../source/platform_abstraction/HardwareFactory.hpp)
 - Numerical toolbox guidelines: [`numerical-toolbox/.github/copilot-instructions.md`](../../numerical-toolbox/.github/copilot-instructions.md)
