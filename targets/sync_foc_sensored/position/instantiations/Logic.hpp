@@ -1,8 +1,8 @@
 #pragma once
 
-#include "targets/sync_foc_sensored/instantiations/LogicWithOuterLoop.hpp"
 #include "source/foc/implementations/FocPositionImpl.hpp"
 #include "source/services/cli/TerminalPosition.hpp"
+#include "targets/sync_foc_sensored/instantiations/LogicWithOuterLoop.hpp"
 
 namespace application
 {
