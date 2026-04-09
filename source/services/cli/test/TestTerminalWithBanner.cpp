@@ -29,7 +29,7 @@ namespace
         , public infra::EventDispatcherWithWeakPtrFixture
     {
     public:
-        ::testing::NiceMock<StreamWriterMock> streamWriterMock;
+        ::testing::StrictMock<StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
         ::testing::StrictMock<hal::SerialCommunicationMock> communication;
@@ -39,8 +39,9 @@ namespace
 
         void SetUp() override
         {
-            ON_CALL(streamWriterMock, Insert(testing::_, testing::_))
-                .WillByDefault(testing::Invoke([this](infra::ConstByteRange range, infra::StreamErrorPolicy&)
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_))
+                .Times(testing::AnyNumber())
+                .WillRepeatedly(testing::Invoke([this](infra::ConstByteRange range, infra::StreamErrorPolicy&)
                     {
                         capturedOutputs.push_back(std::vector<uint8_t>(range.begin(), range.end()));
                     }));
