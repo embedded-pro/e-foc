@@ -2,10 +2,10 @@
 
 #include "foc/implementations/WithAutomaticCurrentPidGains.hpp"
 #include "services/peripheral/DebugLed.hpp"
-#include "targets/sync_foc_sensored/instantiations/MotorStateMachine.hpp"
 #include "source/platform_abstraction/HardwareFactory.hpp"
 #include "source/platform_abstraction/MotorFieldOrientedControllerAdapter.hpp"
 #include "source/services/cli/TerminalWithBanner.hpp"
+#include "targets/sync_foc_sensored/instantiations/MotorStateMachine.hpp"
 
 namespace application
 {
