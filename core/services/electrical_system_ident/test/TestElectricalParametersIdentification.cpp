@@ -1,8 +1,9 @@
-#include "infra/timer/test_helper/ClockFixture.hpp"
 #include "core/foc/implementations/test_doubles/DriversMock.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
+#include "infra/timer/test_helper/ClockFixture.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
+#include <numbers>
 
 namespace
 {

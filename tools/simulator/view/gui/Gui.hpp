@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/foc/interfaces/Driver.hpp"
+#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "tools/simulator/model/Model.hpp"
 #include "tools/simulator/view/gui/ControlPanel.hpp"
 #include "tools/simulator/view/gui/ParametersPanel.hpp"
