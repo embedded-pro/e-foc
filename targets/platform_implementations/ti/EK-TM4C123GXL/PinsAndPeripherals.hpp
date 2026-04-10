@@ -1,10 +1,10 @@
 #pragma once
 
+#include "hal_tiva/synchronous_tiva/SynchronousPwm.hpp"
 #include "hal_tiva/tiva/Adc.hpp"
 #include "hal_tiva/tiva/ClockTm4c123.hpp"
-#include "infra/hal/ti/hal_tiva/synchronous_tiva/SynchronousPwm.hpp"
-#include "infra/hal/ti/hal_tiva/tiva/Gpio.hpp"
-#include "infra/hal/ti/hal_tiva/tiva/PinoutTableDefaultTm4c123.hpp"
+#include "hal_tiva/tiva/Gpio.hpp"
+#include "hal_tiva/tiva/PinoutTableDefaultTm4c123.hpp"
 
 namespace application
 {
