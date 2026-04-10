@@ -1,7 +1,7 @@
 #pragma once
 
-#include "source/foc/implementations/FocPositionImpl.hpp"
-#include "source/services/cli/TerminalPosition.hpp"
+#include "core/foc/implementations/FocPositionImpl.hpp"
+#include "core/services/cli/TerminalPosition.hpp"
 #include "targets/sync_foc_sensored/instantiations/LogicWithOuterLoop.hpp"
 
 namespace application
@@ -10,7 +10,7 @@ namespace application
         : public LogicWithOuterLoop<foc::FocPositionImpl, services::TerminalFocPositionInteractor>
     {
     public:
-        explicit Logic(application::HardwareFactory& hardware)
+        explicit Logic(application::PlatformFactory& hardware)
             : LogicWithOuterLoop(hardware, "sync_foc_sensored:position")
         {}
     };

@@ -1,10 +1,10 @@
 #pragma once
 
+#include "core/foc/implementations/TransformsClarkePark.hpp"
+#include "core/foc/interfaces/Driver.hpp"
+#include "core/foc/interfaces/Units.hpp"
 #include "infra/util/Function.hpp"
 #include "infra/util/Observer.hpp"
-#include "source/foc/implementations/TransformsClarkePark.hpp"
-#include "source/foc/interfaces/Driver.hpp"
-#include "source/foc/interfaces/Units.hpp"
 #include <cstddef>
 #include <optional>
 
@@ -53,6 +53,7 @@ namespace simulator
         void Start() override;
         void Stop() override;
         hal::Hertz BaseFrequency() const override;
+        foc::Ampere MaxCurrentSupported() const override;
 
         // Implementation of foc::Encoder
         foc::Radians Read() override;

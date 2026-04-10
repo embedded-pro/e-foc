@@ -1,5 +1,6 @@
 #include "targets/hardware_test/components/Terminal.hpp"
 #include "foc/interfaces/Driver.hpp"
+#include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/stream/StringInputStream.hpp"
 #include "infra/util/BoundedString.hpp"
 #include "infra/util/Tokenizer.hpp"
@@ -12,19 +13,22 @@
 namespace
 {
     constexpr float pi_div_180 = std::numbers::pi_v<float> / 180.0f;
+    const std::size_t outerInnerLoopRatio = 10;
+    const hal::Hertz defaultPwmFrequency{ 10000 };
+    const hal::Hertz speedLoopFrequency{ static_cast<unsigned int>(defaultPwmFrequency.Value() / outerInnerLoopRatio) };
 
-    application::HardwareFactory::SampleAndHold ToSampleAndHold(const infra::BoundedConstString& value)
+    application::PlatformFactory::SampleAndHold ToSampleAndHold(const infra::BoundedConstString& value)
     {
         if (value == "shortest")
-            return application::HardwareFactory::SampleAndHold::shortest;
+            return application::PlatformFactory::SampleAndHold::shortest;
         else if (value == "shorter")
-            return application::HardwareFactory::SampleAndHold::shorter;
+            return application::PlatformFactory::SampleAndHold::shorter;
         else if (value == "medium")
-            return application::HardwareFactory::SampleAndHold::medium;
+            return application::PlatformFactory::SampleAndHold::medium;
         else if (value == "longer")
-            return application::HardwareFactory::SampleAndHold::longer;
+            return application::PlatformFactory::SampleAndHold::longer;
         else if (value == "longest")
-            return application::HardwareFactory::SampleAndHold::longest;
+            return application::PlatformFactory::SampleAndHold::longest;
         else
             std::abort();
     }
@@ -65,7 +69,7 @@ namespace
 
 namespace application
 {
-    TerminalInteractor::TerminalInteractor(services::TerminalWithStorage& terminal, application::HardwareFactory& hardware)
+    TerminalInteractor::TerminalInteractor(services::TerminalWithStorage& terminal, application::PlatformFactory& hardware)
         : terminal{ terminal }
         , tracer{ hardware.Tracer() }
         , pwmCreator{ hardware.SynchronousThreeChannelsPwmCreator() }
@@ -170,7 +174,7 @@ namespace application
 
         encoderCreator.Emplace();
         pwmCreator.Emplace(std::chrono::nanoseconds{ 500 }, hal::Hertz{ 10000 });
-        StartAdc(HardwareFactory::SampleAndHold::shortest);
+        StartAdc(PlatformFactory::SampleAndHold::shortest);
     }
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::ConfigurePwm(const infra::BoundedConstString& param)
@@ -371,7 +375,7 @@ namespace application
         return { services::TerminalWithStorage::Status::success };
     }
 
-    void TerminalInteractor::StartAdc(HardwareFactory::SampleAndHold sampleAndHold)
+    void TerminalInteractor::StartAdc(PlatformFactory::SampleAndHold sampleAndHold)
     {
         adcCreator.Emplace(sampleAndHold);
         adcCreator->Measure([this](auto phaseA, auto phaseB, auto phaseC)

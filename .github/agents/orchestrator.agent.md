@@ -34,12 +34,12 @@ You triage incoming development requests and route them to the right specialist 
 ## Context to Gather Before Routing
 
 - Which layer does this affect?
-  - `source/foc/interfaces/` — abstract FOC interfaces (`FocTorque`, `FocSpeed`, `FocPosition`, `FocBase`)
-  - `source/foc/implementations/` — Clarke/Park transforms, SVM, current/speed/position control loops
-  - `source/foc/instantiations/` — concrete wiring of FOC components for specific targets
-  - `source/platform_abstraction/` — platform abstraction adapters (`HardwareFactory` interface, ADC, encoder, CAN adapters)
+  - `core/foc/interfaces/` — abstract FOC interfaces (`FocTorque`, `FocSpeed`, `FocPosition`, `FocBase`)
+  - `core/foc/implementations/` — Clarke/Park transforms, SVM, current/speed/position control loops
+  - `core/foc/instantiations/` — concrete wiring of FOC components for specific targets
+  - `core/platform_abstraction/` — platform abstraction adapters (`PlatformFactory` interface, ADC, encoder, CAN adapters)
   - `targets/` — platform implementations (Host, TI, ST) and application entry points
-  - `source/services/` — application-level services
+  - `core/services/` — application-level services
   - `tools/simulator/` — host simulation models for validation
   - `numerical-toolbox/` — PID, filters, fixed-point math used by FOC
 - What is the control mode? Torque / speed / position loop
@@ -53,5 +53,5 @@ You triage incoming development requests and route them to the right specialist 
 - Project guidelines: [copilot-instructions.md](../../.github/copilot-instructions.md)
 - FOC theory: [`documentation/theory/foc.md`](../../documentation/theory/foc.md)
 - Performance optimization: [`documentation/performance-optimization/README.md`](../../documentation/performance-optimization/README.md)
-- Hardware factory: [`source/platform_abstraction/HardwareFactory.hpp`](../../source/platform_abstraction/HardwareFactory.hpp)
+- Hardware factory: [`core/platform_abstraction/PlatformFactory.hpp`](../../core/platform_abstraction/PlatformFactory.hpp)
 - Numerical toolbox guidelines: [`numerical-toolbox/.github/copilot-instructions.md`](../../numerical-toolbox/.github/copilot-instructions.md)

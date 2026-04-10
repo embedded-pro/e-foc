@@ -65,10 +65,10 @@ if (DEFINED TARGET_MCU_VENDOR)
 endif()
 
 add_subdirectory(infra/numerical-toolbox)
-add_subdirectory(source)
+add_subdirectory(core)
 add_subdirectory(targets)
 
-set(E_FOC_CLANGFORMAT_DIRS source targets)
+set(E_FOC_CLANGFORMAT_DIRS core targets)
 
 if (E_FOC_BUILD_SIMULATOR)
     add_subdirectory(tools)

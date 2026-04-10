@@ -84,7 +84,7 @@ When implementing FOC transforms or control loops:
 - **Decoupling**: Add ω·Ld·Iq feedforward to Vd, subtract ω·Lq·Id from Vq where appropriate
 - **Unit types**: Use the type aliases: `Ampere`, `Radians`, `Volts`, `Rpm`, `PhasePwmDutyCycles`, `PhaseCurrents`
 
-Reuse `TransformsClarkePark` and `SpaceVectorModulation` from `source/foc/implementations/` when possible. Do not reimplement existing transforms.
+Reuse `TransformsClarkePark` and `SpaceVectorModulation` from `core/foc/implementations/` when possible. Do not reimplement existing transforms.
 
 ### Naming Conventions
 
@@ -126,7 +126,7 @@ namespace foc
 ### Design Principles
 
 - **Single Responsibility**: One class = one control concern (current loop, speed loop, position loop)
-- **Dependency Injection**: All hardware (ADC, PWM, encoder) injected via `HardwareFactory` / constructor
+- **Dependency Injection**: All hardware (ADC, PWM, encoder) injected via `PlatformFactory` / constructor
 - **Interface-driven**: New FOC modes implement the appropriate abstract interface (`FocTorque`, `FocSpeed`, `FocPosition`)
 - **Small Functions**: ~30 lines max (hard limit ~50). Extract named helpers.
 - **DRY**: Reuse `numerical-toolbox/` PID, filters, and transforms — do not duplicate
@@ -141,12 +141,12 @@ namespace foc
 
 ### Testing
 
-Test files live in `source/foc/implementations/test/Test{ComponentName}.cpp`.
+Test files live in `core/foc/implementations/test/Test{ComponentName}.cpp`.
 
 Use `TEST_F` for single-type fixture tests:
 
 ```cpp
-#include "source/foc/implementations/TransformsClarkePark.hpp"
+#include "core/foc/implementations/TransformsClarkePark.hpp"
 #include <gtest/gtest.h>
 
 namespace
@@ -193,9 +193,9 @@ Follow the TDD Red-Green-Refactor cycle. **Ask clarifying questions before writi
 
 1. **Clarify requirements** — Ask the user focused questions to understand expected inputs/outputs, use cases, edge cases, control mode (torque/speed/position), hardware target, and acceptance criteria. Do not write any code until the requirements are clear.
 2. **Read the plan or task** carefully. Understand the FOC theory context.
-3. **Search for existing patterns** in `source/foc/` — follow them exactly
+3. **Search for existing patterns** in `core/foc/` — follow them exactly
 4. **Reuse `numerical-toolbox/` algorithms** (PID, filters) rather than reimplementing
-5. **Red** — Write failing tests first in `source/foc/implementations/test/Test{ComponentName}.cpp` for every behavior. Tests must fail before writing any production code.
+5. **Red** — Write failing tests first in `core/foc/implementations/test/Test{ComponentName}.cpp` for every behavior. Tests must fail before writing any production code.
 6. **Green** — Implement the minimum production code needed to make all tests pass, one file at a time, following all rules above.
 7. **Add `#pragma GCC optimize` and `OPTIMIZE_FOR_SPEED`** to all hot-path code
 8. **Refactor** — Clean up the implementation (naming, single responsibility, DRY, extract helpers) while keeping all tests green.

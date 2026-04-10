@@ -37,15 +37,15 @@ Do not begin the research or planning phase until the requirements are sufficien
 Before planning, thoroughly investigate:
 
 - **FOC theory**: Consult `documentation/theory/foc.md` and related docs before designing any control loop change
-- **Existing patterns**: Search for similar implementations in `source/foc/`. The codebase is consistent — follow established patterns.
-- **Interface contracts**: Identify abstract interfaces in `source/foc/interfaces/` that must be implemented or extended:
+- **Existing patterns**: Search for similar implementations in `core/foc/`. The codebase is consistent — follow established patterns.
+- **Interface contracts**: Identify abstract interfaces in `core/foc/interfaces/` that must be implemented or extended:
   - `FocBase` — pole pairs, enable/disable, current tunings, `Calculate()`
   - `FocTorque`, `FocSpeed`, `FocPosition` — set-point types
   - `Driver` — hardware adapter abstractions
 - **Timing constraints**: Assess whether each step stays within the FOC loop budget (<400 cycles at 120 MHz for a 20 kHz control rate)
-- **Hardware adapters**: Check `source/platform_abstraction/HardwareFactory.hpp` for peripheral creation and injection patterns
+- **Hardware adapters**: Check `core/platform_abstraction/PlatformFactory.hpp` for peripheral creation and injection patterns
 - **Numerical tools**: Identify if `infra/numerical-toolbox/` algorithms (PID, filters, transforms) can be reused or need extension
-- **Test infrastructure**: Find existing test files in `source/foc/implementations/test/` and simulation models in `tools/simulator/`
+- **Test infrastructure**: Find existing test files in `core/foc/implementations/test/` and simulation models in `tools/simulator/`
 - **Documentation**: Consult `documentation/` for domain guidance:
   - `documentation/theory/foc.md` — FOC algorithm theory
   - `documentation/theory/alignment.md` — motor alignment procedures
@@ -82,7 +82,7 @@ For each file to create or modify, specify:
 #### Interface Design
 - Class declarations with clean single-responsibility ownership
 - Method signatures matching existing `FocBase` / `FocTorque` / `FocSpeed` / `FocPosition` patterns
-- Constructor parameters for hardware dependency injection via `HardwareFactory`
+- Constructor parameters for hardware dependency injection via `PlatformFactory`
 - Hot-path methods marked for `#pragma GCC optimize("O3", "fast-math")` and `OPTIMIZE_FOR_SPEED`
 
 #### Test Strategy
@@ -92,7 +92,7 @@ Tests are designed **before** implementation (TDD Red-Green-Refactor):
 - **Green**: Implementation follows only to make the failing tests pass
 - **Refactor**: Clean up after all tests are green
 
-- Unit test files: `source/foc/implementations/test/Test{ComponentName}.cpp`
+- Unit test files: `core/foc/implementations/test/Test{ComponentName}.cpp`
 - Host simulation models for validation: `tools/simulator/`
 - Host hardware stubs: `targets/platform_implementations/Host/`
 - Key test cases: correctness of transforms, PID output under known conditions, SVM duty cycles, edge cases
@@ -131,7 +131,7 @@ Before finalizing, verify the plan against these constraints:
 
 ## Critical Constraints Checklist
 
-Scope note: The memory and realtime constraints below apply to embedded/runtime motor-control code and hot paths (for example `source/foc/`, embedded `source/platform_abstraction/`, `targets/`, ISR-driven services, and other deterministic control-loop code). Host-side tools, simulators, test infrastructure, and GUI code may use normal host-side STL/heap patterns unless the task explicitly targets embedded/runtime code.
+Scope note: The memory and realtime constraints below apply to embedded/runtime motor-control code and hot paths (for example `core/foc/`, embedded `core/platform_abstraction/`, `targets/`, ISR-driven services, and other deterministic control-loop code). Host-side tools, simulators, test infrastructure, and GUI code may use normal host-side STL/heap patterns unless the task explicitly targets embedded/runtime code.
 
 ### Memory — NO HEAP ALLOCATION IN EMBEDDED / REALTIME RUNTIME CODE
 - [ ] In embedded/runtime FOC code, no `new`, `delete`, `malloc`, `free`, `std::make_unique`, `std::make_shared`

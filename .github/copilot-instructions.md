@@ -5,9 +5,9 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 1) Big-picture architecture (short)
 - Purpose: Field-Oriented Control (FOC) for BLDC/PMSM with strict realtime and memory constraints.
 - Major components:
-  - `source/` — FOC implementations, platform abstraction interfaces, and services (libraries only).
-  - `source/services/` — Application-level services (coordination, scheduling, helpers).
-  - `source/platform_abstraction/` — Abstract `HardwareFactory` interface and shared adapters.
+  - `core/` — FOC implementations, platform abstraction interfaces, and services (libraries only).
+  - `core/services/` — Application-level services (coordination, scheduling, helpers).
+  - `core/platform_abstraction/` — Abstract `PlatformFactory` interface and shared adapters.
   - `targets/` — Application entry points (`hardware_test`, `sync_foc_sensored`) and platform implementations under `targets/platform_implementations/` (Host, ti, st).
   - `numerical-toolbox/` — Generic numerical algorithms (PID, filters, fixed-point helpers). Located at `infra/numerical-toolbox/`.
   - `embedded-infra-lib/` — Infrastructure: bounded containers, build helpers, toolchain cmake pieces. Located at `infra/embedded-infra-lib/`.
@@ -37,9 +37,9 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 
 4) Patterns & code locations (concrete examples)
 - Add a new FOC algorithm:
-  - Implement code in `source/foc/implementations/` and keep public interfaces in `source/foc/interfaces/`.
+  - Implement code in `core/foc/implementations/` and keep public interfaces in `core/foc/interfaces/`.
   - Motor-specific application code lives under `targets/sync_foc_sensored/` and `targets/hardware_test/`.
-- Hardware abstraction & factory: see `source/platform_abstraction/HardwareFactory.hpp` for how peripherals and adapters are created and injected.
+- Platform abstraction & factory: see `core/platform_abstraction/PlatformFactory.hpp` for how peripherals and adapters are created and injected.
 - Numerical algorithms: follow patterns in `infra/numerical-toolbox/` — implement float first, then Q15/Q31 variants, and add typed GoogleTest suites.
 
 5) Testing & CI expectations

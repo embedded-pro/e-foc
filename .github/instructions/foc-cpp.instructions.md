@@ -1,11 +1,11 @@
 ---
 description: "e-foc C++ coding rules for embedded/real-time code: no heap allocation, bounded containers, real-time determinism, FOC theory correctness (Clarke/Park/SVM), motor control best practices, embedded compiler optimizations, Allman brace style, PascalCase naming, SOLID principles, const correctness, documentation alignment."
-applyTo: "source/{foc,platform_abstraction}/**,targets/**"
+applyTo: "core/{foc,platform_abstraction}/**,targets/**"
 ---
 
 # e-foc C++ Rules
 
-> **Scope**: These rules apply to the embedded and real-time code paths (`source/foc/`, `source/platform_abstraction/`, `targets/`). Host-side tooling (`tools/`, `source/services/`) may use standard library heap allocation where appropriate for a host environment.
+> **Scope**: These rules apply to the embedded and real-time code paths (`core/foc/`, `core/platform_abstraction/`, `targets/`). Host-side tooling (`tools/`, `core/services/`) may use standard library heap allocation where appropriate for a host environment.
 
 This project is a Field-Oriented Control (FOC) implementation for BLDC/PMSM motors targeting resource-constrained embedded microcontrollers. Follow these rules strictly within the scoped paths.
 
@@ -71,7 +71,7 @@ Use unit-typed aliases throughout: `Ampere`, `Radians`, `Volts`, `Rpm`, `PhasePw
 ## Design
 
 - SOLID principles — constructor injection, one class = one control concern
-- Hardware dependencies injected via constructor and `HardwareFactory`
+- Platform dependencies injected via constructor and `PlatformFactory`
 - New FOC modes implement `FocTorque`, `FocSpeed`, or `FocPosition` interfaces
 - Reuse `infra/numerical-toolbox/` for PID, filters, and math — do not duplicate
 - RAII for resource management

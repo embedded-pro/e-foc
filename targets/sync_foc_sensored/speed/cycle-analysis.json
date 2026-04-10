@@ -21,7 +21,7 @@
         {
             "label": "Encoder Read",
             "patterns": [
-                "HardwareAdapter::Read",
+                "PlatformAdapter::Read",
                 "QuadratureEncoderDecorator.*::Read",
                 "QuadratureEncoder::Position",
                 "QuadratureEncoder::Resolution"
@@ -54,7 +54,7 @@
         {
             "label": "PWM Output",
             "patterns": [
-                "HardwareAdapter::ThreePhasePwmOutput",
+                "PlatformAdapter::ThreePhasePwmOutput",
                 "SynchronousPwm::Start.*Percent.*Percent.*Percent",
                 "SynchronousPwm::SetComparator",
                 "SynchronousPwm::Sync"
