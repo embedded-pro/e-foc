@@ -1,7 +1,7 @@
 #pragma once
 
-#include "hal/interfaces/AdcMultiChannel.hpp"
 #include "core/foc/interfaces/Driver.hpp"
+#include "hal/interfaces/AdcMultiChannel.hpp"
 #include <type_traits>
 #include <utility>
 

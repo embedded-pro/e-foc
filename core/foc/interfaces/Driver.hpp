@@ -1,8 +1,8 @@
 #pragma once
 
+#include "core/foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/util/Function.hpp"
-#include "core/foc/interfaces/Units.hpp"
 
 namespace foc
 {

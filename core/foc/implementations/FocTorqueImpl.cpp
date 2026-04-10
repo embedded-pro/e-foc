@@ -1,6 +1,6 @@
 #include "core/foc/implementations/FocTorqueImpl.hpp"
-#include "numerical/math/CompilerOptimizations.hpp"
 #include "core/foc/implementations/TrigonometricImpl.hpp"
+#include "numerical/math/CompilerOptimizations.hpp"
 #include <numbers>
 
 #if defined(__GNUC__) || defined(__clang__)

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "numerical/math/CompilerOptimizations.hpp"
 #include "core/foc/interfaces/Driver.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
+#include "numerical/math/CompilerOptimizations.hpp"
 
 namespace application
 {

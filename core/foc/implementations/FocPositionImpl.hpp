@@ -1,7 +1,7 @@
 #pragma once
 
-#include "numerical/controllers/implementations/PidIncremental.hpp"
 #include "core/foc/implementations/FocWithSpeedLoop.hpp"
+#include "numerical/controllers/implementations/PidIncremental.hpp"
 
 namespace foc
 {

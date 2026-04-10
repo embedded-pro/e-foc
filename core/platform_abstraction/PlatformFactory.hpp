@@ -8,10 +8,6 @@
 #include "infra/util/ProxyCreator.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/Terminal.hpp"
-#include "core/foc/interfaces/Driver.hpp"
-#include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
-#include "core/platform_abstraction/CanBusAdapter.hpp"
-#include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
 #include <chrono>
 #include <cstdint>
 

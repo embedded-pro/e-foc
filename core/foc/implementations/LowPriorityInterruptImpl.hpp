@@ -1,7 +1,7 @@
 #pragma once
 
-#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "core/foc/interfaces/Driver.hpp"
+#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 
 namespace foc
 {

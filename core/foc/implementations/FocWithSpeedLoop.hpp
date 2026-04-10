@@ -1,14 +1,14 @@
 #pragma once
 
-#include "infra/util/ReallyAssert.hpp"
-#include "numerical/controllers/implementations/PidIncremental.hpp"
-#include "numerical/math/CompilerOptimizations.hpp"
 #include "core/foc/implementations/FocHelpers.hpp"
 #include "core/foc/implementations/SpaceVectorModulation.hpp"
 #include "core/foc/implementations/TransformsClarkePark.hpp"
 #include "core/foc/implementations/TrigonometricImpl.hpp"
 #include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/Foc.hpp"
+#include "infra/util/ReallyAssert.hpp"
+#include "numerical/controllers/implementations/PidIncremental.hpp"
+#include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc
 {

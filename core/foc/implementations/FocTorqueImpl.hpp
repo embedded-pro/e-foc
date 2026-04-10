@@ -1,10 +1,10 @@
 #pragma once
 
-#include "numerical/controllers/implementations/PidIncremental.hpp"
 #include "core/foc/implementations/SpaceVectorModulation.hpp"
 #include "core/foc/implementations/TransformsClarkePark.hpp"
 #include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/Foc.hpp"
+#include "numerical/controllers/implementations/PidIncremental.hpp"
 
 namespace foc
 {

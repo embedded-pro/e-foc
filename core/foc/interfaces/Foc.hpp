@@ -1,8 +1,8 @@
 #pragma once
 
+#include "core/foc/interfaces/Driver.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "numerical/controllers/interfaces/PidController.hpp"
-#include "core/foc/interfaces/Driver.hpp"
 
 namespace foc
 {

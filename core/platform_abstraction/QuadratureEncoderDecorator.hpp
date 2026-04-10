@@ -1,7 +1,7 @@
 #pragma once
 
-#include "hal/synchronous_interfaces/SynchronousQuadratureEncoder.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "hal/synchronous_interfaces/SynchronousQuadratureEncoder.hpp"
 #include <cmath>
 #include <numbers>
 
