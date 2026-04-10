@@ -11,10 +11,17 @@
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
 #include "core/state_machine/FocStateMachineImpl.hpp"
+#include "core/state_machine/TransitionPolicies.hpp"
 #include "services/peripheral/DebugLed.hpp"
 
 namespace application
 {
+#ifdef E_FOC_AUTO_TRANSITION_POLICY
+    using SelectedTransitionPolicy = state_machine::AutoTransitionPolicy;
+#else
+    using SelectedTransitionPolicy = state_machine::CliTransitionPolicy;
+#endif
+
     class Logic
     {
     public:
@@ -31,6 +38,6 @@ namespace application
         services::ElectricalParametersIdentificationImpl electricalIdent;
         services::MotorAlignmentImpl motorAlignment;
         state_machine::NoOpFaultNotifier noOpFaultNotifier;
-        FocStateMachineImpl<foc::FocTorqueImpl, services::TerminalFocTorqueInteractor> motorStateMachine;
+        FocStateMachineImpl<foc::FocTorqueImpl, services::TerminalFocTorqueInteractor, SelectedTransitionPolicy> motorStateMachine;
     };
 }

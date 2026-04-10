@@ -129,10 +129,20 @@ The last fault code is preserved in `LastFaultCode()` and remains readable even 
 
 ### Transition Policies
 
-The state machine supports two transition policies, selected at instantiation time:
+The state machine supports two transition policies, selected at build time via the `E_FOC_AUTO_TRANSITION_POLICY` CMake cache variable:
 
-- **CLI policy (default)**: The state machine registers the commands `calibrate`, `enable`, `disable`, `clear_fault`, and `clear_cal` on the connected terminal. Users interact via a serial console.
-- **Automatic policy**: No terminal commands are registered. The caller drives transitions programmatically by invoking `CmdCalibrate()`, `CmdEnable()`, `CmdDisable()`, `CmdClearFault()`, and `CmdClearCalibration()` directly — for example, from CAN message handlers or automated test sequences.
+- **CLI policy (default, `E_FOC_AUTO_TRANSITION_POLICY=OFF`)**: The state machine registers the commands `calibrate`, `enable`, `disable`, `clear_fault`, and `clear_cal` on the connected terminal. Users interact via a serial console. Suitable for development, commissioning, and diagnostics.
+- **Automatic policy (`E_FOC_AUTO_TRANSITION_POLICY=ON`)**: No terminal commands are registered. The caller drives transitions programmatically by invoking `CmdCalibrate()`, `CmdEnable()`, `CmdDisable()`, `CmdClearFault()`, and `CmdClearCalibration()` directly — for example, from CAN message handlers or automated production sequences.
+
+The policy is enforced for all application targets at once: setting `E_FOC_AUTO_TRANSITION_POLICY=ON` in a CMake preset or on the command line applies to the torque, speed, and position targets simultaneously. Both policies share identical state transition logic; they differ only in whether lifecycle commands appear on the terminal.
+
+### Mechanical Identification and Control Mode
+
+The calibration sequence extends with a mechanical identification step for speed and position control modes. This step estimates rotor inertia and viscous friction, then computes initial velocity-loop PID gains.
+
+For **speed mode**, the mechanical identification service can be automatically constructed if no external override is provided in `CalibrationServices`.
+
+For **position mode**, `MechanicalParametersIdentification` requires an explicit override supplied via `CalibrationServices.mechIdentOverride`. If no override is provided and position mode is active, the calibration sequence enters `Fault` with `calibrationFailed`. This is a configuration error that must be resolved before calibration can succeed.
 
 ### Boot-Time NVM Check
 

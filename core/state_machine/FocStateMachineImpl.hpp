@@ -34,8 +34,14 @@ namespace application
         foc::NewtonMeter mechTorqueConstant{ foc::NewtonMeter{ 0.1f } };
     };
 
+    // True when FocImpl has an outer velocity loop (FocSpeed or FocPosition).
     template<typename FocImpl>
-    inline constexpr bool HasSpeedLoop = std::is_base_of_v<foc::FocSpeed, FocImpl>;
+    inline constexpr bool HasSpeedLoop = std::is_base_of_v<foc::FocSpeed, FocImpl> || std::is_base_of_v<foc::FocPosition, FocImpl>;
+
+    // True only for FocSpeed: MechanicalParametersIdentificationImpl requires foc::FocSpeed&.
+    // FocPosition must supply a mechIdentOverride in CalibrationServices.
+    template<typename FocImpl>
+    inline constexpr bool HasAutoMechIdent = std::is_base_of_v<foc::FocSpeed, FocImpl>;
 
     template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy = state_machine::CliTransitionPolicy>
     class FocStateMachineImpl
@@ -137,7 +143,7 @@ namespace application
         {
             if (calibServices.mechIdentOverride != nullptr)
                 mechIdent = calibServices.mechIdentOverride;
-            else
+            else if constexpr (HasAutoMechIdent<FocImpl>)
             {
                 optMechIdent.emplace(static_cast<foc::FocSpeed&>(focController), inverter, encoder);
                 mechIdent = &*optMechIdent;
@@ -354,6 +360,13 @@ namespace application
     void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::RunMechanicalIdentStep()
     {
         tracer.Trace() << "[SM] Estimating mechanical parameters";
+
+        if (mechIdent == nullptr)
+        {
+            EnterFault(state_machine::FaultCode::calibrationFailed);
+            return;
+        }
+
         auto& calibrating = std::get<state_machine::Calibrating>(currentState);
         calibrating.step = state_machine::CalibrationStep::frictionAndInertia;
         const auto polePairs = static_cast<std::size_t>(calibrating.pendingData.polePairs);
@@ -389,7 +402,7 @@ namespace application
             inverter.BaseFrequency(), nyquistFactor);
         if constexpr (hasMechanicalIdent)
         {
-            static_cast<foc::FocSpeed&>(focController).SetSpeedTunings(vdc, foc::SpeedTunings{ data.kpVelocity, data.kiVelocity, 0.0f });
+            focController.SetSpeedTunings(vdc, foc::SpeedTunings{ data.kpVelocity, data.kiVelocity, 0.0f });
         }
     }
 
@@ -451,3 +464,22 @@ namespace application
             } });
     }
 }
+
+#ifdef E_FOC_STATE_MACHINE_COVERAGE_BUILD
+#include "core/foc/implementations/FocPositionImpl.hpp"
+#include "core/foc/implementations/FocSpeedImpl.hpp"
+#include "core/foc/implementations/FocTorqueImpl.hpp"
+#include "core/services/cli/TerminalPosition.hpp"
+#include "core/services/cli/TerminalSpeed.hpp"
+#include "core/services/cli/TerminalTorque.hpp"
+
+namespace application
+{
+    extern template class FocStateMachineImpl<foc::FocTorqueImpl, services::TerminalFocTorqueInteractor, state_machine::CliTransitionPolicy>;
+    extern template class FocStateMachineImpl<foc::FocTorqueImpl, services::TerminalFocTorqueInteractor, state_machine::AutoTransitionPolicy>;
+    extern template class FocStateMachineImpl<foc::FocSpeedImpl, services::TerminalFocSpeedInteractor, state_machine::CliTransitionPolicy>;
+    extern template class FocStateMachineImpl<foc::FocSpeedImpl, services::TerminalFocSpeedInteractor, state_machine::AutoTransitionPolicy>;
+    extern template class FocStateMachineImpl<foc::FocPositionImpl, services::TerminalFocPositionInteractor, state_machine::CliTransitionPolicy>;
+    extern template class FocStateMachineImpl<foc::FocPositionImpl, services::TerminalFocPositionInteractor, state_machine::AutoTransitionPolicy>;
+}
+#endif

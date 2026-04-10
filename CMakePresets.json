@@ -13,7 +13,8 @@
             "installDir": "${sourceDir}/install",
             "cacheVariables": {
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "On",
-                "CMAKE_COMPILE_WARNING_AS_ERROR": "On"
+                "CMAKE_COMPILE_WARNING_AS_ERROR": "On",
+                "E_FOC_AUTO_TRANSITION_POLICY": false
             }
         },
         {
