@@ -47,8 +47,8 @@ e-foc is a Field-Oriented Control (FOC) firmware for BLDC and PMSM motors. Its p
 The system is structured in four tiers:
 
 1. **Infrastructure tier** — external repositories providing general-purpose utilities, numerical algorithms, and vendor HAL drivers. These are consumed as submodules and are never modified by this project.
-2. **Source / Library tier** — the FOC algorithm library (`source/foc/`), service library (`source/services/`), and the Platform Abstraction Layer interface (`source/platform_abstraction/`). These are pure, portable libraries with no target-specific knowledge.
-3. **Targets tier** — target-specific code that is NOT reusable across all environments: platform implementations (concrete `HardwareFactory` for TI, ST, and Host) and application entry points (`hardware_test`, `sync_foc_sensored`). Lives under `targets/`.
+2. **Core / Library tier** — the FOC algorithm library (`core/foc/`), service library (`core/services/`), and the Platform Abstraction Layer interface (`core/platform_abstraction/`). These are pure, portable libraries with no target-specific knowledge.
+3. **Targets tier** — target-specific code that is NOT reusable across all environments: platform implementations (concrete `PlatformFactory` for TI, ST, and Host) and application entry points (`hardware_test`, `sync_foc_sensored`). Lives under `targets/`.
 4. **Tools tier** — host-only desktop tools (simulator, CAN commander) that run on development machines only. Lives under `tools/`.
 
 ```mermaid
@@ -60,10 +60,10 @@ graph TD
         PAL_HOST["Host / Simulator\nimplementation"]
     end
 
-    subgraph SRC["Source / Library Tier"]
+    subgraph SRC["Core / Library Tier"]
         SVC["Services\n(Alignment · NVM · Ident · CLI)"]
         FOC["FOC Core\n(Torque / Speed / Position)"]
-        HF["Platform Abstraction\n(HardwareFactory interface + adapters)"]
+        HF["Platform Abstraction\n(PlatformFactory interface + adapters)"]
     end
 
     subgraph INFRA["Infrastructure Tier (submodules)"]
@@ -327,6 +327,6 @@ These patterns eliminate polling, decouple producers from consumers, and allow t
 
 | # | Question / Decision                                    | Status   | Options Considered                                                                                        | Rationale                                                                                                                                                                                                                                               |
 |---|--------------------------------------------------------|----------|-----------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1 | Rename `source/hardware/` and extract platform targets | resolved | Keep current name vs rename to PAL vs full extraction                                                     | Renamed to `source/platform_abstraction/` (interface + adapters only). Platform implementations (TI, ST, Host) and application targets moved to top-level `targets/`. Host-only tools moved to top-level `tools/`. Source tier is now purely libraries. |
+| 1 | Rename `source/hardware/` and extract platform targets | resolved | Keep current name vs rename to PAL vs full extraction | Renamed to `core/platform_abstraction/` (interface + adapters only). Platform implementations (TI, ST, Host) and application targets moved to top-level `targets/`. Host-only tools moved to top-level `tools/`. Core tier is now purely libraries. `source/` directory renamed to `core/`. |
 | 2 | Multi-motor support                                    | open     | Single instantiation per motor vs shared PAL with multiple FOC controllers                                | Current architecture supports one motor per binary. A shared PAL with multiple `FocController` instances is architecturally feasible but not yet required.                                                                                              |
 | 3 | Field-weakening                                        | open     | Extend `FocTorque` interface with flux-weakening setpoint vs separate `FocTorqueFieldWeakening` interface | Required for operation above base speed. Separate interface preferred (ISP) but not yet scoped.                                                                                                                                                         |

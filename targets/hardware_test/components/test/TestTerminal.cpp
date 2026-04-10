@@ -25,8 +25,8 @@ namespace
         MOCK_METHOD(infra::ByteRange, Overwrite, (std::size_t marker), (override));
     };
 
-    class HardwareFactoryMock
-        : public application::HardwareFactory
+    class PlatformFactoryMock
+        : public application::PlatformFactory
     {
     public:
         MOCK_METHOD(void, Run, (), (override));
@@ -130,26 +130,26 @@ namespace
     public:
         TestHardwareTerminal()
         {
-            EXPECT_CALL(hardwareFactoryMock, Terminal()).WillRepeatedly(testing::ReturnRef(terminalWithCommands));
-            EXPECT_CALL(hardwareFactoryMock, Tracer()).WillRepeatedly(testing::ReturnRef(tracer));
-            EXPECT_CALL(hardwareFactoryMock, SynchronousThreeChannelsPwmCreator()).WillRepeatedly(testing::ReturnRef(pwmCreator));
-            EXPECT_CALL(hardwareFactoryMock, AdcMultiChannelCreator()).WillRepeatedly(testing::ReturnRef(adcCreator));
-            EXPECT_CALL(hardwareFactoryMock, SynchronousQuadratureEncoderCreator()).WillRepeatedly(testing::ReturnRef(encoderCreator));
-            EXPECT_CALL(hardwareFactoryMock, CanBusCreator()).WillRepeatedly(testing::ReturnRef(canCreator));
-            EXPECT_CALL(hardwareFactoryMock, PerformanceTimer()).WillRepeatedly(testing::ReturnRef(performanceTrackerMock));
-            EXPECT_CALL(hardwareFactoryMock, PowerSupplyVoltage()).WillRepeatedly(testing::Return(foc::Volts{ 24.0f }));
-            EXPECT_CALL(hardwareFactoryMock, MaxCurrentSupported()).WillRepeatedly(testing::Return(foc::Ampere{ 5.0f }));
-            EXPECT_CALL(hardwareFactoryMock, SystemClock()).WillRepeatedly(testing::Return(hal::Hertz{ 10000 }));
-            EXPECT_CALL(hardwareFactoryMock, LowPriorityInterrupt()).WillRepeatedly(testing::ReturnRef(simpleLowPriorityInterrupt));
-            EXPECT_CALL(hardwareFactoryMock, Eeprom()).WillRepeatedly(testing::ReturnRef(eepromMock));
+            EXPECT_CALL(platformFactoryMock, Terminal()).WillRepeatedly(testing::ReturnRef(terminalWithCommands));
+            EXPECT_CALL(platformFactoryMock, Tracer()).WillRepeatedly(testing::ReturnRef(tracer));
+            EXPECT_CALL(platformFactoryMock, SynchronousThreeChannelsPwmCreator()).WillRepeatedly(testing::ReturnRef(pwmCreator));
+            EXPECT_CALL(platformFactoryMock, AdcMultiChannelCreator()).WillRepeatedly(testing::ReturnRef(adcCreator));
+            EXPECT_CALL(platformFactoryMock, SynchronousQuadratureEncoderCreator()).WillRepeatedly(testing::ReturnRef(encoderCreator));
+            EXPECT_CALL(platformFactoryMock, CanBusCreator()).WillRepeatedly(testing::ReturnRef(canCreator));
+            EXPECT_CALL(platformFactoryMock, PerformanceTimer()).WillRepeatedly(testing::ReturnRef(performanceTrackerMock));
+            EXPECT_CALL(platformFactoryMock, PowerSupplyVoltage()).WillRepeatedly(testing::Return(foc::Volts{ 24.0f }));
+            EXPECT_CALL(platformFactoryMock, MaxCurrentSupported()).WillRepeatedly(testing::Return(foc::Ampere{ 5.0f }));
+            EXPECT_CALL(platformFactoryMock, SystemClock()).WillRepeatedly(testing::Return(hal::Hertz{ 10000 }));
+            EXPECT_CALL(platformFactoryMock, LowPriorityInterrupt()).WillRepeatedly(testing::ReturnRef(simpleLowPriorityInterrupt));
+            EXPECT_CALL(platformFactoryMock, Eeprom()).WillRepeatedly(testing::ReturnRef(eepromMock));
 
             EXPECT_CALL(encoderCreator, Constructed());
             EXPECT_CALL(pwmCreator, Constructed(std::chrono::nanoseconds{ 500 }, hal::Hertz{ 10000 }));
-            EXPECT_CALL(adcCreator, Constructed(application::HardwareFactory::SampleAndHold::shortest));
+            EXPECT_CALL(adcCreator, Constructed(application::PlatformFactory::SampleAndHold::shortest));
 
             EXPECT_CALL(adcDecoratorMock, Measure(testing::_)).WillRepeatedly(testing::SaveArg<0>(&onAdcMeasurementDone));
 
-            terminalInteractor.emplace(terminal, hardwareFactoryMock);
+            terminalInteractor.emplace(terminal, platformFactoryMock);
         }
 
         ~TestHardwareTerminal()
@@ -159,7 +159,7 @@ namespace
             EXPECT_CALL(adcCreator, Destructed()).Times(testing::AtLeast(1));
         }
 
-        testing::StrictMock<HardwareFactoryMock> hardwareFactoryMock;
+        testing::StrictMock<PlatformFactoryMock> platformFactoryMock;
         SimpleLowPriorityInterrupt simpleLowPriorityInterrupt;
         testing::StrictMock<StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
@@ -181,7 +181,7 @@ namespace
         testing::StrictMock<hal::CleanEepromMock> eepromMock;
 
         infra::CreatorMock<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds, hal::Hertz)> pwmCreator{ pwmMock };
-        infra::CreatorMock<application::AdcPhaseCurrentMeasurement, void(application::HardwareFactory::SampleAndHold)> adcCreator{ adcDecoratorMock };
+        infra::CreatorMock<application::AdcPhaseCurrentMeasurement, void(application::PlatformFactory::SampleAndHold)> adcCreator{ adcDecoratorMock };
         infra::CreatorMock<application::QuadratureEncoderDecorator, void()> encoderCreator{ encoderDecoratorMock };
         testing::StrictMock<CanBusAdapterMock> canAdapterMock;
         infra::CreatorMock<application::CanBusAdapter, void(uint32_t, bool)> canCreator{ canAdapterMock };
@@ -305,7 +305,7 @@ TEST_F(TestHardwareTerminal, adc_command)
 {
     InvokeCommand("adc medium", [this]()
         {
-            EXPECT_CALL(adcCreator, Constructed(application::HardwareFactory::SampleAndHold::medium)).Times(1);
+            EXPECT_CALL(adcCreator, Constructed(application::PlatformFactory::SampleAndHold::medium)).Times(1);
             EXPECT_CALL(adcDecoratorMock, Measure(testing::_)).Times(1);
         });
 
@@ -316,7 +316,7 @@ TEST_F(TestHardwareTerminal, adc_alias)
 {
     InvokeCommand("a shortest", [this]()
         {
-            EXPECT_CALL(adcCreator, Constructed(application::HardwareFactory::SampleAndHold::shortest)).Times(1);
+            EXPECT_CALL(adcCreator, Constructed(application::PlatformFactory::SampleAndHold::shortest)).Times(1);
             EXPECT_CALL(adcDecoratorMock, Measure(testing::_)).Times(1);
         });
 
@@ -855,7 +855,7 @@ TEST_F(TestHardwareTerminal, adc_shorter)
 {
     InvokeCommand("adc shorter", [this]()
         {
-            EXPECT_CALL(adcCreator, Constructed(application::HardwareFactory::SampleAndHold::shorter)).Times(1);
+            EXPECT_CALL(adcCreator, Constructed(application::PlatformFactory::SampleAndHold::shorter)).Times(1);
             EXPECT_CALL(adcDecoratorMock, Measure(testing::_)).Times(1);
         });
 
@@ -866,7 +866,7 @@ TEST_F(TestHardwareTerminal, adc_longer)
 {
     InvokeCommand("adc longer", [this]()
         {
-            EXPECT_CALL(adcCreator, Constructed(application::HardwareFactory::SampleAndHold::longer)).Times(1);
+            EXPECT_CALL(adcCreator, Constructed(application::PlatformFactory::SampleAndHold::longer)).Times(1);
             EXPECT_CALL(adcDecoratorMock, Measure(testing::_)).Times(1);
         });
 
@@ -877,7 +877,7 @@ TEST_F(TestHardwareTerminal, adc_longest)
 {
     InvokeCommand("adc longest", [this]()
         {
-            EXPECT_CALL(adcCreator, Constructed(application::HardwareFactory::SampleAndHold::longest)).Times(1);
+            EXPECT_CALL(adcCreator, Constructed(application::PlatformFactory::SampleAndHold::longest)).Times(1);
             EXPECT_CALL(adcDecoratorMock, Measure(testing::_)).Times(1);
         });
 
@@ -1133,7 +1133,7 @@ TEST_F(TestHardwareTerminal, adc_reconfigure_after_buffer_full)
 
     InvokeCommand("adc medium", [this]()
         {
-            EXPECT_CALL(adcCreator, Constructed(application::HardwareFactory::SampleAndHold::medium)).Times(1);
+            EXPECT_CALL(adcCreator, Constructed(application::PlatformFactory::SampleAndHold::medium)).Times(1);
             EXPECT_CALL(adcDecoratorMock, Measure(testing::_)).WillOnce(testing::SaveArg<0>(&onAdcMeasurementDone));
         });
 

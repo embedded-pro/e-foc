@@ -6,16 +6,16 @@
 #include "infra/util/BoundedDeque.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
-#include "source/foc/implementations/FocSpeedImpl.hpp"
-#include "source/foc/interfaces/Driver.hpp"
-#include "source/platform_abstraction/HardwareFactory.hpp"
+#include "core/foc/implementations/FocSpeedImpl.hpp"
+#include "core/foc/interfaces/Driver.hpp"
+#include "core/platform_abstraction/PlatformFactory.hpp"
 
 namespace application
 {
     class TerminalInteractor
     {
     public:
-        TerminalInteractor(services::TerminalWithStorage& terminal, application::HardwareFactory& hardware);
+        TerminalInteractor(services::TerminalWithStorage& terminal, application::PlatformFactory& hardware);
 
     private:
         using StatusWithMessage = services::TerminalWithStorage::StatusWithMessage;
@@ -41,7 +41,7 @@ namespace application
         static constexpr std::size_t averageSampleSize = 100;
         using QueueOfPhaseCurrents = infra::BoundedDeque<foc::PhaseCurrents>::WithMaxSize<averageSampleSize>;
 
-        void StartAdc(HardwareFactory::SampleAndHold sampleAndHold);
+        void StartAdc(PlatformFactory::SampleAndHold sampleAndHold);
         bool IsAdcBufferPopulated() const;
         void RunFocSimulation(foc::PhaseCurrents input, foc::Radians angle);
 
@@ -51,7 +51,7 @@ namespace application
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
         infra::DelayedProxyCreator<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds, hal::Hertz)> pwmCreator;
-        infra::DelayedProxyCreator<AdcPhaseCurrentMeasurement, void(HardwareFactory::SampleAndHold)> adcCreator;
+        infra::DelayedProxyCreator<AdcPhaseCurrentMeasurement, void(PlatformFactory::SampleAndHold)> adcCreator;
         infra::DelayedProxyCreator<QuadratureEncoderDecorator, void()> encoderCreator;
         infra::DelayedProxyCreator<CanBusAdapter, void(uint32_t, bool)> canCreator;
         bool canStarted = false;

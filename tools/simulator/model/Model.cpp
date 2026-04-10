@@ -3,7 +3,7 @@
 #include "foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include "source/foc/interfaces/Driver.hpp"
+#include "core/foc/interfaces/Driver.hpp"
 #include <cmath>
 #include <numbers>
 

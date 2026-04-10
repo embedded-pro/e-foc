@@ -1,0 +1,43 @@
+#pragma once
+
+#include "infra/timer/Timer.hpp"
+#include "infra/util/AutoResetFunction.hpp"
+#include "numerical/estimators/online/RecursiveLeastSquares.hpp"
+#include "core/foc/implementations/TransformsClarkePark.hpp"
+#include "core/foc/interfaces/Driver.hpp"
+#include "core/foc/interfaces/Foc.hpp"
+#include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
+
+namespace services
+{
+    class MechanicalParametersIdentificationImpl
+        : public MechanicalParametersIdentification
+    {
+    public:
+        MechanicalParametersIdentificationImpl(foc::FocSpeed& controller, foc::ThreePhaseInverter& driver, foc::Encoder& encoder);
+
+        void EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone) override;
+
+    private:
+        void OnSamplingUpdate(foc::PhaseCurrents currentPhases, const foc::NewtonMeter& torqueConstant);
+
+        foc::FocSpeed& controller;
+        foc::ThreePhaseInverter& driver;
+        foc::Encoder& encoder;
+
+        float samplingPeriod;
+        Config currentConfig;
+        infra::AutoResetFunction<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)> onDone;
+
+        using MotorRLS = estimators::RecursiveLeastSquares<float, 3>;
+        std::optional<MotorRLS> rls;
+
+        float previousPosition{ 0.0f };
+        float previousSpeed{ 0.0f };
+        float polePairs{ 1.0f };
+        [[no_unique_address]] foc::ClarkePark transform;
+        infra::TimerSingleShot timeoutTimer;
+        MotorRLS::InputMatrix regressor;
+        math::Matrix<float, 1, 1> torque;
+    };
+}

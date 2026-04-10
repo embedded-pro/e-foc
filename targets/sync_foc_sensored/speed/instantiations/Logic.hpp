@@ -1,7 +1,7 @@
 #pragma once
 
-#include "source/foc/implementations/FocSpeedImpl.hpp"
-#include "source/services/cli/TerminalSpeed.hpp"
+#include "core/foc/implementations/FocSpeedImpl.hpp"
+#include "core/services/cli/TerminalSpeed.hpp"
 #include "targets/sync_foc_sensored/instantiations/LogicWithOuterLoop.hpp"
 
 namespace application
@@ -10,7 +10,7 @@ namespace application
         : public LogicWithOuterLoop<foc::FocSpeedImpl, services::TerminalFocSpeedInteractor>
     {
     public:
-        explicit Logic(application::HardwareFactory& hardware)
+        explicit Logic(application::PlatformFactory& hardware)
             : LogicWithOuterLoop(hardware, "sync_foc_sensored:speed")
         {}
     };

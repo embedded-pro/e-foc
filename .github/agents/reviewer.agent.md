@@ -56,7 +56,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 
 ### 1. Memory Safety — Embedded Runtime / Hot Path (CRITICAL)
 
-- [ ] In embedded runtime code (`source/foc/`, `source/platform_abstraction/`, `targets/`, ISR-reachable paths, and other control-loop/hot-path code), no `new`, `delete`, `malloc`, `free`
+- [ ] In embedded runtime code (`core/foc/`, `core/platform_abstraction/`, `targets/`, ISR-reachable paths, and other control-loop/hot-path code), no `new`, `delete`, `malloc`, `free`
 - [ ] In embedded runtime code, no `std::make_unique`, `std::make_shared`
 - [ ] In embedded runtime code, no `std::vector` — must use `infra::BoundedVector<T>::WithMaxSize<N>`
 - [ ] In embedded runtime code, no `std::string` — must use `infra::BoundedString::WithStorage<N>`
@@ -155,7 +155,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 
 - [ ] All mocks use `testing::StrictMock<>` — `NiceMock` and `NaggyMock` are **FORBIDDEN**
 - [ ] **No plain `TEST()` macro** — use `TEST_F` or `TYPED_TEST`
-- [ ] Test files exist at `source/foc/implementations/test/Test{ComponentName}.cpp`
+- [ ] Test files exist at `core/foc/implementations/test/Test{ComponentName}.cpp`
 - [ ] Fixture class inside anonymous `namespace {}`
 - [ ] Test macros outside anonymous namespace
 - [ ] Transforms verified against known mathematical reference values

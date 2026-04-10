@@ -7,7 +7,7 @@ applyTo: "**/test/**"
 
 ## File Structure
 
-- Unit test files: `source/foc/implementations/test/Test{ComponentName}.cpp`
+- Unit test files: `core/foc/implementations/test/Test{ComponentName}.cpp`
 - Hardware stubs for unit tests: `targets/platform_implementations/Host/`
 - Host simulation models for integration: `tools/simulator/`
 - CMake: tests added via `add_subdirectory(test)` in `CMakeLists.txt`
@@ -32,7 +32,7 @@ Tests act as executable specifications. Write tests **before** implementation, n
 ## Fixture Test Pattern (single type — most FOC tests)
 
 ```cpp
-#include "source/foc/implementations/TransformsClarkePark.hpp"
+#include "core/foc/implementations/TransformsClarkePark.hpp"
 #include <gtest/gtest.h>
 
 namespace

@@ -2,9 +2,9 @@
 
 #include "foc/implementations/WithAutomaticCurrentPidGains.hpp"
 #include "services/peripheral/DebugLed.hpp"
-#include "source/platform_abstraction/HardwareFactory.hpp"
-#include "source/platform_abstraction/MotorFieldOrientedControllerAdapter.hpp"
-#include "source/services/cli/TerminalWithBanner.hpp"
+#include "core/platform_abstraction/PlatformFactory.hpp"
+#include "core/platform_abstraction/MotorFieldOrientedControllerAdapter.hpp"
+#include "core/services/cli/TerminalWithBanner.hpp"
 #include "targets/sync_foc_sensored/instantiations/MotorStateMachine.hpp"
 
 namespace application
@@ -13,19 +13,19 @@ namespace application
     class LogicWithOuterLoop
     {
     public:
-        explicit LogicWithOuterLoop(application::HardwareFactory& hardware, infra::BoundedConstString bannerName)
-            : hardwareAdapter{ hardware }
+        explicit LogicWithOuterLoop(application::PlatformFactory& hardware, infra::BoundedConstString bannerName)
+            : platformAdapter{ hardware }
             , debugLed{ hardware.Leds().front(), std::chrono::milliseconds(50), std::chrono::milliseconds(1950) }
             , vdc{ hardware.PowerSupplyVoltage() }
             , terminalWithStorage{ hardware.Terminal(), hardware.Tracer(), services::TerminalWithBanner::Banner{ bannerName, vdc, hardware.SystemClock() } }
             , motorStateMachine(
                   TerminalAndTracer{ terminalWithStorage, hardware.Tracer() },
-                  MotorDriverAndEncoder{ hardwareAdapter, hardwareAdapter },
-                  vdc, hardware.Eeprom(), hardware.MaxCurrentSupported(), hardwareAdapter.BaseFrequency(), hardware.LowPriorityInterrupt())
+                  MotorDriverAndEncoder{ platformAdapter, platformAdapter },
+                  vdc, hardware.Eeprom(), hardware.MaxCurrentSupported(), platformAdapter.BaseFrequency(), hardware.LowPriorityInterrupt())
         {}
 
     private:
-        HardwareAdapter hardwareAdapter;
+        PlatformAdapter platformAdapter;
         services::DebugLed debugLed;
         foc::Volts vdc;
         services::TerminalWithBanner::WithMaxSize<10> terminalWithStorage;

@@ -25,7 +25,7 @@ This project provides a production-ready motor control implementation designed f
 - **Zero Heap Allocation**: All memory statically allocated at compile-time
 - **Fixed Memory Footprint**: Uses `infra::BoundedVector`, `infra::BoundedString` instead of standard containers
 - **Minimal Stack Usage**: No recursion, predictable call depths
-- **Hardware Abstraction**: Support for ST and TI microcontrollers
+- **Platform Abstraction**: `PlatformFactory` interface with ST and TI implementations
 
 ### Simulation & Testing
 - **C++ Simulator**: Mathematical models for motor evaluation and curve plotting
@@ -66,30 +66,41 @@ cmake --build --preset EK-TM4C1294XL-Debug
 
 ## Project Structure
 ```
-├── source/                     # Application-level motor control
-│   ├── foc/                    # FOC implementations and instantiations
-│   │   ├── implementations/    # Concrete FOC algorithm implementations
-│   │   ├── instantiations/     # Application-specific FOC instances
-│   │   └── interfaces/         # FOC interface definitions
-│   ├── hardware/               # Hardware adapters and factory
-│   │   ├── st/                 # STM32-specific adapters
-│   │   ├── ti/                 # TI Tiva C-specific adapters
-│   │   └── Host/               # Host simulation adapters
-│   ├── services/               # Application-level services
-│   ├── application/            # Motor-specific implementations
-│   │   ├── sync_foc_sensored/  # Synchronous FOC with sensors
-│   │   └── hardware_test/      # Hardware validation tests
-│   └── tool/                   # Host tooling
-│       ├── simulator/          # C++ simulators for motor models
-│       └── can_commander/      # CAN bus command interface
-├── infra/                      # Infrastructure submodules
-│   ├── embedded-infra-lib/     # Submodule: infrastructure and utilities
-│   ├── numerical-toolbox/      # Generic algorithms (PID, filters, etc.)
-│   └── can-lite/               # Submodule: CAN protocol library
-├── hal/                        # Hardware Abstraction Layer
-│   ├── st/                     # ST microcontroller HAL
-│   └── ti/                     # TI microcontroller HAL
-└── build/                      # Build artifacts (host, windows targets)
+e-foc/
+├── core/                            # FOC library code (no application entry points)
+│   ├── foc/                         # Field-Oriented Control
+│   │   ├── interfaces/              # Abstract FOC interfaces (Foc.hpp, Driver.hpp, Units.hpp)
+│   │   ├── implementations/         # Clarke/Park, SVM, torque/speed/position loops, Runner
+│   │   └── instantiations/          # Concrete wiring of FOC components
+│   ├── platform_abstraction/        # Platform abstraction interfaces and shared adapters
+│   │   ├── PlatformFactory.hpp      # Abstract factory for peripherals
+│   │   ├── AdcPhaseCurrentMeasurement.hpp
+│   │   ├── CanBusAdapter.hpp
+│   │   ├── QuadratureEncoderDecorator.hpp
+│   │   └── MotorFieldOrientedControllerAdapter.hpp
+│   └── services/                    # Application-level services
+│       ├── alignment/               # Motor alignment and offset detection
+│       ├── cli/                     # Command-line interface service
+│       ├── electrical_system_ident/ # Resistance/inductance estimation
+│       ├── mechanical_system_ident/ # Friction and inertia estimation
+│       └── non_volatile_memory/     # NVM persistence service
+├── targets/                         # Application entry points and platform implementations
+│   ├── sync_foc_sensored/           # Synchronous FOC with encoder feedback
+│   ├── hardware_test/               # Hardware validation application
+│   └── platform_implementations/   # Platform-specific PlatformFactory implementations
+│       ├── host/                    # Host simulation (GoogleTest stubs/mocks)
+│       ├── st/                      # STM32 platform implementation
+│       └── ti/                      # TI Tiva C platform implementation
+├── tools/                           # Host-side developer tools
+│   ├── simulator/                   # C++ motor simulators (torque, speed, position control)
+│   └── can_commander/               # CAN bus command interface tool
+├── infra/                           # Infrastructure submodules
+│   ├── embedded-infra-lib/          # Bounded containers, build helpers, toolchain CMake
+│   ├── numerical-toolbox/           # PID, filters, fixed-point algorithms
+│   ├── can-lite/                    # CAN protocol library
+│   └── hal/                         # Hardware abstraction layer (ST, TI)
+├── documentation/                   # Architecture, design, theory, and requirements docs
+└── build/                           # Build artifacts (generated, not committed)
 ```
 
 ## Key Design Principles
@@ -106,7 +117,7 @@ cmake --build --preset EK-TM4C1294XL-Debug
 
 ### Architecture
 - **Dependency Injection**: Constructor injection for testability and flexibility
-- **Hardware Abstraction**: Clean separation between application logic and hardware
+- **Platform Abstraction**: Clean separation between application logic and hardware
 - **Interface-Driven Design**: Pure virtual interfaces enable mocking and testing
 
 ## How to Run the Simulator
@@ -169,14 +180,44 @@ Run with custom parameters (example):
 
 ## Documentation
 
-For detailed information about the project structure and coding guidelines, see:
-- [FOC Theory](documentation/theory/foc.md) - Field-Oriented Control theory and control block diagrams
-- [Alignment Theory](documentation/theory/alignment.md) - Motor alignment and offset detection
-- [Parameter Estimation](documentation/theory/resistance-inductance-estimation.md) - Resistance and inductance estimation theory
-- [Copilot Instructions](/.github/copilot-instructions.md) - Development guidelines and patterns
-- [Performance Optimization Guide](documentation/performance-optimization/README.md) - Writing high-performance embedded code, analyzing assembly, measuring cycles
-- [embedded-infra-lib Documentation](infra/embedded-infra-lib/README.md) - Infrastructure library reference
-- [numerical-toolbox Documentation](infra/numerical-toolbox/README.md) - Reusable algorithms
+### Architecture
+| Document | Description |
+|---|---|
+| [System Architecture](documentation/architecture/system.md) | High-level system architecture and component relationships |
+
+### Design
+| Document | Description |
+|---|---|
+| [FOC Transforms](documentation/design/foc-transforms.md) | Clarke and Park transform design |
+| [FOC Torque Control](documentation/design/foc-torque.md) | Torque (current) control loop design |
+| [FOC Speed Control](documentation/design/foc-speed.md) | Speed control loop design |
+| [FOC Position Control](documentation/design/foc-position.md) | Position control loop design |
+| [Alignment Service](documentation/design/service-alignment.md) | Motor alignment and offset detection service |
+| [CLI Service](documentation/design/service-cli.md) | Command-line interface service |
+| [Electrical Identification Service](documentation/design/service-electrical-ident.md) | Resistance and inductance estimation service |
+| [Mechanical Identification Service](documentation/design/service-mechanical-ident.md) | Friction and inertia estimation service |
+| [NVM Service](documentation/design/service-nvm.md) | Non-volatile memory persistence service |
+
+### Theory
+| Document | Description |
+|---|---|
+| [FOC Theory](documentation/theory/foc.md) | Field-Oriented Control theory and control block diagrams |
+| [Motor Alignment](documentation/theory/alignment.md) | Motor alignment and offset detection theory |
+| [Resistance & Inductance Estimation](documentation/theory/resistance-inductance-estimation.md) | Parameter estimation theory |
+| [Friction & Inertia Estimation](documentation/theory/friction-inertia-estimation.md) | Mechanical parameter estimation theory |
+
+### Performance & Protocols
+| Document | Description |
+|---|---|
+| [Performance Optimization Guide](documentation/performance-optimization/README.md) | High-performance embedded code, assembly analysis, cycle budgets |
+| [CAN Protocol](documentation/protocols/can-protocol.md) | CAN bus communication protocol specification |
+
+### Development References
+| Document | Description |
+|---|---|
+| [Copilot / Agent Instructions](.github/copilot-instructions.md) | Development guidelines, patterns, and constraints |
+| [embedded-infra-lib](infra/embedded-infra-lib/README.md) | Bounded containers and infrastructure library reference |
+| [numerical-toolbox](infra/numerical-toolbox/README.md) | Reusable numerical algorithms (PID, filters, fixed-point) |
 
 ## Contributing
 

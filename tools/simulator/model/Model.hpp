@@ -2,9 +2,9 @@
 
 #include "infra/util/Function.hpp"
 #include "infra/util/Observer.hpp"
-#include "source/foc/implementations/TransformsClarkePark.hpp"
-#include "source/foc/interfaces/Driver.hpp"
-#include "source/foc/interfaces/Units.hpp"
+#include "core/foc/implementations/TransformsClarkePark.hpp"
+#include "core/foc/interfaces/Driver.hpp"
+#include "core/foc/interfaces/Units.hpp"
 #include <cstddef>
 #include <optional>
 
