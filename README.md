@@ -84,6 +84,7 @@ e-foc/
 │       ├── electrical_system_ident/ # Resistance/inductance estimation
 │       ├── mechanical_system_ident/ # Friction and inertia estimation
 │       └── non_volatile_memory/     # NVM persistence service
+│   └── state_machine/               # FOC motor lifecycle state machine (Idle/Calibrating/Ready/Enabled/Fault)
 ├── targets/                         # Application entry points and platform implementations
 │   ├── sync_foc_sensored/           # Synchronous FOC with encoder feedback
 │   ├── hardware_test/               # Hardware validation application

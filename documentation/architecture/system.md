@@ -177,7 +177,9 @@ graph LR
 
 The wiring layer. Assembles the concrete PAL implementation, the selected FOC mode(s), and the services into a runnable system. This is the only layer that is aware of the specific combination in use — all other layers depend only on abstractions.
 
-An application controller manages the lifecycle: it holds the active FOC control mode, a PID auto-tuner, and a state variant for commissioning phases (idle, aligning, identifying), routing terminal commands to the correct service or control mode.
+The `FocStateMachine` is the central lifecycle authority. It owns the full motor commissioning and operation lifecycle: it enforces a formal five-state machine (`Idle → Calibrating → Ready ⇄ Enabled, Fault`), orchestrates the sequential calibration chain (electrical identification, alignment, and mechanical identification for speed/position modes), and responds to hardware fault notifications by immediately stopping the inverter and entering the `Fault` state. Only after `FocStateMachine` has reached `Ready` can the motor be enabled.
+
+In CLI mode, `FocStateMachine` registers the lifecycle commands `calibrate`, `enable`, `disable`, `clear_fault`, and `clear_cal` directly on the terminal. The `TerminalFocBaseInteractor` (and its control-mode subclasses) register PID tuning and setpoint commands on the same terminal, leaving lifecycle management exclusively to the state machine.
 
 ### 5. Tools
 

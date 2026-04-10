@@ -1,8 +1,8 @@
 #include "core/services/cli/TerminalBase.hpp"
+#include "core/services/cli/TerminalHelper.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "numerical/controllers/interfaces/PidController.hpp"
 #include "services/util/TerminalWithStorage.hpp"
-#include "core/services/cli/TerminalHelper.hpp"
 
 namespace services
 {
@@ -15,18 +15,6 @@ namespace services
             [this](const auto& params)
             {
                 this->terminal.ProcessResult(SetFocPid(params));
-            } });
-
-        terminal.AddCommand({ { "start", "sts", "Start system. start. Ex: start" },
-            [this](const auto&)
-            {
-                this->terminal.ProcessResult(Start());
-            } });
-
-        terminal.AddCommand({ { "stop", "stp", "Stop system. stop. Ex: stop" },
-            [this](const auto&)
-            {
-                this->terminal.ProcessResult(Stop());
             } });
     }
 
@@ -70,18 +58,6 @@ namespace services
         auto qPid = controllers::PidTunings<float>{ (*qkp), (*qki), (*qkd) };
 
         foc.SetCurrentTunings(vdc, foc::IdAndIqTunings{ dPid, qPid });
-        return TerminalFocBaseInteractor::StatusWithMessage();
-    }
-
-    TerminalFocBaseInteractor::StatusWithMessage TerminalFocBaseInteractor::Start()
-    {
-        foc.Enable();
-        return TerminalFocBaseInteractor::StatusWithMessage();
-    }
-
-    TerminalFocBaseInteractor::StatusWithMessage TerminalFocBaseInteractor::Stop()
-    {
-        foc.Disable();
         return TerminalFocBaseInteractor::StatusWithMessage();
     }
 }

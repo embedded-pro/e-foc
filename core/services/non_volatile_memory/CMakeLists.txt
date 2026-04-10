@@ -22,3 +22,4 @@ target_sources(e_foc.services.non_volatile_memory PRIVATE
 )
 
 add_subdirectory(test)
+add_subdirectory(test_doubles)

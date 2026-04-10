@@ -6,7 +6,7 @@ target_include_directories(e_foc.sync_foc_sensored.instantiations INTERFACE
 )
 
 target_link_libraries(e_foc.sync_foc_sensored.instantiations INTERFACE
-    e_foc.foc.instantiations
+    e_foc.state_machine
     e_foc.services.electrical_system_ident
     e_foc.services.alignment
     e_foc.services.non_volatile_memory
@@ -15,5 +15,4 @@ target_link_libraries(e_foc.sync_foc_sensored.instantiations INTERFACE
 
 target_sources(e_foc.sync_foc_sensored.instantiations INTERFACE
     LogicWithOuterLoop.hpp
-    MotorStateMachine.hpp
 )

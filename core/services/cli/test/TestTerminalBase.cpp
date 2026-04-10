@@ -1,11 +1,11 @@
+#include "core/foc/implementations/test_doubles/FocMock.hpp"
+#include "core/services/cli/TerminalBase.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
 #include "infra/util/ByteRange.hpp"
 #include "infra/util/Function.hpp"
 #include "infra/util/test_helper/MockHelpers.hpp"
 #include "services/util/Terminal.hpp"
-#include "core/foc/implementations/test_doubles/FocMock.hpp"
-#include "core/services/cli/TerminalBase.hpp"
 #include "gmock/gmock.h"
 #include <optional>
 
@@ -203,46 +203,6 @@ TEST_F(TerminalBaseTest, set_dq_pid_invalid_q_kd)
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalBaseTest, start)
-{
-    InvokeCommand("start", [this]()
-        {
-            EXPECT_CALL(controllerBaseMock, Enable());
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalBaseTest, start_alias)
-{
-    InvokeCommand("sts", [this]()
-        {
-            EXPECT_CALL(controllerBaseMock, Enable());
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalBaseTest, stop)
-{
-    InvokeCommand("stop", [this]()
-        {
-            EXPECT_CALL(controllerBaseMock, Disable());
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalBaseTest, stop_alias)
-{
-    InvokeCommand("stp", [this]()
-        {
-            EXPECT_CALL(controllerBaseMock, Disable());
         });
 
     ExecuteAllActions();

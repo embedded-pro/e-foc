@@ -25,3 +25,4 @@ target_sources(e_foc.services.mechanical_system_ident PRIVATE
 )
 
 add_subdirectory(test)
+add_subdirectory(test_doubles)

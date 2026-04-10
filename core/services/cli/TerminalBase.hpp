@@ -1,7 +1,7 @@
 #pragma once
 
-#include "services/util/TerminalWithStorage.hpp"
 #include "core/foc/interfaces/Foc.hpp"
+#include "services/util/TerminalWithStorage.hpp"
 
 namespace services
 {
@@ -17,8 +17,6 @@ namespace services
 
     private:
         StatusWithMessage SetFocPid(const infra::BoundedConstString& param);
-        StatusWithMessage Start();
-        StatusWithMessage Stop();
 
     private:
         services::TerminalWithStorage& terminal;
