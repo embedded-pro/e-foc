@@ -181,43 +181,48 @@ Run with custom parameters (example):
 ## Documentation
 
 ### Architecture
-| Document | Description |
-|---|---|
+
+| Document                                                    | Description                                                |
+|-------------------------------------------------------------|------------------------------------------------------------|
 | [System Architecture](documentation/architecture/system.md) | High-level system architecture and component relationships |
 
 ### Design
-| Document | Description |
-|---|---|
-| [FOC Transforms](documentation/design/foc-transforms.md) | Clarke and Park transform design |
-| [FOC Torque Control](documentation/design/foc-torque.md) | Torque (current) control loop design |
-| [FOC Speed Control](documentation/design/foc-speed.md) | Speed control loop design |
-| [FOC Position Control](documentation/design/foc-position.md) | Position control loop design |
-| [Alignment Service](documentation/design/service-alignment.md) | Motor alignment and offset detection service |
-| [CLI Service](documentation/design/service-cli.md) | Command-line interface service |
+
+| Document                                                                              | Description                                  |
+|---------------------------------------------------------------------------------------|----------------------------------------------|
+| [FOC Transforms](documentation/design/foc-transforms.md)                              | Clarke and Park transform design             |
+| [FOC Torque Control](documentation/design/foc-torque.md)                              | Torque (current) control loop design         |
+| [FOC Speed Control](documentation/design/foc-speed.md)                                | Speed control loop design                    |
+| [FOC Position Control](documentation/design/foc-position.md)                          | Position control loop design                 |
+| [Alignment Service](documentation/design/service-alignment.md)                        | Motor alignment and offset detection service |
+| [CLI Service](documentation/design/service-cli.md)                                    | Command-line interface service               |
 | [Electrical Identification Service](documentation/design/service-electrical-ident.md) | Resistance and inductance estimation service |
-| [Mechanical Identification Service](documentation/design/service-mechanical-ident.md) | Friction and inertia estimation service |
-| [NVM Service](documentation/design/service-nvm.md) | Non-volatile memory persistence service |
+| [Mechanical Identification Service](documentation/design/service-mechanical-ident.md) | Friction and inertia estimation service      |
+| [NVM Service](documentation/design/service-nvm.md)                                    | Non-volatile memory persistence service      |
 
 ### Theory
-| Document | Description |
-|---|---|
-| [FOC Theory](documentation/theory/foc.md) | Field-Oriented Control theory and control block diagrams |
-| [Motor Alignment](documentation/theory/alignment.md) | Motor alignment and offset detection theory |
-| [Resistance & Inductance Estimation](documentation/theory/resistance-inductance-estimation.md) | Parameter estimation theory |
-| [Friction & Inertia Estimation](documentation/theory/friction-inertia-estimation.md) | Mechanical parameter estimation theory |
+
+| Document                                                                                       | Description                                              |
+|------------------------------------------------------------------------------------------------|----------------------------------------------------------|
+| [FOC Theory](documentation/theory/foc.md)                                                      | Field-Oriented Control theory and control block diagrams |
+| [Motor Alignment](documentation/theory/alignment.md)                                           | Motor alignment and offset detection theory              |
+| [Resistance & Inductance Estimation](documentation/theory/resistance-inductance-estimation.md) | Parameter estimation theory                              |
+| [Friction & Inertia Estimation](documentation/theory/friction-inertia-estimation.md)           | Mechanical parameter estimation theory                   |
 
 ### Performance & Protocols
-| Document | Description |
-|---|---|
+
+| Document                                                                           | Description                                                      |
+|------------------------------------------------------------------------------------|------------------------------------------------------------------|
 | [Performance Optimization Guide](documentation/performance-optimization/README.md) | High-performance embedded code, assembly analysis, cycle budgets |
-| [CAN Protocol](documentation/protocols/can-protocol.md) | CAN bus communication protocol specification |
+| [CAN Protocol](documentation/protocols/can-protocol.md)                            | CAN bus communication protocol specification                     |
 
 ### Development References
-| Document | Description |
-|---|---|
-| [Copilot / Agent Instructions](.github/copilot-instructions.md) | Development guidelines, patterns, and constraints |
-| [embedded-infra-lib](infra/embedded-infra-lib/README.md) | Bounded containers and infrastructure library reference |
-| [numerical-toolbox](infra/numerical-toolbox/README.md) | Reusable numerical algorithms (PID, filters, fixed-point) |
+
+| Document                                                        | Description                                               |
+|-----------------------------------------------------------------|-----------------------------------------------------------|
+| [Copilot / Agent Instructions](.github/copilot-instructions.md) | Development guidelines, patterns, and constraints         |
+| [embedded-infra-lib](infra/embedded-infra-lib/README.md)        | Bounded containers and infrastructure library reference   |
+| [numerical-toolbox](infra/numerical-toolbox/README.md)          | Reusable numerical algorithms (PID, filters, fixed-point) |
 
 ## Contributing
 
