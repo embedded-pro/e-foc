@@ -7,14 +7,14 @@ component: state-machine
 date: 2026-04-10
 ---
 
-| Field     | Value                     |
-|-----------|---------------------------|
+| Field     | Value                      |
+|-----------|----------------------------|
 | Title     | Service: FOC State Machine |
-| Type      | design                    |
-| Status    | draft                     |
-| Version   | 0.1.0                     |
-| Component | state-machine             |
-| Date      | 2026-04-10                |
+| Type      | design                     |
+| Status    | draft                      |
+| Version   | 0.1.0                      |
+| Component | state-machine              |
+| Date      | 2026-04-10                 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -50,13 +50,13 @@ date: 2026-04-10
 
 The state machine has five named states:
 
-| State        | Motor condition                                                         | Allowed transitions                              |
-|--------------|-------------------------------------------------------------------------|--------------------------------------------------|
-| `Idle`       | No calibration data; motor cannot be enabled                            | → `Calibrating` (CmdCalibrate), → `Ready` (valid NVM on boot), → `Fault` (hardware fault) |
-| `Calibrating`| Calibration sequence in progress; motor is driven by identification services | → `Ready` (sequence complete + NVM saved), → `Fault` (any step fails or hardware fault) |
-| `Ready`      | Calibration data valid and applied; motor can be enabled at any time    | → `Enabled` (CmdEnable), → `Calibrating` (CmdCalibrate re-runs), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault) |
-| `Enabled`    | FOC controller active; motor under closed-loop control                  | → `Ready` (CmdDisable), → `Fault` (hardware fault) |
-| `Fault`      | Safe state; inverter stopped; fault code recorded                       | → `Idle` (CmdClearFault) |
+| State         | Motor condition                                                              | Allowed transitions                                                                                                         |
+|---------------|------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
+| `Idle`        | No calibration data; motor cannot be enabled                                 | → `Calibrating` (CmdCalibrate), → `Ready` (valid NVM on boot), → `Fault` (hardware fault)                                   |
+| `Calibrating` | Calibration sequence in progress; motor is driven by identification services | → `Ready` (sequence complete + NVM saved), → `Fault` (any step fails or hardware fault)                                     |
+| `Ready`       | Calibration data valid and applied; motor can be enabled at any time         | → `Enabled` (CmdEnable), → `Calibrating` (CmdCalibrate re-runs), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault) |
+| `Enabled`     | FOC controller active; motor under closed-loop control                       | → `Ready` (CmdDisable), → `Fault` (hardware fault)                                                                          |
+| `Fault`       | Safe state; inverter stopped; fault code recorded                            | → `Idle` (CmdClearFault)                                                                                                    |
 
 ### State Diagram
 
@@ -111,13 +111,13 @@ sequenceDiagram
 
 **Steps and data produced:**
 
-| Step | Service | Data stored |
-|------|---------|-------------|
-| 1. Pole pairs | Electrical Ident | `polePairs` |
-| 2. Resistance and inductance | Electrical Ident | `rPhase`, `lD`, `lQ` |
-| 3. Alignment | Motor Alignment | `encoderZeroOffset` |
-| 4. Mechanical parameters (speed/position only) | Mechanical Ident | `inertia`, `frictionViscous`, `kpVelocity`, `kiVelocity` |
-| 5. NVM persist | Non-Volatile Memory | All of the above written to EEPROM |
+| Step                                           | Service             | Data stored                                              |
+|------------------------------------------------|---------------------|----------------------------------------------------------|
+| 1. Pole pairs                                  | Electrical Ident    | `polePairs`                                              |
+| 2. Resistance and inductance                   | Electrical Ident    | `rPhase`, `lD`, `lQ`                                     |
+| 3. Alignment                                   | Motor Alignment     | `encoderZeroOffset`                                      |
+| 4. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `kpVelocity`, `kiVelocity` |
+| 5. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                       |
 
 After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, encoder zero offset applied, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`.
 
@@ -144,48 +144,48 @@ On construction, the state machine asynchronously checks whether valid calibrati
 
 ### Provided
 
-| Interface             | Purpose                                                                 | Contract                                                                              |
-|-----------------------|-------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
-| `FocStateMachineBase` | Abstract lifecycle controller — state query and command dispatch        | Constructed once per application; all command methods are safe to call from any state (invalid transitions are silently ignored) |
-| `CurrentState()`      | Returns the current `State` variant for inspection                      | Returns a const reference; valid for the lifetime of the state machine                |
-| `LastFaultCode()`     | Returns the most recent fault code                                      | Value is only meaningful when in `Fault` state or just after clearing a fault         |
-| `CmdCalibrate()`      | Requests start of calibration                                           | Only effective from `Idle` or `Ready`; ignored from all other states                  |
-| `CmdEnable()`         | Requests enabling the FOC controller                                    | Only effective from `Ready`; ignored from all other states                            |
-| `CmdDisable()`        | Requests disabling the FOC controller                                   | Only effective from `Enabled`; ignored from all other states                          |
-| `CmdClearFault()`     | Clears the fault and returns to `Idle`                                  | Only effective from `Fault`; ignored from all other states                            |
-| `CmdClearCalibration()` | Invalidates NVM calibration and returns to `Idle`                     | Ignored when in `Enabled`; effective from all other states                            |
+| Interface               | Purpose                                                          | Contract                                                                                                                         |
+|-------------------------|------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| `FocStateMachineBase`   | Abstract lifecycle controller — state query and command dispatch | Constructed once per application; all command methods are safe to call from any state (invalid transitions are silently ignored) |
+| `CurrentState()`        | Returns the current `State` variant for inspection               | Returns a const reference; valid for the lifetime of the state machine                                                           |
+| `LastFaultCode()`       | Returns the most recent fault code                               | Value is only meaningful when in `Fault` state or just after clearing a fault                                                    |
+| `CmdCalibrate()`        | Requests start of calibration                                    | Only effective from `Idle` or `Ready`; ignored from all other states                                                             |
+| `CmdEnable()`           | Requests enabling the FOC controller                             | Only effective from `Ready`; ignored from all other states                                                                       |
+| `CmdDisable()`          | Requests disabling the FOC controller                            | Only effective from `Enabled`; ignored from all other states                                                                     |
+| `CmdClearFault()`       | Clears the fault and returns to `Idle`                           | Only effective from `Fault`; ignored from all other states                                                                       |
+| `CmdClearCalibration()` | Invalidates NVM calibration and returns to `Idle`                | Ignored when in `Enabled`; effective from all other states                                                                       |
 
 ### Required
 
-| Interface                           | Purpose                                                                 | Contract                                                                 |
-|-------------------------------------|-------------------------------------------------------------------------|--------------------------------------------------------------------------|
-| `NonVolatileMemory`                 | Persists and retrieves calibration data across power cycles             | Must remain valid for the lifetime of the state machine                  |
-| `ElectricalParametersIdentification`| Estimates pole pairs, phase resistance, and dq inductances              | Operations are asynchronous; callback fires on the same event loop       |
-| `MotorAlignment`                    | Forces rotor to a known angle and returns the encoder zero offset       | Operation is asynchronous; result is optional (nullopt = failure)        |
-| `MechanicalParametersIdentification`| Estimates rotor inertia and viscous friction (speed/position modes only)| Operation is asynchronous; result is optional (nullopt = failure)        |
-| `FaultNotifier`                     | Delivers hardware fault notifications to the state machine              | `Register()` must be called during construction; callback may fire at any time |
-| `ThreePhaseInverter`                | Used by the FOC controller to issue PWM and read phase currents         | Stopped immediately on any fault from `Enabled` or `Calibrating` state  |
-| `Encoder`                           | Rotor position sensor; zero offset applied after alignment              | `Set()` called during `ApplyCalibrationData` to configure the zero point |
-| `TerminalWithStorage`               | Serial command interface for CLI-mode transition policy                 | Commands registered in constructor; terminal must outlive the state machine |
-| `Tracer`                            | Debug trace output for lifecycle events                                 | All state transitions and calibration steps are traced                   |
+| Interface                            | Purpose                                                                  | Contract                                                                       |
+|--------------------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| `NonVolatileMemory`                  | Persists and retrieves calibration data across power cycles              | Must remain valid for the lifetime of the state machine                        |
+| `ElectricalParametersIdentification` | Estimates pole pairs, phase resistance, and dq inductances               | Operations are asynchronous; callback fires on the same event loop             |
+| `MotorAlignment`                     | Forces rotor to a known angle and returns the encoder zero offset        | Operation is asynchronous; result is optional (nullopt = failure)              |
+| `MechanicalParametersIdentification` | Estimates rotor inertia and viscous friction (speed/position modes only) | Operation is asynchronous; result is optional (nullopt = failure)              |
+| `FaultNotifier`                      | Delivers hardware fault notifications to the state machine               | `Register()` must be called during construction; callback may fire at any time |
+| `ThreePhaseInverter`                 | Used by the FOC controller to issue PWM and read phase currents          | Stopped immediately on any fault from `Enabled` or `Calibrating` state         |
+| `Encoder`                            | Rotor position sensor; zero offset applied after alignment               | `Set()` called during `ApplyCalibrationData` to configure the zero point       |
+| `TerminalWithStorage`                | Serial command interface for CLI-mode transition policy                  | Commands registered in constructor; terminal must outlive the state machine    |
+| `Tracer`                             | Debug trace output for lifecycle events                                  | All state transitions and calibration steps are traced                         |
 
 ---
 
 ## Data Model
 
-| Entity            | Field               | Type / Unit     | Range         | Notes                                                            |
-|-------------------|---------------------|-----------------|---------------|------------------------------------------------------------------|
-| `CalibrationData` | `polePairs`         | count (uint8)   | 1–255         | Number of electrical pole pairs                                  |
-| `CalibrationData` | `rPhase`            | Ohm (float)     | > 0           | Phase resistance identified by electrical ident                  |
-| `CalibrationData` | `lD` / `lQ`        | mH (float)      | > 0           | D/Q inductances (set equal; anisotropy not estimated)            |
-| `CalibrationData` | `encoderZeroOffset` | int32 (bit-cast float Radians) | any | Quantised electrical angle at encoder zero; applied via `Encoder::Set()` |
-| `CalibrationData` | `inertia`           | N·m·s² (float)  | ≥ 0           | Rotor inertia; populated only for speed/position modes           |
-| `CalibrationData` | `frictionViscous`   | N·m·s/rad (float) | ≥ 0         | Viscous friction coefficient; populated only for speed/position modes |
-| `CalibrationData` | `frictionCoulomb`   | N·m (float)     | ≥ 0           | Coulomb friction; currently 0 (not identified)                   |
-| `CalibrationData` | `kpVelocity`        | (float)         | ≥ 0           | Velocity PID proportional gain; computed as J × ω_bw             |
-| `CalibrationData` | `kiVelocity`        | (float)         | ≥ 0           | Velocity PID integral gain; computed as B × ω_bw                 |
-| `CalibrationData` | `kpCurrent` / `kiCurrent` | (float) | any           | Current PID gains; computed from R/L/bandwidth by auto-tuner, not stored by the state machine |
-| `FaultCode`       | —                   | enum (uint8)    | 7 values      | `overcurrent`, `overvoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed` |
+| Entity            | Field                     | Type / Unit                    | Range    | Notes                                                                                                                   |
+|-------------------|---------------------------|--------------------------------|----------|-------------------------------------------------------------------------------------------------------------------------|
+| `CalibrationData` | `polePairs`               | count (uint8)                  | 1–255    | Number of electrical pole pairs                                                                                         |
+| `CalibrationData` | `rPhase`                  | Ohm (float)                    | > 0      | Phase resistance identified by electrical ident                                                                         |
+| `CalibrationData` | `lD` / `lQ`               | mH (float)                     | > 0      | D/Q inductances (set equal; anisotropy not estimated)                                                                   |
+| `CalibrationData` | `encoderZeroOffset`       | int32 (bit-cast float Radians) | any      | Quantised electrical angle at encoder zero; applied via `Encoder::Set()`                                                |
+| `CalibrationData` | `inertia`                 | N·m·s² (float)                 | ≥ 0      | Rotor inertia; populated only for speed/position modes                                                                  |
+| `CalibrationData` | `frictionViscous`         | N·m·s/rad (float)              | ≥ 0      | Viscous friction coefficient; populated only for speed/position modes                                                   |
+| `CalibrationData` | `frictionCoulomb`         | N·m (float)                    | ≥ 0      | Coulomb friction; currently 0 (not identified)                                                                          |
+| `CalibrationData` | `kpVelocity`              | (float)                        | ≥ 0      | Velocity PID proportional gain; computed as J × ω_bw                                                                    |
+| `CalibrationData` | `kiVelocity`              | (float)                        | ≥ 0      | Velocity PID integral gain; computed as B × ω_bw                                                                        |
+| `CalibrationData` | `kpCurrent` / `kiCurrent` | (float)                        | any      | Current PID gains; computed from R/L/bandwidth by auto-tuner, not stored by the state machine                           |
+| `FaultCode`       | —                         | enum (uint8)                   | 7 values | `overcurrent`, `overvoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed` |
 
 ---
 

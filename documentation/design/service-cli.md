@@ -80,8 +80,8 @@ Only one interactor is active at a time; the application constructs exactly the 
 
 #### `TerminalFocBaseInteractor` — Shared Commands
 
-| Command   | Arguments          | Action                                                         |
-|-----------|--------------------|----------------------------------------------------------------|
+| Command      | Arguments            | Action                                                         |
+|--------------|----------------------|----------------------------------------------------------------|
 | `set_dq_pid` | kp, ki, kd×2 (float) | Sets current-loop PID gains via `FocBase::SetCurrentTunings()` |
 
 This command is available in all control modes.
@@ -131,13 +131,13 @@ After the banner is printed, all subsequent inputs and outputs pass through to t
 
 The `FocStateMachine` registers additional commands on the same `TerminalWithStorage` instance that enforce the motor lifecycle state machine. These commands are always available regardless of which control mode is active:
 
-| Command       | Alias | Action                                                                                         |
-|---------------|-------|-----------------------------------------------------------------------------------------------|
+| Command       | Alias | Action                                                                                               |
+|---------------|-------|------------------------------------------------------------------------------------------------------|
 | `calibrate`   | `cal` | Runs the full calibration sequence (pole pairs → R/L → alignment → mechanical ident for speed modes) |
-| `enable`      | `en`  | Enables the FOC controller (only allowed from `Ready` state)                                   |
-| `disable`     | `dis` | Disables the FOC controller and returns to `Ready`                                             |
-| `clear_fault` | `cf`  | Clears the active fault and returns to `Idle`                                                  |
-| `clear_cal`   | `cc`  | Invalidates NVM calibration data and returns to `Idle`                                         |
+| `enable`      | `en`  | Enables the FOC controller (only allowed from `Ready` state)                                         |
+| `disable`     | `dis` | Disables the FOC controller and returns to `Ready`                                                   |
+| `clear_fault` | `cf`  | Clears the active fault and returns to `Idle`                                                        |
+| `clear_cal`   | `cc`  | Invalidates NVM calibration data and returns to `Idle`                                               |
 
 ### Response Model — `StatusWithMessage`
 
@@ -199,10 +199,10 @@ Registered command handlers are stored in a fixed-size look-up structure in the 
 
 ### Provided
 
-| Interface                                    | Purpose                                                                                                                                                                                | Contract                                                                              |
-|----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
+| Interface                                    | Purpose                                                                                                                                                                    | Contract                                                                              |
+|----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
 | `TerminalFocBaseInteractor` (and subclasses) | Registers the `set_dq_pid` command on `TerminalWithStorage`; exposes a `Terminal()` accessor for the `FocStateMachine` to register lifecycle commands on the same terminal | Constructed once per application; exactly one interactor subclass is active at a time |
-| `TerminalWithBanner`                         | Decorates `TerminalWithStorage` to print a welcome banner on first connection                                                                                                          | Transparent to the underlying terminal after the banner has been printed              |
+| `TerminalWithBanner`                         | Decorates `TerminalWithStorage` to print a welcome banner on first connection                                                                                              | Transparent to the underlying terminal after the banner has been printed              |
 
 ### Required
 
