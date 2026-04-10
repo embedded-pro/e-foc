@@ -7,7 +7,7 @@ target_include_directories(e_foc.services.alignment PUBLIC
 
 target_link_libraries(e_foc.services.alignment PUBLIC
     infra.util
-    e_foc.hardware
+    e_foc.platform_abstraction
     e_foc.foc.interfaces
 )
 

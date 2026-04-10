@@ -64,17 +64,17 @@ jobs:
           version="${{ needs.release_please.outputs.tag_name }}"
           staging="staging/simulator"
           mkdir -p "$staging"
-          find build/host/source/tool/simulator -name "e_foc.tool.simulator.*" -type f -executable | while read -r f; do
+          find build/host/tools/simulator -name "e_foc.tool.simulator.*" -type f -executable | while read -r f; do
             cp "$f" "$staging/"
           done
-          cp source/tool/simulator/config/*.json "$staging/" 2>/dev/null || true
+          cp tools/simulator/config/*.json "$staging/" 2>/dev/null || true
           tar -czf "e_foc-simulator-${version}-linux-x86_64.tar.gz" -C staging simulator
       - name: Package CAN Commander
         run: |
           version="${{ needs.release_please.outputs.tag_name }}"
           staging="staging/can_commander"
           mkdir -p "$staging"
-          find build/host/source/tool/can_commander -name "e_foc.tool.can_commander" -type f -executable | while read -r f; do
+          find build/host/tools/can_commander -name "e_foc.tool.can_commander" -type f -executable | while read -r f; do
             cp "$f" "$staging/"
           done
           tar -czf "e_foc-can_commander-${version}-linux-x86_64.tar.gz" -C staging can_commander
@@ -130,10 +130,10 @@ jobs:
           version="${{ needs.release_please.outputs.tag_name }}"
           staging="staging/simulator"
           mkdir -p "$staging"
-          find build/source/tool/simulator -name "e_foc.tool.simulator.*.exe" -type f | while read -r f; do
+          find build/source/tools/simulator -name "e_foc.tool.simulator.*.exe" -type f | while read -r f; do
             cp "$f" "$staging/"
           done
-          cp source/tool/simulator/config/*.json "$staging/" 2>/dev/null || true
+          cp tools/simulator/config/*.json "$staging/" 2>/dev/null || true
           7z a "e_foc-simulator-${version}-windows-x86_64.zip" "./staging/simulator/*"
       - name: Package CAN Commander
         shell: bash
@@ -141,7 +141,7 @@ jobs:
           version="${{ needs.release_please.outputs.tag_name }}"
           staging="staging/can_commander"
           mkdir -p "$staging"
-          find build/source/tool/can_commander -name "e_foc.tool.can_commander.exe" -type f | while read -r f; do
+          find build/source/tools/can_commander -name "e_foc.tool.can_commander.exe" -type f | while read -r f; do
             cp "$f" "$staging/"
           done
           7z a "e_foc-can_commander-${version}-windows-x86_64.zip" "./staging/can_commander/*"

@@ -137,8 +137,8 @@ jobs:
         uses: ./.github/actions/cycle-analysis
         id: cycles
         with:
-          elf-path: build/${{ matrix.target }}/source/application/sync_foc_sensored/speed/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.speed.main.elf
-          config-path: source/application/sync_foc_sensored/speed/cycle-analysis.json
+          elf-path: build/${{ matrix.target }}/targets/sync_foc_sensored/speed/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.speed.main.elf
+          config-path: targets/sync_foc_sensored/speed/cycle-analysis.json
           target: ${{ matrix.target }}
           build-config: ${{ matrix.configuration }}
           clock-mhz: '120'

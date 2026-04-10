@@ -30,7 +30,7 @@
             "name": "Simulator GUI",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/host/source/tool/simulator/${input:simulatorMode}_control/Debug/e_foc.tool.simulator.${input:simulatorMode}_control",
+            "program": "${workspaceFolder}/build/host/tools/simulator/${input:simulatorMode}_control/Debug/e_foc.tool.simulator.${input:simulatorMode}_control",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -55,7 +55,7 @@
             "name": "Simulator Headless",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/host/source/tool/simulator/${input:simulatorMode}_control/Debug/e_foc.tool.simulator.${input:simulatorMode}_control",
+            "program": "${workspaceFolder}/build/host/tools/simulator/${input:simulatorMode}_control/Debug/e_foc.tool.simulator.${input:simulatorMode}_control",
             "args": [
                 "--no-gui"
             ],
@@ -77,7 +77,7 @@
             "name": "CAN Commander (Docker)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/host/source/tool/can_commander/main/Debug/e_foc.tool.can_commander",
+            "program": "${workspaceFolder}/build/host/tools/can_commander/main/Debug/e_foc.tool.can_commander",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

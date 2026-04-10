@@ -56,7 +56,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 
 ### 1. Memory Safety — Embedded Runtime / Hot Path (CRITICAL)
 
-- [ ] In embedded runtime code (`source/foc/`, `source/hardware/`, ISR-reachable paths, and other control-loop/hot-path code), no `new`, `delete`, `malloc`, `free`
+- [ ] In embedded runtime code (`source/foc/`, `source/platform_abstraction/`, `targets/`, ISR-reachable paths, and other control-loop/hot-path code), no `new`, `delete`, `malloc`, `free`
 - [ ] In embedded runtime code, no `std::make_unique`, `std::make_shared`
 - [ ] In embedded runtime code, no `std::vector` — must use `infra::BoundedVector<T>::WithMaxSize<N>`
 - [ ] In embedded runtime code, no `std::string` — must use `infra::BoundedString::WithStorage<N>`
@@ -162,7 +162,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 - [ ] PID anti-windup and clamping behavior tested
 - [ ] SVM sectors and duty cycles tested for all 6 sectors and edge cases
 - [ ] Host simulation model updated if control loop changed
-- [ ] Hardware stubs present in `source/hardware/Host/` if new hardware interfaces added
+- [ ] Hardware stubs present in `targets/platform_implementations/Host/` if new hardware interfaces added
 - [ ] Tests follow Arrange-Act-Assert pattern
 
 ### 13. Documentation Alignment (CRITICAL)

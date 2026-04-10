@@ -1,6 +1,7 @@
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
 #include "infra/util/ByteRange.hpp"
+#include "infra/util/Function.hpp"
 #include "services/util/Terminal.hpp"
 #include "source/services/cli/TerminalWithBanner.hpp"
 #include "gmock/gmock.h"
@@ -29,22 +30,21 @@ namespace
         , public infra::EventDispatcherWithWeakPtrFixture
     {
     public:
-        ::testing::NiceMock<StreamWriterMock> streamWriterMock;
+        ::testing::StrictMock<StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
         ::testing::StrictMock<hal::SerialCommunicationMock> communication;
-        services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-
         std::vector<std::vector<uint8_t>> capturedOutputs;
-
-        void SetUp() override
-        {
-            ON_CALL(streamWriterMock, Insert(testing::_, testing::_))
-                .WillByDefault(testing::Invoke([this](infra::ConstByteRange range, infra::StreamErrorPolicy&)
-                    {
-                        capturedOutputs.push_back(std::vector<uint8_t>(range.begin(), range.end()));
-                    }));
-        }
+        infra::Execute execute{ [this]()
+            {
+                EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_))
+                    .Times(testing::AnyNumber())
+                    .WillRepeatedly(testing::Invoke([this](infra::ConstByteRange range, infra::StreamErrorPolicy&)
+                        {
+                            capturedOutputs.push_back(std::vector<uint8_t>(range.begin(), range.end()));
+                        }));
+            } };
+        services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
 
         services::TerminalWithBanner::Banner CreateBanner(const char* targetName, float vdc, uint32_t systemClock)
         {

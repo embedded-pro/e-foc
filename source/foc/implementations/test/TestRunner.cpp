@@ -17,17 +17,22 @@ namespace
     public:
         TestRunner()
         {
-            ON_CALL(inverterMock, BaseFrequency()).WillByDefault(Return(hal::Hertz{ 20000 }));
-            ON_CALL(inverterMock, PhaseCurrentsReady(_, _))
-                .WillByDefault([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+            EXPECT_CALL(inverterMock, BaseFrequency())
+                .Times(testing::AnyNumber())
+                .WillRepeatedly(Return(hal::Hertz{ 20000 }));
+            EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _))
+                .Times(testing::AnyNumber())
+                .WillRepeatedly([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
                     {
                         inverterMock.StorePhaseCurrentsCallback(onDone);
                     });
+            EXPECT_CALL(inverterMock, Stop()).Times(testing::AnyNumber());
+            EXPECT_CALL(focMock, Disable()).Times(testing::AnyNumber());
         }
 
-        testing::NiceMock<foc::FieldOrientedControllerInterfaceMock> inverterMock;
-        testing::NiceMock<foc::EncoderMock> encoderMock;
-        testing::NiceMock<foc::FocTorqueMock> focMock;
+        testing::StrictMock<foc::FieldOrientedControllerInterfaceMock> inverterMock;
+        testing::StrictMock<foc::EncoderMock> encoderMock;
+        testing::StrictMock<foc::FocTorqueMock> focMock;
     };
 
     TEST_F(TestRunner, ConstructionRegistersPhaseCurrentsCallback)
