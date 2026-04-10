@@ -21,6 +21,7 @@ namespace application
         void Start() override;
         void Stop() override;
         hal::Hertz BaseFrequency() const override;
+        foc::Ampere MaxCurrentSupported() const override;
 
         // Implementation of Encoder
         OPTIMIZE_FOR_SPEED
@@ -29,6 +30,7 @@ namespace application
         void SetZero() override;
 
     private:
+        PlatformFactory& platformFactory;
         foc::Radians encoderOffset{ 0.0f };
         hal::Hertz pwmBaseFrequency{ 10000 };
         std::chrono::nanoseconds pwmDeadTime{ 500 };

@@ -4,7 +4,8 @@
 namespace application
 {
     PlatformAdapter::PlatformAdapter(PlatformFactory& hardware)
-        : adcMultiChannelCreator{ hardware.AdcMultiChannelCreator(), PlatformFactory::SampleAndHold::shorter }
+        : platformFactory{ hardware }
+        , adcMultiChannelCreator{ hardware.AdcMultiChannelCreator(), PlatformFactory::SampleAndHold::shorter }
         , synchronousThreeChannelsPwmCreator{ hardware.SynchronousThreeChannelsPwmCreator(), pwmDeadTime, pwmBaseFrequency }
         , synchronousQuadratureEncoderCreator(hardware.SynchronousQuadratureEncoderCreator())
     {
@@ -38,6 +39,11 @@ namespace application
     hal::Hertz PlatformAdapter::BaseFrequency() const
     {
         return pwmBaseFrequency;
+    }
+
+    foc::Ampere PlatformAdapter::MaxCurrentSupported() const
+    {
+        return platformFactory.MaxCurrentSupported();
     }
 
     foc::Radians PlatformAdapter::Read()

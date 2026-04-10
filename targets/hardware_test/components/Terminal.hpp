@@ -1,5 +1,6 @@
 #pragma once
 
+#include "foc/implementations/FocTorqueImpl.hpp"
 #include "hal/interfaces/AdcMultiChannel.hpp"
 #include "hal/interfaces/Eeprom.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"

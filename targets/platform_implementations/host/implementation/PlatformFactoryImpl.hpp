@@ -15,6 +15,7 @@ namespace application
     class PlatformFactoryImpl
         : public PlatformFactory
         , public hal::PerformanceTracker
+        , public foc::LowPriorityInterrupt
     {
     public:
         explicit PlatformFactoryImpl(const infra::Function<void()>& onInitialized);
@@ -39,6 +40,10 @@ namespace application
         // Implementation of hal::PerformanceTracker
         void Start() override;
         uint32_t ElapsedCycles() override;
+
+        // Implementation of LowPriorityInterrupt
+        void Trigger() override;
+        void Register(const infra::Function<void()>& handler) override;
 
     private:
         class SimpleLowPriorityInterrupt

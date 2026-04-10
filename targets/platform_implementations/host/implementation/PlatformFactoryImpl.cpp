@@ -1,6 +1,6 @@
 #include "targets/platform_implementations/host/implementation/PlatformFactoryImpl.hpp"
-#include "infra/util/MemoryRange.hpp"
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
+#include "infra/util/MemoryRange.hpp"
 
 namespace application
 {
@@ -59,6 +59,16 @@ namespace application
     uint32_t PlatformFactoryImpl::ElapsedCycles()
     {
         return 0;
+    }
+
+    void PlatformFactoryImpl::Trigger()
+    {
+        simpleLowPriorityInterrupt.Trigger();
+    }
+
+    void PlatformFactoryImpl::Register(const infra::Function<void()>& handler)
+    {
+        simpleLowPriorityInterrupt.Register(handler);
     }
 
     infra::CreatorBase<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)>& PlatformFactoryImpl::SynchronousThreeChannelsPwmCreator()

@@ -1,5 +1,6 @@
 #include "targets/hardware_test/components/Terminal.hpp"
 #include "foc/interfaces/Driver.hpp"
+#include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/stream/StringInputStream.hpp"
 #include "infra/util/BoundedString.hpp"
 #include "infra/util/Tokenizer.hpp"
@@ -12,6 +13,9 @@
 namespace
 {
     constexpr float pi_div_180 = std::numbers::pi_v<float> / 180.0f;
+    const std::size_t outerInnerLoopRatio = 10;
+    const hal::Hertz defaultPwmFrequency{ 10000 };
+    const hal::Hertz speedLoopFrequency{ static_cast<unsigned int>(defaultPwmFrequency.Value() / outerInnerLoopRatio) };
 
     application::PlatformFactory::SampleAndHold ToSampleAndHold(const infra::BoundedConstString& value)
     {

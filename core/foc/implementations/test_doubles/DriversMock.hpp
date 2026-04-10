@@ -51,6 +51,7 @@ namespace foc
         MOCK_METHOD(void, ThreePhasePwmOutput, ((const foc::PhasePwmDutyCycles&)), (override));
         MOCK_METHOD(void, Start, (), (override));
         MOCK_METHOD(void, Stop, (), (override));
+        MOCK_METHOD(foc::Ampere, MaxCurrentSupported, (), (const, override));
         MOCK_METHOD(hal::Hertz, BaseFrequency, (), (const, override));
 
         void StorePhaseCurrentsCallback(const infra::Function<void(foc::PhaseCurrents phaseCurrents)>& onDone)

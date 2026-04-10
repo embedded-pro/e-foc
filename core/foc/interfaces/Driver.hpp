@@ -55,6 +55,7 @@ namespace foc
         virtual void Start() = 0;
         virtual void Stop() = 0;
         virtual hal::Hertz BaseFrequency() const = 0;
+        virtual foc::Ampere MaxCurrentSupported() const = 0;
     };
 
     class Controllable

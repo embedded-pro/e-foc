@@ -1,5 +1,9 @@
 #pragma once
 
+#include "core/foc/interfaces/Driver.hpp"
+#include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
+#include "core/platform_abstraction/CanBusAdapter.hpp"
+#include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
 #include "hal/interfaces/Eeprom.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"

@@ -1,9 +1,9 @@
 #include "tools/simulator/model/Model.hpp"
+#include "core/foc/interfaces/Driver.hpp"
 #include "foc/implementations/TrigonometricImpl.hpp"
 #include "foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include "core/foc/interfaces/Driver.hpp"
 #include <cmath>
 #include <numbers>
 
@@ -110,6 +110,11 @@ namespace simulator
     hal::Hertz ThreePhaseMotorModel::BaseFrequency() const
     {
         return baseFrequency;
+    }
+
+    foc::Ampere ThreePhaseMotorModel::MaxCurrentSupported() const
+    {
+        return foc::Ampere{ 20.0f };
     }
 
     foc::Radians ThreePhaseMotorModel::Read()
