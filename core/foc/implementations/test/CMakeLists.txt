@@ -18,5 +18,6 @@ target_sources(e_foc.foc_test PRIVATE
     TestSpaceVectorModulation.cpp
     TestTrigonometricImpl.cpp
     TestWithAutomaticCurrentPidGains.cpp
+    TestWithAutomaticSpeedPidGains.cpp
     TestTransformsClarkePark.cpp
 )

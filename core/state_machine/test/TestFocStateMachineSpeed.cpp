@@ -732,6 +732,48 @@ TEST_F(FocStateMachineSpeedCliTest, clear_cal_nvm_failure_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
+// --- ApplyOnlineEstimates ---
+
+TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_does_not_change_state_when_enabled)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithSpeedGains();
+    auto sm = CreateSpeedStateMachine();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    sm.CmdEnable();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+
+    sm.ApplyOnlineEstimates();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_is_ignored_when_not_enabled)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithSpeedGains();
+    auto sm = CreateSpeedStateMachine();
+
+    sm.ApplyOnlineEstimates();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineSpeedCliTest, cli_ae_command_applies_estimates_when_enabled)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithSpeedGains();
+    auto sm = CreateSpeedStateMachine();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    sm.CmdEnable();
+    communication.dataReceived(infra::MakeStringByteRange("ae\r"));
+    ExecuteAllActions();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}
+
 // ==========================================================================
 // Speed-mode with AutoTransitionPolicy
 // ==========================================================================

@@ -148,6 +148,52 @@ For **position mode**, `MechanicalParametersIdentification` requires an explicit
 
 On construction, the state machine asynchronously checks whether valid calibration data exists in NVM. If data is found and loads successfully, calibration is applied and the machine transitions directly to `Ready` — no user action required. If the check fails or the data is absent, the machine starts in `Idle`.
 
+### Online Parameter Estimation (Speed/Position Modes)
+
+For speed and position control modes, the state machine creates and manages two online parameter estimators alongside the main control loop:
+
+- **Online Mechanical Estimator** — continuously refines rotor inertia (J) and viscous friction (B) using a Recursive Least Squares estimator that runs at the outer-loop rate (1 kHz).
+- **Online Electrical Estimator** — continuously refines phase resistance (R) and d-axis inductance (Ld) using a d-axis voltage-model RLS estimator running at the same rate.
+
+**Lifecycle of online estimators:**
+
+```mermaid
+sequenceDiagram
+    participant SM as FOC State Machine
+    participant ME as Online Mech. Estimator
+    participant EE as Online Elec. Estimator
+
+    SM->>ME: constructed (in SM constructor)
+    SM->>EE: constructed (in SM constructor)
+    note over SM: ApplyCalibrationData seeds both estimators\nfrom NVM calibration values (warm start)
+    SM->>ME: SetInitialEstimate(J_cal, B_cal)
+    SM->>EE: SetInitialEstimate(R_cal, Ld_cal)
+
+    SM->>ME: SetTorqueConstant(kt) [on EnterEnabled]
+    note over ME,EE: Estimators update opportunistically at outer-loop rate\nwhile FOC controller is running
+```
+
+**Seeding from calibration data:** When `ApplyCalibrationData` is called (either after calibration completes or on NVM boot load), both estimators are seeded with the values from `CalibrationData`. This warm-starts the RLS theta vector at the known-good calibration values rather than zero, ensuring the estimators produce physically meaningful outputs from the first update.
+
+The electrical estimator is seeded using `lD` (d-axis inductance), as the underlying model assumes a non-salient motor ($L_d \approx L_q$). For interior PMSMs, a 3-parameter model with separate Ld and Lq would be required; this is a known limitation.
+
+**Estimate consumption is explicit:** Estimates are NOT applied to PID gains continuously. The operator (or application logic) explicitly triggers a PID retune by calling `ApplyOnlineEstimates()`. This prevents gain oscillation before the estimators have converged and guards against applying poorly-conditioned estimates at runtime.
+
+When `ApplyOnlineEstimates()` is called while in `Enabled` state:
+1. Current inertia and friction estimates are read from the mechanical estimator
+2. Speed PID gains are recomputed: $k_p = J \cdot \omega_{bw}$, $k_i = B \cdot \omega_{bw}$
+3. Current resistance and inductance estimates are read from the electrical estimator
+4. Current PID gains are recomputed from the bandwidth-based tuning rule
+
+If called from any state other than `Enabled`, the call is silently ignored.
+
+**Runtime control commands (CLI policy, speed/position modes only):**
+
+| Command           | Short | Description                                           |
+|-------------------|-------|-------------------------------------------------------|
+| `apply_estimates` | `ae`  | Apply online estimates to speed and current PID gains |
+| `estimate_status` | `es`  | Print current J, B, R, Ld values to the tracer        |
+
 ---
 
 ## Interfaces
@@ -164,6 +210,7 @@ On construction, the state machine asynchronously checks whether valid calibrati
 | `CmdDisable()`          | Requests disabling the FOC controller                            | Only effective from `Enabled`; ignored from all other states                                                                     |
 | `CmdClearFault()`       | Clears the fault and returns to `Idle`                           | Only effective from `Fault`; ignored from all other states                                                                       |
 | `CmdClearCalibration()` | Invalidates NVM calibration and returns to `Idle`                | Ignored when in `Enabled`; effective from all other states                                                                       |
+| `ApplyOnlineEstimates()`| Retunes speed and current PID gains from online estimators       | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or ≤ 0). Speed/position modes only.                                |
 
 ### Required
 
@@ -178,6 +225,8 @@ On construction, the state machine asynchronously checks whether valid calibrati
 | `Encoder`                            | Rotor position sensor; zero offset applied after alignment               | `Set()` called during `ApplyCalibrationData` to configure the zero point       |
 | `TerminalWithStorage`                | Serial command interface for CLI-mode transition policy                  | Commands registered in constructor; terminal must outlive the state machine    |
 | `Tracer`                             | Debug trace output for lifecycle events                                  | All state transitions and calibration steps are traced                         |
+| `RealTimeFrictionAndInertiaEstimator`   | Online RLS estimator for rotor inertia and viscous friction (speed/position only) | Seeded from calibration data; torque constant set on `EnterEnabled`; updates run while FOC outer loop is active |
+| `RealTimeResistanceAndInductanceEstimator` | Online RLS estimator for phase resistance and d-axis inductance (speed/position only) | Assumes non-salient motor (Ld ≈ Lq); seeded using `lD` from calibration        |
 
 ---
 

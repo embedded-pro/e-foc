@@ -17,6 +17,13 @@ namespace foc
         MOCK_METHOD(PhasePwmDutyCycles, Calculate, (const PhaseCurrents& currentPhases, Radians& position), (override));
     };
 
+    class FocSpeedTunableMock
+        : public FocSpeedTunable
+    {
+    public:
+        MOCK_METHOD(void, SetSpeedTunings, (Volts Vdc, const SpeedTunings& speedTuning), (override));
+    };
+
     class FocSpeedMock
         : public FocSpeed
     {
@@ -27,6 +34,8 @@ namespace foc
         MOCK_METHOD(void, SetPoint, (RadiansPerSecond), (override));
         MOCK_METHOD(void, SetCurrentTunings, (Volts Vdc, const IdAndIqTunings& torqueTunings), (override));
         MOCK_METHOD(void, SetSpeedTunings, (Volts Vdc, const SpeedTunings& speedTuning), (override));
+        MOCK_METHOD(void, SetOnlineMechanicalEstimator, (OnlineMechanicalEstimator & estimator), (override));
+        MOCK_METHOD(void, SetOnlineElectricalEstimator, (OnlineElectricalEstimator & estimator), (override));
         MOCK_METHOD(hal::Hertz, OuterLoopFrequency, (), (const, override));
         MOCK_METHOD(PhasePwmDutyCycles, Calculate, (const PhaseCurrents& currentPhases, Radians& position), (override));
     };
@@ -42,6 +51,8 @@ namespace foc
         MOCK_METHOD(void, SetCurrentTunings, (Volts Vdc, const IdAndIqTunings& torqueTunings), (override));
         MOCK_METHOD(void, SetSpeedTunings, (Volts Vdc, const SpeedTunings& speedTuning), (override));
         MOCK_METHOD(void, SetPositionTunings, (const PositionTunings& positionTuning), (override));
+        MOCK_METHOD(void, SetOnlineMechanicalEstimator, (OnlineMechanicalEstimator & estimator), (override));
+        MOCK_METHOD(void, SetOnlineElectricalEstimator, (OnlineElectricalEstimator & estimator), (override));
         MOCK_METHOD(PhasePwmDutyCycles, Calculate, (const PhaseCurrents& currentPhases, Radians& position), (override));
     };
 }

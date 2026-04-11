@@ -1,5 +1,5 @@
 {
-    "path_name": "ADC ISR → FOC Speed (inner + outer loop + all estimators) → PWM Output",
+    "path_name": "ADC ISR → FOC Position (worst case: inner + outer loop + all estimators) → PWM Output",
     "loop_rates_khz": [
         1,
         10,
@@ -29,10 +29,9 @@
         },
         {
             "label": "FOC Inner Loop (Calculate)",
-            "entry": "FocSpeedImpl::Calculate",
+            "entry": "FocPositionImpl::Calculate",
             "patterns": [
-                "FocSpeedImpl::Calculate",
-                "FocSpeedImpl::CalculateFilteredSpeed",
+                "FocPositionImpl::Calculate",
                 "FocWithSpeedLoop::CalculateInnerLoop",
                 "Clarke::Forward",
                 "Park::Forward",
@@ -55,8 +54,10 @@
         {
             "label": "FOC Outer Loop (LowPriorityHandler)",
             "patterns": [
-                "FocSpeedImpl::LowPriorityHandler",
+                "FocPositionImpl::LowPriorityHandler",
+                "FocWithSpeedLoop::LowPriorityHandler",
                 "PidIncrementalSynchronous.*::Process",
+                "PidIncrementalSynchronous.*::SetPoint",
                 "PositionWithWrapAround"
             ]
         },

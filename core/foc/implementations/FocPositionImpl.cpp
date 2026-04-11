@@ -43,6 +43,16 @@ namespace foc
         SetSpeedTuningsImpl(speedTuning);
     }
 
+    void FocPositionImpl::SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator)
+    {
+        SetOnlineMechanicalEstimatorImpl(estimator);
+    }
+
+    void FocPositionImpl::SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator)
+    {
+        SetOnlineElectricalEstimatorImpl(estimator);
+    }
+
     OPTIMIZE_FOR_SPEED
     void FocPositionImpl::SetPositionTunings(const PositionTunings& positionTuning)
     {
@@ -77,6 +87,9 @@ namespace foc
         auto speedReference = positionPid.Process(CurrentMechanicalAngle());
         SpeedPid().SetPoint(speedReference);
         LastSpeedPidOutput() = SpeedPid().Process(mechanicalSpeed);
+
+        UpdateOnlineMechanicalEstimator(mechanicalSpeed);
+        UpdateOnlineElectricalEstimator(mechanicalSpeed * PolePairs());
     }
 
     OPTIMIZE_FOR_SPEED

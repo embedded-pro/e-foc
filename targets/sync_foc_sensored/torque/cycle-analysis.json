@@ -1,9 +1,9 @@
 {
-    "path_name": "ADC ISR → FOC Speed (inner + outer loop + all estimators) → PWM Output",
+    "path_name": "ADC ISR → FOC Torque → PWM Output",
     "loop_rates_khz": [
-        1,
         10,
-        20
+        20,
+        40
     ],
     "path_stages": [
         {
@@ -28,12 +28,10 @@
             ]
         },
         {
-            "label": "FOC Inner Loop (Calculate)",
-            "entry": "FocSpeedImpl::Calculate",
+            "label": "FOC Calculate",
+            "entry": "FocTorqueImpl::Calculate",
             "patterns": [
-                "FocSpeedImpl::Calculate",
-                "FocSpeedImpl::CalculateFilteredSpeed",
-                "FocWithSpeedLoop::CalculateInnerLoop",
+                "FocTorqueImpl::Calculate",
                 "Clarke::Forward",
                 "Park::Forward",
                 "Park::Inverse",
@@ -45,39 +43,10 @@
                 "PidIncrementalBase.*::Clamp",
                 "PidIncrementalSynchronous.*::Process",
                 "PidIncrementalSynchronous.*::SetPoint",
-                "PositionWithWrapAround",
                 "std::array<float.*>::operator\\[\\]",
                 "std::clamp",
                 "std::max<float>",
                 "std::min<float>"
-            ]
-        },
-        {
-            "label": "FOC Outer Loop (LowPriorityHandler)",
-            "patterns": [
-                "FocSpeedImpl::LowPriorityHandler",
-                "PidIncrementalSynchronous.*::Process",
-                "PositionWithWrapAround"
-            ]
-        },
-        {
-            "label": "Online Mechanical Estimator (RLS)",
-            "required": false,
-            "patterns": [
-                "FocWithSpeedLoop::UpdateOnlineMechanicalEstimator",
-                "RealTimeFrictionAndInertiaEstimator::Update",
-                "RecursiveLeastSquares.*::Update",
-                "ClarkePark::Forward"
-            ]
-        },
-        {
-            "label": "Online Electrical Estimator (RLS)",
-            "required": false,
-            "patterns": [
-                "FocWithSpeedLoop::UpdateOnlineElectricalEstimator",
-                "RealTimeResistanceAndInductanceEstimator::Update",
-                "RealTimeResistanceAndInductanceEstimator::ComputeEstimate",
-                "RecursiveLeastSquares.*::Update"
             ]
         },
         {

@@ -42,6 +42,16 @@ namespace foc
         SetSpeedTuningsImpl(speedTuning);
     }
 
+    void FocSpeedImpl::SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator)
+    {
+        SetOnlineMechanicalEstimatorImpl(estimator);
+    }
+
+    void FocSpeedImpl::SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator)
+    {
+        SetOnlineElectricalEstimatorImpl(estimator);
+    }
+
     OPTIMIZE_FOR_SPEED
     void FocSpeedImpl::Enable()
     {
@@ -61,6 +71,9 @@ namespace foc
         auto mechanicalSpeed = detail::PositionWithWrapAround(CurrentMechanicalAngle() - PreviousSpeedPosition()) / SpeedDt();
         PreviousSpeedPosition() = CurrentMechanicalAngle();
         LastSpeedPidOutput() = SpeedPid().Process(mechanicalSpeed);
+
+        UpdateOnlineMechanicalEstimator(mechanicalSpeed);
+        UpdateOnlineElectricalEstimator(mechanicalSpeed * PolePairs());
     }
 
     hal::Hertz FocSpeedImpl::OuterLoopFrequency() const

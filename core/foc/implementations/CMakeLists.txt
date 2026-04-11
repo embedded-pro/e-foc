@@ -16,9 +16,10 @@ target_sources(e_foc.foc.implementations PRIVATE
     FocPositionImpl.hpp
     FocSpeedImpl.cpp
     FocSpeedImpl.hpp
-    FocWithSpeedLoop.hpp
     FocTorqueImpl.cpp
     FocTorqueImpl.hpp
+    FocWithSpeedLoop.cpp
+    FocWithSpeedLoop.hpp
     LowPriorityInterruptImpl.hpp
     NormalizedAngles.hpp
     Runner.cpp
@@ -29,6 +30,8 @@ target_sources(e_foc.foc.implementations PRIVATE
     TrigonometricImpl.hpp
     WithAutomaticCurrentPidGains.cpp
     WithAutomaticCurrentPidGains.hpp
+    WithAutomaticSpeedPidGains.cpp
+    WithAutomaticSpeedPidGains.hpp
     TransformsClarkePark.cpp
     TransformsClarkePark.hpp
 )

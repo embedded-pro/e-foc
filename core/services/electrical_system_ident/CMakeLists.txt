@@ -10,12 +10,15 @@ target_link_libraries(e_foc.services.electrical_system_ident PUBLIC
     e_foc.platform_abstraction
     e_foc.foc.interfaces
     e_foc.foc.implementations
+    numerical.estimators.online
 )
 
 target_sources(e_foc.services.electrical_system_ident PRIVATE
     ElectricalParametersIdentificationImpl.cpp
     ElectricalParametersIdentificationImpl.hpp
     ElectricalParametersIdentification.hpp
+    RealTimeResistanceAndInductanceEstimator.cpp
+    RealTimeResistanceAndInductanceEstimator.hpp
     TerminalElectricalParametersIdentification.cpp
     TerminalElectricalParametersIdentification.hpp
 )
