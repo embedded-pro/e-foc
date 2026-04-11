@@ -35,7 +35,7 @@ inputs:
   output-dir:
     description: 'Directory for generated reports'
     required: false
-    default: 'cycle-analysis-output'
+    default: "cycle-analysis-output"
   post-pr-comment:
     description: "Post a PR comment with the summary (true/false)"
     required: false

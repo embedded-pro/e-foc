@@ -1,5 +1,6 @@
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
-#include <gmock/gmock.h>
+#include <cmath>
+#include <gtest/gtest.h>
 
 namespace
 {

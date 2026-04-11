@@ -126,8 +126,8 @@ stateDiagram-v2
 | SetPoint           | Sets the speed setpoint in radians per second.                       | Written atomically; used on the next outer-loop cycle.                                     |
 | Calculate          | Executes the inner 20 kHz FOC torque loop for one cycle.             | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                     |
 | OuterLoopFrequency | Returns the configured outer-loop frequency in Hz.                   | Pure query; no side effects. Can be called before Enable.                                  |
-| SetOnlineMechanicalEstimator | Attaches an online mechanical parameter estimator (optional). | Estimator updated each outer-loop cycle. Enable/Disable managed externally (by the state machine). |
-| SetOnlineElectricalEstimator | Attaches an online electrical parameter estimator (optional). | Reconstructed Vd supplied from inner-loop cached state. Assumes non-salient motor (Ld ≈ Lq). |
+| SetOnlineMechanicalEstimator | Attaches an online mechanical parameter estimator (optional). | If attached, the estimator is updated automatically on each outer-loop cycle. No separate estimator Enable/Disable interface is defined here; detach or omit the estimator to stop updates. |
+| SetOnlineElectricalEstimator | Attaches an online electrical parameter estimator (optional). | If attached, the estimator is updated automatically on each outer-loop cycle using reconstructed Vd from inner-loop cached state. Assumes non-salient motor (Ld ≈ Lq). |
 
 ### Required
 

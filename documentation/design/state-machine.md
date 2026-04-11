@@ -193,10 +193,10 @@ If called from any state other than `Enabled`, the call is silently ignored.
 
 **Runtime control commands (CLI policy, speed/position modes only):**
 
-| Command            | Short | Description                                           |
-|--------------------|-------|-------------------------------------------------------|
-| `apply_estimates`  | `ae`  | Apply online estimates to speed and current PID gains |
-| `estimate_status`  | `es`  | Print current J, B, R, Ld values to the tracer        |
+| Command           | Short | Description                                           |
+|-------------------|-------|-------------------------------------------------------|
+| `apply_estimates` | `ae`  | Apply online estimates to speed and current PID gains |
+| `estimate_status` | `es`  | Print current J, B, R, Ld values to the tracer        |
 
 ---
 
