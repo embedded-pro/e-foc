@@ -169,12 +169,8 @@ sequenceDiagram
     SM->>ME: SetInitialEstimate(J_cal, B_cal)
     SM->>EE: SetInitialEstimate(R_cal, Ld_cal)
 
-    SM->>ME: Enable() [on EnterEnabled]
-    SM->>EE: Enable() [on EnterEnabled]
-    note over ME,EE: Estimators run passively at outer-loop rate
-
-    SM->>ME: Disable() [on CmdDisable]
-    SM->>EE: Disable() [on CmdDisable]
+    SM->>ME: SetTorqueConstant(kt) [on EnterEnabled]
+    note over ME,EE: Estimators update opportunistically at outer-loop rate\nwhile FOC controller is running
 ```
 
 **Seeding from calibration data:** When `ApplyCalibrationData` is called (either after calibration completes or on NVM boot load), both estimators are seeded with the values from `CalibrationData`. This warm-starts the RLS theta vector at the known-good calibration values rather than zero, ensuring the estimators produce physically meaningful outputs from the first update.
@@ -214,7 +210,7 @@ If called from any state other than `Enabled`, the call is silently ignored.
 | `CmdDisable()`          | Requests disabling the FOC controller                            | Only effective from `Enabled`; ignored from all other states                                                                     |
 | `CmdClearFault()`       | Clears the fault and returns to `Idle`                           | Only effective from `Fault`; ignored from all other states                                                                       |
 | `CmdClearCalibration()` | Invalidates NVM calibration and returns to `Idle`                | Ignored when in `Enabled`; effective from all other states                                                                       |
-| `ApplyOnlineEstimates()`| Retunes speed and current PID gains from online estimators       | Only effective from `Enabled`; silently ignored from all other states. Speed/position modes only.                                |
+| `ApplyOnlineEstimates()`| Retunes speed and current PID gains from online estimators       | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or ≤ 0). Speed/position modes only.                                |
 
 ### Required
 
@@ -229,7 +225,7 @@ If called from any state other than `Enabled`, the call is silently ignored.
 | `Encoder`                            | Rotor position sensor; zero offset applied after alignment               | `Set()` called during `ApplyCalibrationData` to configure the zero point       |
 | `TerminalWithStorage`                | Serial command interface for CLI-mode transition policy                  | Commands registered in constructor; terminal must outlive the state machine    |
 | `Tracer`                             | Debug trace output for lifecycle events                                  | All state transitions and calibration steps are traced                         |
-| `RealTimeFrictionAndInertiaEstimator`   | Online RLS estimator for rotor inertia and viscous friction (speed/position only) | Seeded from calibration data; enabled on `EnterEnabled`; disabled on `CmdDisable` |
+| `RealTimeFrictionAndInertiaEstimator`   | Online RLS estimator for rotor inertia and viscous friction (speed/position only) | Seeded from calibration data; torque constant set on `EnterEnabled`; updates run while FOC outer loop is active |
 | `RealTimeResistanceAndInductanceEstimator` | Online RLS estimator for phase resistance and d-axis inductance (speed/position only) | Assumes non-salient motor (Ld ≈ Lq); seeded using `lD` from calibration        |
 
 ---

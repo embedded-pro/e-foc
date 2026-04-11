@@ -53,7 +53,6 @@
         },
         {
             "label": "FOC Outer Loop (LowPriorityHandler)",
-            "entry": "FocPositionImpl::LowPriorityHandler",
             "patterns": [
                 "FocPositionImpl::LowPriorityHandler",
                 "FocWithSpeedLoop::LowPriorityHandler",
@@ -65,9 +64,8 @@
         {
             "label": "Online Mechanical Estimator (RLS)",
             "required": false,
-            "entry": "OnlineMechanicalEstimatorImpl::Update",
             "patterns": [
-                "OnlineMechanicalEstimatorImpl::Update",
+                "FocWithSpeedLoop::UpdateOnlineMechanicalEstimator",
                 "RealTimeFrictionAndInertiaEstimator::Update",
                 "RecursiveLeastSquares.*::Update",
                 "ClarkePark::Forward"
@@ -76,10 +74,10 @@
         {
             "label": "Online Electrical Estimator (RLS)",
             "required": false,
-            "entry": "OnlineElectricalEstimatorImpl::Update",
             "patterns": [
-                "OnlineElectricalEstimatorImpl::Update",
+                "FocWithSpeedLoop::UpdateOnlineElectricalEstimator",
                 "RealTimeResistanceAndInductanceEstimator::Update",
+                "RealTimeResistanceAndInductanceEstimator::ComputeEstimate",
                 "RecursiveLeastSquares.*::Update"
             ]
         },

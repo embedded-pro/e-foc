@@ -44,12 +44,12 @@ namespace foc
 
     void FocSpeedImpl::SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator)
     {
-        FocWithSpeedLoop::SetOnlineMechanicalEstimator(estimator);
+        SetOnlineMechanicalEstimatorImpl(estimator);
     }
 
     void FocSpeedImpl::SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator)
     {
-        FocWithSpeedLoop::SetOnlineElectricalEstimator(estimator);
+        SetOnlineElectricalEstimatorImpl(estimator);
     }
 
     OPTIMIZE_FOR_SPEED

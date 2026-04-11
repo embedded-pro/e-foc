@@ -49,5 +49,8 @@ namespace state_machine
         virtual void CmdDisable() = 0;
         virtual void CmdClearFault() = 0;
         virtual void CmdClearCalibration() = 0;
+
+        virtual void ApplyOnlineEstimates()
+        {}
     };
 }

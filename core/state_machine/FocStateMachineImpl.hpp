@@ -18,6 +18,7 @@
 #include "services/tracer/Tracer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
 #include <bit>
+#include <cmath>
 #include <optional>
 #include <type_traits>
 
@@ -90,7 +91,7 @@ namespace application
         void CmdDisable() override;
         void CmdClearFault() override;
         void CmdClearCalibration() override;
-        void ApplyOnlineEstimates();
+        void ApplyOnlineEstimates() override;
 
     private:
         void EnterCalibrating();
@@ -527,16 +528,32 @@ namespace application
             {
                 const auto inertia = optOnlineMechEstimator->CurrentInertia();
                 const auto friction = optOnlineMechEstimator->CurrentFriction();
-                tracer.Trace() << "[SM] Applying mechanical estimates: J=" << inertia.Value() << " B=" << friction.Value();
-                optSpeedAutoTuner->SetPidBasedOnInertiaAndFriction(vdc, inertia, friction, velocityBandwidthRadPerSec);
+                if (!std::isfinite(inertia.Value()) || inertia.Value() <= 0.0f ||
+                    !std::isfinite(friction.Value()) || friction.Value() <= 0.0f)
+                {
+                    tracer.Trace() << "[SM] Skipping mechanical estimates: non-physical values (J=" << inertia.Value() << " B=" << friction.Value() << ")";
+                }
+                else
+                {
+                    tracer.Trace() << "[SM] Applying mechanical estimates: J=" << inertia.Value() << " B=" << friction.Value();
+                    optSpeedAutoTuner->SetPidBasedOnInertiaAndFriction(vdc, inertia, friction, velocityBandwidthRadPerSec);
+                }
             }
             if (optOnlineElecEstimator.has_value())
             {
                 const auto resistance = optOnlineElecEstimator->CurrentResistance();
                 const auto inductance = optOnlineElecEstimator->CurrentInductance();
-                tracer.Trace() << "[SM] Applying electrical estimates: R=" << resistance.Value() << " L=" << inductance.Value();
-                pidAutoTuner.SetPidBasedOnResistanceAndInductance(
-                    vdc, resistance, inductance, inverter.BaseFrequency(), nyquistFactor);
+                if (!std::isfinite(resistance.Value()) || resistance.Value() <= 0.0f ||
+                    !std::isfinite(inductance.Value()) || inductance.Value() <= 0.0f)
+                {
+                    tracer.Trace() << "[SM] Skipping electrical estimates: non-physical values (R=" << resistance.Value() << " L=" << inductance.Value() << ")";
+                }
+                else
+                {
+                    tracer.Trace() << "[SM] Applying electrical estimates: R=" << resistance.Value() << " L=" << inductance.Value();
+                    pidAutoTuner.SetPidBasedOnResistanceAndInductance(
+                        vdc, resistance, inductance, inverter.BaseFrequency(), nyquistFactor);
+                }
             }
         }
     }

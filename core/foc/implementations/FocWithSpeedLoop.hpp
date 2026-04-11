@@ -13,205 +13,38 @@
 
 namespace foc
 {
+    struct EstimatorSnapshot
+    {
+        PhaseCurrents phaseCurrents{};
+        float electricalAngle{ 0.0f };
+        float measuredId{ 0.0f };
+        float measuredIq{ 0.0f };
+        float normalizedVd{ 0.0f };
+    };
+
     class FocWithSpeedLoop
     {
     protected:
-        OPTIMIZE_FOR_SPEED
-        explicit FocWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)
-            : speedPid{ { 0.0f, 0.0f, 0.0f }, { -maxCurrent.Value(), maxCurrent.Value() } }
-            , lowPriorityInterrupt(lowPriorityInterrupt)
-            , dt{ 1.0f / static_cast<float>(baseFrequency.Value()) }
-            , speedDt{ 1.0f / static_cast<float>(lowPriorityFrequency.Value()) }
-            , prescaler{ baseFrequency.Value() / lowPriorityFrequency.Value() }
-        {
-            really_assert(maxCurrent.Value() > 0);
-            really_assert(lowPriorityFrequency.Value() > 0);
-            really_assert(lowPriorityFrequency.Value() <= baseFrequency.Value());
-            really_assert(baseFrequency.Value() % lowPriorityFrequency.Value() == 0);
+        explicit FocWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency);
 
-            speedPid.Enable();
-            dPid.Enable();
-            qPid.Enable();
-        }
+        void SetPolePairsImpl(std::size_t pole);
+        void SetCurrentTuningsImpl(Volts Vdc, const IdAndIqTunings& torqueTunings);
+        void SetSpeedTuningsImpl(const SpeedTunings& speedTuning);
+        void EnableSpeedLoop();
+        void DisableSpeedLoop();
+        PhasePwmDutyCycles CalculateInnerLoop(const PhaseCurrents& currentPhases, Radians& position);
 
-        OPTIMIZE_FOR_SPEED
-        void SetPolePairsImpl(std::size_t pole)
-        {
-            polePairs = static_cast<float>(pole);
-        }
+        controllers::PidIncrementalSynchronous<float>& SpeedPid();
+        controllers::PidIncrementalSynchronous<float>& DPid();
+        float CurrentMechanicalAngle() const;
+        float& PreviousSpeedPosition();
+        float& LastSpeedPidOutput();
+        float SpeedDt() const;
+        float PolePairs() const;
+        LowPriorityInterrupt& GetLowPriorityInterrupt();
 
-        OPTIMIZE_FOR_SPEED
-        void SetCurrentTuningsImpl(Volts Vdc, const IdAndIqTunings& torqueTunings)
-        {
-            auto scale = 1.0f / (detail::invSqrt3 * Vdc.Value());
-            auto scale_dt = scale * dt;
-            auto scale_inv_dt = scale / dt;
-
-            const float d_kp = torqueTunings.first.kp;
-            const float d_ki = torqueTunings.first.ki;
-            const float d_kd = torqueTunings.first.kd;
-            const float q_kp = torqueTunings.second.kp;
-            const float q_ki = torqueTunings.second.ki;
-            const float q_kd = torqueTunings.second.kd;
-
-            dPid.SetTunings({ d_kp * scale, d_ki * scale_dt, d_kd * scale_inv_dt });
-            qPid.SetTunings({ q_kp * scale, q_ki * scale_dt, q_kd * scale_inv_dt });
-
-            vdcInvScale = detail::invSqrt3 * Vdc.Value();
-        }
-
-        OPTIMIZE_FOR_SPEED
-        void SetSpeedTuningsImpl(const SpeedTunings& speedTuning)
-        {
-            const float kp = speedTuning.kp;
-            const float ki = speedTuning.ki;
-            const float kd = speedTuning.kd;
-
-            speedPid.SetTunings({ kp, ki * speedDt, kd / speedDt });
-        }
-
-        OPTIMIZE_FOR_SPEED
-        void EnableSpeedLoop()
-        {
-            speedPid.Enable();
-            dPid.Enable();
-            qPid.Enable();
-
-            currentMechanicalAngle = 0.0f;
-            previousSpeedPosition = 0.0f;
-            lastSpeedPidOutput = 0.0f;
-            triggerCounter = 0;
-        }
-
-        OPTIMIZE_FOR_SPEED
-        void DisableSpeedLoop()
-        {
-            speedPid.Disable();
-            dPid.Disable();
-            qPid.Disable();
-        }
-
-        OPTIMIZE_FOR_SPEED
-        PhasePwmDutyCycles CalculateInnerLoop(const PhaseCurrents& currentPhases, Radians& position)
-        {
-            const float ia = currentPhases.a.Value();
-            const float ib = currentPhases.b.Value();
-            const float ic = currentPhases.c.Value();
-
-            auto mechanicalAngle = position.Value();
-            auto electricalAngle = mechanicalAngle * polePairs;
-            currentMechanicalAngle = mechanicalAngle;
-
-            auto cosTheta = FastTrigonometry::Cosine(electricalAngle);
-            auto sinTheta = FastTrigonometry::Sine(electricalAngle);
-
-            qPid.SetPoint(lastSpeedPidOutput);
-
-            auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
-            float normalizedVd = dPid.Process(idAndIq.d);
-            float normalizedVq = qPid.Process(idAndIq.q);
-
-            lastPhaseCurrents = currentPhases;
-            lastElectricalAngle = electricalAngle;
-            lastMeasuredId = idAndIq.d;
-            lastMeasuredIq = idAndIq.q;
-            lastNormalizedVd = normalizedVd;
-
-            auto output = spaceVectorModulator.Generate(park.Inverse(RotatingFrame{ normalizedVd, normalizedVq }, cosTheta, sinTheta));
-
-            ++triggerCounter;
-            if (triggerCounter >= prescaler)
-            {
-                triggerCounter = 0;
-                lowPriorityInterrupt.Trigger();
-            }
-
-            return PhasePwmDutyCycles{ hal::Percent(static_cast<uint8_t>(output.a * 100.0f + 0.5f)),
-                hal::Percent(static_cast<uint8_t>(output.b * 100.0f + 0.5f)),
-                hal::Percent(static_cast<uint8_t>(output.c * 100.0f + 0.5f)) };
-        }
-
-    protected:
-        controllers::PidIncrementalSynchronous<float>& SpeedPid()
-        {
-            return speedPid;
-        }
-
-        controllers::PidIncrementalSynchronous<float>& DPid()
-        {
-            return dPid;
-        }
-
-        float CurrentMechanicalAngle() const
-        {
-            return currentMechanicalAngle;
-        }
-
-        float& PreviousSpeedPosition()
-        {
-            return previousSpeedPosition;
-        }
-
-        float& LastSpeedPidOutput()
-        {
-            return lastSpeedPidOutput;
-        }
-
-        float SpeedDt() const
-        {
-            return speedDt;
-        }
-
-        float PolePairs() const
-        {
-            return polePairs;
-        }
-
-        const PhaseCurrents& LastPhaseCurrents() const
-        {
-            return lastPhaseCurrents;
-        }
-
-        float LastElectricalAngle() const
-        {
-            return lastElectricalAngle;
-        }
-
-        float LastMeasuredId() const
-        {
-            return lastMeasuredId;
-        }
-
-        float LastMeasuredIq() const
-        {
-            return lastMeasuredIq;
-        }
-
-        float LastNormalizedVd() const
-        {
-            return lastNormalizedVd;
-        }
-
-        float VdcInvScale() const
-        {
-            return vdcInvScale;
-        }
-
-        LowPriorityInterrupt& GetLowPriorityInterrupt()
-        {
-            return lowPriorityInterrupt;
-        }
-
-        void SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator)
-        {
-            onlineMechEstimator = &estimator;
-        }
-
-        void SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator)
-        {
-            onlineElecEstimator = &estimator;
-        }
-
+        void SetOnlineMechanicalEstimatorImpl(OnlineMechanicalEstimator& estimator);
+        void SetOnlineElectricalEstimatorImpl(OnlineElectricalEstimator& estimator);
         void UpdateOnlineMechanicalEstimator(float mechanicalSpeed);
         void UpdateOnlineElectricalEstimator(float electricalSpeed);
 
@@ -235,10 +68,6 @@ namespace foc
 
         OnlineMechanicalEstimator* onlineMechEstimator{ nullptr };
         OnlineElectricalEstimator* onlineElecEstimator{ nullptr };
-        PhaseCurrents lastPhaseCurrents{};
-        float lastElectricalAngle{ 0.0f };
-        float lastMeasuredId{ 0.0f };
-        float lastMeasuredIq{ 0.0f };
-        float lastNormalizedVd{ 0.0f };
+        EstimatorSnapshot estimatorSnapshot;
     };
 }

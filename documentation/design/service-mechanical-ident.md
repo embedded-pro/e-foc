@@ -205,7 +205,7 @@ The regressor vector is $\phi = [1,\ \dot{\omega},\ \omega]^T$, and the paramete
 
 ### Torque Constant Dependency
 
-The torque constant $k_t$ must be provided before the online estimator is enabled. In normal operation the state machine supplies $k_t$ from the calibration NVM record via `SetTorqueConstant()` during the transition to the Ready state.
+The torque constant $k_t$ must be provided before the estimator updates begin. In normal operation the state machine supplies $k_t$ from the calibration NVM record via `SetTorqueConstant()` during the `EnterEnabled` transition; updates run opportunistically while the FOC controller is active.
 
 ### RLS Self-Gating at Standstill
 
