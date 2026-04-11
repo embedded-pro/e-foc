@@ -29,7 +29,7 @@ inputs:
     required: false
     default: 'arm-none-eabi-objdump'
   size-tool:
-    description: 'Path to the size binary (default: arm-none-eabi-size)'
+    description: "Path to the size binary (default: arm-none-eabi-size)"
     required: false
     default: "arm-none-eabi-size"
   output-dir:
