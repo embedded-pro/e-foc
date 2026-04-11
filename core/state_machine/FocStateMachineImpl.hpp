@@ -18,12 +18,28 @@
 #include <optional>
 #include <type_traits>
 
+#ifdef E_FOC_STATE_MACHINE_COVERAGE_BUILD
+#include "core/foc/implementations/FocPositionImpl.hpp"
+#include "core/foc/implementations/FocSpeedImpl.hpp"
+#include "core/foc/implementations/FocTorqueImpl.hpp"
+#include "core/services/cli/TerminalPosition.hpp"
+#include "core/services/cli/TerminalSpeed.hpp"
+#include "core/services/cli/TerminalTorque.hpp"
+#endif
+
 namespace application
 {
     struct TerminalAndTracer
     {
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
+    };
+
+    struct MotorHardware
+    {
+        foc::ThreePhaseInverter& inverter;
+        foc::Encoder& encoder;
+        foc::Volts vdc;
     };
 
     struct CalibrationServices
@@ -57,9 +73,7 @@ namespace application
     public:
         template<typename... FocArgs>
         FocStateMachineImpl(const TerminalAndTracer& terminalAndTracer,
-            foc::ThreePhaseInverter& inverter,
-            foc::Encoder& encoder,
-            foc::Volts vdc,
+            const MotorHardware& hardware,
             services::NonVolatileMemory& nvm,
             const CalibrationServices& calibServices,
             state_machine::FaultNotifier& faultNotifier,
@@ -76,7 +90,7 @@ namespace application
 
     private:
         void EnterCalibrating();
-        void EnterReady(services::CalibrationData data);
+        void EnterReady(const services::CalibrationData& data);
         void EnterEnabled();
         void EnterFault(state_machine::FaultCode code);
 
@@ -85,6 +99,8 @@ namespace application
         void RunAlignmentStep();
         void RunMechanicalIdentStep();
         void OnCalibrationComplete();
+
+        bool IsCalibrating(state_machine::CalibrationStep expected) const;
 
         void ApplyCalibrationData(const services::CalibrationData& data);
         void CheckNvmOnBoot();
@@ -120,18 +136,16 @@ namespace application
     template<typename... FocArgs>
     FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::FocStateMachineImpl(
         const TerminalAndTracer& terminalAndTracer,
-        foc::ThreePhaseInverter& inverter,
-        foc::Encoder& encoder,
-        foc::Volts vdc,
+        const MotorHardware& hardware,
         services::NonVolatileMemory& nvm,
         const CalibrationServices& calibServices,
         state_machine::FaultNotifier& faultNotifier,
         FocArgs&&... focArgs)
         : terminal(terminalAndTracer.terminal)
         , tracer(terminalAndTracer.tracer)
-        , inverter(inverter)
-        , encoder(encoder)
-        , vdc(vdc)
+        , inverter(hardware.inverter)
+        , encoder(hardware.encoder)
+        , vdc(hardware.vdc)
         , nvm(nvm)
         , electricalIdent(calibServices.electricalIdent)
         , motorAlignment(calibServices.motorAlignment)
@@ -221,13 +235,19 @@ namespace application
     template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
     void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::CmdClearCalibration()
     {
-        if (std::holds_alternative<state_machine::Enabled>(currentState))
+        if (!std::holds_alternative<state_machine::Idle>(currentState) &&
+            !std::holds_alternative<state_machine::Ready>(currentState))
         {
             return;
         }
 
-        nvm.InvalidateCalibration([this](services::NvmStatus)
+        nvm.InvalidateCalibration([this](services::NvmStatus status)
             {
+                if (status != services::NvmStatus::Ok)
+                {
+                    EnterFault(state_machine::FaultCode::hardwareFault);
+                    return;
+                }
                 tracer.Trace() << "[SM] Calibration cleared";
                 currentState = state_machine::Idle{};
             });
@@ -242,7 +262,7 @@ namespace application
     }
 
     template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::EnterReady(services::CalibrationData data)
+    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::EnterReady(const services::CalibrationData& data)
     {
         tracer.Trace() << "[SM] Entering Ready";
         calibrationData = data;
@@ -279,7 +299,9 @@ namespace application
 
         electricalIdent.EstimateNumberOfPolePairs({}, [this](std::optional<std::size_t> result)
             {
-                if (!result)
+                if (!IsCalibrating(state_machine::CalibrationStep::polePairs))
+                    return;
+                if (!result.has_value())
                 {
                     EnterFault(state_machine::FaultCode::calibrationFailed);
                     return;
@@ -300,6 +322,8 @@ namespace application
         electricalIdent.EstimateResistanceAndInductance({},
             [this](std::optional<foc::Ohm> r, std::optional<foc::MilliHenry> l)
             {
+                if (!IsCalibrating(state_machine::CalibrationStep::resistanceAndInductance))
+                    return;
                 if (!r || !l)
                 {
                     EnterFault(state_machine::FaultCode::calibrationFailed);
@@ -324,6 +348,8 @@ namespace application
         motorAlignment.ForceAlignment(polePairs, {},
             [this](std::optional<foc::Radians> angle)
             {
+                if (!IsCalibrating(state_machine::CalibrationStep::alignment))
+                    return;
                 if (!angle)
                 {
                     EnterFault(state_machine::FaultCode::calibrationFailed);
@@ -341,10 +367,16 @@ namespace application
     template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
     void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::OnCalibrationComplete()
     {
-        nvm.SaveCalibration(
-            std::get<state_machine::Calibrating>(currentState).pendingData,
+        if (!std::holds_alternative<state_machine::Calibrating>(currentState))
+            return;
+
+        auto pendingData = std::get<state_machine::Calibrating>(currentState).pendingData;
+
+        nvm.SaveCalibration(pendingData,
             [this](services::NvmStatus status)
             {
+                if (!std::holds_alternative<state_machine::Calibrating>(currentState))
+                    return;
                 if (status != services::NvmStatus::Ok)
                 {
                     EnterFault(state_machine::FaultCode::calibrationFailed);
@@ -378,6 +410,8 @@ namespace application
             [this](std::optional<foc::NewtonMeterSecondPerRadian> friction,
                 std::optional<foc::NewtonMeterSecondSquared> inertia)
             {
+                if (!IsCalibrating(state_machine::CalibrationStep::frictionAndInertia))
+                    return;
                 if (!friction || !inertia)
                 {
                     EnterFault(state_machine::FaultCode::calibrationFailed);
@@ -407,10 +441,20 @@ namespace application
     }
 
     template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
+    bool FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::IsCalibrating(state_machine::CalibrationStep expected) const
+    {
+        if (!std::holds_alternative<state_machine::Calibrating>(currentState))
+            return false;
+        return std::get<state_machine::Calibrating>(currentState).step == expected;
+    }
+
+    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
     void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::CheckNvmOnBoot()
     {
         nvm.IsCalibrationValid([this](bool valid)
             {
+                if (!std::holds_alternative<state_machine::Idle>(currentState))
+                    return;
                 if (!valid)
                 {
                     tracer.Trace() << "[SM] NVM invalid, starting in Idle";
@@ -419,6 +463,8 @@ namespace application
 
                 nvm.LoadCalibration(calibrationData, [this](services::NvmStatus status)
                     {
+                        if (!std::holds_alternative<state_machine::Idle>(currentState))
+                            return;
                         if (status != services::NvmStatus::Ok)
                         {
                             tracer.Trace() << "[SM] NVM load failed, starting in Idle";
@@ -469,12 +515,6 @@ namespace application
 }
 
 #ifdef E_FOC_STATE_MACHINE_COVERAGE_BUILD
-#include "core/foc/implementations/FocPositionImpl.hpp"
-#include "core/foc/implementations/FocSpeedImpl.hpp"
-#include "core/foc/implementations/FocTorqueImpl.hpp"
-#include "core/services/cli/TerminalPosition.hpp"
-#include "core/services/cli/TerminalSpeed.hpp"
-#include "core/services/cli/TerminalTorque.hpp"
 
 namespace application
 {

@@ -211,7 +211,8 @@ namespace
         {
             return PositionStateMachine{
                 application::TerminalAndTracer{ terminal, tracer },
-                inverterMock, encoderMock, vdc, nvmMock,
+                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
                 faultNotifierMock,
                 foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock
@@ -327,7 +328,8 @@ TEST_F(FocStateMachinePositionCliTest, no_mech_ident_override_enters_fault)
 
     PositionStateMachine sm{
         application::TerminalAndTracer{ terminal, tracer },
-        inverterMock, encoderMock, vdc, nvmMock,
+        application::MotorHardware{ inverterMock, encoderMock, vdc },
+        nvmMock,
         application::CalibrationServices{ electricalIdentMock, alignmentMock },
         faultNotifierMock,
         foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock
@@ -839,7 +841,8 @@ namespace
         {
             return PositionAutoStateMachine{
                 application::TerminalAndTracer{ terminal, tracer },
-                inverterMock, encoderMock, vdc, nvmMock,
+                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
                 faultNotifierMock,
                 foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock

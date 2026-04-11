@@ -36,8 +36,8 @@ namespace application
             , motorAlignment{ platformAdapter, platformAdapter }
             , motorStateMachine(
                   TerminalAndTracer{ terminalWithStorage, hardware.Tracer() },
-                  platformAdapter, platformAdapter,
-                  vdc, nvm,
+                  MotorHardware{ platformAdapter, platformAdapter, vdc },
+                  nvm,
                   CalibrationServices{ electricalIdent, motorAlignment },
                   noOpFaultNotifier,
                   hardware.MaxCurrentSupported(), platformAdapter.BaseFrequency(), hardware.LowPriorityInterrupt())
