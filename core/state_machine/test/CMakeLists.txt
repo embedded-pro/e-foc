@@ -18,5 +18,11 @@ target_link_libraries(e_foc.state_machine_test PUBLIC
 )
 
 target_sources(e_foc.state_machine_test PRIVATE
-    TestFocStateMachine.cpp
+    TestFocStateMachineTorque.cpp
+    TestFocStateMachineSpeed.cpp
+    TestFocStateMachinePosition.cpp
 )
+
+if (EMIL_ENABLE_COVERAGE)
+    emil_enable_coverage_for(e_foc.state_machine_test)
+endif()

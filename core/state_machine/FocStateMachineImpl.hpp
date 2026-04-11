@@ -433,35 +433,38 @@ namespace application
     template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
     void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::RegisterCliCommands()
     {
-        terminal.AddCommand({ { "calibrate", "cal", "Run full calibration sequence" },
-            [this](const infra::BoundedConstString&)
-            {
-                CmdCalibrate();
-            } });
+        if constexpr (std::is_same_v<TransitionPolicy, state_machine::CliTransitionPolicy>)
+        {
+            terminal.AddCommand({ { "calibrate", "cal", "Run full calibration sequence" },
+                [this](const infra::BoundedConstString&)
+                {
+                    CmdCalibrate();
+                } });
 
-        terminal.AddCommand({ { "enable", "en", "Enable FOC controller" },
-            [this](const infra::BoundedConstString&)
-            {
-                CmdEnable();
-            } });
+            terminal.AddCommand({ { "enable", "en", "Enable FOC controller" },
+                [this](const infra::BoundedConstString&)
+                {
+                    CmdEnable();
+                } });
 
-        terminal.AddCommand({ { "disable", "dis", "Disable FOC controller" },
-            [this](const infra::BoundedConstString&)
-            {
-                CmdDisable();
-            } });
+            terminal.AddCommand({ { "disable", "dis", "Disable FOC controller" },
+                [this](const infra::BoundedConstString&)
+                {
+                    CmdDisable();
+                } });
 
-        terminal.AddCommand({ { "clear_fault", "cf", "Clear fault and return to Idle" },
-            [this](const infra::BoundedConstString&)
-            {
-                CmdClearFault();
-            } });
+            terminal.AddCommand({ { "clear_fault", "cf", "Clear fault and return to Idle" },
+                [this](const infra::BoundedConstString&)
+                {
+                    CmdClearFault();
+                } });
 
-        terminal.AddCommand({ { "clear_cal", "cc", "Clear calibration data from NVM" },
-            [this](const infra::BoundedConstString&)
-            {
-                CmdClearCalibration();
-            } });
+            terminal.AddCommand({ { "clear_cal", "cc", "Clear calibration data from NVM" },
+                [this](const infra::BoundedConstString&)
+                {
+                    CmdClearCalibration();
+                } });
+        }
     }
 }
 
