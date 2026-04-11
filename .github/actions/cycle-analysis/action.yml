@@ -31,7 +31,7 @@ inputs:
   size-tool:
     description: 'Path to the size binary (default: arm-none-eabi-size)'
     required: false
-    default: 'arm-none-eabi-size'
+    default: "arm-none-eabi-size"
   output-dir:
     description: "Directory for generated reports"
     required: false
