@@ -68,6 +68,11 @@ namespace foc
 
         OnlineMechanicalEstimator* onlineMechEstimator{ nullptr };
         OnlineElectricalEstimator* onlineElecEstimator{ nullptr };
-        EstimatorSnapshot estimatorSnapshot;
+        // Double-buffer: ISR writes to snapshots[1 - readyIndex], then publishes
+        // by setting readyIndex. The handler reads snapshots[readyIndex]. Since
+        // the ISR always writes to the slot the handler is NOT reading, no torn
+        // reads are possible regardless of when preemption occurs.
+        EstimatorSnapshot snapshots[2];
+        volatile uint8_t readyIndex{ 0 };
     };
 }

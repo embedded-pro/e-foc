@@ -107,7 +107,9 @@ namespace foc
         if (triggerCounter >= prescaler)
         {
             triggerCounter = 0;
-            estimatorSnapshot = EstimatorSnapshot{ currentPhases, electricalAngle, idAndIq.d, idAndIq.q, normalizedVd };
+            const uint8_t writeSlot = 1u - readyIndex;
+            snapshots[writeSlot] = EstimatorSnapshot{ currentPhases, electricalAngle, idAndIq.d, idAndIq.q, normalizedVd };
+            readyIndex = writeSlot;
             lowPriorityInterrupt.Trigger();
         }
 
@@ -171,10 +173,11 @@ namespace foc
         if (onlineMechEstimator == nullptr)
             return;
 
+        const auto& snapshot = snapshots[readyIndex];
         onlineMechEstimator->Update(
-            estimatorSnapshot.phaseCurrents,
+            snapshot.phaseCurrents,
             RadiansPerSecond{ mechanicalSpeed },
-            Radians{ estimatorSnapshot.electricalAngle });
+            Radians{ snapshot.electricalAngle });
     }
 
     void FocWithSpeedLoop::UpdateOnlineElectricalEstimator(float electricalSpeed)
@@ -182,11 +185,12 @@ namespace foc
         if (onlineElecEstimator == nullptr)
             return;
 
-        const float physicalVd = estimatorSnapshot.normalizedVd * vdcInvScale;
+        const auto& snapshot = snapshots[readyIndex];
+        const float physicalVd = snapshot.normalizedVd * vdcInvScale;
         onlineElecEstimator->Update(
             Volts{ physicalVd },
-            Ampere{ estimatorSnapshot.measuredId },
-            Ampere{ estimatorSnapshot.measuredIq },
+            Ampere{ snapshot.measuredId },
+            Ampere{ snapshot.measuredIq },
             RadiansPerSecond{ electricalSpeed });
     }
 }
