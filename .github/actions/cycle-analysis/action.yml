@@ -27,13 +27,13 @@ inputs:
   objdump-tool:
     description: 'Path to the objdump binary (default: arm-none-eabi-objdump)'
     required: false
-    default: 'arm-none-eabi-objdump'
+    default: "arm-none-eabi-objdump"
   size-tool:
-    description: 'Path to the size binary (default: arm-none-eabi-size)'
+    description: "Path to the size binary (default: arm-none-eabi-size)"
     required: false
-    default: 'arm-none-eabi-size'
+    default: "arm-none-eabi-size"
   output-dir:
-    description: 'Directory for generated reports'
+    description: "Directory for generated reports"
     required: false
     default: "cycle-analysis-output"
   post-pr-comment:
