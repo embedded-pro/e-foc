@@ -28,4 +28,51 @@ namespace services
             metrics
         };
     }
+
+    void RealTimeFrictionAndInertiaEstimator::Seed(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction)
+    {
+        if (!rls.has_value())
+            return;
+
+        // RLS model: torque = theta[0]*1(coulomb) + theta[1]*acceleration(inertia) + theta[2]*speed(friction)
+        MotorRLS::CoefficientsMatrix initial{};
+        initial.at(0, 0) = 0.0f;
+        initial.at(1, 0) = inertia.Value();
+        initial.at(2, 0) = friction.Value();
+        rls->SetCoefficients(initial);
+    }
+
+    void RealTimeFrictionAndInertiaEstimator::SetTorqueConstant(foc::NewtonMeter kt)
+    {
+        torqueConstant = kt;
+    }
+
+    void RealTimeFrictionAndInertiaEstimator::SetInitialEstimate(
+        foc::NewtonMeterSecondSquared inertia,
+        foc::NewtonMeterSecondPerRadian friction)
+    {
+        currentInertia = inertia;
+        currentFriction = friction;
+        Seed(inertia, friction);
+    }
+
+    void RealTimeFrictionAndInertiaEstimator::Update(
+        foc::PhaseCurrents currentPhases,
+        foc::RadiansPerSecond speed,
+        foc::Radians electricalAngle)
+    {
+        auto result = Update(currentPhases, speed, electricalAngle, torqueConstant);
+        currentInertia = result.inertia;
+        currentFriction = result.friction;
+    }
+
+    foc::NewtonMeterSecondSquared RealTimeFrictionAndInertiaEstimator::CurrentInertia() const
+    {
+        return currentInertia;
+    }
+
+    foc::NewtonMeterSecondPerRadian RealTimeFrictionAndInertiaEstimator::CurrentFriction() const
+    {
+        return currentFriction;
+    }
 }
