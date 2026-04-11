@@ -186,3 +186,39 @@ Only one estimation may be in progress at a time. A call to `EstimateFrictionAnd
 | `FocSpeed`           | Commands a target speed setpoint to excite the mechanical dynamics                      | Must already be active and in control of the motor before the procedure begins |
 | `ThreePhaseInverter` | Source of ADC current callbacks that supply the Iq measurement on each computation step | Must not be stopped during the estimation procedure                            |
 | `Encoder`            | Supplies mechanical angle samples for speed and acceleration estimation                 | Must be tracking position at the configured sampling rate                      |
+
+---
+
+## Online Inertia and Friction Estimation
+
+In addition to the one-shot timed procedure above, a continuous online estimator (`RealTimeFrictionAndInertiaEstimator`) runs alongside the closed-loop speed controller to track slow mechanical parameter drift.
+
+### Model
+
+The mechanical equation of motion for the motor shaft is:
+
+$$T_e = J \cdot \dot{\omega} + B \cdot \omega + \tau_c$$
+
+The electromagnetic torque is approximated as $T_e = I_q \cdot k_t$, where $k_t$ is the torque constant (supplied by the calibration data). Angular acceleration $\dot{\omega}$ is derived from a finite difference of successive speed measurements scaled by the sampling frequency.
+
+The regressor vector is $\phi = [1,\ \dot{\omega},\ \omega]^T$, and the parameter vector is $\theta = [\tau_c,\ J,\ B]^T$. The scalar output is $T_e$. An RLS algorithm with a forgetting factor of 0.995 updates $\theta$ each outer-loop period.
+
+### Torque Constant Dependency
+
+The torque constant $k_t$ must be provided before the online estimator is enabled. In normal operation the state machine supplies $k_t$ from the calibration NVM record via `SetTorqueConstant()` during the transition to the Ready state.
+
+### RLS Self-Gating at Standstill
+
+No explicit persistence-of-excitation gate is applied. When the motor is at standstill, $T_e \approx 0$, $\dot{\omega} \approx 0$, and $\omega \approx 0$, so the regressor norm is near zero, the prediction error is near zero, and the RLS update naturally produces negligible coefficient change. The estimator is therefore self-gating in the absence of excitation.
+
+### Seeding and Warm Start
+
+When calibration data is loaded (from NVM or after a fresh calibration run), the online estimator is seeded with the calibration values $(J_{cal}, B_{cal})$. This initialises the RLS coefficient vector to $\theta = [0,\ J_{cal},\ B_{cal}]^T$, setting the Coulomb-friction intercept to zero and warm-starting the inertia and viscous-friction estimates at the identified operating point. This avoids a cold-start transient where estimates are physically meaningless during the initial operating period.
+
+### Forgetting Factor
+
+The forgetting factor $\lambda = 0.995$ applies an exponential weight decay to past observations, enabling the estimator to track gradual mechanical changes over the motor lifetime (bearing wear increases friction; load changes affect effective inertia).
+
+### Estimate Consumption
+
+Estimates are not applied automatically. The operator or application explicitly triggers a speed-PID retune via `ApplyOnlineEstimates()` on the state machine. See the State Machine design document for details.

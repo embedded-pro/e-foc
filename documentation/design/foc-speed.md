@@ -126,6 +126,8 @@ stateDiagram-v2
 | SetPoint           | Sets the speed setpoint in radians per second.                       | Written atomically; used on the next outer-loop cycle.                                     |
 | Calculate          | Executes the inner 20 kHz FOC torque loop for one cycle.             | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                     |
 | OuterLoopFrequency | Returns the configured outer-loop frequency in Hz.                   | Pure query; no side effects. Can be called before Enable.                                  |
+| SetOnlineMechanicalEstimator | Attaches an online mechanical parameter estimator (optional). | Estimator updated each outer-loop cycle. Enable/Disable managed externally (by the state machine). |
+| SetOnlineElectricalEstimator | Attaches an online electrical parameter estimator (optional). | Reconstructed Vd supplied from inner-loop cached state. Assumes non-salient motor (Ld ≈ Lq). |
 
 ### Required
 
@@ -171,6 +173,25 @@ sequenceDiagram
     OuterLoop->>InnerLoop: Write new Iq_setpoint (atomic)
     Note over InnerLoop: Next 20 kHz ISR fires and picks up the new Iq_setpoint
 ```
+
+### Online Estimator Update Within Outer-Loop Cycle
+
+When online estimators are attached and enabled, each 1 kHz outer-loop cycle also feeds observations to them after the speed PID step:
+
+```mermaid
+sequenceDiagram
+    participant OuterLoop as Speed Outer Loop
+    participant ME as Online Mech. Estimator
+    participant EE as Online Elec. Estimator
+
+    OuterLoop->>OuterLoop: Compute ω, update speed PID
+    OuterLoop->>ME: Update(phaseCurrents, ω_mech, θe)
+    ME->>ME: RLS step with [1, α, ω] → [J, B] estimates
+    OuterLoop->>EE: Update(Vd_reconstructed, Id, Iq, ω_e)
+    EE->>EE: RLS step with [Id, dId/dt − ωe·Iq] → [R, L] estimates
+```
+
+`Vd_reconstructed` is the d-axis voltage back-computed from the last normalized Vd output of the inner loop and the DC bus voltage.
 
 ---
 

@@ -180,3 +180,35 @@ stateDiagram-v2
 | `ThreePhaseInverter`     | Open-loop voltage application during both procedures; source of ADC sampling callbacks                       | Must not be concurrently claimed by any other controller         |
 | `Encoder`                | Reads mechanical angle during pole-pairs sweep to compute accumulated displacement                           | Must be initialised before `EstimateNumberOfPolePairs` is called |
 | DC bus voltage (`Volts`) | Injected at construction; used to normalise applied voltage and interpret current readings in physical units | Must remain stable throughout any active procedure               |
+
+---
+
+## Online Resistance and Inductance Estimation
+
+In addition to the one-shot calibration procedures above, a continuous online estimator (`RealTimeResistanceAndInductanceEstimator`) runs alongside the closed-loop speed/position controller to track slow parameter drift.
+
+### Model
+
+The d-axis voltage equation for a non-salient PMSM is:
+
+$$V_d = R \cdot I_d + L \cdot \left(\frac{dI_d}{dt} - \omega_e \cdot I_q\right)$$
+
+The regressor vector is $\phi = [I_d,\ (dI_d/dt - \omega_e I_q)]^T$, and the parameter vector is $\theta = [R,\ L]^T$. The scalar output is $V_d$. An RLS algorithm with a forgetting factor of 0.998 updates $\theta$ each outer-loop period (1 kHz by default).
+
+**Non-saliency assumption:** The model equates $L_d = L_q = L$. For surface-mounted PMSM (SPMSM) this is accurate. For interior PMSM (IPMSM), separating $L_d$ and $L_q$ requires a 3-parameter model; this is a known limitation of the current design.
+
+### Persistence-of-Excitation Gate
+
+The RLS update is skipped when the squared regressor norm $|\phi|^2$ falls below $10^{-6}$. This prevents the covariance matrix from growing unbounded when the motor is at standstill or when d-axis excitation is negligible.
+
+### Seeding and Warm Start
+
+When calibration data is loaded (from NVM or after a fresh calibration run), the online estimator is seeded with the identified values $(R_{cal}, L_d^{cal})$. This initialises the RLS coefficient vector to the calibration point rather than zero, avoiding a cold-start transient where estimates are physically meaningless.
+
+### Forgetting Factor
+
+The forgetting factor $\lambda = 0.998$ applies an exponential weight decay to past observations. Older measurements contribute less to the current estimate, allowing the estimator to track gradual parameter changes over the motor lifetime (winding resistance increases with temperature; inductance changes with saturation level).
+
+### Estimate Consumption
+
+Estimates are not applied automatically. The operator or application explicitly triggers a PID retune via `ApplyOnlineEstimates()` on the state machine. See the State Machine design document for details.

@@ -1,9 +1,9 @@
 {
-    "path_name": "ADC ISR → FOC → PWM Output",
+    "path_name": "ADC ISR → FOC Speed (inner + outer loop + all estimators) → PWM Output",
     "loop_rates_khz": [
+        1,
         10,
-        20,
-        40
+        20
     ],
     "path_stages": [
         {
@@ -28,11 +28,12 @@
             ]
         },
         {
-            "label": "FOC Calculate",
+            "label": "FOC Inner Loop (Calculate)",
             "entry": "FocSpeedImpl::Calculate",
             "patterns": [
                 "FocSpeedImpl::Calculate",
                 "FocSpeedImpl::CalculateFilteredSpeed",
+                "FocWithSpeedLoop::CalculateInnerLoop",
                 "Clarke::Forward",
                 "Park::Forward",
                 "Park::Inverse",
@@ -49,6 +50,36 @@
                 "std::clamp",
                 "std::max<float>",
                 "std::min<float>"
+            ]
+        },
+        {
+            "label": "FOC Outer Loop (LowPriorityHandler)",
+            "entry": "FocSpeedImpl::LowPriorityHandler",
+            "patterns": [
+                "FocSpeedImpl::LowPriorityHandler",
+                "PidIncrementalSynchronous.*::Process",
+                "PositionWithWrapAround"
+            ]
+        },
+        {
+            "label": "Online Mechanical Estimator (RLS)",
+            "required": false,
+            "entry": "OnlineMechanicalEstimatorImpl::Update",
+            "patterns": [
+                "OnlineMechanicalEstimatorImpl::Update",
+                "RealTimeFrictionAndInertiaEstimator::Update",
+                "RecursiveLeastSquares.*::Update",
+                "ClarkePark::Forward"
+            ]
+        },
+        {
+            "label": "Online Electrical Estimator (RLS)",
+            "required": false,
+            "entry": "OnlineElectricalEstimatorImpl::Update",
+            "patterns": [
+                "OnlineElectricalEstimatorImpl::Update",
+                "RealTimeResistanceAndInductanceEstimator::Update",
+                "RecursiveLeastSquares.*::Update"
             ]
         },
         {
