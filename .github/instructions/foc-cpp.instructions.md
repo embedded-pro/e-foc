@@ -1,6 +1,6 @@
 ---
 description: "e-foc C++ coding rules for embedded/real-time code: no heap allocation, bounded containers, real-time determinism, FOC theory correctness (Clarke/Park/SVM), motor control best practices, embedded compiler optimizations, Allman brace style, PascalCase naming, SOLID principles, const correctness, documentation alignment."
-applyTo: "core/{foc,platform_abstraction}/**,targets/**"
+applyTo: core/{foc,platform_abstraction,state_machine}/**,targets/**
 ---
 
 # e-foc C++ Rules

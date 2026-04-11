@@ -20,3 +20,4 @@ target_sources(e_foc.services.alignment PRIVATE
 )
 
 add_subdirectory(test)
+add_subdirectory(test_doubles)

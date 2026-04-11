@@ -21,3 +21,4 @@ target_sources(e_foc.services.electrical_system_ident PRIVATE
 )
 
 add_subdirectory(test)
+add_subdirectory(test_doubles)

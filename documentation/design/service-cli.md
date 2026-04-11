@@ -32,7 +32,7 @@ date: 2026-04-07
 - Providing a human-readable serial command-line interface for commissioning, diagnostics, and runtime control of the motor
 - Parsing user-typed command strings into typed arguments (numeric values, enums) using `TerminalHelper`, and returning structured `StatusWithMessage` responses on success or failure
 - Routing commands to the appropriate control mode interface (`FocTorque`, `FocSpeed`, `FocPosition`) based on which interactor is active
-- Delegating identification, alignment, and NVM operations to the corresponding services via the `MotorStateMachine` when commands such as `align`, `identify-electrical`, and `save-calibration` are issued
+- Delegating motor lifecycle and calibration to the `FocStateMachine` when lifecycle commands such as `calibrate`, `enable`, `disable`, `clear_fault`, and `clear_cal` are issued
 - Printing a welcome banner with version information and available commands when the terminal first connects
 - Ensuring all string handling uses bounded-size containers — no heap allocation at any point
 
@@ -76,17 +76,15 @@ classDiagram
     TerminalFocBaseInteractor <|-- TerminalFocPositionInteractor
 ```
 
-Only one interactor is active at a time; the application constructs exactly the interactor matching the desired control mode and connects it to the `MotorStateMachine`.
+Only one interactor is active at a time; the application constructs exactly the interactor matching the desired control mode and connects it to the `FocStateMachine`.
 
 #### `TerminalFocBaseInteractor` — Shared Commands
 
-| Command   | Arguments          | Action                                                         |
-|-----------|--------------------|----------------------------------------------------------------|
-| `start`   | none               | Calls `FocBase::Enable()`                                      |
-| `stop`    | none               | Calls `FocBase::Disable()`                                     |
-| `set-pid` | kp, ki, kd (float) | Sets current-loop PID gains via `FocBase::SetCurrentTunings()` |
+| Command      | Arguments            | Action                                                         |
+|--------------|----------------------|----------------------------------------------------------------|
+| `set_dq_pid` | kp, ki, kd×2 (float) | Sets current-loop PID gains via `FocBase::SetCurrentTunings()` |
 
-These commands are available in all control modes.
+This command is available in all control modes.
 
 #### `TerminalFocTorqueInteractor` — Torque Mode
 
@@ -129,17 +127,17 @@ After the banner is printed, all subsequent inputs and outputs pass through to t
 
 `TerminalHelper` operates entirely on `infra::BoundedString` tokens — no dynamic string allocation occurs.
 
-### Service Commands via `MotorStateMachine`
+### Lifecycle Commands via `FocStateMachine`
 
-The `MotorStateMachine` registers additional commands on the same `TerminalWithStorage` instance that are not specific to any particular control mode:
+The `FocStateMachine` registers additional commands on the same `TerminalWithStorage` instance that enforce the motor lifecycle state machine. These commands are always available regardless of which control mode is active:
 
-| Command               | Service triggered                                                         | Response                                                                           |
-|-----------------------|---------------------------------------------------------------------------|------------------------------------------------------------------------------------|
-| `align`               | `MotorAlignmentImpl::ForceAlignment`                                      | Prints `"Aligning…"` immediately; prints result asynchronously when `onDone` fires |
-| `identify-electrical` | `ElectricalParametersIdentificationImpl::EstimateResistanceAndInductance` | Prints `"Identifying…"` immediately; prints R and L (or error) when `onDone` fires |
-| `identify-mechanical` | `MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia`      | Prints `"Estimating…"` immediately; prints J and B (or error) when `onDone` fires  |
-| `save-calibration`    | `NonVolatileMemory::SaveCalibration`                                      | Prints result when write+verify completes                                          |
-| `load-calibration`    | `NonVolatileMemory::LoadCalibration`                                      | Prints loaded values or error when read completes                                  |
+| Command       | Alias | Action                                                                                               |
+|---------------|-------|------------------------------------------------------------------------------------------------------|
+| `calibrate`   | `cal` | Runs the full calibration sequence (pole pairs → R/L → alignment → mechanical ident for speed modes) |
+| `enable`      | `en`  | Enables the FOC controller (only allowed from `Ready` state)                                         |
+| `disable`     | `dis` | Disables the FOC controller and returns to `Ready`                                                   |
+| `clear_fault` | `cf`  | Clears the active fault and returns to `Idle`                                                        |
+| `clear_cal`   | `cc`  | Invalidates NVM calibration data and returns to `Idle`                                               |
 
 ### Response Model — `StatusWithMessage`
 
@@ -175,7 +173,7 @@ For commands that trigger asynchronous services, the interactor initiates the se
 sequenceDiagram
     participant User as Serial terminal
     participant TWS as TerminalWithStorage
-    participant MSM as MotorStateMachine
+    participant MSM as FocStateMachine
     participant Alignment as MotorAlignmentImpl
 
     User->>TWS: types "align"
@@ -201,10 +199,10 @@ Registered command handlers are stored in a fixed-size look-up structure in the 
 
 ### Provided
 
-| Interface                                    | Purpose                                                                                                                                                                                | Contract                                                                              |
-|----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
-| `TerminalFocBaseInteractor` (and subclasses) | Registers common and mode-specific commands on `TerminalWithStorage`; exposes a `Terminal()` accessor for the `MotorStateMachine` to register additional commands on the same terminal | Constructed once per application; exactly one interactor subclass is active at a time |
-| `TerminalWithBanner`                         | Decorates `TerminalWithStorage` to print a welcome banner on first connection                                                                                                          | Transparent to the underlying terminal after the banner has been printed              |
+| Interface                                    | Purpose                                                                                                                                                                    | Contract                                                                              |
+|----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
+| `TerminalFocBaseInteractor` (and subclasses) | Registers the `set_dq_pid` command on `TerminalWithStorage`; exposes a `Terminal()` accessor for the `FocStateMachine` to register lifecycle commands on the same terminal | Constructed once per application; exactly one interactor subclass is active at a time |
+| `TerminalWithBanner`                         | Decorates `TerminalWithStorage` to print a welcome banner on first connection                                                                                              | Transparent to the underlying terminal after the banner has been printed              |
 
 ### Required
 
