@@ -132,10 +132,24 @@ jobs:
           configurePreset: ${{ matrix.target }}
           buildPreset: ${{ matrix.target }}-${{ matrix.configuration }}
           configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
-      - name: Run cycle analysis
+      - name: Run cycle analysis — torque
         if: matrix.target == 'EK-TM4C1294XL'
         uses: ./.github/actions/cycle-analysis
-        id: cycles
+        id: cycles-torque
+        with:
+          elf-path: build/${{ matrix.target }}/targets/sync_foc_sensored/torque/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.torque.main.elf
+          config-path: targets/sync_foc_sensored/torque/cycle-analysis.json
+          target: ${{ matrix.target }}
+          build-config: ${{ matrix.configuration }}
+          clock-mhz: '120'
+          cortex: 'm4'
+          output-dir: cycle-analysis-torque
+          post-pr-comment: 'false'
+          artifact-name: cycle-analysis-torque
+      - name: Run cycle analysis — speed
+        if: matrix.target == 'EK-TM4C1294XL'
+        uses: ./.github/actions/cycle-analysis
+        id: cycles-speed
         with:
           elf-path: build/${{ matrix.target }}/targets/sync_foc_sensored/speed/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.speed.main.elf
           config-path: targets/sync_foc_sensored/speed/cycle-analysis.json
@@ -143,15 +157,92 @@ jobs:
           build-config: ${{ matrix.configuration }}
           clock-mhz: '120'
           cortex: 'm4'
-          output-dir: cycle-analysis-output
+          output-dir: cycle-analysis-speed
+          post-pr-comment: 'false'
+          artifact-name: cycle-analysis-speed
+      - name: Run cycle analysis — position
+        if: matrix.target == 'EK-TM4C1294XL'
+        uses: ./.github/actions/cycle-analysis
+        id: cycles-position
+        with:
+          elf-path: build/${{ matrix.target }}/targets/sync_foc_sensored/position/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.position.main.elf
+          config-path: targets/sync_foc_sensored/position/cycle-analysis.json
+          target: ${{ matrix.target }}
+          build-config: ${{ matrix.configuration }}
+          clock-mhz: '120'
+          cortex: 'm4'
+          output-dir: cycle-analysis-position
+          post-pr-comment: 'false'
+          artifact-name: cycle-analysis-position
       - name: Cycle analysis summary
         if: matrix.target == 'EK-TM4C1294XL'
         run: |
           {
             echo "## Cycle Analysis Results"
             echo ""
-            echo "- **Min cycles**: ${{ steps.cycles.outputs.min-cycles }}"
-            echo "- **Max cycles**: ${{ steps.cycles.outputs.max-cycles }}"
+            echo "### Torque mode"
+            echo "- **Min cycles**: ${{ steps.cycles-torque.outputs.min-cycles }}"
+            echo "- **Max cycles**: ${{ steps.cycles-torque.outputs.max-cycles }}"
             echo ""
-            cat cycle-analysis-output/cycle_estimation_report.md
+            cat cycle-analysis-torque/cycle_estimation_report.md
+            echo ""
+            echo "### Speed mode"
+            echo "- **Min cycles**: ${{ steps.cycles-speed.outputs.min-cycles }}"
+            echo "- **Max cycles**: ${{ steps.cycles-speed.outputs.max-cycles }}"
+            echo ""
+            cat cycle-analysis-speed/cycle_estimation_report.md
+            echo ""
+            echo "### Position mode (worst case)"
+            echo "- **Min cycles**: ${{ steps.cycles-position.outputs.min-cycles }}"
+            echo "- **Max cycles**: ${{ steps.cycles-position.outputs.max-cycles }}"
+            echo ""
+            cat cycle-analysis-position/cycle_estimation_report.md
           } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Post combined cycle analysis PR comment
+        if: matrix.target == 'EK-TM4C1294XL' && github.event_name == 'pull_request'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const fs = require('fs');
+            const torque  = fs.readFileSync('cycle-analysis-torque/cycle_estimation_report.md',   'utf8');
+            const speed   = fs.readFileSync('cycle-analysis-speed/cycle_estimation_report.md',    'utf8');
+            const pos     = fs.readFileSync('cycle-analysis-position/cycle_estimation_report.md', 'utf8');
+
+            const marker = '<!-- cycle-analysis-comment -->';
+            const body = [
+              marker,
+              '## Cycle Analysis Results',
+              '',
+              '### Torque mode',
+              torque,
+              '',
+              '### Speed mode',
+              speed,
+              '',
+              '### Position mode (worst case)',
+              pos,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
