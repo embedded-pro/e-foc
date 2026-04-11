@@ -27,7 +27,7 @@ inputs:
   objdump-tool:
     description: 'Path to the objdump binary (default: arm-none-eabi-objdump)'
     required: false
-    default: 'arm-none-eabi-objdump'
+    default: "arm-none-eabi-objdump"
   size-tool:
     description: "Path to the size binary (default: arm-none-eabi-size)"
     required: false
