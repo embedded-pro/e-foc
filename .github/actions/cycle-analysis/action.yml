@@ -37,13 +37,13 @@ inputs:
     required: false
     default: 'cycle-analysis-output'
   post-pr-comment:
-    description: 'Post a PR comment with the summary (true/false)'
+    description: "Post a PR comment with the summary (true/false)"
     required: false
-    default: 'true'
+    default: "true"
   artifact-name:
-    description: 'Name for the uploaded artifact (must be unique per workflow run)'
+    description: "Name for the uploaded artifact (must be unique per workflow run)"
     required: false
-    default: 'cycle-analysis'
+    default: "cycle-analysis"
 
 outputs:
   min-cycles:

@@ -141,10 +141,10 @@ jobs:
           config-path: targets/sync_foc_sensored/torque/cycle-analysis.json
           target: ${{ matrix.target }}
           build-config: ${{ matrix.configuration }}
-          clock-mhz: '120'
-          cortex: 'm4'
+          clock-mhz: "120"
+          cortex: "m4"
           output-dir: cycle-analysis-torque
-          post-pr-comment: 'false'
+          post-pr-comment: "false"
           artifact-name: cycle-analysis-torque
       - name: Run cycle analysis — speed
         if: matrix.target == 'EK-TM4C1294XL'
@@ -155,10 +155,10 @@ jobs:
           config-path: targets/sync_foc_sensored/speed/cycle-analysis.json
           target: ${{ matrix.target }}
           build-config: ${{ matrix.configuration }}
-          clock-mhz: '120'
-          cortex: 'm4'
+          clock-mhz: "120"
+          cortex: "m4"
           output-dir: cycle-analysis-speed
-          post-pr-comment: 'false'
+          post-pr-comment: "false"
           artifact-name: cycle-analysis-speed
       - name: Run cycle analysis — position
         if: matrix.target == 'EK-TM4C1294XL'
@@ -169,10 +169,10 @@ jobs:
           config-path: targets/sync_foc_sensored/position/cycle-analysis.json
           target: ${{ matrix.target }}
           build-config: ${{ matrix.configuration }}
-          clock-mhz: '120'
-          cortex: 'm4'
+          clock-mhz: "120"
+          cortex: "m4"
           output-dir: cycle-analysis-position
-          post-pr-comment: 'false'
+          post-pr-comment: "false"
           artifact-name: cycle-analysis-position
       - name: Cycle analysis summary
         if: matrix.target == 'EK-TM4C1294XL'
