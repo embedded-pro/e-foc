@@ -33,7 +33,7 @@ inputs:
     required: false
     default: 'arm-none-eabi-size'
   output-dir:
-    description: 'Directory for generated reports'
+    description: "Directory for generated reports"
     required: false
     default: "cycle-analysis-output"
   post-pr-comment:
