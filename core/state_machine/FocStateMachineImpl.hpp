@@ -1,13 +1,16 @@
 #pragma once
 
 #include "core/foc/implementations/WithAutomaticCurrentPidGains.hpp"
+#include "core/foc/implementations/WithAutomaticSpeedPidGains.hpp"
 #include "core/foc/instantiations/FocController.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/services/alignment/MotorAlignment.hpp"
 #include "core/services/cli/TerminalBase.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
+#include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
+#include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
@@ -87,6 +90,7 @@ namespace application
         void CmdDisable() override;
         void CmdClearFault() override;
         void CmdClearCalibration() override;
+        void ApplyOnlineEstimates();
 
     private:
         void EnterCalibrating();
@@ -106,6 +110,7 @@ namespace application
         void CheckNvmOnBoot();
 
         void RegisterCliCommands();
+        void ApplyOnlineEstimatesImpl();
 
     private:
         services::TerminalWithStorage& terminal;
@@ -128,6 +133,9 @@ namespace application
         services::MechanicalParametersIdentification* mechIdent{ nullptr };
 
         std::optional<services::MechanicalParametersIdentificationImpl> optMechIdent;
+        std::optional<services::RealTimeFrictionAndInertiaEstimator> optOnlineMechEstimator;
+        std::optional<services::RealTimeResistanceAndInductanceEstimator> optOnlineElecEstimator;
+        std::optional<foc::WithAutomaticSpeedPidGains> optSpeedAutoTuner;
     };
 
     // Implementation
@@ -162,6 +170,13 @@ namespace application
                 optMechIdent.emplace(static_cast<foc::FocSpeed&>(focController), inverter, encoder);
                 mechIdent = &*optMechIdent;
             }
+
+            optOnlineMechEstimator.emplace(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, inverter.BaseFrequency());
+            optOnlineElecEstimator.emplace(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, inverter.BaseFrequency());
+            optSpeedAutoTuner.emplace(static_cast<foc::FocSpeedTunable&>(focController));
+
+            static_cast<foc::FocOnlineEstimableBase&>(focController).SetOnlineMechanicalEstimator(*optOnlineMechEstimator);
+            static_cast<foc::FocOnlineEstimableBase&>(focController).SetOnlineElectricalEstimator(*optOnlineElecEstimator);
         }
 
         faultNotifier.Register([this](state_machine::FaultCode code)
@@ -273,6 +288,11 @@ namespace application
     void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::EnterEnabled()
     {
         tracer.Trace() << "[SM] Entering Enabled";
+        if constexpr (hasMechanicalIdent)
+        {
+            if (optOnlineMechEstimator.has_value())
+                optOnlineMechEstimator->SetTorqueConstant(mechTorqueConstant);
+        }
         focController.Start();
         currentState = state_machine::Enabled{};
     }
@@ -437,6 +457,20 @@ namespace application
         if constexpr (hasMechanicalIdent)
         {
             focController.SetSpeedTunings(vdc, foc::SpeedTunings{ data.kpVelocity, data.kiVelocity, 0.0f });
+
+            if (optOnlineMechEstimator.has_value() && data.inertia > 0.0f)
+            {
+                optOnlineMechEstimator->SetInitialEstimate(
+                    foc::NewtonMeterSecondSquared{ data.inertia },
+                    foc::NewtonMeterSecondPerRadian{ data.frictionViscous });
+            }
+            if (optOnlineElecEstimator.has_value())
+            {
+                // Seed using lD: the online electrical estimator assumes a non-salient motor (Ld ≈ Lq).
+                optOnlineElecEstimator->SetInitialEstimate(
+                    foc::Ohm{ data.rPhase },
+                    foc::MilliHenry{ data.lD });
+            }
         }
     }
 
@@ -477,6 +511,37 @@ namespace application
     }
 
     template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
+    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::ApplyOnlineEstimates()
+    {
+        if (!std::holds_alternative<state_machine::Enabled>(currentState))
+            return;
+        ApplyOnlineEstimatesImpl();
+    }
+
+    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
+    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::ApplyOnlineEstimatesImpl()
+    {
+        if constexpr (hasMechanicalIdent)
+        {
+            if (optSpeedAutoTuner.has_value() && optOnlineMechEstimator.has_value())
+            {
+                const auto inertia = optOnlineMechEstimator->CurrentInertia();
+                const auto friction = optOnlineMechEstimator->CurrentFriction();
+                tracer.Trace() << "[SM] Applying mechanical estimates: J=" << inertia.Value() << " B=" << friction.Value();
+                optSpeedAutoTuner->SetPidBasedOnInertiaAndFriction(vdc, inertia, friction, velocityBandwidthRadPerSec);
+            }
+            if (optOnlineElecEstimator.has_value())
+            {
+                const auto resistance = optOnlineElecEstimator->CurrentResistance();
+                const auto inductance = optOnlineElecEstimator->CurrentInductance();
+                tracer.Trace() << "[SM] Applying electrical estimates: R=" << resistance.Value() << " L=" << inductance.Value();
+                pidAutoTuner.SetPidBasedOnResistanceAndInductance(
+                    vdc, resistance, inductance, inverter.BaseFrequency(), nyquistFactor);
+            }
+        }
+    }
+
+    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
     void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::RegisterCliCommands()
     {
         if constexpr (std::is_same_v<TransitionPolicy, state_machine::CliTransitionPolicy>)
@@ -510,6 +575,26 @@ namespace application
                 {
                     CmdClearCalibration();
                 } });
+
+            if constexpr (hasMechanicalIdent)
+            {
+                terminal.AddCommand({ { "apply_estimates", "ae", "Apply online estimates to PID gains" },
+                    [this](const infra::BoundedConstString&)
+                    {
+                        ApplyOnlineEstimates();
+                    } });
+
+                terminal.AddCommand({ { "estimate_status", "es", "Print current online estimates" },
+                    [this](const infra::BoundedConstString&)
+                    {
+                        if (optOnlineMechEstimator.has_value())
+                            tracer.Trace() << "[EST] Mech: J=" << optOnlineMechEstimator->CurrentInertia().Value()
+                                           << " B=" << optOnlineMechEstimator->CurrentFriction().Value();
+                        if (optOnlineElecEstimator.has_value())
+                            tracer.Trace() << "[EST] Elec: R=" << optOnlineElecEstimator->CurrentResistance().Value()
+                                           << " L=" << optOnlineElecEstimator->CurrentInductance().Value();
+                    } });
+            }
         }
     }
 }

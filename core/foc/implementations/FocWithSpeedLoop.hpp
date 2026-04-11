@@ -6,6 +6,7 @@
 #include "core/foc/implementations/TrigonometricImpl.hpp"
 #include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/Foc.hpp"
+#include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "numerical/controllers/implementations/PidIncremental.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
@@ -55,6 +56,8 @@ namespace foc
 
             dPid.SetTunings({ d_kp * scale, d_ki * scale_dt, d_kd * scale_inv_dt });
             qPid.SetTunings({ q_kp * scale, q_ki * scale_dt, q_kd * scale_inv_dt });
+
+            vdcInvScale = detail::invSqrt3 * Vdc.Value();
         }
 
         OPTIMIZE_FOR_SPEED
@@ -105,7 +108,16 @@ namespace foc
             qPid.SetPoint(lastSpeedPidOutput);
 
             auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
-            auto output = spaceVectorModulator.Generate(park.Inverse(RotatingFrame{ dPid.Process(idAndIq.d), qPid.Process(idAndIq.q) }, cosTheta, sinTheta));
+            float normalizedVd = dPid.Process(idAndIq.d);
+            float normalizedVq = qPid.Process(idAndIq.q);
+
+            lastPhaseCurrents = currentPhases;
+            lastElectricalAngle = electricalAngle;
+            lastMeasuredId = idAndIq.d;
+            lastMeasuredIq = idAndIq.q;
+            lastNormalizedVd = normalizedVd;
+
+            auto output = spaceVectorModulator.Generate(park.Inverse(RotatingFrame{ normalizedVd, normalizedVq }, cosTheta, sinTheta));
 
             ++triggerCounter;
             if (triggerCounter >= prescaler)
@@ -150,10 +162,58 @@ namespace foc
             return speedDt;
         }
 
+        float PolePairs() const
+        {
+            return polePairs;
+        }
+
+        const PhaseCurrents& LastPhaseCurrents() const
+        {
+            return lastPhaseCurrents;
+        }
+
+        float LastElectricalAngle() const
+        {
+            return lastElectricalAngle;
+        }
+
+        float LastMeasuredId() const
+        {
+            return lastMeasuredId;
+        }
+
+        float LastMeasuredIq() const
+        {
+            return lastMeasuredIq;
+        }
+
+        float LastNormalizedVd() const
+        {
+            return lastNormalizedVd;
+        }
+
+        float VdcInvScale() const
+        {
+            return vdcInvScale;
+        }
+
         LowPriorityInterrupt& GetLowPriorityInterrupt()
         {
             return lowPriorityInterrupt;
         }
+
+        void SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator)
+        {
+            onlineMechEstimator = &estimator;
+        }
+
+        void SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator)
+        {
+            onlineElecEstimator = &estimator;
+        }
+
+        void UpdateOnlineMechanicalEstimator(float mechanicalSpeed);
+        void UpdateOnlineElectricalEstimator(float electricalSpeed);
 
     private:
         [[no_unique_address]] Park park;
@@ -163,13 +223,22 @@ namespace foc
         controllers::PidIncrementalSynchronous<float> qPid{ { 0.0f, 0.0f, 0.0f }, { -1.0f, 1.0f } };
         [[no_unique_address]] SpaceVectorModulation spaceVectorModulator;
         LowPriorityInterrupt& lowPriorityInterrupt;
-        float currentMechanicalAngle = 0.0f;
-        float previousSpeedPosition = 0.0f;
-        float lastSpeedPidOutput = 0.0f;
+        float currentMechanicalAngle{ 0.0f };
+        float previousSpeedPosition{ 0.0f };
+        float lastSpeedPidOutput{ 0.0f };
         float dt;
         float speedDt;
         uint32_t prescaler;
-        uint32_t triggerCounter = 0;
-        float polePairs = 0.0f;
+        uint32_t triggerCounter{ 0 };
+        float polePairs{ 0.0f };
+        float vdcInvScale{ 1.0f };
+
+        OnlineMechanicalEstimator* onlineMechEstimator{ nullptr };
+        OnlineElectricalEstimator* onlineElecEstimator{ nullptr };
+        PhaseCurrents lastPhaseCurrents{};
+        float lastElectricalAngle{ 0.0f };
+        float lastMeasuredId{ 0.0f };
+        float lastMeasuredIq{ 0.0f };
+        float lastNormalizedVd{ 0.0f };
     };
 }
