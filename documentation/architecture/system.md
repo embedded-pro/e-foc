@@ -343,9 +343,9 @@ The integration test suite verifies the cooperative behaviour of three core subs
 2. **Non-Volatile Memory stack** — the chain from the NVM region abstraction through the EEPROM interface to the concrete NVM service. Integration tests use a real in-memory EEPROM stub rather than a mocked NVM service.
 3. **CAN-to-State-Machine bridge** — the observer that translates CAN FOC motor commands into state machine transition commands.
 
-Platform hardware (ADC, PWM, encoder) is mocked at the application-decorator level. The fixture owns `StrictMock<>` instances of `AdcPhaseCurrentMeasurementMock`, `SynchronousThreeChannelsPwmMock`, and `QuadratureEncoderDecoratorMock`, wrapped by `infra::CreatorMock<>` proxies. The `PlatformFactoryMock` is a pure GMock whose creator methods return these proxies, allowing the real `PlatformAdapter` to be exercised unchanged. EEPROM storage uses a standalone in-memory `EepromStub` owned by the fixture.
+Platform hardware (ADC, PWM, encoder) is mocked at the application-decorator level using hardware-interface mocks injected through creator proxies. The Platform Factory interface is fulfilled by a test double whose creator methods hand out these proxies, allowing the real Platform Adapter to be exercised unchanged. EEPROM storage is provided by an in-memory stub that satisfies the EEPROM interface and persists data across the lifetime of a single test scenario.
 
-Integration tests run exclusively on the host build. The host event dispatcher simulates the asynchronous callback chains used by NVM and calibration services. All mock instances use `StrictMock<>`; `NiceMock` and `NaggyMock` are forbidden.
+Integration tests run exclusively on the host build. The host event dispatcher simulates the asynchronous callback chains used by NVM and calibration services. All mock instances use strict mock policies; lenient mocking is forbidden.
 
 ```mermaid
 graph TD
@@ -398,7 +398,7 @@ graph TD
 
 | Boundary | Real Component | Test Double |
 |----------|---------------|-------------|
-| Platform peripherals (ADC, PWM, encoder) | Platform Adapter (real) backed by `StrictMock<>` hardware mocks | Fixture owns `infra::CreatorMock<>` proxies; `PlatformFactoryMock` returns them |
+| Platform peripherals (ADC, PWM, encoder) | Platform Adapter (real) backed by hardware-interface mocks | Test fixture owns creator proxies; Platform Factory test double returns them |
 | EEPROM storage | In-memory 512-byte array | Replaces embedded EEPROM driver |
 | Calibration services | Electrical identification mock, alignment mock | `StrictMock<>` wrapping service interfaces |
 | Fault notification | Fault notifier mock | `StrictMock<>` wrapping fault notifier |
@@ -423,3 +423,4 @@ graph TD
 | REQ-INT-001 | `can_foc_motor.feature` — CAN Start enables motor |
 | REQ-INT-002 | `can_foc_motor.feature` — CAN Stop disables motor |
 | REQ-INT-003 | `can_foc_motor.feature` — CAN ClearFault clears fault |
+| REQ-INT-004 | Not scenario-based — routing through the category server is a structural constraint verified by the bridge design |

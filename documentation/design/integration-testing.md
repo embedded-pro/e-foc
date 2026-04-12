@@ -8,7 +8,7 @@ date: 2026-04-12
 ---
 
 | Field     | Value                       |
-|-----------|-----------------------------||
+|-----------|------------------------------|
 | Title     | Integration Testing Design  |
 | Type      | design                      |
 | Status    | draft                       |
@@ -164,4 +164,4 @@ sequenceDiagram
 |---|---|---|
 | `state_machine_lifecycle.feature` | Idle on boot, calibration start, enable/disable, fault, fault clear, valid NVM boot | REQ-SM-001..010 |
 | `calibration_flow.feature` | Full calibration success, calibration failure | REQ-SM-003..005, REQ-SM-011 |
-| `can_foc_motor.feature` | CAN Start, CAN Stop, CAN ClearFault | REQ-INT-001..003 |
+| `can_foc_motor.feature` | CAN Start, CAN Stop, CAN ClearFault | REQ-INT-001..003 (REQ-INT-004 is structural — verified by bridge design, not a dedicated scenario) |

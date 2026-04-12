@@ -22,7 +22,7 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
   - `cmake --preset host`
   - `cmake --build --preset host-Debug`
 - Run unit tests (GoogleTest):
-  - `ctest --preset host-Debug`
+  - `ctest --preset host`
 - Build embedded target (example board):
   - `cmake --preset EK-TM4C1294XL`
   - `cmake --build --preset EK-TM4C1294XL-Debug`
