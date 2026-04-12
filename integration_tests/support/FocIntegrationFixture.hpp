@@ -105,9 +105,11 @@ namespace integration
         testing::StrictMock<application::QuadratureEncoderDecoratorMock> encoderDecoratorMock;
 
         infra::CreatorMock<application::AdcPhaseCurrentMeasurement,
-            void(application::PlatformFactory::SampleAndHold)> adcCreator{ adcPhaseCurrentMock };
+            void(application::PlatformFactory::SampleAndHold)>
+            adcCreator{ adcPhaseCurrentMock };
         infra::CreatorMock<hal::SynchronousThreeChannelsPwm,
-            void(std::chrono::nanoseconds, hal::Hertz)> pwmCreator{ pwmMock };
+            void(std::chrono::nanoseconds, hal::Hertz)>
+            pwmCreator{ pwmMock };
         infra::CreatorMock<application::QuadratureEncoderDecorator, void()> encoderCreator{ encoderDecoratorMock };
 
         testing::StrictMock<PlatformFactoryMock> platformFactory;
