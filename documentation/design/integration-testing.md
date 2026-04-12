@@ -176,29 +176,29 @@ sequenceDiagram
 
 The `FocIntegrationFixture` exposes the following test API consumed by Gherkin step definitions:
 
-| Method | Purpose |
-|--------|---------|
-| `ConstructWithInvalidNvm()` | Constructs the state machine with an empty EEPROM — starts in Idle |
-| `ConstructWithValidNvm(data)` | Pre-populates EEPROM and constructs the state machine — starts in Ready |
-| `SetupCalibrationExpectations()` | Arms the pole-pairs estimation mock to capture its callback |
-| `CompletePolePairsEstimation(n)` | Fires the captured pole-pairs callback with a success result |
-| `CompleteRLEstimation(R, L)` | Fires the captured R/L callback and arms the alignment mock |
-| `CompleteAlignment(offset)` | Fires the captured alignment callback, triggering NVM save |
-| `SetupCanIntegration()` | Wires the CAN category server and bridge to the state machine |
-| `InjectCanStart()` | Injects a CAN Start message via `FocMotorCategoryServer::HandleMessage` |
-| `InjectCanStop()` | Injects a CAN Stop message via `FocMotorCategoryServer::HandleMessage` |
-| `InjectCanClearFault()` | Injects a CAN ClearFault message via `FocMotorCategoryServer::HandleMessage` |
+| Method                           | Purpose                                                                      |
+|----------------------------------|------------------------------------------------------------------------------|
+| `ConstructWithInvalidNvm()`      | Constructs the state machine with an empty EEPROM — starts in Idle           |
+| `ConstructWithValidNvm(data)`    | Pre-populates EEPROM and constructs the state machine — starts in Ready      |
+| `SetupCalibrationExpectations()` | Arms the pole-pairs estimation mock to capture its callback                  |
+| `CompletePolePairsEstimation(n)` | Fires the captured pole-pairs callback with a success result                 |
+| `CompleteRLEstimation(R, L)`     | Fires the captured R/L callback and arms the alignment mock                  |
+| `CompleteAlignment(offset)`      | Fires the captured alignment callback, triggering NVM save                   |
+| `SetupCanIntegration()`          | Wires the CAN category server and bridge to the state machine                |
+| `InjectCanStart()`               | Injects a CAN Start message via `FocMotorCategoryServer::HandleMessage`      |
+| `InjectCanStop()`                | Injects a CAN Stop message via `FocMotorCategoryServer::HandleMessage`       |
+| `InjectCanClearFault()`          | Injects a CAN ClearFault message via `FocMotorCategoryServer::HandleMessage` |
 
 ### Required from System Under Test
 
-| Component | Interface | Purpose |
-|-----------|-----------|----------|
-| FOC State Machine | `FocStateMachineBase` | Lifecycle commands and state inspection |
-| Non-Volatile Memory | `NonVolatileMemory` | Calibration data load and save for the NVM-boot path |
-| CAN Category Server | `FocMotorCategoryServer` | CAN command dispatch via `HandleMessage` |
-| Electrical Identification | `ElectricalParametersIdentification` | Controlled via mock in calibration scenarios |
-| Motor Alignment | `MotorAlignment` | Controlled via mock in calibration scenarios |
-| Fault Notifier | `FaultNotifier` | Triggered via mock to test hardware-fault transitions |
+| Component                 | Interface                            | Purpose                                               |
+|---------------------------|--------------------------------------|-------------------------------------------------------|
+| FOC State Machine         | `FocStateMachineBase`                | Lifecycle commands and state inspection               |
+| Non-Volatile Memory       | `NonVolatileMemory`                  | Calibration data load and save for the NVM-boot path  |
+| CAN Category Server       | `FocMotorCategoryServer`             | CAN command dispatch via `HandleMessage`              |
+| Electrical Identification | `ElectricalParametersIdentification` | Controlled via mock in calibration scenarios          |
+| Motor Alignment           | `MotorAlignment`                     | Controlled via mock in calibration scenarios          |
+| Fault Notifier            | `FaultNotifier`                      | Triggered via mock to test hardware-fault transitions |
 
 ---
 
