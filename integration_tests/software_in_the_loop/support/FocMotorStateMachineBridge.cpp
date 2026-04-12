@@ -1,4 +1,4 @@
-#include "integration_tests/support/FocMotorStateMachineBridge.hpp"
+#include "integration_tests/software_in_the_loop/support/FocMotorStateMachineBridge.hpp"
 
 namespace integration
 {

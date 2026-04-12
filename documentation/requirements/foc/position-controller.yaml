@@ -1,0 +1,33 @@
+- id: REQ-POS-001
+  title: Position cascade architecture
+  shall: >
+    The position controller shall implement a triple cascade architecture: an outer
+    position loop feeding a velocity loop executing at 1 kHz, with the inner current
+    loop executing at a frequency at least 10 times the velocity loop rate.
+
+- id: REQ-POS-002
+  title: Position setpoint acceptance
+  shall: >
+    The position controller shall accept a target rotor position expressed in
+    mechanical radians as the primary control setpoint.
+
+- id: REQ-POS-003
+  title: Independent tunings per control loop
+  shall: >
+    The position controller shall accept independent PID tunings for the current loop,
+    the velocity loop, and the position loop. Each set of gains shall be configurable
+    independently without affecting the others.
+
+- id: REQ-POS-004
+  title: Position PID tunings with anti-windup
+  shall: >
+    The position controller shall accept proportional, integral, and derivative gains
+    for the outer position loop. The integrator shall implement anti-windup clamping
+    to prevent integrator saturation.
+
+- id: REQ-POS-005
+  title: FOC loop CPU budget
+  shall: >
+    The complete position control cycle, including sensing, transforms, current PID,
+    velocity PID, position PID, and PWM output, shall not exceed 75 percent of
+    available CPU time per control period at the configured inner loop rate.

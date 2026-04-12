@@ -1,4 +1,4 @@
-#include "integration_tests/support/EepromStub.hpp"
+#include "integration_tests/software_in_the_loop/support/EepromStub.hpp"
 #include <algorithm>
 
 namespace integration

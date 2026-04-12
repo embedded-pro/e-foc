@@ -47,6 +47,63 @@ jobs:
           buildPreset: "host-Debug-WithPackage"
           testPreset: "host"
           configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
+      - name: Run SIL integration tests
+        run: |
+          sil_test=$(find build/host -name "e_foc.integration_tests" -type f -executable -print -quit)
+          if [[ -z "$sil_test" ]]; then
+            echo "::error::SIL integration test executable not found"
+            exit 1
+          fi
+          $sil_test --format summary pretty junit:sil-test-report.xml -- integration_tests/software_in_the_loop/features
+      - name: Generate SIL test summary
+        if: always()
+        run: |
+          if [[ ! -f sil-test-report.xml ]]; then
+            echo "## SIL Integration Test Results" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "_Report not generated — SIL test step did not produce output._" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "## SIL Integration Test Results"
+            echo ""
+            python3 -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('sil-test-report.xml')
+          root = tree.getroot()
+          suites = root.findall('.//testsuite') if root.tag == 'testsuites' else [root]
+          features = {}
+          for suite in suites:
+              for tc in suite.findall('testcase'):
+                  feature = tc.get('classname', 'Unknown')
+                  name = tc.get('name', 'Unknown')
+                  failed = tc.find('failure') is not None
+                  skipped = tc.find('skipped') is not None
+                  status = ':x:' if failed else ':zzz:' if skipped else ':white_check_mark:'
+                  features.setdefault(feature, []).append((name, status))
+          for feature, scenarios in features.items():
+              print(f'### {feature}')
+              print('| Scenario | Status |')
+              print('|---|---|')
+              for name, status in scenarios:
+                  print(f'| {name} | {status} |')
+              print()
+          "
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: EnricoMi/publish-unit-test-result-action@c950f6fb443cb5af20a377fd0dfaa78838901040 # v2.23.0
+        if: always()
+        with:
+          check_name: SIL Integration Test Results
+          comment_title: SIL Integration Test Results
+          files: sil-test-report.xml
+          report_individual_runs: true
+          report_suite_logs: info
+      - name: Upload SIL test report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: sil-test-report
+          path: sil-test-report.xml
       - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: e_foc
