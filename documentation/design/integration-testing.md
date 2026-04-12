@@ -30,7 +30,19 @@ The test suite uses the **amp-cucumber-cpp-runner v4.0.0** framework. Scenarios 
 
 ---
 
-## Component Responsibilities
+## Responsibilities
+
+**Is responsible for:**
+- Providing a shared test context (`FocIntegrationFixture`) that owns and wires all system-under-test components for each Cucumber scenario
+- Mocking hardware peripherals (ADC, PWM, encoder) through proxy creators so the real Platform Adapter runs unchanged
+- Supplying an in-memory EEPROM stub so the full NVM stack executes synchronously without embedded hardware
+- Enabling step-by-step async callback control for calibration sequence testing
+- Injecting CAN commands directly into the category server to verify state machine transitions independently of CAN transport encoding
+
+**Is NOT responsible for:**
+- Testing FOC control algorithm correctness — covered by unit tests in `core/foc/implementations/test/`
+- Testing CAN framing or transport encoding — covered by `can-lite` unit and integration tests
+- Running on an embedded target — host-only suite
 
 ### Platform Factory Mock
 
@@ -104,7 +116,9 @@ The `FocStateMachineImpl` is always constructed with `AutoTransitionPolicy` so t
 
 ---
 
-## Calibration Flow Design
+## Component Details
+
+### Calibration Flow
 
 The calibration scenario requires step-by-step control of async callbacks. The fixture captures each service callback as a member:
 
@@ -137,9 +151,7 @@ sequenceDiagram
     SM-->>Step: state == Ready
 ```
 
----
-
-## CAN Integration Design
+### CAN Integration
 
 To keep scenarios focused on the state machine response rather than CAN wire encoding, CAN frames are injected via `FocMotorCategoryServer::HandleMessage()` directly. A `CanFrameTransport` backed by a `StrictMock<hal::CanMock>` is still required because the server sends acknowledgement frames via the transport.
 
@@ -155,6 +167,38 @@ sequenceDiagram
     BRG->>SM: CmdEnable()
     SM-->>Step: CurrentState() == Enabled
 ```
+
+---
+
+## Interfaces
+
+### Provided to Step Definitions
+
+The `FocIntegrationFixture` exposes the following test API consumed by Gherkin step definitions:
+
+| Method | Purpose |
+|--------|---------|
+| `ConstructWithInvalidNvm()` | Constructs the state machine with an empty EEPROM — starts in Idle |
+| `ConstructWithValidNvm(data)` | Pre-populates EEPROM and constructs the state machine — starts in Ready |
+| `SetupCalibrationExpectations()` | Arms the pole-pairs estimation mock to capture its callback |
+| `CompletePolePairsEstimation(n)` | Fires the captured pole-pairs callback with a success result |
+| `CompleteRLEstimation(R, L)` | Fires the captured R/L callback and arms the alignment mock |
+| `CompleteAlignment(offset)` | Fires the captured alignment callback, triggering NVM save |
+| `SetupCanIntegration()` | Wires the CAN category server and bridge to the state machine |
+| `InjectCanStart()` | Injects a CAN Start message via `FocMotorCategoryServer::HandleMessage` |
+| `InjectCanStop()` | Injects a CAN Stop message via `FocMotorCategoryServer::HandleMessage` |
+| `InjectCanClearFault()` | Injects a CAN ClearFault message via `FocMotorCategoryServer::HandleMessage` |
+
+### Required from System Under Test
+
+| Component | Interface | Purpose |
+|-----------|-----------|----------|
+| FOC State Machine | `FocStateMachineBase` | Lifecycle commands and state inspection |
+| Non-Volatile Memory | `NonVolatileMemory` | Calibration data load and save for the NVM-boot path |
+| CAN Category Server | `FocMotorCategoryServer` | CAN command dispatch via `HandleMessage` |
+| Electrical Identification | `ElectricalParametersIdentification` | Controlled via mock in calibration scenarios |
+| Motor Alignment | `MotorAlignment` | Controlled via mock in calibration scenarios |
+| Fault Notifier | `FaultNotifier` | Triggered via mock to test hardware-fault transitions |
 
 ---
 
