@@ -1,0 +1,13 @@
+- id: REQ-FOC-002
+  title: Independent Id and Iq current control
+  shall: >
+    The torque controller shall accept d-axis current (Id) and q-axis current (Iq)
+    as independent inputs. Both setpoints shall be injectable into the controller
+    and regulated by separate PID controllers with anti-windup.
+
+- id: REQ-FOC-005
+  title: ISR execution budget
+  shall: >
+    The complete torque control cycle (sensing, transforms, PID, SVM, output)
+    shall not exceed 75 percent of available CPU time per control period
+    (<= 4500 cycles at 120 MHz for a 20 kHz control rate).

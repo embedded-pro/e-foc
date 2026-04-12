@@ -28,7 +28,7 @@ date: 2026-04-07
 ## Assumptions & Constraints
 
 - **Constraint**: No dynamic memory allocation on the embedded target. All objects are stack- or statically-allocated for deterministic, bounded memory footprint.
-- **Constraint**: The core FOC loop executes in an interrupt service routine at 20 kHz. The complete control cycle must finish in fewer than 400 cycles at 120 MHz to guarantee real-time deadlines.
+- **Constraint**: The core FOC loop executes in an interrupt service routine at 20 kHz. The complete control cycle must not exceed 75 percent of the available CPU time per control period (<= 4500 cycles at 120 MHz / 20 kHz) to guarantee real-time deadlines.
 - **Constraint**: No recursion in control-loop or ISR-reachable paths. Stack usage must be statically predictable.
 - **Constraint**: No C++ exceptions. Error signalling uses status return values, `std::optional`, or asynchronous callbacks.
 - **Constraint**: The system targets 32-bit ARM Cortex-M microcontrollers (STM32 and TI Tiva families). Host builds are supported for unit testing and simulation only.
@@ -229,7 +229,7 @@ These are never used directly by the FOC core or services — only by the PAL co
 | Interface              | Direction | Purpose                                                                                                    | Invariants                                                                                                          |
 |------------------------|-----------|------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
 | `ThreePhaseInverter`   | required  | Triggers ADC phase-current sampling and applies PWM duty cycles to the three-phase bridge                  | `PhaseCurrentsReady()` installs the callback invoked by the ADC interrupt. Must be called before `Start()`.         |
-| `Encoder`              | required  | Reads rotor mechanical angle and supports zero-offset calibration                                          | Read must be non-blocking and complete in ≤ a few cycles.                                                           |
+| `Encoder`              | required  | Reads rotor mechanical angle and supports zero-offset calibration                                          | Read must be non-blocking and complete in <= a few cycles.                                                           |
 | `LowPriorityInterrupt` | required  | Schedules periodic execution of the speed and position outer loops at a lower rate than the FOC inner loop | `Register()` installs the callback. `Trigger()` is called from the FOC inner loop at the configured prescale ratio. |
 | `NonVolatileMemory`    | required  | Persists and retrieves calibration and configuration data                                                  | All operations are asynchronous and invoke a callback on completion.                                                |
 
@@ -332,3 +332,95 @@ These patterns eliminate polling, decouple producers from consumers, and allow t
 | 1 | Rename `source/hardware/` and extract platform targets | resolved | Keep current name vs rename to PAL vs full extraction | Renamed to `core/platform_abstraction/` (interface + adapters only). Platform implementations (TI, ST, Host) and application targets moved to top-level `targets/`. Host-only tools moved to top-level `tools/`. Core tier is now purely libraries. `source/` directory renamed to `core/`. |
 | 2 | Multi-motor support                                    | open     | Single instantiation per motor vs shared PAL with multiple FOC controllers                                | Current architecture supports one motor per binary. A shared PAL with multiple `FocController` instances is architecturally feasible but not yet required.                                                                                              |
 | 3 | Field-weakening                                        | open     | Extend `FocTorque` interface with flux-weakening setpoint vs separate `FocTorqueFieldWeakening` interface | Required for operation above base speed. Separate interface preferred (ISP) but not yet scoped.                                                                                                                                                         |
+
+---
+
+## Integration Testing
+
+The integration test suite verifies the cooperative behaviour of three core subsystems:
+
+1. **FOC State Machine** — the lifecycle controller (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) that orchestrates calibration services and the FOC control loop.
+2. **Non-Volatile Memory stack** — the chain from the NVM region abstraction through the EEPROM interface to the concrete NVM service. Integration tests use a real in-memory EEPROM stub rather than a mocked NVM service.
+3. **CAN-to-State-Machine bridge** — the observer that translates CAN FOC motor commands into state machine transition commands.
+
+Platform hardware (ADC, PWM, encoder) is mocked at the application-decorator level using hardware-interface mocks injected through creator proxies. The Platform Factory interface is fulfilled by a test double whose creator methods hand out these proxies, allowing the real Platform Adapter to be exercised unchanged. EEPROM storage is provided by an in-memory stub that satisfies the EEPROM interface and persists data across the lifetime of a single test scenario.
+
+Integration tests run exclusively on the host build. The host event dispatcher simulates the asynchronous callback chains used by NVM and calibration services. All mock instances use strict mock policies; lenient mocking is forbidden.
+
+```mermaid
+graph TD
+    subgraph "Integration Test Harness"
+        FIF[FOC Integration Fixture]
+        PFM[Platform Factory Mock]
+        HWM[Hardware Mocks + CreatorMocks]
+        EES[EEPROM Stub]
+    end
+
+    subgraph "System Under Test"
+        PA[Platform Adapter]
+        SM[FOC State Machine]
+        NVM[NVM Stack]
+    end
+
+    subgraph "Service Mocks"
+        EIM[Electrical Ident Mock]
+        AMK[Alignment Mock]
+        FNM[Fault Notifier Mock]
+    end
+
+    subgraph "CAN Integration"
+        MCS[FocMotorCategoryServer]
+        BRG[State Machine Bridge]
+    end
+
+    FIF --> PFM
+    FIF --> HWM
+    FIF --> EES
+    FIF --> SM
+    FIF --> NVM
+    FIF --> EIM
+    FIF --> AMK
+    FIF --> FNM
+
+    PFM --> PA
+    HWM --> PA
+    PA --> SM
+    NVM --> EES
+    SM --> EIM
+    SM --> AMK
+    FNM --> SM
+
+    MCS --> BRG
+    BRG --> SM
+```
+
+### Integration Boundaries
+
+| Boundary                                 | Real Component                                             | Test Double                                                                  |
+|------------------------------------------|------------------------------------------------------------|------------------------------------------------------------------------------|
+| Platform peripherals (ADC, PWM, encoder) | Platform Adapter (real) backed by hardware-interface mocks | Test fixture owns creator proxies; Platform Factory test double returns them |
+| EEPROM storage                           | In-memory 512-byte array                                   | Replaces embedded EEPROM driver                                              |
+| Calibration services                     | Electrical identification mock, alignment mock             | `StrictMock<>` wrapping service interfaces                                   |
+| Fault notification                       | Fault notifier mock                                        | `StrictMock<>` wrapping fault notifier                                       |
+| CAN transport                            | Category server `HandleMessage` invoked directly           | Bypasses CAN wire encoding                                                   |
+| Terminal / tracer                        | Stream writer stub                                         | No-op for terminal output                                                    |
+
+### Requirements Traceability
+
+| Requirement ID | Verified by Feature                                                                                               |
+|----------------|-------------------------------------------------------------------------------------------------------------------|
+| REQ-SM-001     | `state_machine_lifecycle.feature` — Motor starts in Idle                                                          |
+| REQ-SM-002     | `state_machine_lifecycle.feature` — Calibration transitions to Calibrating                                        |
+| REQ-SM-003     | `calibration_flow.feature` — step ordering scenarios                                                              |
+| REQ-SM-004     | `calibration_flow.feature` — full calibration reaches Ready                                                       |
+| REQ-SM-005     | `calibration_flow.feature` — pole pairs failure                                                                   |
+| REQ-SM-006     | `state_machine_lifecycle.feature` — Motor enabled from Ready                                                      |
+| REQ-SM-007     | `state_machine_lifecycle.feature` — Motor disabled to Ready                                                       |
+| REQ-SM-008     | `state_machine_lifecycle.feature` — Fault on hardware fault                                                       |
+| REQ-SM-009     | `state_machine_lifecycle.feature` — Fault cleared to Idle                                                         |
+| REQ-SM-010     | `state_machine_lifecycle.feature` — Valid NVM boots to Ready                                                      |
+| REQ-SM-011     | `calibration_flow.feature` — calibration data saved to NVM                                                        |
+| REQ-INT-001    | `can_foc_motor.feature` — CAN Start enables motor                                                                 |
+| REQ-INT-002    | `can_foc_motor.feature` — CAN Stop disables motor                                                                 |
+| REQ-INT-003    | `can_foc_motor.feature` — CAN ClearFault clears fault                                                             |
+| REQ-INT-004    | Not scenario-based — routing through the category server is a structural constraint verified by the bridge design |

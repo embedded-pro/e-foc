@@ -1,0 +1,48 @@
+- id: REQ-HIL-001
+  title: ADC phase current measurement
+  shall: >
+    The hardware test target shall read three-phase motor currents from the ADC
+    peripheral and report measured values within the expected range for the
+    configured shunt resistor and gain.
+
+- id: REQ-HIL-002
+  title: PWM three-channel output
+  shall: >
+    The hardware test target shall generate three-phase complementary PWM signals
+    with configurable dead-time and verify that all three channels are active and
+    switching at the requested carrier frequency.
+
+- id: REQ-HIL-003
+  title: Quadrature encoder reading
+  shall: >
+    The hardware test target shall read a quadrature encoder and report angular
+    position changes. A known mechanical displacement shall produce the expected
+    increment in reported position.
+
+- id: REQ-HIL-004
+  title: EEPROM read-write integrity
+  shall: >
+    The hardware test target shall write a calibration data block to EEPROM and
+    read it back. The read-back data shall be byte-for-byte identical to the
+    written data.
+
+- id: REQ-HIL-005
+  title: UART serial communication
+  shall: >
+    The hardware test target shall respond to a command sent over the UART
+    serial interface within 100 milliseconds of receipt. The response shall
+    be well-formed and parseable by the test driver.
+
+- id: REQ-HIL-006
+  title: CAN bus communication
+  shall: >
+    The hardware test target shall transmit a CAN frame in response to a CAN
+    command received on the bus. The response frame shall arrive within 10
+    milliseconds of the command.
+
+- id: REQ-HIL-007
+  title: FOC loop CPU budget
+  shall: >
+    On the hardware target, the complete FOC interrupt service routine, measured
+    by the hardware cycle counter, shall not exceed 75 percent of available CPU
+    time per control period at the configured inner loop rate.

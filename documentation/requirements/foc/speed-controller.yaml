@@ -1,0 +1,38 @@
+- id: REQ-SPD-001
+  title: Speed cascade architecture
+  shall: >
+    The speed controller shall implement a cascade control architecture with an outer
+    velocity loop executing at 1 kHz and an inner current loop executing at a frequency
+    at least 10 times the outer loop rate.
+
+- id: REQ-SPD-002
+  title: Speed setpoint acceptance
+  shall: >
+    The speed controller shall accept a target velocity expressed in radians per second
+    as the primary control setpoint.
+
+- id: REQ-SPD-003
+  title: Independent current tunings
+  shall: >
+    The speed controller shall accept independent d-axis and q-axis current PID tunings
+    that are configured separately from the outer velocity loop gains.
+
+- id: REQ-SPD-004
+  title: Speed PID tunings with anti-windup
+  shall: >
+    The speed controller shall accept proportional, integral, and derivative gains for
+    the outer velocity loop. The integrator shall implement anti-windup clamping to
+    prevent integrator saturation.
+
+- id: REQ-SPD-005
+  title: Outer loop frequency reporting
+  shall: >
+    The speed controller shall expose the configured outer loop frequency so that
+    higher-level services can query the effective velocity control rate.
+
+- id: REQ-SPD-006
+  title: FOC loop CPU budget
+  shall: >
+    The complete speed control cycle, including sensing, transforms, current PID,
+    velocity PID, and PWM output, shall not exceed 75 percent of available CPU time
+    per control period at the configured inner loop rate.

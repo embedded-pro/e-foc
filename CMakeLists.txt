@@ -52,6 +52,20 @@ set(EMIL_ENABLE_DOCKER_TOOLS Off CACHE BOOL "" FORCE)
 set(EMIL_INCLUDE_MBEDTLS Off CACHE BOOL "" FORCE)
 
 add_subdirectory(infra/embedded-infra-lib)
+
+if (E_FOC_BUILD_TESTS)
+    set(CCR_FETCH_DEPS On CACHE BOOL "" FORCE)
+    set(CCR_BUILD_TESTS Off CACHE BOOL "" FORCE)
+
+    include(FetchContent)
+    FetchContent_Declare(
+        cucumber_cpp
+        GIT_REPOSITORY https://github.com/philips-software/amp-cucumber-cpp-runner.git
+        GIT_TAG        v4.0.0
+    )
+    FetchContent_MakeAvailable(cucumber_cpp)
+endif()
+
 add_subdirectory(infra/can-lite)
 
 if (E_FOC_BUILD_TESTS)
@@ -67,6 +81,10 @@ endif()
 add_subdirectory(infra/numerical-toolbox)
 add_subdirectory(core)
 add_subdirectory(targets)
+
+if (E_FOC_BUILD_TESTS)
+    add_subdirectory(integration_tests)
+endif()
 
 set(E_FOC_CLANGFORMAT_DIRS core targets)
 

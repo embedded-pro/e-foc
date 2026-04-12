@@ -23,3 +23,5 @@ target_sources(e_foc.platform_abstraction PRIVATE
     MotorFieldOrientedControllerAdapter.cpp
     QuadratureEncoderDecorator.hpp
 )
+
+add_subdirectory(test_doubles)
