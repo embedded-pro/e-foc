@@ -28,7 +28,7 @@ date: 2026-04-07
 ## Assumptions & Constraints
 
 - **Constraint**: No dynamic memory allocation on the embedded target. All objects are stack- or statically-allocated for deterministic, bounded memory footprint.
-- **Constraint**: The core FOC loop executes in an interrupt service routine at 20 kHz. The complete control cycle must finish in fewer than 400 cycles at 120 MHz to guarantee real-time deadlines.
+- **Constraint**: The core FOC loop executes in an interrupt service routine at 20 kHz. The complete control cycle must not exceed 75 percent of the available CPU time per control period (≤ 4500 cycles at 120 MHz / 20 kHz) to guarantee real-time deadlines.
 - **Constraint**: No recursion in control-loop or ISR-reachable paths. Stack usage must be statically predictable.
 - **Constraint**: No C++ exceptions. Error signalling uses status return values, `std::optional`, or asynchronous callbacks.
 - **Constraint**: The system targets 32-bit ARM Cortex-M microcontrollers (STM32 and TI Tiva families). Host builds are supported for unit testing and simulation only.

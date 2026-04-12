@@ -10,6 +10,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  checks: write
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
@@ -59,9 +60,11 @@ jobs:
         if: always()
         run: |
           if [[ ! -f sil-test-report.xml ]]; then
-            echo "## SIL Integration Test Results" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "_Report not generated — SIL test step did not produce output._" >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "## SIL Integration Test Results"
+              echo ""
+              echo "_Report not generated — SIL test step did not produce output._"
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           {

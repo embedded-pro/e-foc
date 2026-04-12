@@ -9,4 +9,5 @@
   title: ISR execution budget
   shall: >
     The complete torque control cycle (sensing, transforms, PID, SVM, output)
-    shall execute within 400 cycles at 120 MHz to support a 20 kHz control rate.
+    shall not exceed 75 percent of available CPU time per control period
+    (≤ 4500 cycles at 120 MHz for a 20 kHz control rate).

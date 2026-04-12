@@ -1,6 +1,7 @@
 #include "integration_tests/hardware_in_the_loop/support/HilFixture.hpp"
 #include <cassert>
 #include <cerrno>
+#include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
 #include <stdexcept>

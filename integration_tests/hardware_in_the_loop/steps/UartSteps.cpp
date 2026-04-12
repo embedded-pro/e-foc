@@ -1,5 +1,7 @@
 #include "cucumber_cpp/Steps.hpp"
 #include "integration_tests/hardware_in_the_loop/support/HilFixture.hpp"
+#include <algorithm>
+#include <cctype>
 #include <gtest/gtest.h>
 
 using namespace hil;

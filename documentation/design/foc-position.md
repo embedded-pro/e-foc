@@ -216,6 +216,6 @@ graph LR
 | No position wrap-around correction | A large step in position setpoint that crosses the encoder wrap boundary may cause a transient. Applications must avoid such steps.   |
 | LPI callback order                 | Position PID must always execute before the speed PID within the same LPI callback. Reversing the order yields stale speed setpoints. |
 | No flux weakening                  | Id = 0 is invariant. High-speed flux-weakening operation is out of scope.                                                             |
-| Cycle budget (inner loop)          | `Calculate()` must complete in < 400 cycles at 120 MHz.                                                                               |
+| Cycle budget (inner loop)          | `Calculate()` must complete in ≤ 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz).                                                                               |
 | PID state at Enable                | All four integrators are zeroed on Enable; position setpoint is preserved.                                                            |
 | Setpoint atomicity                 | Speed and Iq setpoints written by outer loops must be read atomically by downstream loops on 32-bit ARM.                              |

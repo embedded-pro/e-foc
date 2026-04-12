@@ -1,5 +1,6 @@
 #include "cucumber_cpp/Steps.hpp"
 #include "integration_tests/hardware_in_the_loop/support/HilFixture.hpp"
+#include <cmath>
 #include <gtest/gtest.h>
 
 using namespace hil;
