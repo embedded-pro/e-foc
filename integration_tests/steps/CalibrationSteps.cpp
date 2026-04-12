@@ -5,13 +5,7 @@
 using namespace testing;
 using namespace integration;
 
-GIVEN(R"(calibration service expectations are configured for success)")
-{
-    auto& fixture = context.Get<FocIntegrationFixture>();
-    fixture.SetupCalibrationExpectations();
-}
-
-GIVEN(R"(the pole-pairs estimation is configured to fail)")
+GIVEN(R"(calibration service expectations are configured)")
 {
     auto& fixture = context.Get<FocIntegrationFixture>();
     fixture.SetupCalibrationExpectations();
