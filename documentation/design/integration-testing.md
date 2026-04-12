@@ -7,14 +7,14 @@ component: integration-testing
 date: 2026-04-12
 ---
 
-| Field     | Value                       |
-|-----------|------------------------------|
-| Title     | Integration Testing Design  |
-| Type      | design                      |
-| Status    | draft                       |
-| Version   | 0.2.0                       |
-| Component | integration-testing         |
-| Date      | 2026-04-12                  |
+| Field     | Value                      |
+|-----------|----------------------------|
+| Title     | Integration Testing Design |
+| Type      | design                     |
+| Status    | draft                      |
+| Version   | 0.2.0                      |
+| Component | integration-testing        |
+| Date      | 2026-04-12                 |
 
 > **Note — Design-level document**: This document describes *how the integration tests are implemented*. It expands on the architecture by specifying component responsibilities, data flows, and design decisions that would not be obvious to a reviewer unfamiliar with the system.
 >
@@ -52,11 +52,11 @@ The fixture owns the hardware mock instances and the `infra::CreatorMock<>` prox
 
 Hardware mocks owned by the fixture:
 
-| Mock class | Wrapped type | `Constructed()` args |
-|------------|--------------|----------------------|
-| `StrictMock<AdcPhaseCurrentMeasurementMock>` | `AdcPhaseCurrentMeasurement` | `PlatformFactory::SampleAndHold::shorter` |
+| Mock class                                    | Wrapped type                       | `Constructed()` args                                 |
+|-----------------------------------------------|------------------------------------|------------------------------------------------------|
+| `StrictMock<AdcPhaseCurrentMeasurementMock>`  | `AdcPhaseCurrentMeasurement`       | `PlatformFactory::SampleAndHold::shorter`            |
 | `StrictMock<SynchronousThreeChannelsPwmMock>` | `hal::SynchronousThreeChannelsPwm` | `std::chrono::nanoseconds{500}`, `hal::Hertz{10000}` |
-| `StrictMock<QuadratureEncoderDecoratorMock>` | `QuadratureEncoderDecorator` | *(none)* |
+| `StrictMock<QuadratureEncoderDecoratorMock>`  | `QuadratureEncoderDecorator`       | *(none)*                                             |
 
 The `EepromStub` (512-byte in-memory array, all `0xFF` at construction, synchronous R/W) is a separate non-mock class owned by the fixture. The NVM regions reference the stub directly.
 
@@ -204,8 +204,8 @@ The `FocIntegrationFixture` exposes the following test API consumed by Gherkin s
 
 ## Feature-to-Requirements Mapping
 
-| Feature file | Scenarios | Requirements covered |
-|---|---|---|
-| `state_machine_lifecycle.feature` | Idle on boot, calibration start, enable/disable, fault, fault clear, valid NVM boot | REQ-SM-001..010 |
-| `calibration_flow.feature` | Full calibration success, calibration failure | REQ-SM-003..005, REQ-SM-011 |
-| `can_foc_motor.feature` | CAN Start, CAN Stop, CAN ClearFault | REQ-INT-001..003 (REQ-INT-004 is structural — verified by bridge design, not a dedicated scenario) |
+| Feature file                      | Scenarios                                                                           | Requirements covered                                                                               |
+|-----------------------------------|-------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
+| `state_machine_lifecycle.feature` | Idle on boot, calibration start, enable/disable, fault, fault clear, valid NVM boot | REQ-SM-001..010                                                                                    |
+| `calibration_flow.feature`        | Full calibration success, calibration failure                                       | REQ-SM-003..005, REQ-SM-011                                                                        |
+| `can_foc_motor.feature`           | CAN Start, CAN Stop, CAN ClearFault                                                 | REQ-INT-001..003 (REQ-INT-004 is structural — verified by bridge design, not a dedicated scenario) |

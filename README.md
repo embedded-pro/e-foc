@@ -189,9 +189,9 @@ Run with custom parameters (example):
 
 ### Architecture
 
-| Document                                                                                    | Description                                                |
-|---------------------------------------------------------------------------------------------|------------------------------------------------------------|
-| [System Architecture](documentation/architecture/system.md)                                 | High-level system architecture and component relationships |
+| Document                                                    | Description                                                |
+|-------------------------------------------------------------|------------------------------------------------------------|
+| [System Architecture](documentation/architecture/system.md) | High-level system architecture and component relationships |
 
 ### Design
 
@@ -210,11 +210,11 @@ Run with custom parameters (example):
 
 ### Requirements
 
-| Document                                                                                                    | Description                                         |
-|-------------------------------------------------------------------------------------------------------------|-----------------------------------------------------|
-| [State Machine Requirements](documentation/requirements/state-machine/state-machine.yaml)                   | Lifecycle state transitions and NVM boot behaviour  |
-| [FOC Torque Controller Requirements](documentation/requirements/foc/torque-controller.yaml)                 | Torque control loop functional requirements         |
-| [CAN-to-State-Machine Integration Requirements](documentation/requirements/integration/can-state-machine.yaml) | CAN command to state machine mapping requirements |
+| Document                                                                                                       | Description                                        |
+|----------------------------------------------------------------------------------------------------------------|----------------------------------------------------|
+| [State Machine Requirements](documentation/requirements/state-machine/state-machine.yaml)                      | Lifecycle state transitions and NVM boot behaviour |
+| [FOC Torque Controller Requirements](documentation/requirements/foc/torque-controller.yaml)                    | Torque control loop functional requirements        |
+| [CAN-to-State-Machine Integration Requirements](documentation/requirements/integration/can-state-machine.yaml) | CAN command to state machine mapping requirements  |
 
 ### Theory
 
