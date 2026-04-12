@@ -396,31 +396,31 @@ graph TD
 
 ### Integration Boundaries
 
-| Boundary | Real Component | Test Double |
-|----------|---------------|-------------|
+| Boundary                                 | Real Component                                             | Test Double                                                                  |
+|------------------------------------------|------------------------------------------------------------|------------------------------------------------------------------------------|
 | Platform peripherals (ADC, PWM, encoder) | Platform Adapter (real) backed by hardware-interface mocks | Test fixture owns creator proxies; Platform Factory test double returns them |
-| EEPROM storage | In-memory 512-byte array | Replaces embedded EEPROM driver |
-| Calibration services | Electrical identification mock, alignment mock | `StrictMock<>` wrapping service interfaces |
-| Fault notification | Fault notifier mock | `StrictMock<>` wrapping fault notifier |
-| CAN transport | Category server `HandleMessage` invoked directly | Bypasses CAN wire encoding |
-| Terminal / tracer | Stream writer stub | No-op for terminal output |
+| EEPROM storage                           | In-memory 512-byte array                                   | Replaces embedded EEPROM driver                                              |
+| Calibration services                     | Electrical identification mock, alignment mock             | `StrictMock<>` wrapping service interfaces                                   |
+| Fault notification                       | Fault notifier mock                                        | `StrictMock<>` wrapping fault notifier                                       |
+| CAN transport                            | Category server `HandleMessage` invoked directly           | Bypasses CAN wire encoding                                                   |
+| Terminal / tracer                        | Stream writer stub                                         | No-op for terminal output                                                    |
 
 ### Requirements Traceability
 
-| Requirement ID | Verified by Feature |
-|----------------|----------------------|
-| REQ-SM-001 | `state_machine_lifecycle.feature` — Motor starts in Idle |
-| REQ-SM-002 | `state_machine_lifecycle.feature` — Calibration transitions to Calibrating |
-| REQ-SM-003 | `calibration_flow.feature` — step ordering scenarios |
-| REQ-SM-004 | `calibration_flow.feature` — full calibration reaches Ready |
-| REQ-SM-005 | `calibration_flow.feature` — pole pairs failure |
-| REQ-SM-006 | `state_machine_lifecycle.feature` — Motor enabled from Ready |
-| REQ-SM-007 | `state_machine_lifecycle.feature` — Motor disabled to Ready |
-| REQ-SM-008 | `state_machine_lifecycle.feature` — Fault on hardware fault |
-| REQ-SM-009 | `state_machine_lifecycle.feature` — Fault cleared to Idle |
-| REQ-SM-010 | `state_machine_lifecycle.feature` — Valid NVM boots to Ready |
-| REQ-SM-011 | `calibration_flow.feature` — calibration data saved to NVM |
-| REQ-INT-001 | `can_foc_motor.feature` — CAN Start enables motor |
-| REQ-INT-002 | `can_foc_motor.feature` — CAN Stop disables motor |
-| REQ-INT-003 | `can_foc_motor.feature` — CAN ClearFault clears fault |
-| REQ-INT-004 | Not scenario-based — routing through the category server is a structural constraint verified by the bridge design |
+| Requirement ID | Verified by Feature                                                                                               |
+|----------------|-------------------------------------------------------------------------------------------------------------------|
+| REQ-SM-001     | `state_machine_lifecycle.feature` — Motor starts in Idle                                                          |
+| REQ-SM-002     | `state_machine_lifecycle.feature` — Calibration transitions to Calibrating                                        |
+| REQ-SM-003     | `calibration_flow.feature` — step ordering scenarios                                                              |
+| REQ-SM-004     | `calibration_flow.feature` — full calibration reaches Ready                                                       |
+| REQ-SM-005     | `calibration_flow.feature` — pole pairs failure                                                                   |
+| REQ-SM-006     | `state_machine_lifecycle.feature` — Motor enabled from Ready                                                      |
+| REQ-SM-007     | `state_machine_lifecycle.feature` — Motor disabled to Ready                                                       |
+| REQ-SM-008     | `state_machine_lifecycle.feature` — Fault on hardware fault                                                       |
+| REQ-SM-009     | `state_machine_lifecycle.feature` — Fault cleared to Idle                                                         |
+| REQ-SM-010     | `state_machine_lifecycle.feature` — Valid NVM boots to Ready                                                      |
+| REQ-SM-011     | `calibration_flow.feature` — calibration data saved to NVM                                                        |
+| REQ-INT-001    | `can_foc_motor.feature` — CAN Start enables motor                                                                 |
+| REQ-INT-002    | `can_foc_motor.feature` — CAN Stop disables motor                                                                 |
+| REQ-INT-003    | `can_foc_motor.feature` — CAN ClearFault clears fault                                                             |
+| REQ-INT-004    | Not scenario-based — routing through the category server is a structural constraint verified by the bridge design |
