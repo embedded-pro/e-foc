@@ -35,6 +35,7 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 - Prefer fixed-size integer types (`uint8_t`, `int32_t`, ...).
 - Avoid recursion and virtual calls in ISR/hot paths.
 - Favor `constexpr`, `inline`, and `const` correctness for performance.
+- No implementation in headers — only templated classes may have method bodies in `.hpp` files. All other implementation goes in `.cpp` files.
 
 4) Patterns & code locations (concrete examples)
 - Add a new FOC algorithm:

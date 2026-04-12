@@ -78,13 +78,19 @@ e-foc/
 │   │   ├── CanBusAdapter.hpp
 │   │   ├── QuadratureEncoderDecorator.hpp
 │   │   └── MotorFieldOrientedControllerAdapter.hpp
-│   └── services/                    # Application-level services
-│       ├── alignment/               # Motor alignment and offset detection
-│       ├── cli/                     # Command-line interface service
-│       ├── electrical_system_ident/ # Resistance/inductance estimation
-│       ├── mechanical_system_ident/ # Friction and inertia estimation
-│       └── non_volatile_memory/     # NVM persistence service
+│   ├── services/                    # Application-level services
+│   │   ├── alignment/               # Motor alignment and offset detection
+│   │   ├── cli/                     # Command-line interface service
+│   │   ├── electrical_system_ident/ # Resistance/inductance estimation
+│   │   ├── mechanical_system_ident/ # Friction and inertia estimation
+│   │   └── non_volatile_memory/     # NVM persistence service
 │   └── state_machine/               # FOC motor lifecycle state machine (Idle/Calibrating/Ready/Enabled/Fault)
+├── integration_tests/               # BDD integration tests (Cucumber/Gherkin)
+│   ├── features/                    # Gherkin .feature files
+│   ├── steps/                       # Step definitions
+│   ├── hooks/                       # Before/After scenario hooks
+│   ├── main/                        # Test executable entry point
+│   └── support/                     # Fixture, mocks, and bridge
 ├── targets/                         # Application entry points and platform implementations
 │   ├── sync_foc_sensored/           # Synchronous FOC with encoder feedback
 │   ├── hardware_test/               # Hardware validation application
@@ -183,9 +189,9 @@ Run with custom parameters (example):
 
 ### Architecture
 
-| Document                                                    | Description                                                |
-|-------------------------------------------------------------|------------------------------------------------------------|
-| [System Architecture](documentation/architecture/system.md) | High-level system architecture and component relationships |
+| Document                                                                                    | Description                                                |
+|---------------------------------------------------------------------------------------------|------------------------------------------------------------|
+| [System Architecture](documentation/architecture/system.md)                                 | High-level system architecture and component relationships |
 
 ### Design
 
@@ -200,6 +206,15 @@ Run with custom parameters (example):
 | [Electrical Identification Service](documentation/design/service-electrical-ident.md) | Resistance and inductance estimation service |
 | [Mechanical Identification Service](documentation/design/service-mechanical-ident.md) | Friction and inertia estimation service      |
 | [NVM Service](documentation/design/service-nvm.md)                                    | Non-volatile memory persistence service      |
+| [Integration Testing Design](documentation/design/integration-testing.md)             | Fixture design, calibration flow, CAN bridge |
+
+### Requirements
+
+| Document                                                                                                    | Description                                         |
+|-------------------------------------------------------------------------------------------------------------|-----------------------------------------------------|
+| [State Machine Requirements](documentation/requirements/state-machine/state-machine.yaml)                   | Lifecycle state transitions and NVM boot behaviour  |
+| [FOC Torque Controller Requirements](documentation/requirements/foc/torque-controller.yaml)                 | Torque control loop functional requirements         |
+| [CAN-to-State-Machine Integration Requirements](documentation/requirements/integration/can-state-machine.yaml) | CAN command to state machine mapping requirements |
 
 ### Theory
 

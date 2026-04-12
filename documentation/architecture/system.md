@@ -332,3 +332,94 @@ These patterns eliminate polling, decouple producers from consumers, and allow t
 | 1 | Rename `source/hardware/` and extract platform targets | resolved | Keep current name vs rename to PAL vs full extraction | Renamed to `core/platform_abstraction/` (interface + adapters only). Platform implementations (TI, ST, Host) and application targets moved to top-level `targets/`. Host-only tools moved to top-level `tools/`. Core tier is now purely libraries. `source/` directory renamed to `core/`. |
 | 2 | Multi-motor support                                    | open     | Single instantiation per motor vs shared PAL with multiple FOC controllers                                | Current architecture supports one motor per binary. A shared PAL with multiple `FocController` instances is architecturally feasible but not yet required.                                                                                              |
 | 3 | Field-weakening                                        | open     | Extend `FocTorque` interface with flux-weakening setpoint vs separate `FocTorqueFieldWeakening` interface | Required for operation above base speed. Separate interface preferred (ISP) but not yet scoped.                                                                                                                                                         |
+
+---
+
+## Integration Testing
+
+The integration test suite verifies the cooperative behaviour of three core subsystems:
+
+1. **FOC State Machine** — the lifecycle controller (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) that orchestrates calibration services and the FOC control loop.
+2. **Non-Volatile Memory stack** — the chain from the NVM region abstraction through the EEPROM interface to the concrete NVM service. Integration tests use a real in-memory EEPROM stub rather than a mocked NVM service.
+3. **CAN-to-State-Machine bridge** — the observer that translates CAN FOC motor commands into state machine transition commands.
+
+Platform hardware (ADC, PWM, encoder) is mocked at the application-decorator level. The fixture owns `StrictMock<>` instances of `AdcPhaseCurrentMeasurementMock`, `SynchronousThreeChannelsPwmMock`, and `QuadratureEncoderDecoratorMock`, wrapped by `infra::CreatorMock<>` proxies. The `PlatformFactoryMock` is a pure GMock whose creator methods return these proxies, allowing the real `PlatformAdapter` to be exercised unchanged. EEPROM storage uses a standalone in-memory `EepromStub` owned by the fixture.
+
+Integration tests run exclusively on the host build. The host event dispatcher simulates the asynchronous callback chains used by NVM and calibration services. All mock instances use `StrictMock<>`; `NiceMock` and `NaggyMock` are forbidden.
+
+```mermaid
+graph TD
+    subgraph "Integration Test Harness"
+        FIF[FOC Integration Fixture]
+        PFM[Platform Factory Mock]
+        HWM[Hardware Mocks + CreatorMocks]
+        EES[EEPROM Stub]
+    end
+
+    subgraph "System Under Test"
+        PA[Platform Adapter]
+        SM[FOC State Machine]
+        NVM[NVM Stack]
+    end
+
+    subgraph "Service Mocks"
+        EIM[Electrical Ident Mock]
+        AMK[Alignment Mock]
+        FNM[Fault Notifier Mock]
+    end
+
+    subgraph "CAN Integration"
+        MCS[FocMotorCategoryServer]
+        BRG[State Machine Bridge]
+    end
+
+    FIF --> PFM
+    FIF --> HWM
+    FIF --> EES
+    FIF --> SM
+    FIF --> NVM
+    FIF --> EIM
+    FIF --> AMK
+    FIF --> FNM
+
+    PFM --> PA
+    HWM --> PA
+    PA --> SM
+    NVM --> EES
+    SM --> EIM
+    SM --> AMK
+    FNM --> SM
+
+    MCS --> BRG
+    BRG --> SM
+```
+
+### Integration Boundaries
+
+| Boundary | Real Component | Test Double |
+|----------|---------------|-------------|
+| Platform peripherals (ADC, PWM, encoder) | Platform Adapter (real) backed by `StrictMock<>` hardware mocks | Fixture owns `infra::CreatorMock<>` proxies; `PlatformFactoryMock` returns them |
+| EEPROM storage | In-memory 512-byte array | Replaces embedded EEPROM driver |
+| Calibration services | Electrical identification mock, alignment mock | `StrictMock<>` wrapping service interfaces |
+| Fault notification | Fault notifier mock | `StrictMock<>` wrapping fault notifier |
+| CAN transport | Category server `HandleMessage` invoked directly | Bypasses CAN wire encoding |
+| Terminal / tracer | Stream writer stub | No-op for terminal output |
+
+### Requirements Traceability
+
+| Requirement ID | Verified by Feature |
+|----------------|----------------------|
+| REQ-SM-001 | `state_machine_lifecycle.feature` — Motor starts in Idle |
+| REQ-SM-002 | `state_machine_lifecycle.feature` — Calibration transitions to Calibrating |
+| REQ-SM-003 | `calibration_flow.feature` — step ordering scenarios |
+| REQ-SM-004 | `calibration_flow.feature` — full calibration reaches Ready |
+| REQ-SM-005 | `calibration_flow.feature` — pole pairs failure |
+| REQ-SM-006 | `state_machine_lifecycle.feature` — Motor enabled from Ready |
+| REQ-SM-007 | `state_machine_lifecycle.feature` — Motor disabled to Ready |
+| REQ-SM-008 | `state_machine_lifecycle.feature` — Fault on hardware fault |
+| REQ-SM-009 | `state_machine_lifecycle.feature` — Fault cleared to Idle |
+| REQ-SM-010 | `state_machine_lifecycle.feature` — Valid NVM boots to Ready |
+| REQ-SM-011 | `calibration_flow.feature` — calibration data saved to NVM |
+| REQ-INT-001 | `can_foc_motor.feature` — CAN Start enables motor |
+| REQ-INT-002 | `can_foc_motor.feature` — CAN Stop disables motor |
+| REQ-INT-003 | `can_foc_motor.feature` — CAN ClearFault clears fault |

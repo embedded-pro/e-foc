@@ -64,6 +64,7 @@ Use unit-typed aliases throughout: `Ampere`, `Radians`, `Volts`, `Rpm`, `PhasePw
 - Functions ~30 lines max (hard limit ~50)
 - `Calculate()` delegates to focused helper methods
 - Self-documenting code — avoid unnecessary comments
+- No implementation in headers — only templated classes may have their implementation in the header file. All other method bodies go in `.cpp` files.
 - `const` on all non-mutating methods, `constexpr` where possible
 - Fixed-size types: `uint8_t`, `int32_t`, etc.
 - Prefer `{}` initialization over `()` for variables and member data (e.g., `float x{0.0f}`, `std::size_t n{0}`)
