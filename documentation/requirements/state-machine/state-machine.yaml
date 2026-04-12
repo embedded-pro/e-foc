@@ -1,0 +1,109 @@
+---
+document:
+  title: "FOC State Machine Requirements"
+  type: requirements
+  status: approved
+  version: 0.1.0
+  component: state-machine
+  date: 2025-01-01
+
+requirements:
+  - id: REQ-SM-001
+    title: Initial state after reset
+    description: >
+      On power-on or reset with no valid calibration data in non-volatile storage,
+      the state machine shall start in the Idle state.
+    category: functional
+    priority: shall
+
+  - id: REQ-SM-002
+    title: Calibration transition from Idle
+    description: >
+      From the Idle state, when a calibration command is issued, the state machine
+      shall transition to the Calibrating state.
+    category: functional
+    priority: shall
+
+  - id: REQ-SM-003
+    title: Calibration step sequencing
+    description: >
+      During calibration, the state machine shall execute steps in the following
+      fixed order: pole-pairs estimation, resistance and inductance estimation,
+      encoder alignment. Each step shall complete before the next begins.
+    category: functional
+    priority: shall
+
+  - id: REQ-SM-004
+    title: Calibration success transitions to Ready
+    description: >
+      When all calibration steps complete successfully and calibration data is
+      saved to non-volatile memory, the state machine shall transition to the
+      Ready state.
+    category: functional
+    priority: shall
+
+  - id: REQ-SM-005
+    title: Calibration failure transitions to Fault
+    description: >
+      If any calibration step fails (e.g., pole-pairs estimation returns no result),
+      the state machine shall transition to the Fault state with code calibrationFailed.
+    category: functional
+    priority: shall
+
+  - id: REQ-SM-006
+    title: Ready-to-Enabled transition
+    description: >
+      From the Ready state, when an enable command is issued, the state machine
+      shall transition to the Enabled state and activate the FOC control loop.
+    category: functional
+    priority: shall
+
+  - id: REQ-SM-007
+    title: Enabled-to-Ready transition
+    description: >
+      From the Enabled state, when a disable command is issued, the state machine
+      shall transition back to the Ready state and deactivate the FOC control loop.
+    category: functional
+    priority: shall
+
+  - id: REQ-SM-008
+    title: Fault transition on hardware fault
+    description: >
+      From any non-Fault state, when a hardware fault event is raised via the
+      FaultNotifier, the state machine shall immediately transition to the Fault
+      state.
+    category: functional
+    priority: shall
+
+  - id: REQ-SM-009
+    title: Fault clearance transitions to Idle
+    description: >
+      From the Fault state, when a clear-fault command is issued, the state machine
+      shall transition to the Idle state.
+    category: functional
+    priority: shall
+
+  - id: REQ-SM-010
+    title: Valid NVM on boot transitions to Ready
+    description: >
+      On power-on, if valid calibration data exists in non-volatile storage, the
+      state machine shall load that data and transition directly to the Ready state,
+      bypassing the Calibrating state.
+    category: functional
+    priority: shall
+
+  - id: REQ-SM-011
+    title: Calibration data persistence
+    description: >
+      Calibration data produced during a successful calibration run shall be saved
+      to non-volatile memory so that it survives power cycles.
+    category: functional
+    priority: shall
+
+  - id: REQ-SM-012
+    title: No heap allocation in state transitions
+    description: >
+      All state machine transitions and calibration service calls shall execute
+      without dynamic memory allocation.
+    category: non-functional
+    priority: shall

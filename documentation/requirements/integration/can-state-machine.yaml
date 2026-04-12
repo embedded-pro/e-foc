@@ -1,0 +1,44 @@
+---
+document:
+  title: "CAN-to-State-Machine Integration Requirements"
+  type: requirements
+  status: approved
+  version: 0.1.0
+  component: integration-can
+  date: 2025-01-01
+
+requirements:
+  - id: REQ-INT-001
+    title: CAN Start enables motor
+    description: >
+      When the FocMotorCategoryServer receives a Start command (focStartId),
+      the state machine shall transition from Ready to Enabled, activating the
+      FOC control loop.
+    category: functional
+    priority: shall
+
+  - id: REQ-INT-002
+    title: CAN Stop disables motor
+    description: >
+      When the FocMotorCategoryServer receives a Stop command (focStopId),
+      the state machine shall transition from Enabled back to Ready, deactivating
+      the FOC control loop.
+    category: functional
+    priority: shall
+
+  - id: REQ-INT-003
+    title: CAN ClearFault clears fault state
+    description: >
+      When the FocMotorCategoryServer receives a ClearFault command (focClearFaultId),
+      the state machine shall transition from the Fault state to the Idle state.
+    category: functional
+    priority: shall
+
+  - id: REQ-INT-004
+    title: CAN command routing through category server
+    description: >
+      All CAN motor commands shall be dispatched through the FocMotorCategoryServer
+      observer interface. No CAN protocol internals shall be exposed to the state
+      machine layer.
+    category: functional
+    priority: shall
