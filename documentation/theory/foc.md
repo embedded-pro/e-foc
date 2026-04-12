@@ -390,7 +390,7 @@ See also: `documentation/theory/images/foc_coordinates.svg` and `documentation/t
 |---------------------|-------------------------------------------------------|
 | Control rate        | 20 kHz (50 µs period)                                 |
 | Transform latency   | < 20 CPU cycles (Clarke + Park combined)              |
-| LUT angle error     | ≤ $\pi/512 \approx 0.35°$                             |
+| LUT angle error     | <= $\pi/512 \approx 0.35°$                             |
 | SVM duty resolution | 16-bit timer → ≈ 0.0015% per step                     |
 | PI output range     | [−1.0, 1.0] normalised; anti-windup at ±1.0           |
 | Torque linearity    | $\tau_e \propto i_q$ within MTPA region               |

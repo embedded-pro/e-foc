@@ -128,7 +128,7 @@ The parameter and covariance updates are:
 P_k = (P_{k−1} − K_k · φ_k · P_{k−1}) / λ
 ```
 
-The scalar λ (0 < λ ≤ 1) is the **forgetting factor** (default 0.998). Values less than 1 cause older observations to carry exponentially decreasing weight, which is important for tracking slowly time-varying loads. At λ = 1 the estimator is an ordinary batch least squares — it never forgets.
+The scalar λ (0 < λ <= 1) is the **forgetting factor** (default 0.998). Values less than 1 cause older observations to carry exponentially decreasing weight, which is important for tracking slowly time-varying loads. At λ = 1 the estimator is an ordinary batch least squares — it never forgets.
 
 The RLS state (θ and P) is held in a statically allocated object (`std::optional<MotorRLS>`) that is emplaced in-place at the start of each procedure invocation and destroyed when the procedure ends. This avoids heap allocation while still permitting the state to be absent between procedures.
 

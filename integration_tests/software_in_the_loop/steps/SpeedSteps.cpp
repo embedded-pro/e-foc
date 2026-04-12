@@ -10,57 +10,57 @@ static void PopulateSpeedAccessor(StateMachineAccessor& accessor, SpeedIntegrati
 {
     accessor.stateMachine = &*fixture.motorStateMachine;
     accessor.executeAll = [&fixture]()
-        {
-            fixture.ExecuteAllActions();
-        };
+    {
+        fixture.ExecuteAllActions();
+    };
     accessor.setupCalibrationExpectations = [&fixture]()
-        {
-            fixture.SetupCalibrationExpectations();
-        };
+    {
+        fixture.SetupCalibrationExpectations();
+    };
     accessor.setupCanIntegration = [&fixture]()
-        {
-            fixture.SetupCanIntegration();
-        };
+    {
+        fixture.SetupCanIntegration();
+    };
     accessor.injectCanStart = [&fixture]()
-        {
-            fixture.InjectCanStart();
-        };
+    {
+        fixture.InjectCanStart();
+    };
     accessor.injectCanStop = [&fixture]()
-        {
-            fixture.InjectCanStop();
-        };
+    {
+        fixture.InjectCanStop();
+    };
     accessor.injectCanClearFault = [&fixture]()
-        {
-            fixture.InjectCanClearFault();
-        };
+    {
+        fixture.InjectCanClearFault();
+    };
     accessor.triggerHardwareFault = [&fixture]()
-        {
-            fixture.faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
-            fixture.ExecuteAllActions();
-        };
+    {
+        fixture.faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+        fixture.ExecuteAllActions();
+    };
     accessor.completePolePairsEstimation = [&fixture](std::size_t polePairs)
-        {
-            fixture.CompletePolePairsEstimation(polePairs);
-        };
+    {
+        fixture.CompletePolePairsEstimation(polePairs);
+    };
     accessor.completeRLEstimation = [&fixture](foc::Ohm r, foc::MilliHenry l)
-        {
-            fixture.CompleteRLEstimation(r, l);
-        };
+    {
+        fixture.CompleteRLEstimation(r, l);
+    };
     accessor.completeAlignment = [&fixture](foc::Radians offset)
-        {
-            fixture.CompleteAlignment(offset);
-        };
+    {
+        fixture.CompleteAlignment(offset);
+    };
     accessor.completePolePairsFailure = [&fixture]()
-        {
-            fixture.capturedPolePairsCallback(std::nullopt);
-            fixture.ExecuteAllActions();
-        };
+    {
+        fixture.capturedPolePairsCallback(std::nullopt);
+        fixture.ExecuteAllActions();
+    };
     accessor.completeMechanicalIdentification = [&fixture](
-        std::optional<foc::NewtonMeterSecondPerRadian> friction,
-        std::optional<foc::NewtonMeterSecondSquared> inertia)
-        {
-            fixture.CompleteMechanicalIdentification(friction, inertia);
-        };
+                                                    std::optional<foc::NewtonMeterSecondPerRadian> friction,
+                                                    std::optional<foc::NewtonMeterSecondSquared> inertia)
+    {
+        fixture.CompleteMechanicalIdentification(friction, inertia);
+    };
 }
 
 GIVEN(R"(the speed motor system is initialised with no valid calibration data)")
