@@ -1,26 +1,12 @@
----
-document:
-  title: "FOC Torque Controller Requirements"
-  type: requirements
-  status: approved
-  version: 0.2.0
-  component: foc-torque
-  date: 2026-04-12
+- id: REQ-FOC-T-002
+  title: Independent Id and Iq current control
+  shall: >
+    The torque controller shall accept d-axis current (Id) and q-axis current (Iq)
+    as independent inputs. Both setpoints shall be injectable into the controller
+    and regulated by separate PID controllers with anti-windup.
 
-requirements:
-  - id: REQ-FOC-T-002
-    title: Independent Id and Iq current control
-    description: >
-      The torque controller shall accept d-axis current (Id) and q-axis current (Iq)
-      as independent inputs. Both setpoints shall be injectable into the controller
-      and regulated by separate PID controllers with anti-windup.
-    category: functional
-    priority: shall
-
-  - id: REQ-FOC-T-005
-    title: ISR execution budget
-    description: >
-      The complete torque control cycle (sensing, transforms, PID, SVM, output)
-      shall execute within 400 cycles at 120 MHz to support a 20 kHz control rate.
-    category: non-functional
-    priority: shall
+- id: REQ-FOC-T-005
+  title: ISR execution budget
+  shall: >
+    The complete torque control cycle (sensing, transforms, PID, SVM, output)
+    shall execute within 400 cycles at 120 MHz to support a 20 kHz control rate.
