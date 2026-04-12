@@ -206,4 +206,4 @@ sequenceDiagram
 | No flux weakening              | Id = 0 is fixed. Operating above base speed without flux weakening is the application's responsibility.    |
 | LPI scheduling                 | The outer loop does not use an RTOS. The inner loop ISR triggers the LPI — no timer or task involved.      |
 | Cycle budget                   | Inner loop `Calculate()` must complete in ≤ 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz). |
-| Setpoint atomicity             | The Iq setpoint written by the outer loop must be read atomically by the inner loop on 32-bit ARM targets. |
+| Setpoint atomicity             | The Iq setpoint written by the outer loop must be read atomically by the inner loop on 32-bit ARM targets.          |

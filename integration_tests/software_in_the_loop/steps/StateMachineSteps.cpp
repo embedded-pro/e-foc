@@ -10,17 +10,17 @@ static void PopulateTorqueAccessor(StateMachineAccessor& accessor, FocIntegratio
 {
     accessor.stateMachine = &*fixture.motorStateMachine;
     accessor.executeAll = [&fixture]()
-        {
-            fixture.ExecuteAllActions();
-        };
+    {
+        fixture.ExecuteAllActions();
+    };
     accessor.setupCalibrationExpectations = [&fixture]()
-        {
-            fixture.SetupCalibrationExpectations();
-        };
+    {
+        fixture.SetupCalibrationExpectations();
+    };
     accessor.setupCanIntegration = [&fixture]()
-        {
-            fixture.SetupCanIntegration();
-        };
+    {
+        fixture.SetupCanIntegration();
+    };
     accessor.injectCanStart = [&fixture]()
         {
             fixture.InjectCanStart();
