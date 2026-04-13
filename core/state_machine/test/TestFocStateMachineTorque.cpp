@@ -13,7 +13,7 @@ namespace
     public:
         using TestedStateMachine = application::FocStateMachineImpl<foc::FocTorqueImpl, services::TerminalFocTorqueInteractor>;
 
-        StrictMock<test_helpers::StreamWriterMock> streamWriterMock;
+        StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
         hal::SerialCommunicationMock communication;
@@ -816,7 +816,7 @@ namespace
             services::TerminalFocTorqueInteractor,
             state_machine::AutoTransitionPolicy>;
 
-        StrictMock<test_helpers::StreamWriterMock> streamWriterMock;
+        StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
         hal::SerialCommunicationMock communication;

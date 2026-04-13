@@ -19,6 +19,7 @@
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
 #include "infra/stream/OutputStream.hpp"
+#include "infra/stream/test/StreamMock.hpp"
 #include "infra/util/Function.hpp"
 #include "infra/util/test_helper/ProxyCreatorMock.hpp"
 #include "integration_tests/software_in_the_loop/support/EepromStub.hpp"
@@ -31,21 +32,6 @@
 
 namespace integration
 {
-    class StreamWriterMock
-        : public infra::StreamWriter
-    {
-    public:
-        using StreamWriter::StreamWriter;
-
-        MOCK_METHOD(void, Insert, (infra::ConstByteRange range, infra::StreamErrorPolicy& errorPolicy), (override));
-        MOCK_METHOD(std::size_t, Available, (), (const, override));
-        MOCK_METHOD(std::size_t, ConstructSaveMarker, (), (const, override));
-        MOCK_METHOD(std::size_t, GetProcessedBytesSince, (std::size_t marker), (const, override));
-        MOCK_METHOD(infra::ByteRange, SaveState, (std::size_t marker), (override));
-        MOCK_METHOD(void, RestoreState, (infra::ByteRange range), (override));
-        MOCK_METHOD(infra::ByteRange, Overwrite, (std::size_t marker), (override));
-    };
-
     struct FocIntegrationFixture
         : infra::EventDispatcherWithWeakPtrFixture
     {
@@ -81,7 +67,7 @@ namespace integration
             services::TerminalFocTorqueInteractor,
             state_machine::AutoTransitionPolicy>;
 
-        testing::StrictMock<StreamWriterMock> streamWriterMock;
+        testing::StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterMock };
         services::TracerToStream tracer{ tracerStream };
         hal::SerialCommunicationMock serialCommunication;

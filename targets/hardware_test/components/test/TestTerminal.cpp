@@ -2,6 +2,7 @@
 #include "hal/interfaces/test_doubles/EepromMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
+#include "infra/stream/test/StreamMock.hpp"
 #include "infra/util/test_helper/MockHelpers.hpp"
 #include "infra/util/test_helper/ProxyCreatorMock.hpp"
 #include "platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
@@ -12,19 +13,6 @@
 
 namespace
 {
-    class StreamWriterMock
-        : public infra::StreamWriter
-    {
-    public:
-        MOCK_METHOD(void, Insert, (infra::ConstByteRange range, infra::StreamErrorPolicy& errorPolicy), (override));
-        MOCK_METHOD(std::size_t, Available, (), (const override));
-        MOCK_METHOD(std::size_t, ConstructSaveMarker, (), (const override));
-        MOCK_METHOD(std::size_t, GetProcessedBytesSince, (std::size_t marker), (const override));
-        MOCK_METHOD(infra::ByteRange, SaveState, (std::size_t marker), (override));
-        MOCK_METHOD(void, RestoreState, (infra::ByteRange range), (override));
-        MOCK_METHOD(infra::ByteRange, Overwrite, (std::size_t marker), (override));
-    };
-
     class PlatformFactoryMock
         : public application::PlatformFactory
     {
@@ -166,7 +154,7 @@ namespace
 
         testing::StrictMock<PlatformFactoryMock> platformFactoryMock;
         SimpleLowPriorityInterrupt simpleLowPriorityInterrupt;
-        testing::StrictMock<StreamWriterMock> streamWriterMock;
+        testing::StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
         testing::StrictMock<hal::SerialCommunicationMock> communication;
