@@ -36,5 +36,5 @@ namespace application
 
     void FormatFaultData(const PersistentFaultData& data, infra::BoundedString& out);
 
-    extern PersistentFaultData persistentFaultData;
+    extern PersistentFaultData persistentFaultData; // NOSONAR — placed in .noinit section by linker; must be global for HardFault ISR access
 }

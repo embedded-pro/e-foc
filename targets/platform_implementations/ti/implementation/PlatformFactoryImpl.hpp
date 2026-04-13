@@ -11,9 +11,10 @@
 #include "hal_tiva/synchronous_tiva/SynchronousQuadratureEncoder.hpp"
 #include "hal_tiva/tiva/Adc.hpp"
 #include "hal_tiva/tiva/Can.hpp"
+#include "hal_tiva/tiva/Dma.hpp"
 #include "hal_tiva/tiva/Eeprom.hpp"
 #include "hal_tiva/tiva/Gpio.hpp"
-#include "hal_tiva/tiva/Uart.hpp"
+#include "hal_tiva/tiva/UartWithDma.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "services/tracer/SerialCommunicationOnSeggerRtt.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
@@ -73,8 +74,9 @@ namespace application
 
         struct TerminalAndTracer
         {
-            hal::tiva::Uart::Config uartConfig{ true, true, hal::tiva::Uart::Baudrate::_921000_bps, hal::tiva::Uart::FlowControl::none, hal::tiva::Uart::Parity::none, hal::tiva::Uart::StopBits::one, hal::tiva::Uart::NumberOfBytes::_8_bytes, std::nullopt };
-            hal::tiva::Uart uart{ Peripheral::UartIndex, Pins::uartTx, Pins::uartRx, uartConfig };
+            hal::tiva::UartWithDma::Config uartConfig{ true, true, hal::tiva::UartWithDma::Baudrate::_921000_bps, hal::tiva::UartWithDma::FlowControl::none, hal::tiva::UartWithDma::Parity::none, hal::tiva::UartWithDma::StopBits::one, hal::tiva::UartWithDma::NumberOfBytes::_8_bytes, std::nullopt };
+            hal::tiva::Dma dma{ infra::emptyFunction };
+            hal::tiva::UartWithDma::WithRxBuffer<256> uart{ Peripheral::UartIndex, Pins::uartTx, Pins::uartRx, dma, uartConfig };
             services::SerialCommunicationOnSeggerRtt serialCommunicationOnSeggerRtt;
             services::StreamWriterOnSerialCommunication::WithStorage<2048> streamWriterOnSerialCommunication{ serialCommunicationOnSeggerRtt };
             infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterOnSerialCommunication };

@@ -21,12 +21,12 @@ THEN(R"(the fault_status command reports captured fault data)")
     bool foundFaultData = false;
     for (const auto& line : fixture.allLines)
     {
-        if (line.find("PC=") != std::string::npos || line.find("CFSR=") != std::string::npos)
+        if (line.find("PC  :") != std::string::npos || line.find("CFSR :") != std::string::npos)
         {
             foundFaultData = true;
             break;
         }
     }
     EXPECT_TRUE(foundFaultData)
-        << "Expected fault diagnostic data (PC= or CFSR=) in fault_status output";
+        << "Expected fault diagnostic data (PC  : or CFSR :) in fault_status output";
 }

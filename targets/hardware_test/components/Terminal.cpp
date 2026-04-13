@@ -633,7 +633,7 @@ namespace application
     {
         tracer.Trace() << "Triggering HardFault...";
         void (*nullFunc)() = nullptr;
-        nullFunc();
+        nullFunc(); // NOSONAR — intentional null dereference to trigger HardFault for error handler validation
         return { services::TerminalWithStorage::Status::success };
     }
 }

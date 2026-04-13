@@ -9,8 +9,8 @@ using namespace hil;
 WHEN(R"(the reset command is sent to the hardware target)")
 {
     auto& fixture = context.Get<HilFixture>();
-    ASSERT_TRUE(fixture.SendCommand("reset", std::chrono::milliseconds{ 200 }))
-        << "reset command did not respond";
+    // Command triggers an immediate reset — no response will arrive
+    fixture.SendCommand("reset", std::chrono::milliseconds{ 200 });
 }
 
 WHEN(R"(the hardware target reconnects after reset)")
