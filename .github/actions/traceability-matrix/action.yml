@@ -1,4 +1,4 @@
-name: 'Generate Traceability Matrix'
+name: "Generate Traceability Matrix"
 description: >
   Generates a requirements-vs-SIL traceability matrix in Markdown by scanning
   YAML requirement files and Gherkin feature files.  Optionally incorporates
@@ -7,32 +7,32 @@ description: >
 
 inputs:
   requirements-dir:
-    description: 'Directory containing *.yaml requirement files'
+    description: "Directory containing *.yaml requirement files"
     required: false
-    default: 'documentation/requirements'
+    default: "documentation/requirements"
   features-dir:
-    description: 'Directory containing *.feature scenario files'
+    description: "Directory containing *.feature scenario files"
     required: false
-    default: 'integration_tests/software_in_the_loop/features'
+    default: "integration_tests/software_in_the_loop/features"
   junit-xml:
-    description: 'Path to JUnit XML from SIL test run (optional; adds status column)'
+    description: "Path to JUnit XML from SIL test run (optional; adds status column)"
     required: false
-    default: ''
+    default: ""
   output:
-    description: 'Output path for the generated Markdown file'
+    description: "Output path for the generated Markdown file"
     required: true
   pdf-output:
-    description: 'If set, also convert the Markdown to a PDF at this path'
+    description: "If set, also convert the Markdown to a PDF at this path"
     required: false
-    default: ''
+    default: ""
 
 outputs:
   matrix-path:
-    description: 'Path to the generated Markdown traceability matrix'
+    description: "Path to the generated Markdown traceability matrix"
     value: ${{ inputs.output }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Install PyYAML
       shell: bash

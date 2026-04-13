@@ -1,4 +1,4 @@
-name: 'Build Documentation PDFs'
+name: "Build Documentation PDFs"
 description: >
   Converts Markdown documentation files and YAML requirements to PDFs using
   Pandoc and pdflatex.  Outputs are written to the configured output directory
@@ -6,34 +6,34 @@ description: >
 
 inputs:
   version:
-    description: 'Release version tag used to name output files (e.g. v1.2.3)'
+    description: "Release version tag used to name output files (e.g. v1.2.3)"
     required: true
   output-dir:
-    description: 'Output directory for generated PDF files'
+    description: "Output directory for generated PDF files"
     required: false
-    default: 'docs-pdf'
+    default: "docs-pdf"
   docs-dirs:
     description: >
       Space-separated list of documentation directories whose Markdown files
       will be converted to PDF.
     required: false
-    default: 'documentation/architecture documentation/design documentation/theory'
+    default: "documentation/architecture documentation/design documentation/theory"
   requirements-dir:
-    description: 'Directory containing YAML requirement files'
+    description: "Directory containing YAML requirement files"
     required: false
-    default: 'documentation/requirements'
+    default: "documentation/requirements"
   artifact-name:
-    description: 'Name for the uploaded artifact'
+    description: "Name for the uploaded artifact"
     required: false
-    default: 'documentation-pdfs'
+    default: "documentation-pdfs"
 
 outputs:
   output-dir:
-    description: 'Path to the directory containing generated PDFs'
+    description: "Path to the directory containing generated PDFs"
     value: ${{ inputs.output-dir }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Install Pandoc and LaTeX
       shell: bash
