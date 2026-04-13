@@ -123,7 +123,7 @@ namespace application
                 really_assert(address <= stubSize);
                 really_assert(buffer.size() <= stubSize - address);
 
-                std::copy(buffer.begin(), buffer.end(), storage.begin() + address);
+                std::ranges::copy(buffer, storage.begin() + address);
                 onDone();
             }
 
@@ -131,7 +131,7 @@ namespace application
             {
                 really_assert(address <= stubSize);
                 really_assert(buffer.size() <= stubSize - address);
-                std::copy(storage.begin() + address, storage.begin() + address + buffer.size(), buffer.begin());
+                std::ranges::copy(std::span(storage.begin() + address, buffer.size()), buffer.begin());
                 onDone();
             }
 

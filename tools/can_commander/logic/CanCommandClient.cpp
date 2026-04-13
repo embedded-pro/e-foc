@@ -133,12 +133,12 @@ namespace tool
             SetBusy(false);
     }
 
-    void CanCommandClient::SendSetSupplyVoltage(float /*volts*/)
+    void CanCommandClient::SendSetSupplyVoltage(float /*volts*/) const
     {
         // No equivalent in can-lite FocMotorCategoryClient; intentional no-op
     }
 
-    void CanCommandClient::SendSetMaxCurrent(float /*amps*/)
+    void CanCommandClient::SendSetMaxCurrent(float /*amps*/) const
     {
         // No equivalent in can-lite FocMotorCategoryClient; intentional no-op
     }

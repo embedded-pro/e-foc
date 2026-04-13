@@ -2,7 +2,7 @@
 
 #include "core/foc/interfaces/Driver.hpp"
 #include "hal/interfaces/AdcMultiChannel.hpp"
-#include <type_traits>
+#include <concepts>
 #include <utility>
 
 namespace application
@@ -14,7 +14,8 @@ namespace application
         virtual void Stop() = 0;
     };
 
-    template<typename Impl, typename = std::enable_if_t<std::is_base_of_v<hal::AdcMultiChannel, Impl>>>
+    template<typename Impl>
+        requires std::derived_from<Impl, hal::AdcMultiChannel>
     class AdcPhaseCurrentMeasurementImpl
         : public AdcPhaseCurrentMeasurement
     {
@@ -34,17 +35,19 @@ namespace application
 
     // Implementation
 
-    template<typename Impl, typename Enable>
+    template<typename Impl>
+        requires std::derived_from<Impl, hal::AdcMultiChannel>
     template<typename... Args>
-    AdcPhaseCurrentMeasurementImpl<Impl, Enable>::AdcPhaseCurrentMeasurementImpl(float slope, float offset, Args&&... args)
+    AdcPhaseCurrentMeasurementImpl<Impl>::AdcPhaseCurrentMeasurementImpl(float slope, float offset, Args&&... args)
         : adc(std::forward<Args>(args)...)
         , slope(slope)
         , offset(offset)
     {
     }
 
-    template<typename Impl, typename Enable>
-    void AdcPhaseCurrentMeasurementImpl<Impl, Enable>::Measure(const infra::Function<void(foc::Ampere phaseA, foc::Ampere phaseB, foc::Ampere phaseC)>& onDone)
+    template<typename Impl>
+        requires std::derived_from<Impl, hal::AdcMultiChannel>
+    void AdcPhaseCurrentMeasurementImpl<Impl>::Measure(const infra::Function<void(foc::Ampere phaseA, foc::Ampere phaseB, foc::Ampere phaseC)>& onDone)
     {
         onMeasurementDone = onDone;
         adc.Measure([this](auto samples)
@@ -58,8 +61,9 @@ namespace application
             });
     }
 
-    template<typename Impl, typename Enable>
-    void AdcPhaseCurrentMeasurementImpl<Impl, Enable>::Stop()
+    template<typename Impl>
+        requires std::derived_from<Impl, hal::AdcMultiChannel>
+    void AdcPhaseCurrentMeasurementImpl<Impl>::Stop()
     {
         adc.Stop();
     }

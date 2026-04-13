@@ -1,6 +1,7 @@
 #pragma once
 
 #include "numerical/math/CompilerOptimizations.hpp"
+#include <numbers>
 
 namespace foc
 {
@@ -35,7 +36,7 @@ namespace foc
     private:
         constexpr static float oneHalf = 0.5f;
         constexpr static float twoThirds = 0.666666667f;
-        constexpr static float invSqrt3 = 0.5773502691896258f;
+        constexpr static float invSqrt3 = std::numbers::inv_sqrt3_v<float>;
         constexpr static float sqrt3Div2 = 0.8660254037f;
     };
 

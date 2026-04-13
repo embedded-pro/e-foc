@@ -148,8 +148,13 @@ int main(int argc, char* argv[])
         }
 
         simulator::HeadlessSimulation simulation{ model, controller, eventDispatcher,
-            "FOC Speed Control", "foc_speed_results", std::format("{}/output/simulator/speed_control", PROJECT_ROOT_DIR),
-            timeStep, simulationTime };
+            simulator::HeadlessSimulationConfig{
+                .title = "FOC Speed Control",
+                .filename = "foc_speed_results",
+                .outputDirectory = std::format("{}/output/simulator/speed_control", PROJECT_ROOT_DIR),
+                .timeStep = timeStep,
+                .simulationTime = simulationTime,
+            } };
         simulation.Run();
     }
     catch (const std::exception& ex)

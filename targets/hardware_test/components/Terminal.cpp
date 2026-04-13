@@ -9,6 +9,7 @@
 #include <chrono>
 #include <numbers>
 #include <optional>
+#include <ranges>
 
 namespace
 {
@@ -19,16 +20,17 @@ namespace
 
     application::PlatformFactory::SampleAndHold ToSampleAndHold(const infra::BoundedConstString& value)
     {
+        using enum application::PlatformFactory::SampleAndHold;
         if (value == "shortest")
-            return application::PlatformFactory::SampleAndHold::shortest;
+            return shortest;
         else if (value == "shorter")
-            return application::PlatformFactory::SampleAndHold::shorter;
+            return shorter;
         else if (value == "medium")
-            return application::PlatformFactory::SampleAndHold::medium;
+            return medium;
         else if (value == "longer")
-            return application::PlatformFactory::SampleAndHold::longer;
+            return longer;
         else if (value == "longest")
-            return application::PlatformFactory::SampleAndHold::longest;
+            return longest;
         else
             std::abort();
     }
@@ -54,7 +56,7 @@ namespace
         if (data.empty())
             return {};
 
-        auto result = std::find_if(acceptedValues.begin(), acceptedValues.end(),
+        auto result = std::ranges::find_if(acceptedValues,
             [&data](const auto& value)
             {
                 return data == value;
@@ -69,6 +71,8 @@ namespace
 
 namespace application
 {
+    using enum services::TerminalWithStorage::Status;
+
     TerminalInteractor::TerminalInteractor(services::TerminalWithStorage& terminal, application::PlatformFactory& hardware)
         : terminal{ terminal }
         , tracer{ hardware.Tracer() }
@@ -182,20 +186,20 @@ namespace application
         infra::Tokenizer tokenizer(param, ' ');
 
         if (tokenizer.Size() != 2)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments" };
+            return { error, "invalid number of arguments" };
 
         auto deadTime = ParseInput<uint32_t>(tokenizer.Token(0), 500.0f, 2000.0f);
         if (!deadTime.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float between 500 and 2000." };
+            return { error, "invalid value. It should be a float between 500 and 2000." };
 
         auto frequency = ParseInput<uint32_t>(tokenizer.Token(1), 10000.0f, 20000.0f);
         if (!frequency.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float between 10000 and 20000." };
+            return { error, "invalid value. It should be a float between 10000 and 20000." };
 
         pwmCreator.Destroy();
         pwmCreator.Emplace(std::chrono::nanoseconds{ *deadTime }, hal::Hertz{ *frequency });
 
-        return { services::TerminalWithStorage::Status::success };
+        return { success };
     }
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::ConfigureAdc(const infra::BoundedConstString& param)
@@ -203,15 +207,15 @@ namespace application
         infra::Tokenizer tokenizer(param, ' ');
 
         if (tokenizer.Size() != 1)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments" };
+            return { error, "invalid number of arguments" };
 
         auto sampleAndHold = ParseInput(tokenizer.Token(0), acceptedAdcValues);
         if (!sampleAndHold)
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be one of: shortest, shorter, medium, longer, longest." };
+            return { error, "invalid value. It should be one of: shortest, shorter, medium, longer, longest." };
 
         StartAdc(ToSampleAndHold(*sampleAndHold));
 
-        return { services::TerminalWithStorage::Status::success };
+        return { success };
     }
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::ConfigurePid(const infra::BoundedConstString& param)
@@ -219,31 +223,31 @@ namespace application
         infra::Tokenizer tokenizer(param, ' ');
 
         if (tokenizer.Size() != 6)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments" };
+            return { error, "invalid number of arguments" };
 
         auto dKp = ParseInput<float>(tokenizer.Token(0), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
         if (!dKp.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value for Speed Kp" };
+            return { error, "invalid value for Speed Kp" };
 
         auto dKi = ParseInput<float>(tokenizer.Token(1), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
         if (!dKi.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value for Speed Ki" };
+            return { error, "invalid value for Speed Ki" };
 
         auto dKd = ParseInput<float>(tokenizer.Token(2), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
         if (!dKd.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value for Speed Kd" };
+            return { error, "invalid value for Speed Kd" };
 
         auto qKp = ParseInput<float>(tokenizer.Token(3), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
         if (!qKp.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value for DQ-axis Kp" };
+            return { error, "invalid value for DQ-axis Kp" };
 
         auto qKi = ParseInput<float>(tokenizer.Token(4), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
         if (!qKi.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value for DQ-axis Ki" };
+            return { error, "invalid value for DQ-axis Ki" };
 
         auto qKd = ParseInput<float>(tokenizer.Token(5), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
         if (!qKd.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value for DQ-axis Kd" };
+            return { error, "invalid value for DQ-axis Kd" };
 
         speedPidTunings = controllers::PidTunings<float>{ *dKp, *dKi, *dKd };
         dqPidTunings = controllers::PidTunings<float>{ *qKp, *qKi, *qKd };
@@ -251,7 +255,7 @@ namespace application
         foc.SetSpeedTunings(Vdc, speedPidTunings);
         foc.SetCurrentTunings(Vdc, { dqPidTunings, dqPidTunings });
 
-        return { services::TerminalWithStorage::Status::success };
+        return { success };
     }
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::ReadEncoder()
@@ -259,7 +263,7 @@ namespace application
         tracer.Trace() << "  Encoder Readings:";
         tracer.Trace() << "    Position:  " << encoderCreator->Read().Value() << " radians";
 
-        return { services::TerminalWithStorage::Status::success };
+        return { success };
     }
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::SimulateFoc(const infra::BoundedConstString& param)
@@ -267,27 +271,27 @@ namespace application
         infra::Tokenizer tokenizer(param, ' ');
 
         if (tokenizer.Size() != 4)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments" };
+            return { error, "invalid number of arguments" };
 
         auto angle = ParseInput<float>(tokenizer.Token(0), -360.0f, 360.0f);
         if (!angle.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value for angle. It should be a float between -360 and 360." };
+            return { error, "invalid value for angle. It should be a float between -360 and 360." };
 
         auto currentA = ParseInput<float>(tokenizer.Token(1), -1000.0f, 1000.0f);
         if (!currentA.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value for phase A current. It should be a float between -1000 and 1000." };
+            return { error, "invalid value for phase A current. It should be a float between -1000 and 1000." };
 
         auto currentB = ParseInput<float>(tokenizer.Token(2), -1000.0f, 1000.0f);
         if (!currentB.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value for phase B current. It should be a float between -1000 and 1000." };
+            return { error, "invalid value for phase B current. It should be a float between -1000 and 1000." };
 
         auto currentC = ParseInput<float>(tokenizer.Token(3), -1000.0f, 1000.0f);
         if (!currentC.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value for phase C current. It should be a float between -1000 and 1000." };
+            return { error, "invalid value for phase C current. It should be a float between -1000 and 1000." };
 
         RunFocSimulation(foc::PhaseCurrents{ foc::Ampere{ *currentA }, foc::Ampere{ *currentB }, foc::Ampere{ *currentC } }, foc::Radians{ *angle * pi_div_180 });
 
-        return { services::TerminalWithStorage::Status::success };
+        return { success };
     }
 
     void TerminalInteractor::RunFocSimulation(foc::PhaseCurrents input, foc::Radians angle)
@@ -318,7 +322,7 @@ namespace application
     TerminalInteractor::StatusWithMessage TerminalInteractor::Stop()
     {
         pwmCreator->Stop();
-        return { services::TerminalWithStorage::Status::success };
+        return { success };
     }
 
     void TerminalInteractor::ProcessAdcSamples()
@@ -328,8 +332,8 @@ namespace application
 
         tracer.Trace() << "  Current Phases [A;B;C] ampere";
 
-        for (std::size_t i = 0; i < queueOfPhaseCurrents.size(); ++i)
-            tracer.Trace() << queueOfPhaseCurrents[i].a.Value() << ";" << queueOfPhaseCurrents[i].b.Value() << ";" << queueOfPhaseCurrents[i].c.Value();
+        for (const auto& phase : queueOfPhaseCurrents)
+            tracer.Trace() << phase.a.Value() << ";" << phase.b.Value() << ";" << phase.c.Value();
 
         queueOfPhaseCurrents.clear();
     }
@@ -339,23 +343,23 @@ namespace application
         infra::Tokenizer tokenizer(param, ' ');
 
         if (tokenizer.Size() != 3)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments" };
+            return { error, "invalid number of arguments" };
 
         auto dutyA = ParseInput<uint8_t>(tokenizer.Token(0), 1, 99);
         if (!dutyA.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value for phase A. It should be a float between 1 and 99." };
+            return { error, "invalid value for phase A. It should be a float between 1 and 99." };
 
         auto dutyB = ParseInput<uint8_t>(tokenizer.Token(1), 1, 99);
         if (!dutyB.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value for phase B. It should be a float between 1 and 99." };
+            return { error, "invalid value for phase B. It should be a float between 1 and 99." };
 
         auto dutyC = ParseInput<uint8_t>(tokenizer.Token(2), 1, 99);
         if (!dutyC.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value for phase C. It should be a float between 1 and 99." };
+            return { error, "invalid value for phase C. It should be a float between 1 and 99." };
 
         pwmCreator->Start(hal::Percent{ *dutyA }, hal::Percent{ *dutyB }, hal::Percent{ *dutyC });
 
-        return { services::TerminalWithStorage::Status::success };
+        return { success };
     }
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::SetMotorParameters(const infra::BoundedConstString& param)
@@ -363,16 +367,16 @@ namespace application
         infra::Tokenizer tokenizer(param, ' ');
 
         if (tokenizer.Size() != 1)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments" };
+            return { error, "invalid number of arguments" };
 
         auto poles = ParseInput<uint8_t>(tokenizer.Token(0), 2, 16);
         if (!poles.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value for poles. It should be an integer between 2 and 16." };
+            return { error, "invalid value for poles. It should be an integer between 2 and 16." };
 
         polePairs = static_cast<std::size_t>(*poles / 2);
         foc.SetPolePairs(polePairs.value());
 
-        return { services::TerminalWithStorage::Status::success };
+        return { success };
     }
 
     void TerminalInteractor::StartAdc(PlatformFactory::SampleAndHold sampleAndHold)
@@ -392,11 +396,11 @@ namespace application
         infra::Tokenizer tokenizer(param, ' ');
 
         if (tokenizer.Size() < 1 || tokenizer.Size() > 2)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments" };
+            return { error, "invalid number of arguments" };
 
         auto bitRate = ParseInput<uint32_t>(tokenizer.Token(0), 125000, 1000000);
         if (!bitRate.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid bitrate. It should be between 125000 and 1000000." };
+            return { error, "invalid bitrate. It should be between 125000 and 1000000." };
 
         bool testMode = false;
         if (tokenizer.Size() == 2)
@@ -404,7 +408,7 @@ namespace application
             if (tokenizer.Token(1) == "test")
                 testMode = true;
             else
-                return { services::TerminalWithStorage::Status::error, "invalid option. Use 'test' for loopback mode." };
+                return { error, "invalid option. Use 'test' for loopback mode." };
         }
 
         canCreator.Destroy();
@@ -418,7 +422,7 @@ namespace application
 
         tracer.Trace() << "  CAN started at " << *bitRate << " bps" << (testMode ? " (loopback)" : "");
 
-        return { services::TerminalWithStorage::Status::success };
+        return { success };
     }
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::CanStop()
@@ -426,29 +430,29 @@ namespace application
         canCreator.Destroy();
         canStarted = false;
         tracer.Trace() << "  CAN stopped";
-        return { services::TerminalWithStorage::Status::success };
+        return { success };
     }
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::CanSend(const infra::BoundedConstString& param)
     {
         if (!canStarted)
-            return { services::TerminalWithStorage::Status::error, "CAN not started. Run 'can_start' first." };
+            return { error, "CAN not started. Run 'can_start' first." };
 
         infra::Tokenizer tokenizer(param, ' ');
 
         if (tokenizer.Size() < 2 || tokenizer.Size() > 9)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments. Usage: can_send <id> <b0> ... <b7>" };
+            return { error, "invalid number of arguments. Usage: can_send <id> <b0> ... <b7>" };
 
         auto id = ParseInput<uint32_t>(tokenizer.Token(0), 0, 0x1FFFFFFF);
         if (!id.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid CAN ID. It should be between 0 and 0x1FFFFFFF." };
+            return { error, "invalid CAN ID. It should be between 0 and 0x1FFFFFFF." };
 
         hal::Can::Message message;
         for (std::size_t i = 1; i < tokenizer.Size(); ++i)
         {
             auto byte = ParseInput<uint32_t>(tokenizer.Token(i), 0, 255);
             if (!byte.has_value())
-                return { services::TerminalWithStorage::Status::error, "invalid data byte. It should be between 0 and 255." };
+                return { error, "invalid data byte. It should be between 0 and 255." };
             message.push_back(static_cast<uint8_t>(*byte));
         }
 
@@ -462,13 +466,13 @@ namespace application
                     tracer.Trace() << "  CAN frame send failed";
             });
 
-        return { services::TerminalWithStorage::Status::success };
+        return { success };
     }
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::CanListen()
     {
         if (!canStarted)
-            return { services::TerminalWithStorage::Status::error, "CAN not started. Run 'can_start' first." };
+            return { error, "CAN not started. Run 'can_start' first." };
 
         canCreator->ReceiveData([this](hal::Can::Id id, const hal::Can::Message& data)
             {
@@ -479,7 +483,7 @@ namespace application
             });
 
         tracer.Trace() << "  CAN listening for messages";
-        return { services::TerminalWithStorage::Status::success };
+        return { success };
     }
 
     void TerminalInteractor::EepromWrite(const infra::BoundedConstString& param)
@@ -488,21 +492,21 @@ namespace application
 
         if (tokenizer.Size() < 2)
         {
-            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "usage: eeprom_write <addr> <b0> [b1...]" });
+            terminal.ProcessResult({ error, "usage: eeprom_write <addr> <b0> [b1...]" });
             return;
         }
 
-        auto addr = ParseInput<uint32_t>(tokenizer.Token(0), 0.0f, 65535.0f);
+        auto addr = ParseInput<uint32_t>(tokenizer.Token(0), 0u, 65535u);
         if (!addr.has_value())
         {
-            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "invalid address" });
+            terminal.ProcessResult({ error, "invalid address" });
             return;
         }
 
         const std::size_t byteCount = tokenizer.Size() - 1;
         if (byteCount > eepromBuffer.size())
         {
-            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "too many bytes" });
+            terminal.ProcessResult({ error, "too many bytes" });
             return;
         }
 
@@ -511,7 +515,7 @@ namespace application
             auto byte = ParseInput<uint32_t>(tokenizer.Token(i + 1), 0.0f, 255.0f);
             if (!byte.has_value())
             {
-                terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "invalid byte value" });
+                terminal.ProcessResult({ error, "invalid byte value" });
                 return;
             }
             eepromBuffer[i] = static_cast<uint8_t>(*byte);
@@ -520,13 +524,13 @@ namespace application
         const std::size_t eepromSize = eeprom.Size();
         if (*addr > eepromSize || byteCount > eepromSize - *addr)
         {
-            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "address out of range" });
+            terminal.ProcessResult({ error, "address out of range" });
             return;
         }
 
         eeprom.WriteBuffer(infra::ConstByteRange{ eepromBuffer.data(), eepromBuffer.data() + byteCount }, *addr, [this]()
             {
-                this->terminal.ProcessResult({ services::TerminalWithStorage::Status::success });
+                this->terminal.ProcessResult({ success });
             });
     }
 
@@ -536,28 +540,28 @@ namespace application
 
         if (tokenizer.Size() != 2)
         {
-            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "usage: eeprom_read <addr> <size>" });
+            terminal.ProcessResult({ error, "usage: eeprom_read <addr> <size>" });
             return;
         }
 
-        auto addr = ParseInput<uint32_t>(tokenizer.Token(0), 0.0f, 65535.0f);
+        auto addr = ParseInput<uint32_t>(tokenizer.Token(0), 0u, 65535u);
         if (!addr.has_value())
         {
-            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "invalid address" });
+            terminal.ProcessResult({ error, "invalid address" });
             return;
         }
 
-        auto size = ParseInput<uint32_t>(tokenizer.Token(1), 1.0f, static_cast<float>(eepromBuffer.size()));
+        auto size = ParseInput<uint32_t>(tokenizer.Token(1), 1u, static_cast<uint32_t>(eepromBuffer.size()));
         if (!size.has_value())
         {
-            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "invalid size" });
+            terminal.ProcessResult({ error, "invalid size" });
             return;
         }
 
         const std::size_t eepromSize = eeprom.Size();
         if (*addr > eepromSize || *size > eepromSize - *addr)
         {
-            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "address out of range" });
+            terminal.ProcessResult({ error, "address out of range" });
             return;
         }
 
@@ -566,7 +570,7 @@ namespace application
             {
                 for (uint32_t i = 0; i < this->eepromCurrentReadSize; ++i)
                     this->tracer.Trace() << "  [" << i << "] = " << static_cast<uint32_t>(this->eepromBuffer[i]);
-                this->terminal.ProcessResult({ services::TerminalWithStorage::Status::success });
+                this->terminal.ProcessResult({ success });
             });
     }
 
@@ -574,7 +578,7 @@ namespace application
     {
         eeprom.Erase([this]()
             {
-                this->terminal.ProcessResult({ services::TerminalWithStorage::Status::success });
+                this->terminal.ProcessResult({ success });
             });
     }
 }

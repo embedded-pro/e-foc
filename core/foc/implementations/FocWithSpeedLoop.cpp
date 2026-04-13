@@ -82,7 +82,7 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    PhasePwmDutyCycles FocWithSpeedLoop::CalculateInnerLoop(const PhaseCurrents& currentPhases, Radians& position)
+    PhasePwmDutyCycles FocWithSpeedLoop::CalculateInnerLoop(const PhaseCurrents& currentPhases, const Radians& position)
     {
         const float ia = currentPhases.a.Value();
         const float ib = currentPhases.b.Value();

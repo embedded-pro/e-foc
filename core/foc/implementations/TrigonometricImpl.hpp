@@ -94,14 +94,16 @@ namespace foc
         ALWAYS_INLINE static float Sine(float angle) noexcept
         {
             const auto scaledAngle = angle * detail::lutScale;
-            const auto rawIndex = static_cast<std::size_t>(scaledAngle);
+            const auto flooredAngle = std::floor(scaledAngle);
+            // Normalize to [0, LUT_SIZE) in float domain before integer truncation
+            // to avoid undefined behaviour on negative casts and the always-false
+            // size_t < 0 branch that UB would otherwise require.
+            const auto normalizedFloor = std::fmod(flooredAngle, static_cast<float>(detail::sineLUT.size()));
+            const auto rawIndex = static_cast<std::size_t>(
+                normalizedFloor >= 0.0f ? normalizedFloor : normalizedFloor + static_cast<float>(detail::sineLUT.size()));
+            const auto index = rawIndex & detail::lutMask;
 
-            auto index = rawIndex & detail::lutMask;
-
-            if (rawIndex < 0) [[unlikely]]
-                index = (detail::sineLUT.size() + (rawIndex % static_cast<std::size_t>(detail::sineLUT.size()))) & detail::lutMask;
-
-            const auto fraction = scaledAngle - static_cast<float>(rawIndex);
+            const auto fraction = scaledAngle - flooredAngle;
             const auto nextIndex = (index + 1) & detail::lutMask;
 
             const auto y0 = detail::sineLUT[index];

@@ -112,8 +112,13 @@ int main(int argc, char* argv[])
         }
 
         simulator::HeadlessSimulation simulation{ model, controller, eventDispatcher,
-            "FOC Torque Control", "foc_torque_results", std::format("{}/output/simulator/torque_control", PROJECT_ROOT_DIR),
-            timeStep, simulationTime };
+            simulator::HeadlessSimulationConfig{
+                .title = "FOC Torque Control",
+                .filename = "foc_torque_results",
+                .outputDirectory = std::format("{}/output/simulator/torque_control", PROJECT_ROOT_DIR),
+                .timeStep = timeStep,
+                .simulationTime = simulationTime,
+            } };
         simulation.Run();
     }
     catch (const std::exception& ex)

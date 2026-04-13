@@ -14,18 +14,6 @@ namespace
         else
             return std::nullopt;
     }
-
-    std::optional<foc::Ohm> ParseOhmInput(const infra::BoundedConstString& input)
-    {
-        float value = 0.0f;
-        infra::StringInputStream stream(input, infra::softFail);
-        stream >> value;
-
-        if (!stream.ErrorPolicy().Failed() && value >= 0.0f)
-            return std::make_optional(foc::Ohm{ value });
-        else
-            return {};
-    }
 }
 
 namespace services

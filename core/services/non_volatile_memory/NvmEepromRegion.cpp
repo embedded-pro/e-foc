@@ -7,7 +7,6 @@ namespace services
         : eeprom(eeprom)
         , baseAddress(baseAddress)
         , regionSize(regionSize)
-        , eraseBuffer{}
     {
         really_assert(regionSize <= maxRegionSize);
         really_assert(regionSize <= eeprom.Size());

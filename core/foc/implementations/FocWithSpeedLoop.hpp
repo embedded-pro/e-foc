@@ -32,7 +32,7 @@ namespace foc
         void SetSpeedTuningsImpl(const SpeedTunings& speedTuning);
         void EnableSpeedLoop();
         void DisableSpeedLoop();
-        PhasePwmDutyCycles CalculateInnerLoop(const PhaseCurrents& currentPhases, Radians& position);
+        PhasePwmDutyCycles CalculateInnerLoop(const PhaseCurrents& currentPhases, const Radians& position);
 
         controllers::PidIncrementalSynchronous<float>& SpeedPid();
         controllers::PidIncrementalSynchronous<float>& DPid();
@@ -72,7 +72,7 @@ namespace foc
         // by setting readyIndex. The handler reads snapshots[readyIndex]. Since
         // the ISR always writes to the slot the handler is NOT reading, no torn
         // reads are possible regardless of when preemption occurs.
-        EstimatorSnapshot snapshots[2];
+        std::array<EstimatorSnapshot, 2> snapshots{};
         volatile uint8_t readyIndex{ 0 };
     };
 }
