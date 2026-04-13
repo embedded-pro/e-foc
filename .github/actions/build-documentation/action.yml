@@ -1,0 +1,66 @@
+name: 'Build Documentation PDFs'
+description: >
+  Converts Markdown documentation files and YAML requirements to PDFs using
+  Pandoc and pdflatex.  Outputs are written to the configured output directory
+  and uploaded as a workflow artifact.
+
+inputs:
+  version:
+    description: 'Release version tag used to name output files (e.g. v1.2.3)'
+    required: true
+  output-dir:
+    description: 'Output directory for generated PDF files'
+    required: false
+    default: 'docs-pdf'
+  docs-dirs:
+    description: >
+      Space-separated list of documentation directories whose Markdown files
+      will be converted to PDF.
+    required: false
+    default: 'documentation/architecture documentation/design documentation/theory'
+  requirements-dir:
+    description: 'Directory containing YAML requirement files'
+    required: false
+    default: 'documentation/requirements'
+  artifact-name:
+    description: 'Name for the uploaded artifact'
+    required: false
+    default: 'documentation-pdfs'
+
+outputs:
+  output-dir:
+    description: 'Path to the directory containing generated PDFs'
+    value: ${{ inputs.output-dir }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Pandoc and LaTeX
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends \
+          pandoc \
+          texlive-latex-recommended \
+          texlive-latex-extra \
+          texlive-fonts-recommended
+
+    - name: Install PyYAML
+      shell: bash
+      run: pip3 install pyyaml --quiet
+
+    - name: Generate PDFs
+      shell: bash
+      run: |
+        python3 "${{ github.action_path }}/convert_docs.py" \
+          --version      "${{ inputs.version }}" \
+          --output-dir   "${{ inputs.output-dir }}" \
+          --docs-dirs    ${{ inputs.docs-dirs }} \
+          --requirements-dir "${{ inputs.requirements-dir }}"
+
+    - name: Upload documentation PDFs
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ inputs.output-dir }}/*.pdf
+        if-no-files-found: warn

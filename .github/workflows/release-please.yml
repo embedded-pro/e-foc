@@ -165,7 +165,7 @@ jobs:
       matrix:
         target: ["EK-TM4C1294XL", "EK-TM4C123GXL"]
         configuration: ["RelWithDebInfo"]
-        gcc: ["10.3-2021.10"]
+        gcc: ["13.2.Rel1"]
     steps:
       - name: Configure Git
         run: |
@@ -188,12 +188,18 @@ jobs:
         with:
           configurePreset: ${{ matrix.target }}
           buildPreset: ${{ matrix.target }}-${{ matrix.configuration }}
+      - name: Generate hex firmware
+        run: |
+          find "build/${{ matrix.target }}" -name "*.elf" -path "*/${{ matrix.configuration }}/*" -type f | while read -r elf; do
+            hex="${elf%.elf}.hex"
+            arm-none-eabi-objcopy -O ihex "$elf" "$hex"
+          done
       - name: Package firmware
         run: |
           version="${{ needs.release_please.outputs.tag_name }}"
           staging="staging/${{ matrix.target }}"
           mkdir -p "$staging"
-          find "build/${{ matrix.target }}" -name "*.elf" -path "*/${{ matrix.configuration }}/*" -type f | while read -r f; do
+          find "build/${{ matrix.target }}" \( -name "*.elf" -o -name "*.hex" \) -path "*/${{ matrix.configuration }}/*" -type f | while read -r f; do
             cp "$f" "$staging/"
           done
           tar -czf "e_foc-firmware-${{ matrix.target }}-${version}.tar.gz" -C staging "${{ matrix.target }}"
@@ -203,9 +209,37 @@ jobs:
           path: e_foc-firmware-${{ matrix.target }}-*.tar.gz
           if-no-files-found: error
 
+  build_documentation:
+    name: Build Documentation
+    needs: release_please
+    if: needs.release_please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure Git
+        run: |
+          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global --add safe.directory '*'
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: Generate documentation PDFs
+        uses: ./.github/actions/build-documentation
+        with:
+          version: ${{ needs.release_please.outputs.tag_name }}
+          output-dir: docs-pdf
+          artifact-name: documentation-pdfs
+      - name: Generate traceability matrix
+        uses: ./.github/actions/traceability-matrix
+        with:
+          requirements-dir: documentation/requirements
+          features-dir: integration_tests/software_in_the_loop/features
+          output: docs-pdf/traceability-matrix.md
+          pdf-output: docs-pdf/e_foc-traceability-matrix-${{ needs.release_please.outputs.tag_name }}.pdf
+
   publish_release_assets:
     name: Publish Release Assets
-    needs: [release_please, build_linux_tools, build_windows_tools, build_embedded]
+    needs: [release_please, build_linux_tools, build_windows_tools, build_embedded, build_documentation]
     if: needs.release_please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     permissions:

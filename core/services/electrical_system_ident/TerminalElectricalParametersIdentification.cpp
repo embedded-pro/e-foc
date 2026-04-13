@@ -1,7 +1,7 @@
 #include "core/services/electrical_system_ident/TerminalElectricalParametersIdentification.hpp"
+#include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "infra/stream/StringInputStream.hpp"
 #include "infra/util/Tokenizer.hpp"
-#include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 
 namespace
 {

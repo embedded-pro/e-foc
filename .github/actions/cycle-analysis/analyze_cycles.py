@@ -751,6 +751,34 @@ def generate_report(
     return "\n".join(lines)
 
 
+def generate_cpu_budget_table(config: dict, stages: list[PathStage]) -> str:
+    """Generate only the CPU utilization budget markdown table rows (no headings)."""
+    clock = config["clock_mhz"]
+    loop_rates = config.get("loop_rates_khz", [10, 20, 40])
+
+    total_min = sum(s.min_cycles for s in stages)
+    total_max = sum(s.max_cycles for s in stages)
+
+    lines: list[str] = []
+    lines.append("| Loop Rate | Available Cycles | Min Usage | Max Usage | Status |")
+    lines.append("|-----------|-----------------|-----------|-----------|--------|")
+    for rate in loop_rates:
+        avail = clock * 1_000_000 // (rate * 1_000)
+        pct_min = total_min / avail * 100
+        pct_max = total_max / avail * 100
+        if pct_max > 100:
+            status = "🔴 OVER"
+        elif pct_max > 50:
+            status = "🟡 WARN"
+        else:
+            status = "🟢 OK"
+        lines.append(
+            f"| {rate} kHz | {avail} | {total_min} ({pct_min:.1f}%) "
+            f"| {total_max} ({pct_max:.1f}%) | {status} |"
+        )
+    return "\n".join(lines)
+
+
 def generate_pr_comment(config: dict, stages: list[PathStage]) -> str:
     """Generate a concise PR comment banner with Executive Summary + CPU Budget."""
     target = config["target"]
@@ -1083,6 +1111,10 @@ def main():
     report = generate_report(config, stages, all_fns, lookup)
     with open(os.path.join(args.output_dir, "cycle_estimation_report.md"), "w") as f:
         f.write(report)
+
+    budget = generate_cpu_budget_table(config, stages)
+    with open(os.path.join(args.output_dir, "cpu_budget.md"), "w") as f:
+        f.write(budget)
 
     pr_comment = generate_pr_comment(config, stages)
     with open(os.path.join(args.output_dir, "pr_comment.md"), "w") as f:

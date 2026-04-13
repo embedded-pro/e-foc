@@ -63,7 +63,7 @@ namespace application
         CanBusAdapterImpl() = default;
 
         template<typename... Args>
-            requires(sizeof...(Args) > 0 && (!std::same_as<std::remove_cvref_t<Args>, CanBusAdapterImpl> && ...))
+        requires(sizeof...(Args) > 0 && (!std::same_as<std::remove_cvref_t<Args>, CanBusAdapterImpl> && ...))
         explicit CanBusAdapterImpl(Args&&... args)
             : can(std::forward<Args>(args)...)
         {}

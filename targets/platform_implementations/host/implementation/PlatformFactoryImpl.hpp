@@ -1,12 +1,12 @@
 #pragma once
 
+#include "core/platform_abstraction/PlatformFactory.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/interfaces/SerialCommunication.hpp"
 #include "hal/synchronous_interfaces/SynchronousAdc.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
-#include "core/platform_abstraction/PlatformFactory.hpp"
 #include <algorithm>
 #include <array>
 #include <ranges>

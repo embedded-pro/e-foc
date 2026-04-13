@@ -1,7 +1,7 @@
 #pragma once
 
-#include "hal/interfaces/Eeprom.hpp"
 #include "core/services/non_volatile_memory/NvmRegion.hpp"
+#include "hal/interfaces/Eeprom.hpp"
 #include <array>
 #include <cstdint>
 

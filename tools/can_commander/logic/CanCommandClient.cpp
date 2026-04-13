@@ -173,11 +173,14 @@ namespace tool
             });
     }
 
-    void CanCommandClient::OnMotorTypeResponse(FocMotorMode /*mode*/) {}
+    void CanCommandClient::OnMotorTypeResponse(FocMotorMode /*mode*/)
+    {}
 
-    void CanCommandClient::OnElectricalParamsResponse(const FocElectricalParams& /*params*/) {}
+    void CanCommandClient::OnElectricalParamsResponse(const FocElectricalParams& /*params*/)
+    {}
 
-    void CanCommandClient::OnMechanicalParamsResponse(const FocMechanicalParams& /*params*/) {}
+    void CanCommandClient::OnMechanicalParamsResponse(const FocMechanicalParams& /*params*/)
+    {}
 
     void CanCommandClient::OnTelemetryStatusResponse(const FocTelemetryStatus& status)
     {
@@ -242,4 +245,3 @@ namespace tool
             });
     }
 }
-
