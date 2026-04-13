@@ -43,6 +43,9 @@ namespace
         MOCK_METHOD((infra::CreatorBase<application::QuadratureEncoderDecorator, void()>&), SynchronousQuadratureEncoderCreator, (), (override));
         MOCK_METHOD((infra::CreatorBase<application::CanBusAdapter, void(uint32_t, bool)>&), CanBusCreator, (), (override));
         MOCK_METHOD(hal::Eeprom&, Eeprom, (), (override));
+        MOCK_METHOD(void, Reset, (), (override));
+        MOCK_METHOD(application::ResetCause, GetResetCause, (), (const, override));
+        MOCK_METHOD(infra::BoundedConstString, FaultStatus, (), (const, override));
     };
 
     class PwmMock
@@ -142,6 +145,8 @@ namespace
             EXPECT_CALL(platformFactoryMock, SystemClock()).WillRepeatedly(testing::Return(hal::Hertz{ 10000 }));
             EXPECT_CALL(platformFactoryMock, LowPriorityInterrupt()).WillRepeatedly(testing::ReturnRef(simpleLowPriorityInterrupt));
             EXPECT_CALL(platformFactoryMock, Eeprom()).WillRepeatedly(testing::ReturnRef(eepromMock));
+            EXPECT_CALL(platformFactoryMock, GetResetCause()).WillRepeatedly(testing::Return(application::ResetCause::powerUp));
+            EXPECT_CALL(platformFactoryMock, FaultStatus()).WillRepeatedly(testing::Return(infra::BoundedConstString{}));
 
             EXPECT_CALL(encoderCreator, Constructed());
             EXPECT_CALL(pwmCreator, Constructed(std::chrono::nanoseconds{ 500 }, hal::Hertz{ 10000 }));
@@ -170,7 +175,7 @@ namespace
                 EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<16> terminal{ terminalWithCommands, tracer };
+        services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
         testing::StrictMock<PwmMock> pwmMock;
         testing::StrictMock<AdcMock> adcMock;

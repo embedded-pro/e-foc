@@ -1,6 +1,7 @@
 #include "targets/platform_implementations/host/implementation/PlatformFactoryImpl.hpp"
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "infra/util/MemoryRange.hpp"
+#include <cstdlib>
 
 namespace application
 {
@@ -186,5 +187,20 @@ namespace application
 
     void PlatformFactoryImpl::CanStub::ReceiveData(const infra::Function<void(Id id, const Message& data)>&)
     {
+    }
+
+    void PlatformFactoryImpl::Reset()
+    {
+        std::exit(0);
+    }
+
+    ResetCause PlatformFactoryImpl::GetResetCause() const
+    {
+        return resetCause;
+    }
+
+    infra::BoundedConstString PlatformFactoryImpl::FaultStatus() const
+    {
+        return faultStatusString;
     }
 }

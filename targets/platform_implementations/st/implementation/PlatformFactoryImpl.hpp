@@ -3,11 +3,11 @@
 #include <algorithm>
 #include <array>
 #include HARDWARE_PINS_AND_PERIPHERALS_HEADER
+#include "core/platform_abstraction/PlatformFactory.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/interfaces/SerialCommunication.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
-#include "core/platform_abstraction/PlatformFactory.hpp"
 
 namespace application
 {
@@ -33,6 +33,9 @@ namespace application
         infra::CreatorBase<QuadratureEncoderDecorator, void()>& SynchronousQuadratureEncoderCreator() override;
         infra::CreatorBase<CanBusAdapter, void(uint32_t bitRate, bool testMode)>& CanBusCreator() override;
         hal::Eeprom& Eeprom() override;
+        void Reset() override;
+        ResetCause GetResetCause() const override;
+        infra::BoundedConstString FaultStatus() const override;
 
         // Implementation of hal::PerformanceTracker
         void Start() override;
@@ -204,5 +207,7 @@ namespace application
                 object.emplace();
             } };
         EepromStub eepromStub;
+        ResetCause resetCause{ ResetCause::powerUp };
+        infra::BoundedString::WithStorage<1024> faultStatusString;
     };
 }

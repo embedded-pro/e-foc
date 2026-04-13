@@ -288,6 +288,8 @@ is being acknowledged, since message type values are reused across categories.
 
 #### 7.6.3 Request Status (Type 0x03)
 
+
+
 Sent at CanPriority::command. No sequence validation. Empty payload.
 
 When received, the node notifies the application observer via `OnStatusRequested()`.
@@ -297,6 +299,24 @@ active control mode, and fault code.
 
 This message is used by the CAN Commander tool to query the active control mode
 on connection and adapt the GUI accordingly.
+
+#### 7.6.6 Boot Status (Type 0x06)
+
+Sent once at boot at CanPriority::response. No sequence validation.
+
+| Byte | Field         | Type  | Description                                          |
+|------|---------------|-------|------------------------------------------------------|
+| 0    | Reset Cause   | uint8 | See Reset Cause table (Section 9.5)                  |
+| 1    | Has Fault Data| uint8 | 0 = no fault data; 1 = fault data available at boot  |
+
+#### 7.6.7 Fault Report (Type 0x07)
+
+Sent once at boot when fault data is available. CanPriority::emergency.
+
+| Byte | Field | Type     | Description                          |
+|------|-------|----------|--------------------------------------|
+| 0-3  | PC    | uint32 BE| Program Counter at time of fault     |
+| 4-7  | LR    | uint32 BE| Link Register at time of fault       |
 
 ## 8. Data Encoding
 
@@ -353,6 +373,16 @@ Values are saturated (clamped) to the target integer range to prevent overflow.
 | 3     | Over-temperature      |
 | 4     | Sensor fault          |
 | 5     | Communication timeout |
+
+### 9.5 Reset Causes
+
+| Value | Cause    | Description                                                   |
+|-------|----------|---------------------------------------------------------------|
+| 0     | PowerUp  | External power-on reset (POR)                                 |
+| 1     | BrownOut | Supply voltage dropped below threshold (BOR)                  |
+| 2     | Software | Triggered via NVIC_SystemReset (e.g. watchdog feed or command)|
+| 3     | Hardware | External reset pin asserted                                   |
+| 4     | Watchdog | Watchdog timer expired without being fed                      |
 
 ### 9.4 Acknowledgement Status
 

@@ -6,6 +6,7 @@ add_library(e_foc.hil_tests.steps OBJECT
     EncoderSteps.cpp
     FocCycleBudgetSteps.cpp
     PwmSteps.cpp
+    ResetCauseSteps.cpp
     UartSteps.cpp
 )
 

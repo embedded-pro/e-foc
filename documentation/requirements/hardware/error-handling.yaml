@@ -1,0 +1,59 @@
+- id: REQ-EH-001
+  title: Persistent fault data capture on critical failure
+  shall: >
+    On a critical system failure, the embedded target shall save diagnostic
+    information into a persistent memory region that survives a system reset.
+    A validity marker shall be written last to indicate that the region
+    contains valid data.
+
+- id: REQ-EH-002
+  title: Fault status available at boot
+  shall: >
+    On boot, if the persistent memory region contains valid fault data, the
+    platform shall format it into a human-readable bounded string and make it
+    available via the FaultStatus() method of PlatformFactory. The formatted
+    string shall include all saved diagnostic information.
+
+- id: REQ-EH-003
+  title: Persistent fault data invalidation after read
+  shall: >
+    After fault data is read and formatted by the platform at boot, the
+    persistent memory validity marker shall be cleared so that subsequent
+    boots do not re-report the same fault. The formatted string shall remain
+    available in memory for the lifetime of the running application.
+
+- id: REQ-EH-004
+  title: Reset cause detection
+  shall: >
+    The platform shall detect and report the cause of the most recent system
+    reset. The reported cause shall be one of: PowerUp, BrownOut, Software,
+    Hardware, or Watchdog. The underlying hardware-specific reset status shall
+    be cleared after reading to prevent stale values on subsequent resets.
+
+- id: REQ-EH-005
+  title: Software reset command via PlatformFactory
+  shall: >
+    The platform shall expose a Reset() method on PlatformFactory that triggers
+    an immediate system reset. The reset cause on the subsequent boot shall be
+    reported as Software.
+
+- id: REQ-EH-006
+  title: CLI banner reports reset cause and fault status
+  shall: >
+    After the CLI startup banner is printed, the terminal shall display the
+    reset cause. If fault data from a previous failure is available, the
+    terminal shall display the complete formatted fault information surrounded
+    by clearly visible delimiters, before accepting commands.
+
+- id: REQ-HIL-008
+  title: Software reset cause captured correctly
+  shall: >
+    When the "reset" command is issued over the CLI, the device shall reboot
+    and the CLI banner on the subsequent boot shall report "Software" as the
+    reset cause.
+
+- id: REQ-HIL-009
+  title: Power-up reset cause captured correctly
+  shall: >
+    After a power cycle (not a software reset), the CLI banner shall report
+    "PowerUp" as the reset cause.

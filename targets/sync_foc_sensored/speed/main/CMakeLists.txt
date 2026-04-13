@@ -16,10 +16,10 @@ target_sources(e_foc.sync_foc_sensored.speed.main PRIVATE
 )
 
 if(TARGET_MCU_VENDOR STREQUAL "st")
-    halst_target_default_linker_scripts(e_foc.sync_foc_sensored.speed.main)
+    e_foc_st_target_linker_scripts(e_foc.sync_foc_sensored.speed.main)
     halst_target_default_init(e_foc.sync_foc_sensored.speed.main)
 elseif(TARGET_MCU_VENDOR STREQUAL "ti")
-    hal_ti_target_default_linker_scripts(e_foc.sync_foc_sensored.speed.main)
+    e_foc_ti_target_linker_scripts(e_foc.sync_foc_sensored.speed.main)
     hal_ti_target_default_init(e_foc.sync_foc_sensored.speed.main)
 endif()
 

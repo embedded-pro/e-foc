@@ -4,10 +4,12 @@
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
+#include "core/platform_abstraction/ResetCause.hpp"
 #include "hal/interfaces/Eeprom.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "hal/synchronous_interfaces/SynchronousQuadratureEncoder.hpp"
+#include "infra/util/BoundedString.hpp"
 #include "infra/util/MemoryRange.hpp"
 #include "infra/util/ProxyCreator.hpp"
 #include "services/tracer/Tracer.hpp"
@@ -53,5 +55,9 @@ namespace application
         virtual infra::CreatorBase<QuadratureEncoderDecorator, void()>& SynchronousQuadratureEncoderCreator() = 0;
         virtual infra::CreatorBase<CanBusAdapter, void(uint32_t bitRate, bool testMode)>& CanBusCreator() = 0;
         virtual hal::Eeprom& Eeprom() = 0;
+
+        virtual void Reset() = 0;
+        virtual ResetCause GetResetCause() const = 0;
+        virtual infra::BoundedConstString FaultStatus() const = 0;
     };
 }

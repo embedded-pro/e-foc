@@ -12,16 +12,20 @@ target_link_libraries(e_foc.platform_abstraction PUBLIC
     hal.synchronous_interfaces
     infra.util
     infra.event
+    infra.stream
     e_foc.foc.interfaces
 )
 
 target_sources(e_foc.platform_abstraction PRIVATE
     AdcPhaseCurrentMeasurement.hpp
     CanBusAdapter.hpp
+    ResetCause.hpp
+    ResetCause.cpp
     PlatformFactory.hpp
     MotorFieldOrientedControllerAdapter.hpp
     MotorFieldOrientedControllerAdapter.cpp
     QuadratureEncoderDecorator.hpp
 )
 
+add_subdirectory(test)
 add_subdirectory(test_doubles)

@@ -31,5 +31,8 @@ namespace integration
             (infra::CreatorBase<application::CanBusAdapter, void(uint32_t bitRate, bool testMode)>&),
             CanBusCreator, (), (override));
         MOCK_METHOD(hal::Eeprom&, Eeprom, (), (override));
+        MOCK_METHOD(void, Reset, (), (override));
+        MOCK_METHOD(application::ResetCause, GetResetCause, (), (const, override));
+        MOCK_METHOD(infra::BoundedConstString, FaultStatus, (), (const, override));
     };
 }
