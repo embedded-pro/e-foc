@@ -32,7 +32,7 @@ inputs:
     description: "Build configuration (e.g. RelWithDebInfo, Debug)"
     required: true
   clock-mhz:
-    description: 'CPU clock frequency in MHz (e.g. 120)'
+    description: "CPU clock frequency in MHz (e.g. 120)"
     required: true
   cortex:
     description: "Cortex-M variant for timing model (e.g. m4, m33)"
