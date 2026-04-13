@@ -15,7 +15,7 @@ namespace application
     };
 
     template<typename Impl>
-        requires std::derived_from<Impl, hal::AdcMultiChannel>
+    requires std::derived_from<Impl, hal::AdcMultiChannel>
     class AdcPhaseCurrentMeasurementImpl
         : public AdcPhaseCurrentMeasurement
     {
@@ -36,7 +36,7 @@ namespace application
     // Implementation
 
     template<typename Impl>
-        requires std::derived_from<Impl, hal::AdcMultiChannel>
+    requires std::derived_from<Impl, hal::AdcMultiChannel>
     template<typename... Args>
     AdcPhaseCurrentMeasurementImpl<Impl>::AdcPhaseCurrentMeasurementImpl(float slope, float offset, Args&&... args)
         : adc(std::forward<Args>(args)...)
@@ -46,7 +46,7 @@ namespace application
     }
 
     template<typename Impl>
-        requires std::derived_from<Impl, hal::AdcMultiChannel>
+    requires std::derived_from<Impl, hal::AdcMultiChannel>
     void AdcPhaseCurrentMeasurementImpl<Impl>::Measure(const infra::Function<void(foc::Ampere phaseA, foc::Ampere phaseB, foc::Ampere phaseC)>& onDone)
     {
         onMeasurementDone = onDone;
@@ -62,7 +62,7 @@ namespace application
     }
 
     template<typename Impl>
-        requires std::derived_from<Impl, hal::AdcMultiChannel>
+    requires std::derived_from<Impl, hal::AdcMultiChannel>
     void AdcPhaseCurrentMeasurementImpl<Impl>::Stop()
     {
         adc.Stop();

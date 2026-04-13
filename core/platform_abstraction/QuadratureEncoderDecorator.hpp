@@ -14,7 +14,7 @@ namespace application
     };
 
     template<typename Impl>
-        requires std::derived_from<Impl, hal::SynchronousQuadratureEncoder>
+    requires std::derived_from<Impl, hal::SynchronousQuadratureEncoder>
     class QuadratureEncoderDecoratorImpl
         : public QuadratureEncoderDecorator
     {
@@ -31,7 +31,7 @@ namespace application
     // Implementation
 
     template<typename Impl>
-        requires std::derived_from<Impl, hal::SynchronousQuadratureEncoder>
+    requires std::derived_from<Impl, hal::SynchronousQuadratureEncoder>
     template<typename... Args>
     QuadratureEncoderDecoratorImpl<Impl>::QuadratureEncoderDecoratorImpl(uint32_t, Args&&... args)
         : encoder(std::forward<Args>(args)...)
@@ -39,7 +39,7 @@ namespace application
     }
 
     template<typename Impl>
-        requires std::derived_from<Impl, hal::SynchronousQuadratureEncoder>
+    requires std::derived_from<Impl, hal::SynchronousQuadratureEncoder>
     foc::Radians QuadratureEncoderDecoratorImpl<Impl>::Read()
     {
         static constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
