@@ -1,7 +1,6 @@
 #include "core/services/electrical_system_ident/TerminalElectricalParametersIdentification.hpp"
-#include "infra/stream/StringInputStream.hpp"
-#include "infra/util/Tokenizer.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
+#include "infra/util/Tokenizer.hpp"
 
 namespace
 {
@@ -13,18 +12,6 @@ namespace
             return services::WindingConfiguration::Delta;
         else
             return std::nullopt;
-    }
-
-    std::optional<foc::Ohm> ParseOhmInput(const infra::BoundedConstString& input)
-    {
-        float value = 0.0f;
-        infra::StringInputStream stream(input, infra::softFail);
-        stream >> value;
-
-        if (!stream.ErrorPolicy().Failed() && value >= 0.0f)
-            return std::make_optional(foc::Ohm{ value });
-        else
-            return {};
     }
 }
 

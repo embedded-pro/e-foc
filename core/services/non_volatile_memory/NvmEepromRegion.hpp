@@ -1,7 +1,7 @@
 #pragma once
 
-#include "hal/interfaces/Eeprom.hpp"
 #include "core/services/non_volatile_memory/NvmRegion.hpp"
+#include "hal/interfaces/Eeprom.hpp"
 #include <array>
 #include <cstdint>
 
@@ -24,6 +24,6 @@ namespace services
         hal::Eeprom& eeprom;
         uint32_t baseAddress;
         uint32_t regionSize;
-        std::array<uint8_t, maxRegionSize> eraseBuffer;
+        std::array<uint8_t, maxRegionSize> eraseBuffer{};
     };
 }

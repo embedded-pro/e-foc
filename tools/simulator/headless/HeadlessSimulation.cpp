@@ -3,11 +3,10 @@
 namespace simulator
 {
     HeadlessSimulation::HeadlessSimulation(ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
-        const std::string& title, const std::string& filename, const std::string& outputDirectory,
-        std::chrono::microseconds timeStep, std::chrono::milliseconds simulationTime, const AngleUnit& angleUnit)
+        const HeadlessSimulationConfig& config)
         : controller(controller)
         , eventDispatcher(eventDispatcher)
-        , plotter(model, title, filename, outputDirectory, timeStep, simulationTime, angleUnit)
+        , plotter(model, config.title, config.filename, config.outputDirectory, config.timeStep, config.simulationTime, config.angleUnit)
         , finishedObserver(model, [this]()
               {
                   simulationFinished = true;

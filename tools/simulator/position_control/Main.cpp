@@ -131,9 +131,9 @@ int main(int argc, char* argv[])
             simulator::GuiSimulation simulation{ argc, argv, model, controller, eventDispatcher, simulator::JK42BLS01_X038ED::parameters, pidParameters, positionSetpointConfig };
 
             auto& gui = simulation.GetGui();
-            QObject::connect(&gui, &simulator::Gui::setpointChanged, [&controller, &gui, powerSupplyVoltage, &pidParameters, degreesToRadians](int degrees)
+            QObject::connect(&gui, &simulator::Gui::setpointChanged, [&controller, &gui, powerSupplyVoltage, &pidParameters](int degrees)
                 {
-                    controller.SetPoint(foc::Radians{ static_cast<float>(degrees) * degreesToRadians });
+                    controller.SetPoint(foc::Radians{ static_cast<float>(degrees) * (std::numbers::pi_v<float> / 180.0f) });
 
                     controller.SetSpeedTunings(foc::Volts{ powerSupplyVoltage },
                         controllers::PidTunings<float>{ pidParameters.speed->kp, pidParameters.speed->ki, pidParameters.speed->kd });
@@ -152,8 +152,14 @@ int main(int argc, char* argv[])
         const simulator::AngleUnit degreeAngleUnit{ "Position [deg]", radiansToDegrees };
 
         simulator::HeadlessSimulation simulation{ model, controller, eventDispatcher,
-            "FOC Position Control", "foc_position_results", std::format("{}/output/simulator/position_control", PROJECT_ROOT_DIR),
-            timeStep, simulationTime, degreeAngleUnit };
+            simulator::HeadlessSimulationConfig{
+                .title = "FOC Position Control",
+                .filename = "foc_position_results",
+                .outputDirectory = std::format("{}/output/simulator/position_control", PROJECT_ROOT_DIR),
+                .timeStep = timeStep,
+                .simulationTime = simulationTime,
+                .angleUnit = degreeAngleUnit,
+            } };
         simulation.Run();
     }
     catch (const std::exception& ex)

@@ -11,6 +11,11 @@ namespace foc
         Runner(ThreePhaseInverter& inverter, Encoder& encoder, FocBase& foc);
         ~Runner();
 
+        Runner(const Runner&) = delete;
+        Runner& operator=(const Runner&) = delete;
+        Runner(Runner&&) = delete;
+        Runner& operator=(Runner&&) = delete;
+
         void Enable();
         void Disable();
 

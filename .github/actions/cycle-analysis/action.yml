@@ -1,43 +1,57 @@
-name: 'Cycle Analysis'
+name: "Cycle Analysis"
 description: >
-  Estimates CPU cycle consumption for a user-defined critical path through
-  an ARM Cortex-M binary.  Path stages are fully driven by a JSON config
-  file — no application-specific knowledge is hard-coded.
+  Estimates CPU cycle consumption for user-defined critical paths through
+  ARM Cortex-M binaries.  Supports single-mode and multi-mode (one invocation
+  per FOC control mode).  Path stages are fully driven by JSON config files.
 
 inputs:
+  # ── Multi-mode (preferred) ─────────────────────────────────────────────────
+  analyses-json:
+    description: >
+      JSON array of analysis entries for multi-mode runs.  Each entry must
+      have: "label", "elf_path", "config_path", "output_dir".  When provided,
+      the single-mode inputs (elf-path, config-path) are ignored.
+    required: false
+    default: ""
+
+  # ── Single-mode (backwards-compatible) ────────────────────────────────────
   elf-path:
-    description: 'Path to the ELF binary to analyze'
-    required: true
+    description: "Path to the ELF binary (single-mode only)"
+    required: false
+    default: ""
   config-path:
-    description: 'Path to the JSON configuration file defining the path stages'
-    required: true
+    description: "Path to the cycle-analysis JSON config (single-mode only)"
+    required: false
+    default: ""
+
+  # ── Shared ────────────────────────────────────────────────────────────────
   target:
-    description: 'Target board identifier (e.g. EK-TM4C1294XL)'
+    description: "Target board identifier (e.g. EK-TM4C1294XL)"
     required: true
   build-config:
-    description: 'Build configuration (e.g. RelWithDebInfo, Debug)'
+    description: "Build configuration (e.g. RelWithDebInfo, Debug)"
     required: true
   clock-mhz:
-    description: 'CPU clock frequency in MHz (e.g. 120)'
+    description: "CPU clock frequency in MHz (e.g. 120)"
     required: true
   cortex:
-    description: 'Cortex-M variant for timing model (e.g. m4, m33)'
+    description: "Cortex-M variant for timing model (e.g. m4, m33)"
     required: false
-    default: 'm4'
+    default: "m4"
   objdump-tool:
-    description: 'Path to the objdump binary (default: arm-none-eabi-objdump)'
+    description: "Path to the objdump binary"
     required: false
     default: "arm-none-eabi-objdump"
   size-tool:
-    description: "Path to the size binary (default: arm-none-eabi-size)"
+    description: "Path to the size binary"
     required: false
     default: "arm-none-eabi-size"
   output-dir:
-    description: "Directory for generated reports"
+    description: "Directory for generated combined outputs (multi-mode)"
     required: false
     default: "cycle-analysis-output"
   post-pr-comment:
-    description: "Post a PR comment with the summary (true/false)"
+    description: "Post a PR comment with the combined summary (true/false)"
     required: false
     default: "true"
   artifact-name:
@@ -46,70 +60,84 @@ inputs:
     default: "cycle-analysis"
 
 outputs:
+  comment-path:
+    description: "Path to the combined PR comment markdown"
+    value: ${{ steps.run.outputs.comment_path }}
+  summary-path:
+    description: "Path to the combined step summary markdown"
+    value: ${{ steps.run.outputs.summary_path }}
+  # Single-mode outputs (populated only in single-mode)
   min-cycles:
-    description: 'Minimum estimated cycles for the full path'
-    value: ${{ steps.extract.outputs.min_cycles }}
+    description: "Minimum estimated cycles (single-mode only)"
+    value: ${{ steps.run.outputs.min_cycles }}
   max-cycles:
-    description: 'Maximum estimated cycles for the full path'
-    value: ${{ steps.extract.outputs.max_cycles }}
-  report-path:
-    description: 'Path to the full Markdown report'
-    value: ${{ steps.analyze.outputs.report_path }}
-  metrics-path:
-    description: 'Path to the JSON metrics file'
-    value: ${{ steps.analyze.outputs.metrics_path }}
+    description: "Maximum estimated cycles (single-mode only)"
+    value: ${{ steps.run.outputs.max_cycles }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Set up Python
       uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
       with:
-        python-version: '3.11'
+        python-version: "3.11"
 
     - name: Run cycle analysis
-      id: analyze
+      id: run
       shell: bash
+      env:
+        ANALYSES_JSON: ${{ inputs.analyses-json }}
       run: |
         set -euo pipefail
         mkdir -p "${{ inputs.output-dir }}"
 
-        python3 "${{ github.action_path }}/analyze_cycles.py" \
-          "${{ inputs.config-path }}" \
-          --elf "${{ inputs.elf-path }}" \
-          --target "${{ inputs.target }}" \
-          --build-config "${{ inputs.build-config }}" \
-          --clock-mhz "${{ inputs.clock-mhz }}" \
-          --cortex "${{ inputs.cortex }}" \
-          --output-dir "${{ inputs.output-dir }}" \
-          --objdump "${{ inputs.objdump-tool }}" \
-          --size-tool "${{ inputs.size-tool }}"
+        if [[ -n "${ANALYSES_JSON}" ]]; then
+          # ── Multi-mode ──────────────────────────────────────────────────
+          ANALYSES_FILE="${{ inputs.output-dir }}/analyses.json"
+          printf '%s' "${ANALYSES_JSON}" > "${ANALYSES_FILE}"
 
-        echo "report_path=${{ inputs.output-dir }}/cycle_estimation_report.md" >> "$GITHUB_OUTPUT"
-        echo "metrics_path=${{ inputs.output-dir }}/cycle_metrics.json" >> "$GITHUB_OUTPUT"
+          PYTHONPATH="${{ github.action_path }}" python3 "${{ github.action_path }}/analyze_multi.py" \
+            "${ANALYSES_FILE}" \
+            --target    "${{ inputs.target }}" \
+            --build-config "${{ inputs.build-config }}" \
+            --clock-mhz "${{ inputs.clock-mhz }}" \
+            --cortex    "${{ inputs.cortex }}" \
+            --objdump   "${{ inputs.objdump-tool }}" \
+            --size-tool "${{ inputs.size-tool }}" \
+            --output-dir "${{ inputs.output-dir }}"
 
-    - name: Extract metrics
-      id: extract
-      shell: bash
-      run: |
-        set -euo pipefail
-        json="${{ inputs.output-dir }}/cycle_metrics.json"
+          echo "comment_path=${{ inputs.output-dir }}/combined_pr_comment.md" >> "$GITHUB_OUTPUT"
+          echo "summary_path=${{ inputs.output-dir }}/combined_step_summary.md" >> "$GITHUB_OUTPUT"
+          echo "min_cycles=" >> "$GITHUB_OUTPUT"
+          echo "max_cycles=" >> "$GITHUB_OUTPUT"
+        else
+          # ── Single-mode (backwards-compatible) ──────────────────────────
+          PYTHONPATH="${{ github.action_path }}" python3 -m cycle_analysis \
+            "${{ inputs.config-path }}" \
+            --elf "${{ inputs.elf-path }}" \
+            --target    "${{ inputs.target }}" \
+            --build-config "${{ inputs.build-config }}" \
+            --clock-mhz "${{ inputs.clock-mhz }}" \
+            --cortex    "${{ inputs.cortex }}" \
+            --output-dir "${{ inputs.output-dir }}" \
+            --objdump   "${{ inputs.objdump-tool }}" \
+            --size-tool "${{ inputs.size-tool }}"
 
-        min_cycles=$(python3 -c "import json; d=json.load(open('$json')); print(d['summary']['estimated_min_cycles'])")
-        max_cycles=$(python3 -c "import json; d=json.load(open('$json')); print(d['summary']['estimated_max_cycles'])")
+          JSON="${{ inputs.output-dir }}/cycle_metrics.json"
+          MIN=$(python3 -c "import json; d=json.load(open('${JSON}')); print(d['summary']['estimated_min_cycles'])")
+          MAX=$(python3 -c "import json; d=json.load(open('${JSON}')); print(d['summary']['estimated_max_cycles'])")
 
-        echo "min_cycles=${min_cycles}" >> "$GITHUB_OUTPUT"
-        echo "max_cycles=${max_cycles}" >> "$GITHUB_OUTPUT"
+          echo "min_cycles=${MIN}" >> "$GITHUB_OUTPUT"
+          echo "max_cycles=${MAX}" >> "$GITHUB_OUTPUT"
+          echo "comment_path=${{ inputs.output-dir }}/pr_comment.md" >> "$GITHUB_OUTPUT"
+          echo "summary_path=${{ inputs.output-dir }}/pr_comment.md" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Upload analysis artifacts
       uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
       with:
         name: ${{ inputs.artifact-name }}
-        path: |
-          ${{ inputs.output-dir }}/cycle_estimation_report.md
-          ${{ inputs.output-dir }}/annotated_disassembly.md
-          ${{ inputs.output-dir }}/cycle_metrics.json
-          ${{ inputs.output-dir }}/size_report.txt
+        path: ${{ inputs.output-dir }}/
 
     - name: Post PR comment
       if: inputs.post-pr-comment == 'true' && github.event_name == 'pull_request'
@@ -117,21 +145,24 @@ runs:
       with:
         script: |
           const fs = require('fs');
-          const body = fs.readFileSync(
-            '${{ inputs.output-dir }}/pr_comment.md', 'utf8'
-          );
+          const commentFile = '${{ steps.run.outputs.comment_path }}';
+          if (!fs.existsSync(commentFile)) {
+            core.warning(`Comment file not found: ${commentFile}`);
+            return;
+          }
+          const body = fs.readFileSync(commentFile, 'utf8');
 
           const marker = '<!-- cycle-analysis-comment -->';
-          const fullBody = `${marker}\n${body}`;
+          const fullBody = body.includes(marker) ? body : `${marker}\n${body}`;
 
-          // Find & update or create comment
-          const { data: comments } = await github.rest.issues.listComments({
+          const comments = await github.paginate(github.rest.issues.listComments, {
             owner: context.repo.owner,
             repo: context.repo.repo,
             issue_number: context.issue.number,
+            per_page: 100,
           });
 
-          const existing = comments.find(c => c.body.includes(marker));
+          const existing = comments.find(c => c.body && c.body.includes(marker));
 
           if (existing) {
             await github.rest.issues.updateComment({

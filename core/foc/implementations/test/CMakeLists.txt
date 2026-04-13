@@ -7,6 +7,7 @@ target_link_libraries(e_foc.foc_test PUBLIC
     e_foc.foc.instantiations
     numerical.math_test_helper
     infra.timer_test_helper
+    infra.event_test_helper
     e_foc.foc_mock
 )
 
@@ -14,6 +15,7 @@ target_sources(e_foc.foc_test PRIVATE
     TestFocPositionImpl.cpp
     TestFocSpeedImpl.cpp
     TestFocTorqueImpl.cpp
+    TestLowPriorityInterruptImpl.cpp
     TestRunner.cpp
     TestSpaceVectorModulation.cpp
     TestTrigonometricImpl.cpp

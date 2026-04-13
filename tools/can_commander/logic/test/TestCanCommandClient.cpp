@@ -354,4 +354,52 @@ namespace
                 1));
         receiveCallback(canId, data);
     }
+
+    TEST_F(TestCanCommandClient, motor_type_response_received_does_not_call_any_observer)
+    {
+        EXPECT_CALL(observer, OnConnectionChanged(true));
+
+        hal::Can::Message data;
+        data.push_back(static_cast<uint8_t>(FocMotorMode::speed));
+
+        auto canId = hal::Can::Id::Create29BitId(
+            MakeCanId(CanPriority::response,
+                focMotorCategoryId,
+                focMotorTypeResponseId,
+                1));
+        receiveCallback(canId, data);
+        // StrictMock: no observer method should be called — OnMotorTypeResponse is a no-op
+    }
+
+    TEST_F(TestCanCommandClient, electrical_params_response_received_does_not_call_any_observer)
+    {
+        EXPECT_CALL(observer, OnConnectionChanged(true));
+
+        hal::Can::Message data;
+        data.resize(4, 0);
+
+        auto canId = hal::Can::Id::Create29BitId(
+            MakeCanId(CanPriority::response,
+                focMotorCategoryId,
+                focElectricalParamsResponseId,
+                1));
+        receiveCallback(canId, data);
+        // StrictMock: no observer method should be called — OnElectricalParamsResponse is a no-op
+    }
+
+    TEST_F(TestCanCommandClient, mechanical_params_response_received_does_not_call_any_observer)
+    {
+        EXPECT_CALL(observer, OnConnectionChanged(true));
+
+        hal::Can::Message data;
+        data.resize(4, 0);
+
+        auto canId = hal::Can::Id::Create29BitId(
+            MakeCanId(CanPriority::response,
+                focMotorCategoryId,
+                focMechanicalParamsResponseId,
+                1));
+        receiveCallback(canId, data);
+        // StrictMock: no observer method should be called — OnMechanicalParamsResponse is a no-op
+    }
 }

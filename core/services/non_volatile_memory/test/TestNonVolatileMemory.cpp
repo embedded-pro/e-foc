@@ -453,3 +453,198 @@ TEST_F(NonVolatileMemoryTest, format_erases_all_regions)
     for (auto byte : configRegion.storage)
         EXPECT_EQ(byte, 0xFF);
 }
+
+TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_on_crc_corruption)
+{
+    bool saveDone = false;
+    nvm.SaveConfig(MakeTestConfig(), [&](auto)
+        {
+            saveDone = true;
+        });
+    RunUntilDone(saveDone);
+
+    // Corrupt one byte of the CRC field (same offset as calibration record)
+    configRegion.storage[recordCrc32Offset] ^= 0xFF;
+
+    const services::ConfigData defaults = services::MakeDefaultConfigData();
+    services::ConfigData loaded{};
+    bool done = false;
+    services::NvmStatus result{};
+
+    nvm.LoadConfig(loaded, [&](services::NvmStatus s)
+        {
+            result = s;
+            done = true;
+        });
+
+    RunUntilDone(done);
+    EXPECT_EQ(result, services::NvmStatus::Ok);
+    ExpectConfigDataEqual(loaded, defaults);
+}
+
+TEST_F(NonVolatileMemoryTest, save_calibration_write_verify_failure_returns_write_failed)
+{
+    // Override Read to return corrupted data so the readback comparison fails.
+    struct CorruptingRegion
+        : public services::NvmRegion
+    {
+        std::vector<uint8_t> storage;
+        bool corruptOnRead{ false };
+
+        explicit CorruptingRegion(std::size_t size)
+            : storage(size, 0xFF)
+        {}
+
+        void Write(infra::ConstByteRange data, infra::Function<void()> onDone) override
+        {
+            std::copy(data.begin(), data.end(), storage.begin());
+            infra::EventDispatcher::Instance().Schedule(onDone);
+        }
+
+        void Read(infra::ByteRange data, infra::Function<void()> onDone) override
+        {
+            std::copy(storage.begin(), storage.begin() + data.size(), data.begin());
+            if (corruptOnRead && !data.empty())
+                data[0] ^= 0xFF;
+            infra::EventDispatcher::Instance().Schedule(onDone);
+        }
+
+        void Erase(infra::Function<void()> onDone) override
+        {
+            std::fill(storage.begin(), storage.end(), 0xFF);
+            infra::EventDispatcher::Instance().Schedule(onDone);
+        }
+
+        std::size_t Size() const override
+        {
+            return storage.size();
+        }
+    };
+
+    CorruptingRegion corruptCalibrationRegion{ services::NonVolatileMemoryImpl::calibrationRecordSize };
+    NvmRegionStub corruptConfigRegion{ services::NonVolatileMemoryImpl::configRecordSize };
+    services::NonVolatileMemoryImpl nvmWithCorruption{ corruptCalibrationRegion, corruptConfigRegion };
+
+    corruptCalibrationRegion.corruptOnRead = true;
+
+    bool done = false;
+    services::NvmStatus result{};
+
+    nvmWithCorruption.SaveCalibration(MakeTestCalibration(), [&](services::NvmStatus s)
+        {
+            result = s;
+            done = true;
+        });
+
+    RunUntilDone(done);
+    EXPECT_EQ(result, services::NvmStatus::WriteFailed);
+}
+
+TEST_F(NonVolatileMemoryTest, save_config_write_verify_failure_returns_write_failed)
+{
+    struct CorruptingRegion
+        : public services::NvmRegion
+    {
+        std::vector<uint8_t> storage;
+
+        explicit CorruptingRegion(std::size_t size)
+            : storage(size, 0xFF)
+        {}
+
+        void Write(infra::ConstByteRange data, infra::Function<void()> onDone) override
+        {
+            std::copy(data.begin(), data.end(), storage.begin());
+            infra::EventDispatcher::Instance().Schedule(onDone);
+        }
+
+        void Read(infra::ByteRange data, infra::Function<void()> onDone) override
+        {
+            std::copy(storage.begin(), storage.begin() + data.size(), data.begin());
+            if (!data.empty())
+                data[0] ^= 0xFF;
+            infra::EventDispatcher::Instance().Schedule(onDone);
+        }
+
+        void Erase(infra::Function<void()> onDone) override
+        {
+            std::fill(storage.begin(), storage.end(), 0xFF);
+            infra::EventDispatcher::Instance().Schedule(onDone);
+        }
+
+        std::size_t Size() const override
+        {
+            return storage.size();
+        }
+    };
+
+    NvmRegionStub normalCalibrationRegion{ services::NonVolatileMemoryImpl::calibrationRecordSize };
+    CorruptingRegion corruptConfigRegion{ services::NonVolatileMemoryImpl::configRecordSize };
+    services::NonVolatileMemoryImpl nvmWithCorruption{ normalCalibrationRegion, corruptConfigRegion };
+
+    bool done = false;
+    services::NvmStatus result{};
+
+    nvmWithCorruption.SaveConfig(MakeTestConfig(), [&](services::NvmStatus s)
+        {
+            result = s;
+            done = true;
+        });
+
+    RunUntilDone(done);
+    EXPECT_EQ(result, services::NvmStatus::WriteFailed);
+}
+
+TEST_F(NonVolatileMemoryTest, concurrent_save_calibration_second_call_is_rejected)
+{
+    // Start a save that won't complete (no ExecuteAllActions) then call again —
+    // the second call must return silently without interfering with the first.
+    bool firstDone = false;
+
+    nvm.SaveCalibration(MakeTestCalibration(), [&](auto)
+        {
+            firstDone = true;
+        });
+
+    // Second call while first is pending: should be silently ignored.
+    bool secondDone = false;
+    nvm.SaveCalibration(MakeTestCalibration(), [&](auto)
+        {
+            secondDone = true;
+        });
+
+    RunUntilDone(firstDone);
+
+    EXPECT_TRUE(firstDone);
+    EXPECT_FALSE(secondDone);
+}
+
+TEST_F(NonVolatileMemoryTest, concurrent_load_config_second_call_is_rejected)
+{
+    bool saveDone = false;
+    nvm.SaveConfig(MakeTestConfig(), [&](auto)
+        {
+            saveDone = true;
+        });
+    RunUntilDone(saveDone);
+
+    services::ConfigData out1{};
+    services::ConfigData out2{};
+
+    bool firstDone = false;
+
+    nvm.LoadConfig(out1, [&](auto)
+        {
+            firstDone = true;
+        });
+
+    bool secondDone = false;
+    nvm.LoadConfig(out2, [&](auto)
+        {
+            secondDone = true;
+        });
+
+    RunUntilDone(firstDone);
+
+    EXPECT_TRUE(firstDone);
+    EXPECT_FALSE(secondDone);
+}

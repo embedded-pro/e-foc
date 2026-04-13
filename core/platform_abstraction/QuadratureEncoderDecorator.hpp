@@ -13,7 +13,8 @@ namespace application
         virtual foc::Radians Read() = 0;
     };
 
-    template<typename Impl, typename = std::enable_if_t<std::is_base_of_v<hal::SynchronousQuadratureEncoder, Impl>>>
+    template<typename Impl>
+    requires std::derived_from<Impl, hal::SynchronousQuadratureEncoder>
     class QuadratureEncoderDecoratorImpl
         : public QuadratureEncoderDecorator
     {
@@ -29,15 +30,17 @@ namespace application
 
     // Implementation
 
-    template<typename Impl, typename Enable>
+    template<typename Impl>
+    requires std::derived_from<Impl, hal::SynchronousQuadratureEncoder>
     template<typename... Args>
-    QuadratureEncoderDecoratorImpl<Impl, Enable>::QuadratureEncoderDecoratorImpl(uint32_t, Args&&... args)
+    QuadratureEncoderDecoratorImpl<Impl>::QuadratureEncoderDecoratorImpl(uint32_t, Args&&... args)
         : encoder(std::forward<Args>(args)...)
     {
     }
 
-    template<typename Impl, typename Enable>
-    foc::Radians QuadratureEncoderDecoratorImpl<Impl, Enable>::Read()
+    template<typename Impl>
+    requires std::derived_from<Impl, hal::SynchronousQuadratureEncoder>
+    foc::Radians QuadratureEncoderDecoratorImpl<Impl>::Read()
     {
         static constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
         static constexpr float pi = std::numbers::pi_v<float>;

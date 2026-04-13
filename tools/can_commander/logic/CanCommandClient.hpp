@@ -61,8 +61,8 @@ namespace tool
         void SendSetSpeedPid(float kp, float ki, float kd);
         void SendSetPositionPid(float kp, float ki, float kd);
 
-        void SendSetSupplyVoltage(float volts);
-        void SendSetMaxCurrent(float amps);
+        void SendSetSupplyVoltage(float volts) const;
+        void SendSetMaxCurrent(float amps) const;
 
         void RequestData();
 

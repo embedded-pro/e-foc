@@ -109,6 +109,8 @@ namespace application
 
         void ApplyCalibrationData(const services::CalibrationData& data);
         void CheckNvmOnBoot();
+        void OnNvmValidationResult(bool valid);
+        void OnNvmLoadResult(services::NvmStatus status);
 
         void RegisterCliCommands();
         void ApplyOnlineEstimatesImpl();
@@ -488,27 +490,39 @@ namespace application
     {
         nvm.IsCalibrationValid([this](bool valid)
             {
-                if (!std::holds_alternative<state_machine::Idle>(currentState))
-                    return;
-                if (!valid)
-                {
-                    tracer.Trace() << "[SM] NVM invalid, starting in Idle";
-                    return;
-                }
-
-                nvm.LoadCalibration(calibrationData, [this](services::NvmStatus status)
-                    {
-                        if (!std::holds_alternative<state_machine::Idle>(currentState))
-                            return;
-                        if (status != services::NvmStatus::Ok)
-                        {
-                            tracer.Trace() << "[SM] NVM load failed, starting in Idle";
-                            return;
-                        }
-                        ApplyCalibrationData(calibrationData);
-                        EnterReady(calibrationData);
-                    });
+                OnNvmValidationResult(valid);
             });
+    }
+
+    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
+    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::OnNvmValidationResult(bool valid)
+    {
+        if (!std::holds_alternative<state_machine::Idle>(currentState))
+            return;
+        if (!valid)
+        {
+            tracer.Trace() << "[SM] NVM invalid, starting in Idle";
+            return;
+        }
+
+        nvm.LoadCalibration(calibrationData, [this](services::NvmStatus status)
+            {
+                OnNvmLoadResult(status);
+            });
+    }
+
+    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
+    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::OnNvmLoadResult(services::NvmStatus status)
+    {
+        if (!std::holds_alternative<state_machine::Idle>(currentState))
+            return;
+        if (status != services::NvmStatus::Ok)
+        {
+            tracer.Trace() << "[SM] NVM load failed, starting in Idle";
+            return;
+        }
+        ApplyCalibrationData(calibrationData);
+        EnterReady(calibrationData);
     }
 
     template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>

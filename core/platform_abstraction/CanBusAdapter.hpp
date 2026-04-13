@@ -28,21 +28,22 @@ namespace application
 
         friend infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, CanError error)
         {
+            using enum CanError;
             switch (error)
             {
-                case CanError::busOff:
+                case busOff:
                     stream << "bus off";
                     break;
-                case CanError::errorPassive:
+                case errorPassive:
                     stream << "error passive";
                     break;
-                case CanError::errorWarning:
+                case errorWarning:
                     stream << "error warning";
                     break;
-                case CanError::messageLost:
+                case messageLost:
                     stream << "message lost";
                     break;
-                case CanError::rxBufferOverflow:
+                case rxBufferOverflow:
                     stream << "rx buffer overflow";
                     break;
                 default:
@@ -62,7 +63,7 @@ namespace application
         CanBusAdapterImpl() = default;
 
         template<typename... Args>
-            requires(sizeof...(Args) > 0 && (!std::same_as<std::remove_cvref_t<Args>, CanBusAdapterImpl> && ...))
+        requires(sizeof...(Args) > 0 && (!std::same_as<std::remove_cvref_t<Args>, CanBusAdapterImpl> && ...))
         explicit CanBusAdapterImpl(Args&&... args)
             : can(std::forward<Args>(args)...)
         {}

@@ -18,6 +18,7 @@ target_link_libraries(e_foc.state_machine_test PUBLIC
 )
 
 target_sources(e_foc.state_machine_test PRIVATE
+    TestFaultNotifier.cpp
     TestFocStateMachineTorque.cpp
     TestFocStateMachineSpeed.cpp
     TestFocStateMachinePosition.cpp

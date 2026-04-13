@@ -133,12 +133,12 @@ namespace tool
             SetBusy(false);
     }
 
-    void CanCommandClient::SendSetSupplyVoltage(float /*volts*/)
+    void CanCommandClient::SendSetSupplyVoltage(float /*volts*/) const
     {
         // No equivalent in can-lite FocMotorCategoryClient; intentional no-op
     }
 
-    void CanCommandClient::SendSetMaxCurrent(float /*amps*/)
+    void CanCommandClient::SendSetMaxCurrent(float /*amps*/) const
     {
         // No equivalent in can-lite FocMotorCategoryClient; intentional no-op
     }
@@ -173,11 +173,14 @@ namespace tool
             });
     }
 
-    void CanCommandClient::OnMotorTypeResponse(FocMotorMode /*mode*/) {}
+    void CanCommandClient::OnMotorTypeResponse(FocMotorMode /*mode*/)
+    {}
 
-    void CanCommandClient::OnElectricalParamsResponse(const FocElectricalParams& /*params*/) {}
+    void CanCommandClient::OnElectricalParamsResponse(const FocElectricalParams& /*params*/)
+    {}
 
-    void CanCommandClient::OnMechanicalParamsResponse(const FocMechanicalParams& /*params*/) {}
+    void CanCommandClient::OnMechanicalParamsResponse(const FocMechanicalParams& /*params*/)
+    {}
 
     void CanCommandClient::OnTelemetryStatusResponse(const FocTelemetryStatus& status)
     {
@@ -242,4 +245,3 @@ namespace tool
             });
     }
 }
-
