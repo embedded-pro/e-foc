@@ -1,6 +1,8 @@
 #pragma once
 
+#ifndef Q_MOC_RUN
 #include "core/foc/implementations/TransformsClarkePark.hpp"
+#endif
 #include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "infra/util/Function.hpp"

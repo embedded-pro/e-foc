@@ -9,6 +9,8 @@
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include <algorithm>
 #include <array>
+#include <ranges>
+#include <span>
 
 namespace application
 {
