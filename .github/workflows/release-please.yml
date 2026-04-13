@@ -27,7 +27,7 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
+      - uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
         id: token
         with:
           app-id: ${{ vars.FOREST_RELEASER_APP_ID }}
@@ -78,17 +78,17 @@ jobs:
             cp "$f" "$staging/"
           done
           tar -czf "e_foc-can_commander-${version}-linux-x86_64.tar.gz" -C staging can_commander
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: linux-simulator
           path: e_foc-simulator-*-linux-x86_64.tar.gz
           if-no-files-found: error
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: linux-can-commander
           path: e_foc-can_commander-*-linux-x86_64.tar.gz
           if-no-files-found: error
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: host-install-package
           path: build/host/e_foc-*.*
@@ -145,12 +145,12 @@ jobs:
             cp "$f" "$staging/"
           done
           7z a "e_foc-can_commander-${version}-windows-x86_64.zip" "./staging/can_commander/*"
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: windows-simulator
           path: e_foc-simulator-*-windows-x86_64.zip
           if-no-files-found: error
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: windows-can-commander
           path: e_foc-can_commander-*-windows-x86_64.zip
@@ -175,7 +175,7 @@ jobs:
           persist-credentials: false
           submodules: recursive
       - name: Install GNU Arm Embedded Toolchain ${{ matrix.gcc }}
-        uses: carlosperate/arm-none-eabi-gcc-action@7153327ecfbc421a0b4268058e4bb3d5d6e5df2c # v1.12.1
+        uses: carlosperate/arm-none-eabi-gcc-action@0725d97b026acf7fc8e22dfd5bee912998879ba8 # v1.12.3
         with:
           release: ${{ matrix.gcc }}
       - run: sudo apt-get update && sudo apt-get install ninja-build xsltproc
@@ -197,7 +197,7 @@ jobs:
             cp "$f" "$staging/"
           done
           tar -czf "e_foc-firmware-${{ matrix.target }}-${version}.tar.gz" -C staging "${{ matrix.target }}"
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: firmware-${{ matrix.target }}
           path: e_foc-firmware-${{ matrix.target }}-*.tar.gz
