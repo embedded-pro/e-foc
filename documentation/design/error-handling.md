@@ -7,14 +7,14 @@ component: "error-handling"
 date: 2026-04-13
 ---
 
-| Field     | Value            |
-|-----------|------------------|
+| Field     | Value                 |
+|-----------|-----------------------|
 | Title     | Error Handling Design |
-| Type      | design           |
-| Status    | stable           |
-| Version   | 1.0.0            |
-| Component | error-handling   |
-| Date      | 2026-04-13       |
+| Type      | design                |
+| Status    | stable                |
+| Version   | 1.0.0                 |
+| Component | error-handling        |
+| Date      | 2026-04-13            |
 
 ---
 
@@ -63,32 +63,32 @@ The CLI banner reads both the reset cause and any pending fault snapshot from `P
 
 ### Provided
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
-| `PlatformFactory::Reset()` | Trigger an immediate software reset | Called synchronously; does not return |
-| `PlatformFactory::GetResetCause() const` | Return the reset cause captured at boot | Valid for the lifetime of the application; thread-safe by value semantics |
-| `PlatformFactory::FaultStatus() const` | Return the formatted fault string (empty if no fault) | Valid for the lifetime of the application once the constructor returns |
+| Interface                                | Purpose                                               | Contract                                                                  |
+|------------------------------------------|-------------------------------------------------------|---------------------------------------------------------------------------|
+| `PlatformFactory::Reset()`               | Trigger an immediate software reset                   | Called synchronously; does not return                                     |
+| `PlatformFactory::GetResetCause() const` | Return the reset cause captured at boot               | Valid for the lifetime of the application; thread-safe by value semantics |
+| `PlatformFactory::FaultStatus() const`   | Return the formatted fault string (empty if no fault) | Valid for the lifetime of the application once the constructor returns    |
 
 ### Required
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
-| Platform linker script | Provide `.error_handling` NOLOAD section in RAM | Must be placed before `.bss` to avoid zero-fill |
-| ARM Cortex-M NVIC | Deliver HardFault exception to the handler trampoline | Always-enabled; not configurable via NVIC_EnableIRQ |
-| `SYSCTL->RESC` (TI) / `RCC->CSR` or `RCC->RSR` (ST) | Provide reset source bits at boot | Read once; cleared after read |
+| Interface                                           | Purpose                                               | Contract                                            |
+|-----------------------------------------------------|-------------------------------------------------------|-----------------------------------------------------|
+| Platform linker script                              | Provide `.error_handling` NOLOAD section in RAM       | Must be placed before `.bss` to avoid zero-fill     |
+| ARM Cortex-M NVIC                                   | Deliver HardFault exception to the handler trampoline | Always-enabled; not configurable via NVIC_EnableIRQ |
+| `SYSCTL->RESC` (TI) / `RCC->CSR` or `RCC->RSR` (ST) | Provide reset source bits at boot                     | Read once; cleared after read                       |
 
 ---
 
 ## Data Model
 
-| Entity | Field | Type / Unit | Range | Notes |
-|--------|-------|-------------|-------|-------|
-| PersistentFaultData | magic | 32-bit unsigned | 0 or 0xDEADBEEF | Written last to commit capture |
-| PersistentFaultData | r0–r3, r12, lr, pc, psr | 32-bit unsigned | Any | ARM exception stack frame words |
-| PersistentFaultData | cfsr, mmfar, bfar | 32-bit unsigned | Any | Cortex-M fault status registers |
-| PersistentFaultData | stackTrace[243] | 32-bit unsigned array | Any | Addresses within `.text` found on stack |
-| PersistentFaultData | stackTraceCount | 32-bit unsigned | 0–243 | Number of valid trace entries |
-| ResetCause | — | enum | powerUp, brownOut, software, hardware, watchdog | MCU-agnostic |
+| Entity              | Field                   | Type / Unit           | Range                                           | Notes                                   |
+|---------------------|-------------------------|-----------------------|-------------------------------------------------|-----------------------------------------|
+| PersistentFaultData | magic                   | 32-bit unsigned       | 0 or 0xDEADBEEF                                 | Written last to commit capture          |
+| PersistentFaultData | r0–r3, r12, lr, pc, psr | 32-bit unsigned       | Any                                             | ARM exception stack frame words         |
+| PersistentFaultData | cfsr, mmfar, bfar       | 32-bit unsigned       | Any                                             | Cortex-M fault status registers         |
+| PersistentFaultData | stackTrace[243]         | 32-bit unsigned array | Any                                             | Addresses within `.text` found on stack |
+| PersistentFaultData | stackTraceCount         | 32-bit unsigned       | 0–243                                           | Number of valid trace entries           |
+| ResetCause          | —                       | enum                  | powerUp, brownOut, software, hardware, watchdog | MCU-agnostic                            |
 
 ---
 
