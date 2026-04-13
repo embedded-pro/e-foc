@@ -1,4 +1,4 @@
-name: 'Generate Traceability Matrix'
+name: "Generate Traceability Matrix"
 description: >
   Generates a requirements-vs-SIL traceability matrix in Markdown by scanning
   YAML requirement files and Gherkin feature files.  Optionally incorporates
@@ -7,17 +7,17 @@ description: >
 
 inputs:
   requirements-dir:
-    description: 'Directory containing *.yaml requirement files'
+    description: "Directory containing *.yaml requirement files"
     required: false
-    default: 'documentation/requirements'
+    default: "documentation/requirements"
   features-dir:
-    description: 'Directory containing *.feature scenario files'
+    description: "Directory containing *.feature scenario files"
     required: false
-    default: 'integration_tests/software_in_the_loop/features'
+    default: "integration_tests/software_in_the_loop/features"
   junit-xml:
-    description: 'Path to JUnit XML from SIL test run (optional; adds status column)'
+    description: "Path to JUnit XML from SIL test run (optional; adds status column)"
     required: false
-    default: ''
+    default: ""
   output:
     description: 'Output path for the generated Markdown file'
     required: true

@@ -1,4 +1,4 @@
-name: 'Cycle Analysis'
+name: "Cycle Analysis"
 description: >
   Estimates CPU cycle consumption for user-defined critical paths through
   ARM Cortex-M binaries.  Supports single-mode and multi-mode (one invocation
@@ -16,17 +16,17 @@ inputs:
 
   # ── Single-mode (backwards-compatible) ────────────────────────────────────
   elf-path:
-    description: 'Path to the ELF binary (single-mode only)'
+    description: "Path to the ELF binary (single-mode only)"
     required: false
     default: ""
   config-path:
-    description: 'Path to the cycle-analysis JSON config (single-mode only)'
+    description: "Path to the cycle-analysis JSON config (single-mode only)"
     required: false
     default: ""
 
   # ── Shared ────────────────────────────────────────────────────────────────
   target:
-    description: 'Target board identifier (e.g. EK-TM4C1294XL)'
+    description: "Target board identifier (e.g. EK-TM4C1294XL)"
     required: true
   build-config:
     description: 'Build configuration (e.g. RelWithDebInfo, Debug)'
@@ -37,9 +37,9 @@ inputs:
   cortex:
     description: 'Cortex-M variant for timing model (e.g. m4, m33)'
     required: false
-    default: 'm4'
+    default: "m4"
   objdump-tool:
-    description: 'Path to the objdump binary'
+    description: "Path to the objdump binary"
     required: false
     default: "arm-none-eabi-objdump"
   size-tool:
@@ -61,26 +61,26 @@ inputs:
 
 outputs:
   comment-path:
-    description: 'Path to the combined PR comment markdown'
+    description: "Path to the combined PR comment markdown"
     value: ${{ steps.run.outputs.comment_path }}
   summary-path:
-    description: 'Path to the combined step summary markdown'
+    description: "Path to the combined step summary markdown"
     value: ${{ steps.run.outputs.summary_path }}
   # Single-mode outputs (populated only in single-mode)
   min-cycles:
-    description: 'Minimum estimated cycles (single-mode only)'
+    description: "Minimum estimated cycles (single-mode only)"
     value: ${{ steps.run.outputs.min_cycles }}
   max-cycles:
-    description: 'Maximum estimated cycles (single-mode only)'
+    description: "Maximum estimated cycles (single-mode only)"
     value: ${{ steps.run.outputs.max_cycles }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Set up Python
       uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
       with:
-        python-version: '3.11'
+        python-version: "3.11"
 
     - name: Run cycle analysis
       id: run
