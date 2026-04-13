@@ -239,7 +239,14 @@ jobs:
 
   publish_release_assets:
     name: Publish Release Assets
-    needs: [release_please, build_linux_tools, build_windows_tools, build_embedded, build_documentation]
+    needs:
+      [
+        release_please,
+        build_linux_tools,
+        build_windows_tools,
+        build_embedded,
+        build_documentation
+      ]
     if: needs.release_please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     permissions:

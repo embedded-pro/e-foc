@@ -19,20 +19,20 @@ inputs:
     required: false
     default: ""
   output:
-    description: 'Output path for the generated Markdown file'
+    description: "Output path for the generated Markdown file"
     required: true
   pdf-output:
-    description: 'If set, also convert the Markdown to a PDF at this path'
+    description: "If set, also convert the Markdown to a PDF at this path"
     required: false
-    default: ''
+    default: ""
 
 outputs:
   matrix-path:
-    description: 'Path to the generated Markdown traceability matrix'
+    description: "Path to the generated Markdown traceability matrix"
     value: ${{ inputs.output }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Install PyYAML
       shell: bash

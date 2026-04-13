@@ -29,13 +29,13 @@ inputs:
     description: "Target board identifier (e.g. EK-TM4C1294XL)"
     required: true
   build-config:
-    description: 'Build configuration (e.g. RelWithDebInfo, Debug)'
+    description: "Build configuration (e.g. RelWithDebInfo, Debug)"
     required: true
   clock-mhz:
     description: 'CPU clock frequency in MHz (e.g. 120)'
     required: true
   cortex:
-    description: 'Cortex-M variant for timing model (e.g. m4, m33)'
+    description: "Cortex-M variant for timing model (e.g. m4, m33)"
     required: false
     default: "m4"
   objdump-tool:
