@@ -4,11 +4,11 @@
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
-#include "core/platform_abstraction/ResetCause.hpp"
 #include "hal/interfaces/Eeprom.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "hal/synchronous_interfaces/SynchronousQuadratureEncoder.hpp"
+#include "infra/stream/OutputStream.hpp"
 #include "infra/util/BoundedString.hpp"
 #include "infra/util/MemoryRange.hpp"
 #include "infra/util/ProxyCreator.hpp"
@@ -29,6 +29,17 @@ namespace hal
 
 namespace application
 {
+    enum class ResetCause : uint8_t
+    {
+        powerUp = 0,
+        brownOut = 1,
+        software = 2,
+        hardware = 3,
+        watchdog = 4,
+    };
+
+    infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, ResetCause cause);
+
     class PlatformFactory
     {
     public:

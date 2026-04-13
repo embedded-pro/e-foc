@@ -1,4 +1,4 @@
-#include "core/platform_abstraction/ResetCause.hpp"
+#include "core/platform_abstraction/PlatformFactory.hpp"
 #include "infra/stream/StreamManipulators.hpp"
 
 namespace application

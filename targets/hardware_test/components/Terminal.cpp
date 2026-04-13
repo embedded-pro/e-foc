@@ -192,6 +192,12 @@ namespace application
                 this->terminal.ProcessResult(GetFaultStatus());
             } });
 
+        terminal.AddCommand({ { "force_hardfault", "fhf", "Trigger a HardFault exception for error handler validation. Ex: force_hardfault" },
+            [this](const auto&)
+            {
+                this->terminal.ProcessResult(ForceHardfault());
+            } });
+
         encoderCreator.Emplace();
         pwmCreator.Emplace(std::chrono::nanoseconds{ 500 }, hal::Hertz{ 10000 });
         StartAdc(PlatformFactory::SampleAndHold::shortest);
@@ -620,6 +626,14 @@ namespace application
             tracer.Trace() << "No fault data available.";
         else
             tracer.Trace() << faultData;
+        return { services::TerminalWithStorage::Status::success };
+    }
+
+    TerminalInteractor::StatusWithMessage TerminalInteractor::ForceHardfault()
+    {
+        tracer.Trace() << "Triggering HardFault...";
+        void (*nullFunc)() = nullptr;
+        nullFunc();
         return { services::TerminalWithStorage::Status::success };
     }
 }

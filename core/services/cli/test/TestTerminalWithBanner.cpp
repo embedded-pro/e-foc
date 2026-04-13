@@ -1,4 +1,4 @@
-#include "core/platform_abstraction/ResetCause.hpp"
+#include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/services/cli/TerminalWithBanner.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"

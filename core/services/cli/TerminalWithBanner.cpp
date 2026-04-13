@@ -1,4 +1,5 @@
 #include "core/services/cli/TerminalWithBanner.hpp"
+#include "core/platform_abstraction/PlatformFactory.hpp"
 
 namespace services
 {

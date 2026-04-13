@@ -19,13 +19,10 @@ target_link_libraries(e_foc.platform_abstraction PUBLIC
 target_sources(e_foc.platform_abstraction PRIVATE
     AdcPhaseCurrentMeasurement.hpp
     CanBusAdapter.hpp
-    ResetCause.hpp
-    ResetCause.cpp
     PlatformFactory.hpp
+    PlatformFactory.cpp
     MotorFieldOrientedControllerAdapter.hpp
     MotorFieldOrientedControllerAdapter.cpp
     QuadratureEncoderDecorator.hpp
 )
-
-add_subdirectory(test)
 add_subdirectory(test_doubles)

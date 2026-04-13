@@ -1,10 +1,15 @@
 #pragma once
 
 #include "core/foc/interfaces/Units.hpp"
-#include "core/platform_abstraction/ResetCause.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/util/BoundedString.hpp"
 #include "services/util/TerminalWithStorage.hpp"
+#include <cstdint>
+
+namespace application
+{
+    enum class ResetCause : uint8_t;
+}
 
 namespace services
 {
@@ -20,7 +25,7 @@ namespace services
             infra::BoundedConstString::WithStorage<32> targetName;
             foc::Volts vdc;
             hal::Hertz systemClock;
-            application::ResetCause resetCause{ application::ResetCause::powerUp };
+            application::ResetCause resetCause{};
             infra::BoundedConstString faultStatus;
         };
 

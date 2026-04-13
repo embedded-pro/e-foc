@@ -40,6 +40,7 @@ namespace application
         StatusWithMessage ResetDevice();
         StatusWithMessage GetResetCauseStatus();
         StatusWithMessage GetFaultStatus();
+        StatusWithMessage ForceHardfault();
 
     private:
         static constexpr std::size_t averageSampleSize = 100;

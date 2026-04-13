@@ -57,3 +57,11 @@
   shall: >
     After a power cycle (not a software reset), the CLI banner shall report
     "PowerUp" as the reset cause.
+
+- id: REQ-HIL-010
+  title: HardFault handler captures and reports fault data
+  shall: >
+    When a HardFault is deliberately induced via the "force_hardfault" CLI
+    command, the device shall reboot and the fault_status command on the
+    subsequent boot shall return captured fault diagnostic data including
+    at minimum the faulting PC address.
