@@ -15,7 +15,7 @@ namespace
             foc::FocPositionImpl,
             services::TerminalFocPositionInteractor>;
 
-        StrictMock<test_helpers::StreamWriterMock> streamWriterMock;
+        StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
         hal::SerialCommunicationMock communication;
@@ -645,7 +645,7 @@ namespace
             services::TerminalFocPositionInteractor,
             state_machine::AutoTransitionPolicy>;
 
-        StrictMock<test_helpers::StreamWriterMock> streamWriterMock;
+        StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
         hal::SerialCommunicationMock communication;

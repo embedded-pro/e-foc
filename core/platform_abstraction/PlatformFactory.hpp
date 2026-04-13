@@ -8,6 +8,8 @@
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "hal/synchronous_interfaces/SynchronousQuadratureEncoder.hpp"
+#include "infra/stream/OutputStream.hpp"
+#include "infra/util/BoundedString.hpp"
 #include "infra/util/MemoryRange.hpp"
 #include "infra/util/ProxyCreator.hpp"
 #include "services/tracer/Tracer.hpp"
@@ -27,6 +29,17 @@ namespace hal
 
 namespace application
 {
+    enum class ResetCause : uint8_t
+    {
+        powerUp = 0,
+        brownOut = 1,
+        software = 2,
+        hardware = 3,
+        watchdog = 4,
+    };
+
+    infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, ResetCause cause);
+
     class PlatformFactory
     {
     public:
@@ -53,5 +66,9 @@ namespace application
         virtual infra::CreatorBase<QuadratureEncoderDecorator, void()>& SynchronousQuadratureEncoderCreator() = 0;
         virtual infra::CreatorBase<CanBusAdapter, void(uint32_t bitRate, bool testMode)>& CanBusCreator() = 0;
         virtual hal::Eeprom& Eeprom() = 0;
+
+        virtual void Reset() = 0;
+        virtual ResetCause GetResetCause() const = 0;
+        virtual infra::BoundedConstString FaultStatus() const = 0;
     };
 }

@@ -225,12 +225,11 @@ Run with custom parameters (example):
 | [Resistance & Inductance Estimation](documentation/theory/resistance-inductance-estimation.md) | Parameter estimation theory                              |
 | [Friction & Inertia Estimation](documentation/theory/friction-inertia-estimation.md)           | Mechanical parameter estimation theory                   |
 
-### Performance & Protocols
+### Performance
 
 | Document                                                                           | Description                                                      |
 |------------------------------------------------------------------------------------|------------------------------------------------------------------|
 | [Performance Optimization Guide](documentation/performance-optimization/README.md) | High-performance embedded code, assembly analysis, cycle budgets |
-| [CAN Protocol](documentation/protocols/can-protocol.md)                            | CAN bus communication protocol specification                     |
 
 ### Development References
 

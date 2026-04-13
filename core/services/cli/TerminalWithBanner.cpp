@@ -1,4 +1,5 @@
 #include "core/services/cli/TerminalWithBanner.hpp"
+#include "core/platform_abstraction/PlatformFactory.hpp"
 
 namespace services
 {
@@ -20,7 +21,14 @@ namespace services
         tracer.Trace() << "Target: " << E_FOC_TARGET_BOARD;
         tracer.Trace() << "System Clock: " << banner.systemClock.Value() << " Hz";
         tracer.Trace() << "Power Supply Voltage: " << banner.vdc.Value() << " V";
+        tracer.Trace() << "Reset Cause: " << banner.resetCause;
         tracer.Trace() << "================================================";
+        if (!banner.faultStatus.empty())
+        {
+            tracer.Trace() << "!!! FAULT DATA FROM PREVIOUS SESSION !!!";
+            tracer.Trace() << banner.faultStatus;
+            tracer.Trace() << "!!! END FAULT DATA !!!";
+        }
         tracer.Trace() << "Ready to accept commands. Type 'help' for available commands.";
     }
 }

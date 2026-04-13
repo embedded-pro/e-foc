@@ -1,5 +1,6 @@
 #include "targets/platform_implementations/st/implementation/PlatformFactoryImpl.hpp"
 #include "infra/util/MemoryRange.hpp"
+#include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
 
 namespace
@@ -15,11 +16,49 @@ extern "C" void PendSV_Handler()
 
 unsigned int hse_value = 8'000'000;
 
+namespace
+{
+    application::ResetCause ReadAndClearResetCause()
+    {
+#if defined(STM32H5)
+        const uint32_t rst = RCC->RSR;
+        RCC->RSR |= RCC_RSR_RMVF;
+        if (rst & RCC_RSR_SFTRSTF)
+            return application::ResetCause::software;
+        if (rst & (RCC_RSR_IWDGRSTF | RCC_RSR_WWDGRSTF))
+            return application::ResetCause::watchdog;
+        if (rst & RCC_RSR_BORRSTF)
+            return application::ResetCause::brownOut;
+        if (rst & RCC_RSR_PINRSTF)
+            return application::ResetCause::hardware;
+#elif defined(STM32F4)
+        const uint32_t rst = RCC->CSR;
+        RCC->CSR |= RCC_CSR_RMVF;
+        if (rst & RCC_CSR_SFTRSTF)
+            return application::ResetCause::software;
+        if (rst & (RCC_CSR_IWDGRSTF | RCC_CSR_WWDGRSTF))
+            return application::ResetCause::watchdog;
+        if (rst & RCC_CSR_BORRSTF)
+            return application::ResetCause::brownOut;
+        if (rst & RCC_CSR_PINRSTF)
+            return application::ResetCause::hardware;
+#endif
+        return application::ResetCause::powerUp;
+    }
+}
+
 namespace application
 {
     PlatformFactoryImpl::PlatformFactoryImpl(const infra::Function<void()>& onInitialized)
         : onInitialized(onInitialized)
+        , resetCause(ReadAndClearResetCause())
     {
+        if (persistentFaultData.IsValid())
+        {
+            FormatFaultData(persistentFaultData, faultStatusString);
+            persistentFaultData.Invalidate();
+        }
+
         HAL_Init();
     }
 
@@ -202,5 +241,20 @@ namespace application
 
     void PlatformFactoryImpl::CanStub::ReceiveData(const infra::Function<void(Id id, const Message& data)>&)
     {
+    }
+
+    void PlatformFactoryImpl::Reset()
+    {
+        NVIC_SystemReset();
+    }
+
+    ResetCause PlatformFactoryImpl::GetResetCause() const
+    {
+        return resetCause;
+    }
+
+    infra::BoundedConstString PlatformFactoryImpl::FaultStatus() const
+    {
+        return faultStatusString;
     }
 }

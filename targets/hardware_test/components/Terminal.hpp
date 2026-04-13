@@ -1,5 +1,8 @@
 #pragma once
 
+#include "core/foc/implementations/FocSpeedImpl.hpp"
+#include "core/foc/interfaces/Driver.hpp"
+#include "core/platform_abstraction/PlatformFactory.hpp"
 #include "foc/implementations/FocTorqueImpl.hpp"
 #include "hal/interfaces/AdcMultiChannel.hpp"
 #include "hal/interfaces/Eeprom.hpp"
@@ -7,9 +10,6 @@
 #include "infra/util/BoundedDeque.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
-#include "core/foc/implementations/FocSpeedImpl.hpp"
-#include "core/foc/interfaces/Driver.hpp"
-#include "core/platform_abstraction/PlatformFactory.hpp"
 
 namespace application
 {
@@ -37,6 +37,10 @@ namespace application
         void EepromWrite(const infra::BoundedConstString& param);
         void EepromRead(const infra::BoundedConstString& param);
         void EepromErase();
+        StatusWithMessage ResetDevice();
+        StatusWithMessage GetResetCauseStatus();
+        StatusWithMessage GetFaultStatus();
+        StatusWithMessage ForceHardfault();
 
     private:
         static constexpr std::size_t averageSampleSize = 100;
@@ -51,6 +55,7 @@ namespace application
 
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
+        application::PlatformFactory& hardware;
         infra::DelayedProxyCreator<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds, hal::Hertz)> pwmCreator;
         infra::DelayedProxyCreator<AdcPhaseCurrentMeasurement, void(PlatformFactory::SampleAndHold)> adcCreator;
         infra::DelayedProxyCreator<QuadratureEncoderDecorator, void()> encoderCreator;

@@ -1,36 +1,23 @@
+#include "core/platform_abstraction/PlatformFactory.hpp"
+#include "core/services/cli/TerminalWithBanner.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
+#include "infra/stream/test/StreamMock.hpp"
 #include "infra/util/ByteRange.hpp"
 #include "infra/util/Function.hpp"
 #include "services/util/Terminal.hpp"
-#include "core/services/cli/TerminalWithBanner.hpp"
 #include "gmock/gmock.h"
 #include <string>
 #include <vector>
 
 namespace
 {
-    class StreamWriterMock
-        : public infra::StreamWriter
-    {
-    public:
-        using StreamWriter::StreamWriter;
-
-        MOCK_METHOD2(Insert, void(infra::ConstByteRange range, infra::StreamErrorPolicy& errorPolicy));
-        MOCK_CONST_METHOD0(Available, std::size_t());
-        MOCK_CONST_METHOD0(ConstructSaveMarker, std::size_t());
-        MOCK_CONST_METHOD1(GetProcessedBytesSince, std::size_t(std::size_t marker));
-        MOCK_METHOD1(SaveState, infra::ByteRange(std::size_t marker));
-        MOCK_METHOD1(RestoreState, void(infra::ByteRange range));
-        MOCK_METHOD1(Overwrite, infra::ByteRange(std::size_t marker));
-    };
-
     class TerminalWithBannerTest
         : public ::testing::Test
         , public infra::EventDispatcherWithWeakPtrFixture
     {
     public:
-        ::testing::StrictMock<StreamWriterMock> streamWriterMock;
+        ::testing::StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
         ::testing::StrictMock<hal::SerialCommunicationMock> communication;
@@ -52,6 +39,20 @@ namespace
                 .targetName = infra::BoundedConstString(targetName),
                 .vdc = foc::Volts{ vdc },
                 .systemClock = hal::Hertz{ systemClock }
+            };
+            return banner;
+        }
+
+        services::TerminalWithBanner::Banner CreateBannerWithResetAndFault(
+            const char* targetName, float vdc, uint32_t systemClock,
+            application::ResetCause resetCause, infra::BoundedConstString faultStatus = "")
+        {
+            services::TerminalWithBanner::Banner banner{
+                .targetName = infra::BoundedConstString(targetName),
+                .vdc = foc::Volts{ vdc },
+                .systemClock = hal::Hertz{ systemClock },
+                .resetCause = resetCause,
+                .faultStatus = faultStatus
             };
             return banner;
         }
@@ -182,4 +183,60 @@ TEST_F(TerminalWithBannerTest, construction_includes_build_info_in_output)
 
     std::string output = GetFullOutput();
     EXPECT_NE(output.find("Build: "), std::string::npos);
+}
+
+TEST_F(TerminalWithBannerTest, construction_prints_reset_cause)
+{
+    auto banner = CreateBanner("Board", 12.0f, 80000000);
+    services::TerminalWithBanner::WithMaxSize<10> terminalWithBanner{ terminalWithCommands, tracer, banner };
+    ExecuteAllActions();
+
+    std::string output = GetFullOutput();
+    EXPECT_NE(output.find("Reset Cause: "), std::string::npos);
+    EXPECT_NE(output.find("PowerUp"), std::string::npos);
+}
+
+TEST_F(TerminalWithBannerTest, construction_prints_watchdog_reset_cause)
+{
+    auto banner = CreateBannerWithResetAndFault("Board", 12.0f, 80000000, application::ResetCause::watchdog);
+    services::TerminalWithBanner::WithMaxSize<10> terminalWithBanner{ terminalWithCommands, tracer, banner };
+    ExecuteAllActions();
+
+    std::string output = GetFullOutput();
+    EXPECT_NE(output.find("Reset Cause: "), std::string::npos);
+    EXPECT_NE(output.find("Watchdog"), std::string::npos);
+}
+
+TEST_F(TerminalWithBannerTest, construction_prints_compiler_info)
+{
+    auto banner = CreateBanner("Board", 12.0f, 80000000);
+    services::TerminalWithBanner::WithMaxSize<10> terminalWithBanner{ terminalWithCommands, tracer, banner };
+    ExecuteAllActions();
+
+    std::string output = GetFullOutput();
+    EXPECT_NE(output.find("Compiler: "), std::string::npos);
+}
+
+TEST_F(TerminalWithBannerTest, construction_prints_fault_data_when_present)
+{
+    auto banner = CreateBannerWithResetAndFault(
+        "Board", 12.0f, 80000000, application::ResetCause::hardware, "PC=0x08001234 LR=0x08005678");
+    services::TerminalWithBanner::WithMaxSize<10> terminalWithBanner{ terminalWithCommands, tracer, banner };
+    ExecuteAllActions();
+
+    std::string output = GetFullOutput();
+    EXPECT_NE(output.find("!!! FAULT DATA FROM PREVIOUS SESSION !!!"), std::string::npos);
+    EXPECT_NE(output.find("PC=0x08001234 LR=0x08005678"), std::string::npos);
+    EXPECT_NE(output.find("!!! END FAULT DATA !!!"), std::string::npos);
+}
+
+TEST_F(TerminalWithBannerTest, construction_does_not_print_fault_data_when_empty)
+{
+    auto banner = CreateBannerWithResetAndFault("Board", 12.0f, 80000000, application::ResetCause::powerUp);
+    services::TerminalWithBanner::WithMaxSize<10> terminalWithBanner{ terminalWithCommands, tracer, banner };
+    ExecuteAllActions();
+
+    std::string output = GetFullOutput();
+    EXPECT_EQ(output.find("!!! FAULT DATA FROM PREVIOUS SESSION !!!"), std::string::npos);
+    EXPECT_EQ(output.find("!!! END FAULT DATA !!!"), std::string::npos);
 }

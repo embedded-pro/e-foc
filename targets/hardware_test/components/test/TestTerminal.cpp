@@ -2,6 +2,7 @@
 #include "hal/interfaces/test_doubles/EepromMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
+#include "infra/stream/test/StreamMock.hpp"
 #include "infra/util/test_helper/MockHelpers.hpp"
 #include "infra/util/test_helper/ProxyCreatorMock.hpp"
 #include "platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
@@ -12,19 +13,6 @@
 
 namespace
 {
-    class StreamWriterMock
-        : public infra::StreamWriter
-    {
-    public:
-        MOCK_METHOD(void, Insert, (infra::ConstByteRange range, infra::StreamErrorPolicy& errorPolicy), (override));
-        MOCK_METHOD(std::size_t, Available, (), (const override));
-        MOCK_METHOD(std::size_t, ConstructSaveMarker, (), (const override));
-        MOCK_METHOD(std::size_t, GetProcessedBytesSince, (std::size_t marker), (const override));
-        MOCK_METHOD(infra::ByteRange, SaveState, (std::size_t marker), (override));
-        MOCK_METHOD(void, RestoreState, (infra::ByteRange range), (override));
-        MOCK_METHOD(infra::ByteRange, Overwrite, (std::size_t marker), (override));
-    };
-
     class PlatformFactoryMock
         : public application::PlatformFactory
     {
@@ -43,6 +31,9 @@ namespace
         MOCK_METHOD((infra::CreatorBase<application::QuadratureEncoderDecorator, void()>&), SynchronousQuadratureEncoderCreator, (), (override));
         MOCK_METHOD((infra::CreatorBase<application::CanBusAdapter, void(uint32_t, bool)>&), CanBusCreator, (), (override));
         MOCK_METHOD(hal::Eeprom&, Eeprom, (), (override));
+        MOCK_METHOD(void, Reset, (), (override));
+        MOCK_METHOD(application::ResetCause, GetResetCause, (), (const, override));
+        MOCK_METHOD(infra::BoundedConstString, FaultStatus, (), (const, override));
     };
 
     class PwmMock
@@ -142,6 +133,8 @@ namespace
             EXPECT_CALL(platformFactoryMock, SystemClock()).WillRepeatedly(testing::Return(hal::Hertz{ 10000 }));
             EXPECT_CALL(platformFactoryMock, LowPriorityInterrupt()).WillRepeatedly(testing::ReturnRef(simpleLowPriorityInterrupt));
             EXPECT_CALL(platformFactoryMock, Eeprom()).WillRepeatedly(testing::ReturnRef(eepromMock));
+            EXPECT_CALL(platformFactoryMock, GetResetCause()).WillRepeatedly(testing::Return(application::ResetCause::powerUp));
+            EXPECT_CALL(platformFactoryMock, FaultStatus()).WillRepeatedly(testing::Return(infra::BoundedConstString{}));
 
             EXPECT_CALL(encoderCreator, Constructed());
             EXPECT_CALL(pwmCreator, Constructed(std::chrono::nanoseconds{ 500 }, hal::Hertz{ 10000 }));
@@ -161,7 +154,7 @@ namespace
 
         testing::StrictMock<PlatformFactoryMock> platformFactoryMock;
         SimpleLowPriorityInterrupt simpleLowPriorityInterrupt;
-        testing::StrictMock<StreamWriterMock> streamWriterMock;
+        testing::StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
         testing::StrictMock<hal::SerialCommunicationMock> communication;
@@ -170,7 +163,7 @@ namespace
                 EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<16> terminal{ terminalWithCommands, tracer };
+        services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
         testing::StrictMock<PwmMock> pwmMock;
         testing::StrictMock<AdcMock> adcMock;

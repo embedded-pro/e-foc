@@ -1,4 +1,5 @@
 add_subdirectory(platform_implementations/${E_FOC_TARGET_PLATFORM})
+add_subdirectory(platform_implementations/error_handling_cortex_m)
 
 add_library(e_foc.platform_abstraction_impl INTERFACE)
 

@@ -2,6 +2,7 @@
 #include "foc/interfaces/Driver.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/stream/StringInputStream.hpp"
+#include "infra/stream/StringOutputStream.hpp"
 #include "infra/util/BoundedString.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
@@ -72,6 +73,7 @@ namespace application
     TerminalInteractor::TerminalInteractor(services::TerminalWithStorage& terminal, application::PlatformFactory& hardware)
         : terminal{ terminal }
         , tracer{ hardware.Tracer() }
+        , hardware{ hardware }
         , pwmCreator{ hardware.SynchronousThreeChannelsPwmCreator() }
         , adcCreator{ hardware.AdcMultiChannelCreator() }
         , encoderCreator{ hardware.SynchronousQuadratureEncoderCreator() }
@@ -170,6 +172,30 @@ namespace application
             [this](const auto&)
             {
                 EepromErase();
+            } });
+
+        terminal.AddCommand({ { "reset", "rst", "Reset the device. Ex: reset" },
+            [this](const auto&)
+            {
+                this->terminal.ProcessResult(ResetDevice());
+            } });
+
+        terminal.AddCommand({ { "reset_cause", "rc", "Display reset cause. Ex: reset_cause" },
+            [this](const auto&)
+            {
+                this->terminal.ProcessResult(GetResetCauseStatus());
+            } });
+
+        terminal.AddCommand({ { "fault_status", "fs", "Display fault data from previous session. Ex: fault_status" },
+            [this](const auto&)
+            {
+                this->terminal.ProcessResult(GetFaultStatus());
+            } });
+
+        terminal.AddCommand({ { "force_hardfault", "fhf", "Trigger a HardFault exception for error handler validation. Ex: force_hardfault" },
+            [this](const auto&)
+            {
+                this->terminal.ProcessResult(ForceHardfault());
             } });
 
         encoderCreator.Emplace();
@@ -576,5 +602,38 @@ namespace application
             {
                 this->terminal.ProcessResult({ services::TerminalWithStorage::Status::success });
             });
+    }
+
+    TerminalInteractor::StatusWithMessage TerminalInteractor::ResetDevice()
+    {
+        hardware.Reset();
+        return { services::TerminalWithStorage::Status::success };
+    }
+
+    TerminalInteractor::StatusWithMessage TerminalInteractor::GetResetCauseStatus()
+    {
+        infra::BoundedString::WithStorage<64> causeString;
+        infra::StringOutputStream stream(causeString, infra::noFail);
+        stream << hardware.GetResetCause();
+        tracer.Trace() << causeString;
+        return { services::TerminalWithStorage::Status::success };
+    }
+
+    TerminalInteractor::StatusWithMessage TerminalInteractor::GetFaultStatus()
+    {
+        const infra::BoundedConstString faultData = hardware.FaultStatus();
+        if (faultData.empty())
+            tracer.Trace() << "No fault data available.";
+        else
+            tracer.Trace() << faultData;
+        return { services::TerminalWithStorage::Status::success };
+    }
+
+    TerminalInteractor::StatusWithMessage TerminalInteractor::ForceHardfault()
+    {
+        tracer.Trace() << "Triggering HardFault...";
+        void (*nullFunc)() = nullptr;
+        nullFunc(); // NOSONAR — intentional null dereference to trigger HardFault for error handler validation
+        return { services::TerminalWithStorage::Status::success };
     }
 }

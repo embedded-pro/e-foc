@@ -1,29 +1,15 @@
+#include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
+#include "core/services/mechanical_system_ident/TerminalMechanicalParametersIdentification.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
+#include "infra/stream/test/StreamMock.hpp"
 #include "infra/util/ByteRange.hpp"
 #include "infra/util/test_helper/MockHelpers.hpp"
 #include "services/util/TerminalWithStorage.hpp"
-#include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
-#include "core/services/mechanical_system_ident/TerminalMechanicalParametersIdentification.hpp"
 #include "gmock/gmock.h"
 
 namespace
 {
-    class StreamWriterMock
-        : public infra::StreamWriter
-    {
-    public:
-        using StreamWriter::StreamWriter;
-
-        MOCK_METHOD2(Insert, void(infra::ConstByteRange range, infra::StreamErrorPolicy& errorPolicy));
-        MOCK_CONST_METHOD0(Available, std::size_t());
-        MOCK_CONST_METHOD0(ConstructSaveMarker, std::size_t());
-        MOCK_CONST_METHOD1(GetProcessedBytesSince, std::size_t(std::size_t marker));
-        MOCK_METHOD1(SaveState, infra::ByteRange(std::size_t marker));
-        MOCK_METHOD1(RestoreState, void(infra::ByteRange range));
-        MOCK_METHOD1(Overwrite, infra::ByteRange(std::size_t marker));
-    };
-
     class MechanicalParametersIdentificationMock
         : public services::MechanicalParametersIdentification
     {
@@ -37,7 +23,7 @@ namespace
     {
     public:
         ::testing::StrictMock<MechanicalParametersIdentificationMock> identificationMock;
-        ::testing::StrictMock<StreamWriterMock> streamWriterMock;
+        ::testing::StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
         ::testing::StrictMock<hal::SerialCommunicationMock> communication;
