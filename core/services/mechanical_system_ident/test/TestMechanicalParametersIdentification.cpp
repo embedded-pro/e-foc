@@ -90,3 +90,32 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_calculates_damp
             foc::Ampere{ 1.0f },
             foc::Ampere{ 1.0f } });
 }
+
+TEST_F(MechanicalParametersIdentificationTest, estimate_friction_timeout_calls_done_with_nullopt)
+{
+    services::MechanicalParametersIdentification::Config config{
+        foc::RadiansPerSecond{ 52.36f },
+        0.998f,
+        std::chrono::milliseconds{ 500 }
+    };
+
+    // Use a sentinel value (has_value()==true) so we can detect whether the callback was called.
+    std::optional<foc::NewtonMeterSecondPerRadian> resultFriction = foc::NewtonMeterSecondPerRadian{ 99.0f };
+    std::optional<foc::NewtonMeterSecondSquared> resultInertia = foc::NewtonMeterSecondSquared{ 99.0f };
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(::testing::Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(controllerMock, Enable());
+    EXPECT_CALL(controllerMock, SetPoint(foc::RadiansPerSecond{ 52.36f }));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_)).Times(2);
+
+    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [&](auto friction, auto inertia)
+        {
+            resultFriction = friction;
+            resultInertia = inertia;
+        });
+
+    ForwardTime(std::chrono::milliseconds{ 500 } + std::chrono::milliseconds{ 1 });
+
+    EXPECT_FALSE(resultFriction.has_value());
+    EXPECT_FALSE(resultInertia.has_value());
+}

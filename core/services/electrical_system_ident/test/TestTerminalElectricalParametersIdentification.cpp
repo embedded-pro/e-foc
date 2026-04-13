@@ -193,3 +193,58 @@ TEST_F(TerminalElectricalParametersIdentificationTest, estpp_failure_callback)
     capturedCallback(std::nullopt);
     ExecuteAllActions();
 }
+
+TEST_F(TerminalElectricalParametersIdentificationTest, estrl_invalid_winding_type_returns_error)
+{
+    InvokeCommand("estrl invalid_type", [this]()
+        {
+            ::testing::InSequence _;
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string message{ "invalid value. It should be an 'star', 'wye' or 'delta'." };
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(message.begin(), message.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TerminalElectricalParametersIdentificationTest, estrl_wrong_argument_count_returns_error)
+{
+    InvokeCommand("estrl", [this]()
+        {
+            ::testing::InSequence _;
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string message{ "invalid number of arguments" };
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(message.begin(), message.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TerminalElectricalParametersIdentificationTest, estrl_inductance_failure_callback)
+{
+    infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)> capturedCallback;
+
+    InvokeCommand("estrl wye", [this, &capturedCallback]()
+        {
+            EXPECT_CALL(identificationMock, EstimateResistanceAndInductance(testing::_, testing::_))
+                .WillOnce(testing::SaveArg<1>(&capturedCallback));
+        });
+
+    ExecuteAllActions();
+
+    ::testing::InSequence _;
+    std::string newline{ "\r\n" };
+    std::string message{ "Inductance estimation failed." };
+    EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+    EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(message.begin(), message.end())), testing::_));
+
+    // Valid resistance but nullopt inductance
+    capturedCallback(foc::Ohm{ 1.5f }, std::nullopt);
+    ExecuteAllActions();
+}

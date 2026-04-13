@@ -115,9 +115,9 @@ def load_junit_results(junit_xml: Path) -> dict[str, str]:
 # ── Matrix generation ─────────────────────────────────────────────────────────
 
 _STATUS_ICON = {
-    "pass": "✅",
-    "fail": "❌",
-    "skip": "⚠️",
+    "pass": "PASS",
+    "fail": "FAIL",
+    "skip": "SKIP",
 }
 
 
@@ -127,12 +127,12 @@ def _scenario_status(scenarios: list[str], junit: dict[str, str]) -> str:
         return "—"
     statuses = {junit.get(s, "unknown") for s in scenarios}
     if "fail" in statuses:
-        return f"{_STATUS_ICON['fail']} FAIL"
+        return f"{_STATUS_ICON['fail']}"
     if "unknown" in statuses:
-        return "⚠️ PARTIAL"
+        return "PARTIAL"
     if "skip" in statuses and "pass" not in statuses:
-        return f"{_STATUS_ICON['skip']} SKIP"
-    return f"{_STATUS_ICON['pass']} PASS"
+        return f"{_STATUS_ICON['skip']}"
+    return f"{_STATUS_ICON['pass']}"
 
 
 def generate_matrix(

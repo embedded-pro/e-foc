@@ -94,22 +94,19 @@ namespace foc
         ALWAYS_INLINE static float Sine(float angle) noexcept
         {
             const auto scaledAngle = angle * detail::lutScale;
-            const auto flooredAngle = std::floor(scaledAngle);
-            // Normalize to [0, LUT_SIZE) in float domain before integer truncation
-            // to avoid undefined behaviour on negative casts and the always-false
-            // size_t < 0 branch that UB would otherwise require.
-            const auto normalizedFloor = std::fmod(flooredAngle, static_cast<float>(detail::sineLUT.size()));
-            const auto rawIndex = static_cast<std::size_t>(
-                normalizedFloor >= 0.0f ? normalizedFloor : normalizedFloor + static_cast<float>(detail::sineLUT.size()));
-            const auto index = rawIndex & detail::lutMask;
-
-            const auto fraction = scaledAngle - flooredAngle;
+            // Integer floor: truncate toward zero, then subtract 1 if the original
+            // value was strictly less than the truncated result (i.e., negative fractional).
+            // This avoids std::floor (may invoke a libm call) and std::fmod entirely.
+            const auto i = static_cast<int32_t>(scaledAngle);
+            const auto floored = i - (scaledAngle < static_cast<float>(i) ? 1 : 0);
+            const auto fraction = scaledAngle - static_cast<float>(floored);
+            // Reinterpret as uint32_t before masking so that negative indices wrap
+            // correctly: e.g. -1 becomes 0xFFFFFFFF, and 0xFFFFFFFF & 511 == 511,
+            // which is the correct wrap-around for a 512-entry power-of-two LUT.
+            const auto index = static_cast<std::size_t>(static_cast<uint32_t>(floored)) & detail::lutMask;
             const auto nextIndex = (index + 1) & detail::lutMask;
 
-            const auto y0 = detail::sineLUT[index];
-            const auto y1 = detail::sineLUT[nextIndex];
-
-            return y0 + fraction * (y1 - y0);
+            return detail::sineLUT[index] + fraction * (detail::sineLUT[nextIndex] - detail::sineLUT[index]);
         }
 
         ALWAYS_INLINE static float Cosine(float angle) noexcept

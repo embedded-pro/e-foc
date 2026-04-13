@@ -92,3 +92,21 @@ TEST_F(TerminalTorqueTest, set_torque_invalid_value)
 
     ExecuteAllActions();
 }
+
+TEST_F(TerminalTorqueTest, set_torque_wrong_argument_count)
+{
+    InvokeCommand("set_torque 1.0 2.0", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid number of arguments." };
+            std::string newline{ "\r\n" };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}

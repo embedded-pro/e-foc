@@ -140,3 +140,35 @@ TEST_F(TestFocSpeedImpl, set_speed_tunings)
     EXPECT_GE(result.a.Value(), 0);
     EXPECT_LE(result.a.Value(), 100);
 }
+
+TEST_F(TestFocSpeedImpl, prescaler_triggers_low_priority_at_correct_rate)
+{
+    // baseFrequency = 20000, lowPriorityFrequency = 2000 → prescaler = 10
+    // LowPriorityInterrupt::Trigger() must be called exactly once every 10 iterations.
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 0.0f });
+
+    const uint32_t prescaler = baseFrequencyValue / 2000;
+
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(1);
+
+    for (uint32_t i = 0; i < prescaler; ++i)
+    {
+        foc::Radians position{ 0.0f };
+        focSpeed->Calculate(ZeroCurrents(), position);
+    }
+}
+
+TEST_F(TestFocSpeedImpl, second_prescaler_cycle_triggers_again)
+{
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 0.0f });
+
+    const uint32_t prescaler = baseFrequencyValue / 2000;
+
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(2);
+
+    for (uint32_t i = 0; i < prescaler * 2; ++i)
+    {
+        foc::Radians position{ 0.0f };
+        focSpeed->Calculate(ZeroCurrents(), position);
+    }
+}

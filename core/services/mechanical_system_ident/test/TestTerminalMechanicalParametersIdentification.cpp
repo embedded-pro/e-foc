@@ -153,3 +153,31 @@ TEST_F(TerminalMechanicalParametersIdentificationTest, estfric_failure_callback)
     capturedCallback(std::nullopt, std::nullopt);
     ExecuteAllActions();
 }
+
+TEST_F(TerminalMechanicalParametersIdentificationTest, estmech_zero_target_speed_returns_error)
+{
+    InvokeCommandExpectingError("estmech 0.0 0.1 7", "invalid target speed. Must be > 0 RPM");
+
+    ExecuteAllActions();
+}
+
+TEST_F(TerminalMechanicalParametersIdentificationTest, estmech_negative_target_speed_returns_error)
+{
+    InvokeCommandExpectingError("estmech -100.0 0.1 7", "invalid target speed. Must be > 0 RPM");
+
+    ExecuteAllActions();
+}
+
+TEST_F(TerminalMechanicalParametersIdentificationTest, estmech_zero_torque_constant_returns_error)
+{
+    InvokeCommandExpectingError("estmech 500.0 0.0 7", "invalid torque constant. Must be > 0 Nm/A");
+
+    ExecuteAllActions();
+}
+
+TEST_F(TerminalMechanicalParametersIdentificationTest, estmech_non_numeric_pole_pairs_returns_error)
+{
+    InvokeCommandExpectingError("estmech 500.0 0.1 abc", "invalid number of pole pairs. Must be > 0");
+
+    ExecuteAllActions();
+}
