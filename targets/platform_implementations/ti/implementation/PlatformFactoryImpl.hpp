@@ -16,7 +16,6 @@
 #include "hal_tiva/tiva/Gpio.hpp"
 #include "hal_tiva/tiva/UartWithDma.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include "services/tracer/SerialCommunicationOnSeggerRtt.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
 
@@ -56,6 +55,9 @@ namespace application
         uint32_t ElapsedCycles() override;
 
     private:
+        static constexpr float adcReferenceVoltage = 3.3f;
+        static constexpr float adcResolution = 4096.0f;
+
         struct PendSvLowPriorityInterrupt
             : public foc::LowPriorityInterrupt
         {
@@ -74,17 +76,27 @@ namespace application
 
         struct TerminalAndTracer
         {
-            hal::tiva::UartWithDma::Config uartConfig{ true, true, hal::tiva::UartWithDma::Baudrate::_921000_bps, hal::tiva::UartWithDma::FlowControl::none, hal::tiva::UartWithDma::Parity::none, hal::tiva::UartWithDma::StopBits::one, hal::tiva::UartWithDma::NumberOfBytes::_8_bytes, std::nullopt };
             hal::tiva::Dma dma{ infra::emptyFunction };
+            hal::tiva::UartWithDma::Config uartConfig{ true, true, hal::tiva::UartWithDma::Baudrate::_921000_bps, hal::tiva::UartWithDma::FlowControl::none, hal::tiva::UartWithDma::Parity::none, hal::tiva::UartWithDma::StopBits::one, hal::tiva::UartWithDma::NumberOfBytes::_8_bytes, std::nullopt };
             hal::tiva::UartWithDma::WithRxBuffer<256> uart{ Peripheral::UartIndex, Pins::uartTx, Pins::uartRx, dma, uartConfig };
-            services::SerialCommunicationOnSeggerRtt serialCommunicationOnSeggerRtt;
-            services::StreamWriterOnSerialCommunication::WithStorage<2048> streamWriterOnSerialCommunication{ serialCommunicationOnSeggerRtt };
+            services::StreamWriterOnSerialCommunication::WithStorage<8192> streamWriterOnSerialCommunication{ uart };
             infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterOnSerialCommunication };
             services::TracerWithDateTime tracer{ tracerStream };
-            services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<256, 10> terminal{ serialCommunicationOnSeggerRtt, tracer };
+            services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<256, 10> terminal{ uart, tracer };
         };
 
-        struct MotorFieldOrientedControllerInterfaceImpl
+        struct AdcForPowerSupplyMeasurementImpl
+        {
+            static constexpr float voltageToVolts = 18.433f;
+            static constexpr float adcToVoltsFactor = (adcReferenceVoltage / adcResolution) * voltageToVolts;
+            infra::Function<void(std::tuple<infra::Ampere, infra::Ampere, infra::Ampere> voltagePhases)> phaseCurrentsReady;
+            std::array<hal::tiva::AnalogPin, 1> powerSupplyAnalogPins{ { hal::tiva::AnalogPin{ Pins::powerSupplyVoltage } } };
+            constexpr static auto powerSupplyOversampling = hal::tiva::SynchronousAdc::Oversampling::oversampling8;
+            hal::tiva::SynchronousAdc::Config powerSupplyAdcConfig{ hal::tiva::SynchronousAdc::SampleAndHold::sampleAndHold256, hal::tiva::SynchronousAdc::Priority::priority3, std::make_optional(powerSupplyOversampling) };
+            hal::tiva::SynchronousAdc powerSupplyAdc{ 1, 0, powerSupplyAnalogPins, powerSupplyAdcConfig };
+        };
+
+        struct AdcForPhaseCurrentMeasurementImpl
         {
             const std::array<hal::tiva::Adc::SampleAndHold, 5> toSampleAndHold{ { hal::tiva::Adc::SampleAndHold::sampleAndHold4,
                 hal::tiva::Adc::SampleAndHold::sampleAndHold16,
@@ -92,12 +104,9 @@ namespace application
                 hal::tiva::Adc::SampleAndHold::sampleAndHold64,
                 hal::tiva::Adc::SampleAndHold::sampleAndHold256 } };
             static constexpr float voltageToCurrent = 5.0f;
-            static constexpr float adcReferenceVoltage = 3.3f;
-            static constexpr float adcResolution = 4096.0f;
-            static constexpr float voltageToVolts = 18.433f;
             static constexpr float adcToAmpereSlope = (adcReferenceVoltage / adcResolution) * voltageToCurrent;
             static constexpr float adcToAmpereOffset = -(adcReferenceVoltage / 2.0f) * voltageToCurrent; // adc midpoint reference
-            static constexpr float adcToVoltsFactor = (adcReferenceVoltage / adcResolution) * voltageToVolts;
+
             static constexpr hal::tiva::Adc::SamplingDelay phaseDelay{ 4 };
             static constexpr auto currentSensingOversampling = hal::tiva::Adc::Oversampling::oversampling2;
             hal::tiva::Adc::Config adcConfig{ false, 0, Peripheral::adcTrigger, hal::tiva::Adc::SampleAndHold::sampleAndHold8, std::make_optional(currentSensingOversampling), phaseDelay };
@@ -108,6 +117,10 @@ namespace application
 
                     object.emplace(adcToAmpereSlope, adcToAmpereOffset, Peripheral::AdcIndex, Peripheral::AdcSequencerIndex, currentPhaseAnalogPins, adcConfig);
                 } };
+        };
+
+        struct PwmImpl
+        {
             hal::tiva::SynchronousPwm::Config::ClockDivisor clockDivisor{ hal::tiva::SynchronousPwm::Config::ClockDivisor::divisor8 };
             hal::tiva::SynchronousPwm::Config::Control controlConfig{ hal::tiva::SynchronousPwm::Config::Control::Mode::centerAligned, hal::tiva::SynchronousPwm::Config::Control::UpdateMode::globally, false };
             hal::tiva::SynchronousPwm::Config::DeadTime deadTimeConfig{ hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(1000ns, clockDivisor), hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(1000ns, clockDivisor) };
@@ -122,11 +135,6 @@ namespace application
                     object.emplace(Peripheral::PwmIndex, Peripheral::pwmPhases, pwmConfig);
                     object->SetBaseFrequency(frequency);
                 } };
-            infra::Function<void(std::tuple<infra::Ampere, infra::Ampere, infra::Ampere> voltagePhases)> phaseCurrentsReady;
-            std::array<hal::tiva::AnalogPin, 1> powerSupplyAnalogPins{ { hal::tiva::AnalogPin{ Pins::powerSupplyVoltage } } };
-            constexpr static auto powerSupplyOversampling = hal::tiva::SynchronousAdc::Oversampling::oversampling8;
-            hal::tiva::SynchronousAdc::Config powerSupplyAdcConfig{ hal::tiva::SynchronousAdc::SampleAndHold::sampleAndHold256, hal::tiva::SynchronousAdc::Priority::priority3, std::make_optional(powerSupplyOversampling) };
-            hal::tiva::SynchronousAdc powerSupplyAdc{ 1, 0, powerSupplyAnalogPins, powerSupplyAdcConfig };
         };
 
         struct EncoderImpl
@@ -164,13 +172,14 @@ namespace application
 
             infra::Creator<CanBusAdapter, CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<32>>, void(uint32_t bitRate, bool testMode)> canCreator{ [this](auto& object, uint32_t bitRate, bool testMode)
                 {
+                    auto onError = [&object](hal::tiva::Can::Error error)
+                    {
+                        static_cast<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<32>>&>(*object).InvokeErrorHandler(ToAdapterError(error));
+                    };
                     canConfig.bitRate = bitRate;
                     canConfig.testMode = testMode;
 
-                    object.emplace(Peripheral::CanIndex, Pins::canRx, Pins::canTx, canConfig, infra::Function<void(hal::tiva::Can::Error)>([&object](hal::tiva::Can::Error error)
-                                                                                                  {
-                                                                                                      static_cast<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<32>>&>(*object).InvokeErrorHandler(ToAdapterError(error));
-                                                                                                  }));
+                    object.emplace(Peripheral::CanIndex, Pins::canRx, Pins::canTx, canConfig, infra::Function<void(hal::tiva::Can::Error)>(onError));
                 } };
         };
 
@@ -182,8 +191,10 @@ namespace application
             Cortex cortex;
             TerminalAndTracer terminalAndTracer;
             EncoderImpl encoderImpl;
+            AdcForPowerSupplyMeasurementImpl adcForPowerSupplyMeasurementImpl;
+            AdcForPhaseCurrentMeasurementImpl adcForPhaseCurrentMeasurementImpl;
+            PwmImpl pwmImpl;
             CanImpl canImpl;
-            MotorFieldOrientedControllerInterfaceImpl motorFieldOrientedController;
             hal::tiva::Eeprom eepromPeripheral;
         };
 

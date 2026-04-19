@@ -556,8 +556,10 @@ namespace application
 
         eeprom.WriteBuffer(infra::ConstByteRange{ eepromBuffer.data(), eepromBuffer.data() + byteCount }, *addr, [this]()
             {
+                tracer.Trace() << "  Written to EEPROM";
                 this->terminal.ProcessResult({ success });
             });
+        tracer.Trace() << "  Writing to EEPROM at address " << *addr << " bytes: " << byteCount << "...";
     }
 
     void TerminalInteractor::EepromRead(const infra::BoundedConstString& param)
@@ -604,8 +606,10 @@ namespace application
     {
         eeprom.Erase([this]()
             {
+                tracer.Trace() << "  EEPROM erased";
                 this->terminal.ProcessResult({ success });
             });
+        tracer.Trace() << "  Erasing entire EEPROM...";
     }
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::ResetDevice()

@@ -18,29 +18,29 @@ namespace application
         out.clear();
         infra::StringOutputStream stream(out, infra::softFail);
 
-        stream << "Stack frame:\n";
-        stream << " R0  : 0x" << infra::hex << infra::Width(8, '0') << data.r0 << "\n";
-        stream << " R1  : 0x" << infra::hex << infra::Width(8, '0') << data.r1 << "\n";
-        stream << " R2  : 0x" << infra::hex << infra::Width(8, '0') << data.r2 << "\n";
-        stream << " R3  : 0x" << infra::hex << infra::Width(8, '0') << data.r3 << "\n";
-        stream << " R12 : 0x" << infra::hex << infra::Width(8, '0') << data.r12 << "\n";
-        stream << " LR  : 0x" << infra::hex << infra::Width(8, '0') << data.lr << "\n";
-        stream << " PC  : 0x" << infra::hex << infra::Width(8, '0') << data.pc << "\n";
-        stream << " PSR : 0x" << infra::hex << infra::Width(8, '0') << data.psr << "\n";
-        stream << "FSR/FAR:\n";
-        stream << " CFSR : 0x" << infra::hex << infra::Width(8, '0') << data.cfsr << "\n";
-        stream << " MMFAR: 0x" << infra::hex << infra::Width(8, '0') << data.mmfar << "\n";
-        stream << " BFAR : 0x" << infra::hex << infra::Width(8, '0') << data.bfar << "\n";
+        stream << "\r\n\tStack frame:\r\n";
+        stream << "\t\tR0  : 0x" << infra::hex << data.r0 << "\r\n";
+        stream << "\t\tR1  : 0x" << infra::hex << data.r1 << "\r\n";
+        stream << "\t\tR2  : 0x" << infra::hex << data.r2 << "\r\n";
+        stream << "\t\tR3  : 0x" << infra::hex << data.r3 << "\r\n";
+        stream << "\t\tR12 : 0x" << infra::hex << data.r12 << "\r\n";
+        stream << "\t\tLR  : 0x" << infra::hex << data.lr << "\r\n";
+        stream << "\t\tPC  : 0x" << infra::hex << data.pc << "\r\n";
+        stream << "\t\tPSR : 0x" << infra::hex << data.psr << "\r\n";
+        stream << "\tFSR/FAR:\r\n";
+        stream << "\t\tCFSR : 0x" << infra::hex << data.cfsr << "\r\n";
+        stream << "\t\tMMFAR: 0x" << infra::hex << data.mmfar << "\r\n";
+        stream << "\t\tBFAR : 0x" << infra::hex << data.bfar << "\r\n";
 
         if (data.stackTraceCount > 0)
         {
-            stream << "Backtrace:";
+            stream << "\tBacktrace:\r\n\t\t";
             const uint32_t count = (data.stackTraceCount < PersistentFaultData::kMaxStackTraceEntries)
                                        ? data.stackTraceCount
                                        : PersistentFaultData::kMaxStackTraceEntries;
             for (uint32_t i = 0; i < count; ++i)
                 stream << " 0x" << infra::hex << infra::Width(8, '0') << data.stackTrace[i];
-            stream << "\n";
+            stream << "\r\n";
         }
 
         // Acknowledge possible truncation (buffer may be smaller than worst-case output)

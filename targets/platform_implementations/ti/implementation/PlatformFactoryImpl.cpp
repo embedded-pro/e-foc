@@ -18,7 +18,6 @@ extern "C" void PendSV_Handler()
 
 namespace
 {
-    // TM4C129x TRM Table 5-9: SYSCTL RESC register bit positions (offset 0x05C)
     static constexpr uint32_t sysctlRescExt = 0x00000001u;  // Bit 0: External reset pin
     static constexpr uint32_t sysctlRescBor = 0x00000004u;  // Bit 2: Brown-Out reset
     static constexpr uint32_t sysctlRescWdt0 = 0x00000008u; // Bit 3: Watchdog Timer 0
@@ -96,9 +95,9 @@ namespace application
 
     foc::Volts PlatformFactoryImpl::PowerSupplyVoltage()
     {
-        auto samples = peripherals->motorFieldOrientedController.powerSupplyAdc.Measure(1);
+        auto samples = peripherals->adcForPowerSupplyMeasurementImpl.powerSupplyAdc.Measure(1);
 
-        return foc::Volts{ static_cast<float>(samples.front()) * MotorFieldOrientedControllerInterfaceImpl::adcToVoltsFactor };
+        return foc::Volts{ static_cast<float>(samples.front()) * AdcForPowerSupplyMeasurementImpl::adcToVoltsFactor };
     }
 
     foc::Ampere PlatformFactoryImpl::MaxCurrentSupported()
@@ -136,12 +135,12 @@ namespace application
 
     infra::CreatorBase<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)>& PlatformFactoryImpl::SynchronousThreeChannelsPwmCreator()
     {
-        return peripherals->motorFieldOrientedController.pwmBrushless;
+        return peripherals->pwmImpl.pwmBrushless;
     }
 
     infra::CreatorBase<AdcPhaseCurrentMeasurement, void(PlatformFactory::SampleAndHold)>& PlatformFactoryImpl::AdcMultiChannelCreator()
     {
-        return peripherals->motorFieldOrientedController.adcCurrentPhases;
+        return peripherals->adcForPhaseCurrentMeasurementImpl.adcCurrentPhases;
     }
 
     infra::CreatorBase<QuadratureEncoderDecorator, void()>& PlatformFactoryImpl::SynchronousQuadratureEncoderCreator()
