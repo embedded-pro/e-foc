@@ -5,16 +5,21 @@
 
 static main_::NetworkAdapter network;
 
+namespace
+{
+    const char* GetEnvOrDefault(const char* name, const char* defaultValue)
+    {
+        const char* value = std::getenv(name);
+        return value != nullptr ? value : defaultValue;
+    }
+}
+
 int main(int argc, const char* argv[])
 {
     std::printf("CAN TCP Bridge Client\n");
 
-    const char* hostString = argc > 1
-        ? argv[1]
-        : (std::getenv("CAN_BRIDGE_HOST") != nullptr ? std::getenv("CAN_BRIDGE_HOST") : "172.17.0.1");
-    const char* portString = argc > 2
-        ? argv[2]
-        : (std::getenv("CAN_BRIDGE_PORT") != nullptr ? std::getenv("CAN_BRIDGE_PORT") : "5001");
+    const char* hostString = argc > 1 ? argv[1] : GetEnvOrDefault("CAN_BRIDGE_HOST", "172.17.0.1");
+    const char* portString = argc > 2 ? argv[2] : GetEnvOrDefault("CAN_BRIDGE_PORT", "5001");
 
     unsigned int host0 = 172;
     unsigned int host1 = 17;

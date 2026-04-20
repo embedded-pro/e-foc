@@ -54,9 +54,7 @@ namespace tool
 
         if (connectionHandler && (!queuedSendData.empty() || queuedSendOnDone))
         {
-            connectionHandler->RequestSend(
-                infra::ConstByteRange(queuedSendData.data(), queuedSendData.data() + queuedSendData.size()),
-                queuedSendOnDone);
+            connectionHandler->RequestSend(infra::MakeByteRange(queuedSendData), queuedSendOnDone);
             queuedSendData.clear();
             queuedSendOnDone = nullptr;
         }

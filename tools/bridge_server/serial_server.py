@@ -74,9 +74,7 @@ class SerialOverTcpServer:
             )
 
             for task in done:
-                exc = task.exception()
-                if exc is not None:
-                    raise exc
+                task.result()
         except asyncio.CancelledError:
             pass
         except Exception:
