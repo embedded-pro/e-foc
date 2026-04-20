@@ -249,3 +249,69 @@ TEST_F(TestTcpClientCanbusConnection, receive_frame_triggers_callback)
     EXPECT_EQ(result.msg[0], 0xDE);
     EXPECT_EQ(result.msg[1], 0xAD);
 }
+
+TEST_F(TestTcpClientCanbusConnection, send_data_fails_when_max_stream_size_is_too_small)
+{
+    CreateAndConnect();
+    connectionStub->maxSendStreamSize = tool::TcpClientCanbus::canFrameSize - 1;
+
+    auto id = hal::Can::Id::Create11BitId(0x123);
+    hal::Can::Message msg;
+    msg.push_back(0xAA);
+
+    bool success{ true };
+    can->SendData(id, msg, [&success](bool sendSuccess)
+        {
+            success = sendSuccess;
+        });
+    ExecuteAllActions();
+
+    EXPECT_FALSE(success);
+    EXPECT_TRUE(connectionStub->sentData.empty());
+}
+
+TEST_F(TestTcpClientCanbusConnection, second_send_while_pending_is_rejected)
+{
+    CreateAndConnect();
+    connectionStub->maxSendStreamSize = tool::TcpClientCanbus::canFrameSize;
+
+    auto id = hal::Can::Id::Create11BitId(0x123);
+    hal::Can::Message msg;
+    msg.push_back(0xAA);
+
+    bool firstSuccess{ false };
+    bool secondSuccess{ true };
+    can->SendData(id, msg, [&firstSuccess](bool sendSuccess)
+        {
+            firstSuccess = sendSuccess;
+        });
+    can->SendData(id, msg, [&secondSuccess](bool sendSuccess)
+        {
+            secondSuccess = sendSuccess;
+        });
+
+    ExecuteAllActions();
+
+    EXPECT_TRUE(firstSuccess);
+    EXPECT_FALSE(secondSuccess);
+}
+
+TEST_F(TestTcpClientCanbusConnection, connection_failed_completes_pending_callback_with_failure)
+{
+    CreateAndConnect();
+
+    auto id = hal::Can::Id::Create11BitId(0x123);
+    hal::Can::Message msg;
+    msg.push_back(0xAA);
+
+    bool success{ true };
+    can->SendData(id, msg, [&success](bool sendSuccess)
+        {
+            success = sendSuccess;
+        });
+
+    capturedClient->ConnectionFailed(services::ClientConnectionObserverFactory::ConnectFailReason::refused);
+    ExecuteAllActions();
+
+    EXPECT_FALSE(success);
+}

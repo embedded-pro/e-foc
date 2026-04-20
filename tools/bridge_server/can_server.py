@@ -86,6 +86,7 @@ class CanBusOverTcpServer:
     async def stop(self) -> None:
         if self._writer is not None:
             self._writer.close()
+            await self._writer.wait_closed()
             self._writer = None
             self._reader = None
 
@@ -113,18 +114,41 @@ class CanBusOverTcpServer:
         self._reader = reader
         self._writer = writer
 
+        can_to_tcp_task = asyncio.create_task(self._can_to_tcp())
+        tcp_to_can_task = asyncio.create_task(self._tcp_to_can())
+
         try:
-            await asyncio.gather(
-                self._can_to_tcp(),
-                self._tcp_to_can(),
+            done, pending = await asyncio.wait(
+                {can_to_tcp_task, tcp_to_can_task},
+                return_when=asyncio.FIRST_COMPLETED,
             )
+
+            for task in done:
+                task.result()
+
+            for task in pending:
+                task.cancel()
+
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
         except asyncio.CancelledError:
             pass
         except Exception:
             logger.exception("CAN bridge error")
         finally:
+            for task in (can_to_tcp_task, tcp_to_can_task):
+                if not task.done():
+                    task.cancel()
+
+            await asyncio.gather(
+                can_to_tcp_task,
+                tcp_to_can_task,
+                return_exceptions=True,
+            )
+
             logger.info("CAN client disconnected: %s", peer)
             self._writer.close()
+            await self._writer.wait_closed()
             self._writer = None
             self._reader = None
 

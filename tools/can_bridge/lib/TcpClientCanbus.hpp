@@ -30,6 +30,7 @@ namespace tool
         uint16_t Port() const override;
         void ConnectionEstablished(infra::AutoResetFunction<void(infra::SharedPtr<services::ConnectionObserver>)>&& createdObserver) override;
         void ConnectionFailed(ConnectFailReason reason) override;
+        void HandleDisconnected(bool clearConnectionHandler);
 
         class ConnectionHandler
             : public services::ConnectionObserver
@@ -39,8 +40,11 @@ namespace tool
 
             void SendStreamAvailable(infra::SharedPtr<infra::StreamWriter>&& streamWriter) override;
             void DataReceived() override;
+            void Close() override;
+            void Abort() override;
 
             void RequestSend(Id id, const Message& data, const infra::Function<void(bool success)>& onDone);
+            void FailPendingSend(bool success);
 
         private:
             TcpClientCanbus& parent;

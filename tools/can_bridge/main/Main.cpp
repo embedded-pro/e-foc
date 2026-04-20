@@ -1,14 +1,52 @@
 #include "services/network_instantiations/NetworkAdapter.hpp"
 #include "tools/can_bridge/lib/TcpClientCanbus.hpp"
+#include <cstdlib>
 #include <cstdio>
 
 static main_::NetworkAdapter network;
 
-int main()
+int main(int argc, const char* argv[])
 {
     std::printf("CAN TCP Bridge Client\n");
 
-    tool::TcpClientCanbus can(network.ConnectionFactory(), services::IPv4Address{ 172, 17, 0, 1 }, 5001);
+    const char* hostString = argc > 1
+        ? argv[1]
+        : (std::getenv("CAN_BRIDGE_HOST") != nullptr ? std::getenv("CAN_BRIDGE_HOST") : "172.17.0.1");
+    const char* portString = argc > 2
+        ? argv[2]
+        : (std::getenv("CAN_BRIDGE_PORT") != nullptr ? std::getenv("CAN_BRIDGE_PORT") : "5001");
+
+    unsigned int host0 = 172;
+    unsigned int host1 = 17;
+    unsigned int host2 = 0;
+    unsigned int host3 = 1;
+    if (std::sscanf(hostString, "%u.%u.%u.%u", &host0, &host1, &host2, &host3) != 4
+        || host0 > 255
+        || host1 > 255
+        || host2 > 255
+        || host3 > 255)
+    {
+        host0 = 172;
+        host1 = 17;
+        host2 = 0;
+        host3 = 1;
+    }
+
+    long portValue = std::strtol(portString, nullptr, 10);
+    if (portValue <= 0 || portValue > 65535)
+        portValue = 5001;
+
+    const services::IPv4Address serverAddress{
+        static_cast<uint8_t>(host0),
+        static_cast<uint8_t>(host1),
+        static_cast<uint8_t>(host2),
+        static_cast<uint8_t>(host3)
+    };
+    const uint16_t serverPort = static_cast<uint16_t>(portValue);
+
+    std::printf("Connecting to %u.%u.%u.%u:%u\n", host0, host1, host2, host3, serverPort);
+
+    tool::TcpClientCanbus can(network.ConnectionFactory(), serverAddress, serverPort);
 
     can.ReceiveData([](hal::Can::Id id, const hal::Can::Message& data)
         {

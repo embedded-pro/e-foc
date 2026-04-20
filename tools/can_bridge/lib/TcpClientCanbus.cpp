@@ -1,9 +1,8 @@
 #include "tools/can_bridge/lib/TcpClientCanbus.hpp"
 #include "infra/stream/InputStream.hpp"
 #include "infra/stream/OutputStream.hpp"
+#include "services/tracer/GlobalTracer.hpp"
 #include <algorithm>
-#include <cstdio>
-#include <cstdlib>
 #include <cstring>
 
 namespace tool
@@ -47,8 +46,8 @@ namespace tool
 
     void TcpClientCanbus::ConnectionFailed(ConnectFailReason reason)
     {
-        std::fprintf(stderr, "TcpClientCanbus: connection failed (reason=%d)\n", static_cast<int>(reason));
-        std::abort();
+        services::GlobalTracer().Trace() << "TcpClientCanbus: connection failed reason=" << static_cast<int>(reason);
+        HandleDisconnected(true);
     }
 
     TcpClientCanbus::ConnectionHandler::ConnectionHandler(TcpClientCanbus& parent)
@@ -57,6 +56,12 @@ namespace tool
 
     void TcpClientCanbus::ConnectionHandler::SendStreamAvailable(infra::SharedPtr<infra::StreamWriter>&& streamWriter)
     {
+        if (!pendingSendOnDone)
+        {
+            streamWriter = nullptr;
+            return;
+        }
+
         infra::DataOutputStream::WithErrorPolicy stream(*streamWriter);
         stream << infra::ConstByteRange(pendingSendFrame.data(), pendingSendFrame.data() + canFrameSize);
         streamWriter = nullptr;
@@ -97,11 +102,55 @@ namespace tool
 
     void TcpClientCanbus::ConnectionHandler::RequestSend(Id id, const Message& data, const infra::Function<void(bool success)>& onDone)
     {
+        if (pendingSendOnDone)
+        {
+            if (onDone)
+                onDone(false);
+            return;
+        }
+
+        const auto maxSendStreamSize = services::ConnectionObserver::Subject().MaxSendStreamSize();
+        if (maxSendStreamSize < canFrameSize)
+        {
+            if (onDone)
+                onDone(false);
+            return;
+        }
+
         EncodeFrame(id, data, pendingSendFrame);
         pendingSendOnDone = onDone;
+        services::ConnectionObserver::Subject().RequestSendStream(canFrameSize);
+    }
 
-        auto sendSize = std::min(canFrameSize, services::ConnectionObserver::Subject().MaxSendStreamSize());
-        services::ConnectionObserver::Subject().RequestSendStream(sendSize);
+    void TcpClientCanbus::ConnectionHandler::Close()
+    {
+        parent.HandleDisconnected(false);
+    }
+
+    void TcpClientCanbus::ConnectionHandler::Abort()
+    {
+        parent.HandleDisconnected(false);
+    }
+
+    void TcpClientCanbus::ConnectionHandler::FailPendingSend(bool success)
+    {
+        if (pendingSendOnDone)
+        {
+            auto onDone = pendingSendOnDone;
+            pendingSendOnDone = nullptr;
+            onDone(success);
+        }
+    }
+
+    void TcpClientCanbus::HandleDisconnected(bool clearConnectionHandler)
+    {
+        connected = false;
+
+        if (connectionHandler)
+            connectionHandler->FailPendingSend(false);
+
+        if (clearConnectionHandler)
+            connectionHandler = nullptr;
     }
 
     void TcpClientCanbus::EncodeFrame(Id id, const Message& data, std::array<uint8_t, canFrameSize>& buffer)

@@ -36,6 +36,7 @@ class SerialOverTcpServer:
     async def stop(self) -> None:
         if self._writer is not None:
             self._writer.close()
+            await self._writer.wait_closed()
             self._writer = None
             self._reader = None
 
@@ -63,18 +64,37 @@ class SerialOverTcpServer:
         self._reader = reader
         self._writer = writer
 
+        serial_to_tcp_task = asyncio.create_task(self._serial_to_tcp())
+        tcp_to_serial_task = asyncio.create_task(self._tcp_to_serial())
+
         try:
-            await asyncio.gather(
-                self._serial_to_tcp(),
-                self._tcp_to_serial(),
+            done, _ = await asyncio.wait(
+                {serial_to_tcp_task, tcp_to_serial_task},
+                return_when=asyncio.FIRST_COMPLETED,
             )
+
+            for task in done:
+                exc = task.exception()
+                if exc is not None:
+                    raise exc
         except asyncio.CancelledError:
             pass
         except Exception:
             logger.exception("Serial bridge error")
         finally:
+            for task in (serial_to_tcp_task, tcp_to_serial_task):
+                if not task.done():
+                    task.cancel()
+
+            await asyncio.gather(
+                serial_to_tcp_task,
+                tcp_to_serial_task,
+                return_exceptions=True,
+            )
+
             logger.info("Serial client disconnected: %s", peer)
             self._writer.close()
+            await self._writer.wait_closed()
             self._writer = None
             self._reader = None
 

@@ -6,6 +6,7 @@
 #include "services/network/connection/Connection.hpp"
 #include <array>
 #include <cstdint>
+#include <vector>
 
 namespace tool
 {
@@ -24,6 +25,7 @@ namespace tool
         uint16_t Port() const override;
         void ConnectionEstablished(infra::AutoResetFunction<void(infra::SharedPtr<services::ConnectionObserver>)>&& createdObserver) override;
         void ConnectionFailed(ConnectFailReason reason) override;
+        void HandleDisconnected(bool clearConnectionHandler);
 
         class ConnectionHandler
             : public services::ConnectionObserver
@@ -33,12 +35,18 @@ namespace tool
 
             void SendStreamAvailable(infra::SharedPtr<infra::StreamWriter>&& streamWriter) override;
             void DataReceived() override;
+            void Close() override;
+            void Abort() override;
 
             void RequestSend(infra::ConstByteRange data, infra::Function<void()> onDone);
+            void FailPendingSend();
 
         private:
+            void RequestNextSendChunk();
+
             TcpClientSerial& parent;
-            infra::ConstByteRange pendingSendData;
+            std::vector<uint8_t> pendingSendData;
+            std::size_t pendingSendOffset{ 0 };
             infra::Function<void()> pendingSendOnDone;
         };
 
@@ -49,7 +57,7 @@ namespace tool
         infra::SharedOptional<ConnectionHandler> connectionHandler;
         infra::Function<void(infra::ConstByteRange data)> receiveCallback;
 
-        infra::ConstByteRange queuedSendData;
+        std::vector<uint8_t> queuedSendData;
         infra::Function<void()> queuedSendOnDone;
         bool connected{ false };
     };

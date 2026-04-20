@@ -91,3 +91,77 @@ TEST_F(TestTcpClientSerial, receive_data_triggers_callback)
     EXPECT_EQ(received[0], 0xAA);
     EXPECT_EQ(received[1], 0xBB);
 }
+
+TEST_F(TestTcpClientSerial, send_data_larger_than_stream_size_is_chunked)
+{
+    CreateAndConnect();
+    connectionStub->maxSendStreamSize = 2;
+
+    static const uint8_t data[] = { 0x01, 0x02, 0x03, 0x04, 0x05 };
+    serial->SendData(infra::MakeByteRange(data), []() {});
+    ExecuteAllActions();
+
+    ASSERT_EQ(connectionStub->sentData.size(), 5u);
+    for (std::size_t i = 0; i < 5; ++i)
+        EXPECT_EQ(connectionStub->sentData[i], data[i]);
+}
+
+TEST_F(TestTcpClientSerial, queued_send_before_connect_overwrites_previous_and_completes_previous_callback)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_))
+        .WillOnce(testing::Invoke([this](services::ClientConnectionObserverFactory& factory)
+            {
+                capturedClient = &factory;
+            }));
+    serial.emplace(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5000);
+
+    bool firstCompleted{ false };
+    bool secondCompleted{ false };
+    static const uint8_t firstData[] = { 0x01 };
+    static const uint8_t secondData[] = { 0xAA, 0xBB };
+
+    serial->SendData(infra::MakeByteRange(firstData), [&firstCompleted]()
+        {
+            firstCompleted = true;
+        });
+    serial->SendData(infra::MakeByteRange(secondData), [&secondCompleted]()
+        {
+            secondCompleted = true;
+        });
+
+    EXPECT_TRUE(firstCompleted);
+    EXPECT_FALSE(secondCompleted);
+
+    connectionPtr = connectionStub.Emplace();
+    capturedClient->ConnectionEstablished([this](infra::SharedPtr<services::ConnectionObserver> observer)
+        {
+            connectionPtr->Attach(observer);
+        });
+    ExecuteAllActions();
+
+    ASSERT_EQ(connectionStub->sentData.size(), 2u);
+    EXPECT_EQ(connectionStub->sentData[0], 0xAA);
+    EXPECT_EQ(connectionStub->sentData[1], 0xBB);
+    EXPECT_TRUE(secondCompleted);
+}
+
+TEST_F(TestTcpClientSerial, connection_failed_completes_pending_callbacks)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_))
+        .WillOnce(testing::Invoke([this](services::ClientConnectionObserverFactory& factory)
+            {
+                capturedClient = &factory;
+            }));
+    serial.emplace(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5000);
+
+    bool queuedCompleted{ false };
+    static const uint8_t data[] = { 0x01 };
+    serial->SendData(infra::MakeByteRange(data), [&queuedCompleted]()
+        {
+            queuedCompleted = true;
+        });
+
+    capturedClient->ConnectionFailed(services::ClientConnectionObserverFactory::ConnectFailReason::refused);
+
+    EXPECT_TRUE(queuedCompleted);
+}

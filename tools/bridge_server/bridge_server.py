@@ -130,11 +130,12 @@ async def main() -> None:
         except NotImplementedError:
             signal.signal(sig, lambda *_: stop_event.set())
 
-    await stop_event.wait()
-
-    logger.info("Shutting down...")
-    for srv in servers:
-        await srv.stop()
+    try:
+        await stop_event.wait()
+    finally:
+        logger.info("Shutting down...")
+        for srv in servers:
+            await srv.stop()
 
 
 if __name__ == "__main__":

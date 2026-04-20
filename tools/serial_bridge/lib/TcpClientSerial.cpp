@@ -1,9 +1,8 @@
 #include "tools/serial_bridge/lib/TcpClientSerial.hpp"
 #include "infra/stream/InputStream.hpp"
 #include "infra/stream/OutputStream.hpp"
+#include "services/tracer/GlobalTracer.hpp"
 #include <algorithm>
-#include <cstdio>
-#include <cstdlib>
 
 namespace tool
 {
@@ -21,7 +20,14 @@ namespace tool
             connectionHandler->RequestSend(data, actionOnCompletion);
         else
         {
-            queuedSendData = data;
+            if (queuedSendOnDone)
+            {
+                auto previousOnDone = queuedSendOnDone;
+                queuedSendOnDone = nullptr;
+                previousOnDone();
+            }
+
+            queuedSendData.assign(data.begin(), data.end());
             queuedSendOnDone = actionOnCompletion;
         }
     }
@@ -46,18 +52,20 @@ namespace tool
         connected = true;
         createdObserver(connectionHandler.Emplace(*this));
 
-        if (!queuedSendData.empty() && connectionHandler)
+        if (connectionHandler && (!queuedSendData.empty() || queuedSendOnDone))
         {
-            connectionHandler->RequestSend(queuedSendData, queuedSendOnDone);
-            queuedSendData = {};
+            connectionHandler->RequestSend(
+                infra::ConstByteRange(queuedSendData.data(), queuedSendData.data() + queuedSendData.size()),
+                queuedSendOnDone);
+            queuedSendData.clear();
             queuedSendOnDone = nullptr;
         }
     }
 
     void TcpClientSerial::ConnectionFailed(ConnectFailReason reason)
     {
-        std::fprintf(stderr, "TcpClientSerial: connection failed (reason=%d)\n", static_cast<int>(reason));
-        std::abort();
+        services::GlobalTracer().Trace() << "TcpClientSerial: connection failed reason=" << static_cast<int>(reason);
+        HandleDisconnected(true);
     }
 
     TcpClientSerial::ConnectionHandler::ConnectionHandler(TcpClientSerial& parent)
@@ -66,19 +74,35 @@ namespace tool
 
     void TcpClientSerial::ConnectionHandler::SendStreamAvailable(infra::SharedPtr<infra::StreamWriter>&& streamWriter)
     {
-        if (!pendingSendData.empty())
+        if (pendingSendData.empty())
         {
-            infra::DataOutputStream::WithErrorPolicy stream(*streamWriter);
-            stream << pendingSendData;
-            pendingSendData = {};
             streamWriter = nullptr;
+            return;
+        }
 
-            if (pendingSendOnDone)
-            {
-                auto onDone = pendingSendOnDone;
-                pendingSendOnDone = nullptr;
-                onDone();
-            }
+        const auto remainingBytes = pendingSendData.size() - pendingSendOffset;
+        const auto chunkSize = std::min(remainingBytes, services::ConnectionObserver::Subject().MaxSendStreamSize());
+        infra::DataOutputStream::WithErrorPolicy stream(*streamWriter);
+        stream << infra::ConstByteRange(
+            pendingSendData.data() + pendingSendOffset,
+            pendingSendData.data() + pendingSendOffset + chunkSize);
+        streamWriter = nullptr;
+
+        pendingSendOffset += chunkSize;
+        if (pendingSendOffset < pendingSendData.size())
+        {
+            RequestNextSendChunk();
+            return;
+        }
+
+        pendingSendData.clear();
+        pendingSendOffset = 0;
+
+        if (pendingSendOnDone)
+        {
+            auto onDone = pendingSendOnDone;
+            pendingSendOnDone = nullptr;
+            onDone();
         }
     }
 
@@ -104,10 +128,78 @@ namespace tool
 
     void TcpClientSerial::ConnectionHandler::RequestSend(infra::ConstByteRange data, infra::Function<void()> onDone)
     {
-        pendingSendData = data;
-        pendingSendOnDone = onDone;
+        if (pendingSendOnDone)
+        {
+            if (onDone)
+                onDone();
+            return;
+        }
 
-        auto sendSize = std::min(data.size(), services::ConnectionObserver::Subject().MaxSendStreamSize());
+        if (data.empty())
+        {
+            if (onDone)
+                onDone();
+            return;
+        }
+
+        pendingSendData.assign(data.begin(), data.end());
+        pendingSendOffset = 0;
+        pendingSendOnDone = onDone;
+        RequestNextSendChunk();
+    }
+
+    void TcpClientSerial::ConnectionHandler::RequestNextSendChunk()
+    {
+        if (pendingSendOffset >= pendingSendData.size())
+            return;
+
+        const auto sendSize = std::min(
+            pendingSendData.size() - pendingSendOffset,
+            services::ConnectionObserver::Subject().MaxSendStreamSize());
         services::ConnectionObserver::Subject().RequestSendStream(sendSize);
+    }
+
+    void TcpClientSerial::ConnectionHandler::Close()
+    {
+        parent.HandleDisconnected(false);
+    }
+
+    void TcpClientSerial::ConnectionHandler::Abort()
+    {
+        parent.HandleDisconnected(false);
+    }
+
+    void TcpClientSerial::ConnectionHandler::FailPendingSend()
+    {
+        pendingSendData.clear();
+        pendingSendOffset = 0;
+
+        if (pendingSendOnDone)
+        {
+            auto onDone = pendingSendOnDone;
+            pendingSendOnDone = nullptr;
+            onDone();
+        }
+    }
+
+    void TcpClientSerial::HandleDisconnected(bool clearConnectionHandler)
+    {
+        connected = false;
+
+        if (queuedSendOnDone)
+        {
+            auto onDone = queuedSendOnDone;
+            queuedSendOnDone = nullptr;
+            queuedSendData.clear();
+            onDone();
+        }
+        else
+            queuedSendData.clear();
+
+        if (connectionHandler)
+            connectionHandler->FailPendingSend();
+
+        if (clearConnectionHandler)
+            connectionHandler = nullptr;
     }
 }
