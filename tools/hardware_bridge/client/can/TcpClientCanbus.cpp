@@ -149,15 +149,17 @@ namespace tool
         else
             canId = id.Get11BitId();
 
-        std::memcpy(buffer.data(), &canId, sizeof(uint32_t));
+        buffer[0] = static_cast<uint8_t>(canId & 0xFF);
+        buffer[1] = static_cast<uint8_t>((canId >> 8) & 0xFF);
+        buffer[2] = static_cast<uint8_t>((canId >> 16) & 0xFF);
+        buffer[3] = static_cast<uint8_t>((canId >> 24) & 0xFF);
         buffer[4] = static_cast<uint8_t>(std::min(data.size(), std::size_t{ 8 }));
         std::memcpy(buffer.data() + 8, data.data(), std::min(data.size(), std::size_t{ 8 }));
     }
 
     bool TcpClientCanbus::DecodeFrame(const uint8_t* raw, Id& outId, Message& outData)
     {
-        uint32_t canId{ 0 };
-        std::memcpy(&canId, raw, sizeof(uint32_t));
+        const uint32_t canId = static_cast<uint32_t>(raw[0]) | (static_cast<uint32_t>(raw[1]) << 8) | (static_cast<uint32_t>(raw[2]) << 16) | (static_cast<uint32_t>(raw[3]) << 24);
 
         if (canId & canErrFlag)
             return false;

@@ -1,6 +1,7 @@
 #include "tools/hardware_bridge/client/gui/BridgeController.hpp"
 #include "infra/event/EventDispatcher.hpp"
 #include "tools/hardware_bridge/client/common/BridgeException.hpp"
+#include "tools/hardware_bridge/client/common/ParseIPv4.hpp"
 #include <QMetaObject>
 #include <cassert>
 #include <cstdio>
@@ -81,7 +82,7 @@ namespace tool
             {
                 try
                 {
-                    const services::IPv4Address address = ParseIPv4(hostStr);
+                    const services::IPv4Address address = tool::ParseIPv4(hostStr);
 
                     network.emplace();
 
@@ -210,18 +211,5 @@ namespace tool
                 if (canClient && send)
                     canClient->SendData(send->first, send->second, [](bool) {});
             });
-    }
-
-    services::IPv4Address BridgeController::ParseIPv4(const std::string& host)
-    {
-        unsigned int o0 = 0, o1 = 0, o2 = 0, o3 = 0;
-        if (std::sscanf(host.c_str(), "%u.%u.%u.%u", &o0, &o1, &o2, &o3) != 4 || o0 > 255 || o1 > 255 || o2 > 255 || o3 > 255)
-            throw BridgeArgumentException("invalid IP address: " + host);
-        return services::IPv4Address{
-            static_cast<uint8_t>(o0),
-            static_cast<uint8_t>(o1),
-            static_cast<uint8_t>(o2),
-            static_cast<uint8_t>(o3)
-        };
     }
 }

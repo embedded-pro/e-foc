@@ -29,12 +29,12 @@ namespace tool
         hostInput->setMinimumWidth(180);
         connLayout->addWidget(hostInput);
 
-        connLayout->addWidget(new QLabel("Serial port:"));
+        connLayout->addWidget(new QLabel("Serial TCP port:"));
         serialPortInput = new QLineEdit("5000");
         serialPortInput->setFixedWidth(60);
         connLayout->addWidget(serialPortInput);
 
-        connLayout->addWidget(new QLabel("CAN port:"));
+        connLayout->addWidget(new QLabel("CAN TCP port:"));
         canPortInput = new QLineEdit("5001");
         canPortInput->setFixedWidth(60);
         connLayout->addWidget(canPortInput);

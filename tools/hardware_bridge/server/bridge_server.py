@@ -122,7 +122,7 @@ async def main() -> None:
     logger.info("Bridge server running. Press Ctrl+C to stop.")
 
     stop_event = asyncio.Event()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:

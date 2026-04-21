@@ -26,3 +26,5 @@ else()
         -Wno-error
     )
 endif()
+
+add_subdirectory(test)

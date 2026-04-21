@@ -67,8 +67,6 @@ namespace tool
             BridgeController& parent;
         };
 
-        static services::IPv4Address ParseIPv4(const std::string& host);
-
         std::thread infraThread;
         std::atomic<bool> stopRequested{ false };
 

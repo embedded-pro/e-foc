@@ -97,7 +97,7 @@ class SerialOverTcpServer:
             self._reader = None
 
     async def _serial_to_tcp(self) -> None:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         assert self._serial is not None
         assert self._writer is not None
 
@@ -118,6 +118,7 @@ class SerialOverTcpServer:
         return data
 
     async def _tcp_to_serial(self) -> None:
+        loop = asyncio.get_running_loop()
         assert self._serial is not None
         assert self._reader is not None
 
@@ -125,4 +126,4 @@ class SerialOverTcpServer:
             data = await self._reader.read(4096)
             if not data:
                 break
-            self._serial.write(data)
+            await loop.run_in_executor(None, self._serial.write, data)

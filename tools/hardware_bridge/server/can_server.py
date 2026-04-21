@@ -153,7 +153,7 @@ class CanBusOverTcpServer:
             self._reader = None
 
     async def _can_to_tcp(self) -> None:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         assert self._bus is not None
         assert self._writer is not None
 
@@ -173,6 +173,7 @@ class CanBusOverTcpServer:
         assert self._reader is not None
         buf = b""
 
+
         while True:
             data = await self._reader.read(4096)
             if not data:
@@ -184,7 +185,8 @@ class CanBusOverTcpServer:
                 buf = buf[CAN_FRAME_SIZE:]
                 msg = self._decode_frame(raw_frame)
                 if msg is not None:
-                    self._bus.send(msg)
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(None, self._bus.send, msg)
 
     @staticmethod
     def _encode_frame(msg: can.Message) -> bytes:

@@ -99,13 +99,14 @@ namespace tool
         }
 
         bool idOk = false;
-        const quint32 id = idStr.toUInt(&idOk, 0);
-        if (!idOk)
+        const quint64 idParsed = idStr.toULongLong(&idOk, 0);
+        if (!idOk || idParsed > 0x1FFFFFFFu)
         {
             QMessageBox::warning(this, "Send Error",
-                QString("Invalid CAN ID: '%1'. Use decimal or 0x-prefixed hex.").arg(idStr));
+                QString("Invalid CAN ID: '%1'. Must be 11-bit (0..0x7FF) or 29-bit (0..0x1FFFFFFF).").arg(idStr));
             return;
         }
+        const quint32 id = static_cast<quint32>(idParsed);
 
         const bool extended = id > 0x7FF;
 
