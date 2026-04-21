@@ -1,9 +1,8 @@
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
 #include "infra/util/SharedOptional.hpp"
-#include "infra/util/test_helper/MockCallback.hpp"
 #include "services/network/connection/test_doubles/ConnectionMock.hpp"
 #include "services/network/connection/test_doubles/ConnectionStub.hpp"
-#include "tools/serial_bridge/lib/TcpClientSerial.hpp"
+#include "tools/hardware_bridge/serial_client/lib/TcpClientSerial.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include <optional>
@@ -164,4 +163,102 @@ TEST_F(TestTcpClientSerial, connection_failed_completes_pending_callbacks)
     capturedClient->ConnectionFailed(services::ClientConnectionObserverFactory::ConnectFailReason::refused);
 
     EXPECT_TRUE(queuedCompleted);
+}
+
+TEST_F(TestTcpClientSerial, close_from_server_triggers_disconnect)
+{
+    CreateAndConnect();
+
+    EXPECT_CALL(*connectionPtr, AbortAndDestroyMock);
+    connectionPtr->AbortAndDestroy();
+    connectionPtr = nullptr;
+
+    static const uint8_t data[] = { 0x01 };
+    serial->SendData(infra::MakeByteRange(data), []() {});
+}
+
+TEST_F(TestTcpClientSerial, abort_from_server_triggers_disconnect)
+{
+    CreateAndConnect();
+
+    EXPECT_CALL(*connectionPtr, AbortAndDestroyMock);
+    connectionPtr->AbortAndDestroy();
+    connectionPtr = nullptr;
+
+    static const uint8_t data[] = { 0x02 };
+    serial->SendData(infra::MakeByteRange(data), []() {});
+}
+
+TEST_F(TestTcpClientSerial, receive_callback_not_set_does_not_crash)
+{
+    CreateAndConnect();
+
+    const uint8_t serverData[] = { 0xAA, 0xBB };
+    connectionStub->SimulateDataReceived(infra::MakeByteRange(serverData));
+}
+
+TEST_F(TestTcpClientSerial, send_while_not_connected_queues_data)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_))
+        .WillOnce(testing::Invoke([this](services::ClientConnectionObserverFactory& factory)
+            {
+                capturedClient = &factory;
+            }));
+    serial.emplace(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5000);
+
+    bool callbackFired{ false };
+    static const uint8_t data[] = { 0xDE, 0xAD };
+    serial->SendData(infra::MakeByteRange(data), [&callbackFired]()
+        {
+            callbackFired = true;
+        });
+
+    EXPECT_FALSE(callbackFired);
+
+    connectionPtr = connectionStub.Emplace();
+    capturedClient->ConnectionEstablished([this](infra::SharedPtr<services::ConnectionObserver> observer)
+        {
+            connectionPtr->Attach(observer);
+        });
+    ExecuteAllActions();
+
+    ASSERT_EQ(connectionStub->sentData.size(), 2u);
+    EXPECT_EQ(connectionStub->sentData[0], 0xDE);
+    EXPECT_EQ(connectionStub->sentData[1], 0xAD);
+    EXPECT_TRUE(callbackFired);
+}
+
+TEST_F(TestTcpClientSerial, connection_failed_clears_queued_data_and_fires_callback)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_))
+        .WillOnce(testing::Invoke([this](services::ClientConnectionObserverFactory& factory)
+            {
+                capturedClient = &factory;
+            }));
+    serial.emplace(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5000);
+
+    bool callbackFired{ false };
+    static const uint8_t data[] = { 0x01 };
+    serial->SendData(infra::MakeByteRange(data), [&callbackFired]()
+        {
+            callbackFired = true;
+        });
+
+    capturedClient->ConnectionFailed(services::ClientConnectionObserverFactory::ConnectFailReason::refused);
+
+    EXPECT_TRUE(callbackFired);
+}
+
+TEST_F(TestTcpClientSerial, send_on_active_connection_does_not_queue)
+{
+    CreateAndConnect();
+
+    static const uint8_t data[] = { 0x11, 0x22, 0x33 };
+    serial->SendData(infra::MakeByteRange(data), []() {});
+    ExecuteAllActions();
+
+    ASSERT_EQ(connectionStub->sentData.size(), 3u);
+    EXPECT_EQ(connectionStub->sentData[0], 0x11);
+    EXPECT_EQ(connectionStub->sentData[1], 0x22);
+    EXPECT_EQ(connectionStub->sentData[2], 0x33);
 }

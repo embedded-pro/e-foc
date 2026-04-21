@@ -3,7 +3,8 @@
 #include "infra/util/SharedOptional.hpp"
 #include "services/network/connection/test_doubles/ConnectionMock.hpp"
 #include "services/network/connection/test_doubles/ConnectionStub.hpp"
-#include "tools/can_bridge/lib/TcpClientCanbus.hpp"
+#include "tools/hardware_bridge/can_client/lib/TcpClientCanbus.hpp"
+#include "tools/hardware_bridge/common/BridgeException.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include <array>
@@ -12,7 +13,8 @@
 
 namespace
 {
-    class TestTcpClientCanbusFrameEncoding : public testing::Test
+    class TestTcpClientCanbusFrameEncoding
+        : public testing::Test
     {
     protected:
         std::array<uint8_t, tool::TcpClientCanbus::canFrameSize> buffer{};
@@ -314,4 +316,184 @@ TEST_F(TestTcpClientCanbusConnection, connection_failed_completes_pending_callba
     ExecuteAllActions();
 
     EXPECT_FALSE(success);
+}
+
+TEST_F(TestTcpClientCanbusConnection, close_from_server_triggers_disconnect)
+{
+    CreateAndConnect();
+
+    auto id = hal::Can::Id::Create11BitId(0x123);
+    hal::Can::Message msg;
+    msg.push_back(0xAA);
+
+    bool callbackFired{ false };
+    bool callbackSuccess{ true };
+    can->SendData(id, msg, [&callbackFired, &callbackSuccess](bool sendSuccess)
+        {
+            callbackFired = true;
+            callbackSuccess = sendSuccess;
+        });
+
+    EXPECT_CALL(*connectionPtr, AbortAndDestroyMock);
+    connectionPtr->AbortAndDestroy();
+    connectionPtr = nullptr;
+    ExecuteAllActions();
+
+    EXPECT_TRUE(callbackFired);
+    EXPECT_FALSE(callbackSuccess);
+}
+
+TEST_F(TestTcpClientCanbusConnection, abort_from_server_triggers_disconnect)
+{
+    CreateAndConnect();
+
+    auto id = hal::Can::Id::Create11BitId(0x123);
+    hal::Can::Message msg;
+    msg.push_back(0xBB);
+
+    bool callbackFired{ false };
+    bool callbackSuccess{ true };
+    can->SendData(id, msg, [&callbackFired, &callbackSuccess](bool sendSuccess)
+        {
+            callbackFired = true;
+            callbackSuccess = sendSuccess;
+        });
+
+    EXPECT_CALL(*connectionPtr, AbortAndDestroyMock);
+    connectionPtr->AbortAndDestroy();
+    connectionPtr = nullptr;
+    ExecuteAllActions();
+
+    EXPECT_TRUE(callbackFired);
+    EXPECT_FALSE(callbackSuccess);
+}
+
+TEST_F(TestTcpClientCanbusConnection, partial_frame_receive_accumulates_correctly)
+{
+    CreateAndConnect();
+
+    struct PartialResult
+    {
+        int callCount{ 0 };
+        hal::Can::Id receivedId = hal::Can::Id::Create11BitId(0);
+        hal::Can::Message receivedMsg;
+    } result;
+
+    can->ReceiveData([&result](hal::Can::Id id, const hal::Can::Message& data)
+        {
+            ++result.callCount;
+            result.receivedId = id;
+            result.receivedMsg = data;
+        });
+
+    std::array<uint8_t, tool::TcpClientCanbus::canFrameSize> frame{};
+    auto sendId = hal::Can::Id::Create11BitId(0x7FF);
+    hal::Can::Message sendMsg;
+    sendMsg.push_back(0x11);
+    sendMsg.push_back(0x22);
+    tool::TcpClientCanbus::EncodeFrame(sendId, sendMsg, frame);
+
+    connectionStub->SimulateDataReceived(infra::ConstByteRange(frame.data(), frame.data() + 8));
+    EXPECT_EQ(result.callCount, 0);
+
+    connectionStub->SimulateDataReceived(infra::ConstByteRange(frame.data() + 8, frame.data() + tool::TcpClientCanbus::canFrameSize));
+    EXPECT_EQ(result.callCount, 1);
+    EXPECT_EQ(result.receivedId, sendId);
+    ASSERT_EQ(result.receivedMsg.size(), 2u);
+    EXPECT_EQ(result.receivedMsg[0], 0x11);
+    EXPECT_EQ(result.receivedMsg[1], 0x22);
+}
+
+TEST_F(TestTcpClientCanbusConnection, multiple_frames_in_one_receive_all_dispatched)
+{
+    CreateAndConnect();
+
+    struct MultiResult
+    {
+        int callCount{ 0 };
+        std::vector<hal::Can::Id> receivedIds;
+        std::vector<hal::Can::Message> receivedMsgs;
+    } result;
+
+    can->ReceiveData([&result](hal::Can::Id id, const hal::Can::Message& data)
+        {
+            ++result.callCount;
+            result.receivedIds.push_back(id);
+            result.receivedMsgs.push_back(data);
+        });
+
+    std::array<uint8_t, tool::TcpClientCanbus::canFrameSize> frame1{};
+    auto id1 = hal::Can::Id::Create11BitId(0x111);
+    hal::Can::Message msg1;
+    msg1.push_back(0xAA);
+    tool::TcpClientCanbus::EncodeFrame(id1, msg1, frame1);
+
+    std::array<uint8_t, tool::TcpClientCanbus::canFrameSize> frame2{};
+    auto id2 = hal::Can::Id::Create11BitId(0x222);
+    hal::Can::Message msg2;
+    msg2.push_back(0xBB);
+    tool::TcpClientCanbus::EncodeFrame(id2, msg2, frame2);
+
+    std::array<uint8_t, 2 * tool::TcpClientCanbus::canFrameSize> combined{};
+    std::memcpy(combined.data(), frame1.data(), tool::TcpClientCanbus::canFrameSize);
+    std::memcpy(combined.data() + tool::TcpClientCanbus::canFrameSize, frame2.data(), tool::TcpClientCanbus::canFrameSize);
+
+    connectionStub->SimulateDataReceived(infra::MakeByteRange(combined));
+
+    EXPECT_EQ(result.callCount, 2);
+    ASSERT_EQ(result.receivedIds.size(), 2u);
+    EXPECT_EQ(result.receivedIds[0], id1);
+    EXPECT_EQ(result.receivedIds[1], id2);
+    ASSERT_EQ(result.receivedMsgs[0].size(), 1u);
+    EXPECT_EQ(result.receivedMsgs[0][0], 0xAA);
+    ASSERT_EQ(result.receivedMsgs[1].size(), 1u);
+    EXPECT_EQ(result.receivedMsgs[1][0], 0xBB);
+}
+
+TEST_F(TestTcpClientCanbusConnection, malformed_frame_closes_connection)
+{
+    CreateAndConnect();
+
+    bool callbackCalled{ false };
+    can->ReceiveData([&callbackCalled](hal::Can::Id, const hal::Can::Message&)
+        {
+            callbackCalled = true;
+        });
+
+    std::array<uint8_t, tool::TcpClientCanbus::canFrameSize> frame{};
+    uint32_t errCanId{ tool::TcpClientCanbus::canErrFlag };
+    std::memcpy(frame.data(), &errCanId, sizeof(uint32_t));
+    frame[4] = 1;
+    frame[8] = 0xFF;
+
+    EXPECT_CALL(*connectionPtr, AbortAndDestroyMock);
+    EXPECT_THROW(connectionStub->SimulateDataReceived(infra::MakeByteRange(frame)), tool::BridgeConnectionException);
+    connectionPtr = nullptr;
+
+    EXPECT_FALSE(callbackCalled);
+}
+
+TEST_F(TestTcpClientCanbusConnection, send_while_not_connected_fails_immediately)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_))
+        .WillOnce(testing::Invoke([this](services::ClientConnectionObserverFactory& factory)
+            {
+                capturedClient = &factory;
+            }));
+    can.emplace(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5001);
+
+    auto id = hal::Can::Id::Create11BitId(0x123);
+    hal::Can::Message msg;
+    msg.push_back(0xAA);
+
+    bool callbackFired{ false };
+    bool callbackSuccess{ true };
+    can->SendData(id, msg, [&callbackFired, &callbackSuccess](bool sendSuccess)
+        {
+            callbackFired = true;
+            callbackSuccess = sendSuccess;
+        });
+
+    EXPECT_TRUE(callbackFired);
+    EXPECT_FALSE(callbackSuccess);
 }

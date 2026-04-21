@@ -3,7 +3,7 @@
 #include "hal/interfaces/Can.hpp"
 #include "infra/util/Function.hpp"
 #include "infra/util/SharedOptional.hpp"
-#include "services/network/connection/Connection.hpp"
+#include "tools/hardware_bridge/common/TcpClientBase.hpp"
 #include <array>
 #include <cstdint>
 
@@ -11,7 +11,7 @@ namespace tool
 {
     class TcpClientCanbus
         : public hal::Can
-        , private services::ClientConnectionObserverFactory
+        , public TcpClient
     {
     public:
         TcpClientCanbus(services::ConnectionFactory& factory, services::IPAddress address, uint16_t port);
@@ -21,17 +21,16 @@ namespace tool
 
         static constexpr std::size_t canFrameSize{ 16 };
         static constexpr uint32_t canEffFlag{ 0x80000000 };
+        static constexpr uint32_t canErrFlag{ 0x20000000 };
 
         static void EncodeFrame(Id id, const Message& data, std::array<uint8_t, canFrameSize>& buffer);
         static bool DecodeFrame(const uint8_t* raw, Id& outId, Message& outData);
 
-    private:
-        services::IPAddress Address() const override;
-        uint16_t Port() const override;
-        void ConnectionEstablished(infra::AutoResetFunction<void(infra::SharedPtr<services::ConnectionObserver>)>&& createdObserver) override;
-        void ConnectionFailed(ConnectFailReason reason) override;
-        void HandleDisconnected(bool clearConnectionHandler);
+    protected:
+        void OnConnectionEstablished(infra::AutoResetFunction<void(infra::SharedPtr<services::ConnectionObserver>)>&& createdObserver) override;
+        void OnDisconnected(bool clearConnectionHandler) override;
 
+    private:
         class ConnectionHandler
             : public services::ConnectionObserver
         {
@@ -46,6 +45,9 @@ namespace tool
             void RequestSend(Id id, const Message& data, const infra::Function<void(bool success)>& onDone);
             void FailPendingSend(bool success);
 
+        protected:
+            void Detaching() override;
+
         private:
             TcpClientCanbus& parent;
             std::array<uint8_t, canFrameSize> pendingSendFrame{};
@@ -54,12 +56,9 @@ namespace tool
             std::size_t accumulatedBytes{ 0 };
         };
 
-        services::ConnectionFactory& factory;
-        services::IPAddress address;
-        uint16_t port;
-
         infra::SharedOptional<ConnectionHandler> connectionHandler;
+        infra::SharedPtr<ConnectionHandler> connectionHandlerPtr;
         infra::Function<void(Id id, const Message& data)> receiveCallback;
-        bool connected{ false };
     };
+
 }

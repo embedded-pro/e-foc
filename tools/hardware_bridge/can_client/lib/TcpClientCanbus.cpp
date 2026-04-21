@@ -1,19 +1,15 @@
-#include "tools/can_bridge/lib/TcpClientCanbus.hpp"
+#include "tools/hardware_bridge/can_client/lib/TcpClientCanbus.hpp"
 #include "infra/stream/InputStream.hpp"
 #include "infra/stream/OutputStream.hpp"
-#include "services/tracer/GlobalTracer.hpp"
+#include "tools/hardware_bridge/common/BridgeException.hpp"
 #include <algorithm>
 #include <cstring>
 
 namespace tool
 {
     TcpClientCanbus::TcpClientCanbus(services::ConnectionFactory& factory, services::IPAddress address, uint16_t port)
-        : factory(factory)
-        , address(address)
-        , port(port)
-    {
-        factory.Connect(*this);
-    }
+        : TcpClient(factory, address, port)
+    {}
 
     void TcpClientCanbus::SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion)
     {
@@ -28,26 +24,19 @@ namespace tool
         receiveCallback = receivedAction;
     }
 
-    services::IPAddress TcpClientCanbus::Address() const
+    void TcpClientCanbus::OnConnectionEstablished(infra::AutoResetFunction<void(infra::SharedPtr<services::ConnectionObserver>)>&& createdObserver)
     {
-        return address;
+        connectionHandlerPtr = connectionHandler.Emplace(*this);
+        createdObserver(connectionHandlerPtr);
     }
 
-    uint16_t TcpClientCanbus::Port() const
+    void TcpClientCanbus::OnDisconnected(bool clearConnectionHandler)
     {
-        return port;
-    }
+        if (connectionHandlerPtr)
+            connectionHandlerPtr->FailPendingSend(false);
 
-    void TcpClientCanbus::ConnectionEstablished(infra::AutoResetFunction<void(infra::SharedPtr<services::ConnectionObserver>)>&& createdObserver)
-    {
-        connected = true;
-        createdObserver(connectionHandler.Emplace(*this));
-    }
-
-    void TcpClientCanbus::ConnectionFailed(ConnectFailReason reason)
-    {
-        services::GlobalTracer().Trace() << "TcpClientCanbus: connection failed reason=" << static_cast<int>(reason);
-        HandleDisconnected(true);
+        if (clearConnectionHandler)
+            connectionHandlerPtr = nullptr;
     }
 
     TcpClientCanbus::ConnectionHandler::ConnectionHandler(TcpClientCanbus& parent)
@@ -66,12 +55,9 @@ namespace tool
         stream << infra::ConstByteRange(pendingSendFrame.data(), pendingSendFrame.data() + canFrameSize);
         streamWriter = nullptr;
 
-        if (pendingSendOnDone)
-        {
-            auto onDone = pendingSendOnDone;
-            pendingSendOnDone = nullptr;
-            onDone(true);
-        }
+        auto onDone = pendingSendOnDone;
+        pendingSendOnDone = nullptr;
+        onDone(true);
     }
 
     void TcpClientCanbus::ConnectionHandler::DataReceived()
@@ -90,7 +76,13 @@ namespace tool
             {
                 Id id = Id::Create11BitId(0);
                 Message msg;
-                if (DecodeFrame(receiveAccumulator.data(), id, msg) && parent.receiveCallback)
+                if (!DecodeFrame(receiveAccumulator.data(), id, msg))
+                {
+                    services::ConnectionObserver::Subject().AbortAndDestroy();
+                    throw BridgeConnectionException("malformed CAN frame");
+                }
+
+                if (parent.receiveCallback)
                     parent.receiveCallback(id, msg);
 
                 accumulatedBytes = 0;
@@ -132,6 +124,11 @@ namespace tool
         parent.HandleDisconnected(false);
     }
 
+    void TcpClientCanbus::ConnectionHandler::Detaching()
+    {
+        parent.HandleDisconnected(true);
+    }
+
     void TcpClientCanbus::ConnectionHandler::FailPendingSend(bool success)
     {
         if (pendingSendOnDone)
@@ -140,17 +137,6 @@ namespace tool
             pendingSendOnDone = nullptr;
             onDone(success);
         }
-    }
-
-    void TcpClientCanbus::HandleDisconnected(bool clearConnectionHandler)
-    {
-        connected = false;
-
-        if (connectionHandler)
-            connectionHandler->FailPendingSend(false);
-
-        if (clearConnectionHandler)
-            connectionHandler = nullptr;
     }
 
     void TcpClientCanbus::EncodeFrame(Id id, const Message& data, std::array<uint8_t, canFrameSize>& buffer)
@@ -173,19 +159,23 @@ namespace tool
         uint32_t canId{ 0 };
         std::memcpy(&canId, raw, sizeof(uint32_t));
 
-        bool isExtended = (canId & canEffFlag) != 0;
-        uint32_t arbId = canId & 0x1FFFFFFF;
+        if (canId & canErrFlag)
+            return false;
+
+        const bool isExtended = (canId & canEffFlag) != 0;
+        const uint32_t arbId = canId & 0x1FFFFFFF;
 
         if (isExtended)
             outId = Id::Create29BitId(arbId);
         else
             outId = Id::Create11BitId(arbId);
 
-        uint8_t dlc = std::min(raw[4], uint8_t{ 8 });
+        const uint8_t dlc = std::min(raw[4], uint8_t{ 8 });
         outData.clear();
         for (uint8_t i = 0; i < dlc; ++i)
             outData.push_back(raw[8 + i]);
 
         return true;
     }
+
 }

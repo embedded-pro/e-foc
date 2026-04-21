@@ -1,18 +1,13 @@
-#include "tools/serial_bridge/lib/TcpClientSerial.hpp"
+#include "tools/hardware_bridge/serial_client/lib/TcpClientSerial.hpp"
 #include "infra/stream/InputStream.hpp"
 #include "infra/stream/OutputStream.hpp"
-#include "services/tracer/GlobalTracer.hpp"
 #include <algorithm>
 
 namespace tool
 {
     TcpClientSerial::TcpClientSerial(services::ConnectionFactory& factory, services::IPAddress address, uint16_t port)
-        : factory(factory)
-        , address(address)
-        , port(port)
-    {
-        factory.Connect(*this);
-    }
+        : TcpClient(factory, address, port)
+    {}
 
     void TcpClientSerial::SendData(infra::ConstByteRange data, infra::Function<void()> actionOnCompletion)
     {
@@ -37,33 +32,36 @@ namespace tool
         receiveCallback = dataReceived;
     }
 
-    services::IPAddress TcpClientSerial::Address() const
+    void TcpClientSerial::OnConnectionEstablished(infra::AutoResetFunction<void(infra::SharedPtr<services::ConnectionObserver>)>&& createdObserver)
     {
-        return address;
-    }
+        connectionHandlerPtr = connectionHandler.Emplace(*this);
+        createdObserver(connectionHandlerPtr);
 
-    uint16_t TcpClientSerial::Port() const
-    {
-        return port;
-    }
-
-    void TcpClientSerial::ConnectionEstablished(infra::AutoResetFunction<void(infra::SharedPtr<services::ConnectionObserver>)>&& createdObserver)
-    {
-        connected = true;
-        createdObserver(connectionHandler.Emplace(*this));
-
-        if (connectionHandler && (!queuedSendData.empty() || queuedSendOnDone))
+        if (connectionHandlerPtr && (!queuedSendData.empty() || queuedSendOnDone))
         {
-            connectionHandler->RequestSend(infra::MakeByteRange(queuedSendData), queuedSendOnDone);
+            connectionHandlerPtr->RequestSend(infra::ConstByteRange(queuedSendData.data(), queuedSendData.data() + queuedSendData.size()), queuedSendOnDone);
             queuedSendData.clear();
             queuedSendOnDone = nullptr;
         }
     }
 
-    void TcpClientSerial::ConnectionFailed(ConnectFailReason reason)
+    void TcpClientSerial::OnDisconnected(bool clearConnectionHandler)
     {
-        services::GlobalTracer().Trace() << "TcpClientSerial: connection failed reason=" << static_cast<int>(reason);
-        HandleDisconnected(true);
+        if (queuedSendOnDone)
+        {
+            auto onDone = queuedSendOnDone;
+            queuedSendOnDone = nullptr;
+            queuedSendData.clear();
+            onDone();
+        }
+        else
+            queuedSendData.clear();
+
+        if (connectionHandlerPtr)
+            connectionHandlerPtr->FailPendingSend();
+
+        if (clearConnectionHandler)
+            connectionHandlerPtr = nullptr;
     }
 
     TcpClientSerial::ConnectionHandler::ConnectionHandler(TcpClientSerial& parent)
@@ -180,24 +178,8 @@ namespace tool
         }
     }
 
-    void TcpClientSerial::HandleDisconnected(bool clearConnectionHandler)
+    void TcpClientSerial::ConnectionHandler::Detaching()
     {
-        connected = false;
-
-        if (queuedSendOnDone)
-        {
-            auto onDone = queuedSendOnDone;
-            queuedSendOnDone = nullptr;
-            queuedSendData.clear();
-            onDone();
-        }
-        else
-            queuedSendData.clear();
-
-        if (connectionHandler)
-            connectionHandler->FailPendingSend();
-
-        if (clearConnectionHandler)
-            connectionHandler = nullptr;
+        parent.HandleDisconnected(true);
     }
 }

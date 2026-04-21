@@ -3,8 +3,7 @@
 #include "hal/interfaces/SerialCommunication.hpp"
 #include "infra/util/Function.hpp"
 #include "infra/util/SharedOptional.hpp"
-#include "services/network/connection/Connection.hpp"
-#include <array>
+#include "tools/hardware_bridge/common/TcpClientBase.hpp"
 #include <cstdint>
 #include <vector>
 
@@ -12,7 +11,7 @@ namespace tool
 {
     class TcpClientSerial
         : public hal::SerialCommunication
-        , private services::ClientConnectionObserverFactory
+        , public TcpClient
     {
     public:
         TcpClientSerial(services::ConnectionFactory& factory, services::IPAddress address, uint16_t port);
@@ -20,13 +19,11 @@ namespace tool
         void SendData(infra::ConstByteRange data, infra::Function<void()> actionOnCompletion) override;
         void ReceiveData(infra::Function<void(infra::ConstByteRange data)> dataReceived) override;
 
-    private:
-        services::IPAddress Address() const override;
-        uint16_t Port() const override;
-        void ConnectionEstablished(infra::AutoResetFunction<void(infra::SharedPtr<services::ConnectionObserver>)>&& createdObserver) override;
-        void ConnectionFailed(ConnectFailReason reason) override;
-        void HandleDisconnected(bool clearConnectionHandler);
+    protected:
+        void OnConnectionEstablished(infra::AutoResetFunction<void(infra::SharedPtr<services::ConnectionObserver>)>&& createdObserver) override;
+        void OnDisconnected(bool clearConnectionHandler) override;
 
+    private:
         class ConnectionHandler
             : public services::ConnectionObserver
         {
@@ -41,6 +38,9 @@ namespace tool
             void RequestSend(infra::ConstByteRange data, infra::Function<void()> onDone);
             void FailPendingSend();
 
+        protected:
+            void Detaching() override;
+
         private:
             void RequestNextSendChunk();
 
@@ -50,15 +50,10 @@ namespace tool
             infra::Function<void()> pendingSendOnDone;
         };
 
-        services::ConnectionFactory& factory;
-        services::IPAddress address;
-        uint16_t port;
-
         infra::SharedOptional<ConnectionHandler> connectionHandler;
+        infra::SharedPtr<ConnectionHandler> connectionHandlerPtr;
         infra::Function<void(infra::ConstByteRange data)> receiveCallback;
-
         std::vector<uint8_t> queuedSendData;
         infra::Function<void()> queuedSendOnDone;
-        bool connected{ false };
     };
 }
