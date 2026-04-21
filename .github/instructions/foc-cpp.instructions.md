@@ -5,6 +5,8 @@ applyTo: core/{foc,platform_abstraction,state_machine}/**,targets/**
 
 # e-foc C++ Rules
 
+> Canonical enforced rules are tracked in `.github/memory/invariants.jsonl`. The sections below provide narrative context and examples.
+
 > **Scope**: These rules apply to the embedded and real-time code paths (`core/foc/`, `core/platform_abstraction/`, `targets/`). Host-side tooling (`tools/`, `core/services/`) may use standard library heap allocation where appropriate for a host environment.
 
 This project is a Field-Oriented Control (FOC) implementation for BLDC/PMSM motors targeting resource-constrained embedded microcontrollers. Follow these rules strictly within the scoped paths.

@@ -2,6 +2,12 @@
 
 This file is a concise, task-oriented guide for AI coding agents to be immediately productive in this repository.
 
+0) Agent memory bootstrap (do this first, every session)
+- Read `.github/memory/invariants.jsonl` **in full** before starting any task.
+- Scan `.github/memory/pitfalls.jsonl` for entries whose `trigger` field matches the task scope (file paths, function names, FOC concepts).
+- If modifying any file listed in `.github/memory/sources.jsonl`, treat all entries in that record's `importedBy` as in-scope for the change.
+- See `.github/memory/PATTERN.md` for the full protocol.
+
 1) Big-picture architecture (short)
 - Purpose: Field-Oriented Control (FOC) for BLDC/PMSM with strict realtime and memory constraints.
 - Major components:
@@ -62,6 +68,8 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 8) When making changes, be explicit
 - Update corresponding `doc/` entries for algorithms and any example in `examples/`.
 - For algorithmic code, include numerical properties (stability, range, complexity) in `doc/`.
+- Any new enforced rule must be added as an entry in `.github/memory/invariants.jsonl` in the same change set.
+- Any new non-obvious failure mode discovered during review or post-mortem must be added as an entry in `.github/memory/pitfalls.jsonl`.
 
 9) Quick pointers for reviewers / code suggestions
 - If suggesting new APIs, prefer interface-driven DI and small, testable functions.

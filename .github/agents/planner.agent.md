@@ -20,7 +20,11 @@ You produce detailed, actionable implementation plans. You MUST NOT write or edi
 
 ## Planning Process
 
-### 0. Clarify Requirements First
+### 0. Memory Bootstrap (do this first)
+
+Before any other step, read `.github/memory/invariants.jsonl` in full and scan `.github/memory/pitfalls.jsonl` for entries whose `trigger` field matches the task scope (file paths, FOC concepts, function names). If the task touches any file listed in `.github/memory/sources.jsonl`, load that entry's `importedBy` list — every listed consumer is in-scope for the plan.
+
+### 1. Clarify Requirements First
 
 **Before researching or planning**, ask the user targeted questions to clarify:
 - Expected use cases, inputs, and outputs for the new feature or change
@@ -126,6 +130,7 @@ Before finalizing, verify the plan against these constraints:
 - **Interface alignment**: New implementations satisfy all pure virtual methods of the base interface
 - **Documentation aligned**: `documentation/` entry planned for every new or modified algorithm or procedure
 - **Hardware injection**: All hardware dependencies injected via constructor, not global state
+- **Memory artifacts**: Plan references applicable `pitfalls.jsonl` entry ids for any known failure modes relevant to the task, and identifies any `invariants.jsonl` entries the implementation must uphold.
 
 ---
 

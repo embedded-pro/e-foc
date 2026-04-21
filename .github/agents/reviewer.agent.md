@@ -22,6 +22,7 @@ You review code for compliance with project standards. You MUST NOT modify any f
 
 ## Review Process
 
+0. **Memory bootstrap**: Read `.github/memory/invariants.jsonl` in full. Scan `.github/memory/pitfalls.jsonl` for entries whose `trigger` matches the changed files or FOC concepts involved. If any changed file is listed in `.github/memory/sources.jsonl`, verify all `importedBy` consumers were updated in the same change.
 1. **Identify changed files**: Determine which files were created or modified
 2. **Read each file** completely — do not skim
 3. **Check each rule** in the checklist below
@@ -190,3 +191,9 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 - [ ] Headers properly ordered: system includes, then project includes
 - [ ] No unused includes or forward declarations
 - [ ] No warnings from clang-tidy where applicable
+
+### 16. Memory Artifact Compliance
+
+- [ ] Change does not violate any entry in `.github/memory/invariants.jsonl` — verify each `statement` against the changed code
+- [ ] Change does not trip any `trigger` in `.github/memory/pitfalls.jsonl` — flag any matching pitfall as a finding with the pitfall id
+- [ ] If a blast-radius header listed in `.github/memory/sources.jsonl` was modified, all entries in its `importedBy` array were updated in this change set

@@ -18,6 +18,10 @@ You are the executor agent for the **e-foc** project — a Field-Oriented Contro
 
 You implement code changes strictly following the project's conventions.
 
+## Memory Bootstrap (do this first)
+
+Before writing any code, read `.github/memory/invariants.jsonl` in full and scan `.github/memory/pitfalls.jsonl` for entries whose `trigger` field matches the task scope. If the task modifies any file listed in `.github/memory/sources.jsonl`, load that entry's `importedBy` — every consumer listed is in-scope. Note the applicable invariant ids (e.g., i001, i009) — cite them in your change description.
+
 ## Implementation Rules
 
 Follow these rules for EVERY change. Violations are unacceptable in this codebase.

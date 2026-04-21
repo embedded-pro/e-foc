@@ -23,6 +23,8 @@ You triage incoming development requests and route them to the right specialist 
 
 ## Workflow
 
+**Step 0 — Memory bootstrap**: Before doing anything else, read `.github/memory/invariants.jsonl` in full and scan `.github/memory/pitfalls.jsonl` for entries whose `trigger` field matches the task (affected file paths, function names, FOC concepts). If the task touches any file listed in `.github/memory/sources.jsonl`, load that entry's `importedBy` list and treat every listed path as in-scope.
+
 1. **Understand the request**: Read the user's task description carefully. **Ask as many clarifying questions as needed** to fully understand the use cases before routing. At minimum clarify: specific use cases and expected behavior, control mode (torque/speed/position), hardware target (EK-TM4C1294XL, STM32, or simulation), timing constraints, edge cases that must be handled, and acceptance criteria. Do not route to a specialist agent until requirements are sufficiently clear.
 2. **Gather context**: Use read and search tools to identify which modules, files, and patterns are relevant. Check the repository structure and existing code to understand the scope.
 3. **Summarize scope**: Provide a brief summary of what the task involves, which modules are affected, the FOC/motor-control theory involved, and the recommended approach.
