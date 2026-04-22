@@ -5,6 +5,7 @@
 #include "tools/hardware_bridge/client/common/TcpClientBase.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <memory>
 #include <optional>
 
 namespace
@@ -22,14 +23,45 @@ namespace
         void OnConnectionEstablished(infra::AutoResetFunction<void(infra::SharedPtr<services::ConnectionObserver>)>&& createdObserver) override
         {
             onEstablishedCalled = true;
-            createdObserver = nullptr;
+            connectionHandlerPtr = connectionHandler.Emplace(*this);
+            createdObserver(connectionHandlerPtr);
         }
 
         void OnDisconnected(bool clearConnectionHandler) override
         {
             onDisconnectedCalled = true;
             lastClearConnectionHandler = clearConnectionHandler;
+            if (clearConnectionHandler)
+                connectionHandlerPtr = nullptr;
         }
+
+    private:
+        class ConnectionHandler
+            : public services::ConnectionObserver
+        {
+        public:
+            explicit ConnectionHandler(ConcreteTcpClient& parent)
+                : parent(parent)
+            {}
+
+            void SendStreamAvailable(infra::SharedPtr<infra::StreamWriter>&&) override
+            {}
+
+            void DataReceived() override
+            {}
+
+        protected:
+            void Detaching() override
+            {
+                parent.HandleDisconnected(true);
+            }
+
+        private:
+            ConcreteTcpClient& parent;
+        };
+
+        infra::SharedOptional<ConnectionHandler> connectionHandler;
+        infra::SharedPtr<ConnectionHandler> connectionHandlerPtr;
     };
 
     class TcpClientObserverMock
@@ -47,6 +79,15 @@ namespace
         , public infra::EventDispatcherWithWeakPtrFixture
     {
     protected:
+        ~TestTcpClientBase() override
+        {
+            if (connectionPtr != nullptr)
+            {
+                EXPECT_CALL(*connectionPtr, AbortAndDestroyMock);
+                connectionPtr->AbortAndDestroy();
+            }
+        }
+
         void CreateAndConnect()
         {
             EXPECT_CALL(connectionFactory, Connect(testing::_))

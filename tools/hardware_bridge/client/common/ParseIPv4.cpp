@@ -10,7 +10,8 @@ namespace tool
         unsigned int o1 = 0;
         unsigned int o2 = 0;
         unsigned int o3 = 0;
-        if (std::sscanf(host.c_str(), "%u.%u.%u.%u", &o0, &o1, &o2, &o3) != 4 || o0 > 255 || o1 > 255 || o2 > 255 || o3 > 255)
+        int consumed = 0;
+        if (std::sscanf(host.c_str(), "%u.%u.%u.%u%n", &o0, &o1, &o2, &o3, &consumed) != 4 || o0 > 255 || o1 > 255 || o2 > 255 || o3 > 255 || consumed != static_cast<int>(host.size()))
             throw BridgeArgumentException("invalid IP address: " + host);
 
         return services::IPv4Address{
