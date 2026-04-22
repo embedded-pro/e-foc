@@ -149,17 +149,8 @@ int main(int argc, char* argv[])
         }
 
         constexpr auto radiansToDegrees = 180.0f / std::numbers::pi_v<float>;
-        const simulator::AngleUnit degreeAngleUnit{ "Position [deg]", radiansToDegrees };
 
-        simulator::HeadlessSimulation simulation{ model, controller, eventDispatcher,
-            simulator::HeadlessSimulationConfig{
-                .title = "FOC Position Control",
-                .filename = "foc_position_results",
-                .outputDirectory = std::format("{}/output/simulator/position_control", PROJECT_ROOT_DIR),
-                .timeStep = timeStep,
-                .simulationTime = simulationTime,
-                .angleUnit = degreeAngleUnit,
-            } };
+        simulator::HeadlessSimulation simulation{ model, controller, eventDispatcher };
         simulation.Run();
     }
     catch (const std::exception& ex)

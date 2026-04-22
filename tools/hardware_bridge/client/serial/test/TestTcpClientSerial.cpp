@@ -262,3 +262,68 @@ TEST_F(TestTcpClientSerial, send_on_active_connection_does_not_queue)
     EXPECT_EQ(connectionStub->sentData[1], 0x22);
     EXPECT_EQ(connectionStub->sentData[2], 0x33);
 }
+
+TEST_F(TestTcpClientSerial, send_empty_data_when_connected_fires_callback_immediately)
+{
+    CreateAndConnect();
+
+    bool callbackFired{ false };
+    serial->SendData(infra::ConstByteRange{}, [&callbackFired]()
+        {
+            callbackFired = true;
+        });
+
+    EXPECT_TRUE(callbackFired);
+    EXPECT_TRUE(connectionStub->sentData.empty());
+}
+
+TEST_F(TestTcpClientSerial, send_empty_data_when_connected_without_callback_does_not_crash)
+{
+    CreateAndConnect();
+
+    serial->SendData(infra::ConstByteRange{}, infra::Function<void()>{});
+
+    EXPECT_TRUE(connectionStub->sentData.empty());
+}
+
+TEST_F(TestTcpClientSerial, second_send_while_pending_with_null_callback_does_not_crash)
+{
+    CreateAndConnect();
+
+    static const uint8_t data[] = { 0x01, 0x02 };
+    serial->SendData(infra::MakeByteRange(data), []() {});
+
+    serial->SendData(infra::MakeByteRange(data), infra::Function<void()>{});
+    ExecuteAllActions();
+
+    ASSERT_EQ(connectionStub->sentData.size(), 2u);
+}
+
+TEST_F(TestTcpClientSerial, connection_close_from_observer_path_signals_disconnect)
+{
+    CreateAndConnect();
+
+    connectionPtr->Observer().Close();
+
+    EXPECT_FALSE(serial->IsConnected());
+}
+
+TEST_F(TestTcpClientSerial, connection_abort_from_observer_path_signals_disconnect)
+{
+    CreateAndConnect();
+
+    connectionPtr->Observer().Abort();
+
+    EXPECT_FALSE(serial->IsConnected());
+}
+
+TEST_F(TestTcpClientSerial, disconnect_with_no_pending_send_is_noop_for_send_state)
+{
+    CreateAndConnect();
+
+    EXPECT_CALL(*connectionPtr, AbortAndDestroyMock);
+    connectionPtr->AbortAndDestroy();
+    connectionPtr = nullptr;
+
+    EXPECT_FALSE(serial->IsConnected());
+}

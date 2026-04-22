@@ -542,3 +542,88 @@ TEST_F(TestTcpClientCanbusConnection, send_while_not_connected_fails_immediately
     EXPECT_TRUE(callbackFired);
     EXPECT_FALSE(callbackSuccess);
 }
+
+TEST_F(TestTcpClientCanbusConnection, send_while_not_connected_without_callback_does_not_crash)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_))
+        .WillOnce(testing::Invoke([this](services::ClientConnectionObserverFactory& factory)
+            {
+                capturedClient = &factory;
+            }));
+    can.emplace(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5001);
+
+    auto id = hal::Can::Id::Create11BitId(0x123);
+    hal::Can::Message msg;
+    msg.push_back(0xAA);
+
+    can->SendData(id, msg, infra::Function<void(bool)>{});
+}
+
+TEST_F(TestTcpClientCanbusConnection, second_send_while_pending_with_null_callback_does_not_crash)
+{
+    CreateAndConnect();
+
+    auto id = hal::Can::Id::Create11BitId(0x123);
+    hal::Can::Message msg;
+    msg.push_back(0xAA);
+
+    can->SendData(id, msg, [](bool) {});
+    can->SendData(id, msg, infra::Function<void(bool)>{});
+    ExecuteAllActions();
+}
+
+TEST_F(TestTcpClientCanbusConnection, send_fails_when_max_stream_size_too_small_without_callback)
+{
+    CreateAndConnect();
+    connectionStub->maxSendStreamSize = TestTcpClientCanbusFrameEncoding::canFrameSize - 1;
+
+    auto id = hal::Can::Id::Create11BitId(0x123);
+    hal::Can::Message msg;
+    msg.push_back(0xAA);
+
+    can->SendData(id, msg, infra::Function<void(bool)>{});
+
+    EXPECT_TRUE(connectionStub->sentData.empty());
+}
+
+TEST_F(TestTcpClientCanbusConnection, receive_frame_without_callback_does_not_crash)
+{
+    CreateAndConnect();
+
+    std::array<uint8_t, TestTcpClientCanbusFrameEncoding::canFrameSize> frame{};
+    auto sendId = hal::Can::Id::Create11BitId(0x100);
+    hal::Can::Message sendMsg;
+    sendMsg.push_back(0x55);
+    TestTcpClientCanbusFrameEncoding::EncodeFrame(sendId, sendMsg, frame);
+
+    connectionStub->SimulateDataReceived(infra::MakeByteRange(frame));
+}
+
+TEST_F(TestTcpClientCanbusConnection, connection_close_from_observer_path_signals_disconnect)
+{
+    CreateAndConnect();
+
+    connectionPtr->Observer().Close();
+
+    EXPECT_FALSE(can->IsConnected());
+}
+
+TEST_F(TestTcpClientCanbusConnection, connection_abort_from_observer_path_signals_disconnect)
+{
+    CreateAndConnect();
+
+    connectionPtr->Observer().Abort();
+
+    EXPECT_FALSE(can->IsConnected());
+}
+
+TEST_F(TestTcpClientCanbusConnection, disconnect_with_no_pending_send_is_noop_for_fail_state)
+{
+    CreateAndConnect();
+
+    EXPECT_CALL(*connectionPtr, AbortAndDestroyMock);
+    connectionPtr->AbortAndDestroy();
+    connectionPtr = nullptr;
+
+    EXPECT_FALSE(can->IsConnected());
+}

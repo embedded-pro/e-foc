@@ -7,11 +7,11 @@
 
 namespace
 {
-    static constexpr std::size_t canFrameSize{ 16 };
-    static constexpr uint32_t canEffFlag{ 0x80000000 };
-    static constexpr uint32_t canErrFlag{ 0x20000000 };
+    constexpr std::size_t canFrameSize{ 16 };
+    constexpr uint32_t canEffFlag{ 0x80000000 };
+    constexpr uint32_t canErrFlag{ 0x20000000 };
 
-    static void EncodeFrame(hal::Can::Id id, const hal::Can::Message& data, std::array<uint8_t, canFrameSize>& buffer)
+    void EncodeFrame(hal::Can::Id id, const hal::Can::Message& data, std::array<uint8_t, canFrameSize>& buffer)
     {
         std::memset(buffer.data(), 0, canFrameSize);
 
@@ -29,7 +29,7 @@ namespace
         std::memcpy(buffer.data() + 8, data.data(), std::min(data.size(), std::size_t{ 8 }));
     }
 
-    static bool DecodeFrame(const uint8_t* raw, hal::Can::Id& outId, hal::Can::Message& outData)
+    bool DecodeFrame(const uint8_t* raw, hal::Can::Id& outId, hal::Can::Message& outData)
     {
         const uint32_t canId = static_cast<uint32_t>(raw[0]) | (static_cast<uint32_t>(raw[1]) << 8) | (static_cast<uint32_t>(raw[2]) << 16) | (static_cast<uint32_t>(raw[3]) << 24);
 
