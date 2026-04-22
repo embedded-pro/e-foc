@@ -6,7 +6,6 @@ namespace simulator
         const HeadlessSimulationConfig& config)
         : controller(controller)
         , eventDispatcher(eventDispatcher)
-        , plotter(model, config.title, config.filename, config.outputDirectory, config.timeStep, config.simulationTime, config.angleUnit)
         , finishedObserver(model, [this]()
               {
                   simulationFinished = true;

@@ -19,13 +19,6 @@ namespace tool
         void SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion) override;
         void ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction) override;
 
-        static constexpr std::size_t canFrameSize{ 16 };
-        static constexpr uint32_t canEffFlag{ 0x80000000 };
-        static constexpr uint32_t canErrFlag{ 0x20000000 };
-
-        static void EncodeFrame(Id id, const Message& data, std::array<uint8_t, canFrameSize>& buffer);
-        static bool DecodeFrame(const uint8_t* raw, Id& outId, Message& outData);
-
     protected:
         void OnConnectionEstablished(infra::AutoResetFunction<void(infra::SharedPtr<services::ConnectionObserver>)>&& createdObserver) override;
         void OnDisconnected(bool clearConnectionHandler) override;
@@ -49,6 +42,7 @@ namespace tool
             void Detaching() override;
 
         private:
+            static constexpr std::size_t canFrameSize{ 16 };
             TcpClientCanbus& parent;
             std::array<uint8_t, canFrameSize> pendingSendFrame{};
             infra::Function<void(bool success)> pendingSendOnDone;

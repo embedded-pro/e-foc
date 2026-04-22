@@ -42,7 +42,7 @@ namespace tool
             void Detaching() override;
 
         private:
-            void RequestNextSendChunk();
+            void RequestNextSendChunk() const;
 
             TcpClientSerial& parent;
             std::vector<uint8_t> pendingSendData;

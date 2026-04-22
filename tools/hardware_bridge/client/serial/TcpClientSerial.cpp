@@ -144,7 +144,7 @@ namespace tool
         RequestNextSendChunk();
     }
 
-    void TcpClientSerial::ConnectionHandler::RequestNextSendChunk()
+    void TcpClientSerial::ConnectionHandler::RequestNextSendChunk() const
     {
         if (pendingSendOffset >= pendingSendData.size())
             return;

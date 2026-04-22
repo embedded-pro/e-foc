@@ -16,9 +16,8 @@ namespace
         : public tool::TcpClientObserver
     {
     public:
-        explicit ConnectionTracker(tool::TcpClient& subject, const char* name)
+        explicit ConnectionTracker(tool::TcpClient& subject)
             : tool::TcpClientObserver(subject)
-            , name(name)
         {}
 
         void Connected() override
@@ -47,13 +46,7 @@ namespace
             return alive;
         }
 
-        const char* Name() const
-        {
-            return name;
-        }
-
     private:
-        const char* name;
         bool connectedOnce{ false };
         bool alive{ false };
     };
@@ -112,8 +105,8 @@ int main(int argc, char* argv[])
         tool::TcpClientCanbus can(network.ConnectionFactory(), ipv4, canPort);
         tool::TcpClientSerial serial(network.ConnectionFactory(), ipv4, serialPort);
 
-        ConnectionTracker canTracker(can, "CAN");
-        ConnectionTracker serialTracker(serial, "Serial");
+        ConnectionTracker canTracker(can);
+        ConnectionTracker serialTracker(serial);
 
         can.ReceiveData([](hal::Can::Id id, const hal::Can::Message& data)
             {

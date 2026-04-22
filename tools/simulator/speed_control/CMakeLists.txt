@@ -3,7 +3,6 @@ emil_build_for(e_foc.tool.simulator.speed_control HOST All PREREQUISITE_BOOL E_F
 
 target_link_libraries(e_foc.tool.simulator.speed_control PUBLIC
     e_foc.tool.simulator.model
-    e_foc.tool.simulator.view
     e_foc.tool.simulator.view.gui
     e_foc.tool.simulator.headless
     e_foc.foc.instantiations

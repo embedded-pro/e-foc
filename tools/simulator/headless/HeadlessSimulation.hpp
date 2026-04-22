@@ -3,12 +3,17 @@
 #include "core/foc/interfaces/Driver.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "tools/simulator/model/Model.hpp"
-#include "tools/simulator/view/plot/Plot.hpp"
 #include <chrono>
 #include <string>
 
 namespace simulator
 {
+    struct AngleUnit
+    {
+        std::string label = "Electrical Angle [rad]";
+        float scaleFactor = 1.0f;
+    };
+
     struct HeadlessSimulationConfig
     {
         std::string title;
@@ -31,7 +36,6 @@ namespace simulator
         foc::Controllable& controller;
         infra::EventDispatcherWithWeakPtr& eventDispatcher;
 
-        Plot plotter;
         bool simulationFinished = false;
         SimulationFinishedObserver finishedObserver;
     };
