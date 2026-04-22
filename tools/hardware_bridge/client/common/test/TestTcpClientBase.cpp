@@ -1,0 +1,287 @@
+#include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
+#include "infra/util/SharedOptional.hpp"
+#include "services/network/connection/test_doubles/ConnectionMock.hpp"
+#include "services/network/connection/test_doubles/ConnectionStub.hpp"
+#include "tools/hardware_bridge/client/common/TcpClientBase.hpp"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include <memory>
+#include <optional>
+
+namespace
+{
+    class ConcreteTcpClient
+        : public tool::TcpClient
+    {
+    public:
+        using tool::TcpClient::TcpClient;
+
+        bool onEstablishedCalled{ false };
+        bool onDisconnectedCalled{ false };
+        bool lastClearConnectionHandler{ false };
+
+        void OnConnectionEstablished(infra::AutoResetFunction<void(infra::SharedPtr<services::ConnectionObserver>)>&& createdObserver) override
+        {
+            onEstablishedCalled = true;
+            connectionHandlerPtr = connectionHandler.Emplace(*this);
+            createdObserver(connectionHandlerPtr);
+        }
+
+        void OnDisconnected(bool clearConnectionHandler) override
+        {
+            onDisconnectedCalled = true;
+            lastClearConnectionHandler = clearConnectionHandler;
+            if (clearConnectionHandler)
+                connectionHandlerPtr = nullptr;
+        }
+
+    private:
+        class ConnectionHandler
+            : public services::ConnectionObserver
+        {
+        public:
+            explicit ConnectionHandler(ConcreteTcpClient& parent)
+                : parent(parent)
+            {}
+
+            void SendStreamAvailable(infra::SharedPtr<infra::StreamWriter>&&) override
+            {}
+
+            void DataReceived() override
+            {}
+
+        protected:
+            void Detaching() override
+            {
+                parent.HandleDisconnected(true);
+            }
+
+        private:
+            ConcreteTcpClient& parent;
+        };
+
+        infra::SharedOptional<ConnectionHandler> connectionHandler;
+        infra::SharedPtr<ConnectionHandler> connectionHandlerPtr;
+    };
+
+    class TcpClientObserverMock
+        : public tool::TcpClientObserver
+    {
+    public:
+        using tool::TcpClientObserver::TcpClientObserver;
+
+        MOCK_METHOD(void, Connected, (), (override));
+        MOCK_METHOD(void, Disconnected, (), (override));
+    };
+
+    class TestTcpClientBase
+        : public testing::Test
+        , public infra::EventDispatcherWithWeakPtrFixture
+    {
+    protected:
+        ~TestTcpClientBase() override
+        {
+            if (connectionPtr != nullptr)
+            {
+                EXPECT_CALL(*connectionPtr, AbortAndDestroyMock);
+                connectionPtr->AbortAndDestroy();
+            }
+        }
+
+        void CreateAndConnect()
+        {
+            EXPECT_CALL(connectionFactory, Connect(testing::_))
+                .WillOnce(testing::Invoke([this](services::ClientConnectionObserverFactory& factory)
+                    {
+                        capturedClient = &factory;
+                    }));
+
+            client.emplace(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5000);
+
+            connectionPtr = connectionStub.Emplace();
+            capturedClient->ConnectionEstablished([this](infra::SharedPtr<services::ConnectionObserver> observer)
+                {
+                    connectionPtr->Attach(observer);
+                });
+            ExecuteAllActions();
+        }
+
+        testing::StrictMock<services::ConnectionFactoryMock> connectionFactory;
+        infra::SharedOptional<testing::StrictMock<services::ConnectionStub>> connectionStub;
+        infra::SharedPtr<services::ConnectionStub> connectionPtr;
+        services::ClientConnectionObserverFactory* capturedClient{ nullptr };
+        std::optional<ConcreteTcpClient> client;
+    };
+}
+
+TEST_F(TestTcpClientBase, constructor_calls_factory_connect)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_));
+
+    ConcreteTcpClient c(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5000);
+}
+
+TEST_F(TestTcpClientBase, is_not_connected_initially)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_));
+
+    ConcreteTcpClient c(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5000);
+
+    EXPECT_FALSE(c.IsConnected());
+}
+
+TEST_F(TestTcpClientBase, is_connected_after_connection_established)
+{
+    CreateAndConnect();
+
+    EXPECT_TRUE(client->IsConnected());
+}
+
+TEST_F(TestTcpClientBase, on_connection_established_called_after_connect)
+{
+    CreateAndConnect();
+
+    EXPECT_TRUE(client->onEstablishedCalled);
+}
+
+TEST_F(TestTcpClientBase, observers_notified_connected_on_establish)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_))
+        .WillOnce(testing::Invoke([this](services::ClientConnectionObserverFactory& factory)
+            {
+                capturedClient = &factory;
+            }));
+
+    client.emplace(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5000);
+
+    testing::StrictMock<TcpClientObserverMock> observer(*client);
+
+    connectionPtr = connectionStub.Emplace();
+    EXPECT_CALL(observer, Connected());
+    capturedClient->ConnectionEstablished([this](infra::SharedPtr<services::ConnectionObserver> obs)
+        {
+            connectionPtr->Attach(obs);
+        });
+    ExecuteAllActions();
+}
+
+TEST_F(TestTcpClientBase, connection_failed_sets_not_connected_and_notifies_disconnected)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_))
+        .WillOnce(testing::Invoke([this](services::ClientConnectionObserverFactory& factory)
+            {
+                capturedClient = &factory;
+            }));
+
+    client.emplace(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5000);
+
+    testing::StrictMock<TcpClientObserverMock> observer(*client);
+
+    EXPECT_CALL(observer, Disconnected());
+    capturedClient->ConnectionFailed(services::ClientConnectionObserverFactory::ConnectFailReason::refused);
+    ExecuteAllActions();
+
+    EXPECT_FALSE(client->IsConnected());
+}
+
+TEST_F(TestTcpClientBase, connection_close_notifies_disconnected_observer)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_))
+        .WillOnce(testing::Invoke([this](services::ClientConnectionObserverFactory& factory)
+            {
+                capturedClient = &factory;
+            }));
+
+    client.emplace(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5000);
+
+    connectionPtr = connectionStub.Emplace();
+    testing::StrictMock<TcpClientObserverMock> observer(*client);
+
+    EXPECT_CALL(observer, Connected());
+    capturedClient->ConnectionEstablished([this](infra::SharedPtr<services::ConnectionObserver> obs)
+        {
+            connectionPtr->Attach(obs);
+        });
+    ExecuteAllActions();
+
+    EXPECT_CALL(observer, Disconnected());
+    EXPECT_CALL(*connectionPtr, AbortAndDestroyMock);
+    connectionPtr->AbortAndDestroy();
+    connectionPtr = nullptr;
+    ExecuteAllActions();
+
+    EXPECT_FALSE(client->IsConnected());
+}
+
+TEST_F(TestTcpClientBase, address_returned_via_factory_interface_matches_constructor)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_))
+        .WillOnce(testing::Invoke([this](services::ClientConnectionObserverFactory& factory)
+            {
+                capturedClient = &factory;
+            }));
+
+    const services::IPv4Address expected{ 192, 168, 1, 42 };
+    client.emplace(connectionFactory, expected, 5000);
+
+    EXPECT_EQ(capturedClient->Address(), services::IPAddress{ expected });
+}
+
+TEST_F(TestTcpClientBase, port_returned_via_factory_interface_matches_constructor)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_))
+        .WillOnce(testing::Invoke([this](services::ClientConnectionObserverFactory& factory)
+            {
+                capturedClient = &factory;
+            }));
+
+    constexpr uint16_t expectedPort{ 6543 };
+    client.emplace(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, expectedPort);
+
+    EXPECT_EQ(capturedClient->Port(), expectedPort);
+}
+
+TEST_F(TestTcpClientBase, multiple_observers_all_notified_on_connect_and_disconnect)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_))
+        .WillOnce(testing::Invoke([this](services::ClientConnectionObserverFactory& factory)
+            {
+                capturedClient = &factory;
+            }));
+    client.emplace(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5000);
+
+    testing::StrictMock<TcpClientObserverMock> observerA(*client);
+    testing::StrictMock<TcpClientObserverMock> observerB(*client);
+
+    connectionPtr = connectionStub.Emplace();
+    EXPECT_CALL(observerA, Connected());
+    EXPECT_CALL(observerB, Connected());
+    capturedClient->ConnectionEstablished([this](infra::SharedPtr<services::ConnectionObserver> obs)
+        {
+            connectionPtr->Attach(obs);
+        });
+    ExecuteAllActions();
+
+    EXPECT_CALL(observerA, Disconnected());
+    EXPECT_CALL(observerB, Disconnected());
+    EXPECT_CALL(*connectionPtr, AbortAndDestroyMock);
+    connectionPtr->AbortAndDestroy();
+    connectionPtr = nullptr;
+    ExecuteAllActions();
+}
+
+TEST_F(TestTcpClientBase, on_disconnected_invoked_on_connection_failure_with_clear_handler)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_))
+        .WillOnce(testing::Invoke([this](services::ClientConnectionObserverFactory& factory)
+            {
+                capturedClient = &factory;
+            }));
+    client.emplace(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5000);
+
+    capturedClient->ConnectionFailed(services::ClientConnectionObserverFactory::ConnectFailReason::refused);
+
+    EXPECT_TRUE(client->onDisconnectedCalled);
+    EXPECT_TRUE(client->lastClearConnectionHandler);
+    EXPECT_FALSE(client->IsConnected());
+}

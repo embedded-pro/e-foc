@@ -3,27 +3,13 @@
 #include "core/foc/interfaces/Driver.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "tools/simulator/model/Model.hpp"
-#include "tools/simulator/view/plot/Plot.hpp"
-#include <chrono>
-#include <string>
 
 namespace simulator
 {
-    struct HeadlessSimulationConfig
-    {
-        std::string title;
-        std::string filename;
-        std::string outputDirectory;
-        std::chrono::microseconds timeStep;
-        std::chrono::milliseconds simulationTime;
-        AngleUnit angleUnit{};
-    };
-
     class HeadlessSimulation
     {
     public:
-        HeadlessSimulation(ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
-            const HeadlessSimulationConfig& config);
+        HeadlessSimulation(ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher);
 
         void Run();
 
@@ -31,7 +17,6 @@ namespace simulator
         foc::Controllable& controller;
         infra::EventDispatcherWithWeakPtr& eventDispatcher;
 
-        Plot plotter;
         bool simulationFinished = false;
         SimulationFinishedObserver finishedObserver;
     };

@@ -1,7 +1,7 @@
 ---
 description: "Use when a detailed implementation plan is needed before writing code in e-foc. Produces structured, actionable plans that follow all e-foc constraints: no heap allocation, real-time determinism, FOC theory correctness, motor control best practices, SOLID principles, and documentation alignment."
 tools: [read, search, web]
-model: "Claude Opus 4.6"
+model: "Claude Opus 4.7"
 handoffs:
   - label: "Start Implementation"
     agent: executor
