@@ -3,8 +3,8 @@ emil_build_for(e_foc.tool.simulator.torque_control HOST All PREREQUISITE_BOOL E_
 
 target_link_libraries(e_foc.tool.simulator.torque_control PUBLIC
     e_foc.tool.simulator.model
+    e_foc.tool.simulator.services
     e_foc.tool.simulator.view.gui
-    e_foc.tool.simulator.headless
     e_foc.foc.instantiations
     e_foc.services.alignment
     e_foc.services.electrical_system_ident

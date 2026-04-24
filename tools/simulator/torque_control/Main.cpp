@@ -5,9 +5,9 @@
 #include "foc/interfaces/Units.hpp"
 #include "hal/generic/TimerServiceGeneric.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include "tools/simulator/headless/HeadlessSimulation.hpp"
 #include "tools/simulator/model/Jk42bls01X038ed.hpp"
 #include "tools/simulator/model/Model.hpp"
+#include "tools/simulator/services/OnlineElectricalRls.hpp"
 #include "tools/simulator/view/gui/GuiSimulation.hpp"
 #include "tools/simulator/view/gui/ParametersPanel.hpp"
 #include <chrono>
@@ -46,7 +46,6 @@ int main(int argc, char* argv[])
     args::Positional loadTorqueArgument(positionals, "loadTorque", "load torque for the simulation (in N\xC2\xB7m) [default = 0.02 Nm]", 0.02f, args::Options::Single);
     args::Positional timeStepArgument(positionals, "timeStep", "time step for the simulation (in microseconds) [default = 10 us]", 10, args::Options::Single);
     args::Positional simulationTimeArgument(positionals, "simulationTime", "total simulation time (in milliseconds) [default = 1000 ms]", 1000, args::Options::Single);
-    args::Flag noGuiFlag(parser, "no-gui", "Run without GUI (headless mode).", { "no-gui" });
     args::HelpFlag help(parser, "help", "display this help menu.", { 'h', "help" });
 
     try
@@ -64,8 +63,6 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    const bool enableGui = !noGuiFlag;
-
     try
     {
         infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
@@ -82,7 +79,7 @@ int main(int argc, char* argv[])
         const auto baseFrequency = hal::Hertz{ static_cast<uint32_t>(microsecondsPerSecond / timeStepUs) };
         const auto steps = static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::duration<float>>(simulationTime).count() / std::chrono::duration_cast<std::chrono::duration<float>>(timeStep).count());
 
-        simulator::ThreePhaseMotorModel model{ simulator::JK42BLS01_X038ED::parameters, foc::Volts{ powerSupplyVoltage }, baseFrequency, enableGui ? std::optional<std::size_t>{} : std::optional<std::size_t>{ steps } };
+        simulator::ThreePhaseMotorModel model{ simulator::JK42BLS01_X038ED::parameters, foc::Volts{ powerSupplyVoltage }, baseFrequency, std::optional<std::size_t>{} };
         if (loadTorque > 0.0f)
             model.SetLoad(foc::NewtonMeter{ loadTorque });
 
@@ -95,7 +92,6 @@ int main(int argc, char* argv[])
         controller.SetPolePairs(simulator::JK42BLS01_X038ED::parameters.p);
         controller.SetPoint(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ args::get(currentSetPointArgument) } });
 
-        if (enableGui)
         {
             const simulator::ParametersPanel::PidParameters pidParameters{
                 .current = { args::get(kpTorqueArgument), args::get(kiTorqueArgument), args::get(kdTorqueArgument) }
@@ -119,9 +115,14 @@ int main(int argc, char* argv[])
             auto& gui = simulation.GetGui();
             gui.DisableMechanicalIdent();
 
+            simulator::OnlineElectricalRls electricalRls{ model, simulator::JK42BLS01_X038ED::parameters.p, baseFrequency };
+            QObject::connect(&electricalRls, &simulator::OnlineElectricalRls::electricalEstimatesChanged,
+                &gui, &simulator::Gui::OnElectricalRlsUpdate);
+
             QObject::connect(&gui, &simulator::Gui::alignRequested, [&]()
                 {
                     controller.Stop();
+                    gui.SetStatus(QString::fromUtf8("Aligning\xe2\x80\xa6"));
                     alignment.ForceAlignment(simulator::JK42BLS01_X038ED::parameters.p, services::MotorAlignment::AlignmentConfig{}, [&gui](std::optional<foc::Radians> offset)
                         {
                             if (offset)
@@ -133,6 +134,7 @@ int main(int argc, char* argv[])
             QObject::connect(&gui, &simulator::Gui::identifyElectricalRequested, [&]()
                 {
                     controller.Stop();
+                    gui.SetStatus(QString::fromUtf8("Identifying R/L\xe2\x80\xa6"));
                     electricalIdent.EstimateResistanceAndInductance(services::ElectricalParametersIdentification::ResistanceAndInductanceConfig{},
                         [&gui, &electricalIdent](std::optional<foc::Ohm> r, std::optional<foc::MilliHenry> l)
                         {
@@ -151,9 +153,6 @@ int main(int argc, char* argv[])
 
             return simulation.Run();
         }
-
-        simulator::HeadlessSimulation simulation{ model, controller, eventDispatcher };
-        simulation.Run();
     }
     catch (const std::exception& ex)
     {

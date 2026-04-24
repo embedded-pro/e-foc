@@ -110,13 +110,15 @@ namespace simulator
 
         connect(startButton, &QPushButton::clicked, this, [this]()
             {
-                SetEditable(false);
+                SetMode(Mode::Running);
                 emit startClicked();
             });
 
         connect(stopButton, &QPushButton::clicked, this, [this]()
             {
-                SetEditable(true);
+                if (mode != Mode::Running)
+                    return;
+                SetMode(Mode::Idle);
                 emit stopClicked();
             });
 
@@ -133,59 +135,94 @@ namespace simulator
 
         connect(alignButton, &QPushButton::clicked, this, [this]()
             {
-                SetEditable(false);
+                SetMode(Mode::Calibrating);
                 statusLabel->setText("Aligning...");
+                emit statusChanged(statusLabel->text());
                 emit alignClicked();
             });
 
         connect(identifyElectricalButton, &QPushButton::clicked, this, [this]()
             {
-                SetEditable(false);
+                SetMode(Mode::Calibrating);
                 statusLabel->setText("Identifying electrical...");
+                emit statusChanged(statusLabel->text());
                 emit identifyElectricalClicked();
             });
 
         connect(identifyMechanicalButton, &QPushButton::clicked, this, [this]()
             {
-                SetEditable(false);
+                SetMode(Mode::Calibrating);
                 statusLabel->setText("Identifying mechanical...");
+                emit statusChanged(statusLabel->text());
                 emit identifyMechanicalClicked();
             });
+
+        SetMode(Mode::Idle);
     }
 
-    void ControlPanel::SetEditable(bool editable)
+    void ControlPanel::SetMode(Mode newMode)
     {
-        alignButton->setEnabled(editable);
-        identifyElectricalButton->setEnabled(editable);
-        identifyMechanicalButton->setEnabled(editable);
-        startButton->setEnabled(editable);
-        stopButton->setEnabled(!editable);
+        mode = newMode;
+        switch (mode)
+        {
+            case Mode::Idle:
+                alignButton->setEnabled(alignmentAvailable);
+                identifyElectricalButton->setEnabled(electricalIdentAvailable);
+                identifyMechanicalButton->setEnabled(mechanicalIdentAvailable);
+                startButton->setEnabled(true);
+                stopButton->setEnabled(false);
+                statusLabel->setText("Idle");
+                emit statusChanged(statusLabel->text());
+                break;
+
+            case Mode::Running:
+                alignButton->setEnabled(false);
+                identifyElectricalButton->setEnabled(false);
+                identifyMechanicalButton->setEnabled(false);
+                startButton->setEnabled(false);
+                stopButton->setEnabled(true);
+                statusLabel->setText("Running");
+                emit statusChanged(statusLabel->text());
+                break;
+
+            case Mode::Calibrating:
+                alignButton->setEnabled(false);
+                identifyElectricalButton->setEnabled(false);
+                identifyMechanicalButton->setEnabled(false);
+                startButton->setEnabled(false);
+                stopButton->setEnabled(false);
+                // Status text is set by the caller before SetMode.
+                break;
+        }
     }
 
     void ControlPanel::SetStatus(const QString& status)
     {
         statusLabel->setText(status);
+        emit statusChanged(status);
     }
 
     void ControlPanel::DisableMechanicalIdent()
     {
+        mechanicalIdentAvailable = false;
         identifyMechanicalButton->setEnabled(false);
         identifyMechanicalButton->setToolTip("Mechanical identification not available in this control mode");
     }
 
     void ControlPanel::DisableElectricalIdent()
     {
+        electricalIdentAvailable = false;
         identifyElectricalButton->setEnabled(false);
     }
 
     void ControlPanel::DisableAlignment()
     {
+        alignmentAvailable = false;
         alignButton->setEnabled(false);
     }
 
     void ControlPanel::CalibrationFinished()
     {
-        SetEditable(true);
-        statusLabel->setText("Idle");
+        SetMode(Mode::Idle);
     }
 }

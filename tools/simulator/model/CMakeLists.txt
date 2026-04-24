@@ -15,3 +15,5 @@ target_sources(e_foc.tool.simulator.model PRIVATE
     Model.hpp
     Model.cpp
 )
+
+add_subdirectory(test)

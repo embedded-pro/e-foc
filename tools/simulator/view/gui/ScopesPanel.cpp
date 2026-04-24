@@ -1,6 +1,10 @@
 #include "tools/simulator/view/gui/ScopesPanel.hpp"
+#include "tools/simulator/view/gui/CollapsibleGroupBox.hpp"
 #include <QColor>
+#include <QFont>
 #include <QGroupBox>
+#include <QHBoxLayout>
+#include <QLabel>
 #include <QVBoxLayout>
 #include <memory>
 
@@ -8,6 +12,8 @@ namespace simulator
 {
     namespace
     {
+        constexpr int hexagonMaxHeight = 280;
+
         template<typename T, typename... Args>
         T* QtOwned(Args&&... args)
         {
@@ -20,19 +26,41 @@ namespace simulator
     {
         auto* layout = QtOwned<QVBoxLayout>(this);
 
-        // SVPWM hexagon (top, largest)
+        // Mode label at the top
+        modeLabel = QtOwned<QLabel>("Idle", this);
+        modeLabel->setAlignment(Qt::AlignCenter);
+        QFont modeFont;
+        modeFont.setBold(true);
+        modeFont.setPointSize(11);
+        modeLabel->setFont(modeFont);
+        layout->addWidget(modeLabel);
+
+        // SVPWM hexagon — compact at top, centered horizontally
         auto* hexagonGroup = QtOwned<QGroupBox>("SVPWM Hexagon (Vβ vs Vα)", this);
-        auto* hexagonLayout = QtOwned<QVBoxLayout>();
+        auto* hexagonOuter = QtOwned<QHBoxLayout>();
+        hexagonOuter->setContentsMargins(4, 4, 4, 4);
 
         hexagonWidget = QtOwned<HexagonWidget>(this);
-        hexagonLayout->addWidget(hexagonWidget);
+        // Force a square footprint so the widget does not stretch to the panel width.
+        hexagonWidget->setFixedSize(hexagonMaxHeight, hexagonMaxHeight);
 
-        hexagonGroup->setLayout(hexagonLayout);
-        layout->addWidget(hexagonGroup, 3);
+        hexagonOuter->addStretch(1);
+        hexagonOuter->addWidget(hexagonWidget);
+        hexagonOuter->addStretch(1);
 
-        // Phase currents scope
-        auto* currentGroup = QtOwned<QGroupBox>("Phase Currents (A, B, C)", this);
-        auto* currentLayout = QtOwned<QVBoxLayout>();
+        hexagonGroup->setLayout(hexagonOuter);
+        hexagonGroup->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+        layout->addWidget(hexagonGroup, 0);
+
+        // Phase signals (currents + voltages) — collapsible, single combined panel
+        auto* phaseSignalsBox = QtOwned<CollapsibleGroupBox>("Phase Signals (Currents & Voltages)", this);
+        auto* phaseSignalsLayout = QtOwned<QVBoxLayout>();
+
+        auto* currentsLabel = QtOwned<QLabel>("Phase Currents (A, B, C)", this);
+        QFont sectionFont;
+        sectionFont.setBold(true);
+        currentsLabel->setFont(sectionFont);
+        phaseSignalsLayout->addWidget(currentsLabel);
 
         currentScope = QtOwned<ScopeWidget>(this);
         currentScope->SetChannelCount(3);
@@ -41,16 +69,12 @@ namespace simulator
         currentScope->SetChannelConfig(2, { "Ic", QColor(0, 200, 80) });
 
         currentScopeToolbar = QtOwned<ScopeToolbar>(*currentScope, this);
+        phaseSignalsLayout->addWidget(currentScopeToolbar);
+        phaseSignalsLayout->addWidget(currentScope);
 
-        currentLayout->addWidget(currentScopeToolbar);
-        currentLayout->addWidget(currentScope);
-
-        currentGroup->setLayout(currentLayout);
-        layout->addWidget(currentGroup, 1);
-
-        // Phase voltages scope
-        auto* voltageGroup = QtOwned<QGroupBox>("Phase Voltages — inverter midpoint (Va, Vb, Vc)", this);
-        auto* voltageLayout = QtOwned<QVBoxLayout>();
+        auto* voltagesLabel = QtOwned<QLabel>("Phase Voltages — inverter midpoint (Va, Vb, Vc)", this);
+        voltagesLabel->setFont(sectionFont);
+        phaseSignalsLayout->addWidget(voltagesLabel);
 
         voltageScope = QtOwned<ScopeWidget>(this);
         voltageScope->SetChannelCount(3);
@@ -59,12 +83,32 @@ namespace simulator
         voltageScope->SetChannelConfig(2, { "Vc", QColor(0, 200, 80) });
 
         voltageScopeToolbar = QtOwned<ScopeToolbar>(*voltageScope, this);
+        phaseSignalsLayout->addWidget(voltageScopeToolbar);
+        phaseSignalsLayout->addWidget(voltageScope);
 
-        voltageLayout->addWidget(voltageScopeToolbar);
-        voltageLayout->addWidget(voltageScope);
+        phaseSignalsBox->SetContentLayout(phaseSignalsLayout);
+        layout->addWidget(phaseSignalsBox, 2);
 
-        voltageGroup->setLayout(voltageLayout);
-        layout->addWidget(voltageGroup, 1);
+        // Online RLS Estimates — collapsible
+        auto* rlsBox = QtOwned<CollapsibleGroupBox>("Online RLS Estimates", this);
+        auto* rlsLayout = QtOwned<QVBoxLayout>();
+
+        electricalRlsScope = QtOwned<ScopeWidget>(this);
+        electricalRlsScope->SetChannelCount(2);
+        electricalRlsScope->SetChannelConfig(0, { "R\xCC\x82 [\xCE\xA9]", QColor(220, 50, 50) });
+        electricalRlsScope->SetChannelConfig(1, { "L\xCC\x82 [mH]", QColor(0, 220, 220) });
+        rlsLayout->addWidget(electricalRlsScope);
+
+        mechanicalRlsScope = QtOwned<ScopeWidget>(this);
+        mechanicalRlsScope->SetChannelCount(2);
+        mechanicalRlsScope->SetChannelConfig(0, { "B\xCC\x82 [\xC2\xB5N\xC2\xB7m\xC2\xB7s/rad]", QColor(220, 200, 0) });
+        mechanicalRlsScope->SetChannelConfig(1, { "J\xCC\x82 [\xC2\xB5kg\xC2\xB7m\xC2\xB2]", QColor(0, 200, 80) });
+        rlsLayout->addWidget(mechanicalRlsScope);
+
+        rlsBox->SetContentLayout(rlsLayout);
+        layout->addWidget(rlsBox, 1);
+
+        layout->addStretch(1);
     }
 
     void ScopesPanel::AddCurrentSample(std::span<const float> sample)
@@ -87,10 +131,29 @@ namespace simulator
         hexagonWidget->SetDcLink(vdc);
     }
 
+    void ScopesPanel::SetMode(const QString& label)
+    {
+        modeLabel->setText(label);
+    }
+
     void ScopesPanel::Clear()
     {
         currentScope->Clear();
         voltageScope->Clear();
         hexagonWidget->Clear();
+        electricalRlsScope->Clear();
+        mechanicalRlsScope->Clear();
+    }
+
+    void ScopesPanel::AddElectricalRlsSample(float Rhat, float Lhat)
+    {
+        const std::array<float, 2> a = { Rhat, Lhat * 1000.0f };
+        electricalRlsScope->AddSample({ a.data(), 2 });
+    }
+
+    void ScopesPanel::AddMechanicalRlsSample(float Bhat, float Jhat)
+    {
+        const std::array<float, 2> a = { Bhat * 1.0e6f, Jhat * 1.0e6f };
+        mechanicalRlsScope->AddSample({ a.data(), 2 });
     }
 }

@@ -2,7 +2,9 @@
 
 #include "core/foc/interfaces/Units.hpp"
 #include "tools/simulator/model/Model.hpp"
+#include <QDoubleSpinBox>
 #include <QLabel>
+#include <QPushButton>
 #include <QWidget>
 #include <cstddef>
 #include <optional>
@@ -38,6 +40,16 @@ namespace simulator
         void UpdateInertia(foc::NewtonMeterSecondSquared value);
         void UpdatePolePairs(std::size_t value);
         void UpdateAlignmentOffset(foc::Radians value);
+        void UpdateLiveThermal(float tempCelsius, foc::Ohm rEff, foc::Henry lEff);
+
+    signals:
+        void noiseConfigChanged(simulator::ThreePhaseMotorModel::NoiseConfig config);
+        void thermalConfigChanged(simulator::ThreePhaseMotorModel::ThermalConfig config);
+        void thermalResetRequested();
+
+    private:
+        void EmitNoiseConfig();
+        void EmitThermalConfig();
 
     private:
         QLabel* resistanceLabel;
@@ -55,5 +67,21 @@ namespace simulator
         QLabel* positionKpLabel = nullptr;
         QLabel* positionKiLabel = nullptr;
         QLabel* positionKdLabel = nullptr;
+
+        QDoubleSpinBox* sigmaSpin{ nullptr };
+        QDoubleSpinBox* biasASpin{ nullptr };
+        QDoubleSpinBox* biasBSpin{ nullptr };
+        QDoubleSpinBox* biasCSpin{ nullptr };
+
+        QDoubleSpinBox* tAmbientSpin{ nullptr };
+        QDoubleSpinBox* rThSpin{ nullptr };
+        QDoubleSpinBox* cThSpin{ nullptr };
+        QDoubleSpinBox* alphaCuSpin{ nullptr };
+        QDoubleSpinBox* betaFeSpin{ nullptr };
+        QPushButton* resetTempButton{ nullptr };
+
+        QLabel* tWindingLabel{ nullptr };
+        QLabel* rEffLabel{ nullptr };
+        QLabel* lEffLabel{ nullptr };
     };
 }

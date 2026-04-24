@@ -8,6 +8,7 @@
 #include "tools/simulator/view/gui/ParametersPanel.hpp"
 #include "tools/simulator/view/gui/ScopesPanel.hpp"
 #include <QMainWindow>
+#include <QTimer>
 #include <cstddef>
 
 namespace simulator
@@ -25,7 +26,7 @@ namespace simulator
 
         // ThreePhaseMotorModelObserver
         void Started() override;
-        void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta) override;
+        void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta, foc::RadiansPerSecond omegaMech) override;
         void StatorVoltages(foc::ThreePhase phaseVoltages, foc::TwoPhase alphaBeta) override;
         void Finished() override;
 
@@ -36,7 +37,18 @@ namespace simulator
         void identifyMechanicalRequested();
 
     public:
+        void OnElectricalRlsUpdate(float Rhat, float Lhat)
+        {
+            scopesPanel->AddElectricalRlsSample(Rhat, Lhat);
+        }
+
+        void OnMechanicalRlsUpdate(float Bhat, float Jhat)
+        {
+            scopesPanel->AddMechanicalRlsSample(Bhat, Jhat);
+        }
+
         void UpdatePidParameters(const ParametersPanel::PidParameters& pidParameters);
+        void SetStatus(const QString& status);
         void SetIdentifiedElectrical(foc::Ohm resistance, foc::MilliHenry inductance);
         void SetIdentifiedPolePairs(std::size_t polePairs);
         void SetIdentifiedMechanical(foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia);
@@ -52,5 +64,6 @@ namespace simulator
         ControlPanel* controlPanel;
         ParametersPanel* parametersPanel;
         ScopesPanel* scopesPanel;
+        QTimer* thermalTimer{ nullptr };
     };
 }

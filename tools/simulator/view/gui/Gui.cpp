@@ -42,6 +42,8 @@ namespace simulator
         scopesPanel = QtOwned<ScopesPanel>(this);
         scopesPanel->SetDcLink(powerSupplyVoltage);
 
+        connect(controlPanel, &ControlPanel::statusChanged, scopesPanel, &ScopesPanel::SetMode);
+
         // Left column: control + parameters in a scrollable container
         auto* leftContainer = QtOwned<QWidget>(this);
         auto* leftLayout = QtOwned<QVBoxLayout>(leftContainer);
@@ -66,9 +68,6 @@ namespace simulator
 
         connect(controlPanel, &ControlPanel::startClicked, this, [this]()
             {
-                while (!this->eventDispatcher.IsIdle())
-                    this->eventDispatcher.ExecuteFirstAction();
-
                 this->controller.Start();
             });
 
@@ -87,6 +86,34 @@ namespace simulator
         connect(controlPanel, &ControlPanel::alignClicked, this, &Gui::alignRequested);
         connect(controlPanel, &ControlPanel::identifyElectricalClicked, this, &Gui::identifyElectricalRequested);
         connect(controlPanel, &ControlPanel::identifyMechanicalClicked, this, &Gui::identifyMechanicalRequested);
+
+        connect(parametersPanel, &ParametersPanel::noiseConfigChanged, this,
+            [this](ThreePhaseMotorModel::NoiseConfig c)
+            {
+                this->model.SetAdcNoise(c);
+            });
+
+        connect(parametersPanel, &ParametersPanel::thermalConfigChanged, this,
+            [this](ThreePhaseMotorModel::ThermalConfig c)
+            {
+                this->model.SetThermalConfig(c);
+            });
+
+        connect(parametersPanel, &ParametersPanel::thermalResetRequested, this,
+            [this]()
+            {
+                this->model.ResetTemperature();
+            });
+
+        thermalTimer = QtOwned<QTimer>(this);
+        connect(thermalTimer, &QTimer::timeout, this, [this]()
+            {
+                parametersPanel->UpdateLiveThermal(
+                    this->model.WindingTemperatureCelsius(),
+                    this->model.EffectiveResistance(),
+                    this->model.EffectiveInductanceD());
+            });
+        thermalTimer->start(100);
     }
 
     void Gui::Started()
@@ -95,7 +122,7 @@ namespace simulator
         scopesPanel->Clear();
     }
 
-    void Gui::PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians /*theta*/)
+    void Gui::PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians /*theta*/, foc::RadiansPerSecond /*omegaMech*/)
     {
         const std::array<float, 3> currents = { currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() };
         scopesPanel->AddCurrentSample(currents);
@@ -110,13 +137,17 @@ namespace simulator
 
     void Gui::Finished()
     {
-        controlPanel->SetStatus("Finished");
-        controlPanel->SetEditable(true);
+        controlPanel->SetMode(ControlPanel::Mode::Idle);
     }
 
     void Gui::UpdatePidParameters(const ParametersPanel::PidParameters& pidParameters)
     {
         parametersPanel->UpdatePidParameters(pidParameters);
+    }
+
+    void Gui::SetStatus(const QString& status)
+    {
+        controlPanel->SetStatus(status);
     }
 
     void Gui::SetIdentifiedElectrical(foc::Ohm resistance, foc::MilliHenry inductance)

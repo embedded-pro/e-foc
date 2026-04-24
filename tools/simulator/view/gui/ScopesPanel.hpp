@@ -4,6 +4,8 @@
 #include "tools/simulator/view/gui/HexagonWidget.hpp"
 #include "tools/simulator/view/gui/ScopeToolbar.hpp"
 #include "tools/simulator/view/gui/ScopeWidget.hpp"
+#include <QLabel>
+#include <QString>
 #include <QWidget>
 #include <span>
 
@@ -21,13 +23,19 @@ namespace simulator
         void AddVoltageSample(std::span<const float> sample);
         void SetHexagonSample(float va, float vb, float vc, float vAlpha, float vBeta);
         void SetDcLink(foc::Volts vdc);
+        void SetMode(const QString& label);
         void Clear();
+        void AddElectricalRlsSample(float Rhat, float Lhat);
+        void AddMechanicalRlsSample(float Bhat, float Jhat);
 
     private:
+        QLabel* modeLabel;
         ScopeWidget* currentScope;
         ScopeToolbar* currentScopeToolbar;
         ScopeWidget* voltageScope;
         ScopeToolbar* voltageScopeToolbar;
         HexagonWidget* hexagonWidget;
+        ScopeWidget* electricalRlsScope{ nullptr };
+        ScopeWidget* mechanicalRlsScope{ nullptr };
     };
 }

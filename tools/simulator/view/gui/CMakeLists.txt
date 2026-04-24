@@ -13,6 +13,8 @@ target_link_libraries(e_foc.tool.simulator.view.gui PUBLIC
 )
 
 target_sources(e_foc.tool.simulator.view.gui PRIVATE
+    CollapsibleGroupBox.hpp
+    CollapsibleGroupBox.cpp
     ControlPanel.hpp
     ControlPanel.cpp
     Gui.hpp

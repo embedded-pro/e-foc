@@ -48,7 +48,7 @@ namespace simulator
     {
         setMinimumHeight(520);
         setMinimumWidth(520);
-        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
         setStyleSheet("background-color: #0a0a0a;");
 
         connect(&refreshTimer, &QTimer::timeout, this, QOverload<>::of(&QWidget::update));
