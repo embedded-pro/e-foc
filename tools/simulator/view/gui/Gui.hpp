@@ -2,12 +2,14 @@
 
 #include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/state_machine/FocStateMachine.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "tools/simulator/model/Model.hpp"
 #include "tools/simulator/view/gui/ControlPanel.hpp"
 #include "tools/simulator/view/gui/ParametersPanel.hpp"
 #include "tools/simulator/view/gui/ScopesPanel.hpp"
 #include <QMainWindow>
+#include <QString>
 #include <QTimer>
 #include <cstddef>
 
@@ -49,6 +51,8 @@ namespace simulator
 
         void UpdatePidParameters(const ParametersPanel::PidParameters& pidParameters);
         void SetStatus(const QString& status);
+        void SetState(const state_machine::State& state);
+        static QString LabelFor(const state_machine::State& state);
         void SetIdentifiedElectrical(foc::Ohm resistance, foc::MilliHenry inductance);
         void SetIdentifiedPolePairs(std::size_t polePairs);
         void SetIdentifiedMechanical(foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia);

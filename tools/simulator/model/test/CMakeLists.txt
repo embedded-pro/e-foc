@@ -10,5 +10,6 @@ target_link_libraries(e_foc.tool.simulator.model_test PUBLIC
 
 target_sources(e_foc.tool.simulator.model_test PRIVATE
     TestAdcNoise.cpp
+    TestEncoderNoise.cpp
     TestThermalModel.cpp
 )

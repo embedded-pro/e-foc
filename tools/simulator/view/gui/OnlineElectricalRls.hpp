@@ -2,9 +2,8 @@
 
 #ifndef Q_MOC_RUN
 #include "core/foc/implementations/TransformsClarkePark.hpp"
-#include "core/foc/implementations/TrigonometricImpl.hpp"
 #include "core/foc/interfaces/Units.hpp"
-#include "numerical/estimators/online/RecursiveLeastSquares.hpp"
+#include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
 #include "tools/simulator/model/Model.hpp"
 #endif
 
@@ -13,6 +12,9 @@
 
 namespace simulator
 {
+    // Thin Qt observer that adapts the simulator's three-phase model samples
+    // to the production RealTimeResistanceAndInductanceEstimator and re-emits
+    // the resulting estimates as Qt signals for the GUI scopes.
     class OnlineElectricalRls
         : public QObject
         , public ThreePhaseMotorModelObserver
@@ -27,35 +29,14 @@ namespace simulator
         void StatorVoltages(foc::ThreePhase phaseVoltages, foc::TwoPhase alphaBeta) override;
         void Finished() override;
 
-        float ResistanceEstimate() const
-        {
-            return rHat;
-        }
-
-        float InductanceEstimate() const
-        {
-            return lHat;
-        }
-
-        void UpdateForTest(float vd, float id, float iq, float omegaElec);
-
     signals:
         void electricalEstimatesChanged(float Rhat, float Lhat);
 
     private:
-        void Update(float vd, float id, float iq, float omegaElec);
-
         uint8_t polePairs;
-        float ts;
-        foc::Clarke clarke;
-        foc::Park park;
-        foc::FastTrigonometry trig;
-        estimators::RecursiveLeastSquares<float, 2> rls;
-        bool haveVoltage{ false };
+        [[no_unique_address]] foc::Clarke clarke;
+        [[no_unique_address]] foc::Park park;
+        services::RealTimeResistanceAndInductanceEstimator estimator;
         foc::TwoPhase lastVAlphaBeta{};
-        float idPrev{ 0.0f };
-        bool haveCurrentPrev{ false };
-        float rHat{ 0.0f };
-        float lHat{ 0.001f };
     };
 }

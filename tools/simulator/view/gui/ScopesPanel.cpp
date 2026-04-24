@@ -1,10 +1,10 @@
 #include "tools/simulator/view/gui/ScopesPanel.hpp"
-#include "tools/simulator/view/gui/CollapsibleGroupBox.hpp"
 #include <QColor>
 #include <QFont>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QTabWidget>
 #include <QVBoxLayout>
 #include <memory>
 
@@ -12,7 +12,7 @@ namespace simulator
 {
     namespace
     {
-        constexpr int hexagonMaxHeight = 280;
+        constexpr int hexagonMaxHeight = 460;
 
         template<typename T, typename... Args>
         T* QtOwned(Args&&... args)
@@ -35,26 +35,29 @@ namespace simulator
         modeLabel->setFont(modeFont);
         layout->addWidget(modeLabel);
 
-        // SVPWM hexagon — compact at top, centered horizontally
+        // SVPWM hexagon — always visible at top, centered horizontally
         auto* hexagonGroup = QtOwned<QGroupBox>("SVPWM Hexagon (Vβ vs Vα)", this);
         auto* hexagonOuter = QtOwned<QHBoxLayout>();
         hexagonOuter->setContentsMargins(4, 4, 4, 4);
 
         hexagonWidget = QtOwned<HexagonWidget>(this);
-        // Force a square footprint so the widget does not stretch to the panel width.
-        hexagonWidget->setFixedSize(hexagonMaxHeight, hexagonMaxHeight);
+        hexagonWidget->setMinimumSize(hexagonMaxHeight, hexagonMaxHeight);
+        hexagonWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
         hexagonOuter->addStretch(1);
         hexagonOuter->addWidget(hexagonWidget);
         hexagonOuter->addStretch(1);
 
         hexagonGroup->setLayout(hexagonOuter);
-        hexagonGroup->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+        hexagonGroup->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
         layout->addWidget(hexagonGroup, 0);
 
-        // Phase signals (currents + voltages) — collapsible, single combined panel
-        auto* phaseSignalsBox = QtOwned<CollapsibleGroupBox>("Phase Signals (Currents & Voltages)", this);
-        auto* phaseSignalsLayout = QtOwned<QVBoxLayout>();
+        // Tabbed area: phase signals and RLS estimates
+        auto* tabs = QtOwned<QTabWidget>(this);
+
+        // Tab 1: Phase Signals
+        auto* phaseTab = QtOwned<QWidget>(this);
+        auto* phaseSignalsLayout = QtOwned<QVBoxLayout>(phaseTab);
 
         auto* currentsLabel = QtOwned<QLabel>("Phase Currents (A, B, C)", this);
         QFont sectionFont;
@@ -86,12 +89,11 @@ namespace simulator
         phaseSignalsLayout->addWidget(voltageScopeToolbar);
         phaseSignalsLayout->addWidget(voltageScope);
 
-        phaseSignalsBox->SetContentLayout(phaseSignalsLayout);
-        layout->addWidget(phaseSignalsBox, 2);
+        tabs->addTab(phaseTab, "Phase Signals");
 
-        // Online RLS Estimates — collapsible
-        auto* rlsBox = QtOwned<CollapsibleGroupBox>("Online RLS Estimates", this);
-        auto* rlsLayout = QtOwned<QVBoxLayout>();
+        // Tab 2: Online RLS Estimates
+        auto* rlsTab = QtOwned<QWidget>(this);
+        auto* rlsLayout = QtOwned<QVBoxLayout>(rlsTab);
 
         electricalRlsScope = QtOwned<ScopeWidget>(this);
         electricalRlsScope->SetChannelCount(2);
@@ -105,10 +107,9 @@ namespace simulator
         mechanicalRlsScope->SetChannelConfig(1, { "J\xCC\x82 [\xC2\xB5kg\xC2\xB7m\xC2\xB2]", QColor(0, 200, 80) });
         rlsLayout->addWidget(mechanicalRlsScope);
 
-        rlsBox->SetContentLayout(rlsLayout);
-        layout->addWidget(rlsBox, 1);
+        tabs->addTab(rlsTab, "RLS Estimates");
 
-        layout->addStretch(1);
+        layout->addWidget(tabs, 1);
     }
 
     void ScopesPanel::AddCurrentSample(std::span<const float> sample)

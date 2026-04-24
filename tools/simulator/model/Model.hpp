@@ -64,10 +64,17 @@ namespace simulator
             float ironInductanceCoeff{ 0.0f }; // 1/°C
         };
 
+        struct EncoderNoiseConfig
+        {
+            float sigmaRadians{ 0.0f };
+            float biasRadians{ 0.0f };
+        };
+
         ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency, std::optional<std::size_t> maxIterations);
 
         void SetLoad(foc::NewtonMeter load);
         void SetAdcNoise(const NoiseConfig& config);
+        void SetEncoderNoise(const EncoderNoiseConfig& config);
         void SetThermalConfig(const ThermalConfig& config);
         void ResetTemperature();
         float WindingTemperatureCelsius() const;
@@ -138,6 +145,10 @@ namespace simulator
 
         ThermalConfig thermalConfig{};
         float windingTempCelsius{ 25.0f };
+
+        EncoderNoiseConfig encoderNoiseConfig{};
+        std::mt19937 encoderNoiseEngine{ 0xbaadf00dU };
+        std::normal_distribution<float> encoderNoiseDistribution{ 0.0f, 1.0f };
 
         bool selfDriving{ false };
         bool cycleScheduled{ false };

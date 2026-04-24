@@ -43,6 +43,11 @@ namespace simulator
         noiseConfig = config;
     }
 
+    void ThreePhaseMotorModel::SetEncoderNoise(const EncoderNoiseConfig& config)
+    {
+        encoderNoiseConfig = config;
+    }
+
     void ThreePhaseMotorModel::SetThermalConfig(const ThermalConfig& config)
     {
         thermalConfig = config;
@@ -232,7 +237,8 @@ namespace simulator
 
     foc::Radians ThreePhaseMotorModel::Read()
     {
-        return theta_mech;
+        const float noise = encoderNoiseConfig.sigmaRadians * encoderNoiseDistribution(encoderNoiseEngine);
+        return foc::Radians{ WrapAngle(theta_mech.Value() + encoderNoiseConfig.biasRadians + noise) };
     }
 
     void ThreePhaseMotorModel::Set(foc::Radians value)

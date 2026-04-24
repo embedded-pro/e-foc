@@ -93,6 +93,12 @@ namespace simulator
                 this->model.SetAdcNoise(c);
             });
 
+        connect(parametersPanel, &ParametersPanel::encoderNoiseConfigChanged, this,
+            [this](ThreePhaseMotorModel::EncoderNoiseConfig c)
+            {
+                this->model.SetEncoderNoise(c);
+            });
+
         connect(parametersPanel, &ParametersPanel::thermalConfigChanged, this,
             [this](ThreePhaseMotorModel::ThermalConfig c)
             {
@@ -148,6 +154,57 @@ namespace simulator
     void Gui::SetStatus(const QString& status)
     {
         controlPanel->SetStatus(status);
+    }
+
+    QString Gui::LabelFor(const state_machine::State& state)
+    {
+        return std::visit([](const auto& s) -> QString
+            {
+                using T = std::decay_t<decltype(s)>;
+                if constexpr (std::is_same_v<T, state_machine::Idle>)
+                    return QStringLiteral("Idle");
+                else if constexpr (std::is_same_v<T, state_machine::Calibrating>)
+                {
+                    switch (s.step)
+                    {
+                        case state_machine::CalibrationStep::polePairs:
+                            return QStringLiteral("Calibrating: pole pairs\xe2\x80\xa6");
+                        case state_machine::CalibrationStep::resistanceAndInductance:
+                            return QStringLiteral("Calibrating: R/L\xe2\x80\xa6");
+                        case state_machine::CalibrationStep::alignment:
+                            return QStringLiteral("Calibrating: alignment\xe2\x80\xa6");
+                        case state_machine::CalibrationStep::frictionAndInertia:
+                            return QStringLiteral("Calibrating: B/J\xe2\x80\xa6");
+                    }
+                    return QStringLiteral("Calibrating\xe2\x80\xa6");
+                }
+                else if constexpr (std::is_same_v<T, state_machine::Ready>)
+                    return QStringLiteral("Ready");
+                else if constexpr (std::is_same_v<T, state_machine::Enabled>)
+                    return QStringLiteral("Running");
+                else if constexpr (std::is_same_v<T, state_machine::Fault>)
+                    return QStringLiteral("Fault");
+                else
+                    return QStringLiteral("Unknown");
+            },
+            state);
+    }
+
+    void Gui::SetState(const state_machine::State& state)
+    {
+        const auto label = LabelFor(state);
+        controlPanel->SetStatus(label);
+        std::visit([this](const auto& s)
+            {
+                using T = std::decay_t<decltype(s)>;
+                if constexpr (std::is_same_v<T, state_machine::Calibrating>)
+                    controlPanel->SetMode(ControlPanel::Mode::Calibrating);
+                else if constexpr (std::is_same_v<T, state_machine::Enabled>)
+                    controlPanel->SetMode(ControlPanel::Mode::Running);
+                else
+                    controlPanel->SetMode(ControlPanel::Mode::Idle);
+            },
+            state);
     }
 
     void Gui::SetIdentifiedElectrical(foc::Ohm resistance, foc::MilliHenry inductance)

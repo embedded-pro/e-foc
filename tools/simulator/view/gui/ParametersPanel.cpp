@@ -3,6 +3,7 @@
 #include <QGroupBox>
 #include <QLabel>
 #include <QString>
+#include <QTabWidget>
 #include <QVBoxLayout>
 #include <memory>
 
@@ -20,7 +21,19 @@ namespace simulator
     ParametersPanel::ParametersPanel(const ThreePhaseMotorModel::Parameters& motorParameters, const PidParameters& pidParameters, QWidget* parent)
         : QWidget(parent)
     {
-        auto* layout = QtOwned<QVBoxLayout>(this);
+        auto* outerLayout = QtOwned<QVBoxLayout>(this);
+        outerLayout->setContentsMargins(0, 0, 0, 0);
+
+        auto* tabs = QtOwned<QTabWidget>(this);
+        outerLayout->addWidget(tabs);
+
+        auto* parametersTab = QtOwned<QWidget>(this);
+        auto* layout = QtOwned<QVBoxLayout>(parametersTab);
+        tabs->addTab(parametersTab, "Parameters");
+
+        auto* configTab = QtOwned<QWidget>(this);
+        auto* configLayout = QtOwned<QVBoxLayout>(configTab);
+        tabs->addTab(configTab, "Configuration");
 
         // Electrical parameters
         auto* electricalGroup = QtOwned<QGroupBox>("Electrical Parameters", this);
@@ -140,6 +153,8 @@ namespace simulator
             layout->addWidget(positionPidGroup);
         }
 
+        layout->addStretch();
+
         // ADC Noise
         auto* noiseGroup = QtOwned<QGroupBox>("ADC Noise", this);
         auto* noiseLayout = QtOwned<QGridLayout>();
@@ -177,7 +192,7 @@ namespace simulator
         noiseLayout->addWidget(biasCSpin, 3, 1);
 
         noiseGroup->setLayout(noiseLayout);
-        layout->addWidget(noiseGroup);
+        configLayout->addWidget(noiseGroup);
 
         connect(sigmaSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double)
             {
@@ -258,7 +273,7 @@ namespace simulator
         thermalLayout->addWidget(resetTempButton, 5, 0, 1, 2);
 
         thermalGroup->setLayout(thermalLayout);
-        layout->addWidget(thermalGroup);
+        configLayout->addWidget(thermalGroup);
 
         connect(tAmbientSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double)
             {
@@ -308,13 +323,45 @@ namespace simulator
         liveThermalLayout->addWidget(lEffLabel, 2, 1);
 
         liveThermalGroup->setLayout(liveThermalLayout);
-        layout->addWidget(liveThermalGroup);
+        configLayout->addWidget(liveThermalGroup);
 
-        layout->addStretch();
+        // Encoder Noise
+        auto* encoderNoiseGroup = QtOwned<QGroupBox>("Encoder Noise", this);
+        auto* encoderNoiseLayout = QtOwned<QGridLayout>();
+
+        encoderNoiseLayout->addWidget(QtOwned<QLabel>("Sigma:", this), 0, 0);
+        encoderSigmaSpin = QtOwned<QDoubleSpinBox>(this);
+        encoderSigmaSpin->setRange(0.0, 1000.0);
+        encoderSigmaSpin->setSuffix(" mrad");
+        encoderSigmaSpin->setSingleStep(0.5);
+        encoderSigmaSpin->setValue(0.0);
+        encoderNoiseLayout->addWidget(encoderSigmaSpin, 0, 1);
+
+        encoderNoiseLayout->addWidget(QtOwned<QLabel>("Bias:", this), 1, 0);
+        encoderBiasSpin = QtOwned<QDoubleSpinBox>(this);
+        encoderBiasSpin->setRange(-3141.59, 3141.59);
+        encoderBiasSpin->setSuffix(" mrad");
+        encoderBiasSpin->setSingleStep(1.0);
+        encoderBiasSpin->setValue(0.0);
+        encoderNoiseLayout->addWidget(encoderBiasSpin, 1, 1);
+
+        encoderNoiseGroup->setLayout(encoderNoiseLayout);
+        configLayout->addWidget(encoderNoiseGroup);
+
+        connect(encoderSigmaSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double)
+            {
+                EmitEncoderNoiseConfig();
+            });
+        connect(encoderBiasSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double)
+            {
+                EmitEncoderNoiseConfig();
+            });
+
+        configLayout->addStretch();
 
         // Populate values
         resistanceLabel->setText(QString::number(static_cast<double>(motorParameters.R.Value()), 'g', 4) + QString::fromUtf8(" \xCE\xA9"));
-        inductanceLabel->setText(QString::number(static_cast<double>(motorParameters.Ld.Value()), 'g', 4) + " H");
+        inductanceLabel->setText(QString::number(static_cast<double>(motorParameters.Ld.Value()) * 1000.0, 'g', 4) + " mH");
         frictionLabel->setText(QString::number(static_cast<double>(motorParameters.B.Value()), 'g', 4) + QString::fromUtf8(" N\xC2\xB7m\xC2\xB7s/rad"));
         inertiaLabel->setText(QString::number(static_cast<double>(motorParameters.J.Value()), 'g', 4) + QString::fromUtf8(" kg\xC2\xB7m\xC2\xB2"));
         polePairsLabel->setText(QString::number(static_cast<int>(motorParameters.p)));
@@ -380,6 +427,14 @@ namespace simulator
         c.biasAmpereB = static_cast<float>(biasBSpin->value() / 1000.0);
         c.biasAmpereC = static_cast<float>(biasCSpin->value() / 1000.0);
         emit noiseConfigChanged(c);
+    }
+
+    void ParametersPanel::EmitEncoderNoiseConfig()
+    {
+        ThreePhaseMotorModel::EncoderNoiseConfig c;
+        c.sigmaRadians = static_cast<float>(encoderSigmaSpin->value() / 1000.0);
+        c.biasRadians = static_cast<float>(encoderBiasSpin->value() / 1000.0);
+        emit encoderNoiseConfigChanged(c);
     }
 
     void ParametersPanel::EmitThermalConfig()

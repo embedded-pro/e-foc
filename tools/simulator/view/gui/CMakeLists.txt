@@ -9,6 +9,9 @@ target_link_libraries(e_foc.tool.simulator.view.gui PUBLIC
     Qt6::Widgets
     e_foc.tool.simulator.model
     e_foc.foc.interfaces
+    e_foc.services.electrical_system_ident
+    e_foc.services.mechanical_system_ident
+    e_foc.state_machine
     infra.event
 )
 
@@ -21,6 +24,10 @@ target_sources(e_foc.tool.simulator.view.gui PRIVATE
     Gui.cpp
     GuiSimulation.hpp
     GuiSimulation.cpp
+    OnlineElectricalRls.hpp
+    OnlineElectricalRls.cpp
+    OnlineMechanicalRls.hpp
+    OnlineMechanicalRls.cpp
     ParametersPanel.hpp
     ParametersPanel.cpp
     ScopesPanel.hpp

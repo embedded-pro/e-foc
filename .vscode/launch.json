@@ -30,7 +30,7 @@
             "name": "Simulator GUI",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/host/tools/simulator/${input:simulatorMode}_control/Debug/e_foc.tool.simulator.${input:simulatorMode}_control",
+            "program": "${workspaceFolder}/build/host/tools/simulator/app/Debug/e_foc.tool.simulator",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -40,28 +40,6 @@
                     "value": "host.docker.internal:0.0"
                 }
             ],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "miDebuggerPath": "/usr/bin/gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ]
-        },
-        {
-            "name": "Simulator Headless",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/host/tools/simulator/${input:simulatorMode}_control/Debug/e_foc.tool.simulator.${input:simulatorMode}_control",
-            "args": [
-                "--no-gui"
-            ],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
             "miDebuggerPath": "/usr/bin/gdb",
@@ -141,19 +119,6 @@
             "overrideRestartCommands": [
                 "monitor reset"
             ]
-        }
-    ],
-    "inputs": [
-        {
-            "id": "simulatorMode",
-            "type": "pickString",
-            "description": "Select simulation mode",
-            "options": [
-                "torque",
-                "speed",
-                "position"
-            ],
-            "default": "speed"
         }
     ]
 }

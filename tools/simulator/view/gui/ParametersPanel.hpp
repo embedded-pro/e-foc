@@ -44,11 +44,13 @@ namespace simulator
 
     signals:
         void noiseConfigChanged(simulator::ThreePhaseMotorModel::NoiseConfig config);
+        void encoderNoiseConfigChanged(simulator::ThreePhaseMotorModel::EncoderNoiseConfig config);
         void thermalConfigChanged(simulator::ThreePhaseMotorModel::ThermalConfig config);
         void thermalResetRequested();
 
     private:
         void EmitNoiseConfig();
+        void EmitEncoderNoiseConfig();
         void EmitThermalConfig();
 
     private:
@@ -72,6 +74,9 @@ namespace simulator
         QDoubleSpinBox* biasASpin{ nullptr };
         QDoubleSpinBox* biasBSpin{ nullptr };
         QDoubleSpinBox* biasCSpin{ nullptr };
+
+        QDoubleSpinBox* encoderSigmaSpin{ nullptr };
+        QDoubleSpinBox* encoderBiasSpin{ nullptr };
 
         QDoubleSpinBox* tAmbientSpin{ nullptr };
         QDoubleSpinBox* rThSpin{ nullptr };
