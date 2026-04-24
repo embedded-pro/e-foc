@@ -1,7 +1,10 @@
 #include "args.hxx"
+#include "core/services/alignment/MotorAlignmentImpl.hpp"
+#include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "foc/implementations/LowPriorityInterruptImpl.hpp"
 #include "foc/instantiations/FocController.hpp"
 #include "foc/interfaces/Units.hpp"
+#include "hal/generic/TimerServiceGeneric.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "tools/simulator/headless/HeadlessSimulation.hpp"
 #include "tools/simulator/model/Jk42bls01X038ed.hpp"
@@ -128,9 +131,46 @@ int main(int argc, char* argv[])
                 .defaultValue = 0
             };
 
-            simulator::GuiSimulation simulation{ argc, argv, model, controller, eventDispatcher, simulator::JK42BLS01_X038ED::parameters, pidParameters, positionSetpointConfig };
+            simulator::GuiSimulation simulation{ argc, argv, model, controller, eventDispatcher, simulator::JK42BLS01_X038ED::parameters, pidParameters, positionSetpointConfig, foc::Volts{ powerSupplyVoltage } };
+
+            hal::TimerServiceGeneric timerService;
+            services::MotorAlignmentImpl alignment{ model, model };
+            services::ElectricalParametersIdentificationImpl electricalIdent{ model, model, foc::Volts{ powerSupplyVoltage } };
+            const auto& motorParams = simulator::JK42BLS01_X038ED::parameters;
 
             auto& gui = simulation.GetGui();
+            gui.DisableMechanicalIdent();
+
+            QObject::connect(&gui, &simulator::Gui::alignRequested, [&]()
+                {
+                    controller.Stop();
+                    alignment.ForceAlignment(motorParams.p, services::MotorAlignment::AlignmentConfig{}, [&gui](std::optional<foc::Radians> offset)
+                        {
+                            if (offset)
+                                gui.SetAlignmentOffset(*offset);
+                            gui.CalibrationFinished();
+                        });
+                });
+
+            QObject::connect(&gui, &simulator::Gui::identifyElectricalRequested, [&]()
+                {
+                    controller.Stop();
+                    electricalIdent.EstimateResistanceAndInductance(services::ElectricalParametersIdentification::ResistanceAndInductanceConfig{},
+                        [&gui, &electricalIdent](std::optional<foc::Ohm> r, std::optional<foc::MilliHenry> l)
+                        {
+                            if (r && l)
+                                gui.SetIdentifiedElectrical(*r, *l);
+
+                            electricalIdent.EstimateNumberOfPolePairs(services::ElectricalParametersIdentification::PolePairsConfig{},
+                                [&gui](std::optional<std::size_t> p)
+                                {
+                                    if (p)
+                                        gui.SetIdentifiedPolePairs(*p);
+                                    gui.CalibrationFinished();
+                                });
+                        });
+                });
+
             QObject::connect(&gui, &simulator::Gui::setpointChanged, [&controller, &gui, powerSupplyVoltage, &pidParameters](int degrees)
                 {
                     controller.SetPoint(foc::Radians{ static_cast<float>(degrees) * (std::numbers::pi_v<float> / 180.0f) });

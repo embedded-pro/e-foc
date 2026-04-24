@@ -130,6 +130,27 @@ namespace simulator
             {
                 emit loadChanged(value);
             });
+
+        connect(alignButton, &QPushButton::clicked, this, [this]()
+            {
+                SetEditable(false);
+                statusLabel->setText("Aligning...");
+                emit alignClicked();
+            });
+
+        connect(identifyElectricalButton, &QPushButton::clicked, this, [this]()
+            {
+                SetEditable(false);
+                statusLabel->setText("Identifying electrical...");
+                emit identifyElectricalClicked();
+            });
+
+        connect(identifyMechanicalButton, &QPushButton::clicked, this, [this]()
+            {
+                SetEditable(false);
+                statusLabel->setText("Identifying mechanical...");
+                emit identifyMechanicalClicked();
+            });
     }
 
     void ControlPanel::SetEditable(bool editable)
@@ -144,5 +165,27 @@ namespace simulator
     void ControlPanel::SetStatus(const QString& status)
     {
         statusLabel->setText(status);
+    }
+
+    void ControlPanel::DisableMechanicalIdent()
+    {
+        identifyMechanicalButton->setEnabled(false);
+        identifyMechanicalButton->setToolTip("Mechanical identification not available in this control mode");
+    }
+
+    void ControlPanel::DisableElectricalIdent()
+    {
+        identifyElectricalButton->setEnabled(false);
+    }
+
+    void ControlPanel::DisableAlignment()
+    {
+        alignButton->setEnabled(false);
+    }
+
+    void ControlPanel::CalibrationFinished()
+    {
+        SetEditable(true);
+        statusLabel->setText("Idle");
     }
 }

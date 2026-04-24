@@ -1,7 +1,7 @@
 #pragma once
 
-#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "core/foc/interfaces/Driver.hpp"
+#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "tools/simulator/model/Model.hpp"
 #include "tools/simulator/view/gui/Gui.hpp"
 #include "tools/simulator/view/gui/ParametersPanel.hpp"
@@ -15,7 +15,7 @@ namespace simulator
     public:
         GuiSimulation(int& argc, char** argv, ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
             const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
-            const ControlPanel::SetpointConfig& setpointConfig);
+            const ControlPanel::SetpointConfig& setpointConfig, foc::Volts powerSupplyVoltage);
 
         Gui& GetGui();
         int Run() const;

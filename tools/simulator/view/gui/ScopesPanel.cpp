@@ -20,6 +20,16 @@ namespace simulator
     {
         auto* layout = QtOwned<QVBoxLayout>(this);
 
+        // SVPWM hexagon (top, largest)
+        auto* hexagonGroup = QtOwned<QGroupBox>("SVPWM Hexagon (Vβ vs Vα)", this);
+        auto* hexagonLayout = QtOwned<QVBoxLayout>();
+
+        hexagonWidget = QtOwned<HexagonWidget>(this);
+        hexagonLayout->addWidget(hexagonWidget);
+
+        hexagonGroup->setLayout(hexagonLayout);
+        layout->addWidget(hexagonGroup, 3);
+
         // Phase currents scope
         auto* currentGroup = QtOwned<QGroupBox>("Phase Currents (A, B, C)", this);
         auto* currentLayout = QtOwned<QVBoxLayout>();
@@ -36,24 +46,25 @@ namespace simulator
         currentLayout->addWidget(currentScope);
 
         currentGroup->setLayout(currentLayout);
-        layout->addWidget(currentGroup);
+        layout->addWidget(currentGroup, 1);
 
-        // Position & Speed scope
-        auto* positionSpeedGroup = QtOwned<QGroupBox>("Position && Speed", this);
-        auto* positionSpeedLayout = QtOwned<QVBoxLayout>();
+        // Phase voltages scope
+        auto* voltageGroup = QtOwned<QGroupBox>("Phase Voltages — inverter midpoint (Va, Vb, Vc)", this);
+        auto* voltageLayout = QtOwned<QVBoxLayout>();
 
-        positionSpeedScope = QtOwned<ScopeWidget>(this);
-        positionSpeedScope->SetChannelCount(2);
-        positionSpeedScope->SetChannelConfig(0, { "θ (rad)", QColor(0, 150, 255) });
-        positionSpeedScope->SetChannelConfig(1, { "ω (rad/s)", QColor(255, 100, 100) });
+        voltageScope = QtOwned<ScopeWidget>(this);
+        voltageScope->SetChannelCount(3);
+        voltageScope->SetChannelConfig(0, { "Va", QColor(0, 150, 255) });
+        voltageScope->SetChannelConfig(1, { "Vb", QColor(255, 165, 0) });
+        voltageScope->SetChannelConfig(2, { "Vc", QColor(0, 200, 80) });
 
-        positionSpeedScopeToolbar = QtOwned<ScopeToolbar>(*positionSpeedScope, this);
+        voltageScopeToolbar = QtOwned<ScopeToolbar>(*voltageScope, this);
 
-        positionSpeedLayout->addWidget(positionSpeedScopeToolbar);
-        positionSpeedLayout->addWidget(positionSpeedScope);
+        voltageLayout->addWidget(voltageScopeToolbar);
+        voltageLayout->addWidget(voltageScope);
 
-        positionSpeedGroup->setLayout(positionSpeedLayout);
-        layout->addWidget(positionSpeedGroup);
+        voltageGroup->setLayout(voltageLayout);
+        layout->addWidget(voltageGroup, 1);
     }
 
     void ScopesPanel::AddCurrentSample(std::span<const float> sample)
@@ -61,14 +72,25 @@ namespace simulator
         currentScope->AddSample(sample);
     }
 
-    void ScopesPanel::AddPositionSpeedSample(std::span<const float> sample)
+    void ScopesPanel::AddVoltageSample(std::span<const float> sample)
     {
-        positionSpeedScope->AddSample(sample);
+        voltageScope->AddSample(sample);
+    }
+
+    void ScopesPanel::SetHexagonSample(float va, float vb, float vc, float vAlpha, float vBeta)
+    {
+        hexagonWidget->SetSample(va, vb, vc, vAlpha, vBeta);
+    }
+
+    void ScopesPanel::SetDcLink(foc::Volts vdc)
+    {
+        hexagonWidget->SetDcLink(vdc);
     }
 
     void ScopesPanel::Clear()
     {
         currentScope->Clear();
-        positionSpeedScope->Clear();
+        voltageScope->Clear();
+        hexagonWidget->Clear();
     }
 }

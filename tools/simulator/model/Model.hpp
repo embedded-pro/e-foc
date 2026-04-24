@@ -22,6 +22,7 @@ namespace simulator
 
         virtual void Started() = 0;
         virtual void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta) = 0;
+        virtual void StatorVoltages(foc::ThreePhase phaseVoltages, foc::TwoPhase alphaBeta) = 0;
         virtual void Finished() = 0;
     };
 
@@ -96,6 +97,7 @@ namespace simulator
 
         void Started() override;
         void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta) override;
+        void StatorVoltages(foc::ThreePhase phaseVoltages, foc::TwoPhase alphaBeta) override;
         void Finished() override;
 
     private:

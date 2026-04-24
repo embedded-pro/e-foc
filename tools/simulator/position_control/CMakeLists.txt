@@ -6,6 +6,9 @@ target_link_libraries(e_foc.tool.simulator.position_control PUBLIC
     e_foc.tool.simulator.view.gui
     e_foc.tool.simulator.headless
     e_foc.foc.instantiations
+    e_foc.services.alignment
+    e_foc.services.electrical_system_ident
+    hal.generic
     infra.event
     args
 )

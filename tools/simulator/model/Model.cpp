@@ -58,10 +58,19 @@ namespace simulator
                 });
 
         if (running)
-            NotifyObservers([this](auto& observer)
+        {
+            const auto va = (dutyPhases.a.Value() / percentToFraction - half) * powerSupplyVoltage.Value();
+            const auto vb = (dutyPhases.b.Value() / percentToFraction - half) * powerSupplyVoltage.Value();
+            const auto vc = (dutyPhases.c.Value() / percentToFraction - half) * powerSupplyVoltage.Value();
+            const foc::ThreePhase vAbc{ va, vb, vc };
+            const auto vAlphaBeta = clarke.Forward(vAbc);
+
+            NotifyObservers([this, &vAbc, &vAlphaBeta](auto& observer)
                 {
                     observer.PhaseCurrentsWithMechanicalAngle({ ia, ib, ic }, theta_mech);
+                    observer.StatorVoltages(vAbc, vAlphaBeta);
                 });
+        }
         else
             NotifyObservers([](auto& observer)
                 {
@@ -194,6 +203,10 @@ namespace simulator
     }
 
     void SimulationFinishedObserver::PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta)
+    {
+    }
+
+    void SimulationFinishedObserver::StatorVoltages(foc::ThreePhase phaseVoltages, foc::TwoPhase alphaBeta)
     {
     }
 

@@ -56,6 +56,23 @@ namespace simulator
         mechanicalGroup->setLayout(mechanicalLayout);
         layout->addWidget(mechanicalGroup);
 
+        // Calibration results
+        auto* calibrationGroup = QtOwned<QGroupBox>("Calibration Results", this);
+        auto* calibrationLayout = QtOwned<QGridLayout>();
+
+        calibrationLayout->addWidget(QtOwned<QLabel>("Pole pairs (p):", this), 0, 0);
+        polePairsLabel = QtOwned<QLabel>("---", this);
+        polePairsLabel->setAlignment(Qt::AlignRight);
+        calibrationLayout->addWidget(polePairsLabel, 0, 1);
+
+        calibrationLayout->addWidget(QtOwned<QLabel>("Alignment offset:", this), 1, 0);
+        alignmentOffsetLabel = QtOwned<QLabel>("---", this);
+        alignmentOffsetLabel->setAlignment(Qt::AlignRight);
+        calibrationLayout->addWidget(alignmentOffsetLabel, 1, 1);
+
+        calibrationGroup->setLayout(calibrationLayout);
+        layout->addWidget(calibrationGroup);
+
         // Current controller gains
         auto* currentPidGroup = QtOwned<QGroupBox>("Current Controller (PI)", this);
         auto* currentPidLayout = QtOwned<QGridLayout>();
@@ -130,6 +147,7 @@ namespace simulator
         inductanceLabel->setText(QString::number(static_cast<double>(motorParameters.Ld.Value()), 'g', 4) + " H");
         frictionLabel->setText(QString::number(static_cast<double>(motorParameters.B.Value()), 'g', 4) + QString::fromUtf8(" N\xC2\xB7m\xC2\xB7s/rad"));
         inertiaLabel->setText(QString::number(static_cast<double>(motorParameters.J.Value()), 'g', 4) + QString::fromUtf8(" kg\xC2\xB7m\xC2\xB2"));
+        polePairsLabel->setText(QString::number(static_cast<int>(motorParameters.p)));
 
         UpdatePidParameters(pidParameters);
     }
@@ -152,5 +170,35 @@ namespace simulator
             positionKiLabel->setText(QString::number(static_cast<double>(pidParameters.position->ki), 'g', 6));
             positionKdLabel->setText(QString::number(static_cast<double>(pidParameters.position->kd), 'g', 6));
         }
+    }
+
+    void ParametersPanel::UpdateResistance(foc::Ohm value)
+    {
+        resistanceLabel->setText(QString::number(static_cast<double>(value.Value()), 'g', 4) + QString::fromUtf8(" \xCE\xA9"));
+    }
+
+    void ParametersPanel::UpdateInductance(foc::MilliHenry value)
+    {
+        inductanceLabel->setText(QString::number(static_cast<double>(value.Value()), 'g', 4) + " mH");
+    }
+
+    void ParametersPanel::UpdateFriction(foc::NewtonMeterSecondPerRadian value)
+    {
+        frictionLabel->setText(QString::number(static_cast<double>(value.Value()), 'g', 4) + QString::fromUtf8(" N\xC2\xB7m\xC2\xB7s/rad"));
+    }
+
+    void ParametersPanel::UpdateInertia(foc::NewtonMeterSecondSquared value)
+    {
+        inertiaLabel->setText(QString::number(static_cast<double>(value.Value()), 'g', 4) + QString::fromUtf8(" kg\xC2\xB7m\xC2\xB2"));
+    }
+
+    void ParametersPanel::UpdatePolePairs(std::size_t value)
+    {
+        polePairsLabel->setText(QString::number(static_cast<qulonglong>(value)));
+    }
+
+    void ParametersPanel::UpdateAlignmentOffset(foc::Radians value)
+    {
+        alignmentOffsetLabel->setText(QString::number(static_cast<double>(value.Value()), 'g', 4) + " rad");
     }
 }

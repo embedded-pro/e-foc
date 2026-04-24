@@ -5,8 +5,8 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QSlider>
-#include <QWidget>
 #include <QString>
+#include <QWidget>
 
 namespace simulator
 {
@@ -30,12 +30,19 @@ namespace simulator
 
         void SetEditable(bool editable);
         void SetStatus(const QString& status);
+        void DisableMechanicalIdent();
+        void DisableElectricalIdent();
+        void DisableAlignment();
+        void CalibrationFinished();
 
     signals:
         void startClicked();
         void stopClicked();
         void setpointChanged(int value);
         void loadChanged(double torqueNm);
+        void alignClicked();
+        void identifyElectricalClicked();
+        void identifyMechanicalClicked();
 
     private:
         void Build(const SetpointConfig& config);
