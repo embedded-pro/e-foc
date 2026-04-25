@@ -327,3 +327,12 @@ TEST_F(TestTcpClientSerial, disconnect_with_no_pending_send_is_noop_for_send_sta
 
     EXPECT_FALSE(serial->IsConnected());
 }
+
+TEST_F(TestTcpClientSerial, destructor_aborts_active_connection_before_handler_storage_is_destroyed)
+{
+    CreateAndConnect();
+
+    EXPECT_CALL(*connectionPtr, AbortAndDestroyMock);
+    serial.reset();
+    connectionPtr = nullptr;
+}

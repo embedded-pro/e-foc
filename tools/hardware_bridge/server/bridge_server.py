@@ -60,8 +60,8 @@ def parse_args() -> argparse.Namespace:
     )
     can_group.add_argument(
         "--can-channel",
-        default="can0",
-        help="CAN channel (e.g. can0, PCAN_USBBUS1, /dev/ttyACM0, COM3). Default: can0",
+        default=None,
+        help="CAN channel (e.g. can0, PCAN_USBBUS1, /dev/ttyACM0, COM3). Required when --can-interface is set.",
     )
     can_group.add_argument(
         "--can-bitrate", type=int, default=500000, help="CAN bitrate (default: 500000)"
@@ -95,6 +95,10 @@ async def main() -> None:
 
     if args.serial_port is None and args.can_interface is None:
         logger.error("At least one of --serial-port or --can-interface must be specified.")
+        sys.exit(1)
+
+    if args.can_interface is not None and args.can_channel is None:
+        logger.error("--can-channel is required when --can-interface is specified.")
         sys.exit(1)
 
     servers: list[SerialOverTcpServer | CanBusOverTcpServer] = []

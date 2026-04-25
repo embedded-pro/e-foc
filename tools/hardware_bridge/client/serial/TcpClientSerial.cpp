@@ -9,6 +9,12 @@ namespace tool
         : TcpClient(factory, address, port)
     {}
 
+    TcpClientSerial::~TcpClientSerial()
+    {
+        if (connectionHandlerPtr)
+            connectionHandlerPtr->Subject().AbortAndDestroy();
+    }
+
     void TcpClientSerial::SendData(infra::ConstByteRange data, infra::Function<void()> actionOnCompletion)
     {
         if (IsConnected() && connectionHandler)
@@ -104,19 +110,16 @@ namespace tool
 
     void TcpClientSerial::ConnectionHandler::DataReceived()
     {
-        if (!parent.receiveCallback)
-            return;
-
         auto stream = services::ConnectionObserver::Subject().ReceiveStream();
         infra::DataInputStream::WithErrorPolicy dataStream(*stream, infra::noFail);
 
         while (!dataStream.Empty())
         {
-            std::array<uint8_t, 256> buffer;
-            auto bytesToRead = std::min(buffer.size(), static_cast<std::size_t>(dataStream.Available()));
-            infra::ByteRange range(buffer.data(), buffer.data() + bytesToRead);
-            dataStream >> range;
-            parent.receiveCallback(infra::ConstByteRange(buffer.data(), buffer.data() + bytesToRead));
+            auto chunk = dataStream.ContiguousRange();
+            if (chunk.empty())
+                break;
+            if (parent.receiveCallback)
+                parent.receiveCallback(chunk);
         }
 
         services::ConnectionObserver::Subject().AckReceived();

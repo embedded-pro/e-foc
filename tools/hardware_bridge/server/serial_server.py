@@ -21,7 +21,7 @@ class SerialOverTcpServer:
         self._serial = serial.Serial(
             self.serial_port,
             self.baudrate,
-            timeout=0,
+            timeout=0.05,
         )
         self._serial.reset_input_buffer()
         logger.info(
@@ -109,7 +109,6 @@ class SerialOverTcpServer:
 
     def _serial_read_blocking(self) -> bytes:
         assert self._serial is not None
-        self._serial.timeout = 0.05
         data = self._serial.read(1)
         if data:
             remaining = self._serial.in_waiting

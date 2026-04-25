@@ -627,3 +627,12 @@ TEST_F(TestTcpClientCanbusConnection, disconnect_with_no_pending_send_is_noop_fo
 
     EXPECT_FALSE(can->IsConnected());
 }
+
+TEST_F(TestTcpClientCanbusConnection, destructor_aborts_active_connection_before_handler_storage_is_destroyed)
+{
+    CreateAndConnect();
+
+    EXPECT_CALL(*connectionPtr, AbortAndDestroyMock);
+    can.reset();
+    connectionPtr = nullptr;
+}
