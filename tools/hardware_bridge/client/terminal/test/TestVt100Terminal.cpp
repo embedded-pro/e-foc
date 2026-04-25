@@ -35,7 +35,7 @@ TEST_F(TestVt100Terminal, feed_accepts_byte_ranges)
 {
     const uint8_t bytes[] = { 'O', 'K' };
 
-    terminal.Feed(bytes, sizeof(bytes));
+    terminal.Feed(bytes);
 
     EXPECT_EQ(Line(0), "OK");
 }

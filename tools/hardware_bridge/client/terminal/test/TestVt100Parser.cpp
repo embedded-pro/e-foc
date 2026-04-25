@@ -75,7 +75,7 @@ TEST_F(TestVt100Parser, feed_accepts_byte_ranges)
     tool::terminal::Vt100Parser parser(MakeCallbacks());
     const uint8_t bytes[] = { 'O', 'K' };
 
-    parser.Feed(bytes, sizeof(bytes));
+    parser.Feed(bytes);
 
     ASSERT_EQ(events.size(), 2u);
     EXPECT_EQ(events[0].printChar, U'O');
@@ -111,7 +111,7 @@ TEST_F(TestVt100Parser, executes_less_common_c0_controls)
     tool::terminal::Vt100Parser parser(MakeCallbacks());
     const uint8_t bytes[] = { 0x19, 0x1C };
 
-    parser.Feed(bytes, sizeof(bytes));
+    parser.Feed(bytes);
 
     ASSERT_EQ(events.size(), 2u);
     EXPECT_EQ(events[0].executeByte, 0x19);
@@ -343,7 +343,7 @@ TEST_F(TestVt100Parser, c0_and_del_in_csi_entry_do_not_abort_sequence)
     tool::terminal::Vt100Parser parser(MakeCallbacks());
     const uint8_t bytes[] = { 0x1B, '[', 0x19, 0x7F, 'H' };
 
-    parser.Feed(bytes, sizeof(bytes));
+    parser.Feed(bytes);
 
     ASSERT_EQ(events.size(), 2u);
     EXPECT_EQ(events[0].kind, ParserEvent::Kind::Execute);
@@ -369,7 +369,7 @@ TEST_F(TestVt100Parser, del_in_csi_param_does_not_abort_sequence)
     tool::terminal::Vt100Parser parser(MakeCallbacks());
     const uint8_t bytes[] = { 0x1B, '[', '1', 0x7F, ';', '2', 'H' };
 
-    parser.Feed(bytes, sizeof(bytes));
+    parser.Feed(bytes);
 
     ASSERT_EQ(events.size(), 1u);
     ASSERT_EQ(events[0].params.size(), 2u);
@@ -382,7 +382,7 @@ TEST_F(TestVt100Parser, c0_del_and_repeated_intermediate_in_csi_intermediate_are
     tool::terminal::Vt100Parser parser(MakeCallbacks());
     const uint8_t bytes[] = { 0x1B, '[', '1', ' ', 0x1C, 0x7F, '!', 'q' };
 
-    parser.Feed(bytes, sizeof(bytes));
+    parser.Feed(bytes);
 
     ASSERT_EQ(events.size(), 2u);
     EXPECT_EQ(events[0].kind, ParserEvent::Kind::Execute);
@@ -397,7 +397,7 @@ TEST_F(TestVt100Parser, invalid_csi_param_byte_is_ignored_until_final)
     tool::terminal::Vt100Parser parser(MakeCallbacks());
     const uint8_t bytes[] = { 0x1B, '[', '1', 0x80, 'H', 'A' };
 
-    parser.Feed(bytes, sizeof(bytes));
+    parser.Feed(bytes);
 
     ASSERT_EQ(events.size(), 1u);
     EXPECT_EQ(events[0].kind, ParserEvent::Kind::Print);
@@ -409,7 +409,7 @@ TEST_F(TestVt100Parser, invalid_csi_intermediate_byte_is_ignored_until_final)
     tool::terminal::Vt100Parser parser(MakeCallbacks());
     const uint8_t bytes[] = { 0x1B, '[', ' ', 0x80, 'H', 'A' };
 
-    parser.Feed(bytes, sizeof(bytes));
+    parser.Feed(bytes);
 
     ASSERT_EQ(events.size(), 1u);
     EXPECT_EQ(events[0].kind, ParserEvent::Kind::Print);
@@ -421,7 +421,7 @@ TEST_F(TestVt100Parser, c0_and_del_inside_escape_are_handled_without_aborting_es
     tool::terminal::Vt100Parser parser(MakeCallbacks());
     const uint8_t bytes[] = { 0x1B, 0x0D, 0x7F, 'D' };
 
-    parser.Feed(bytes, sizeof(bytes));
+    parser.Feed(bytes);
 
     ASSERT_EQ(events.size(), 2u);
     EXPECT_EQ(events[0].kind, ParserEvent::Kind::Execute);
@@ -435,7 +435,7 @@ TEST_F(TestVt100Parser, invalid_csi_bytes_are_ignored_until_final)
     tool::terminal::Vt100Parser parser(MakeCallbacks());
     const uint8_t bytes[] = { 0x1B, '[', 0x80, 'A', 'B', 'C' };
 
-    parser.Feed(bytes, sizeof(bytes));
+    parser.Feed(bytes);
     parser.FeedByte('Z');
 
     ASSERT_EQ(events.size(), 3u);

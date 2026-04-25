@@ -1,5 +1,6 @@
 #include "tools/hardware_bridge/client/terminal/Vt100Terminal.hpp"
-#include <cstdio>
+#include <array>
+#include <string>
 #include <utility>
 
 namespace tool::terminal
@@ -19,6 +20,142 @@ namespace tool::terminal
             if (index >= params.size())
                 return defaultValue;
             return params[index];
+        }
+
+        struct ColorCode
+        {
+            int code;
+            Color color;
+        };
+
+        using enum Color;
+
+        constexpr std::array<ColorCode, 17> foregroundCodes{ {
+            { 30, Black },
+            { 31, Red },
+            { 32, Green },
+            { 33, Yellow },
+            { 34, Blue },
+            { 35, Magenta },
+            { 36, Cyan },
+            { 37, White },
+            { 39, Default },
+            { 90, BrightBlack },
+            { 91, BrightRed },
+            { 92, BrightGreen },
+            { 93, BrightYellow },
+            { 94, BrightBlue },
+            { 95, BrightMagenta },
+            { 96, BrightCyan },
+            { 97, BrightWhite },
+        } };
+
+        constexpr std::array<ColorCode, 17> backgroundCodes{ {
+            { 40, Black },
+            { 41, Red },
+            { 42, Green },
+            { 43, Yellow },
+            { 44, Blue },
+            { 45, Magenta },
+            { 46, Cyan },
+            { 47, White },
+            { 49, Default },
+            { 100, BrightBlack },
+            { 101, BrightRed },
+            { 102, BrightGreen },
+            { 103, BrightYellow },
+            { 104, BrightBlue },
+            { 105, BrightMagenta },
+            { 106, BrightCyan },
+            { 107, BrightWhite },
+        } };
+
+        bool ApplyColorCode(int parameter, std::span<const ColorCode> codes, Color& target)
+        {
+            for (const ColorCode& code : codes)
+            {
+                if (parameter == code.code)
+                {
+                    target = code.color;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool ApplyStyleCode(int parameter, Rendition& rendition)
+        {
+            if (parameter == 0)
+                rendition = {};
+            else if (parameter == 1)
+                rendition.bold = true;
+            else if (parameter == 2)
+                rendition.faint = true;
+            else if (parameter == 3)
+                rendition.italic = true;
+            else if (parameter == 4)
+                rendition.underline = true;
+            else if (parameter == 5)
+                rendition.blink = true;
+            else if (parameter == 7)
+                rendition.inverse = true;
+            else if (parameter == 22)
+            {
+                rendition.bold = false;
+                rendition.faint = false;
+            }
+            else if (parameter == 23)
+                rendition.italic = false;
+            else if (parameter == 24)
+                rendition.underline = false;
+            else if (parameter == 25)
+                rendition.blink = false;
+            else if (parameter == 27)
+                rendition.inverse = false;
+            else
+                return false;
+
+            return true;
+        }
+
+        void ApplySgrParameter(int parameter, Rendition& rendition)
+        {
+            if (ApplyStyleCode(parameter, rendition))
+                return;
+            if (ApplyColorCode(parameter, foregroundCodes, rendition.foreground))
+                return;
+            ApplyColorCode(parameter, backgroundCodes, rendition.background);
+        }
+
+        void FillScreenWithAlignmentPattern(TerminalScreen& screen)
+        {
+            for (int row = 0; row < screen.Rows(); ++row)
+            {
+                for (int column = 0; column < screen.Cols(); ++column)
+                {
+                    screen.CursorOperations().MoveTo(row + 1, column + 1);
+                    screen.Write(U'E');
+                }
+            }
+            screen.CursorOperations().MoveTo(1, 1);
+        }
+
+        void ApplyPrivateMode(TerminalScreen& screen, int parameter, bool set)
+        {
+            if (parameter == 1)
+                screen.GetModes().applicationCursorKeys = set;
+            else if (parameter == 6)
+                screen.GetModes().originMode = set;
+            else if (parameter == 7)
+                screen.GetModes().autoWrap = set;
+            else if (parameter == 25)
+                screen.GetModes().cursorVisible = set;
+        }
+
+        void ApplyAnsiMode(TerminalScreen& screen, int parameter, bool set)
+        {
+            if (parameter == 20)
+                screen.GetModes().lineFeedNewLine = set;
         }
     }
 
@@ -49,9 +186,9 @@ namespace tool::terminal
     {
     }
 
-    void Vt100Terminal::Feed(const uint8_t* data, std::size_t size)
+    void Vt100Terminal::Feed(std::span<const uint8_t> data)
     {
-        parser_.Feed(data, size);
+        parser_.Feed(data);
     }
 
     void Vt100Terminal::Feed(std::string_view data)
@@ -134,16 +271,7 @@ namespace tool::terminal
         if (intermediate == '#')
         {
             if (finalByte == '8')
-            {
-                // DECALN: fill screen with 'E'.
-                for (int r = 0; r < screen_.Rows(); ++r)
-                    for (int c = 0; c < screen_.Cols(); ++c)
-                    {
-                        screen_.MoveCursor(r + 1, c + 1);
-                        screen_.Write(U'E');
-                    }
-                screen_.MoveCursor(1, 1);
-            }
+                FillScreenWithAlignmentPattern(screen_);
             return;
         }
         if (intermediate != 0)
@@ -161,13 +289,13 @@ namespace tool::terminal
                 screen_.ReverseIndex();
                 break; // RI
             case 'H':
-                screen_.SetTabStop();
+                screen_.TabStops().SetHere();
                 break; // HTS
             case '7':
-                screen_.SaveCursor();
+                screen_.CursorOperations().Save();
                 break; // DECSC
             case '8':
-                screen_.RestoreCursor();
+                screen_.CursorOperations().Restore();
                 break; // DECRC
             case 'c':
                 screen_.Reset();
@@ -194,31 +322,31 @@ namespace tool::terminal
         switch (finalByte)
         {
             case 'A':
-                screen_.CursorUp(Param(params, 0, 1));
+                screen_.CursorOperations().Up(Param(params, 0, 1));
                 break;
             case 'B':
-                screen_.CursorDown(Param(params, 0, 1));
+                screen_.CursorOperations().Down(Param(params, 0, 1));
                 break;
             case 'C':
-                screen_.CursorForward(Param(params, 0, 1));
+                screen_.CursorOperations().Forward(Param(params, 0, 1));
                 break;
             case 'D':
-                screen_.CursorBackward(Param(params, 0, 1));
+                screen_.CursorOperations().Backward(Param(params, 0, 1));
                 break;
             case 'E':
-                screen_.CursorDown(Param(params, 0, 1));
-                screen_.CursorColumn(1);
+                screen_.CursorOperations().Down(Param(params, 0, 1));
+                screen_.CursorOperations().MoveToColumn(1);
                 break;
             case 'F':
-                screen_.CursorUp(Param(params, 0, 1));
-                screen_.CursorColumn(1);
+                screen_.CursorOperations().Up(Param(params, 0, 1));
+                screen_.CursorOperations().MoveToColumn(1);
                 break;
             case 'G':
-                screen_.CursorColumn(Param(params, 0, 1));
+                screen_.CursorOperations().MoveToColumn(Param(params, 0, 1));
                 break;
             case 'H':
             case 'f':
-                screen_.MoveCursor(Param(params, 0, 1), Param(params, 1, 1));
+                screen_.CursorOperations().MoveTo(Param(params, 0, 1), Param(params, 1, 1));
                 break;
             case 'J':
                 screen_.EraseInDisplay(ParamRaw(params, 0, 0));
@@ -228,9 +356,9 @@ namespace tool::terminal
                 break;
             case 'g':
                 if (ParamRaw(params, 0, 0) == 3)
-                    screen_.ClearAllTabStops();
+                    screen_.TabStops().ClearAll();
                 else
-                    screen_.ClearTabStopHere();
+                    screen_.TabStops().ClearHere();
                 break;
             case 'h':
                 ApplyMode(params, true, privateMarker);
@@ -255,10 +383,10 @@ namespace tool::terminal
                 screen_.SetScrollRegion(ParamRaw(params, 0, 1), ParamRaw(params, 1, screen_.Rows()));
                 break;
             case 's':
-                screen_.SaveCursor();
+                screen_.CursorOperations().Save();
                 break; // SCO save cursor
             case 'u':
-                screen_.RestoreCursor();
+                screen_.CursorOperations().Restore();
                 break; // SCO restore cursor
             default:
                 break;
@@ -280,154 +408,8 @@ namespace tool::terminal
             return;
         }
 
-        for (std::size_t i = 0; i < params.size(); ++i)
-        {
-            int p = params[i];
-            switch (p)
-            {
-                case 0:
-                    r = {};
-                    break;
-                case 1:
-                    r.bold = true;
-                    break;
-                case 2:
-                    r.faint = true;
-                    break;
-                case 3:
-                    r.italic = true;
-                    break;
-                case 4:
-                    r.underline = true;
-                    break;
-                case 5:
-                    r.blink = true;
-                    break;
-                case 7:
-                    r.inverse = true;
-                    break;
-                case 22:
-                    r.bold = false;
-                    r.faint = false;
-                    break;
-                case 23:
-                    r.italic = false;
-                    break;
-                case 24:
-                    r.underline = false;
-                    break;
-                case 25:
-                    r.blink = false;
-                    break;
-                case 27:
-                    r.inverse = false;
-                    break;
-                case 30:
-                    r.foreground = Color::Black;
-                    break;
-                case 31:
-                    r.foreground = Color::Red;
-                    break;
-                case 32:
-                    r.foreground = Color::Green;
-                    break;
-                case 33:
-                    r.foreground = Color::Yellow;
-                    break;
-                case 34:
-                    r.foreground = Color::Blue;
-                    break;
-                case 35:
-                    r.foreground = Color::Magenta;
-                    break;
-                case 36:
-                    r.foreground = Color::Cyan;
-                    break;
-                case 37:
-                    r.foreground = Color::White;
-                    break;
-                case 39:
-                    r.foreground = Color::Default;
-                    break;
-                case 40:
-                    r.background = Color::Black;
-                    break;
-                case 41:
-                    r.background = Color::Red;
-                    break;
-                case 42:
-                    r.background = Color::Green;
-                    break;
-                case 43:
-                    r.background = Color::Yellow;
-                    break;
-                case 44:
-                    r.background = Color::Blue;
-                    break;
-                case 45:
-                    r.background = Color::Magenta;
-                    break;
-                case 46:
-                    r.background = Color::Cyan;
-                    break;
-                case 47:
-                    r.background = Color::White;
-                    break;
-                case 49:
-                    r.background = Color::Default;
-                    break;
-                case 90:
-                    r.foreground = Color::BrightBlack;
-                    break;
-                case 91:
-                    r.foreground = Color::BrightRed;
-                    break;
-                case 92:
-                    r.foreground = Color::BrightGreen;
-                    break;
-                case 93:
-                    r.foreground = Color::BrightYellow;
-                    break;
-                case 94:
-                    r.foreground = Color::BrightBlue;
-                    break;
-                case 95:
-                    r.foreground = Color::BrightMagenta;
-                    break;
-                case 96:
-                    r.foreground = Color::BrightCyan;
-                    break;
-                case 97:
-                    r.foreground = Color::BrightWhite;
-                    break;
-                case 100:
-                    r.background = Color::BrightBlack;
-                    break;
-                case 101:
-                    r.background = Color::BrightRed;
-                    break;
-                case 102:
-                    r.background = Color::BrightGreen;
-                    break;
-                case 103:
-                    r.background = Color::BrightYellow;
-                    break;
-                case 104:
-                    r.background = Color::BrightBlue;
-                    break;
-                case 105:
-                    r.background = Color::BrightMagenta;
-                    break;
-                case 106:
-                    r.background = Color::BrightCyan;
-                    break;
-                case 107:
-                    r.background = Color::BrightWhite;
-                    break;
-                default:
-                    break; // unknown SGR codes are ignored
-            }
-        }
+        for (int parameter : params)
+            ApplySgrParameter(parameter, r);
         screen_.SetRendition(r);
     }
 
@@ -436,36 +418,9 @@ namespace tool::terminal
         for (int p : params)
         {
             if (privateMarker)
-            {
-                switch (p)
-                {
-                    case 1:
-                        screen_.GetModes().applicationCursorKeys = set;
-                        break; // DECCKM
-                    case 6:
-                        screen_.GetModes().originMode = set;
-                        break; // DECOM
-                    case 7:
-                        screen_.GetModes().autoWrap = set;
-                        break; // DECAWM
-                    case 25:
-                        screen_.GetModes().cursorVisible = set;
-                        break; // DECTCEM
-                    default:
-                        break;
-                }
-            }
+                ApplyPrivateMode(screen_, p, set);
             else
-            {
-                switch (p)
-                {
-                    case 20:
-                        screen_.GetModes().lineFeedNewLine = set;
-                        break; // LNM
-                    default:
-                        break;
-                }
-            }
+                ApplyAnsiMode(screen_, p, set);
         }
     }
 
@@ -473,9 +428,11 @@ namespace tool::terminal
     {
         // 1-based row;column.
         const auto& c = screen_.Cursor();
-        char buf[32];
-        std::snprintf(buf, sizeof(buf), "\x1B[%d;%dR", c.row + 1, c.column + 1);
-        outgoing_ += buf;
+        outgoing_ += "\x1B[";
+        outgoing_ += std::to_string(c.row + 1);
+        outgoing_ += ";";
+        outgoing_ += std::to_string(c.column + 1);
+        outgoing_ += "R";
     }
 
     void Vt100Terminal::ReportDeviceStatus()

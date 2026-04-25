@@ -3,6 +3,7 @@
 #include "tools/hardware_bridge/client/terminal/TerminalScreen.hpp"
 #include "tools/hardware_bridge/client/terminal/Vt100Parser.hpp"
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -16,9 +17,9 @@ namespace tool::terminal
     class Vt100Terminal
     {
     public:
-        Vt100Terminal(int rows = 24, int cols = 100);
+        explicit Vt100Terminal(int rows = 24, int cols = 100);
 
-        void Feed(const uint8_t* data, std::size_t size);
+        void Feed(std::span<const uint8_t> data);
         void Feed(std::string_view data);
         void FeedByte(uint8_t b);
 

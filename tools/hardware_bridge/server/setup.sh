@@ -39,7 +39,7 @@ fi
 VENV_DIR="$SCRIPT_DIR/.venv"
 VENV_PYTHON="$VENV_DIR/bin/python"
 
-if [ ! -x "$VENV_PYTHON" ]; then
+if [[ ! -x "$VENV_PYTHON" ]]; then
     echo "Creating virtual environment at $VENV_DIR..."
     if ! python3 -m venv "$VENV_DIR"; then
         echo "ERROR: Could not create a virtual environment." >&2
@@ -53,7 +53,7 @@ echo "Using Python virtual environment: $($VENV_PYTHON --version)"
 # --- 3. Install requirements into the virtual environment -----------------
 REQUIREMENTS="$SCRIPT_DIR/requirements.txt"
 
-if [ -f "$REQUIREMENTS" ]; then
+if [[ -f "$REQUIREMENTS" ]]; then
     echo "Installing requirements from requirements.txt..."
     "$VENV_PYTHON" -m pip install --upgrade pip --quiet
     "$VENV_PYTHON" -m pip install -r "$REQUIREMENTS"
@@ -66,11 +66,11 @@ fi
 echo "Checking if server folder is in PATH..."
 
 PROFILE_FILE=""
-if [ -f "$HOME/.bashrc" ]; then
+if [[ -f "$HOME/.bashrc" ]]; then
     PROFILE_FILE="$HOME/.bashrc"
-elif [ -f "$HOME/.bash_profile" ]; then
+elif [[ -f "$HOME/.bash_profile" ]]; then
     PROFILE_FILE="$HOME/.bash_profile"
-elif [ -f "$HOME/.profile" ]; then
+elif [[ -f "$HOME/.profile" ]]; then
     PROFILE_FILE="$HOME/.profile"
 fi
 
@@ -80,7 +80,7 @@ case ":$PATH:" in
         ;;
     *)
         echo "Adding '$SCRIPT_DIR' to PATH..."
-        if [ -n "$PROFILE_FILE" ]; then
+        if [[ -n "$PROFILE_FILE" ]]; then
             echo "" >> "$PROFILE_FILE"
             echo "# Added by setup.sh" >> "$PROFILE_FILE"
             echo "export PATH=\"\$PATH:$SCRIPT_DIR\"" >> "$PROFILE_FILE"

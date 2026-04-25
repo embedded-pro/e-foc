@@ -198,87 +198,107 @@ namespace tool::terminal
             --cursor_.row;
     }
 
-    void TerminalScreen::SetTabStop()
+    TerminalTabStops TerminalScreen::TabStops()
     {
-        if (cursor_.column >= 0 && cursor_.column < cols_)
-            tabStops_[cursor_.column] = true;
+        return TerminalTabStops{ *this };
     }
 
-    void TerminalScreen::ClearTabStopHere()
+    TerminalCursorOperations TerminalScreen::CursorOperations()
     {
-        if (cursor_.column >= 0 && cursor_.column < cols_)
-            tabStops_[cursor_.column] = false;
+        return TerminalCursorOperations{ *this };
     }
 
-    void TerminalScreen::ClearAllTabStops()
+    TerminalTabStops::TerminalTabStops(TerminalScreen& screen)
+        : screen_(screen)
     {
-        std::fill(tabStops_.begin(), tabStops_.end(), false);
     }
 
-    void TerminalScreen::CursorUp(int n)
+    void TerminalTabStops::SetHere()
     {
-        pendingWrap_ = false;
+        if (screen_.cursor_.column >= 0 && screen_.cursor_.column < screen_.cols_)
+            screen_.tabStops_[screen_.cursor_.column] = true;
+    }
+
+    void TerminalTabStops::ClearHere()
+    {
+        if (screen_.cursor_.column >= 0 && screen_.cursor_.column < screen_.cols_)
+            screen_.tabStops_[screen_.cursor_.column] = false;
+    }
+
+    void TerminalTabStops::ClearAll()
+    {
+        std::ranges::fill(screen_.tabStops_, false);
+    }
+
+    TerminalCursorOperations::TerminalCursorOperations(TerminalScreen& screen)
+        : screen_(screen)
+    {
+    }
+
+    void TerminalCursorOperations::Up(int n)
+    {
+        screen_.pendingWrap_ = false;
         if (n < 1)
             n = 1;
-        cursor_.row = std::max(scrollTop_, cursor_.row - n);
+        screen_.cursor_.row = std::max(screen_.scrollTop_, screen_.cursor_.row - n);
     }
 
-    void TerminalScreen::CursorDown(int n)
+    void TerminalCursorOperations::Down(int n)
     {
-        pendingWrap_ = false;
+        screen_.pendingWrap_ = false;
         if (n < 1)
             n = 1;
-        cursor_.row = std::min(scrollBottom_, cursor_.row + n);
+        screen_.cursor_.row = std::min(screen_.scrollBottom_, screen_.cursor_.row + n);
     }
 
-    void TerminalScreen::CursorForward(int n)
+    void TerminalCursorOperations::Forward(int n)
     {
-        pendingWrap_ = false;
+        screen_.pendingWrap_ = false;
         if (n < 1)
             n = 1;
-        cursor_.column = std::min(cols_ - 1, cursor_.column + n);
+        screen_.cursor_.column = std::min(screen_.cols_ - 1, screen_.cursor_.column + n);
     }
 
-    void TerminalScreen::CursorBackward(int n)
+    void TerminalCursorOperations::Backward(int n)
     {
-        pendingWrap_ = false;
+        screen_.pendingWrap_ = false;
         if (n < 1)
             n = 1;
-        cursor_.column = std::max(0, cursor_.column - n);
+        screen_.cursor_.column = std::max(0, screen_.cursor_.column - n);
     }
 
-    void TerminalScreen::MoveCursor(int row, int col)
+    void TerminalCursorOperations::MoveTo(int row, int col)
     {
-        pendingWrap_ = false;
+        screen_.pendingWrap_ = false;
         if (row < 1)
             row = 1;
         if (col < 1)
             col = 1;
-        cursor_.row = row - 1;
-        cursor_.column = col - 1;
-        ClampCursor();
+        screen_.cursor_.row = row - 1;
+        screen_.cursor_.column = col - 1;
+        screen_.ClampCursor();
     }
 
-    void TerminalScreen::CursorColumn(int col)
+    void TerminalCursorOperations::MoveToColumn(int col)
     {
-        pendingWrap_ = false;
+        screen_.pendingWrap_ = false;
         if (col < 1)
             col = 1;
-        cursor_.column = std::min(cols_ - 1, col - 1);
+        screen_.cursor_.column = std::min(screen_.cols_ - 1, col - 1);
     }
 
-    void TerminalScreen::SaveCursor()
+    void TerminalCursorOperations::Save()
     {
-        savedCursor_ = cursor_;
-        savedRendition_ = currentRendition_;
+        screen_.savedCursor_ = screen_.cursor_;
+        screen_.savedRendition_ = screen_.currentRendition_;
     }
 
-    void TerminalScreen::RestoreCursor()
+    void TerminalCursorOperations::Restore()
     {
-        cursor_ = savedCursor_;
-        currentRendition_ = savedRendition_;
-        pendingWrap_ = false;
-        ClampCursor();
+        screen_.cursor_ = screen_.savedCursor_;
+        screen_.currentRendition_ = screen_.savedRendition_;
+        screen_.pendingWrap_ = false;
+        screen_.ClampCursor();
     }
 
     void TerminalScreen::EraseInDisplay(int mode)

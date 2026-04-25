@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -20,11 +20,11 @@ namespace tool::terminal
         // Excludes ESC, CAN, SUB, which are handled internally for state
         // transitions.
         std::function<void(uint8_t)> Execute;
-        // ESC <intermediate?> <final>. For sequences like ESC D, ESC E,
+        // ESC <intermediate?> <finalByte>. For sequences like ESC D, ESC E,
         // ESC ( B, ESC # 8, ESC 7 / ESC 8, ESC c, ESC =, ESC >.
-        std::function<void(char final, char intermediate)> EscDispatch;
-        // CSI (ESC [) <private?> <params> <intermediate?> <final>.
-        std::function<void(char final, const std::vector<int>& params, bool privateMarker, char intermediate)> CsiDispatch;
+        std::function<void(char finalByte, char intermediate)> EscDispatch;
+        // CSI (ESC [) <private?> <params> <intermediate?> <finalByte>.
+        std::function<void(char finalByte, const std::vector<int>& params, bool privateMarker, char intermediate)> CsiDispatch;
         // OSC (ESC ] ... ST/BEL): ignored payload-string consumed.
         std::function<void(const std::string& payload)> OscDispatch;
     };
@@ -34,7 +34,7 @@ namespace tool::terminal
     public:
         explicit Vt100Parser(ParserCallbacks callbacks);
 
-        void Feed(const uint8_t* data, std::size_t size);
+        void Feed(std::span<const uint8_t> data);
         void Feed(std::string_view data);
         void FeedByte(uint8_t b);
 
@@ -55,7 +55,7 @@ namespace tool::terminal
 
         void Transition(State next);
         void Anywhere(uint8_t b, bool& consumed);
-        void HandleGround(uint8_t b);
+        void HandleGround(uint8_t b) const;
         void HandleEscape(uint8_t b);
         void HandleCsiEntry(uint8_t b);
         void HandleCsiParam(uint8_t b);

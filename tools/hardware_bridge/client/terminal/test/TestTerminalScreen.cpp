@@ -148,17 +148,17 @@ TEST_F(TestTerminalScreen, horizontal_tab_advances_to_next_tab_stop)
 TEST_F(TestTerminalScreen, set_and_clear_tab_stops)
 {
     tool::terminal::TerminalScreen wide{ 5, 20 };
-    wide.ClearAllTabStops();
+    wide.TabStops().ClearAll();
 
-    wide.MoveCursor(1, 4);
-    wide.SetTabStop();
-    wide.MoveCursor(1, 1);
+    wide.CursorOperations().MoveTo(1, 4);
+    wide.TabStops().SetHere();
+    wide.CursorOperations().MoveTo(1, 1);
     wide.HorizontalTab();
 
     EXPECT_EQ(wide.Cursor().column, 3);
 
-    wide.ClearTabStopHere();
-    wide.MoveCursor(1, 1);
+    wide.TabStops().ClearHere();
+    wide.CursorOperations().MoveTo(1, 1);
     wide.HorizontalTab();
 
     EXPECT_EQ(wide.Cursor().column, 19);
@@ -166,9 +166,9 @@ TEST_F(TestTerminalScreen, set_and_clear_tab_stops)
 
 TEST_F(TestTerminalScreen, clear_tab_stop_here_ignores_out_of_range_cursor_after_clamp)
 {
-    screen.MoveCursor(100, 100);
+    screen.CursorOperations().MoveTo(100, 100);
 
-    screen.ClearTabStopHere();
+    screen.TabStops().ClearHere();
 
     EXPECT_EQ(screen.Cursor().row, 4);
     EXPECT_EQ(screen.Cursor().column, 9);
@@ -176,9 +176,9 @@ TEST_F(TestTerminalScreen, clear_tab_stop_here_ignores_out_of_range_cursor_after
 
 TEST_F(TestTerminalScreen, reverse_index_at_top_scrolls_down)
 {
-    screen.MoveCursor(2, 1);
+    screen.CursorOperations().MoveTo(2, 1);
     screen.Write(U'X');
-    screen.MoveCursor(1, 1);
+    screen.CursorOperations().MoveTo(1, 1);
 
     screen.ReverseIndex();
 
@@ -190,11 +190,11 @@ TEST_F(TestTerminalScreen, reverse_index_at_top_scrolls_down)
 
 TEST_F(TestTerminalScreen, save_restore_cursor)
 {
-    screen.MoveCursor(3, 5);
-    screen.SaveCursor();
-    screen.MoveCursor(1, 1);
+    screen.CursorOperations().MoveTo(3, 5);
+    screen.CursorOperations().Save();
+    screen.CursorOperations().MoveTo(1, 1);
 
-    screen.RestoreCursor();
+    screen.CursorOperations().Restore();
 
     EXPECT_EQ(screen.Cursor().row, 2);
     EXPECT_EQ(screen.Cursor().column, 4);
@@ -204,7 +204,7 @@ TEST_F(TestTerminalScreen, erase_in_line_to_right)
 {
     for (int c = 0; c < 5; ++c)
         screen.Write(U'X');
-    screen.MoveCursor(1, 3);
+    screen.CursorOperations().MoveTo(1, 3);
 
     screen.EraseInLine(0);
 
@@ -215,7 +215,7 @@ TEST_F(TestTerminalScreen, erase_in_line_to_left)
 {
     for (int c = 0; c < 5; ++c)
         screen.Write(U'X');
-    screen.MoveCursor(1, 3);
+    screen.CursorOperations().MoveTo(1, 3);
 
     screen.EraseInLine(1);
 
@@ -238,10 +238,10 @@ TEST_F(TestTerminalScreen, erase_in_display_below)
 {
     for (int r = 0; r < 3; ++r)
     {
-        screen.MoveCursor(r + 1, 1);
+        screen.CursorOperations().MoveTo(r + 1, 1);
         screen.Write(U'A');
     }
-    screen.MoveCursor(1, 1);
+    screen.CursorOperations().MoveTo(1, 1);
 
     screen.EraseInDisplay(0);
 
@@ -253,7 +253,7 @@ TEST_F(TestTerminalScreen, erase_in_display_below)
 TEST_F(TestTerminalScreen, erase_in_display_all)
 {
     screen.Write(U'X');
-    screen.MoveCursor(3, 3);
+    screen.CursorOperations().MoveTo(3, 3);
     screen.Write(U'Y');
 
     screen.EraseInDisplay(2);
@@ -264,13 +264,13 @@ TEST_F(TestTerminalScreen, erase_in_display_all)
 
 TEST_F(TestTerminalScreen, erase_in_display_above_preserves_below_cursor)
 {
-    screen.MoveCursor(1, 1);
+    screen.CursorOperations().MoveTo(1, 1);
     screen.Write(U'A');
-    screen.MoveCursor(3, 1);
+    screen.CursorOperations().MoveTo(3, 1);
     screen.Write(U'B');
-    screen.MoveCursor(5, 1);
+    screen.CursorOperations().MoveTo(5, 1);
     screen.Write(U'C');
-    screen.MoveCursor(3, 1);
+    screen.CursorOperations().MoveTo(3, 1);
 
     screen.EraseInDisplay(1);
 
@@ -297,7 +297,7 @@ TEST_F(TestTerminalScreen, erase_in_display_mode_three_clears_scrollback)
 
 TEST_F(TestTerminalScreen, move_cursor_clamps_to_screen)
 {
-    screen.MoveCursor(99, 99);
+    screen.CursorOperations().MoveTo(99, 99);
 
     EXPECT_EQ(screen.Cursor().row, 4);
     EXPECT_EQ(screen.Cursor().column, 9);
@@ -305,7 +305,7 @@ TEST_F(TestTerminalScreen, move_cursor_clamps_to_screen)
 
 TEST_F(TestTerminalScreen, move_cursor_clamps_low_values_to_origin)
 {
-    screen.MoveCursor(0, -4);
+    screen.CursorOperations().MoveTo(0, -4);
 
     EXPECT_EQ(screen.Cursor().row, 0);
     EXPECT_EQ(screen.Cursor().column, 0);
@@ -313,24 +313,24 @@ TEST_F(TestTerminalScreen, move_cursor_clamps_low_values_to_origin)
 
 TEST_F(TestTerminalScreen, cursor_movement_treats_non_positive_counts_as_one)
 {
-    screen.MoveCursor(3, 3);
+    screen.CursorOperations().MoveTo(3, 3);
 
-    screen.CursorUp(0);
+    screen.CursorOperations().Up(0);
     EXPECT_EQ(screen.Cursor().row, 1);
-    screen.CursorDown(-4);
+    screen.CursorOperations().Down(-4);
     EXPECT_EQ(screen.Cursor().row, 2);
-    screen.CursorForward(0);
+    screen.CursorOperations().Forward(0);
     EXPECT_EQ(screen.Cursor().column, 3);
-    screen.CursorBackward(-9);
+    screen.CursorOperations().Backward(-9);
     EXPECT_EQ(screen.Cursor().column, 2);
 }
 
 TEST_F(TestTerminalScreen, cursor_column_clamps_low_and_high_values)
 {
-    screen.CursorColumn(0);
+    screen.CursorOperations().MoveToColumn(0);
     EXPECT_EQ(screen.Cursor().column, 0);
 
-    screen.CursorColumn(99);
+    screen.CursorOperations().MoveToColumn(99);
     EXPECT_EQ(screen.Cursor().column, 9);
 }
 
@@ -363,7 +363,7 @@ TEST_F(TestTerminalScreen, scroll_region_clamps_top_to_first_row)
 TEST_F(TestTerminalScreen, scroll_region_limits_index_to_region)
 {
     screen.SetScrollRegion(2, 4);
-    screen.MoveCursor(4, 1);
+    screen.CursorOperations().MoveTo(4, 1);
     screen.Write(U'A');
     screen.CarriageReturn();
     screen.Index();

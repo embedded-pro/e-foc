@@ -2,19 +2,53 @@
 
 #include "tools/hardware_bridge/client/terminal/TerminalTypes.hpp"
 #include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <string>
 #include <vector>
 
 namespace tool::terminal
 {
+    class TerminalScreen;
+
+    class TerminalCursorOperations
+    {
+    public:
+        explicit TerminalCursorOperations(TerminalScreen& screen);
+
+        void Up(int n);
+        void Down(int n);
+        void Forward(int n);
+        void Backward(int n);
+        void MoveTo(int row, int col);
+        void MoveToColumn(int col);
+        void Save();
+        void Restore();
+
+    private:
+        TerminalScreen& screen_;
+    };
+
+    class TerminalTabStops
+    {
+    public:
+        explicit TerminalTabStops(TerminalScreen& screen);
+
+        void SetHere();
+        void ClearHere();
+        void ClearAll();
+
+    private:
+        TerminalScreen& screen_;
+    };
+
     // VT100/VT102-style screen buffer with cursor, scroll region, tab stops,
     // pending-wrap, and a scrollback history of lines that have scrolled off
     // the top of the active screen.
     class TerminalScreen
     {
     public:
-        TerminalScreen(int rows = 24, int cols = 100);
+        explicit TerminalScreen(int rows = 24, int cols = 100);
 
         int Rows() const;
         int Cols() const;
@@ -52,22 +86,10 @@ namespace tool::terminal
         void ReverseIndex(); // ESC M
 
         // Tab stops
-        void SetTabStop();       // HTS
-        void ClearTabStopHere(); // TBC 0
-        void ClearAllTabStops(); // TBC 3
+        TerminalTabStops TabStops();
 
         // Cursor movement
-        void CursorUp(int n);
-        void CursorDown(int n);
-        void CursorForward(int n);
-        void CursorBackward(int n);
-        // 1-based addressing as used by CUP/HVP.
-        void MoveCursor(int row, int col);
-        void CursorColumn(int col); // 1-based, CHA
-
-        // DECSC / DECRC
-        void SaveCursor();
-        void RestoreCursor();
+        TerminalCursorOperations CursorOperations();
 
         // Erase
         void EraseInDisplay(int mode);
@@ -82,6 +104,9 @@ namespace tool::terminal
         std::string LineText(int row) const;
 
     private:
+        friend class TerminalCursorOperations;
+        friend class TerminalTabStops;
+
         void ScrollUpInRegion(int n);
         void ScrollDownInRegion(int n);
         std::vector<Cell> MakeBlankRow() const;
@@ -95,7 +120,7 @@ namespace tool::terminal
         CursorPosition savedCursor_{};
         Rendition currentRendition_{};
         Rendition savedRendition_{};
-        std::vector<bool> tabStops_;
+        std::vector<uint8_t> tabStops_;
         int scrollTop_{ 0 };
         int scrollBottom_{ 0 };
         bool pendingWrap_{ false };

@@ -52,7 +52,9 @@ namespace tool::terminal
 
     void Vt100Parser::Reset()
     {
-        state_ = State::Ground;
+        using enum State;
+
+        state_ = Ground;
         params_.clear();
         oscBuffer_.clear();
         intermediate_ = 0;
@@ -61,27 +63,29 @@ namespace tool::terminal
 
     void Vt100Parser::Transition(State next)
     {
+        using enum State;
+
         state_ = next;
-        if (next == State::CsiEntry)
+        if (next == CsiEntry)
         {
             params_.clear();
             intermediate_ = 0;
             privateMarker_ = false;
         }
-        else if (next == State::Escape)
+        else if (next == Escape)
         {
             intermediate_ = 0;
         }
-        else if (next == State::OscString)
+        else if (next == OscString)
         {
             oscBuffer_.clear();
         }
     }
 
-    void Vt100Parser::Feed(const uint8_t* data, std::size_t size)
+    void Vt100Parser::Feed(std::span<const uint8_t> data)
     {
-        for (std::size_t i = 0; i < size; ++i)
-            FeedByte(data[i]);
+        for (uint8_t byte : data)
+            FeedByte(byte);
     }
 
     void Vt100Parser::Feed(std::string_view data)
@@ -92,17 +96,19 @@ namespace tool::terminal
 
     void Vt100Parser::Anywhere(uint8_t b, bool& consumed)
     {
+        using enum State;
+
         consumed = true;
         if (b == ESC_BYTE)
         {
             // ESC always restarts; abandons any in-progress sequence.
-            Transition(State::Escape);
+            Transition(Escape);
         }
         else if (b == CAN_BYTE || b == SUB_BYTE)
         {
             // Abort current sequence; SUB conventionally also displays a
             // substitute character, but we silently drop it for now.
-            Transition(State::Ground);
+            Transition(Ground);
         }
         else
         {
@@ -112,14 +118,16 @@ namespace tool::terminal
 
     void Vt100Parser::FeedByte(uint8_t b)
     {
+        using enum State;
+
         // OSC must capture ESC as the first half of ST (ESC \), so handle
         // OSC states before the generic anywhere transitions.
-        if (state_ == State::OscString)
+        if (state_ == OscString)
         {
             HandleOsc(b);
             return;
         }
-        if (state_ == State::OscStringEsc)
+        if (state_ == OscStringEsc)
         {
             HandleOscEsc(b);
             return;
@@ -132,32 +140,32 @@ namespace tool::terminal
 
         switch (state_)
         {
-            case State::Ground:
+            case Ground:
                 HandleGround(b);
                 break;
-            case State::Escape:
+            case Escape:
                 HandleEscape(b);
                 break;
-            case State::CsiEntry:
+            case CsiEntry:
                 HandleCsiEntry(b);
                 break;
-            case State::CsiParam:
+            case CsiParam:
                 HandleCsiParam(b);
                 break;
-            case State::CsiIntermediate:
+            case CsiIntermediate:
                 HandleCsiIntermediate(b);
                 break;
-            case State::Ignore:
+            case Ignore:
                 if (IsFinal(b))
-                    Transition(State::Ground);
+                    Transition(Ground);
                 break;
-            case State::OscString:
-            case State::OscStringEsc:
+            case OscString:
+            case OscStringEsc:
                 break; // handled above
         }
     }
 
-    void Vt100Parser::HandleGround(uint8_t b)
+    void Vt100Parser::HandleGround(uint8_t b) const
     {
         if (b == DEL_BYTE)
             return;
@@ -176,6 +184,8 @@ namespace tool::terminal
 
     void Vt100Parser::HandleEscape(uint8_t b)
     {
+        using enum State;
+
         if (IsC0Execute(b))
         {
             if (callbacks_.Execute)
@@ -193,24 +203,24 @@ namespace tool::terminal
         }
         if (b == '[')
         {
-            Transition(State::CsiEntry);
+            Transition(CsiEntry);
             return;
         }
         if (b == ']')
         {
-            Transition(State::OscString);
+            Transition(OscString);
             return;
         }
         if (b == 'P' || b == 'X' || b == '^' || b == '_')
         {
             // DCS/SOS/PM/APC: consume the string until ST or BEL.
-            Transition(State::OscString);
+            Transition(OscString);
             return;
         }
         if (b == '\\')
         {
             // Lone ST outside string mode: ignore.
-            Transition(State::Ground);
+            Transition(Ground);
             return;
         }
         if (IsFinal(b) || (b >= 0x30 && b <= 0x3F))
@@ -218,13 +228,15 @@ namespace tool::terminal
             // ESC <intermediate?> <final>
             if (callbacks_.EscDispatch)
                 callbacks_.EscDispatch(static_cast<char>(b), intermediate_);
-            Transition(State::Ground);
+            Transition(Ground);
             return;
         }
     }
 
     void Vt100Parser::HandleCsiEntry(uint8_t b)
     {
+        using enum State;
+
         if (IsC0Execute(b))
         {
             if (callbacks_.Execute)
@@ -235,22 +247,21 @@ namespace tool::terminal
             return;
         if (IsPrivateMarker(b))
         {
-            if (b == '?')
-                privateMarker_ = true;
+            privateMarker_ = b == '?';
             // Other private markers (=, >, <) are tolerated but not flagged.
-            Transition(State::CsiParam);
+            Transition(CsiParam);
             return;
         }
         if (IsParameter(b))
         {
             params_.push_back(static_cast<char>(b == 0x3A ? 0x3B : b));
-            Transition(State::CsiParam);
+            Transition(CsiParam);
             return;
         }
         if (IsIntermediate(b))
         {
             intermediate_ = static_cast<char>(b);
-            Transition(State::CsiIntermediate);
+            Transition(CsiIntermediate);
             return;
         }
         if (IsFinal(b))
@@ -258,11 +269,13 @@ namespace tool::terminal
             DispatchCsi(static_cast<char>(b));
             return;
         }
-        Transition(State::Ignore);
+        Transition(Ignore);
     }
 
     void Vt100Parser::HandleCsiParam(uint8_t b)
     {
+        using enum State;
+
         if (IsC0Execute(b))
         {
             if (callbacks_.Execute)
@@ -279,7 +292,7 @@ namespace tool::terminal
         if (IsIntermediate(b))
         {
             intermediate_ = static_cast<char>(b);
-            Transition(State::CsiIntermediate);
+            Transition(CsiIntermediate);
             return;
         }
         if (IsFinal(b))
@@ -287,11 +300,13 @@ namespace tool::terminal
             DispatchCsi(static_cast<char>(b));
             return;
         }
-        Transition(State::Ignore);
+        Transition(Ignore);
     }
 
     void Vt100Parser::HandleCsiIntermediate(uint8_t b)
     {
+        using enum State;
+
         if (IsC0Execute(b))
         {
             if (callbacks_.Execute)
@@ -310,11 +325,13 @@ namespace tool::terminal
             DispatchCsi(static_cast<char>(b));
             return;
         }
-        Transition(State::Ignore);
+        Transition(Ignore);
     }
 
     void Vt100Parser::DispatchCsi(char finalByte)
     {
+        using enum State;
+
         std::vector<int> values;
         int current = 0;
         bool hasDigit = false;
@@ -338,26 +355,28 @@ namespace tool::terminal
         if (callbacks_.CsiDispatch)
             callbacks_.CsiDispatch(finalByte, values, privateMarker_, intermediate_);
 
-        Transition(State::Ground);
+        Transition(Ground);
     }
 
     void Vt100Parser::HandleOsc(uint8_t b)
     {
+        using enum State;
+
         if (b == BEL_BYTE)
         {
             if (callbacks_.OscDispatch)
                 callbacks_.OscDispatch(oscBuffer_);
-            Transition(State::Ground);
+            Transition(Ground);
             return;
         }
         if (b == ESC_BYTE)
         {
-            state_ = State::OscStringEsc;
+            state_ = OscStringEsc;
             return;
         }
         if (b == CAN_BYTE || b == SUB_BYTE)
         {
-            Transition(State::Ground);
+            Transition(Ground);
             return;
         }
         oscBuffer_.push_back(static_cast<char>(b));
@@ -365,16 +384,18 @@ namespace tool::terminal
 
     void Vt100Parser::HandleOscEsc(uint8_t b)
     {
+        using enum State;
+
         if (b == '\\')
         {
             if (callbacks_.OscDispatch)
                 callbacks_.OscDispatch(oscBuffer_);
-            Transition(State::Ground);
+            Transition(Ground);
             return;
         }
         // Not a valid ST; abandon the OSC and reinterpret the byte from
         // the Escape state so the user's intent is not lost.
-        Transition(State::Escape);
+        Transition(Escape);
         FeedByte(b);
     }
 }
