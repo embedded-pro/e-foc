@@ -7,6 +7,7 @@
 #include <QTextCursor>
 #include <QTextDocument>
 #include <algorithm>
+#include <span>
 
 namespace
 {
@@ -109,7 +110,9 @@ namespace tool
     {
         const bool atBottom = verticalScrollBar()->value() >= verticalScrollBar()->maximum() - 1;
 
-        terminal.Feed(reinterpret_cast<const uint8_t*>(data.constData()), static_cast<std::size_t>(data.size()));
+        terminal.Feed(std::span{
+            reinterpret_cast<const uint8_t*>(data.constData()),
+            static_cast<std::size_t>(data.size()) });
 
         std::string outgoing = terminal.TakeOutgoing();
         if (!outgoing.empty())
@@ -176,6 +179,7 @@ namespace tool
             int length;
             terminal::Rendition rendition;
         };
+
         QString text;
         std::vector<Run> runs;
 
