@@ -1,7 +1,9 @@
 #include "tools/hardware_bridge/client/terminal/Vt100Terminal.hpp"
+#include <array>
 #include <gtest/gtest.h>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace
 {
@@ -27,6 +29,15 @@ TEST_F(TestVt100Terminal, plain_ascii_appears_on_first_line)
     Feed("Hello");
 
     EXPECT_EQ(Line(0), "Hello");
+}
+
+TEST_F(TestVt100Terminal, feed_accepts_byte_ranges)
+{
+    const uint8_t bytes[] = { 'O', 'K' };
+
+    terminal.Feed(bytes, sizeof(bytes));
+
+    EXPECT_EQ(Line(0), "OK");
 }
 
 TEST_F(TestVt100Terminal, crlf_starts_a_new_line_with_no_loss)
@@ -136,6 +147,89 @@ TEST_F(TestVt100Terminal, sgr_unknown_codes_are_ignored)
     EXPECT_EQ(terminal.Screen().At(0, 0).rendition.foreground, tool::terminal::Color::Red);
 }
 
+TEST_F(TestVt100Terminal, sgr_sets_and_clears_text_style_flags)
+{
+    Feed("\x1B[1;2;3;4;5;7mA");
+    const auto& styled = terminal.Screen().At(0, 0).rendition;
+    EXPECT_TRUE(styled.bold);
+    EXPECT_TRUE(styled.faint);
+    EXPECT_TRUE(styled.italic);
+    EXPECT_TRUE(styled.underline);
+    EXPECT_TRUE(styled.blink);
+    EXPECT_TRUE(styled.inverse);
+
+    Feed("\x1B[22;23;24;25;27mB");
+    const auto& cleared = terminal.Screen().At(0, 1).rendition;
+    EXPECT_FALSE(cleared.bold);
+    EXPECT_FALSE(cleared.faint);
+    EXPECT_FALSE(cleared.italic);
+    EXPECT_FALSE(cleared.underline);
+    EXPECT_FALSE(cleared.blink);
+    EXPECT_FALSE(cleared.inverse);
+}
+
+TEST_F(TestVt100Terminal, sgr_maps_all_foreground_colors)
+{
+    const std::array<std::pair<int, tool::terminal::Color>, 16> colors{ {
+        { 30, tool::terminal::Color::Black },
+        { 31, tool::terminal::Color::Red },
+        { 32, tool::terminal::Color::Green },
+        { 33, tool::terminal::Color::Yellow },
+        { 34, tool::terminal::Color::Blue },
+        { 35, tool::terminal::Color::Magenta },
+        { 36, tool::terminal::Color::Cyan },
+        { 37, tool::terminal::Color::White },
+        { 90, tool::terminal::Color::BrightBlack },
+        { 91, tool::terminal::Color::BrightRed },
+        { 92, tool::terminal::Color::BrightGreen },
+        { 93, tool::terminal::Color::BrightYellow },
+        { 94, tool::terminal::Color::BrightBlue },
+        { 95, tool::terminal::Color::BrightMagenta },
+        { 96, tool::terminal::Color::BrightCyan },
+        { 97, tool::terminal::Color::BrightWhite },
+    } };
+
+    for (std::size_t i = 0; i < colors.size(); ++i)
+    {
+        Feed("\x1B[" + std::to_string(colors[i].first) + "mX");
+        EXPECT_EQ(terminal.Screen().At(0, static_cast<int>(i)).rendition.foreground, colors[i].second);
+    }
+
+    Feed("\x1B[39mY");
+    EXPECT_EQ(terminal.Screen().At(0, 16).rendition.foreground, tool::terminal::Color::Default);
+}
+
+TEST_F(TestVt100Terminal, sgr_maps_all_background_colors)
+{
+    const std::array<std::pair<int, tool::terminal::Color>, 16> colors{ {
+        { 40, tool::terminal::Color::Black },
+        { 41, tool::terminal::Color::Red },
+        { 42, tool::terminal::Color::Green },
+        { 43, tool::terminal::Color::Yellow },
+        { 44, tool::terminal::Color::Blue },
+        { 45, tool::terminal::Color::Magenta },
+        { 46, tool::terminal::Color::Cyan },
+        { 47, tool::terminal::Color::White },
+        { 100, tool::terminal::Color::BrightBlack },
+        { 101, tool::terminal::Color::BrightRed },
+        { 102, tool::terminal::Color::BrightGreen },
+        { 103, tool::terminal::Color::BrightYellow },
+        { 104, tool::terminal::Color::BrightBlue },
+        { 105, tool::terminal::Color::BrightMagenta },
+        { 106, tool::terminal::Color::BrightCyan },
+        { 107, tool::terminal::Color::BrightWhite },
+    } };
+
+    for (std::size_t i = 0; i < colors.size(); ++i)
+    {
+        Feed("\x1B[" + std::to_string(colors[i].first) + "mX");
+        EXPECT_EQ(terminal.Screen().At(0, static_cast<int>(i)).rendition.background, colors[i].second);
+    }
+
+    Feed("\x1B[49mY");
+    EXPECT_EQ(terminal.Screen().At(0, 16).rendition.background, tool::terminal::Color::Default);
+}
+
 TEST_F(TestVt100Terminal, esc_d_indexes_cursor_down)
 {
     Feed("A\x1B"
@@ -190,6 +284,35 @@ TEST_F(TestVt100Terminal, esc_paren_b_designates_ascii_no_visual_effect)
     EXPECT_EQ(Line(0), "Hello");
 }
 
+TEST_F(TestVt100Terminal, esc_hash_eight_fills_screen_with_alignment_pattern)
+{
+    Feed("\x1B#8");
+
+    EXPECT_EQ(Line(0), "EEEEEEEEEEEEEEEEEEEE");
+    EXPECT_EQ(Line(5), "EEEEEEEEEEEEEEEEEEEE");
+    EXPECT_EQ(terminal.Screen().Cursor().row, 0);
+    EXPECT_EQ(terminal.Screen().Cursor().column, 0);
+}
+
+TEST_F(TestVt100Terminal, keypad_application_mode_toggles_with_esc_sequences)
+{
+    Feed("\x1B=");
+    EXPECT_TRUE(terminal.Screen().GetModes().applicationKeypad);
+
+    Feed("\x1B>");
+    EXPECT_FALSE(terminal.Screen().GetModes().applicationKeypad);
+}
+
+TEST_F(TestVt100Terminal, decid_replies_with_device_attributes)
+{
+    terminal.SetDeviceAttributesResponse("custom");
+
+    Feed("\x1BZ");
+
+    EXPECT_EQ(terminal.TakeOutgoing(), "custom");
+    EXPECT_EQ(terminal.TakeOutgoing(), "");
+}
+
 TEST_F(TestVt100Terminal, dsr_5_replies_with_zero_n)
 {
     Feed("\x1B[5n");
@@ -213,6 +336,13 @@ TEST_F(TestVt100Terminal, da_replies_with_device_attributes)
     EXPECT_EQ(terminal.TakeOutgoing(), std::string{ "\x1B[?6c" });
 }
 
+TEST_F(TestVt100Terminal, private_da_is_ignored)
+{
+    Feed("\x1B[?0c");
+
+    EXPECT_EQ(terminal.TakeOutgoing(), "");
+}
+
 TEST_F(TestVt100Terminal, decset_decrst_toggles_autowrap)
 {
     Feed("\x1B[?7l");
@@ -222,6 +352,19 @@ TEST_F(TestVt100Terminal, decset_decrst_toggles_autowrap)
     EXPECT_TRUE(terminal.Screen().GetModes().autoWrap);
 }
 
+TEST_F(TestVt100Terminal, private_modes_toggle_cursor_keys_origin_and_visibility)
+{
+    Feed("\x1B[?1;6;25h");
+    EXPECT_TRUE(terminal.Screen().GetModes().applicationCursorKeys);
+    EXPECT_TRUE(terminal.Screen().GetModes().originMode);
+    EXPECT_TRUE(terminal.Screen().GetModes().cursorVisible);
+
+    Feed("\x1B[?1;6;25l");
+    EXPECT_FALSE(terminal.Screen().GetModes().applicationCursorKeys);
+    EXPECT_FALSE(terminal.Screen().GetModes().originMode);
+    EXPECT_FALSE(terminal.Screen().GetModes().cursorVisible);
+}
+
 TEST_F(TestVt100Terminal, lnm_set_makes_lf_perform_crlf)
 {
     Feed("\x1B[20h");
@@ -229,6 +372,79 @@ TEST_F(TestVt100Terminal, lnm_set_makes_lf_perform_crlf)
 
     EXPECT_EQ(Line(0), "AB");
     EXPECT_EQ(Line(1), "CD");
+}
+
+TEST_F(TestVt100Terminal, cursor_next_and_previous_line_sequences_move_to_column_one)
+{
+    Feed("\x1B[3;5HX");
+
+    Feed("\x1B[2EY");
+    EXPECT_EQ(terminal.Screen().Cursor().row, 4);
+    EXPECT_EQ(terminal.Screen().Cursor().column, 1);
+    EXPECT_EQ(Line(4), "Y");
+
+    Feed("\x1B[2FZ");
+    EXPECT_EQ(terminal.Screen().Cursor().row, 2);
+    EXPECT_EQ(terminal.Screen().Cursor().column, 1);
+    EXPECT_EQ(Line(2), "Z   X");
+}
+
+TEST_F(TestVt100Terminal, hvp_moves_cursor_like_cup)
+{
+    Feed("\x1B[4;6fX");
+
+    EXPECT_EQ(Line(3), "     X");
+}
+
+TEST_F(TestVt100Terminal, tab_clear_sequences_update_tab_stops)
+{
+    Feed("\x1B[3g");
+    Feed("\tA");
+    EXPECT_EQ(Line(0), "                   A");
+
+    Feed("\x1B[1;5H\x1BH\x1B[0g\x1B[1;1H\tB");
+    EXPECT_EQ(terminal.Screen().Cursor().column, 19);
+}
+
+TEST_F(TestVt100Terminal, save_and_restore_cursor_with_csi_sequences)
+{
+    Feed("AB\x1B[s\r\nCD\x1B[uX");
+
+    EXPECT_EQ(Line(0), "ABX");
+    EXPECT_EQ(Line(1), "CD");
+}
+
+TEST_F(TestVt100Terminal, vertical_tab_and_form_feed_are_treated_as_line_feed)
+{
+    Feed("A\vB\fC");
+
+    EXPECT_EQ(Line(0), "A");
+    EXPECT_EQ(Line(1), " B");
+    EXPECT_EQ(Line(2), "  C");
+}
+
+TEST_F(TestVt100Terminal, ignored_execute_bytes_have_no_visual_effect)
+{
+    Feed(std::string_view{ "A\0\x05\x11\x13\x07"
+                           "B",
+        7 });
+
+    EXPECT_EQ(Line(0), "AB");
+}
+
+TEST_F(TestVt100Terminal, csi_with_intermediate_is_ignored)
+{
+    Feed("A\x1B[1 qB");
+
+    EXPECT_EQ(Line(0), "AB");
+}
+
+TEST_F(TestVt100Terminal, osc_payload_is_accepted_and_ignored)
+{
+    Feed("A\x1B]0;title\x07"
+         "B");
+
+    EXPECT_EQ(Line(0), "AB");
 }
 
 TEST_F(TestVt100Terminal, scroll_region_limits_scrolling)

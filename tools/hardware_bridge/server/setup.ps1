@@ -12,8 +12,16 @@ if (-not $python) {
 
     $installerUrl = "https://www.python.org/ftp/python/3.12.3/python-3.12.3-amd64.exe"
     $installerPath = "$env:TEMP\python-installer.exe"
+    $expectedInstallerSha256 = "edfc6c84dc47eebd4fae9167e96ff5d9c27f8abaa779ee1deab9c3d964d0de3c"
 
     Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -UseBasicParsing
+
+    $actualInstallerSha256 = (Get-FileHash -Path $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actualInstallerSha256 -ne $expectedInstallerSha256) {
+        Remove-Item $installerPath -Force
+        Write-Error "Downloaded Python installer SHA256 mismatch. Expected $expectedInstallerSha256 but got $actualInstallerSha256."
+        exit 1
+    }
 
     # Install silently, add to PATH, install for all users
     Start-Process -FilePath $installerPath -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1 Include_pip=1" -Wait

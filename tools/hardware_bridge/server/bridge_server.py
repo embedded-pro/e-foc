@@ -32,6 +32,7 @@ import sys
 
 from serial_server import SerialOverTcpServer
 from can_server import CanBusOverTcpServer
+from server_errors import BridgeServerError
 
 logger = logging.getLogger(__name__)
 
@@ -103,25 +104,36 @@ async def main() -> None:
 
     servers: list[SerialOverTcpServer | CanBusOverTcpServer] = []
 
-    if args.serial_port is not None:
-        serial_srv = SerialOverTcpServer(
-            serial_port=args.serial_port,
-            baudrate=args.serial_baudrate,
-            tcp_port=args.serial_tcp_port,
-        )
-        await serial_srv.start()
-        servers.append(serial_srv)
+    try:
+        if args.serial_port is not None:
+            serial_srv = SerialOverTcpServer(
+                serial_port=args.serial_port,
+                baudrate=args.serial_baudrate,
+                tcp_port=args.serial_tcp_port,
+            )
+            await serial_srv.start()
+            servers.append(serial_srv)
 
-    if args.can_interface is not None:
-        can_srv = CanBusOverTcpServer(
-            interface=args.can_interface,
-            channel=args.can_channel,
-            bitrate=args.can_bitrate,
-            tcp_port=args.can_tcp_port,
-            tty_baudrate=args.can_tty_baudrate if args.can_interface == "slcan" else None,
-        )
-        await can_srv.start()
-        servers.append(can_srv)
+        if args.can_interface is not None:
+            can_srv = CanBusOverTcpServer(
+                interface=args.can_interface,
+                channel=args.can_channel,
+                bitrate=args.can_bitrate,
+                tcp_port=args.can_tcp_port,
+                tty_baudrate=args.can_tty_baudrate if args.can_interface == "slcan" else None,
+            )
+            await can_srv.start()
+            servers.append(can_srv)
+    except BridgeServerError as exc:
+        logger.error("Bridge server startup failed: %s", exc)
+        for srv in reversed(servers):
+            await srv.stop()
+        sys.exit(1)
+    except Exception:
+        logger.exception("Unexpected bridge server startup failure")
+        for srv in reversed(servers):
+            await srv.stop()
+        sys.exit(1)
 
     logger.info("Bridge server running. Press Ctrl+C to stop.")
 

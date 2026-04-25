@@ -10,7 +10,7 @@ namespace tool::terminal
 
     TerminalScreen::TerminalScreen(int rows, int cols)
         : rows_(rows > 0 ? rows : 24)
-        , cols_(cols > 0 ? cols : 80)
+        , cols_(cols > 0 ? cols : 100)
     {
         Reset();
     }

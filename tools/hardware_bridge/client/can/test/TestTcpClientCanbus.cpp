@@ -238,6 +238,14 @@ TEST_F(TestTcpClientCanbusConnection, connects_to_factory)
     tool::TcpClientCanbus can(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5001);
 }
 
+TEST_F(TestTcpClientCanbusConnection, destructor_without_connection_does_not_abort)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_));
+
+    can.emplace(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5001);
+    can.reset();
+}
+
 TEST_F(TestTcpClientCanbusConnection, send_data_arrives_at_connection)
 {
     CreateAndConnect();
@@ -261,6 +269,48 @@ TEST_F(TestTcpClientCanbusConnection, send_data_arrives_at_connection)
     EXPECT_EQ(connectionStub->sentData[4], 2u);
     EXPECT_EQ(connectionStub->sentData[8], 0xAA);
     EXPECT_EQ(connectionStub->sentData[9], 0xBB);
+}
+
+TEST_F(TestTcpClientCanbusConnection, send_extended_id_uses_production_eff_encoding)
+{
+    CreateAndConnect();
+
+    auto id = hal::Can::Id::Create29BitId(0x1ABCDEFu);
+    hal::Can::Message msg;
+    msg.push_back(0x01);
+
+    can->SendData(id, msg, [](bool success)
+        {
+            EXPECT_TRUE(success);
+        });
+    ExecuteAllActions();
+
+    ASSERT_EQ(connectionStub->sentData.size(), TestTcpClientCanbusFrameEncoding::canFrameSize);
+    uint32_t encodedId{ 0 };
+    std::memcpy(&encodedId, connectionStub->sentData.data(), sizeof(uint32_t));
+    EXPECT_EQ(encodedId, 0x1ABCDEFu | TestTcpClientCanbusFrameEncoding::canEffFlag);
+    EXPECT_EQ(connectionStub->sentData[4], 1u);
+    EXPECT_EQ(connectionStub->sentData[8], 0x01);
+}
+
+TEST_F(TestTcpClientCanbusConnection, receive_extended_frame_uses_production_eff_decoding)
+{
+    CreateAndConnect();
+
+    hal::Can::Id receivedId = hal::Can::Id::Create11BitId(0);
+    can->ReceiveData([&receivedId](hal::Can::Id id, const hal::Can::Message&)
+        {
+            receivedId = id;
+        });
+
+    std::array<uint8_t, TestTcpClientCanbusFrameEncoding::canFrameSize> frame{};
+    auto sendId = hal::Can::Id::Create29BitId(0x1ABCDEFu);
+    hal::Can::Message sendMsg;
+    TestTcpClientCanbusFrameEncoding::EncodeFrame(sendId, sendMsg, frame);
+
+    connectionStub->SimulateDataReceived(infra::MakeByteRange(frame));
+
+    EXPECT_EQ(receivedId, sendId);
 }
 
 TEST_F(TestTcpClientCanbusConnection, receive_frame_triggers_callback)

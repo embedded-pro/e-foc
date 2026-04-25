@@ -2,36 +2,29 @@
 #include "infra/event/EventDispatcher.hpp"
 #include "tools/hardware_bridge/client/common/BridgeException.hpp"
 #include "tools/hardware_bridge/client/common/ParseIPv4.hpp"
+#include <QAbstractSocket>
+#include <QHostAddress>
+#include <QHostInfo>
 #include <QMetaObject>
-#include <arpa/inet.h>
 #include <cassert>
-#include <cstdio>
-#include <cstring>
-#include <netdb.h>
 
 namespace
 {
     std::string ResolveToIPv4(const std::string& host)
     {
-        unsigned int o0 = 0, o1 = 0, o2 = 0, o3 = 0;
-        int consumed = 0;
-        if (std::sscanf(host.c_str(), "%u.%u.%u.%u%n", &o0, &o1, &o2, &o3, &consumed) == 4 && consumed == static_cast<int>(host.size()))
-            return host;
+        const QString hostName = QString::fromStdString(host);
+        QHostAddress directAddress;
+        if (directAddress.setAddress(hostName) && directAddress.protocol() == QAbstractSocket::IPv4Protocol)
+            return directAddress.toString().toStdString();
 
-        addrinfo hints{};
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_STREAM;
-        addrinfo* result = nullptr;
-        if (getaddrinfo(host.c_str(), nullptr, &hints, &result) == 0 && result != nullptr)
+        const QHostInfo hostInfo = QHostInfo::fromName(hostName);
+        if (hostInfo.error() == QHostInfo::NoError)
         {
-            char buf[INET_ADDRSTRLEN];
-            const auto* sa = reinterpret_cast<const sockaddr_in*>(result->ai_addr);
-            if (inet_ntop(AF_INET, &sa->sin_addr, buf, sizeof(buf)) != nullptr)
+            for (const QHostAddress& address : hostInfo.addresses())
             {
-                freeaddrinfo(result);
-                return buf;
+                if (address.protocol() == QAbstractSocket::IPv4Protocol)
+                    return address.toString().toStdString();
             }
-            freeaddrinfo(result);
         }
 
         throw tool::BridgeArgumentException("cannot resolve host: " + host);

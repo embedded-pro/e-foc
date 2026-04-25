@@ -35,19 +35,28 @@ else
     echo "Python installed successfully: $(python3 --version)"
 fi
 
-# --- 2. Ensure pip is available ------------------------------------------
-if ! command -v pip3 &>/dev/null && ! python3 -m pip --version &>/dev/null 2>&1; then
-    echo "Bootstrapping pip..."
-    python3 -m ensurepip --upgrade
+# --- 2. Create / Use virtual environment ---------------------------------
+VENV_DIR="$SCRIPT_DIR/.venv"
+VENV_PYTHON="$VENV_DIR/bin/python"
+
+if [ ! -x "$VENV_PYTHON" ]; then
+    echo "Creating virtual environment at $VENV_DIR..."
+    if ! python3 -m venv "$VENV_DIR"; then
+        echo "ERROR: Could not create a virtual environment." >&2
+        echo "Install the Python venv package for your distribution (for example: sudo apt-get install python3-venv) and rerun setup.sh." >&2
+        exit 1
+    fi
 fi
 
-# --- 3. Install requirements ---------------------------------------------
+echo "Using Python virtual environment: $($VENV_PYTHON --version)"
+
+# --- 3. Install requirements into the virtual environment -----------------
 REQUIREMENTS="$SCRIPT_DIR/requirements.txt"
 
 if [ -f "$REQUIREMENTS" ]; then
     echo "Installing requirements from requirements.txt..."
-    python3 -m pip install --upgrade pip --quiet
-    python3 -m pip install -r "$REQUIREMENTS"
+    "$VENV_PYTHON" -m pip install --upgrade pip --quiet
+    "$VENV_PYTHON" -m pip install -r "$REQUIREMENTS"
     echo "Requirements installed successfully."
 else
     echo "WARNING: requirements.txt not found at $REQUIREMENTS - skipping."
@@ -86,3 +95,5 @@ esac
 
 echo ""
 echo "Setup complete."
+echo "Run the server with: $VENV_PYTHON $SCRIPT_DIR/bridge_server.py"
+echo "Or activate the environment with: source $VENV_DIR/bin/activate"

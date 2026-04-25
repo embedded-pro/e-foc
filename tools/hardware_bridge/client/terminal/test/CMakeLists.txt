@@ -8,6 +8,7 @@ target_link_libraries(e_foc.tool.hardware_bridge.terminal_test PUBLIC
 )
 
 target_sources(e_foc.tool.hardware_bridge.terminal_test PRIVATE
+    TestTerminalTypes.cpp
     TestVt100Parser.cpp
     TestTerminalScreen.cpp
     TestVt100Terminal.cpp
