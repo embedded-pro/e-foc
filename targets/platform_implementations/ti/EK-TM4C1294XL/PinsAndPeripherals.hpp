@@ -33,11 +33,11 @@ namespace application
 
         static hal::tiva::GpioPin led1{ hal::tiva::Port::N, 0 };
 
-        static hal::tiva::GpioPin uartRx{ hal::tiva::Port::A, 0 };
-        static hal::tiva::GpioPin uartTx{ hal::tiva::Port::A, 1 };
+        static hal::tiva::GpioPin uartRx{ hal::tiva::Port::D, 4 };
+        static hal::tiva::GpioPin uartTx{ hal::tiva::Port::D, 5 };
 
-        static hal::tiva::GpioPin canRx{ hal::tiva::Port::B, 0 };
-        static hal::tiva::GpioPin canTx{ hal::tiva::Port::B, 1 };
+        static hal::tiva::GpioPin canRx{ hal::tiva::Port::A, 0 };
+        static hal::tiva::GpioPin canTx{ hal::tiva::Port::A, 1 };
 
         static hal::tiva::GpioPin performance{ hal::tiva::Port::N, 4 };
     }
@@ -49,7 +49,7 @@ namespace application
         constexpr static uint8_t QeiIndex = 0;
         constexpr static uint8_t AdcIndex = 0;
         constexpr static uint8_t AdcSequencerIndex = 0;
-        constexpr static uint8_t UartIndex = 0;
+        constexpr static uint8_t UartIndex = 2;
         constexpr static uint8_t PwmIndex = 0;
         constexpr static uint8_t CanIndex = 0;
 

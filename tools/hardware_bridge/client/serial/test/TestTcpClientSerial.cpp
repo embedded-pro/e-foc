@@ -56,6 +56,14 @@ TEST_F(TestTcpClientSerial, connects_to_factory)
     tool::TcpClientSerial serial(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5000);
 }
 
+TEST_F(TestTcpClientSerial, destructor_without_connection_does_not_abort)
+{
+    EXPECT_CALL(connectionFactory, Connect(testing::_));
+
+    serial.emplace(connectionFactory, services::IPv4Address{ 127, 0, 0, 1 }, 5000);
+    serial.reset();
+}
+
 TEST_F(TestTcpClientSerial, send_data_arrives_at_connection)
 {
     CreateAndConnect();
@@ -103,6 +111,35 @@ TEST_F(TestTcpClientSerial, send_data_larger_than_stream_size_is_chunked)
     ASSERT_EQ(connectionStub->sentData.size(), 5u);
     for (std::size_t i = 0; i < 5; ++i)
         EXPECT_EQ(connectionStub->sentData[i], data[i]);
+}
+
+TEST_F(TestTcpClientSerial, second_send_while_pending_fires_second_callback_immediately)
+{
+    CreateAndConnect();
+    connectionStub->maxSendStreamSize = 2;
+
+    static const uint8_t firstData[] = { 0x01, 0x02, 0x03 };
+    static const uint8_t secondData[] = { 0xAA };
+    bool firstCompleted{ false };
+    bool secondCompleted{ false };
+
+    serial->SendData(infra::MakeByteRange(firstData), [&firstCompleted]()
+        {
+            firstCompleted = true;
+        });
+    serial->SendData(infra::MakeByteRange(secondData), [&secondCompleted]()
+        {
+            secondCompleted = true;
+        });
+
+    EXPECT_FALSE(firstCompleted);
+    EXPECT_TRUE(secondCompleted);
+
+    ExecuteAllActions();
+
+    EXPECT_TRUE(firstCompleted);
+    ASSERT_EQ(connectionStub->sentData.size(), 3u);
+    EXPECT_EQ(connectionStub->sentData[2], 0x03);
 }
 
 TEST_F(TestTcpClientSerial, queued_send_before_connect_overwrites_previous_and_completes_previous_callback)
@@ -326,4 +363,13 @@ TEST_F(TestTcpClientSerial, disconnect_with_no_pending_send_is_noop_for_send_sta
     connectionPtr = nullptr;
 
     EXPECT_FALSE(serial->IsConnected());
+}
+
+TEST_F(TestTcpClientSerial, destructor_aborts_active_connection_before_handler_storage_is_destroyed)
+{
+    CreateAndConnect();
+
+    EXPECT_CALL(*connectionPtr, AbortAndDestroyMock);
+    serial.reset();
+    connectionPtr = nullptr;
 }

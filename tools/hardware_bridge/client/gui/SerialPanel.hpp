@@ -1,10 +1,8 @@
 #pragma once
 
+#include "tools/hardware_bridge/client/gui/AnsiTerminalWidget.hpp"
+#include <QByteArray>
 #include <QGroupBox>
-#include <QLineEdit>
-#include <QPlainTextEdit>
-#include <QPushButton>
-#include <QString>
 
 namespace tool
 {
@@ -16,18 +14,13 @@ namespace tool
     public:
         explicit SerialPanel(QWidget* parent = nullptr);
 
-        void AppendText(const QString& text);
+        void AppendText(const QByteArray& data);
         void SetConnected(bool connected);
 
     signals:
-        void SendRequested(QString text);
-
-    private slots:
-        void OnSendClicked();
+        void SendRequested(QByteArray data);
 
     private:
-        QPlainTextEdit* outputView;
-        QLineEdit* sendInput;
-        QPushButton* sendButton;
+        AnsiTerminalWidget* outputView;
     };
 }
