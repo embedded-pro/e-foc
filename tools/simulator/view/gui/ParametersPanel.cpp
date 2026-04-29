@@ -3,6 +3,7 @@
 #include <QGroupBox>
 #include <QLabel>
 #include <QString>
+#include <QTabWidget>
 #include <QVBoxLayout>
 #include <memory>
 
@@ -20,7 +21,19 @@ namespace simulator
     ParametersPanel::ParametersPanel(const ThreePhaseMotorModel::Parameters& motorParameters, const PidParameters& pidParameters, QWidget* parent)
         : QWidget(parent)
     {
-        auto* layout = QtOwned<QVBoxLayout>(this);
+        auto* outerLayout = QtOwned<QVBoxLayout>(this);
+        outerLayout->setContentsMargins(0, 0, 0, 0);
+
+        auto* tabs = QtOwned<QTabWidget>(this);
+        outerLayout->addWidget(tabs);
+
+        auto* parametersTab = QtOwned<QWidget>(this);
+        auto* layout = QtOwned<QVBoxLayout>(parametersTab);
+        tabs->addTab(parametersTab, "Parameters");
+
+        auto* configTab = QtOwned<QWidget>(this);
+        auto* configLayout = QtOwned<QVBoxLayout>(configTab);
+        tabs->addTab(configTab, "Configuration");
 
         // Electrical parameters
         auto* electricalGroup = QtOwned<QGroupBox>("Electrical Parameters", this);
@@ -55,6 +68,23 @@ namespace simulator
 
         mechanicalGroup->setLayout(mechanicalLayout);
         layout->addWidget(mechanicalGroup);
+
+        // Calibration results
+        auto* calibrationGroup = QtOwned<QGroupBox>("Calibration Results", this);
+        auto* calibrationLayout = QtOwned<QGridLayout>();
+
+        calibrationLayout->addWidget(QtOwned<QLabel>("Pole pairs (p):", this), 0, 0);
+        polePairsLabel = QtOwned<QLabel>("---", this);
+        polePairsLabel->setAlignment(Qt::AlignRight);
+        calibrationLayout->addWidget(polePairsLabel, 0, 1);
+
+        calibrationLayout->addWidget(QtOwned<QLabel>("Alignment offset:", this), 1, 0);
+        alignmentOffsetLabel = QtOwned<QLabel>("---", this);
+        alignmentOffsetLabel->setAlignment(Qt::AlignRight);
+        calibrationLayout->addWidget(alignmentOffsetLabel, 1, 1);
+
+        calibrationGroup->setLayout(calibrationLayout);
+        layout->addWidget(calibrationGroup);
 
         // Current controller gains
         auto* currentPidGroup = QtOwned<QGroupBox>("Current Controller (PI)", this);
@@ -125,11 +155,216 @@ namespace simulator
 
         layout->addStretch();
 
+        // ADC Noise
+        auto* noiseGroup = QtOwned<QGroupBox>("ADC Noise", this);
+        auto* noiseLayout = QtOwned<QGridLayout>();
+
+        noiseLayout->addWidget(QtOwned<QLabel>("Sigma:", this), 0, 0);
+        sigmaSpin = QtOwned<QDoubleSpinBox>(this);
+        sigmaSpin->setRange(0.0, 500.0);
+        sigmaSpin->setSuffix(" mA");
+        sigmaSpin->setSingleStep(1.0);
+        sigmaSpin->setValue(0.0);
+        noiseLayout->addWidget(sigmaSpin, 0, 1);
+
+        noiseLayout->addWidget(QtOwned<QLabel>("Bias A:", this), 1, 0);
+        biasASpin = QtOwned<QDoubleSpinBox>(this);
+        biasASpin->setRange(-500.0, 500.0);
+        biasASpin->setSuffix(" mA");
+        biasASpin->setSingleStep(1.0);
+        biasASpin->setValue(0.0);
+        noiseLayout->addWidget(biasASpin, 1, 1);
+
+        noiseLayout->addWidget(QtOwned<QLabel>("Bias B:", this), 2, 0);
+        biasBSpin = QtOwned<QDoubleSpinBox>(this);
+        biasBSpin->setRange(-500.0, 500.0);
+        biasBSpin->setSuffix(" mA");
+        biasBSpin->setSingleStep(1.0);
+        biasBSpin->setValue(0.0);
+        noiseLayout->addWidget(biasBSpin, 2, 1);
+
+        noiseLayout->addWidget(QtOwned<QLabel>("Bias C:", this), 3, 0);
+        biasCSpin = QtOwned<QDoubleSpinBox>(this);
+        biasCSpin->setRange(-500.0, 500.0);
+        biasCSpin->setSuffix(" mA");
+        biasCSpin->setSingleStep(1.0);
+        biasCSpin->setValue(0.0);
+        noiseLayout->addWidget(biasCSpin, 3, 1);
+
+        noiseGroup->setLayout(noiseLayout);
+        configLayout->addWidget(noiseGroup);
+
+        connect(sigmaSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double)
+            {
+                EmitNoiseConfig();
+            });
+        connect(biasASpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double)
+            {
+                EmitNoiseConfig();
+            });
+        connect(biasBSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double)
+            {
+                EmitNoiseConfig();
+            });
+        connect(biasCSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double)
+            {
+                EmitNoiseConfig();
+            });
+
+        // Thermal Config
+        auto* thermalGroup = QtOwned<QGroupBox>("Thermal Config", this);
+        auto* thermalLayout = QtOwned<QGridLayout>();
+
+        thermalLayout->addWidget(QtOwned<QLabel>(QString::fromUtf8("T_ambient (\xC2\xB0"
+                                                                   "C):"),
+                                     this),
+            0, 0);
+        tAmbientSpin = QtOwned<QDoubleSpinBox>(this);
+        tAmbientSpin->setRange(-40.0, 150.0);
+        tAmbientSpin->setSingleStep(1.0);
+        tAmbientSpin->setValue(25.0);
+        thermalLayout->addWidget(tAmbientSpin, 0, 1);
+
+        thermalLayout->addWidget(QtOwned<QLabel>(QString::fromUtf8("R_th (\xC2\xB0"
+                                                                   "C/W):"),
+                                     this),
+            1, 0);
+        rThSpin = QtOwned<QDoubleSpinBox>(this);
+        rThSpin->setRange(0.01, 100.0);
+        rThSpin->setSingleStep(0.1);
+        rThSpin->setValue(2.0);
+        thermalLayout->addWidget(rThSpin, 1, 1);
+
+        thermalLayout->addWidget(QtOwned<QLabel>(QString::fromUtf8("C_th (J/\xC2\xB0"
+                                                                   "C):"),
+                                     this),
+            2, 0);
+        cThSpin = QtOwned<QDoubleSpinBox>(this);
+        cThSpin->setRange(0.1, 1000.0);
+        cThSpin->setSingleStep(0.5);
+        cThSpin->setValue(25.0);
+        thermalLayout->addWidget(cThSpin, 2, 1);
+
+        thermalLayout->addWidget(QtOwned<QLabel>(QString::fromUtf8("\xCE\xB1"
+                                                                   "_Cu (1/\xC2\xB0"
+                                                                   "C):"),
+                                     this),
+            3, 0);
+        alphaCuSpin = QtOwned<QDoubleSpinBox>(this);
+        alphaCuSpin->setRange(0.0, 0.01);
+        alphaCuSpin->setSingleStep(0.0001);
+        alphaCuSpin->setDecimals(5);
+        alphaCuSpin->setValue(0.00393);
+        thermalLayout->addWidget(alphaCuSpin, 3, 1);
+
+        thermalLayout->addWidget(QtOwned<QLabel>(QString::fromUtf8("\xCE\xB2"
+                                                                   "_Fe (1/\xC2\xB0"
+                                                                   "C):"),
+                                     this),
+            4, 0);
+        betaFeSpin = QtOwned<QDoubleSpinBox>(this);
+        betaFeSpin->setRange(-0.001, 0.001);
+        betaFeSpin->setSingleStep(0.0001);
+        betaFeSpin->setDecimals(5);
+        betaFeSpin->setValue(0.0);
+        thermalLayout->addWidget(betaFeSpin, 4, 1);
+
+        resetTempButton = QtOwned<QPushButton>("Reset Temperature", this);
+        thermalLayout->addWidget(resetTempButton, 5, 0, 1, 2);
+
+        thermalGroup->setLayout(thermalLayout);
+        configLayout->addWidget(thermalGroup);
+
+        connect(tAmbientSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double)
+            {
+                EmitThermalConfig();
+            });
+        connect(rThSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double)
+            {
+                EmitThermalConfig();
+            });
+        connect(cThSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double)
+            {
+                EmitThermalConfig();
+            });
+        connect(alphaCuSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double)
+            {
+                EmitThermalConfig();
+            });
+        connect(betaFeSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double)
+            {
+                EmitThermalConfig();
+            });
+        connect(resetTempButton, &QPushButton::clicked, this, [this]()
+            {
+                emit thermalResetRequested();
+            });
+
+        // Live Thermal
+        auto* liveThermalGroup = QtOwned<QGroupBox>("Live Thermal", this);
+        auto* liveThermalLayout = QtOwned<QGridLayout>();
+
+        liveThermalLayout->addWidget(QtOwned<QLabel>(QString::fromUtf8("T_winding (\xC2\xB0"
+                                                                       "C):"),
+                                         this),
+            0, 0);
+        tWindingLabel = QtOwned<QLabel>("---", this);
+        tWindingLabel->setAlignment(Qt::AlignRight);
+        liveThermalLayout->addWidget(tWindingLabel, 0, 1);
+
+        liveThermalLayout->addWidget(QtOwned<QLabel>(QString::fromUtf8("R(T) (\xCE\xA9):"), this), 1, 0);
+        rEffLabel = QtOwned<QLabel>("---", this);
+        rEffLabel->setAlignment(Qt::AlignRight);
+        liveThermalLayout->addWidget(rEffLabel, 1, 1);
+
+        liveThermalLayout->addWidget(QtOwned<QLabel>("L_d(T) (mH):", this), 2, 0);
+        lEffLabel = QtOwned<QLabel>("---", this);
+        lEffLabel->setAlignment(Qt::AlignRight);
+        liveThermalLayout->addWidget(lEffLabel, 2, 1);
+
+        liveThermalGroup->setLayout(liveThermalLayout);
+        configLayout->addWidget(liveThermalGroup);
+
+        // Encoder Noise
+        auto* encoderNoiseGroup = QtOwned<QGroupBox>("Encoder Noise", this);
+        auto* encoderNoiseLayout = QtOwned<QGridLayout>();
+
+        encoderNoiseLayout->addWidget(QtOwned<QLabel>("Sigma:", this), 0, 0);
+        encoderSigmaSpin = QtOwned<QDoubleSpinBox>(this);
+        encoderSigmaSpin->setRange(0.0, 1000.0);
+        encoderSigmaSpin->setSuffix(" mrad");
+        encoderSigmaSpin->setSingleStep(0.5);
+        encoderSigmaSpin->setValue(0.0);
+        encoderNoiseLayout->addWidget(encoderSigmaSpin, 0, 1);
+
+        encoderNoiseLayout->addWidget(QtOwned<QLabel>("Bias:", this), 1, 0);
+        encoderBiasSpin = QtOwned<QDoubleSpinBox>(this);
+        encoderBiasSpin->setRange(-3141.59, 3141.59);
+        encoderBiasSpin->setSuffix(" mrad");
+        encoderBiasSpin->setSingleStep(1.0);
+        encoderBiasSpin->setValue(0.0);
+        encoderNoiseLayout->addWidget(encoderBiasSpin, 1, 1);
+
+        encoderNoiseGroup->setLayout(encoderNoiseLayout);
+        configLayout->addWidget(encoderNoiseGroup);
+
+        connect(encoderSigmaSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double)
+            {
+                EmitEncoderNoiseConfig();
+            });
+        connect(encoderBiasSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double)
+            {
+                EmitEncoderNoiseConfig();
+            });
+
+        configLayout->addStretch();
+
         // Populate values
         resistanceLabel->setText(QString::number(static_cast<double>(motorParameters.R.Value()), 'g', 4) + QString::fromUtf8(" \xCE\xA9"));
-        inductanceLabel->setText(QString::number(static_cast<double>(motorParameters.Ld.Value()), 'g', 4) + " H");
+        inductanceLabel->setText(QString::number(static_cast<double>(motorParameters.Ld.Value()) * 1000.0, 'g', 4) + " mH");
         frictionLabel->setText(QString::number(static_cast<double>(motorParameters.B.Value()), 'g', 4) + QString::fromUtf8(" N\xC2\xB7m\xC2\xB7s/rad"));
         inertiaLabel->setText(QString::number(static_cast<double>(motorParameters.J.Value()), 'g', 4) + QString::fromUtf8(" kg\xC2\xB7m\xC2\xB2"));
+        polePairsLabel->setText(QString::number(static_cast<int>(motorParameters.p)));
 
         UpdatePidParameters(pidParameters);
     }
@@ -152,5 +387,72 @@ namespace simulator
             positionKiLabel->setText(QString::number(static_cast<double>(pidParameters.position->ki), 'g', 6));
             positionKdLabel->setText(QString::number(static_cast<double>(pidParameters.position->kd), 'g', 6));
         }
+    }
+
+    void ParametersPanel::UpdateResistance(foc::Ohm value)
+    {
+        resistanceLabel->setText(QString::number(static_cast<double>(value.Value()), 'g', 4) + QString::fromUtf8(" \xCE\xA9"));
+    }
+
+    void ParametersPanel::UpdateInductance(foc::MilliHenry value)
+    {
+        inductanceLabel->setText(QString::number(static_cast<double>(value.Value()), 'g', 4) + " mH");
+    }
+
+    void ParametersPanel::UpdateFriction(foc::NewtonMeterSecondPerRadian value)
+    {
+        frictionLabel->setText(QString::number(static_cast<double>(value.Value()), 'g', 4) + QString::fromUtf8(" N\xC2\xB7m\xC2\xB7s/rad"));
+    }
+
+    void ParametersPanel::UpdateInertia(foc::NewtonMeterSecondSquared value)
+    {
+        inertiaLabel->setText(QString::number(static_cast<double>(value.Value()), 'g', 4) + QString::fromUtf8(" kg\xC2\xB7m\xC2\xB2"));
+    }
+
+    void ParametersPanel::UpdatePolePairs(std::size_t value)
+    {
+        polePairsLabel->setText(QString::number(static_cast<qulonglong>(value)));
+    }
+
+    void ParametersPanel::UpdateAlignmentOffset(foc::Radians value)
+    {
+        alignmentOffsetLabel->setText(QString::number(static_cast<double>(value.Value()), 'g', 4) + " rad");
+    }
+
+    void ParametersPanel::EmitNoiseConfig()
+    {
+        ThreePhaseMotorModel::NoiseConfig c;
+        c.sigmaAmpere = static_cast<float>(sigmaSpin->value() / 1000.0);
+        c.biasAmpereA = static_cast<float>(biasASpin->value() / 1000.0);
+        c.biasAmpereB = static_cast<float>(biasBSpin->value() / 1000.0);
+        c.biasAmpereC = static_cast<float>(biasCSpin->value() / 1000.0);
+        emit noiseConfigChanged(c);
+    }
+
+    void ParametersPanel::EmitEncoderNoiseConfig()
+    {
+        ThreePhaseMotorModel::EncoderNoiseConfig c;
+        c.sigmaRadians = static_cast<float>(encoderSigmaSpin->value() / 1000.0);
+        c.biasRadians = static_cast<float>(encoderBiasSpin->value() / 1000.0);
+        emit encoderNoiseConfigChanged(c);
+    }
+
+    void ParametersPanel::EmitThermalConfig()
+    {
+        ThreePhaseMotorModel::ThermalConfig c;
+        c.ambientCelsius = static_cast<float>(tAmbientSpin->value());
+        c.thermalResistance = static_cast<float>(rThSpin->value());
+        c.thermalCapacitance = static_cast<float>(cThSpin->value());
+        c.copperTempCoeff = static_cast<float>(alphaCuSpin->value());
+        c.ironInductanceCoeff = static_cast<float>(betaFeSpin->value());
+        emit thermalConfigChanged(c);
+    }
+
+    void ParametersPanel::UpdateLiveThermal(float tempCelsius, foc::Ohm rEff, foc::Henry lEff)
+    {
+        tWindingLabel->setText(QString::number(static_cast<double>(tempCelsius), 'f', 1) + QString::fromUtf8(" \xC2\xB0"
+                                                                                                             "C"));
+        rEffLabel->setText(QString::number(static_cast<double>(rEff.Value()), 'g', 4) + QString::fromUtf8(" \xCE\xA9"));
+        lEffLabel->setText(QString::number(static_cast<double>(lEff.Value()) * 1000.0, 'g', 4) + " mH");
     }
 }

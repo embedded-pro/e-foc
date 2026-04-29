@@ -1,23 +1,14 @@
 #include "tools/simulator/view/gui/GuiSimulation.hpp"
+#include <QApplication>
 #include <cstdlib>
 #include <iostream>
 
 namespace simulator
 {
-    namespace
-    {
-        int& InitAndPassArgc(int& argc)
-        {
-            GuiSimulation::Init();
-            return argc;
-        }
-    }
-
-    GuiSimulation::GuiSimulation(int& argc, char** argv, ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
+    GuiSimulation::GuiSimulation(ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
         const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
-        const ControlPanel::SetpointConfig& setpointConfig)
-        : app(InitAndPassArgc(argc), argv)
-        , gui(model, controller, eventDispatcher, motorParameters, pidParameters, setpointConfig)
+        const ControlPanel::SetpointConfig& setpointConfig, foc::Volts powerSupplyVoltage)
+        : gui(model, controller, eventDispatcher, motorParameters, pidParameters, setpointConfig, powerSupplyVoltage)
     {
         gui.show();
 
