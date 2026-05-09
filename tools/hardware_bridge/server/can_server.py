@@ -11,6 +11,9 @@ Supported adapters:
     - SocketCAN (Linux native): interface=socketcan, channel=can0
     - PCAN (Windows/Linux):     interface=pcan, channel=PCAN_USBBUS1
     - CANable (slcan):          interface=slcan, channel=/dev/ttyACM0 or COM3
+    - CANable candleLight:      interface=gs_usb, channel=0
+    - CANable candleLight (Candle API, Windows native):
+                                interface=candle, channel=0
     - Any python-can backend:   pass the appropriate interface/channel
 """
 
@@ -23,6 +26,55 @@ from typing import Any
 import can
 
 from server_errors import HardwareUnavailableError, PortUnavailableError
+
+
+def _ensure_libusb_backend() -> None:
+    """Patch pyusb's backend discovery so gs_usb works on Windows.
+
+    pyusb searches for libusb-1.0.dll using the OS loader, which does NOT look
+    inside Python's site-packages. Both ``libusb`` (karpierz) and
+    ``libusb-package`` install the DLL there, so pyusb silently falls back to
+    "No backend available" unless we tell it the exact path.
+
+    This function is idempotent: it does nothing if pyusb can already find a
+    backend on its own.
+    """
+    try:
+        import usb.backend.libusb1 as _lb1
+    except ImportError:
+        return  # pyusb not installed — gs_usb will raise a clearer error later
+
+    if _lb1.get_backend() is not None:
+        return  # already works (e.g. system-wide libusb or Zadig WinUSB)
+
+    dll_path: str | None = None
+
+    # 1. libusb-package (pyocd) — exposes find_library()
+    try:
+        import libusb_package
+        dll_path = libusb_package.find_library("usb-1.0")
+    except ImportError:
+        pass
+
+    # 2. libusb (karpierz) — loads the DLL itself; grab its resolved path
+    if not dll_path:
+        try:
+            import libusb  # noqa: PLC0415
+            dll_path = getattr(libusb.dll, "_name", None)
+        except (ImportError, AttributeError):
+            pass
+
+    if not dll_path:
+        return  # nothing we can do; the original error will propagate
+
+    _original = _lb1.get_backend
+
+    def _patched(find_library=None):  # type: ignore[override]
+        if find_library is None:
+            find_library = lambda _: dll_path  # noqa: E731
+        return _original(find_library=find_library)
+
+    _lb1.get_backend = _patched
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +92,15 @@ def _build_bus_kwargs(
 ) -> dict[str, Any]:
     kwargs: dict[str, Any] = {
         "interface": interface,
-        "channel": channel,
         "bitrate": bitrate,
     }
+
+    if interface in ("gs_usb", "candle"):
+        kwargs["channel"] = int(channel)
+        kwargs["fd"] = False
+        kwargs["state"] = can.bus.BusState.ACTIVE
+    else:
+        kwargs["channel"] = channel
 
     if interface == "slcan":
         kwargs["ttyBaudrate"] = tty_baudrate or 115200
@@ -58,7 +116,7 @@ class CanBusOverTcpServer:
         bitrate: int,
         tcp_port: int,
         tty_baudrate: int | None = None,
-        bus_factory=can.Bus,
+        bus_factory=None,
         server_factory=asyncio.start_server,
     ):
         self.interface = interface
@@ -77,8 +135,19 @@ class CanBusOverTcpServer:
         bus_kwargs = _build_bus_kwargs(
             self.interface, self.channel, self.bitrate, self.tty_baudrate
         )
+        if self._bus_factory is not None:
+            factory = self._bus_factory
+        elif self.interface == "candle":
+            from candle_bus import CandleBus
+            factory = CandleBus
+        else:
+            factory = can.Bus
+
+        if self.interface == "gs_usb":
+            _ensure_libusb_backend()
+
         try:
-            self._bus = self._bus_factory(**bus_kwargs)
+            self._bus = factory(**bus_kwargs)
         except Exception as exc:
             raise HardwareUnavailableError(
                 f"Cannot open CAN bus {self.interface}:{self.channel}: {exc}"

@@ -18,6 +18,12 @@ Usage examples:
     # CAN with CANable (slcan) on Windows
     python bridge_server.py --can-interface slcan --can-channel COM3
 
+    # CAN with CANable (gs_usb / candleLight) on Windows/Linux
+    python bridge_server.py --can-interface gs_usb --can-channel 0
+
+    # CAN with CANable (Candle API, no WinUSB driver swap needed, Windows)
+    python bridge_server.py --can-interface candle --can-channel 0
+
     # Both serial and CAN (SocketCAN on Linux)
     python bridge_server.py \\
         --serial-port /dev/ttyACM0 --serial-baudrate 921600 \\
@@ -57,7 +63,7 @@ def parse_args() -> argparse.Namespace:
     can_group = parser.add_argument_group("CAN bus")
     can_group.add_argument(
         "--can-interface",
-        help="python-can interface type (e.g. socketcan, pcan, slcan). Omit to disable.",
+        help="python-can interface type (e.g. socketcan, pcan, slcan, gs_usb, candle). Omit to disable.",
     )
     can_group.add_argument(
         "--can-channel",
@@ -65,7 +71,7 @@ def parse_args() -> argparse.Namespace:
         help="CAN channel (e.g. can0, PCAN_USBBUS1, /dev/ttyACM0, COM3). Required when --can-interface is set.",
     )
     can_group.add_argument(
-        "--can-bitrate", type=int, default=500000, help="CAN bitrate (default: 500000)"
+        "--can-bitrate", type=int, default=125000, help="CAN bitrate (default: 125000)"
     )
     can_group.add_argument(
         "--can-tty-baudrate",
@@ -99,8 +105,11 @@ async def main() -> None:
         sys.exit(1)
 
     if args.can_interface is not None and args.can_channel is None:
-        logger.error("--can-channel is required when --can-interface is specified.")
-        sys.exit(1)
+        if args.can_interface in ("gs_usb", "candle"):
+            args.can_channel = "0"
+        else:
+            logger.error("--can-channel is required when --can-interface is specified.")
+            sys.exit(1)
 
     servers: list[SerialOverTcpServer | CanBusOverTcpServer] = []
 

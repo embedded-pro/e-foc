@@ -14,11 +14,12 @@ sys.path.insert(0, str(SERVER_DIR))
 
 
 class FakeCanMessage:
-    def __init__(self, arbitration_id, is_extended_id=False, dlc=0, data=b""):
+    def __init__(self, arbitration_id, is_extended_id=False, dlc=0, data=b"", is_remote_frame=False):
         self.arbitration_id = arbitration_id
         self.is_extended_id = is_extended_id
         self.dlc = dlc
         self.data = bytes(data)
+        self.is_remote_frame = is_remote_frame
 
 
 fake_serial_module = types.ModuleType("serial")
@@ -31,8 +32,15 @@ fake_can_module.BusABC = object
 fake_can_module.Bus = mock.Mock(name="Bus")
 sys.modules["can"] = fake_can_module
 
+# Stub out candle_driver so CandleBus can be imported without the real library.
+fake_candle_driver_module = types.ModuleType("candle_driver")
+fake_candle_driver_module.CANDLE_ID_EXTENDED = 0x80000000
+fake_candle_driver_module.list_devices = mock.Mock(return_value=[])
+sys.modules["candle_driver"] = fake_candle_driver_module
+
 import bridge_server
 import can_server
+import candle_bus
 import serial_server
 from server_errors import BridgeServerError, PortUnavailableError
 
@@ -366,6 +374,142 @@ class TestCanServerBadWeather(unittest.IsolatedAsyncioTestCase):
         self.assertIs(server._writer, active_writer)
         self.assertFalse(active_writer.closed)
 
+    def test_build_bus_kwargs_gs_usb_converts_channel_to_int(self):
+        kwargs = can_server._build_bus_kwargs("gs_usb", "0", 500000)
+
+        self.assertEqual(kwargs["interface"], "gs_usb")
+        self.assertEqual(kwargs["bitrate"], 500000)
+        self.assertIsInstance(kwargs["channel"], int)
+        self.assertEqual(kwargs["channel"], 0)
+        self.assertNotIn("ttyBaudrate", kwargs)
+
+    def test_build_bus_kwargs_gs_usb_non_zero_index(self):
+        kwargs = can_server._build_bus_kwargs("gs_usb", "1", 1000000)
+
+        self.assertIsInstance(kwargs["channel"], int)
+        self.assertEqual(kwargs["channel"], 1)
+
+    def test_build_bus_kwargs_candle_converts_channel_to_int(self):
+        kwargs = can_server._build_bus_kwargs("candle", "0", 500000)
+
+        self.assertEqual(kwargs["interface"], "candle")
+        self.assertEqual(kwargs["bitrate"], 500000)
+        self.assertIsInstance(kwargs["channel"], int)
+        self.assertEqual(kwargs["channel"], 0)
+        self.assertNotIn("ttyBaudrate", kwargs)
+
+    def test_build_bus_kwargs_candle_non_zero_index(self):
+        kwargs = can_server._build_bus_kwargs("candle", "1", 1000000)
+
+        self.assertIsInstance(kwargs["channel"], int)
+        self.assertEqual(kwargs["channel"], 1)
+
+
+class TestCandleBus(unittest.TestCase):
+    def _make_fake_device(self, read_result=None, read_exception=None):
+        fake_ch = mock.Mock()
+        if read_exception is not None:
+            fake_ch.read.side_effect = read_exception
+        else:
+            fake_ch.read.return_value = read_result
+        fake_device = mock.Mock()
+        fake_device.channel.return_value = fake_ch
+        return fake_device, fake_ch
+
+    def _patch_devices(self, devices):
+        return mock.patch.object(
+            fake_candle_driver_module, "list_devices", return_value=devices
+        )
+
+    def test_no_devices_raises_runtime_error(self):
+        with self._patch_devices([]):
+            with self.assertRaises(RuntimeError, msg="No Candle USB devices found"):
+                candle_bus.CandleBus(channel=0, bitrate=500000)
+
+    def test_channel_out_of_range_raises_runtime_error(self):
+        device, _ = self._make_fake_device(read_exception=TimeoutError)
+        with self._patch_devices([device]):
+            with self.assertRaises(RuntimeError):
+                candle_bus.CandleBus(channel=1, bitrate=500000)
+
+    def test_recv_timeout_returns_none(self):
+        device, ch = self._make_fake_device(read_exception=TimeoutError)
+        with self._patch_devices([device]):
+            bus = candle_bus.CandleBus(channel=0, bitrate=500000)
+
+        ch.read.side_effect = TimeoutError
+        result = bus.recv(timeout=0.05)
+
+        self.assertIsNone(result)
+
+    def test_recv_returns_can_message(self):
+        frame = (0, 0x123, b"\xAB\xCD", False, 0)
+        device, ch = self._make_fake_device(read_result=frame)
+        with self._patch_devices([device]):
+            bus = candle_bus.CandleBus(channel=0, bitrate=500000)
+
+        ch.read.return_value = frame
+        msg = bus.recv(timeout=0.1)
+
+        self.assertIsNotNone(msg)
+        self.assertEqual(msg.arbitration_id, 0x123)
+        self.assertFalse(msg.is_extended_id)
+        self.assertEqual(msg.dlc, 2)
+        self.assertEqual(msg.data, b"\xAB\xCD")
+
+    def test_recv_extended_frame(self):
+        frame = (0, 0x1FFFF, b"\x01", True, 0)
+        device, ch = self._make_fake_device(read_result=frame)
+        with self._patch_devices([device]):
+            bus = candle_bus.CandleBus(channel=0, bitrate=500000)
+
+        ch.read.return_value = frame
+        msg = bus.recv(timeout=0.1)
+
+        self.assertTrue(msg.is_extended_id)
+        self.assertEqual(msg.arbitration_id, 0x1FFFF)
+
+    def test_send_standard_frame(self):
+        device, ch = self._make_fake_device(read_exception=TimeoutError)
+        with self._patch_devices([device]):
+            bus = candle_bus.CandleBus(channel=0, bitrate=500000)
+
+        msg = FakeCanMessage(0x100, is_extended_id=False, dlc=2, data=b"\x01\x02")
+        bus.send(msg)
+
+        ch.write.assert_called_once_with(0x100, b"\x01\x02")
+
+    def test_send_extended_frame_sets_extended_flag(self):
+        device, ch = self._make_fake_device(read_exception=TimeoutError)
+        with self._patch_devices([device]):
+            bus = candle_bus.CandleBus(channel=0, bitrate=500000)
+
+        msg = FakeCanMessage(0x1FFFF, is_extended_id=True, dlc=1, data=b"\xAA")
+        bus.send(msg)
+
+        expected_id = 0x1FFFF | 0x80000000
+        ch.write.assert_called_once_with(expected_id, b"\xAA")
+
+    def test_shutdown_stops_channel_and_closes_device(self):
+        device, ch = self._make_fake_device(read_exception=TimeoutError)
+        with self._patch_devices([device]):
+            bus = candle_bus.CandleBus(channel=0, bitrate=500000)
+
+        bus.shutdown()
+
+        ch.stop.assert_called_once()
+        device.close.assert_called_once()
+
+    def test_shutdown_tolerates_errors(self):
+        device, ch = self._make_fake_device(read_exception=TimeoutError)
+        ch.stop.side_effect = OSError("gone")
+        device.close.side_effect = OSError("gone")
+        with self._patch_devices([device]):
+            bus = candle_bus.CandleBus(channel=0, bitrate=500000)
+
+        # Should not raise
+        bus.shutdown()
+
 
 class TestBridgeServerStartup(unittest.IsolatedAsyncioTestCase):
     async def test_startup_failure_stops_already_started_servers(self):
@@ -453,6 +597,70 @@ class TestBridgeServerStartup(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(exit_context.exception.code, 1)
         self.assertEqual(stopped, ["serial"])
         self.assertIn("Unexpected bridge server startup failure", "\n".join(logs.output))
+
+    async def test_gs_usb_defaults_channel_to_zero_when_omitted(self):
+        captured = {}
+
+        class CapturingCanServer:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+            async def start(self):
+                raise BridgeServerError("stop early")
+
+            async def stop(self):
+                pass
+
+        args = argparse.Namespace(
+            serial_port=None,
+            can_interface="gs_usb",
+            can_channel=None,
+            can_bitrate=500000,
+            can_tcp_port=5001,
+            can_tty_baudrate=115200,
+            log_level="ERROR",
+        )
+
+        with mock.patch.object(bridge_server, "parse_args", return_value=args), \
+            mock.patch.object(bridge_server, "CanBusOverTcpServer", CapturingCanServer), \
+            self.assertLogs(bridge_server.logger, level="ERROR"), \
+            self.assertRaises(SystemExit):
+            await bridge_server.main()
+
+        self.assertEqual(captured["channel"], "0")
+        self.assertIsNone(captured["tty_baudrate"])
+
+    async def test_candle_defaults_channel_to_zero_when_omitted(self):
+        captured = {}
+
+        class CapturingCanServer:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+            async def start(self):
+                raise BridgeServerError("stop early")
+
+            async def stop(self):
+                pass
+
+        args = argparse.Namespace(
+            serial_port=None,
+            can_interface="candle",
+            can_channel=None,
+            can_bitrate=500000,
+            can_tcp_port=5001,
+            can_tty_baudrate=115200,
+            log_level="ERROR",
+        )
+
+        with mock.patch.object(bridge_server, "parse_args", return_value=args), \
+            mock.patch.object(bridge_server, "CanBusOverTcpServer", CapturingCanServer), \
+            self.assertLogs(bridge_server.logger, level="ERROR"), \
+            self.assertRaises(SystemExit):
+            await bridge_server.main()
+
+        self.assertEqual(captured["channel"], "0")
+        self.assertIsNone(captured["tty_baudrate"])
 
 
 if __name__ == "__main__":
