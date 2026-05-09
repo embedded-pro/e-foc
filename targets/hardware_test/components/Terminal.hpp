@@ -3,8 +3,6 @@
 #include "core/foc/implementations/FocSpeedImpl.hpp"
 #include "core/foc/interfaces/Driver.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
-#include "foc/implementations/FocTorqueImpl.hpp"
-#include "hal/interfaces/AdcMultiChannel.hpp"
 #include "hal/interfaces/Eeprom.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/util/BoundedDeque.hpp"

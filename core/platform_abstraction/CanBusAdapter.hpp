@@ -21,6 +21,12 @@ namespace application
             errorWarning,
             messageLost,
             rxBufferOverflow,
+            ackError,
+            stuffError,
+            formError,
+            crcError,
+            bit0Error,
+            bit1Error,
             other,
         };
 
@@ -45,6 +51,24 @@ namespace application
                     break;
                 case rxBufferOverflow:
                     stream << "rx buffer overflow";
+                    break;
+                case ackError:
+                    stream << "ack error";
+                    break;
+                case stuffError:
+                    stream << "stuff error";
+                    break;
+                case formError:
+                    stream << "form error";
+                    break;
+                case crcError:
+                    stream << "crc error";
+                    break;
+                case bit0Error:
+                    stream << "bit0 error";
+                    break;
+                case bit1Error:
+                    stream << "bit1 error";
                     break;
                 default:
                     stream << "unknown";

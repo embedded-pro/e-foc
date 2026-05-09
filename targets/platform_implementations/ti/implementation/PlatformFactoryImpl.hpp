@@ -161,6 +161,18 @@ namespace application
                     return CanBusAdapter::CanError::errorWarning;
                 case hal::tiva::Can::Error::messageLost:
                     return CanBusAdapter::CanError::messageLost;
+                case hal::tiva::Can::Error::ackError:
+                    return CanBusAdapter::CanError::ackError;
+                case hal::tiva::Can::Error::stuffError:
+                    return CanBusAdapter::CanError::stuffError;
+                case hal::tiva::Can::Error::formError:
+                    return CanBusAdapter::CanError::formError;
+                case hal::tiva::Can::Error::crcError:
+                    return CanBusAdapter::CanError::crcError;
+                case hal::tiva::Can::Error::bit0Error:
+                    return CanBusAdapter::CanError::bit0Error;
+                case hal::tiva::Can::Error::bit1Error:
+                    return CanBusAdapter::CanError::bit1Error;
                 default:
                     return CanBusAdapter::CanError::other;
             }
@@ -176,7 +188,7 @@ namespace application
                     {
                         static_cast<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<32>>&>(*object).InvokeErrorHandler(ToAdapterError(error));
                     };
-                    canConfig.bitRate = bitRate;
+                    canConfig.timing = hal::tiva::Can::BitRate{ bitRate };
                     canConfig.testMode = testMode;
 
                     object.emplace(Peripheral::CanIndex, Pins::canRx, Pins::canTx, canConfig, infra::Function<void(hal::tiva::Can::Error)>(onError));
