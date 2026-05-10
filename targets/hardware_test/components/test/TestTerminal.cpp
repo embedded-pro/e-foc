@@ -150,6 +150,7 @@ namespace
             EXPECT_CALL(encoderCreator, Destructed()).Times(1);
             EXPECT_CALL(pwmCreator, Destructed()).Times(testing::AtLeast(1));
             EXPECT_CALL(adcCreator, Destructed()).Times(testing::AtLeast(1));
+            EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
         }
 
         testing::StrictMock<PlatformFactoryMock> platformFactoryMock;
@@ -1256,7 +1257,7 @@ TEST_F(TestHardwareTerminal, can_start_invalid_bitrate)
 
             std::string newline{ "\r\n" };
             std::string header{ "ERROR: " };
-            std::string payload{ "invalid bitrate. It should be between 125000 and 1000000." };
+            std::string payload{ "invalid bitrate. It should be between 100000 and 1000000." };
 
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
