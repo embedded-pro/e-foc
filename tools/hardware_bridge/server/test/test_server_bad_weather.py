@@ -26,11 +26,18 @@ fake_serial_module = types.ModuleType("serial")
 fake_serial_module.Serial = mock.Mock(name="Serial")
 sys.modules["serial"] = fake_serial_module
 
+fake_can_bus_module = types.ModuleType("can.bus")
+fake_can_bus_state = mock.Mock(name="BusState")
+fake_can_bus_state.ACTIVE = mock.sentinel.BUS_STATE_ACTIVE
+fake_can_bus_module.BusState = fake_can_bus_state
+
 fake_can_module = types.ModuleType("can")
 fake_can_module.Message = FakeCanMessage
 fake_can_module.BusABC = object
 fake_can_module.Bus = mock.Mock(name="Bus")
+fake_can_module.bus = fake_can_bus_module
 sys.modules["can"] = fake_can_module
+sys.modules["can.bus"] = fake_can_bus_module
 
 # Stub out candle_driver so CandleBus can be imported without the real library.
 fake_candle_driver_module = types.ModuleType("candle_driver")
