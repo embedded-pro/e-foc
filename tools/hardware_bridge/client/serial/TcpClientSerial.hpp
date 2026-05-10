@@ -15,6 +15,7 @@ namespace tool
     {
     public:
         TcpClientSerial(services::ConnectionFactory& factory, services::IPAddress address, uint16_t port);
+        ~TcpClientSerial() override;
 
         void SendData(infra::ConstByteRange data, infra::Function<void()> actionOnCompletion) override;
         void ReceiveData(infra::Function<void(infra::ConstByteRange data)> dataReceived) override;

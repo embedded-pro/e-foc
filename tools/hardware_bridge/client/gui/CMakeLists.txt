@@ -6,13 +6,17 @@ target_include_directories(e_foc.tool.hardware_bridge.gui PUBLIC
 )
 
 target_link_libraries(e_foc.tool.hardware_bridge.gui PUBLIC
+    Qt6::Network
     Qt6::Widgets
     e_foc.tool.hardware_bridge.serial_client
     e_foc.tool.hardware_bridge.can_client
+    e_foc.tool.hardware_bridge.terminal
     services.network_instantiations
 )
 
 target_sources(e_foc.tool.hardware_bridge.gui PRIVATE
+    AnsiTerminalWidget.hpp
+    AnsiTerminalWidget.cpp
     BridgeController.hpp
     BridgeController.cpp
     BridgeWindow.hpp

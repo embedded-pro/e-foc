@@ -100,7 +100,8 @@ e-foc/
 │       └── ti/                      # TI Tiva C platform implementation
 ├── tools/                           # Host-side developer tools
 │   ├── simulator/                   # C++ motor simulators (torque, speed, position control)
-│   └── can_commander/               # CAN bus command interface tool
+│   ├── can_commander/               # CAN bus command interface tool
+│   └── hardware_bridge/             # Terminal/CAN/serial bridge client and Python server
 ├── infra/                           # Infrastructure submodules
 │   ├── embedded-infra-lib/          # Bounded containers, build helpers, toolchain CMake
 │   ├── numerical-toolbox/           # PID, filters, fixed-point algorithms
@@ -239,28 +240,8 @@ Run with custom parameters (example):
 | [embedded-infra-lib](infra/embedded-infra-lib/README.md)        | Bounded containers and infrastructure library reference   |
 | [numerical-toolbox](infra/numerical-toolbox/README.md)          | Reusable numerical algorithms (PID, filters, fixed-point) |
 
-## Contributing
-
-We welcome contributions! Please follow these guidelines:
-
-### Development Workflow
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Follow the coding standards in [copilot-instructions.md](/.github/copilot-instructions.md).
-4. Ensure all tests pass
-5. Update CHANGELOG.md according to release-please conventions
-6. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-7. Push to the branch (`git push origin feature/AmazingFeature`)
-8. Open a Pull Request
-
-### Critical Guidelines
-- **NO heap allocation** (`new`, `delete`, `malloc`, `free`)
-- **NO standard containers** (use `infra::Bounded*` alternatives)
-- Use fixed-size types (`uint8_t`, `int32_t`, etc.)
-- Mark all non-mutating methods as `const`
-- Write unit tests for new functionality
-- Follow `.clang-format` rules for code formatting
-
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the e-foc Non-Commercial License. Commercial use is not permitted without prior written permission from the project owner. See the [LICENSE](LICENSE) file for details.
+
+Third-party components and submodules keep their own license terms as documented in their respective directories.

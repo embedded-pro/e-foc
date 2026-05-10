@@ -18,6 +18,12 @@ Usage examples:
     # CAN with CANable (slcan) on Windows
     python bridge_server.py --can-interface slcan --can-channel COM3
 
+    # CAN with CANable (gs_usb / candleLight) on Windows/Linux
+    python bridge_server.py --can-interface gs_usb --can-channel 0
+
+    # CAN with CANable (Candle API, no WinUSB driver swap needed, Windows)
+    python bridge_server.py --can-interface candle --can-channel 0
+
     # Both serial and CAN (SocketCAN on Linux)
     python bridge_server.py \\
         --serial-port /dev/ttyACM0 --serial-baudrate 921600 \\
@@ -32,6 +38,7 @@ import sys
 
 from serial_server import SerialOverTcpServer
 from can_server import CanBusOverTcpServer
+from server_errors import BridgeServerError
 
 logger = logging.getLogger(__name__)
 
@@ -56,15 +63,15 @@ def parse_args() -> argparse.Namespace:
     can_group = parser.add_argument_group("CAN bus")
     can_group.add_argument(
         "--can-interface",
-        help="python-can interface type (e.g. socketcan, pcan, slcan). Omit to disable.",
+        help="python-can interface type (e.g. socketcan, pcan, slcan, gs_usb, candle). Omit to disable.",
     )
     can_group.add_argument(
         "--can-channel",
-        default="can0",
-        help="CAN channel (e.g. can0, PCAN_USBBUS1, /dev/ttyACM0, COM3). Default: can0",
+        default=None,
+        help="CAN channel (e.g. can0, PCAN_USBBUS1, /dev/ttyACM0, COM3). Required when --can-interface is set.",
     )
     can_group.add_argument(
-        "--can-bitrate", type=int, default=500000, help="CAN bitrate (default: 500000)"
+        "--can-bitrate", type=int, default=125000, help="CAN bitrate (default: 125000)"
     )
     can_group.add_argument(
         "--can-tty-baudrate",
@@ -97,27 +104,45 @@ async def main() -> None:
         logger.error("At least one of --serial-port or --can-interface must be specified.")
         sys.exit(1)
 
+    if args.can_interface is not None and args.can_channel is None:
+        if args.can_interface in ("gs_usb", "candle"):
+            args.can_channel = "0"
+        else:
+            logger.error("--can-channel is required when --can-interface is specified.")
+            sys.exit(1)
+
     servers: list[SerialOverTcpServer | CanBusOverTcpServer] = []
 
-    if args.serial_port is not None:
-        serial_srv = SerialOverTcpServer(
-            serial_port=args.serial_port,
-            baudrate=args.serial_baudrate,
-            tcp_port=args.serial_tcp_port,
-        )
-        await serial_srv.start()
-        servers.append(serial_srv)
+    try:
+        if args.serial_port is not None:
+            serial_srv = SerialOverTcpServer(
+                serial_port=args.serial_port,
+                baudrate=args.serial_baudrate,
+                tcp_port=args.serial_tcp_port,
+            )
+            await serial_srv.start()
+            servers.append(serial_srv)
 
-    if args.can_interface is not None:
-        can_srv = CanBusOverTcpServer(
-            interface=args.can_interface,
-            channel=args.can_channel,
-            bitrate=args.can_bitrate,
-            tcp_port=args.can_tcp_port,
-            tty_baudrate=args.can_tty_baudrate if args.can_interface == "slcan" else None,
-        )
-        await can_srv.start()
-        servers.append(can_srv)
+        if args.can_interface is not None:
+            can_srv = CanBusOverTcpServer(
+                interface=args.can_interface,
+                channel=args.can_channel,
+                bitrate=args.can_bitrate,
+                tcp_port=args.can_tcp_port,
+                tty_baudrate=args.can_tty_baudrate if args.can_interface == "slcan" else None,
+            )
+            await can_srv.start()
+            servers.append(can_srv)
+    except BridgeServerError as exc:
+        logger.error("Bridge server startup failed: %s", exc)
+        for srv in reversed(servers):
+            await srv.stop()
+        sys.exit(1)
+    except Exception:
+        logger.exception("Unexpected bridge server startup failure")
+        for srv in reversed(servers):
+            await srv.stop()
+        sys.exit(1)
 
     logger.info("Bridge server running. Press Ctrl+C to stop.")
 

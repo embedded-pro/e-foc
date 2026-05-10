@@ -4,13 +4,13 @@
 #include "infra/stream/StringInputStream.hpp"
 #include "infra/stream/StringOutputStream.hpp"
 #include "infra/util/BoundedString.hpp"
+#include "infra/util/Function.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
 #include <algorithm>
 #include <chrono>
 #include <numbers>
 #include <optional>
-#include <ranges>
 
 namespace
 {
@@ -136,7 +136,7 @@ namespace application
                 this->terminal.ProcessResult(SetMotorParameters(param));
             } });
 
-        terminal.AddCommand({ { "can_start", "cs", "Start CAN bus [bitrate [125000;1000000]] [test]. Ex: can_start 500000" },
+        terminal.AddCommand({ { "can_start", "cs", "Start CAN bus [bitrate [100000;1000000]] [test]. Ex: can_start 500000" },
             [this](const infra::BoundedConstString& param)
             {
                 this->terminal.ProcessResult(CanStart(param));
@@ -424,9 +424,9 @@ namespace application
         if (tokenizer.Size() < 1 || tokenizer.Size() > 2)
             return { error, "invalid number of arguments" };
 
-        auto bitRate = ParseInput<uint32_t>(tokenizer.Token(0), 125000, 1000000);
+        auto bitRate = ParseInput<uint32_t>(tokenizer.Token(0), 100000, 1000000);
         if (!bitRate.has_value())
-            return { error, "invalid bitrate. It should be between 125000 and 1000000." };
+            return { error, "invalid bitrate. It should be between 100000 and 1000000." };
 
         bool testMode = false;
         if (tokenizer.Size() == 2)

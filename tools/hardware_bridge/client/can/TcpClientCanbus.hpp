@@ -15,6 +15,7 @@ namespace tool
     {
     public:
         TcpClientCanbus(services::ConnectionFactory& factory, services::IPAddress address, uint16_t port);
+        ~TcpClientCanbus() override;
 
         void SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion) override;
         void ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction) override;

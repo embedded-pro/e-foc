@@ -30,13 +30,13 @@ namespace tool
 
         void Connect(const QString& host, quint16 serialPort, quint16 canPort);
         void Disconnect();
-        void SendSerial(const QString& text);
+        void SendSerial(const QByteArray& data);
         void SendCan(quint32 id, bool extended, const QByteArray& data);
 
     signals:
         void SerialConnected();
         void SerialDisconnected();
-        void SerialDataReceived(QString text);
+        void SerialDataReceived(QByteArray data);
         void CanConnected();
         void CanDisconnected();
         void CanFrameReceived(quint32 id, bool extended, QByteArray data);

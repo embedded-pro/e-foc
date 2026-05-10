@@ -2,10 +2,34 @@
 #include "infra/event/EventDispatcher.hpp"
 #include "tools/hardware_bridge/client/common/BridgeException.hpp"
 #include "tools/hardware_bridge/client/common/ParseIPv4.hpp"
+#include <QAbstractSocket>
+#include <QHostAddress>
+#include <QHostInfo>
 #include <QMetaObject>
 #include <cassert>
-#include <cstdio>
-#include <cstring>
+
+namespace
+{
+    std::string ResolveToIPv4(const std::string& host)
+    {
+        const QString hostName = QString::fromStdString(host);
+        QHostAddress directAddress;
+        if (directAddress.setAddress(hostName) && directAddress.protocol() == QAbstractSocket::IPv4Protocol)
+            return directAddress.toString().toStdString();
+
+        const QHostInfo hostInfo = QHostInfo::fromName(hostName);
+        if (hostInfo.error() == QHostInfo::NoError)
+        {
+            for (const QHostAddress& address : hostInfo.addresses())
+            {
+                if (address.protocol() == QAbstractSocket::IPv4Protocol)
+                    return address.toString().toStdString();
+            }
+        }
+
+        throw tool::BridgeArgumentException("cannot resolve host: " + host);
+    }
+}
 
 namespace tool
 {
@@ -82,7 +106,7 @@ namespace tool
             {
                 try
                 {
-                    const services::IPv4Address address = tool::ParseIPv4(hostStr);
+                    const services::IPv4Address address = tool::ParseIPv4(ResolveToIPv4(hostStr));
 
                     network.emplace();
 
@@ -90,12 +114,12 @@ namespace tool
                     serialObserver.emplace(*this, *serialClient);
                     serialClient->ReceiveData([this](infra::ConstByteRange data)
                         {
-                            const QString text = QString::fromLatin1(
+                            const QByteArray bytes(
                                 reinterpret_cast<const char*>(data.begin()),
                                 static_cast<int>(data.size()));
-                            QMetaObject::invokeMethod(this, [this, text]()
+                            QMetaObject::invokeMethod(this, [this, bytes]()
                                 {
-                                    emit SerialDataReceived(text);
+                                    emit SerialDataReceived(bytes);
                                 },
                                 Qt::QueuedConnection);
                         });
@@ -155,14 +179,14 @@ namespace tool
         stopRequested = false;
     }
 
-    void BridgeController::SendSerial(const QString& text)
+    void BridgeController::SendSerial(const QByteArray& data)
     {
         if (!serialClient)
             return;
 
         {
             std::lock_guard<std::mutex> lock(sendMutex);
-            pendingSerialSend = text.toStdString();
+            pendingSerialSend.assign(data.constData(), data.constData() + data.size());
         }
 
         infra::EventDispatcher::Instance().Schedule([this]()
