@@ -24,6 +24,8 @@ namespace hil
         bool SendCommand(const std::string& command,
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 500 });
 
+        bool DrainLines(std::chrono::milliseconds timeout);
+
         // Last non-empty response line received from the target.
         std::string lastResponse;
 

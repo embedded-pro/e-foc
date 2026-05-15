@@ -123,4 +123,41 @@ namespace hil
 
         return !allLines.empty();
     }
+
+    bool HilFixture::DrainLines(std::chrono::milliseconds timeout)
+    {
+        lastResponse.clear();
+        allLines.clear();
+
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        std::string buffer;
+        char ch{ 0 };
+
+        while (std::chrono::steady_clock::now() < deadline)
+        {
+            const auto n = ::read(serialFd, &ch, 1);
+            if (n > 0)
+            {
+                if (ch == '\n')
+                {
+                    if (!buffer.empty() && buffer.back() == '\r')
+                    {
+                        buffer.pop_back();
+                    }
+                    if (!buffer.empty())
+                    {
+                        allLines.push_back(buffer);
+                        lastResponse = buffer;
+                    }
+                    buffer.clear();
+                }
+                else
+                {
+                    buffer += ch;
+                }
+            }
+        }
+
+        return !allLines.empty();
+    }
 }

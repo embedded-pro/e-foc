@@ -9,13 +9,11 @@ using namespace hil;
 WHEN(R"(the reset command is sent to the hardware target)")
 {
     auto& fixture = context.Get<HilFixture>();
-    // Command triggers an immediate reset — no response will arrive
     fixture.SendCommand("reset", std::chrono::milliseconds{ 200 });
 }
 
 WHEN(R"(the hardware target reconnects after reset)")
 {
-    // Wait for the firmware to reboot and re-initialize the UART
     std::this_thread::sleep_for(std::chrono::milliseconds{ 3000 });
     auto& fixture = context.Get<HilFixture>();
     ASSERT_TRUE(fixture.SendCommand("help", std::chrono::milliseconds{ 1000 }))

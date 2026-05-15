@@ -9,7 +9,6 @@ using namespace hil;
 WHEN(R"(the force_hardfault command is sent to the hardware target)")
 {
     auto& fixture = context.Get<HilFixture>();
-    // Command causes a crash — ignore the return; no response will arrive
     fixture.SendCommand("force_hardfault", std::chrono::milliseconds{ 200 });
 }
 

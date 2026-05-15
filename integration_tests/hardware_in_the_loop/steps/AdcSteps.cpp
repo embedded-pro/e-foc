@@ -8,7 +8,6 @@ using namespace hil;
 WHEN(R"(the ADC phase current measurement is requested)")
 {
     auto& fixture = context.Get<HilFixture>();
-    // Firmware command: 'adc <sample_and_hold>' where sample_and_hold is short/medium/long.
     ASSERT_TRUE(fixture.SendCommand("adc short")) << "ADC command did not receive a response";
 }
 
@@ -17,9 +16,6 @@ THEN(R"(the measured phase currents shall be within the idle current range)")
     const auto& response = context.Get<HilFixture>().lastResponse;
     ASSERT_FALSE(response.empty()) << "No ADC measurement response received";
 
-    // The 'adc short' response contains three raw ADC counts on one line.
-    // At idle with no current flowing, all three channels shall read near zero.
-    // Accept counts in [0, 4095] (12-bit ADC); refine per board scaling when known.
     std::istringstream ss{ response };
     int ch0{ -1 }, ch1{ -1 }, ch2{ -1 };
     ss >> ch0 >> ch1 >> ch2;
