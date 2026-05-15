@@ -1,25 +1,57 @@
 #include "cucumber_cpp/Steps.hpp"
+#include "hal/interfaces/Can.hpp"
 #include "integration_tests/hardware_in_the_loop/support/HilFixture.hpp"
+#include <array>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <gtest/gtest.h>
 
 using namespace hil;
+
+namespace
+{
+    constexpr uint32_t expectedCanId{ 256 };
+    constexpr std::array<uint8_t, 3> expectedCanPayload{ 0x01, 0x02, 0x03 };
+}
 
 WHEN(R"(a CAN command is transmitted to the hardware target)")
 {
     auto& fixture = context.Get<HilFixture>();
 
+    fixture.StartCanCapture();
+
     ASSERT_TRUE(fixture.SendCommand("can_start 500000"))
         << "can_start command did not receive a response";
 
+    fixture.MarkCanReference();
     ASSERT_TRUE(fixture.SendCommand("can_send 256 1 2 3", std::chrono::milliseconds{ 100 }))
         << "can_send command did not receive a response within 100 ms";
+
+    ASSERT_FALSE(fixture.lastResponse.empty())
+        << "CLI did not acknowledge can_send";
 }
 
 THEN(R"(a CAN response frame shall be received within 10 milliseconds)")
 {
-    const auto& fixture = context.Get<HilFixture>();
-    ASSERT_FALSE(fixture.lastResponse.empty()) << "No CAN response received after can_send";
-    EXPECT_LE(fixture.lastCommandDuration.count(), 10)
-        << "CAN response latency " << fixture.lastCommandDuration.count()
+    auto& fixture = context.Get<HilFixture>();
+
+    hal::Can::Message payload;
+    std::chrono::milliseconds elapsed{ 0 };
+    const auto expectedId = hal::Can::Id::Create11BitId(expectedCanId);
+
+    ASSERT_TRUE(fixture.WaitForCanFrame(expectedId, payload,
+        std::chrono::milliseconds{ 10 }, elapsed))
+        << "No CAN frame with id 0x" << std::hex << expectedCanId
+        << " observed on the bus within 10 ms";
+
+    ASSERT_EQ(payload.size(), expectedCanPayload.size())
+        << "CAN frame payload length mismatch";
+    for (std::size_t i = 0; i < expectedCanPayload.size(); ++i)
+        EXPECT_EQ(payload[i], expectedCanPayload[i])
+            << "CAN payload byte " << i << " mismatch";
+
+    EXPECT_LE(elapsed.count(), 10)
+        << "CAN response latency " << elapsed.count()
         << " ms exceeds the 10 ms budget (REQ-HIL-006)";
 }

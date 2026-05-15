@@ -119,7 +119,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_COMPILE_WARNING_AS_ERROR=On
           -DE_FOC_TARGET_PLATFORM=Host
-          -DE_FOC_BUILD_SIMULATOR=On
+
           -DE_FOC_BUILD_TESTS=Off
           -DNUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS=Off
       - name: Build
