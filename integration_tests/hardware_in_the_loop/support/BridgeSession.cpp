@@ -1,6 +1,9 @@
 #include "integration_tests/hardware_in_the_loop/support/BridgeSession.hpp"
 #include "tools/hardware_bridge/client/common/ParseIPv4.hpp"
+#include <arpa/inet.h>
 #include <chrono>
+#include <cstring>
+#include <netdb.h>
 #include <stdexcept>
 
 namespace hil
@@ -10,6 +13,37 @@ namespace hil
         std::chrono::milliseconds ToMilliseconds(std::chrono::steady_clock::duration d)
         {
             return std::chrono::duration_cast<std::chrono::milliseconds>(d);
+        }
+
+        services::IPv4Address ResolveHost(const std::string& host)
+        {
+            try
+            {
+                return tool::ParseIPv4(host);
+            }
+            catch (...)
+            {
+            }
+
+            addrinfo hints{};
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = SOCK_STREAM;
+
+            addrinfo* result = nullptr;
+            const int rc = ::getaddrinfo(host.c_str(), nullptr, &hints, &result);
+            if (rc != 0 || result == nullptr)
+                throw std::runtime_error{ "BridgeSession: cannot resolve host '" + host + "': " + ::gai_strerror(rc) };
+
+            const auto* in = reinterpret_cast<const sockaddr_in*>(result->ai_addr);
+            const uint32_t addr = ntohl(in->sin_addr.s_addr);
+            ::freeaddrinfo(result);
+
+            return services::IPv4Address{
+                static_cast<uint8_t>((addr >> 24) & 0xff),
+                static_cast<uint8_t>((addr >> 16) & 0xff),
+                static_cast<uint8_t>((addr >> 8) & 0xff),
+                static_cast<uint8_t>(addr & 0xff)
+            };
         }
     }
 
@@ -27,7 +61,7 @@ namespace hil
 
     void BridgeSession::Connect()
     {
-        const auto ipv4 = tool::ParseIPv4(config.host);
+        const auto ipv4 = ResolveHost(config.host);
 
         serial = std::make_unique<tool::TcpClientSerial>(
             network.ConnectionFactory(), ipv4, config.serialPort);
@@ -126,6 +160,12 @@ namespace hil
         if (!serialTracker || !serialTracker->Alive())
             throw std::runtime_error{ "BridgeSession: serial bridge disconnected" };
 
+        constexpr auto preDrain = std::chrono::milliseconds{ 30 };
+        RunUntil([]
+            {
+                return false;
+            },
+            preDrain);
         ClearSerialLines();
 
         const std::string payload = command + "\r\n";
@@ -140,11 +180,32 @@ namespace hil
                 return !serialLines.empty();
             },
             timeout);
+        if (serialLines.empty())
+            return false;
 
-        if (!serialLines.empty())
-            lastSerialDuration = ToMilliseconds(std::chrono::steady_clock::now() - sendStart);
+        constexpr auto idleWindow = std::chrono::milliseconds{ 75 };
+        const auto drainDeadline = std::chrono::steady_clock::now() + timeout;
+        while (std::chrono::steady_clock::now() < drainDeadline)
+        {
+            const auto linesBefore = serialLines.size();
+            const auto bufferBefore = serialBuffer.size();
+            RunUntil([]
+                {
+                    return false;
+                },
+                idleWindow);
+            if (serialLines.size() == linesBefore && serialBuffer.size() == bufferBefore)
+                break;
+        }
 
-        return !serialLines.empty();
+        if (!serialLines.empty() && serialLines.front() == command)
+        {
+            serialLines.erase(serialLines.begin());
+            lastSerialLine = serialLines.empty() ? std::string{} : serialLines.back();
+        }
+
+        lastSerialDuration = ToMilliseconds(std::chrono::steady_clock::now() - sendStart);
+        return !serialLines.empty() || !lastSerialLine.empty();
     }
 
     bool BridgeSession::DrainSerial(std::chrono::milliseconds timeout)

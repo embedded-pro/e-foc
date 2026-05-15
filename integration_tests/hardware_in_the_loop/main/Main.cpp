@@ -24,7 +24,8 @@ int main(int argc, char** argv)
            "GDB remote target (host:port, e.g. host.docker.internal:2334)")
         ->required();
     cli.add_option("--firmware-elf", config.firmwareElf,
-        "Path to the firmware ELF to flash before tests");
+           "Path to the firmware ELF to flash before tests")
+        ->expected(1);
     cli.add_flag("--skip-flash", config.skipFlash,
         "Skip the GDB flash step before scenarios run");
 

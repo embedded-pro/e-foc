@@ -7,3 +7,4 @@ megalinter-reports/
 install/
 .venv/
 output/
+cucumber.toml

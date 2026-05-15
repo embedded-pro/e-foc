@@ -25,7 +25,7 @@ namespace tool
             });
     }
 
-    void TcpClient::OnConnectionFailed(ConnectFailReason reason)
+    void TcpClient::OnConnectionFailed(ConnectFailReason /*reason*/)
     {
         HandleDisconnected(true);
     }

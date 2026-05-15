@@ -143,7 +143,7 @@
             ]
         },
         {
-            "name": "HIL Tests (EK-TM4C1294XL)",
+            "name": "HIL Tests",
             "type": "cppdbg",
             "request": "launch",
             "preLaunchTask": "Build HIL tests",
@@ -160,7 +160,7 @@
                 "--gdb-target",
                 "host.docker.internal:2334",
                 "--firmware-elf",
-                "${workspaceFolder}/build/EK-TM4C1294XL/targets/hardware_test/main/${input:hilBuildType}/e_foc.hardware_test.main.elf",
+                "${workspaceFolder}/build/${input:boardType}/targets/hardware_test/main/${input:hilBuildType}/e_foc.hardware_test.main.elf",
                 "${workspaceFolder}/integration_tests/hardware_in_the_loop/features"
             ],
             "stopAtEntry": false,
@@ -189,6 +189,18 @@
                 "position"
             ],
             "default": "speed"
+        },
+        {
+            "id": "boardType",
+            "type": "pickString",
+            "description": "Select board type for HIL tests and target firmware",
+            "options": [
+                "EK-TM4C1294XL",
+                "EK-TM4C123GXL",
+                "STM32F407G-DISC1",
+                "NUCLEO-H563ZI"
+            ],
+            "default": "EK-TM4C1294XL"
         },
         {
             "id": "hilBuildType",

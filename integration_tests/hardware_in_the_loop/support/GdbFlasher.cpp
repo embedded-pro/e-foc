@@ -58,6 +58,7 @@ namespace hil
             script += "load\n";
             script += "compare-sections\n";
             script += "monitor reset\n";
+            script += "monitor go\n";
             script += "disconnect\n";
             script += "quit\n";
             return script;
