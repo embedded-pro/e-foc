@@ -17,22 +17,16 @@ int main(int argc, char** argv)
     cli.add_option("--can-port", config.canPort,
            "hardware_bridge CAN TCP port")
         ->required();
-    cli.add_option("--jlink-exe", config.jlinkExe,
-           "Path to the JLinkExe commander binary")
+    cli.add_option("--gdb-exe", config.gdbExe,
+           "Path to the GDB client used for flashing (e.g. gdb-multiarch)")
         ->required();
-    cli.add_option("--jlink-device", config.jlinkDevice,
-           "JLink device name (e.g. TM4C1294NCPDT)")
+    cli.add_option("--gdb-target", config.gdbTarget,
+           "GDB remote target (host:port, e.g. host.docker.internal:2334)")
         ->required();
-    cli.add_option("--jlink-hex", config.jlinkHex,
-        "Path to the firmware image to flash before tests");
-    cli.add_option("--jlink-if", config.jlinkInterface,
-           "JLink target interface (SWD or JTAG)")
-        ->required();
-    cli.add_option("--jlink-speed-khz", config.jlinkSpeedKHz,
-           "JLink interface speed in kHz")
-        ->required();
+    cli.add_option("--firmware-elf", config.firmwareElf,
+        "Path to the firmware ELF to flash before tests");
     cli.add_flag("--skip-flash", config.skipFlash,
-        "Skip the JLink flash step before scenarios run");
+        "Skip the GDB flash step before scenarios run");
 
     return application.Run(argc, argv);
 }

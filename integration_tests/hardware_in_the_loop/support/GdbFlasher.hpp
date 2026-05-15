@@ -4,10 +4,10 @@
 
 namespace hil
 {
-    class JLinkFlasher
+    class GdbFlasher
     {
     public:
-        explicit JLinkFlasher(const BridgeConfig& config);
+        explicit GdbFlasher(const BridgeConfig& config);
 
         void Flash() const;
 

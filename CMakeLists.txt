@@ -85,9 +85,12 @@ if (E_FOC_BUILD_TESTS)
     add_subdirectory(integration_tests)
 endif()
 
-set(E_FOC_CLANGFORMAT_DIRS core targets tools)
+set(E_FOC_CLANGFORMAT_DIRS core targets)
 
-add_subdirectory(tools)
+if (NOT CMAKE_CROSSCOMPILING)
+    add_subdirectory(tools)
+    list(APPEND E_FOC_CLANGFORMAT_DIRS tools)
+endif()
 
 
 emil_clangformat_directories(e_foc DIRECTORIES ${E_FOC_CLANGFORMAT_DIRS})

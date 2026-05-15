@@ -14,11 +14,9 @@ namespace hil
 
         std::chrono::milliseconds connectTimeout{ std::chrono::seconds{ 10 } };
 
-        std::string jlinkExe;
-        std::string jlinkDevice;
-        std::string jlinkHex;
-        std::string jlinkInterface;
-        uint32_t jlinkSpeedKHz{ 0 };
+        std::string gdbExe;
+        std::string gdbTarget;
+        std::string firmwareElf;
         bool skipFlash{ false };
 
         std::chrono::milliseconds postFlashDelay{ std::chrono::milliseconds{ 500 } };

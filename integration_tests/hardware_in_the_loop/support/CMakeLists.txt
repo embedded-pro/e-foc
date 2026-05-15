@@ -5,8 +5,8 @@ add_library(e_foc.hil_tests.support OBJECT
     BridgeSession.hpp
     HilFixture.cpp
     HilFixture.hpp
-    JLinkFlasher.cpp
-    JLinkFlasher.hpp
+    GdbFlasher.cpp
+    GdbFlasher.hpp
 )
 
 target_include_directories(e_foc.hil_tests.support PUBLIC

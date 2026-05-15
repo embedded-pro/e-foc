@@ -1,9 +1,8 @@
-#include "integration_tests/hardware_in_the_loop/support/JLinkFlasher.hpp"
+#include "integration_tests/hardware_in_the_loop/support/GdbFlasher.hpp"
 #include <array>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
-#include <fcntl.h>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -21,7 +20,7 @@ namespace hil
 
             ScopedTempFile()
             {
-                char buffer[] = "/tmp/efoc_hil_jlinkXXXXXX";
+                char buffer[] = "/tmp/efoc_hil_gdbXXXXXX";
                 const int fd = ::mkstemp(buffer);
                 if (fd < 0)
                     throw std::runtime_error{ std::string{ "mkstemp failed: " } + std::strerror(errno) };
@@ -50,14 +49,17 @@ namespace hil
         std::string BuildScript(const BridgeConfig& cfg)
         {
             std::string script;
-            script += "device " + cfg.jlinkDevice + "\n";
-            script += "si " + std::string{ cfg.jlinkInterface == "JTAG" ? "1" : "2" } + "\n";
-            script += "speed " + std::to_string(cfg.jlinkSpeedKHz) + "\n";
-            script += "connect\n";
-            script += "loadfile " + cfg.jlinkHex + "\n";
-            script += "r\n";
-            script += "g\n";
-            script += "qc\n";
+            script += "set pagination off\n";
+            script += "set confirm off\n";
+            script += "set print thread-events off\n";
+            script += "target extended-remote " + cfg.gdbTarget + "\n";
+            script += "monitor reset\n";
+            script += "monitor halt\n";
+            script += "load\n";
+            script += "compare-sections\n";
+            script += "monitor reset\n";
+            script += "disconnect\n";
+            script += "quit\n";
             return script;
         }
 
@@ -82,39 +84,37 @@ namespace hil
         }
     }
 
-    JLinkFlasher::JLinkFlasher(const BridgeConfig& config)
+    GdbFlasher::GdbFlasher(const BridgeConfig& config)
         : config(config)
     {}
 
-    void JLinkFlasher::Flash() const
+    void GdbFlasher::Flash() const
     {
         if (config.skipFlash)
         {
-            std::cout << "[HIL] Flash skipped (E_FOC_HIL_SKIP_FLASH set)\n";
+            std::cout << "[HIL] Flash skipped (--skip-flash)\n";
             return;
         }
 
-        if (config.jlinkDevice.empty() || config.jlinkHex.empty())
-        {
-            std::cout << "[HIL] Flash skipped: jlinkDevice or jlinkHex unresolved\n";
-            return;
-        }
+        if (config.gdbExe.empty() || config.gdbTarget.empty() || config.firmwareElf.empty())
+            throw std::runtime_error{ "GdbFlasher: gdbExe, gdbTarget and firmwareElf must be set" };
 
         ScopedTempFile script;
         WriteFile(script.path, BuildScript(config));
 
-        const std::string command = config.jlinkExe +
-                                    " -CommanderScript " + script.path +
-                                    " -ExitOnError 1 -NoGui 1";
+        const std::string command = config.gdbExe +
+                                    " --batch --nx" +
+                                    " -x " + script.path + " " +
+                                    config.firmwareElf + " 2>&1";
 
-        std::cout << "[HIL] Flashing target: " << command << "\n";
+        std::cout << "[HIL] Flashing target via GDB: " << command << "\n";
 
         std::string output;
         const int exitCode = RunAndCapture(command, output);
         std::cout << output;
 
         if (exitCode != 0)
-            throw std::runtime_error{ "JLinkExe flash failed (exit " +
+            throw std::runtime_error{ "GDB flash failed (exit " +
                                       std::to_string(exitCode) + ")" };
 
         std::this_thread::sleep_for(config.postFlashDelay);
