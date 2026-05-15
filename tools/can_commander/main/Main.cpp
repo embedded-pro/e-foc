@@ -19,7 +19,7 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     QApplication::setApplicationName("e-foc CAN Commander");
 
-#ifdef __linux__
+#if defined(__linux__)
     tool::SocketCanAdapter adapter;
 #elif defined(_WIN32)
     tool::WindowsCanAdapter adapter;
@@ -29,6 +29,7 @@ int main(int argc, char* argv[])
     return 1;
 #endif
 
+#if defined(__linux__) || defined(_WIN32)
     try
     {
         adapter.ValidateDriverAvailability();
@@ -43,4 +44,5 @@ int main(int argc, char* argv[])
     window.show();
 
     return QApplication::exec();
+#endif
 }
