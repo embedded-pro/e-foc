@@ -92,7 +92,6 @@ if (NOT CMAKE_CROSSCOMPILING)
     list(APPEND E_FOC_CLANGFORMAT_DIRS tools)
 endif()
 
-
 emil_clangformat_directories(e_foc DIRECTORIES ${E_FOC_CLANGFORMAT_DIRS})
 emil_folderize_all_targets()
 emil_exclude_directory_from_coverage(infra/embedded-infra-lib)
