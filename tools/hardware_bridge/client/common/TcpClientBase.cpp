@@ -3,9 +3,9 @@
 
 namespace tool
 {
-    TcpClient::TcpClient(services::ConnectionFactory& factory, services::IPAddress address, uint16_t port)
-        : address(address)
-        , port(port)
+    TcpClient::TcpClient(services::ConnectionFactory& factory, services::IPAddress ipAddress, uint16_t portNum)
+        : address(ipAddress)
+        , port(portNum)
     {
         factory.Connect(*this);
     }

@@ -93,8 +93,8 @@ namespace tool
             connectionHandlerPtr = nullptr;
     }
 
-    TcpClientCanbus::ConnectionHandler::ConnectionHandler(TcpClientCanbus& parent)
-        : parent(parent)
+    TcpClientCanbus::ConnectionHandler::ConnectionHandler(TcpClientCanbus& owner)
+        : parent(owner)
     {}
 
     void TcpClientCanbus::ConnectionHandler::SendStreamAvailable(infra::SharedPtr<infra::StreamWriter>&& streamWriter)

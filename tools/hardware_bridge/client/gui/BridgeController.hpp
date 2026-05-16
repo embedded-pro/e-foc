@@ -47,7 +47,7 @@ namespace tool
             : public TcpClientObserver
         {
         public:
-            SerialObserver(BridgeController& parent, TcpClient& client);
+            SerialObserver(BridgeController& owner, TcpClient& client);
             void Connected() override;
             void Disconnected() override;
 
@@ -59,7 +59,7 @@ namespace tool
             : public TcpClientObserver
         {
         public:
-            CanObserver(BridgeController& parent, TcpClient& client);
+            CanObserver(BridgeController& owner, TcpClient& client);
             void Connected() override;
             void Disconnected() override;
 

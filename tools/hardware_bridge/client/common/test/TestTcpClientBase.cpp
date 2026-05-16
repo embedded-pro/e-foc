@@ -40,8 +40,8 @@ namespace
             : public services::ConnectionObserver
         {
         public:
-            explicit ConnectionHandler(ConcreteTcpClient& parent)
-                : parent(parent)
+            explicit ConnectionHandler(ConcreteTcpClient& owner)
+                : parent(owner)
             {}
 
             void SendStreamAvailable(infra::SharedPtr<infra::StreamWriter>&&) override

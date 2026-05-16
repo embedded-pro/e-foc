@@ -106,13 +106,13 @@ namespace tool
         return MapForeground(color);
     }
 
-    void AnsiTerminalWidget::AppendData(const QByteArray& _data)
+    void AnsiTerminalWidget::AppendData(const QByteArray& data)
     {
         const bool atBottom = verticalScrollBar()->value() >= verticalScrollBar()->maximum() - 1;
 
         terminal.Feed(std::span{
-            reinterpret_cast<const uint8_t*>(_data.constData()),
-            static_cast<std::size_t>(_data.size()) });
+            reinterpret_cast<const uint8_t*>(data.constData()),
+            static_cast<std::size_t>(data.size()) });
 
         std::string outgoing = terminal.TakeOutgoing();
         if (!outgoing.empty())
@@ -230,9 +230,9 @@ namespace tool
         cursor.endEditBlock();
     }
 
-    void AnsiTerminalWidget::SetInputEnabled(bool _enabled)
+    void AnsiTerminalWidget::SetInputEnabled(bool enabled)
     {
-        inputEnabled = _enabled;
+        inputEnabled = enabled;
     }
 
     void AnsiTerminalWidget::keyPressEvent(QKeyEvent* event)
