@@ -53,7 +53,6 @@ namespace tool
 
         root->addWidget(connGroup);
 
-        // --- Panels ---
         auto* splitter = new QSplitter(Qt::Horizontal);
 
         serialPanel = new SerialPanel();
@@ -65,7 +64,6 @@ namespace tool
         splitter->setSizes({ 600, 600 });
         root->addWidget(splitter, 1);
 
-        // --- Signal wiring ---
         connect(connectButton, &QPushButton::clicked, this, &BridgeWindow::OnConnectClicked);
         connect(disconnectButton, &QPushButton::clicked, this, &BridgeWindow::OnDisconnectClicked);
 
@@ -78,9 +76,9 @@ namespace tool
         connect(controller, &BridgeController::SerialDataReceived, serialPanel, &SerialPanel::AppendText);
 
         connect(controller, &BridgeController::CanFrameReceived,
-            [this](quint32 id, bool extended, QByteArray data)
+            [this](quint32 id, bool extended, QByteArray _data)
             {
-                canPanel->AppendFrame(true, id, extended, data);
+                canPanel->AppendFrame(true, id, extended, _data);
             });
 
         connect(serialPanel, &SerialPanel::SendRequested, controller, &BridgeController::SendSerial);
@@ -164,9 +162,9 @@ namespace tool
         UpdateConnectionStatus();
     }
 
-    void BridgeWindow::OnConnectionError(const QString& message)
+    void BridgeWindow::OnConnectionError(const QString& _message)
     {
-        QMessageBox::warning(this, "Connection Error", message);
+        QMessageBox::warning(this, "Connection Error", _message);
         OnDisconnectClicked();
     }
 

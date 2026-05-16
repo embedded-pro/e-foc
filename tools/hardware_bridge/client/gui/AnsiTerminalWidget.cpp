@@ -106,13 +106,13 @@ namespace tool
         return MapForeground(color);
     }
 
-    void AnsiTerminalWidget::AppendData(const QByteArray& data)
+    void AnsiTerminalWidget::AppendData(const QByteArray& _data)
     {
         const bool atBottom = verticalScrollBar()->value() >= verticalScrollBar()->maximum() - 1;
 
         terminal.Feed(std::span{
-            reinterpret_cast<const uint8_t*>(data.constData()),
-            static_cast<std::size_t>(data.size()) });
+            reinterpret_cast<const uint8_t*>(_data.constData()),
+            static_cast<std::size_t>(_data.size()) });
 
         std::string outgoing = terminal.TakeOutgoing();
         if (!outgoing.empty())
@@ -144,9 +144,6 @@ namespace tool
             return true;
         };
 
-        // Collect rows: history first, then active screen up to the last
-        // non-blank row (or the cursor row, whichever is lower) so trailing
-        // empty rows aren't padded onto the document.
         std::vector<std::vector<terminal::Cell>> rows;
         rows.reserve(screen.History().size() + static_cast<std::size_t>(screen.Rows()));
         for (const auto& row : screen.History())
@@ -170,9 +167,6 @@ namespace tool
             rows.push_back(std::move(row));
         }
 
-        // Build the full plain text and a flat list of (start, length,
-        // rendition) runs so we can apply char formats in a single pass
-        // after setPlainText.
         struct Run
         {
             int start;
@@ -213,11 +207,8 @@ namespace tool
             }
         }
 
-        // Install content via the idiomatic API; QPlainTextEdit handles
-        // block construction unambiguously here (no empty-block-0 trap).
         setPlainText(text);
 
-        // Apply character formats per run.
         QTextCursor cursor(document());
         cursor.beginEditBlock();
         for (const Run& run : runs)
@@ -239,9 +230,9 @@ namespace tool
         cursor.endEditBlock();
     }
 
-    void AnsiTerminalWidget::SetInputEnabled(bool enabled)
+    void AnsiTerminalWidget::SetInputEnabled(bool _enabled)
     {
-        inputEnabled = enabled;
+        inputEnabled = _enabled;
     }
 
     void AnsiTerminalWidget::keyPressEvent(QKeyEvent* event)

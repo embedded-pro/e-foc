@@ -211,14 +211,14 @@ namespace tool
         telemetryPanel->OnFaultEvent(fault);
     }
 
-    void MainWindow::OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data)
+    void MainWindow::OnFrameLog(bool transmitted, uint32_t id, const CanFrame& _data)
     {
         QString hex;
-        for (std::size_t i = 0; i < data.size(); ++i)
+        for (std::size_t i = 0; i < _data.size(); ++i)
         {
             if (i > 0)
                 hex += " ";
-            hex += QString("%1").arg(data[i], 2, 16, QChar('0')).toUpper();
+            hex += QString("%1").arg(_data[i], 2, 16, QChar('0')).toUpper();
         }
 
         logView->appendPlainText(
