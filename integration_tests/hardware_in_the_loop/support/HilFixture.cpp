@@ -27,6 +27,24 @@ namespace hil
         return received;
     }
 
+    bool HilFixture::FlushPartialLines(std::chrono::milliseconds timeout)
+    {
+        const bool ok = session.FlushAndAccumulate(timeout);
+        allLines = session.SerialLines();
+        lastResponse = session.LastSerialLine();
+        lastCommandDuration = session.LastSerialDuration();
+        return ok;
+    }
+
+    bool HilFixture::WaitForPrompt(std::chrono::milliseconds timeout)
+    {
+        const bool ok = session.WaitForPrompt(timeout);
+        allLines = session.SerialLines();
+        lastResponse = session.LastSerialLine();
+        lastCommandDuration = session.LastSerialDuration();
+        return ok;
+    }
+
     void HilFixture::StartCanCapture()
     {
         session.ClearCanFrames();

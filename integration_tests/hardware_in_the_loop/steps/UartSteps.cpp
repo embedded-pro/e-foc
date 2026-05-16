@@ -1,6 +1,6 @@
 #include "cucumber_cpp/Steps.hpp"
 #include "integration_tests/hardware_in_the_loop/support/HilFixture.hpp"
-#include <chrono>
+#include "integration_tests/hardware_in_the_loop/support/Timeouts.hpp"
 #include <gtest/gtest.h>
 #include <string>
 
@@ -9,7 +9,8 @@ using namespace hil;
 WHEN(R"(the hardware target is rebooted and emits its banner over UART)")
 {
     auto& fixture = context.Get<HilFixture>();
-    ASSERT_TRUE(fixture.DrainLines(std::chrono::milliseconds{ 3000 }))
+    fixture.FlushPartialLines(timeouts::bootBanner);
+    ASSERT_FALSE(fixture.allLines.empty())
         << "No UART output captured while waiting for the post-reset banner";
 }
 

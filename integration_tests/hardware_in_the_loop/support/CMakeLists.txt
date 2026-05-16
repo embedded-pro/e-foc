@@ -7,6 +7,11 @@ add_library(e_foc.hil_tests.support OBJECT
     HilFixture.hpp
     GdbFlasher.cpp
     GdbFlasher.hpp
+    SerialLogger.cpp
+    SerialLogger.hpp
+    Timeouts.hpp
+    TypingTransmitter.cpp
+    TypingTransmitter.hpp
 )
 
 target_include_directories(e_foc.hil_tests.support PUBLIC

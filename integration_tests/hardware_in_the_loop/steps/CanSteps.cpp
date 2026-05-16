@@ -1,11 +1,14 @@
 #include "cucumber_cpp/Steps.hpp"
 #include "hal/interfaces/Can.hpp"
 #include "integration_tests/hardware_in_the_loop/support/HilFixture.hpp"
+#include "integration_tests/hardware_in_the_loop/support/Timeouts.hpp"
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
+#include <string>
 
 using namespace hil;
 
@@ -21,15 +24,23 @@ WHEN(R"(a CAN command is transmitted to the hardware target)")
 
     fixture.StartCanCapture();
 
-    ASSERT_TRUE(fixture.SendCommand("can_start 500000"))
+    ASSERT_TRUE(fixture.SendCommand("can_start 500000", timeouts::command))
         << "can_start command did not receive a response";
 
-    fixture.MarkCanReference();
-    ASSERT_TRUE(fixture.SendCommand("can_send 256 1 2 3", std::chrono::milliseconds{ 100 }))
-        << "can_send command did not receive a response within 100 ms";
+    ASSERT_TRUE(fixture.SendCommand("can_send 256 1 2 3", timeouts::command))
+        << "can_send command did not receive a response within timeout";
 
-    ASSERT_FALSE(fixture.lastResponse.empty())
-        << "CLI did not acknowledge can_send";
+    fixture.MarkCanReference();
+
+    fixture.FlushPartialLines(timeouts::command);
+
+    const auto& lines = fixture.allLines;
+    const bool acknowledged = std::any_of(lines.begin(), lines.end(),
+        [](const std::string& l)
+        {
+            return l.find("CAN frame sent") != std::string::npos;
+        });
+    ASSERT_TRUE(acknowledged) << "CLI did not acknowledge can_send";
 }
 
 THEN(R"(a CAN response frame shall be received within 10 milliseconds)")

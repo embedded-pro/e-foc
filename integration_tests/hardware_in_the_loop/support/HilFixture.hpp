@@ -2,6 +2,7 @@
 
 #include "hal/interfaces/Can.hpp"
 #include "integration_tests/hardware_in_the_loop/support/BridgeSession.hpp"
+#include "integration_tests/hardware_in_the_loop/support/Timeouts.hpp"
 #include <chrono>
 #include <string>
 #include <vector>
@@ -14,9 +15,13 @@ namespace hil
         ~HilFixture();
 
         bool SendCommand(const std::string& command,
-            std::chrono::milliseconds timeout = std::chrono::milliseconds{ 500 });
+            std::chrono::milliseconds timeout = timeouts::command);
 
         bool DrainLines(std::chrono::milliseconds timeout);
+
+        bool FlushPartialLines(std::chrono::milliseconds timeout);
+
+        bool WaitForPrompt(std::chrono::milliseconds timeout = timeouts::prompt);
 
         std::string lastResponse;
         std::vector<std::string> allLines;

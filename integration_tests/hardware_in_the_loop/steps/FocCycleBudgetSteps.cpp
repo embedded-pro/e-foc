@@ -1,5 +1,6 @@
 #include "cucumber_cpp/Steps.hpp"
 #include "integration_tests/hardware_in_the_loop/support/HilFixture.hpp"
+#include "integration_tests/hardware_in_the_loop/support/Timeouts.hpp"
 #include <algorithm>
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -12,7 +13,7 @@ static constexpr uint32_t kMaxAllowedCycles{ 4500 };
 WHEN(R"(the FOC loop CPU utilisation is sampled for one control cycle)")
 {
     auto& fixture = context.Get<HilFixture>();
-    ASSERT_TRUE(fixture.SendCommand("foc 0 0 0 0", std::chrono::milliseconds{ 500 }))
+    ASSERT_TRUE(fixture.SendCommand("foc 0.0 0.0 0.0 0.0", timeouts::slowCommand))
         << "FOC simulation command did not receive a response";
 }
 

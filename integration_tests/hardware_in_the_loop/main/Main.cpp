@@ -1,5 +1,13 @@
 #include "cucumber_cpp/CucumberCpp.hpp"
 #include "integration_tests/hardware_in_the_loop/support/BridgeConfig.hpp"
+#include "integration_tests/hardware_in_the_loop/support/SerialLogger.hpp"
+#include <string>
+
+namespace
+{
+    std::string g_logDir{ "build/host/integration_tests/hardware_in_the_loop/logs" };
+    bool g_logDisabled{ false };
+}
 
 int main(int argc, char** argv)
 {
@@ -28,6 +36,15 @@ int main(int argc, char** argv)
         ->expected(1);
     cli.add_flag("--skip-flash", config.skipFlash,
         "Skip the GDB flash step before scenarios run");
+    cli.add_option("--log-dir", g_logDir,
+        "Root directory for HIL serial transcripts; a timestamped subdirectory is created per run");
+    cli.add_flag("--log-disabled", g_logDisabled,
+        "Disable HIL serial transcript logging");
+
+    cli.parse_complete_callback([]
+        {
+            hil::SerialLogger::Instance().Configure(g_logDir, g_logDisabled);
+        });
 
     return application.Run(argc, argv);
 }

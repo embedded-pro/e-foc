@@ -3,6 +3,7 @@
 #include "hal/interfaces/Can.hpp"
 #include "infra/util/ByteRange.hpp"
 #include "integration_tests/hardware_in_the_loop/support/BridgeConfig.hpp"
+#include "integration_tests/hardware_in_the_loop/support/TypingTransmitter.hpp"
 #include "services/network_instantiations/NetworkAdapter.hpp"
 #include "tools/hardware_bridge/client/can/TcpClientCanbus.hpp"
 #include "tools/hardware_bridge/client/common/TcpClientBase.hpp"
@@ -38,6 +39,9 @@ namespace hil
         void ClearSerialLines();
         bool SendSerial(const std::string& command, std::chrono::milliseconds timeout);
         bool DrainSerial(std::chrono::milliseconds timeout);
+        bool WaitForPrompt(std::chrono::milliseconds timeout);
+
+        bool FlushAndAccumulate(std::chrono::milliseconds timeout);
 
         const std::vector<std::string>& SerialLines() const
         {
@@ -70,6 +74,11 @@ namespace hil
 
         void Connect();
         void RunUntil(const std::function<bool()>& predicate, std::chrono::milliseconds timeout);
+        void OnSerialBytes(infra::ConstByteRange data);
+        void AppendSerialByte(char ch);
+        void EmitSerialLine(std::string line);
+        void DrainUntilQuiet(std::chrono::milliseconds budget);
+        void TransmitSerial(const std::string& payload);
 
         class Tracker
             : public tool::TcpClientObserver
@@ -112,10 +121,12 @@ namespace hil
         std::unique_ptr<tool::TcpClientCanbus> can;
         std::unique_ptr<Tracker> serialTracker;
         std::unique_ptr<Tracker> canTracker;
+        std::unique_ptr<TypingTransmitter> typingTransmitter;
 
         std::string serialBuffer;
         std::vector<std::string> serialLines;
         std::string lastSerialLine;
+        bool promptSeen{ false };
         std::chrono::milliseconds lastSerialDuration{ 0 };
 
         std::deque<CanFrame> canQueue;

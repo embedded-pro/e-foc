@@ -1,9 +1,12 @@
 #include "integration_tests/hardware_in_the_loop/support/BridgeSession.hpp"
+#include "integration_tests/hardware_in_the_loop/support/SerialLogger.hpp"
+#include "integration_tests/hardware_in_the_loop/support/Timeouts.hpp"
 #include "tools/hardware_bridge/client/common/ParseIPv4.hpp"
 #include <arpa/inet.h>
 #include <chrono>
 #include <cstring>
 #include <netdb.h>
+#include <sstream>
 #include <stdexcept>
 
 namespace hil
@@ -71,28 +74,21 @@ namespace hil
         serialTracker = std::make_unique<Tracker>(*serial);
         canTracker = std::make_unique<Tracker>(*can);
 
+        typingTransmitter = std::make_unique<TypingTransmitter>(
+            *serial,
+            [this](std::chrono::milliseconds budget)
+            {
+                RunUntil([]
+                    {
+                        return false;
+                    },
+                    budget);
+            },
+            timeouts::typingInterCharDelay);
+
         serial->ReceiveData([this](infra::ConstByteRange data)
             {
-                for (auto byte : data)
-                {
-                    const char ch = static_cast<char>(byte);
-                    if (ch == '\n')
-                    {
-                        if (!serialBuffer.empty() && serialBuffer.back() == '\r')
-                            serialBuffer.pop_back();
-
-                        if (!serialBuffer.empty())
-                        {
-                            serialLines.push_back(serialBuffer);
-                            lastSerialLine = serialBuffer;
-                        }
-                        serialBuffer.clear();
-                    }
-                    else
-                    {
-                        serialBuffer += ch;
-                    }
-                }
+                OnSerialBytes(data);
             });
 
         can->ReceiveData([this](hal::Can::Id id, const hal::Can::Message& data)
@@ -151,6 +147,7 @@ namespace hil
         serialLines.clear();
         lastSerialLine.clear();
         serialBuffer.clear();
+        promptSeen = false;
         lastSerialDuration = std::chrono::milliseconds{ 0 };
     }
 
@@ -160,52 +157,189 @@ namespace hil
         if (!serialTracker || !serialTracker->Alive())
             throw std::runtime_error{ "BridgeSession: serial bridge disconnected" };
 
-        constexpr auto preDrain = std::chrono::milliseconds{ 30 };
+        {
+            std::ostringstream os;
+            os << "SendSerial(\"" << command << "\", timeout=" << timeout.count() << "ms)";
+            SerialLogger::Instance().ApiCall(os.str());
+        }
+
         RunUntil([]
             {
                 return false;
             },
-            preDrain);
+            timeouts::preDrain);
         ClearSerialLines();
 
-        const std::string payload = command + "\r\n";
         const auto sendStart = std::chrono::steady_clock::now();
-        serial->SendData(
-            infra::ConstByteRange(reinterpret_cast<const uint8_t*>(payload.data()),
-                reinterpret_cast<const uint8_t*>(payload.data() + payload.size())),
-            infra::Function<void()>{});
+        TransmitSerial(command + "\r\n");
 
         RunUntil([this]
             {
-                return !serialLines.empty();
+                return !serialLines.empty() || promptSeen;
             },
             timeout);
-        if (serialLines.empty())
+
+        DrainUntilQuiet(timeout);
+
+        if (!serialLines.empty() && serialLines.front() == command)
+            serialLines.erase(serialLines.begin());
+
+        lastSerialLine.clear();
+        for (auto it = serialLines.rbegin(); it != serialLines.rend(); ++it)
+        {
+            if (!it->empty() && *it != "> ")
+            {
+                lastSerialLine = *it;
+                break;
+            }
+        }
+
+        lastSerialDuration = ToMilliseconds(std::chrono::steady_clock::now() - sendStart);
+        const bool ok = promptSeen || !serialLines.empty() || !lastSerialLine.empty();
+        {
+            std::ostringstream os;
+            os << "SendSerial -> " << (ok ? "true" : "false")
+               << " (duration=" << lastSerialDuration.count() << "ms"
+               << ", lines=" << serialLines.size()
+               << ", promptSeen=" << (promptSeen ? "true" : "false") << ")";
+            SerialLogger::Instance().ApiResult(os.str());
+        }
+        return ok;
+    }
+
+    bool BridgeSession::WaitForPrompt(std::chrono::milliseconds timeout)
+    {
+        if (!serialTracker || !serialTracker->Alive())
             return false;
 
-        constexpr auto idleWindow = std::chrono::milliseconds{ 75 };
-        const auto drainDeadline = std::chrono::steady_clock::now() + timeout;
-        while (std::chrono::steady_clock::now() < drainDeadline)
+        {
+            std::ostringstream os;
+            os << "WaitForPrompt(timeout=" << timeout.count() << "ms)";
+            SerialLogger::Instance().ApiCall(os.str());
+        }
+
+        ClearSerialLines();
+        TransmitSerial("\r\n");
+
+        RunUntil([this]
+            {
+                return promptSeen;
+            },
+            timeout);
+        DrainUntilQuiet(timeout);
+
+        const bool ok = promptSeen;
+        ClearSerialLines();
+
+        {
+            std::ostringstream os;
+            os << "WaitForPrompt -> " << (ok ? "true" : "false");
+            SerialLogger::Instance().ApiResult(os.str());
+        }
+        return ok;
+    }
+
+    bool BridgeSession::FlushAndAccumulate(std::chrono::milliseconds timeout)
+    {
+        if (!serialTracker || !serialTracker->Alive())
+            return false;
+
+        {
+            std::ostringstream os;
+            os << "FlushAndAccumulate(timeout=" << timeout.count() << "ms)";
+            SerialLogger::Instance().ApiCall(os.str());
+        }
+
+        const std::size_t linesBefore = serialLines.size();
+        promptSeen = false;
+
+        TransmitSerial("\r\n");
+        RunUntil([this]
+            {
+                return promptSeen;
+            },
+            timeout);
+        DrainUntilQuiet(timeout);
+
+        const bool ok = promptSeen;
+        const std::size_t newLines = serialLines.size() - linesBefore;
+
+        {
+            std::ostringstream os;
+            os << "FlushAndAccumulate -> " << (ok ? "true" : "false")
+               << " (newLines=" << newLines << ", total=" << serialLines.size() << ")";
+            SerialLogger::Instance().ApiResult(os.str());
+        }
+        return ok;
+    }
+
+    void BridgeSession::OnSerialBytes(infra::ConstByteRange data)
+    {
+        SerialLogger::Instance().RxBytes(data);
+        for (auto byte : data)
+            AppendSerialByte(static_cast<char>(byte));
+    }
+
+    void BridgeSession::AppendSerialByte(char ch)
+    {
+        if (ch == '\n')
+        {
+            if (!serialBuffer.empty() && serialBuffer.back() == '\r')
+                serialBuffer.pop_back();
+            EmitSerialLine(std::move(serialBuffer));
+            serialBuffer.clear();
+            return;
+        }
+
+        serialBuffer += ch;
+
+        if (serialBuffer.size() >= 2 &&
+            serialBuffer[serialBuffer.size() - 2] == '>' &&
+            serialBuffer[serialBuffer.size() - 1] == ' ')
+        {
+            std::string content = serialBuffer.substr(0, serialBuffer.size() - 2);
+            if (!content.empty() && content.back() == '\r')
+                content.pop_back();
+            EmitSerialLine(std::move(content));
+            promptSeen = true;
+            serialBuffer.clear();
+            SerialLogger::Instance().Prompt();
+        }
+    }
+
+    void BridgeSession::EmitSerialLine(std::string line)
+    {
+        if (line.empty())
+            return;
+        SerialLogger::Instance().Line(line);
+        lastSerialLine = line;
+        serialLines.push_back(std::move(line));
+    }
+
+    void BridgeSession::DrainUntilQuiet(std::chrono::milliseconds budget)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + budget;
+        while (std::chrono::steady_clock::now() < deadline)
         {
             const auto linesBefore = serialLines.size();
             const auto bufferBefore = serialBuffer.size();
+            const bool promptBefore = promptSeen;
             RunUntil([]
                 {
                     return false;
                 },
-                idleWindow);
-            if (serialLines.size() == linesBefore && serialBuffer.size() == bufferBefore)
+                timeouts::idleWindow);
+            if (serialLines.size() == linesBefore &&
+                serialBuffer.size() == bufferBefore &&
+                promptSeen == promptBefore)
                 break;
         }
+    }
 
-        if (!serialLines.empty() && serialLines.front() == command)
-        {
-            serialLines.erase(serialLines.begin());
-            lastSerialLine = serialLines.empty() ? std::string{} : serialLines.back();
-        }
-
-        lastSerialDuration = ToMilliseconds(std::chrono::steady_clock::now() - sendStart);
-        return !serialLines.empty() || !lastSerialLine.empty();
+    void BridgeSession::TransmitSerial(const std::string& payload)
+    {
+        SerialLogger::Instance().TxBytes(payload);
+        typingTransmitter->Send(payload);
     }
 
     bool BridgeSession::DrainSerial(std::chrono::milliseconds timeout)
@@ -213,13 +347,27 @@ namespace hil
         if (!serialTracker || !serialTracker->Alive())
             throw std::runtime_error{ "BridgeSession: serial bridge disconnected" };
 
+        {
+            std::ostringstream os;
+            os << "DrainSerial(timeout=" << timeout.count() << "ms)";
+            SerialLogger::Instance().ApiCall(os.str());
+        }
+
         ClearSerialLines();
         RunUntil([]
             {
                 return false;
             },
             timeout);
-        return !serialLines.empty();
+
+        const bool ok = !serialLines.empty();
+        {
+            std::ostringstream os;
+            os << "DrainSerial -> " << (ok ? "true" : "false")
+               << " (lines=" << serialLines.size() << ")";
+            SerialLogger::Instance().ApiResult(os.str());
+        }
+        return ok;
     }
 
     void BridgeSession::ClearCanFrames()
