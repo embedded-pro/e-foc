@@ -86,10 +86,10 @@ namespace tool
         connect(serialPanel, &SerialPanel::SendRequested, controller, &BridgeController::SendSerial);
 
         connect(canPanel, &CanPanel::SendRequested,
-            [this](quint32 id, bool extended, QByteArray data)
+            [this](quint32 id, bool extended, QByteArray _data)
             {
-                controller->SendCan(id, extended, data);
-                canPanel->AppendFrame(false, id, extended, data);
+                controller->SendCan(id, extended, _data);
+                canPanel->AppendFrame(false, id, extended, _data);
             });
     }
 

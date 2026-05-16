@@ -14,9 +14,9 @@ namespace tool
         connect(outputView, &AnsiTerminalWidget::DataToSend, this, &SerialPanel::SendRequested);
     }
 
-    void SerialPanel::AppendText(const QByteArray& data)
+    void SerialPanel::AppendText(const QByteArray& _data)
     {
-        outputView->AppendData(data);
+        outputView->AppendData(_data);
     }
 
     void SerialPanel::SetConnected(bool connected)
