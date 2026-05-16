@@ -53,5 +53,6 @@ HOOK_AFTER_SCENARIO()
     auto& session = hil::BridgeSession::Instance();
     (void)session.DrainSerial(hil::timeouts::cleanup);
     (void)session.WaitForPrompt(hil::timeouts::promptShort);
+
     hil::SerialLogger::Instance().EndScenario(true);
 }

@@ -15,7 +15,11 @@ namespace hil
         {
             const auto time = std::chrono::system_clock::to_time_t(tp);
             std::tm tm{};
+#ifdef _WIN32
+            ::localtime_s(&tm, &time);
+#else
             ::localtime_r(&time, &tm);
+#endif
             std::ostringstream os;
             os << std::put_time(&tm, "%Y%m%d-%H%M%S");
             return os.str();
@@ -151,14 +155,14 @@ namespace hil
     {
         if (!enabled)
             return;
-        Write("API", summary);
+        Write("API>", summary);
     }
 
     void SerialLogger::ApiResult(std::string_view summary)
     {
         if (!enabled)
             return;
-        Write("API", summary);
+        Write("API<", summary);
     }
 
     void SerialLogger::Note(std::string_view category, std::string_view message)

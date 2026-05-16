@@ -34,8 +34,14 @@ namespace hil
 
             addrinfo* result = nullptr;
             const int rc = ::getaddrinfo(host.c_str(), nullptr, &hints, &result);
-            if (rc != 0 || result == nullptr)
+            if (rc != 0)
+            {
+                if (result != nullptr)
+                    ::freeaddrinfo(result);
                 throw std::runtime_error{ "BridgeSession: cannot resolve host '" + host + "': " + ::gai_strerror(rc) };
+            }
+            if (result == nullptr)
+                throw std::runtime_error{ "BridgeSession: cannot resolve host '" + host + "': no address returned" };
 
             const auto* in = reinterpret_cast<const sockaddr_in*>(result->ai_addr);
             const uint32_t addr = ntohl(in->sin_addr.s_addr);
