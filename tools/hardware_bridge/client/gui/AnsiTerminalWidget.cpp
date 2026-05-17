@@ -106,13 +106,13 @@ namespace tool
         return MapForeground(color);
     }
 
-    void AnsiTerminalWidget::AppendData(const QByteArray& data)
+    void AnsiTerminalWidget::AppendData(const QByteArray& bytes)
     {
         const bool atBottom = verticalScrollBar()->value() >= verticalScrollBar()->maximum() - 1;
 
         terminal.Feed(std::span{
-            reinterpret_cast<const uint8_t*>(data.constData()),
-            static_cast<std::size_t>(data.size()) });
+            reinterpret_cast<const uint8_t*>(bytes.constData()),
+            static_cast<std::size_t>(bytes.size()) });
 
         std::string outgoing = terminal.TakeOutgoing();
         if (!outgoing.empty())

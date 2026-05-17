@@ -45,7 +45,7 @@ namespace simulator
             foc::NewtonMeterSecondPerRadian B; // Viscous friction coefficient [N·m·s/rad]
         };
 
-        ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency, std::optional<std::size_t> maxIterations);
+        ThreePhaseMotorModel(const Parameters& params, foc::Volts supplyVoltage, hal::Hertz pwmFrequency, std::optional<std::size_t> iterationLimit);
 
         void SetLoad(foc::NewtonMeter load);
 
