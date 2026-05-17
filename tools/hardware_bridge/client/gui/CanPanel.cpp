@@ -48,7 +48,7 @@ namespace tool
         connect(dataInput, &QLineEdit::returnPressed, this, &CanPanel::OnSendClicked);
     }
 
-    void CanPanel::AppendFrame(bool rx, quint32 id, bool extended, const QByteArray& data)
+    void CanPanel::AppendFrame(bool rx, quint32 id, bool extended, const QByteArray& _data)
     {
         if (frameTable->rowCount() >= maxRows)
             frameTable->removeRow(0);
@@ -68,14 +68,14 @@ namespace tool
                                   : QString("0x%1").arg(id, 3, 16, QChar('0')).toUpper();
         frameTable->setItem(row, 2, new QTableWidgetItem(idStr));
 
-        frameTable->setItem(row, 3, new QTableWidgetItem(QString::number(data.size())));
+        frameTable->setItem(row, 3, new QTableWidgetItem(QString::number(_data.size())));
 
         QString dataStr;
-        for (int i = 0; i < data.size(); ++i)
+        for (int i = 0; i < _data.size(); ++i)
         {
             if (i > 0)
                 dataStr += ' ';
-            dataStr += QString("%1").arg(static_cast<uint8_t>(data[i]), 2, 16, QChar('0')).toUpper();
+            dataStr += QString("%1").arg(static_cast<uint8_t>(_data[i]), 2, 16, QChar('0')).toUpper();
         }
         frameTable->setItem(row, 4, new QTableWidgetItem(dataStr));
 

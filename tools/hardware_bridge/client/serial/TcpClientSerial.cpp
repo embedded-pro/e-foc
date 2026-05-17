@@ -73,8 +73,8 @@ namespace tool
             connectionHandlerPtr = nullptr;
     }
 
-    TcpClientSerial::ConnectionHandler::ConnectionHandler(TcpClientSerial& parent)
-        : parent(parent)
+    TcpClientSerial::ConnectionHandler::ConnectionHandler(TcpClientSerial& owner)
+        : parent(owner)
     {}
 
     void TcpClientSerial::ConnectionHandler::SendStreamAvailable(infra::SharedPtr<infra::StreamWriter>&& streamWriter)

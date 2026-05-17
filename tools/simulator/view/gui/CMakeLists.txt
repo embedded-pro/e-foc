@@ -34,7 +34,7 @@ set_target_properties(e_foc.tool.simulator.view.gui PROPERTIES
 )
 
 if(MSVC)
-    target_compile_options(e_foc.tool.simulator.view.gui PRIVATE /W4)
+    target_compile_options(e_foc.tool.simulator.view.gui PRIVATE /W4 /WX-)
 else()
     target_compile_options(e_foc.tool.simulator.view.gui PRIVATE
         -Wno-error

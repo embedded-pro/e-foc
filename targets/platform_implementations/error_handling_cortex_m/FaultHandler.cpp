@@ -68,8 +68,7 @@ extern "C"
         // Write magic last — this atomically marks data as valid
         persistentFaultData.magic = PersistentFaultData::kMagicValid;
 
-        // Trigger reset via abort — platform startup (DefaultInit / HAL) maps
-        // abort() to NVIC_SystemReset() or equivalent.
-        std::abort();
+        NVIC_SystemReset();
+        __builtin_unreachable();
     }
 }

@@ -354,7 +354,6 @@ namespace application
     void TerminalInteractor::ProcessAdcSamples()
     {
         adcCreator->Stop();
-        adcCreator.Destroy();
 
         tracer.Trace() << "  Current Phases [A;B;C] ampere";
 
@@ -407,6 +406,7 @@ namespace application
 
     void TerminalInteractor::StartAdc(PlatformFactory::SampleAndHold sampleAndHold)
     {
+        adcCreator.Destroy();
         adcCreator.Emplace(sampleAndHold);
         adcCreator->Measure([this](auto phaseA, auto phaseB, auto phaseC)
             {

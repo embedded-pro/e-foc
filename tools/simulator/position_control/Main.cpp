@@ -148,8 +148,6 @@ int main(int argc, char* argv[])
             return simulation.Run();
         }
 
-        constexpr auto radiansToDegrees = 180.0f / std::numbers::pi_v<float>;
-
         simulator::HeadlessSimulation simulation{ model, controller, eventDispatcher };
         simulation.Run();
     }

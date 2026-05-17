@@ -1100,7 +1100,6 @@ TEST_F(TestHardwareTerminal, adc_buffer_full_triggers_processing)
         onAdcMeasurementDone(phaseA, phaseB, phaseC);
 
     EXPECT_CALL(adcDecoratorMock, Stop()).Times(1);
-    EXPECT_CALL(adcCreator, Destructed()).Times(1);
     EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
 
     onAdcMeasurementDone(phaseA, phaseB, phaseC);

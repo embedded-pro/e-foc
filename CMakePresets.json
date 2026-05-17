@@ -25,7 +25,7 @@
                 "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo;MinSizeRel",
                 "E_FOC_TARGET_PLATFORM": "host",
                 "E_FOC_BUILD_TESTS": true,
-                "E_FOC_BUILD_SIMULATOR": true,
+                "E_FOC_BUILD_HIL_TESTS": true,
                 "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": false
             },
             "generator": "Ninja Multi-Config"
@@ -55,7 +55,6 @@
                 "QT_HOST_PATH_CMAKE_DIR": "/usr/lib/x86_64-linux-gnu/cmake",
                 "E_FOC_TARGET_PLATFORM": "host",
                 "E_FOC_BUILD_TESTS": true,
-                "E_FOC_BUILD_SIMULATOR": true,
                 "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": false
             },
             "generator": "Ninja Multi-Config"

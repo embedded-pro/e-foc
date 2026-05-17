@@ -29,7 +29,7 @@ if(WIN32)
 endif()
 
 if(MSVC)
-    target_compile_options(e_foc.tool.can_commander.adapter PRIVATE /W4)
+    target_compile_options(e_foc.tool.can_commander.adapter PRIVATE /W4 /WX-)
 else()
     target_compile_options(e_foc.tool.can_commander.adapter PRIVATE
         -Wno-error

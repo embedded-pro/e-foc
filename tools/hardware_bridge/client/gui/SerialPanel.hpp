@@ -14,7 +14,7 @@ namespace tool
     public:
         explicit SerialPanel(QWidget* parent = nullptr);
 
-        void AppendText(const QByteArray& data);
+        void AppendText(const QByteArray& bytes);
         void SetConnected(bool connected);
 
     signals:

@@ -29,7 +29,7 @@ namespace tool
             : public services::ConnectionObserver
         {
         public:
-            explicit ConnectionHandler(TcpClientCanbus& parent);
+            explicit ConnectionHandler(TcpClientCanbus& owner);
 
             void SendStreamAvailable(infra::SharedPtr<infra::StreamWriter>&& streamWriter) override;
             void DataReceived() override;
