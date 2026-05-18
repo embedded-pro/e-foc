@@ -1,4 +1,4 @@
-FROM gabrielfrasantos/embedded-devcontainer-cpp:latest@sha256:9393ef6a1ded67410b5dac0e80999bedc32bd6c4c145f7d1c7ba098e06192987
+FROM gabrielfrasantos/embedded-devcontainer-cpp:latest@sha256:7a175a091628c1b74de2a0570e49948050f11320eba8709e647ad480a4928086
 
 HEALTHCHECK NONE
 
