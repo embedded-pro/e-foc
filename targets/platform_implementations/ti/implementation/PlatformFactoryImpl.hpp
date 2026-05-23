@@ -2,6 +2,7 @@
 
 #include <optional>
 #include HARDWARE_PINS_AND_PERIPHERALS_HEADER
+#include MOTOR_BOARD_CHARACTERISTICS_HEADER
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
