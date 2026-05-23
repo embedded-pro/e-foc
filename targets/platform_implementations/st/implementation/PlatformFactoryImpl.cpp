@@ -96,7 +96,7 @@ namespace application
         return foc::Volts(48.0f);
     }
 
-    foc::Ampere PlatformFactoryImpl::MaxCurrentSupported()
+    foc::Ampere PlatformFactoryImpl::MaxCurrentSupported() const
     {
         return foc::Ampere(15.0f);
     }
@@ -104,6 +104,16 @@ namespace application
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
     {
         return pendSvLowPriorityInterrupt;
+    }
+
+    void PlatformFactoryImpl::Trigger()
+    {
+        pendSvLowPriorityInterrupt.Trigger();
+    }
+
+    void PlatformFactoryImpl::Register(const infra::Function<void()>& handler)
+    {
+        pendSvLowPriorityInterrupt.Register(handler);
     }
 
     void PlatformFactoryImpl::PendSvLowPriorityInterrupt::Trigger()
@@ -126,24 +136,74 @@ namespace application
         return 0;
     }
 
-    infra::CreatorBase<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)>& PlatformFactoryImpl::SynchronousThreeChannelsPwmCreator()
+    void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds /*deadTime*/, SampleAndHold /*sampleAndHold*/)
     {
-        return pwmBrushless;
+        phaseCurrentAdc.reset();
+        phaseCurrentAdc.emplace(0.0f, 0.0f);
+        pwm.reset();
+        pwm.emplace();
+        pwmBaseFrequency = baseFrequency;
     }
 
-    infra::CreatorBase<AdcPhaseCurrentMeasurement, void(PlatformFactory::SampleAndHold)>& PlatformFactoryImpl::AdcMultiChannelCreator()
+    void PlatformFactoryImpl::SetEncoderResolution(uint32_t resolution)
     {
-        return adcCurrentPhases;
+        encoder.reset();
+        encoder.emplace(resolution);
     }
 
-    infra::CreatorBase<QuadratureEncoderDecorator, void()>& PlatformFactoryImpl::SynchronousQuadratureEncoderCreator()
+    void PlatformFactoryImpl::ConfigureCanBus(uint32_t /*bitRate*/, bool /*testMode*/)
     {
-        return synchronousQuadratureEncoderCreator;
+        canBus.reset();
+        canBus.emplace();
     }
 
-    infra::CreatorBase<CanBusAdapter, void(uint32_t bitRate, bool testMode)>& PlatformFactoryImpl::CanBusCreator()
+    CanBusAdapter& PlatformFactoryImpl::CanBus()
     {
-        return canCreator;
+        return *canBus;
+    }
+
+    void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz /*baseFrequency*/, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+    {
+        phaseCurrentAdc->Measure([onDone](foc::Ampere a, foc::Ampere b, foc::Ampere c)
+            {
+                onDone(foc::PhaseCurrents{ a, b, c });
+            });
+    }
+
+    void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
+    {
+        if (pwm)
+            pwm->Start(dutyPhases.a, dutyPhases.b, dutyPhases.c);
+    }
+
+    void PlatformFactoryImpl::Stop()
+    {
+        if (pwm)
+            pwm->Stop();
+    }
+
+    hal::Hertz PlatformFactoryImpl::BaseFrequency() const
+    {
+        return pwmBaseFrequency;
+    }
+
+    foc::Radians PlatformFactoryImpl::Read()
+    {
+        if (!encoder)
+            return foc::Radians{ 0.0f };
+        return encoder->Read() - encoderOffset;
+    }
+
+    void PlatformFactoryImpl::Set(foc::Radians value)
+    {
+        if (encoder)
+            encoderOffset = encoder->Read() - value;
+    }
+
+    void PlatformFactoryImpl::SetZero()
+    {
+        if (encoder)
+            encoderOffset = encoder->Read();
     }
 
     hal::Eeprom& PlatformFactoryImpl::Eeprom()
@@ -202,15 +262,15 @@ namespace application
     {
     }
 
-    void PlatformFactoryImpl::SynchronousThreeChannelsPwmStub::SetBaseFrequency(hal::Hertz baseFrequency)
+    void PlatformFactoryImpl::ThreeChannelsPwmStub::SetBaseFrequency(hal::Hertz baseFrequency)
     {
     }
 
-    void PlatformFactoryImpl::SynchronousThreeChannelsPwmStub::Stop()
+    void PlatformFactoryImpl::ThreeChannelsPwmStub::Stop()
     {
     }
 
-    void PlatformFactoryImpl::SynchronousThreeChannelsPwmStub::Start(hal::Percent dutyCycle1, hal::Percent dutyCycle2, hal::Percent dutyCycle3)
+    void PlatformFactoryImpl::ThreeChannelsPwmStub::Start(hal::Percent dutyCycle1, hal::Percent dutyCycle2, hal::Percent dutyCycle3)
     {
     }
 

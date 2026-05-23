@@ -343,7 +343,7 @@ The integration test suite verifies the cooperative behaviour of three core subs
 2. **Non-Volatile Memory stack** — the chain from the NVM region abstraction through the EEPROM interface to the concrete NVM service. Integration tests use a real in-memory EEPROM stub rather than a mocked NVM service.
 3. **CAN-to-State-Machine bridge** — the observer that translates CAN FOC motor commands into state machine transition commands.
 
-Platform hardware (ADC, PWM, encoder) is mocked at the application-decorator level using hardware-interface mocks injected through creator proxies. The Platform Factory interface is fulfilled by a test double whose creator methods hand out these proxies, allowing the real Platform Adapter to be exercised unchanged. EEPROM storage is provided by an in-memory stub that satisfies the EEPROM interface and persists data across the lifetime of a single test scenario.
+Platform hardware is mocked by replacing `PlatformFactory` with a `PlatformFactoryMock` that stubs the inherited `foc::ThreePhaseInverter` (`PhaseCurrentsReady`, `ThreePhasePwmOutput`, `Start`, `Stop`, `BaseFrequency`, `MaxCurrentSupported`) and `foc::Encoder` (`Read`, `Set`, `SetZero`) methods directly. There is no separate platform-adapter layer between the factory and the FOC pipeline. EEPROM storage is provided by an in-memory stub that satisfies the EEPROM interface and persists data across the lifetime of a single test scenario.
 
 Integration tests run exclusively on the host build. The host event dispatcher simulates the asynchronous callback chains used by NVM and calibration services. All mock instances use strict mock policies; lenient mocking is forbidden.
 
@@ -351,13 +351,12 @@ Integration tests run exclusively on the host build. The host event dispatcher s
 graph TD
     subgraph "Integration Test Harness"
         FIF[FOC Integration Fixture]
-        PFM[Platform Factory Mock]
-        HWM[Hardware Mocks + CreatorMocks]
+        PFM[PlatformFactoryMock]
+        HWM[PlatformFactoryMock + EepromStub]
         EES[EEPROM Stub]
     end
 
     subgraph "System Under Test"
-        PA[Platform Adapter]
         SM[FOC State Machine]
         NVM[NVM Stack]
     end
@@ -382,9 +381,7 @@ graph TD
     FIF --> AMK
     FIF --> FNM
 
-    PFM --> PA
-    HWM --> PA
-    PA --> SM
+    PFM --> SM
     NVM --> EES
     SM --> EIM
     SM --> AMK
@@ -398,7 +395,7 @@ graph TD
 
 | Boundary                                 | Real Component                                             | Test Double                                                                  |
 |------------------------------------------|------------------------------------------------------------|------------------------------------------------------------------------------|
-| Platform peripherals (ADC, PWM, encoder) | Platform Adapter (real) backed by hardware-interface mocks | Test fixture owns creator proxies; Platform Factory test double returns them |
+| Platform peripherals (PWM, encoder, current sense) | `PlatformFactoryMock` (single GMock) | Inverter and encoder hot-path methods mocked directly on the factory; default `EXPECT_CALL`s in the fixture constructor |
 | EEPROM storage                           | In-memory 512-byte array                                   | Replaces embedded EEPROM driver                                              |
 | Calibration services                     | Electrical identification mock, alignment mock             | `StrictMock<>` wrapping service interfaces                                   |
 | Fault notification                       | Fault notifier mock                                        | `StrictMock<>` wrapping fault notifier                                       |

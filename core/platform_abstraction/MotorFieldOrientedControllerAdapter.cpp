@@ -6,7 +6,7 @@ namespace application
     PlatformAdapter::PlatformAdapter(PlatformFactory& hardware)
         : platformFactory{ hardware }
         , adcMultiChannelCreator{ hardware.AdcMultiChannelCreator(), PlatformFactory::SampleAndHold::shorter }
-        , synchronousThreeChannelsPwmCreator{ hardware.SynchronousThreeChannelsPwmCreator(), pwmDeadTime, pwmBaseFrequency }
+        , threeChannelsPwmCreator{ hardware.ThreeChannelsPwmCreator(), pwmDeadTime, pwmBaseFrequency }
         , synchronousQuadratureEncoderCreator(hardware.SynchronousQuadratureEncoderCreator())
     {
     }
@@ -14,7 +14,7 @@ namespace application
     void PlatformAdapter::PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone)
     {
         onPhaseCurrentsReady = onDone;
-        synchronousThreeChannelsPwmCreator->SetBaseFrequency(baseFrequency);
+        threeChannelsPwmCreator->SetBaseFrequency(baseFrequency);
         adcMultiChannelCreator->Measure([this](auto phaseA, auto phaseB, auto phaseC)
             {
                 onPhaseCurrentsReady(foc::PhaseCurrents{ phaseA, phaseB, phaseC });
@@ -23,17 +23,17 @@ namespace application
 
     void PlatformAdapter::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        synchronousThreeChannelsPwmCreator->Start(dutyPhases.a, dutyPhases.b, dutyPhases.c);
+        threeChannelsPwmCreator->Start(dutyPhases.a, dutyPhases.b, dutyPhases.c);
     }
 
     void PlatformAdapter::Start()
     {
-        synchronousThreeChannelsPwmCreator->Start(hal::Percent{ 1 }, hal::Percent{ 1 }, hal::Percent{ 1 });
+        threeChannelsPwmCreator->Start(hal::Percent{ 1 }, hal::Percent{ 1 }, hal::Percent{ 1 });
     }
 
     void PlatformAdapter::Stop()
     {
-        synchronousThreeChannelsPwmCreator->Stop();
+        threeChannelsPwmCreator->Stop();
     }
 
     hal::Hertz PlatformAdapter::BaseFrequency() const

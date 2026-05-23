@@ -3,9 +3,13 @@
 #include <algorithm>
 #include <array>
 #include HARDWARE_PINS_AND_PERIPHERALS_HEADER
+#include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
+#include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
+#include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/interfaces/SerialCommunication.hpp"
+#include "numerical/math/CompilerOptimizations.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
 
@@ -14,11 +18,18 @@ namespace application
     class PlatformFactoryImpl
         : public PlatformFactory
         , public hal::PerformanceTracker
+        , public foc::LowPriorityInterrupt
     {
     public:
         explicit PlatformFactoryImpl(const infra::Function<void()>& onInitialized);
 
-        // Implementation of PlatformFactory
+        // Implementation of PlatformFactory — configuration
+        void ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold) override;
+        void SetEncoderResolution(uint32_t resolution) override;
+        void ConfigureCanBus(uint32_t bitRate, bool testMode) override;
+        CanBusAdapter& CanBus() override;
+
+        // Implementation of PlatformFactory — accessors
         void Run() override;
         services::Tracer& Tracer() override;
         services::TerminalWithCommands& Terminal() override;
@@ -26,20 +37,34 @@ namespace application
         hal::PerformanceTracker& PerformanceTimer() override;
         hal::Hertz SystemClock() const override;
         foc::Volts PowerSupplyVoltage() override;
-        foc::Ampere MaxCurrentSupported() override;
         foc::LowPriorityInterrupt& LowPriorityInterrupt() override;
-        infra::CreatorBase<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)>& SynchronousThreeChannelsPwmCreator() override;
-        infra::CreatorBase<AdcPhaseCurrentMeasurement, void(SampleAndHold)>& AdcMultiChannelCreator() override;
-        infra::CreatorBase<QuadratureEncoderDecorator, void()>& SynchronousQuadratureEncoderCreator() override;
-        infra::CreatorBase<CanBusAdapter, void(uint32_t bitRate, bool testMode)>& CanBusCreator() override;
         hal::Eeprom& Eeprom() override;
         void Reset() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
 
-        // Implementation of hal::PerformanceTracker
+        void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>&) override
+        {}
+
+        // Implementation of hal::PerformanceTracker (Start also satisfies ThreePhaseInverter::Start — no-op on ST)
         void Start() override;
         uint32_t ElapsedCycles() override;
+
+        // Implementation of LowPriorityInterrupt
+        void Trigger() override;
+        void Register(const infra::Function<void()>& handler) override;
+
+        // Implementation of foc::ThreePhaseInverter
+        void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
+        void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
+        void Stop() override;
+        hal::Hertz BaseFrequency() const override;
+        foc::Ampere MaxCurrentSupported() const override;
+
+        // Implementation of foc::Encoder
+        foc::Radians Read() override;
+        void Set(foc::Radians value) override;
+        void SetZero() override;
 
     private:
         struct PendSvLowPriorityInterrupt
@@ -84,11 +109,11 @@ namespace application
             void Stop() override;
         };
 
-        class SynchronousThreeChannelsPwmStub
-            : public hal::SynchronousThreeChannelsPwm
+        class ThreeChannelsPwmStub
+            : public hal::ThreeChannelsPwm
         {
         public:
-            // Implementation of hal::SynchronousThreeChannelsPwm
+            // Implementation of hal::ThreeChannelsPwm
             void SetBaseFrequency(hal::Hertz baseFrequency) override;
             void Stop() override;
             void Start(hal::Percent dutyCycle1, hal::Percent dutyCycle2, hal::Percent dutyCycle3) override;
@@ -190,24 +215,14 @@ namespace application
         GpioPinStub pin;
         SerialCommunicationStub serial;
         TerminalAndTracer terminalAndTracer{ serial };
-        infra::Creator<AdcPhaseCurrentMeasurement, AdcPhaseCurrentMeasurementImpl<AdcMultiChannelStub>, void(SampleAndHold)> adcCurrentPhases{ [this](auto& object, auto sampleAndHold)
-            {
-                object.emplace(0.0f, 0.0f);
-            } };
-        infra::Creator<hal::SynchronousThreeChannelsPwm, SynchronousThreeChannelsPwmStub, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)> pwmBrushless{ [this](auto& object, auto deadTime, auto frequency)
-            {
-                object.emplace();
-            } };
-        infra::Creator<QuadratureEncoderDecorator, QuadratureEncoderDecoratorImpl<SynchronousQuadratureEncoderStub>, void()> synchronousQuadratureEncoderCreator{ [this](auto& object)
-            {
-                object.emplace(0);
-            } };
-        infra::Creator<CanBusAdapter, CanBusAdapterImpl<CanStub>, void(uint32_t bitRate, bool testMode)> canCreator{ [this](auto& object, auto, auto)
-            {
-                object.emplace();
-            } };
+        std::optional<AdcPhaseCurrentMeasurementImpl<AdcMultiChannelStub>> phaseCurrentAdc;
+        std::optional<ThreeChannelsPwmStub> pwm;
+        std::optional<QuadratureEncoderDecoratorImpl<SynchronousQuadratureEncoderStub>> encoder;
+        std::optional<CanBusAdapterImpl<CanStub>> canBus;
         EepromStub eepromStub;
         ResetCause resetCause{ ResetCause::powerUp };
         infra::BoundedString::WithStorage<1024> faultStatusString;
+        hal::Hertz pwmBaseFrequency{ 10000 };
+        foc::Radians encoderOffset{ 0.0f };
     };
 }

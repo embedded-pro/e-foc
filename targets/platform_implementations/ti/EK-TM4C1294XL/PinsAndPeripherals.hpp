@@ -5,6 +5,7 @@
 #include "hal_tiva/tiva/ClockTm4c129.hpp"
 #include "hal_tiva/tiva/Gpio.hpp"
 #include "hal_tiva/tiva/PinoutTableDefaultTm4c129.hpp"
+#include "hal_tiva/tiva/Pwm.hpp"
 
 namespace application
 {
@@ -44,7 +45,7 @@ namespace application
 
     namespace Peripheral
     {
-        using hal_pwm = hal::tiva::SynchronousPwm;
+        using hal_pwm = hal::tiva::Pwm;
 
         constexpr static uint8_t QeiIndex = 0;
         constexpr static uint8_t AdcIndex = 0;
@@ -53,13 +54,41 @@ namespace application
         constexpr static uint8_t PwmIndex = 0;
         constexpr static uint8_t CanIndex = 0;
 
+        // ADC digital comparator indices mapped to PWM FLTSRC1 lines.
+        // DCMP0 (PB4 / ADC10) → overcurrent trip; DCMP1 (PB5 / ADC11) → overvoltage trip.
+        constexpr static bool hasFaultComparators = true;
+        constexpr static uint8_t OvercurrentComparatorIndex = 0;
+        constexpr static uint8_t OvervoltageComparatorIndex = 1;
+
+        // Overvoltage: bus voltage limit 58 V; divider factor = 18.433.
+        // count = (58 / (3.3 * 18.433)) * 4096
+        constexpr static float adcReferenceVoltage = 3.3f;
+        constexpr static float adcResolution = 4096.0f;
+        constexpr static float voltageToVolts = 18.433f;
+        constexpr static float overvoltageThresholdVolts = 58.0f;
+        constexpr static uint16_t overvoltageThresholdCounts = static_cast<uint16_t>(
+            (overvoltageThresholdVolts / (adcReferenceVoltage * voltageToVolts)) * adcResolution);
+
+        // Overcurrent on PB4: assume 0–15 A sensor → 0–3.3 V; trip at 12 A (80 %).
+        constexpr static float maxCurrentAmps = 15.0f;
+        constexpr static float overcurrentThresholdAmps = 12.0f;
+        constexpr static uint16_t overcurrentThresholdCounts = static_cast<uint16_t>(
+            (overcurrentThresholdAmps / maxCurrentAmps) * (adcResolution - 1.0f));
+
         static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator1;
 
-        static hal_pwm::PinChannel pwmPhase1{ hal_pwm::GeneratorIndex::generator1, Pins::pwmPhase1a, Pins::pwmPhase1b, true, true, std::make_optional(hal::tiva::SynchronousPwm::PinChannel::Trigger::countZero) };
-        static hal_pwm::PinChannel pwmPhase2{ hal_pwm::GeneratorIndex::generator2, Pins::pwmPhase2a, Pins::pwmPhase2b, true, true, std::nullopt };
-        static hal_pwm::PinChannel pwmPhase3{ hal_pwm::GeneratorIndex::generator3, Pins::pwmPhase3a, Pins::pwmPhase3b, true, true, std::nullopt };
+        static hal_pwm::PinChannel asyncPwmPhase1{ hal_pwm::GeneratorIndex::generator1, Pins::pwmPhase1a, Pins::pwmPhase1b, true, true, std::make_optional(hal::tiva::Pwm::PinChannel::Trigger::countZero) };
+        static hal_pwm::PinChannel asyncPwmPhase2{ hal_pwm::GeneratorIndex::generator2, Pins::pwmPhase2a, Pins::pwmPhase2b, true, true, std::nullopt };
+        static hal_pwm::PinChannel asyncPwmPhase3{ hal_pwm::GeneratorIndex::generator3, Pins::pwmPhase3a, Pins::pwmPhase3b, true, true, std::nullopt };
 
-        static std::array<hal_pwm::PinChannel, 3> pwmPhases{ { pwmPhase1, pwmPhase2, pwmPhase3 } };
+        static std::array<hal_pwm::PinChannel, 3> asyncPwmPhases{ { asyncPwmPhase1, asyncPwmPhase2, asyncPwmPhase3 } };
+
+        // Synchronous PWM stubs — not used on this board; required for compilation only.
+        static hal::tiva::SynchronousPwm::PinChannel syncPwmPhase1{ hal::tiva::SynchronousPwm::GeneratorIndex::generator0, Pins::pwmPhase1a, Pins::pwmPhase1b, true, true, std::nullopt };
+        static hal::tiva::SynchronousPwm::PinChannel syncPwmPhase2{ hal::tiva::SynchronousPwm::GeneratorIndex::generator1, Pins::pwmPhase2a, Pins::pwmPhase2b, true, true, std::nullopt };
+        static hal::tiva::SynchronousPwm::PinChannel syncPwmPhase3{ hal::tiva::SynchronousPwm::GeneratorIndex::generator2, Pins::pwmPhase3a, Pins::pwmPhase3b, true, true, std::nullopt };
+
+        static std::array<hal::tiva::SynchronousPwm::PinChannel, 3> syncPwmPhases{ { syncPwmPhase1, syncPwmPhase2, syncPwmPhase3 } };
     }
 
     namespace Clocks

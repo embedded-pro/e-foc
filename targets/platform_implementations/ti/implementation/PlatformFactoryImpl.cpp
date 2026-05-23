@@ -5,6 +5,10 @@
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC optimize("O3", "fast-math")
+#endif
+
 namespace
 {
     infra::Function<void()>* pendSvHandlerCallback = nullptr;
@@ -85,7 +89,7 @@ namespace application
 
     hal::PerformanceTracker& PlatformFactoryImpl::PerformanceTimer()
     {
-        return *this;
+        return peripherals->performanceTrackerImpl;
     }
 
     hal::Hertz PlatformFactoryImpl::SystemClock() const
@@ -100,7 +104,7 @@ namespace application
         return foc::Volts{ static_cast<float>(samples.front()) * AdcForPowerSupplyMeasurementImpl::adcToVoltsFactor };
     }
 
-    foc::Ampere PlatformFactoryImpl::MaxCurrentSupported()
+    foc::Ampere PlatformFactoryImpl::MaxCurrentSupported() const
     {
         return foc::Ampere(15.0f);
     }
@@ -121,41 +125,182 @@ namespace application
         pendSvHandlerCallback = &onLowPriorityInterrupt;
     }
 
+    PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::PerformanceTrackerImpl(hal::DataWatchPointAndTrace& dwt, hal::OutputPin& pin)
+        : dwt(dwt)
+        , pin(pin)
+    {}
+
+    void PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::Start()
+    {
+        pin.Set(true);
+    }
+
+    uint32_t PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::ElapsedCycles()
+    {
+        pin.Set(false);
+        return dwt.Stop();
+    }
+
+    void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold)
+    {
+        using namespace std::chrono_literals;
+        auto& impl = peripherals->adcForPhaseCurrentMeasurementImpl;
+
+        auto& adcCfg = impl.adcConfig;
+        adcCfg.sampleAndHold = impl.toSampleAndHold.at(static_cast<std::size_t>(sampleAndHold));
+        if constexpr (Peripheral::hasFaultComparators)
+            adcCfg.digitalComparators = infra::MakeRange(impl.digitalComparators);
+
+        peripherals->phaseCurrentAdc.reset();
+        peripherals->phaseCurrentAdc.emplace(
+            AdcForPhaseCurrentMeasurementImpl::adcToAmpereSlope,
+            AdcForPhaseCurrentMeasurementImpl::adcToAmpereOffset,
+            Peripheral::AdcIndex,
+            Peripheral::AdcSequencerIndex,
+            impl.currentPhaseAnalogPins,
+            adcCfg);
+
+        peripherals->asyncPwm.reset();
+        peripherals->syncPwm.reset();
+        if (Peripheral::hasFaultComparators)
+        {
+            auto& cfg = peripherals->asyncPwmConfig;
+            cfg.deadTimeConfig.fallInClockCycles = hal::tiva::Pwm::CalculateDeadTimeCycles(deadTime, cfg.clockDivisor);
+            cfg.deadTimeConfig.riseInClockCycles = hal::tiva::Pwm::CalculateDeadTimeCycles(deadTime, cfg.clockDivisor);
+            cfg.pwmConfig.deadTime = std::make_optional(cfg.deadTimeConfig);
+
+            peripherals->asyncPwm.emplace(
+                Peripheral::PwmIndex,
+                infra::MakeRange(Peripheral::asyncPwmPhases),
+                cfg.pwmConfig,
+                infra::Function<void(hal::tiva::Pwm::NormalEvent)>{},
+                [this](hal::tiva::Pwm::FaultEvent ev)
+                {
+                    if (!onFaultCallback)
+                        return;
+                    const auto bits = static_cast<uint8_t>(ev.comparatorInputsByGenerator[1]);
+                    if (bits & static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator0))
+                        onFaultCallback(PlatformFactory::BoardProtectionReason::overCurrent);
+                    if (bits & static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1))
+                        onFaultCallback(PlatformFactory::BoardProtectionReason::overVoltage);
+                });
+        }
+        else
+        {
+            auto& cfg = peripherals->syncPwmConfig;
+            cfg.deadTimeConfig.fallInClockCycles = hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(deadTime, cfg.clockDivisor);
+            cfg.deadTimeConfig.riseInClockCycles = hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(deadTime, cfg.clockDivisor);
+            cfg.pwmConfig.deadTime = std::make_optional(cfg.deadTimeConfig);
+
+            peripherals->syncPwm.emplace(
+                Peripheral::PwmIndex,
+                infra::MakeRange(Peripheral::syncPwmPhases),
+                cfg.pwmConfig);
+        }
+        if (Peripheral::hasFaultComparators)
+            peripherals->asyncPwm->SetBaseFrequency(baseFrequency);
+        else
+            peripherals->syncPwm->SetBaseFrequency(baseFrequency);
+        pwmBaseFrequency = baseFrequency;
+    }
+
+    void PlatformFactoryImpl::SetEncoderResolution(uint32_t resolution)
+    {
+        using Conf = hal::tiva::QuadratureEncoder::Config;
+        hal::tiva::QuadratureEncoder::Config qeiConfig{ resolution, 0, false, false, false,
+            Conf::ResetMode::onMaxPosition, Conf::CaptureMode::phaseAandPhaseB, Conf::SignalMode::quadrature };
+        peripherals->encoder.reset();
+        peripherals->encoder.emplace(resolution, Peripheral::QeiIndex, Pins::encoderA, Pins::encoderB, Pins::encoderZ, qeiConfig);
+    }
+
+    void PlatformFactoryImpl::ConfigureCanBus(uint32_t bitRate, bool testMode)
+    {
+        hal::tiva::Can::Config canConfig;
+        canConfig.timing = hal::tiva::Can::BitRate{ bitRate };
+        canConfig.testMode = testMode;
+
+        peripherals->canBus.reset();
+        peripherals->canBus.emplace(
+            Peripheral::CanIndex,
+            Pins::canRx,
+            Pins::canTx,
+            canConfig,
+            infra::Function<void(hal::tiva::Can::Error)>([this](hal::tiva::Can::Error error)
+                {
+                    peripherals->canBus->InvokeErrorHandler(ToAdapterError(error));
+                }));
+    }
+
+    CanBusAdapter& PlatformFactoryImpl::CanBus()
+    {
+        return *peripherals->canBus;
+    }
+
+    OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+    {
+        onPhaseCurrentsReady = onDone;
+        if (Peripheral::hasFaultComparators)
+            peripherals->asyncPwm->SetBaseFrequency(baseFrequency);
+        else
+            peripherals->syncPwm->SetBaseFrequency(baseFrequency);
+        peripherals->phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
+            {
+                onPhaseCurrentsReady(foc::PhaseCurrents{ a, b, c });
+            });
+    }
+
+    OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
+    {
+        if (Peripheral::hasFaultComparators)
+            peripherals->asyncPwm->Start(dutyPhases.a, dutyPhases.b, dutyPhases.c);
+        else
+            peripherals->syncPwm->Start(dutyPhases.a, dutyPhases.b, dutyPhases.c);
+    }
+
     void PlatformFactoryImpl::Start()
     {
-        peripherals->cortex.dataWatchPointAndTrace.Start();
-        peripherals->performance.Set(true);
+        if (Peripheral::hasFaultComparators)
+            peripherals->asyncPwm->Start(hal::Percent{ 1 }, hal::Percent{ 1 }, hal::Percent{ 1 });
+        else
+            peripherals->syncPwm->Start(hal::Percent{ 1 }, hal::Percent{ 1 }, hal::Percent{ 1 });
     }
 
-    uint32_t PlatformFactoryImpl::ElapsedCycles()
+    void PlatformFactoryImpl::Stop()
     {
-        peripherals->performance.Set(false);
-        return peripherals->cortex.dataWatchPointAndTrace.Stop();
+        if (Peripheral::hasFaultComparators)
+            peripherals->asyncPwm->Stop();
+        else
+            peripherals->syncPwm->Stop();
     }
 
-    infra::CreatorBase<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)>& PlatformFactoryImpl::SynchronousThreeChannelsPwmCreator()
+    hal::Hertz PlatformFactoryImpl::BaseFrequency() const
     {
-        return peripherals->pwmImpl.pwmBrushless;
+        return pwmBaseFrequency;
     }
 
-    infra::CreatorBase<AdcPhaseCurrentMeasurement, void(PlatformFactory::SampleAndHold)>& PlatformFactoryImpl::AdcMultiChannelCreator()
+    OPTIMIZE_FOR_SPEED foc::Radians PlatformFactoryImpl::Read()
     {
-        return peripherals->adcForPhaseCurrentMeasurementImpl.adcCurrentPhases;
+        return peripherals->encoder->Read() - encoderOffset;
     }
 
-    infra::CreatorBase<QuadratureEncoderDecorator, void()>& PlatformFactoryImpl::SynchronousQuadratureEncoderCreator()
+    void PlatformFactoryImpl::Set(foc::Radians value)
     {
-        return peripherals->encoderImpl.synchronousQuadratureEncoderCreator;
+        encoderOffset = peripherals->encoder->Read() - value;
     }
 
-    infra::CreatorBase<CanBusAdapter, void(uint32_t bitRate, bool testMode)>& PlatformFactoryImpl::CanBusCreator()
+    void PlatformFactoryImpl::SetZero()
     {
-        return peripherals->canImpl.canCreator;
+        encoderOffset = peripherals->encoder->Read();
     }
 
     hal::Eeprom& PlatformFactoryImpl::Eeprom()
     {
         return peripherals->eepromPeripheral;
+    }
+
+    void PlatformFactoryImpl::RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>& onProtection)
+    {
+        onFaultCallback = onProtection;
     }
 
     void PlatformFactoryImpl::Reset()

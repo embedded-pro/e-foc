@@ -21,8 +21,6 @@ target_sources(e_foc.platform_abstraction PRIVATE
     CanBusAdapter.hpp
     PlatformFactory.hpp
     PlatformFactory.cpp
-    MotorFieldOrientedControllerAdapter.hpp
-    MotorFieldOrientedControllerAdapter.cpp
     QuadratureEncoderDecorator.hpp
 )
 add_subdirectory(test_doubles)

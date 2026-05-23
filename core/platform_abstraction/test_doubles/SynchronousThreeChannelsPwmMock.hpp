@@ -1,12 +1,12 @@
 #pragma once
 
-#include "hal/synchronous_interfaces/SynchronousPwm.hpp"
+#include "hal/interfaces/Pwm.hpp"
 #include <gmock/gmock.h>
 
 namespace hal
 {
-    class SynchronousThreeChannelsPwmMock
-        : public SynchronousThreeChannelsPwm
+    class ThreeChannelsPwmMock
+        : public ThreeChannelsPwm
     {
     public:
         MOCK_METHOD(void, SetBaseFrequency, (Hertz baseFrequency), (override));

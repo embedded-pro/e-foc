@@ -5,10 +5,6 @@
 #include "can-lite/core/test/CanMock.hpp"
 #include "core/foc/implementations/FocPositionImpl.hpp"
 #include "core/foc/implementations/test_doubles/DriversMock.hpp"
-#include "core/platform_abstraction/MotorFieldOrientedControllerAdapter.hpp"
-#include "core/platform_abstraction/test_doubles/AdcPhaseCurrentMeasurementMock.hpp"
-#include "core/platform_abstraction/test_doubles/QuadratureEncoderDecoratorMock.hpp"
-#include "core/platform_abstraction/test_doubles/SynchronousThreeChannelsPwmMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
 #include "core/services/cli/TerminalPosition.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
@@ -23,7 +19,6 @@
 #include "infra/stream/OutputStream.hpp"
 #include "infra/stream/test/StreamMock.hpp"
 #include "infra/util/Function.hpp"
-#include "infra/util/test_helper/ProxyCreatorMock.hpp"
 #include "integration_tests/software_in_the_loop/support/EepromStub.hpp"
 #include "integration_tests/software_in_the_loop/support/FocMotorStateMachineBridge.hpp"
 #include "integration_tests/software_in_the_loop/support/PlatformFactoryMock.hpp"
@@ -84,22 +79,8 @@ namespace integration
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ serialCommunication, tracer };
         services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
-        testing::StrictMock<application::AdcPhaseCurrentMeasurementMock> adcPhaseCurrentMock;
-        testing::StrictMock<hal::SynchronousThreeChannelsPwmMock> pwmMock;
-        testing::StrictMock<application::QuadratureEncoderDecoratorMock> encoderDecoratorMock;
-
-        infra::CreatorMock<application::AdcPhaseCurrentMeasurement,
-            void(application::PlatformFactory::SampleAndHold)>
-            adcCreator{ adcPhaseCurrentMock };
-        infra::CreatorMock<hal::SynchronousThreeChannelsPwm,
-            void(std::chrono::nanoseconds, hal::Hertz)>
-            pwmCreator{ pwmMock };
-        infra::CreatorMock<application::QuadratureEncoderDecorator, void()> encoderCreator{ encoderDecoratorMock };
-
         testing::StrictMock<PlatformFactoryMock> platformFactory;
         EepromStub eepromStub;
-
-        std::optional<application::PlatformAdapter> platformAdapter;
 
         services::NvmEepromRegion calibrationRegion{ eepromStub, 0, 128 };
         services::NvmEepromRegion configRegion{ eepromStub, 128, 128 };

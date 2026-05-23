@@ -35,7 +35,7 @@ namespace application
         hal::Hertz pwmBaseFrequency{ 10000 };
         std::chrono::nanoseconds pwmDeadTime{ 500 };
         infra::ProxyCreator<AdcPhaseCurrentMeasurement, void(PlatformFactory::SampleAndHold)> adcMultiChannelCreator;
-        infra::ProxyCreator<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)> synchronousThreeChannelsPwmCreator;
+        infra::ProxyCreator<hal::ThreeChannelsPwm, void(std::chrono::nanoseconds deadTime, hal::Hertz frequency)> threeChannelsPwmCreator;
         infra::ProxyCreator<QuadratureEncoderDecorator, void()> synchronousQuadratureEncoderCreator;
         infra::Function<void(foc::PhaseCurrents currentPhases)> onPhaseCurrentsReady;
     };
