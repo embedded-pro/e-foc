@@ -8,7 +8,9 @@
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
 #include "hal/interfaces/Gpio.hpp"
+#include "hal/interfaces/Pwm.hpp"
 #include "hal/interfaces/SerialCommunication.hpp"
+#include "hal/synchronous_interfaces/SynchronousQuadratureEncoder.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
@@ -224,5 +226,6 @@ namespace application
         infra::BoundedString::WithStorage<1024> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 10000 };
         foc::Radians encoderOffset{ 0.0f };
+        infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
     };
 }

@@ -164,9 +164,10 @@ namespace application
 
     void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz /*baseFrequency*/, const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
-        phaseCurrentAdc->Measure([onDone](foc::Ampere a, foc::Ampere b, foc::Ampere c)
+        onPhaseCurrentsReady = onDone;
+        phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
             {
-                onDone(foc::PhaseCurrents{ a, b, c });
+                onPhaseCurrentsReady(foc::PhaseCurrents{ a, b, c });
             });
     }
 

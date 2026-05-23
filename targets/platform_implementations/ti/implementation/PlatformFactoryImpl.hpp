@@ -101,8 +101,7 @@ namespace application
 
         struct AdcForPowerSupplyMeasurementImpl
         {
-            static constexpr float voltageToVolts = 18.433f;
-            static constexpr float adcToVoltsFactor = (adcReferenceVoltage / adcResolution) * voltageToVolts;
+            static constexpr float adcToVoltsFactor = application::BoardCharacteristics::AdcToVoltsFactor(adcReferenceVoltage, adcResolution);
             infra::Function<void(std::tuple<infra::Ampere, infra::Ampere, infra::Ampere> voltagePhases)> phaseCurrentsReady;
             std::array<hal::tiva::AnalogPin, 1> powerSupplyAnalogPins{ { hal::tiva::AnalogPin{ Pins::powerSupplyVoltage } } };
             constexpr static auto powerSupplyOversampling = hal::tiva::SynchronousAdc::Oversampling::oversampling8;
@@ -117,9 +116,8 @@ namespace application
                 hal::tiva::Adc::SampleAndHold::sampleAndHold32,
                 hal::tiva::Adc::SampleAndHold::sampleAndHold64,
                 hal::tiva::Adc::SampleAndHold::sampleAndHold256 } };
-            static constexpr float voltageToCurrent = 5.0f;
-            static constexpr float adcToAmpereSlope = (adcReferenceVoltage / adcResolution) * voltageToCurrent;
-            static constexpr float adcToAmpereOffset = -(adcReferenceVoltage / 2.0f) * voltageToCurrent; // adc midpoint reference
+            static constexpr float adcToAmpereSlope = application::BoardCharacteristics::AdcToAmpereSlope(adcReferenceVoltage, adcResolution);
+            static constexpr float adcToAmpereOffset = application::BoardCharacteristics::AdcToAmpereOffset(adcReferenceVoltage);
 
             static constexpr hal::tiva::Adc::SamplingDelay phaseDelay{ 4 };
             static constexpr auto currentSensingOversampling = hal::tiva::Adc::Oversampling::oversampling2;

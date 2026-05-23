@@ -118,7 +118,8 @@
                 "TARGET_CORTEX": "m4",
                 "TARGET_MCU_FAMILY": "TM4C129",
                 "TARGET_MCU": "tm4c1294ncpdt",
-                "E_FOC_TARGET_BOARD": "EK-TM4C1294XL"
+                "E_FOC_TARGET_BOARD": "EK-TM4C1294XL",
+                "E_FOC_MOTOR_BOARD": "FRDM-MC-LVPMSM"
             }
         },
         {
@@ -131,7 +132,8 @@
                 "TARGET_CORTEX": "m4",
                 "TARGET_MCU_FAMILY": "TM4C123",
                 "TARGET_MCU": "tm4c123gh6pm",
-                "E_FOC_TARGET_BOARD": "EK-TM4C123GXL"
+                "E_FOC_TARGET_BOARD": "EK-TM4C123GXL",
+                "E_FOC_MOTOR_BOARD": "FRDM-MC-LVPMSM"
             }
         },
         {
@@ -144,7 +146,8 @@
                 "TARGET_CORTEX": "m4",
                 "TARGET_MCU_FAMILY": "stm32f4xx",
                 "TARGET_MCU": "stm32f407",
-                "E_FOC_TARGET_BOARD": "STM32F407G-DISC1"
+                "E_FOC_TARGET_BOARD": "STM32F407G-DISC1",
+                "E_FOC_MOTOR_BOARD": "FRDM-MC-LVPMSM"
             }
         },
         {
@@ -157,7 +160,8 @@
                 "TARGET_CORTEX": "m33",
                 "TARGET_MCU_FAMILY": "stm32h5xx",
                 "TARGET_MCU": "stm32h563",
-                "E_FOC_TARGET_BOARD": "NUCLEO-H563ZI"
+                "E_FOC_TARGET_BOARD": "NUCLEO-H563ZI",
+                "E_FOC_MOTOR_BOARD": "FRDM-MC-LVPMSM"
             }
         }
     ],

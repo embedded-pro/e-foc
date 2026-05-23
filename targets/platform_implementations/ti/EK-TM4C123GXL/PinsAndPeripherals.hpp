@@ -55,17 +55,14 @@ namespace application
         constexpr static uint8_t CanIndex = 0;
 
         // Fault comparator support is not available on EK-TM4C123GXL.
-        constexpr static bool hasFaultComparators = false;
-        constexpr static uint8_t OvercurrentComparatorIndex = 0;
-        constexpr static uint8_t OvervoltageComparatorIndex = 1;
-        constexpr static float adcReferenceVoltage = 3.3f;
-        constexpr static float adcResolution = 4096.0f;
-        constexpr static float voltageToVolts = 1.0f;
-        constexpr static float overvoltageThresholdVolts = 0.0f;
-        constexpr static uint16_t overvoltageThresholdCounts = 0;
-        constexpr static float maxCurrentAmps = 15.0f;
-        constexpr static float overcurrentThresholdAmps = 12.0f;
-        constexpr static uint16_t overcurrentThresholdCounts = 0;
+        constexpr static bool hasFaultComparators{ false };
+        constexpr static uint8_t OvercurrentComparatorIndex{ 0 };
+        constexpr static uint8_t OvervoltageComparatorIndex{ 1 };
+        constexpr static float adcReferenceVoltage{ 3.3f };
+        constexpr static float adcResolution{ 4096.0f };
+        // Hardware comparators absent — trip counts not used; set to 0 explicitly.
+        constexpr static uint16_t overvoltageThresholdCounts{ 0 };
+        constexpr static uint16_t overcurrentThresholdCounts{ 0 };
 
         static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator0;
 

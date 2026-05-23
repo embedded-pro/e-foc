@@ -6,6 +6,7 @@
 #include "hal_tiva/tiva/Gpio.hpp"
 #include "hal_tiva/tiva/PinoutTableDefaultTm4c129.hpp"
 #include "hal_tiva/tiva/Pwm.hpp"
+#include MOTOR_BOARD_CHARACTERISTICS_HEADER
 
 namespace application
 {
@@ -60,20 +61,14 @@ namespace application
         constexpr static uint8_t OvercurrentComparatorIndex = 0;
         constexpr static uint8_t OvervoltageComparatorIndex = 1;
 
-        // Overvoltage: bus voltage limit 58 V; divider factor = 18.433.
-        // count = (58 / (3.3 * 18.433)) * 4096
-        constexpr static float adcReferenceVoltage = 3.3f;
-        constexpr static float adcResolution = 4096.0f;
-        constexpr static float voltageToVolts = 18.433f;
-        constexpr static float overvoltageThresholdVolts = 58.0f;
-        constexpr static uint16_t overvoltageThresholdCounts = static_cast<uint16_t>(
-            (overvoltageThresholdVolts / (adcReferenceVoltage * voltageToVolts)) * adcResolution);
+        constexpr static float adcReferenceVoltage{ 3.3f };
+        constexpr static float adcResolution{ 4096.0f };
 
-        // Overcurrent on PB4: assume 0–15 A sensor → 0–3.3 V; trip at 12 A (80 %).
-        constexpr static float maxCurrentAmps = 15.0f;
-        constexpr static float overcurrentThresholdAmps = 12.0f;
-        constexpr static uint16_t overcurrentThresholdCounts = static_cast<uint16_t>(
-            (overcurrentThresholdAmps / maxCurrentAmps) * (adcResolution - 1.0f));
+        // Fault trip thresholds derived from motor board shield characteristics.
+        constexpr static uint16_t overvoltageThresholdCounts =
+            application::BoardCharacteristics::OvervoltageThresholdCounts(adcReferenceVoltage, adcResolution);
+        constexpr static uint16_t overcurrentThresholdCounts =
+            application::BoardCharacteristics::OvercurrentThresholdCounts(adcResolution);
 
         static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator1;
 
