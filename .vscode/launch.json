@@ -141,6 +141,41 @@
             "overrideRestartCommands": [
                 "monitor reset"
             ]
+        },
+        {
+            "name": "HIL Tests",
+            "type": "cppdbg",
+            "request": "launch",
+            "preLaunchTask": "Build HIL tests",
+            "program": "${workspaceFolder}/build/host/integration_tests/hardware_in_the_loop/main/${input:hilBuildType}/e_foc.hil_tests",
+            "args": [
+                "--bridge-host",
+                "host.docker.internal",
+                "--serial-port",
+                "5000",
+                "--can-port",
+                "5001",
+                "--gdb-exe",
+                "/usr/bin/gdb-multiarch",
+                "--gdb-target",
+                "host.docker.internal:2334",
+                "--firmware-elf",
+                "${workspaceFolder}/build/${input:boardType}/targets/hardware_test/main/${input:hilBuildType}/e_foc.hardware_test.main.elf",
+                "${workspaceFolder}/integration_tests/hardware_in_the_loop/features"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
         }
     ],
     "inputs": [
@@ -154,6 +189,30 @@
                 "position"
             ],
             "default": "speed"
+        },
+        {
+            "id": "boardType",
+            "type": "pickString",
+            "description": "Select board type for HIL tests and target firmware",
+            "options": [
+                "EK-TM4C1294XL",
+                "EK-TM4C123GXL",
+                "STM32F407G-DISC1",
+                "NUCLEO-H563ZI"
+            ],
+            "default": "EK-TM4C1294XL"
+        },
+        {
+            "id": "hilBuildType",
+            "type": "pickString",
+            "description": "Select build type for HIL tests and target firmware",
+            "options": [
+                "Debug",
+                "Release",
+                "RelWithDebInfo",
+                "MinSizeRel"
+            ],
+            "default": "Debug"
         }
     ]
 }

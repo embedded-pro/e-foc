@@ -1,5 +1,5 @@
 add_executable(e_foc.tool.simulator.position_control)
-emil_build_for(e_foc.tool.simulator.position_control HOST All PREREQUISITE_BOOL E_FOC_BUILD_SIMULATOR)
+emil_build_for(e_foc.tool.simulator.position_control HOST All)
 
 target_link_libraries(e_foc.tool.simulator.position_control PUBLIC
     e_foc.tool.simulator.model

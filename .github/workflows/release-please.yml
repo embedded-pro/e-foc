@@ -27,7 +27,7 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: token
         with:
           app-id: ${{ vars.FOREST_RELEASER_APP_ID }}
@@ -109,7 +109,7 @@ jobs:
           submodules: recursive
       - uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
       - name: Install Qt6
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@v4.3.1
         with:
           version: "6.7.*"
           cache: true
@@ -119,7 +119,6 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_COMPILE_WARNING_AS_ERROR=On
           -DE_FOC_TARGET_PLATFORM=Host
-          -DE_FOC_BUILD_SIMULATOR=On
           -DE_FOC_BUILD_TESTS=Off
           -DNUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS=Off
       - name: Build

@@ -1,5 +1,5 @@
 add_executable(e_foc.tool.can_commander)
-emil_build_for(e_foc.tool.can_commander HOST All PREREQUISITE_BOOL E_FOC_BUILD_SIMULATOR)
+emil_build_for(e_foc.tool.can_commander HOST All)
 
 target_include_directories(e_foc.tool.can_commander PRIVATE
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../../..>"

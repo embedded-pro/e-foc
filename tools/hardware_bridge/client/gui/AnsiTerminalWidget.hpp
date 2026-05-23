@@ -19,7 +19,7 @@ namespace tool
         void SetInputEnabled(bool enabled);
 
     public slots:
-        void AppendData(const QByteArray& data);
+        void AppendData(const QByteArray& bytes);
         void Clear();
 
     signals:

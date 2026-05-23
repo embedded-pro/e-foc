@@ -35,9 +35,9 @@ namespace tool
 {
     // --- SerialObserver ---
 
-    BridgeController::SerialObserver::SerialObserver(BridgeController& parent, TcpClient& client)
+    BridgeController::SerialObserver::SerialObserver(BridgeController& owner, TcpClient& client)
         : TcpClientObserver(client)
-        , parent(parent)
+        , parent(owner)
     {}
 
     void BridgeController::SerialObserver::Connected()
@@ -60,9 +60,9 @@ namespace tool
 
     // --- CanObserver ---
 
-    BridgeController::CanObserver::CanObserver(BridgeController& parent, TcpClient& client)
+    BridgeController::CanObserver::CanObserver(BridgeController& owner, TcpClient& client)
         : TcpClientObserver(client)
-        , parent(parent)
+        , parent(owner)
     {}
 
     void BridgeController::CanObserver::Connected()

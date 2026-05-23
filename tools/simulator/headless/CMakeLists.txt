@@ -17,7 +17,7 @@ target_sources(e_foc.tool.simulator.headless PRIVATE
 )
 
 if(MSVC)
-    target_compile_options(e_foc.tool.simulator.headless PRIVATE /W4)
+    target_compile_options(e_foc.tool.simulator.headless PRIVATE /W4 /WX-)
 else()
     target_compile_options(e_foc.tool.simulator.headless PRIVATE
         -Wno-error
