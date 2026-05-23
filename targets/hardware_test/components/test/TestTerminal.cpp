@@ -1032,6 +1032,7 @@ TEST_F(TestHardwareTerminal, adc_buffer_full_triggers_processing)
         onPhaseCurrentsReady(phases);
 
     EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+    EXPECT_CALL(platformFactoryMock, Stop());
 
     onPhaseCurrentsReady(phases);
 
@@ -1046,6 +1047,7 @@ TEST_F(TestHardwareTerminal, adc_reconfigure_after_buffer_full)
         onPhaseCurrentsReady(phases);
 
     EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+    EXPECT_CALL(platformFactoryMock, Stop());
 
     onPhaseCurrentsReady(phases);
 

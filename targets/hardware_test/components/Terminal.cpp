@@ -353,6 +353,7 @@ namespace application
     void TerminalInteractor::ProcessAdcSamples()
     {
         adcActive_ = false;
+        hardware.Stop();
 
         tracer.Trace() << "  Current Phases [A;B;C] ampere";
 

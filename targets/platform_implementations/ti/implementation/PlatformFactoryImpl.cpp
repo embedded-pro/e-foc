@@ -132,6 +132,7 @@ namespace application
 
     void PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::Start()
     {
+        dwt.Start();
         pin.Set(true);
     }
 

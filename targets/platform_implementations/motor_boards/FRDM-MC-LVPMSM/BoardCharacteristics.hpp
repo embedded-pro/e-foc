@@ -32,7 +32,7 @@ namespace application
 
         static constexpr uint16_t OvervoltageThresholdCounts(float adcReferenceVoltage, float adcResolution)
         {
-            return static_cast<uint16_t>((overvoltageThresholdVolts / (adcReferenceVoltage * voltageToVolts)) * adcResolution);
+            return static_cast<uint16_t>((overvoltageThresholdVolts / (adcReferenceVoltage * voltageToVolts)) * (adcResolution - 1.0f));
         }
 
         static constexpr uint16_t OvercurrentThresholdCounts(float adcResolution)
@@ -41,6 +41,6 @@ namespace application
         }
     };
 
-    static_assert(BoardCharacteristics::OvervoltageThresholdCounts(3.3f, 4096.0f) == 3905u, "FRDM-MC-LVPMSM overvoltage threshold mismatch");
+    static_assert(BoardCharacteristics::OvervoltageThresholdCounts(3.3f, 4096.0f) == 3904u, "FRDM-MC-LVPMSM overvoltage threshold mismatch");
     static_assert(BoardCharacteristics::OvercurrentThresholdCounts(4096.0f) == 3276u, "FRDM-MC-LVPMSM overcurrent threshold mismatch");
 }
