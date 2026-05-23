@@ -76,8 +76,7 @@ e-foc/
 │   │   ├── PlatformFactory.hpp      # Abstract factory for peripherals
 │   │   ├── AdcPhaseCurrentMeasurement.hpp
 │   │   ├── CanBusAdapter.hpp
-│   │   ├── QuadratureEncoderDecorator.hpp
-│   │   └── MotorFieldOrientedControllerAdapter.hpp
+│   │   └── QuadratureEncoderDecorator.hpp
 │   ├── services/                    # Application-level services
 │   │   ├── alignment/               # Motor alignment and offset detection
 │   │   ├── cli/                     # Command-line interface service

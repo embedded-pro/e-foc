@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/foc/implementations/FocTorqueImpl.hpp"
-#include "core/platform_abstraction/MotorFieldOrientedControllerAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/cli/TerminalTorque.hpp"
@@ -28,7 +27,6 @@ namespace application
         explicit Logic(application::PlatformFactory& hardware);
 
     private:
-        PlatformAdapter platformAdapter;
         services::DebugLed debugLed;
         foc::Volts vdc;
         services::TerminalWithBanner::WithMaxSize<20> terminalWithStorage;
