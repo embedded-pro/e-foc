@@ -234,3 +234,42 @@ jobs:
       - name: Cycle analysis summary
         if: matrix.target == 'EK-TM4C1294XL'
         run: cat cycle-analysis-combined/combined_step_summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Run memory analysis
+        if: matrix.target == 'EK-TM4C1294XL'
+        uses: embedded-pro/cortex-memory-budget@b58a161015913e77cfe454532a84121cef5a18f5 # main
+        with:
+          comment-marker: '<!-- memory-analysis-comment -->'
+          analyses-json: |
+            [
+              {
+                "label": "Torque mode",
+                "elf_path": "build/${{ matrix.target }}/targets/sync_foc_sensored/torque/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.torque.main.elf",
+                "config_path": "targets/sync_foc_sensored/torque/memory-analysis.json",
+                "linker_script": "infra/hal/ti/tiva/ldscripts/mem_tm4c1294ncpdt.ld",
+                "output_dir": "memory-analysis-combined/torque"
+              },
+              {
+                "label": "Speed mode",
+                "elf_path": "build/${{ matrix.target }}/targets/sync_foc_sensored/speed/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.speed.main.elf",
+                "config_path": "targets/sync_foc_sensored/speed/memory-analysis.json",
+                "linker_script": "infra/hal/ti/tiva/ldscripts/mem_tm4c1294ncpdt.ld",
+                "output_dir": "memory-analysis-combined/speed"
+              },
+              {
+                "label": "Position mode",
+                "elf_path": "build/${{ matrix.target }}/targets/sync_foc_sensored/position/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.position.main.elf",
+                "config_path": "targets/sync_foc_sensored/position/memory-analysis.json",
+                "linker_script": "infra/hal/ti/tiva/ldscripts/mem_tm4c1294ncpdt.ld",
+                "output_dir": "memory-analysis-combined/position"
+              }
+            ]
+          target: ${{ matrix.target }}
+          build-config: ${{ matrix.configuration }}
+          cortex: "m4"
+          output-dir: memory-analysis-combined
+          post-comment: "true"
+          package-version: "@git+https://github.com/embedded-pro/cortex-memory-budget.git@b58a161015913e77cfe454532a84121cef5a18f5"
+          artifact-name: memory-analysis
+      - name: Memory analysis summary
+        if: matrix.target == 'EK-TM4C1294XL'
+        run: cat memory-analysis-combined/combined_step_summary.md >> "$GITHUB_STEP_SUMMARY"
