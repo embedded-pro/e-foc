@@ -200,8 +200,9 @@ jobs:
           configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
       - name: Run cycle analysis
         if: matrix.target == 'EK-TM4C1294XL'
-        uses: ./.github/actions/cycle-analysis
+        uses: embedded-pro/cortex-cycle-budget@9819544b7fdb3019cfbd37b2586157690d769321 # v0.2.0
         with:
+          comment-marker: '<!-- cycle-analysis-comment -->'
           analyses-json: |
             [
               {
