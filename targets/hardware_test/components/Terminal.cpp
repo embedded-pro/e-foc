@@ -238,6 +238,8 @@ namespace application
         if (!sampleAndHold)
             return { error, "invalid value. It should be one of: shortest, shorter, medium, longer, longest." };
 
+        adcActive_ = false;
+        hardware.ConfigureAdcAndPwm(currentPwmFrequency_, currentPwmDeadTime_, ToSampleAndHold(*sampleAndHold));
         StartAdc(ToSampleAndHold(*sampleAndHold));
 
         return { success };

@@ -242,6 +242,8 @@ TEST_F(TestHardwareTerminal, adc_command)
 {
     InvokeCommand("adc medium", [this]()
         {
+            ::testing::InSequence _;
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::medium)).Times(1);
             EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
         });
 
@@ -252,6 +254,8 @@ TEST_F(TestHardwareTerminal, adc_alias)
 {
     InvokeCommand("a shortest", [this]()
         {
+            ::testing::InSequence _;
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::shortest)).Times(1);
             EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
         });
 
@@ -790,6 +794,8 @@ TEST_F(TestHardwareTerminal, adc_shorter)
 {
     InvokeCommand("adc shorter", [this]()
         {
+            ::testing::InSequence _;
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::shorter)).Times(1);
             EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
         });
 
@@ -800,6 +806,8 @@ TEST_F(TestHardwareTerminal, adc_longer)
 {
     InvokeCommand("adc longer", [this]()
         {
+            ::testing::InSequence _;
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::longer)).Times(1);
             EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
         });
 
@@ -810,6 +818,8 @@ TEST_F(TestHardwareTerminal, adc_longest)
 {
     InvokeCommand("adc longest", [this]()
         {
+            ::testing::InSequence _;
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::longest)).Times(1);
             EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
         });
 
@@ -1055,6 +1065,8 @@ TEST_F(TestHardwareTerminal, adc_reconfigure_after_buffer_full)
 
     InvokeCommand("adc medium", [this]()
         {
+            ::testing::InSequence _;
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::medium)).Times(1);
             EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
         });
 
