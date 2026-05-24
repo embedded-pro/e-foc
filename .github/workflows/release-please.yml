@@ -222,19 +222,18 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Generate documentation PDFs
-        uses: ./.github/actions/build-documentation
+      - name: Generate documentation PDFs and traceability matrix
+        uses: embedded-pro/project-documentation@54fca1cb9925af16e53bd9d2640d1285560d295b # v0.2.0
         with:
+          run-build-documentation-pdfs: 'true'
+          run-traceability-matrix: 'true'
           version: ${{ needs.release_please.outputs.tag_name }}
           output-dir: docs-pdf
           artifact-name: documentation-pdfs
-      - name: Generate traceability matrix
-        uses: ./.github/actions/traceability-matrix
-        with:
           requirements-dir: documentation/requirements
           features-dir: integration_tests/software_in_the_loop/features
-          output: docs-pdf/traceability-matrix.md
-          pdf-output: docs-pdf/e_foc-traceability-matrix-${{ needs.release_please.outputs.tag_name }}.pdf
+          matrix-output: docs-pdf/traceability-matrix.md
+          matrix-pdf-output: docs-pdf/e_foc-traceability-matrix-${{ needs.release_please.outputs.tag_name }}.pdf
 
   publish_release_assets:
     name: Publish Release Assets
