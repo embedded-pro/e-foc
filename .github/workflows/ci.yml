@@ -268,7 +268,6 @@ jobs:
           cortex: "m4"
           output-dir: memory-analysis-combined
           post-comment: "true"
-          package-version: "@git+https://github.com/embedded-pro/cortex-memory-budget.git@30e949139cce9f9138a52505e96126fa47fd3a48"
           artifact-name: memory-analysis
       - name: Memory analysis summary
         if: matrix.target == 'EK-TM4C1294XL'
