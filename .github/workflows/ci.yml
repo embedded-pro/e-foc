@@ -236,7 +236,7 @@ jobs:
         run: cat cycle-analysis-combined/combined_step_summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Run memory analysis
         if: matrix.target == 'EK-TM4C1294XL'
-        uses: embedded-pro/cortex-memory-budget@b58a161015913e77cfe454532a84121cef5a18f5 # main
+        uses: embedded-pro/cortex-memory-budget@82021126c96f4daee482d3556e79449b888fc2cb
         with:
           comment-marker: '<!-- memory-analysis-comment -->'
           analyses-json: |
@@ -268,6 +268,7 @@ jobs:
           cortex: "m4"
           output-dir: memory-analysis-combined
           post-comment: "true"
+          package-version: "@git+https://github.com/embedded-pro/cortex-memory-budget.git@30e949139cce9f9138a52505e96126fa47fd3a48"
           artifact-name: memory-analysis
       - name: Memory analysis summary
         if: matrix.target == 'EK-TM4C1294XL'
