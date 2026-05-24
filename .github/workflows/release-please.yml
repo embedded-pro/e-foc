@@ -223,7 +223,7 @@ jobs:
           persist-credentials: false
           submodules: recursive
       - name: Generate documentation PDFs and traceability matrix
-        uses: embedded-pro/project-documentation@4b61de3b41661df6d7ee69f5091c27be8b557ee9 # v0.2.0
+        uses: embedded-pro/project-documentation@54fca1cb9925af16e53bd9d2640d1285560d295b # v0.2.0
         with:
           run-build-documentation-pdfs: 'true'
           run-traceability-matrix: 'true'
