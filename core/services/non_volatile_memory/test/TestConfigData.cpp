@@ -9,24 +9,6 @@ namespace
     };
 }
 
-TEST_F(TestConfigData, make_default_config_data_returns_expected_max_current)
-{
-    const auto cfg = services::MakeDefaultConfigData();
-    EXPECT_FLOAT_EQ(cfg.maxCurrent, 5.0f);
-}
-
-TEST_F(TestConfigData, make_default_config_data_returns_expected_max_velocity)
-{
-    const auto cfg = services::MakeDefaultConfigData();
-    EXPECT_FLOAT_EQ(cfg.maxVelocity, 1000.0f);
-}
-
-TEST_F(TestConfigData, make_default_config_data_returns_expected_max_torque)
-{
-    const auto cfg = services::MakeDefaultConfigData();
-    EXPECT_FLOAT_EQ(cfg.maxTorque, 1.0f);
-}
-
 TEST_F(TestConfigData, make_default_config_data_returns_expected_can_node_id)
 {
     const auto cfg = services::MakeDefaultConfigData();
@@ -36,7 +18,7 @@ TEST_F(TestConfigData, make_default_config_data_returns_expected_can_node_id)
 TEST_F(TestConfigData, make_default_config_data_returns_expected_can_baudrate)
 {
     const auto cfg = services::MakeDefaultConfigData();
-    EXPECT_EQ(cfg.canBaudrate, 500000u);
+    EXPECT_EQ(cfg.canBaudrate, 1000000u);
 }
 
 TEST_F(TestConfigData, make_default_config_data_returns_expected_telemetry_rate)
@@ -45,17 +27,10 @@ TEST_F(TestConfigData, make_default_config_data_returns_expected_telemetry_rate)
     EXPECT_EQ(cfg.telemetryRateHz, 100u);
 }
 
-TEST_F(TestConfigData, make_default_config_data_returns_expected_over_temp_threshold)
+TEST_F(TestConfigData, make_default_config_data_returns_expected_encoder_resolution)
 {
     const auto cfg = services::MakeDefaultConfigData();
-    EXPECT_FLOAT_EQ(cfg.overTempThreshold, 80.0f);
-}
-
-TEST_F(TestConfigData, make_default_config_data_returns_expected_thresholds)
-{
-    const auto cfg = services::MakeDefaultConfigData();
-    EXPECT_FLOAT_EQ(cfg.underVoltageThreshold, 10.0f);
-    EXPECT_FLOAT_EQ(cfg.overVoltageThreshold, 28.0f);
+    EXPECT_EQ(cfg.encoderResolution, 4000u);
 }
 
 TEST_F(TestConfigData, make_default_config_data_returns_zero_default_control_mode)
@@ -64,7 +39,7 @@ TEST_F(TestConfigData, make_default_config_data_returns_zero_default_control_mod
     EXPECT_EQ(cfg.defaultControlMode, uint8_t{ 0 });
 }
 
-TEST_F(TestConfigData, config_data_sizeof_is_40)
+TEST_F(TestConfigData, config_data_sizeof_is_20)
 {
-    EXPECT_EQ(sizeof(services::ConfigData), std::size_t{ 40 });
+    EXPECT_EQ(sizeof(services::ConfigData), std::size_t{ 20 });
 }

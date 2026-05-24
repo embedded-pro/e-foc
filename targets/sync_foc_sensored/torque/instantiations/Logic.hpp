@@ -27,6 +27,14 @@ namespace application
         explicit Logic(application::PlatformFactory& hardware);
 
     private:
+        static constexpr uint32_t calibrationRegionOffset = 0;
+        static constexpr uint32_t calibrationRegionSize = 128;
+        static constexpr uint32_t configRegionOffset = calibrationRegionOffset + calibrationRegionSize;
+        static constexpr uint32_t configRegionSize = 128;
+        static constexpr uint32_t controlLoopFrequencyHz = 10000;
+        static constexpr uint32_t pwmDeadTimeNs = 500;
+
+        application::PlatformFactory& hardware;
         services::DebugLed debugLed;
         foc::Volts vdc;
         services::TerminalWithBanner::WithMaxSize<20> terminalWithStorage;
@@ -37,5 +45,6 @@ namespace application
         services::MotorAlignmentImpl motorAlignment;
         state_machine::NoOpFaultNotifier noOpFaultNotifier;
         FocStateMachineImpl<foc::FocTorqueImpl, services::TerminalFocTorqueInteractor, SelectedTransitionPolicy> motorStateMachine;
+        services::ConfigData configData;
     };
 }
