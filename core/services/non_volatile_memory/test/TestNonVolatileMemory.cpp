@@ -1,7 +1,7 @@
+#include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "infra/event/EventDispatcher.hpp"
 #include "infra/event/test_helper/EventDispatcherFixture.hpp"
 #include "infra/util/Crc.hpp"
-#include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include <algorithm>
 #include <cstring>
 #include <gmock/gmock.h>
@@ -99,15 +99,10 @@ namespace
     void ExpectConfigDataEqual(const services::ConfigData& actual,
         const services::ConfigData& expected)
     {
-        EXPECT_EQ(actual.maxCurrent, expected.maxCurrent);
-        EXPECT_EQ(actual.maxVelocity, expected.maxVelocity);
-        EXPECT_EQ(actual.maxTorque, expected.maxTorque);
         EXPECT_EQ(actual.canNodeId, expected.canNodeId);
         EXPECT_EQ(actual.canBaudrate, expected.canBaudrate);
         EXPECT_EQ(actual.telemetryRateHz, expected.telemetryRateHz);
-        EXPECT_EQ(actual.overTempThreshold, expected.overTempThreshold);
-        EXPECT_EQ(actual.underVoltageThreshold, expected.underVoltageThreshold);
-        EXPECT_EQ(actual.overVoltageThreshold, expected.overVoltageThreshold);
+        EXPECT_EQ(actual.encoderResolution, expected.encoderResolution);
         EXPECT_EQ(actual.defaultControlMode, expected.defaultControlMode);
     }
 
@@ -149,15 +144,10 @@ namespace
         {
             services::ConfigData c{};
             c.defaultControlMode = 1;
-            c.maxCurrent = 10.0f;
-            c.maxVelocity = 3000.0f;
-            c.maxTorque = 2.5f;
             c.canNodeId = 5;
             c.canBaudrate = 1000000;
             c.telemetryRateHz = 200;
-            c.overTempThreshold = 90.0f;
-            c.underVoltageThreshold = 12.0f;
-            c.overVoltageThreshold = 30.0f;
+            c.encoderResolution = 8000;
             return c;
         }
 

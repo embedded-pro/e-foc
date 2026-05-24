@@ -10,6 +10,7 @@
 #include "core/state_machine/FocStateMachineImpl.hpp"
 #include "core/state_machine/TransitionPolicies.hpp"
 #include "services/peripheral/DebugLed.hpp"
+#include <optional>
 
 namespace application
 {
@@ -24,28 +25,42 @@ namespace application
     {
     public:
         explicit LogicWithOuterLoop(application::PlatformFactory& hardware, infra::BoundedConstString bannerName)
-            : debugLed{ hardware.Leds().front(), std::chrono::milliseconds(50), std::chrono::milliseconds(1950) }
+            : hardware{ hardware }
+            , debugLed{ hardware.Leds().front(), std::chrono::milliseconds(50), std::chrono::milliseconds(1950) }
             , vdc{ hardware.PowerSupplyVoltage() }
             , terminalWithStorage{ hardware.Terminal(), hardware.Tracer(), services::TerminalWithBanner::Banner{ bannerName, vdc, hardware.SystemClock(), hardware.GetResetCause(), hardware.FaultStatus() } }
-            , calibrationRegion{ hardware.Eeprom(), 0, 128 }
-            , configRegion{ hardware.Eeprom(), 128, 128 }
+            , calibrationRegion{ hardware.Eeprom(), calibrationRegionOffset, calibrationRegionSize }
+            , configRegion{ hardware.Eeprom(), configRegionOffset, configRegionSize }
             , nvm{ calibrationRegion, configRegion }
             , electricalIdent{ hardware, hardware, vdc }
             , motorAlignment{ hardware, hardware }
-            , motorStateMachine(
-                  TerminalAndTracer{ terminalWithStorage, hardware.Tracer() },
-                  MotorHardware{ hardware, hardware, vdc },
-                  nvm,
-                  CalibrationServices{ electricalIdent, motorAlignment },
-                  noOpFaultNotifier,
-                  hardware.MaxCurrentSupported(), hardware.BaseFrequency(), hardware.LowPriorityInterrupt())
         {
-            hardware.ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, PlatformFactory::SampleAndHold::shorter);
-            hardware.SetEncoderResolution(4000);
-            hardware.ConfigureCanBus(1'000'000, false);
+            hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shorter);
+            nvm.LoadConfig(configData, [this](services::NvmStatus status)
+                {
+                    if (status != services::NvmStatus::Ok)
+                        configData = services::MakeDefaultConfigData();
+                    this->hardware.SetEncoderResolution(this->configData.encoderResolution);
+                    this->hardware.ConfigureCanBus(this->configData.canBaudrate, false);
+                    motorStateMachine.emplace(
+                        TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
+                        MotorHardware{ this->hardware, this->hardware, vdc },
+                        nvm,
+                        CalibrationServices{ electricalIdent, motorAlignment },
+                        noOpFaultNotifier,
+                        this->hardware.MaxCurrentSupported(), this->hardware.BaseFrequency(), this->hardware.LowPriorityInterrupt());
+                });
         }
 
     private:
+        static constexpr uint32_t calibrationRegionOffset = 0;
+        static constexpr uint32_t calibrationRegionSize = 128;
+        static constexpr uint32_t configRegionOffset = calibrationRegionOffset + calibrationRegionSize;
+        static constexpr uint32_t configRegionSize = 128;
+        static constexpr uint32_t controlLoopFrequencyHz = 10000;
+        static constexpr uint32_t pwmDeadTimeNs = 500;
+
+        application::PlatformFactory& hardware;
         services::DebugLed debugLed;
         foc::Volts vdc;
         services::TerminalWithBanner::WithMaxSize<20> terminalWithStorage;
@@ -55,6 +70,7 @@ namespace application
         services::ElectricalParametersIdentificationImpl electricalIdent;
         services::MotorAlignmentImpl motorAlignment;
         state_machine::NoOpFaultNotifier noOpFaultNotifier;
-        FocStateMachineImpl<FocImpl, TerminalImpl, SelectedTransitionPolicy> motorStateMachine;
+        services::ConfigData configData;
+        std::optional<FocStateMachineImpl<FocImpl, TerminalImpl, SelectedTransitionPolicy>> motorStateMachine;
     };
 }
