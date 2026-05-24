@@ -12,6 +12,7 @@
 #include "core/state_machine/FocStateMachineImpl.hpp"
 #include "core/state_machine/TransitionPolicies.hpp"
 #include "services/peripheral/DebugLed.hpp"
+#include <optional>
 
 namespace application
 {
@@ -44,7 +45,7 @@ namespace application
         services::ElectricalParametersIdentificationImpl electricalIdent;
         services::MotorAlignmentImpl motorAlignment;
         state_machine::NoOpFaultNotifier noOpFaultNotifier;
-        FocStateMachineImpl<foc::FocTorqueImpl, services::TerminalFocTorqueInteractor, SelectedTransitionPolicy> motorStateMachine;
         services::ConfigData configData;
+        std::optional<FocStateMachineImpl<foc::FocTorqueImpl, services::TerminalFocTorqueInteractor, SelectedTransitionPolicy>> motorStateMachine;
     };
 }

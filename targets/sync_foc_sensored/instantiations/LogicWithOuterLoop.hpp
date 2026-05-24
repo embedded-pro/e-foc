@@ -10,6 +10,7 @@
 #include "core/state_machine/FocStateMachineImpl.hpp"
 #include "core/state_machine/TransitionPolicies.hpp"
 #include "services/peripheral/DebugLed.hpp"
+#include <optional>
 
 namespace application
 {
@@ -33,19 +34,21 @@ namespace application
             , nvm{ calibrationRegion, configRegion }
             , electricalIdent{ hardware, hardware, vdc }
             , motorAlignment{ hardware, hardware }
-            , motorStateMachine(
-                  TerminalAndTracer{ terminalWithStorage, hardware.Tracer() },
-                  MotorHardware{ hardware, hardware, vdc },
-                  nvm,
-                  CalibrationServices{ electricalIdent, motorAlignment },
-                  noOpFaultNotifier,
-                  hardware.MaxCurrentSupported(), hardware.BaseFrequency(), hardware.LowPriorityInterrupt())
         {
             hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shorter);
-            nvm.LoadConfig(configData, [this](services::NvmStatus)
+            nvm.LoadConfig(configData, [this](services::NvmStatus status)
                 {
+                    if (status != services::NvmStatus::Ok)
+                        configData = services::MakeDefaultConfigData();
                     this->hardware.SetEncoderResolution(this->configData.encoderResolution);
                     this->hardware.ConfigureCanBus(this->configData.canBaudrate, false);
+                    motorStateMachine.emplace(
+                        TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
+                        MotorHardware{ this->hardware, this->hardware, vdc },
+                        nvm,
+                        CalibrationServices{ electricalIdent, motorAlignment },
+                        noOpFaultNotifier,
+                        this->hardware.MaxCurrentSupported(), this->hardware.BaseFrequency(), this->hardware.LowPriorityInterrupt());
                 });
         }
 
@@ -67,7 +70,7 @@ namespace application
         services::ElectricalParametersIdentificationImpl electricalIdent;
         services::MotorAlignmentImpl motorAlignment;
         state_machine::NoOpFaultNotifier noOpFaultNotifier;
-        FocStateMachineImpl<FocImpl, TerminalImpl, SelectedTransitionPolicy> motorStateMachine;
         services::ConfigData configData;
+        std::optional<FocStateMachineImpl<FocImpl, TerminalImpl, SelectedTransitionPolicy>> motorStateMachine;
     };
 }
