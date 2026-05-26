@@ -103,9 +103,9 @@ namespace
         {
             return fixture.lastSelectResponseReason;
         };
-        accessor.nvmWriteCount = [&fixture]() -> int
+        accessor.nvmWriteCount = [&fixture]() -> std::size_t
         {
-            return fixture.nvmSaveCount;
+            return fixture.eepromStub.writeCount;
         };
         accessor.restartSystem = [&fixture]()
         {
@@ -145,6 +145,7 @@ WHEN(R"(the CAN SelectControlMode command is received with mode {word})", (std::
 WHEN(R"(the CAN SetTorqueSetpoint command is received with value {int})", (int32_t value))
 {
     auto& accessor = context.Get<StateMachineAccessor>();
+    accessor.nvmWriteBaseline = accessor.nvmWriteCount();
     accessor.injectCanSetTorqueSetpoint(static_cast<int16_t>(value));
     accessor.executeAll();
 }
@@ -152,6 +153,7 @@ WHEN(R"(the CAN SetTorqueSetpoint command is received with value {int})", (int32
 WHEN(R"(the CAN SetSpeedSetpoint command is received with value {int})", (int32_t value))
 {
     auto& accessor = context.Get<StateMachineAccessor>();
+    accessor.nvmWriteBaseline = accessor.nvmWriteCount();
     accessor.injectCanSetSpeedSetpoint(static_cast<int16_t>(value));
     accessor.executeAll();
 }
@@ -159,6 +161,7 @@ WHEN(R"(the CAN SetSpeedSetpoint command is received with value {int})", (int32_
 WHEN(R"(the CAN SetPositionSetpoint command is received with value {int})", (int32_t value))
 {
     auto& accessor = context.Get<StateMachineAccessor>();
+    accessor.nvmWriteBaseline = accessor.nvmWriteCount();
     accessor.injectCanSetPositionSetpoint(static_cast<int16_t>(value));
     accessor.executeAll();
 }
@@ -201,5 +204,6 @@ THEN(R"(no CommandRejected frame shall be emitted)")
 
 THEN(R"(no NVM write shall occur)")
 {
-    EXPECT_EQ(context.Get<StateMachineAccessor>().nvmWriteCount(), 0);
+    const auto& accessor = context.Get<StateMachineAccessor>();
+    EXPECT_EQ(accessor.nvmWriteCount(), accessor.nvmWriteBaseline);
 }

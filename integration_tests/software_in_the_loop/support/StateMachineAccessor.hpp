@@ -35,7 +35,8 @@ namespace integration
         std::function<bool()> wasSelectResponseSent;
         std::function<services::FocRejectReason()> lastCommandRejectedReason;
         std::function<services::FocRejectReason()> lastSelectResponseReason;
-        std::function<int()> nvmWriteCount;
+        std::function<std::size_t()> nvmWriteCount;
+        std::size_t nvmWriteBaseline{ 0 };
 
         bool calibrationExpectationsConfigured{ false };
 

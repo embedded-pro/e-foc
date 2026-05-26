@@ -293,9 +293,9 @@ namespace
         data[0] = static_cast<uint8_t>(FocMotorState::running);
         data[1] = static_cast<uint8_t>(FocFaultCode::none);
         data[2] = 0;
-        data[3] = 10;
-        data[4] = 0;
-        data[5] = 100;
+        data[3] = 100; // speed wire = 100 → physical = 100 / 10 = 10.0 rad/s
+        data[4] = 3;
+        data[5] = 232; // position wire = 1000 → physical = 1000 / 1000 = 1.0 rad
 
         auto canId = hal::Can::Id::Create29BitId(
             MakeCanId(CanPriority::telemetry,
@@ -339,13 +339,13 @@ namespace
         hal::Can::Message data;
         data.resize(8, 0);
         data[0] = 0;
-        data[1] = 240;
+        data[1] = 240; // voltage wire = 240 → physical = 240 / 10 = 24.0 V
         data[2] = 0;
         data[3] = 0;
-        data[4] = 0;
-        data[5] = 50;
-        data[6] = 0;
-        data[7] = 30;
+        data[4] = 1;
+        data[5] = 244; // iq wire = 500 → physical = 500 / 100 = 5.0 A
+        data[6] = 1;
+        data[7] = 44; // id wire = 300 → physical = 300 / 100 = 3.0 A
 
         auto canId = hal::Can::Id::Create29BitId(
             MakeCanId(CanPriority::telemetry,
@@ -401,5 +401,43 @@ namespace
                 1));
         receiveCallback(canId, data);
         // StrictMock: no observer method should be called — OnMechanicalParamsResponse is a no-op
+    }
+
+    // ---------- Encoding: torque setpoint uses focCurrentScale ----------
+
+    TEST_F(TestCanCommandClient, send_torque_setpoint_encodes_with_correct_scale)
+    {
+        hal::Can::Message capturedData;
+        EXPECT_CALL(adapter, SendData(_, _, _))
+            .WillOnce(Invoke([&capturedData](hal::Can::Id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
+                {
+                    capturedData = msg;
+                    cb(true);
+                }));
+
+        client.SendSetTorqueSetpoint(5.0f); // 5.0 A * focCurrentScale(100) = 500 = 0x01F4
+
+        ASSERT_EQ(capturedData.size(), 3u);
+        EXPECT_EQ(capturedData[1], 0x01u); // high byte of 500
+        EXPECT_EQ(capturedData[2], 0xF4u); // low  byte of 500
+    }
+
+    // ---------- Encoding: speed setpoint clamps to INT16_MAX when overrange ----------
+
+    TEST_F(TestCanCommandClient, send_speed_setpoint_overrange_wire_value_clamped_to_int16_max)
+    {
+        hal::Can::Message capturedData;
+        EXPECT_CALL(adapter, SendData(_, _, _))
+            .WillOnce(Invoke([&capturedData](hal::Can::Id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
+                {
+                    capturedData = msg;
+                    cb(true);
+                }));
+
+        client.SendSetSpeedSetpoint(100000.0f); // 100000 * 10 = 1000000 > INT16_MAX → clamped to 32767 = 0x7FFF
+
+        ASSERT_EQ(capturedData.size(), 3u);
+        EXPECT_EQ(capturedData[1], 0x7Fu); // high byte of INT16_MAX
+        EXPECT_EQ(capturedData[2], 0xFFu); // low  byte of INT16_MAX
     }
 }

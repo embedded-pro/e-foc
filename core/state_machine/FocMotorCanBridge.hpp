@@ -10,10 +10,6 @@ namespace state_machine
     class FocMotorCanBridge
         : public services::FocMotorCategoryServerObserver
     {
-        static constexpr float focCurrentScale = 100.0f;
-        static constexpr float focSpeedScale = 10.0f;
-        static constexpr float focPositionScale = 1000.0f;
-
     public:
         FocMotorCanBridge(
             services::FocMotorCategoryServer& server,
@@ -101,7 +97,7 @@ namespace state_machine
     template<typename TorqueFoc, typename SpeedFoc, typename PositionFoc>
     void FocMotorCanBridge<TorqueFoc, SpeedFoc, PositionFoc>::OnSetTorqueSetpoint(int16_t value)
     {
-        const foc::IdAndIqPoint setpoint{ foc::Ampere{ 0.0f }, foc::Ampere{ static_cast<float>(value) / focCurrentScale } };
+        const foc::IdAndIqPoint setpoint{ foc::Ampere{ 0.0f }, foc::Ampere{ static_cast<float>(value) / static_cast<float>(services::focCurrentScale) } };
         if (!controlMode.TrySetTorque(setpoint))
             server.SendCommandRejected(services::focSetTorqueSetpointId, services::FocRejectReason::controlModeMismatch);
     }
@@ -109,7 +105,7 @@ namespace state_machine
     template<typename TorqueFoc, typename SpeedFoc, typename PositionFoc>
     void FocMotorCanBridge<TorqueFoc, SpeedFoc, PositionFoc>::OnSetSpeedSetpoint(int16_t value)
     {
-        const foc::RadiansPerSecond setpoint{ static_cast<float>(value) / focSpeedScale };
+        const foc::RadiansPerSecond setpoint{ static_cast<float>(value) / static_cast<float>(services::focSpeedScale) };
         if (!controlMode.TrySetSpeed(setpoint))
             server.SendCommandRejected(services::focSetSpeedSetpointId, services::FocRejectReason::controlModeMismatch);
     }
@@ -117,7 +113,7 @@ namespace state_machine
     template<typename TorqueFoc, typename SpeedFoc, typename PositionFoc>
     void FocMotorCanBridge<TorqueFoc, SpeedFoc, PositionFoc>::OnSetPositionSetpoint(int16_t value)
     {
-        const foc::Radians setpoint{ static_cast<float>(value) / focPositionScale };
+        const foc::Radians setpoint{ static_cast<float>(value) / static_cast<float>(services::focPositionScale) };
         if (!controlMode.TrySetPosition(setpoint))
             server.SendCommandRejected(services::focSetPositionSetpointId, services::FocRejectReason::controlModeMismatch);
     }

@@ -67,6 +67,7 @@ namespace state_machine
         services::ConfigData configData;
         ControlMode pendingSelectMode{ ControlMode::torque };
         infra::Function<void(SelectResult)> pendingSelectCallback;
+        uint8_t previousDefaultControlMode{ 0 };
         ActiveSM activeSm;
     };
 
@@ -96,12 +97,19 @@ namespace state_machine
         ControlMode mode,
         infra::Function<void(SelectResult)> onDone)
     {
+        if (pendingSelectCallback != nullptr)
+        {
+            onDone(SelectResult::busy);
+            return;
+        }
+
         if (!IsMotorStopped())
         {
             onDone(SelectResult::busy);
             return;
         }
 
+        previousDefaultControlMode = configData.defaultControlMode;
         configData.defaultControlMode = static_cast<uint8_t>(mode);
         pendingSelectMode = mode;
         pendingSelectCallback = onDone;
@@ -118,6 +126,7 @@ namespace state_machine
         pendingSelectCallback = nullptr;
         if (status != services::NvmStatus::Ok)
         {
+            configData.defaultControlMode = previousDefaultControlMode;
             callback(SelectResult::nvmFailed);
             return;
         }

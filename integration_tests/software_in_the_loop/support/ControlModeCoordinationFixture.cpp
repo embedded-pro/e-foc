@@ -144,7 +144,6 @@ namespace integration
         commandRejectedSent = false;
         selectResponseSent = false;
         lastSelectResponseReason = services::FocRejectReason::ok;
-        nvmSaveCount = 0;
 
         hal::Can::Message data;
         data.resize(2, 0);

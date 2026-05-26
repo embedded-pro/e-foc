@@ -98,7 +98,6 @@ namespace integration
 
         std::optional<CoordinatorType> coordinator;
 
-        int nvmSaveCount{ 0 };
         uint8_t lastSentMessageType{ 0 };
         bool commandRejectedSent{ false };
         bool selectResponseSent{ false };
