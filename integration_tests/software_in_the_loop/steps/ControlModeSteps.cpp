@@ -4,6 +4,7 @@
 #include "integration_tests/software_in_the_loop/support/ControlModeCoordinationFixture.hpp"
 #include "integration_tests/software_in_the_loop/support/StateMachineAccessor.hpp"
 #include <gtest/gtest.h>
+#include <stdexcept>
 #include <string>
 
 using namespace testing;
