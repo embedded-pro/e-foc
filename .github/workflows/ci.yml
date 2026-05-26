@@ -200,7 +200,7 @@ jobs:
           configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
       - name: Run cycle analysis
         if: matrix.target == 'EK-TM4C1294XL'
-        uses: embedded-pro/cortex-cycle-budget@9819544b7fdb3019cfbd37b2586157690d769321 # v0.2.0
+        uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
         with:
           comment-marker: '<!-- cycle-analysis-comment -->'
           analyses-json: |
@@ -224,7 +224,7 @@ jobs:
         run: cat cycle-analysis/combined_step_summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Run memory analysis
         if: matrix.target == 'EK-TM4C1294XL'
-        uses: embedded-pro/cortex-memory-budget@82021126c96f4daee482d3556e79449b888fc2cb
+        uses: embedded-pro/cortex-memory-budget@cc5057b824ad7a5c340dfa6a3c8d22be0b89b35c
         with:
           comment-marker: '<!-- memory-analysis-comment -->'
           analyses-json: |
