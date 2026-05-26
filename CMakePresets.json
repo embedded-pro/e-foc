@@ -226,11 +226,6 @@
             "configurePreset": "windows"
         },
         {
-            "name": "windows-MinSizeRel",
-            "configuration": "MinSizeRel",
-            "configurePreset": "windows"
-        },
-        {
             "name": "coverage",
             "configuration": "Debug",
             "configurePreset": "coverage"
