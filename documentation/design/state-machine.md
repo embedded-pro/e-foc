@@ -202,17 +202,17 @@ If called from any state other than `Enabled`, the call is silently ignored.
 
 All setpoint and telemetry values exchanged over CAN use signed 16-bit integers. The physical value is recovered by dividing the wire integer by a mode-specific scale factor. The authoritative scale constants are defined once in `FocMotorDefinitions` (in the `services` namespace) and shared by every consumer:
 
-| Physical Quantity | Scale Factor | Resolution          | Wire Range (int16) | Physical Range          |
-|-------------------|--------------|---------------------|--------------------|-------------------------|
-| Phase current     | 100          | 10 mA               | −32 768 … +32 767  | ≈ ±327.67 A             |
-| Angular velocity  | 10           | 0.1 rad/s           | −32 768 … +32 767  | ≈ ±3 276.7 rad/s        |
-| Angular position  | 1 000        | 1 mrad              | −32 768 … +32 767  | ≈ ±32.767 rad            |
-| Bus voltage       | 10           | 0.1 V               | 0 … +32 767        | 0 … 3 276.7 V           |
+| Physical Quantity | Scale Factor | Resolution | Wire Range (int16) | Physical Range   |
+|-------------------|--------------|------------|--------------------|------------------|
+| Phase current     | 100          | 10 mA      | −32 768 … +32 767  | ≈ ±327.67 A      |
+| Angular velocity  | 10           | 0.1 rad/s  | −32 768 … +32 767  | ≈ ±3 276.7 rad/s |
+| Angular position  | 1 000        | 1 mrad     | −32 768 … +32 767  | ≈ ±32.767 rad    |
+| Bus voltage       | 10           | 0.1 V      | 0 … +32 767        | 0 … 3 276.7 V    |
 
-Encoding: `wire_int16 = clamp(round(physical × scale), INT16_MIN, INT16_MAX)`.  
+Encoding: `wire_int16 = clamp(trunc(physical × scale), INT16_MIN, INT16_MAX)`, where `trunc` means truncation toward zero (matching `static_cast<int32_t>(physical * scale)` in C++).  
 Decoding: `physical = wire_int16 / scale` (using floating-point division).
 
-Clamping before the cast to `int16_t` is mandatory to prevent signed integer overflow (undefined behaviour in C++).
+Clamping the truncated intermediate value before the cast to `int16_t` is mandatory to prevent signed integer overflow (undefined behaviour in C++).
 
 #### C2 — Re-entrancy Guard for In-Flight Selection
 
