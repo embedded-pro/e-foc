@@ -22,7 +22,10 @@ namespace integration
         void OnIdentifyMechanical() override;
         void OnRequestTelemetry() override;
         void OnSetEncoderResolution(uint16_t) override;
-        void OnSetTarget(const services::FocSetpoint&) override;
+        void OnSelectControlMode(services::FocMotorMode mode) override;
+        void OnSetTorqueSetpoint(int16_t value) override;
+        void OnSetSpeedSetpoint(int16_t value) override;
+        void OnSetPositionSetpoint(int16_t value) override;
         void OnClearFault() override;
         void OnEmergencyStop() override;
         void OnConfigureTelemetryRate(uint8_t) override;

@@ -1,4 +1,6 @@
 add_library(e_foc.integration_tests.support OBJECT
+    ControlModeCoordinationFixture.cpp
+    ControlModeCoordinationFixture.hpp
     EepromStub.cpp
     EepromStub.hpp
     FocIntegrationFixture.cpp
