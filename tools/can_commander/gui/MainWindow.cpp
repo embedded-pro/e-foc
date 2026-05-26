@@ -121,15 +121,6 @@ namespace tool
                 timeoutTimer.start(2000);
             });
 
-        connect(commandPanel, &CommandPanel::SetSupplyVoltageRequested, [this](float v)
-            {
-                client.SendSetSupplyVoltage(v);
-            });
-        connect(commandPanel, &CommandPanel::SetMaxCurrentRequested, [this](float a)
-            {
-                client.SendSetMaxCurrent(a);
-            });
-
         connect(commandPanel, &CommandPanel::RequestDataRequested, [this]()
             {
                 client.RequestData();
@@ -184,6 +175,21 @@ namespace tool
     void MainWindow::OnAdapterError(infra::BoundedConstString message)
     {
         logView->appendPlainText(QString("ERROR: %1").arg(QString::fromUtf8(message.data(), static_cast<int>(message.size()))));
+    }
+
+    void MainWindow::OnControlModeAcknowledged(services::FocMotorMode activeMode, services::FocRejectReason reason)
+    {
+        if (reason == services::FocRejectReason::ok)
+            logView->appendPlainText(QString("Mode accepted: %1").arg(static_cast<int>(activeMode)));
+        else
+            logView->appendPlainText(QString("Mode rejected: reason=%1").arg(static_cast<int>(reason)));
+    }
+
+    void MainWindow::OnCommandRejected(uint8_t origCmdId, services::FocRejectReason reason)
+    {
+        logView->appendPlainText(QString("Command rejected: cmdId=0x%1 reason=%2")
+            .arg(origCmdId, 2, 16, QChar('0'))
+            .arg(static_cast<int>(reason)));
     }
 
     void MainWindow::OnMotorStatusReceived(services::FocMotorState state, services::FocFaultCode fault)

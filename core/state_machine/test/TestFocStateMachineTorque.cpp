@@ -1255,3 +1255,591 @@ TEST_F(FocStateMachineTorqueAutoTest, clear_cal_nvm_failure_enters_fault)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
+
+// --- CmdClearCalibration async callback races ---
+
+TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidate_callback_after_enable_is_ignored)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    infra::Function<void(services::NvmStatus)> capturedCb;
+    EXPECT_CALL(nvmMock, InvalidateCalibration(_))
+        .WillOnce(Invoke([&capturedCb](infra::Function<void(services::NvmStatus)> onDone)
+            {
+                capturedCb = onDone;
+            }));
+    sm.CmdClearCalibration();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    sm.CmdEnable();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+
+    capturedCb(services::NvmStatus::Ok);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidate_callback_after_fault_is_ignored)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    infra::Function<void(services::NvmStatus)> capturedCb;
+    EXPECT_CALL(nvmMock, InvalidateCalibration(_))
+        .WillOnce(Invoke([&capturedCb](infra::Function<void(services::NvmStatus)> onDone)
+            {
+                capturedCb = onDone;
+            }));
+    sm.CmdClearCalibration();
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    capturedCb(services::NvmStatus::Ok);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidate_failure_callback_after_fault_does_not_re_enter_fault)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    infra::Function<void(services::NvmStatus)> capturedCb;
+    EXPECT_CALL(nvmMock, InvalidateCalibration(_))
+        .WillOnce(Invoke([&capturedCb](infra::Function<void(services::NvmStatus)> onDone)
+            {
+                capturedCb = onDone;
+            }));
+    sm.CmdClearCalibration();
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    ASSERT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
+
+    capturedCb(services::NvmStatus::WriteFailed);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, clear_cal_invalidate_callback_after_enable_is_ignored)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    infra::Function<void(services::NvmStatus)> capturedCb;
+    EXPECT_CALL(nvmMock, InvalidateCalibration(_))
+        .WillOnce(Invoke([&capturedCb](infra::Function<void(services::NvmStatus)> onDone)
+            {
+                capturedCb = onDone;
+            }));
+    sm.CmdClearCalibration();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    sm.CmdEnable();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+
+    capturedCb(services::NvmStatus::Ok);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, clear_cal_invalidate_callback_after_fault_is_ignored)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    infra::Function<void(services::NvmStatus)> capturedCb;
+    EXPECT_CALL(nvmMock, InvalidateCalibration(_))
+        .WillOnce(Invoke([&capturedCb](infra::Function<void(services::NvmStatus)> onDone)
+            {
+                capturedCb = onDone;
+            }));
+    sm.CmdClearCalibration();
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    capturedCb(services::NvmStatus::Ok);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, clear_cal_invalidate_failure_callback_after_fault_does_not_re_enter_fault)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    infra::Function<void(services::NvmStatus)> capturedCb;
+    EXPECT_CALL(nvmMock, InvalidateCalibration(_))
+        .WillOnce(Invoke([&capturedCb](infra::Function<void(services::NvmStatus)> onDone)
+            {
+                capturedCb = onDone;
+            }));
+    sm.CmdClearCalibration();
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    ASSERT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
+
+    capturedCb(services::NvmStatus::WriteFailed);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
+}
+
+// --- Auto policy: remaining async safety parity with CLI ---
+
+TEST_F(FocStateMachineTorqueAutoTest, late_resistance_callback_after_fault_is_ignored)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)> capturedCb;
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
+            {
+                cb(std::size_t{ 7 });
+            }));
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([&capturedCb](const auto&,
+                             const infra::Function<void(std::optional<foc::Ohm>,
+                                 std::optional<foc::MilliHenry>)>& cb)
+            {
+                capturedCb = cb;
+            }));
+    auto sm = CreateStateMachine();
+    sm.CmdCalibrate();
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    capturedCb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, late_alignment_callback_after_fault_is_ignored)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    infra::Function<void(std::optional<foc::Radians>)> capturedCb;
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
+            {
+                cb(std::size_t{ 7 });
+            }));
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const auto&,
+                             const infra::Function<void(std::optional<foc::Ohm>,
+                                 std::optional<foc::MilliHenry>)>& cb)
+            {
+                cb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+            }));
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([&capturedCb](std::size_t, const auto&,
+                             const infra::Function<void(std::optional<foc::Radians>)>& cb)
+            {
+                capturedCb = cb;
+            }));
+    auto sm = CreateStateMachine();
+    sm.CmdCalibrate();
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    capturedCb(foc::Radians{ 0.0f });
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, late_nvm_save_callback_after_fault_is_ignored)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    infra::Function<void(services::NvmStatus)> capturedCb;
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
+            {
+                cb(std::size_t{ 7 });
+            }));
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const auto&,
+                             const infra::Function<void(std::optional<foc::Ohm>,
+                                 std::optional<foc::MilliHenry>)>& cb)
+            {
+                cb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+            }));
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&,
+                             const infra::Function<void(std::optional<foc::Radians>)>& cb)
+            {
+                cb(foc::Radians{ 0.0f });
+            }));
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([&capturedCb](const services::CalibrationData&,
+                             infra::Function<void(services::NvmStatus)> onDone)
+            {
+                capturedCb = onDone;
+            }));
+    auto sm = CreateStateMachine();
+    sm.CmdCalibrate();
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    capturedCb(services::NvmStatus::Ok);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, nvm_boot_callback_ignored_if_calibration_started)
+{
+    GivenFaultNotifierRegistered();
+    infra::Function<void(bool)> bootCb;
+    EXPECT_CALL(nvmMock, IsCalibrationValid(_))
+        .WillOnce(Invoke([&bootCb](infra::Function<void(bool)> onDone)
+            {
+                bootCb = onDone;
+            }));
+    ExpectCalibrationSequence();
+    auto sm = CreateStateMachine();
+
+    sm.CmdCalibrate();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+
+    bootCb(true);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+
+
+// --- CmdCalibrate forbidden source states ---
+
+TEST_F(FocStateMachineTorqueCliTest, calibrate_from_calibrating_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>&) {}));
+    auto sm = CreateStateMachine();
+    sm.CmdCalibrate();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+    sm.CmdCalibrate();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, calibrate_from_fault_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    sm.CmdCalibrate();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, calibrate_from_calibrating_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>&) {}));
+    auto sm = CreateStateMachine();
+    sm.CmdCalibrate();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+    sm.CmdCalibrate();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, calibrate_from_fault_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    sm.CmdCalibrate();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+// --- CmdEnable forbidden source states ---
+
+TEST_F(FocStateMachineTorqueCliTest, enable_from_calibrating_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>&) {}));
+    auto sm = CreateStateMachine();
+    sm.CmdCalibrate();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+    sm.CmdEnable();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, enable_from_fault_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    sm.CmdEnable();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, enable_from_enabled_does_not_call_start_again)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    sm.CmdEnable();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+
+    sm.CmdEnable();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, enable_from_calibrating_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>&) {}));
+    auto sm = CreateStateMachine();
+    sm.CmdCalibrate();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+    sm.CmdEnable();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, enable_from_fault_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    sm.CmdEnable();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, enable_from_enabled_does_not_call_start_again)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    sm.CmdEnable();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+
+    sm.CmdEnable();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}
+
+// --- CmdDisable forbidden source states ---
+
+TEST_F(FocStateMachineTorqueCliTest, disable_from_idle_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    sm.CmdDisable();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, disable_from_calibrating_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>&) {}));
+    auto sm = CreateStateMachine();
+    sm.CmdCalibrate();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+    sm.CmdDisable();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, disable_from_fault_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    sm.CmdDisable();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, disable_from_idle_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    sm.CmdDisable();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, disable_from_calibrating_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>&) {}));
+    auto sm = CreateStateMachine();
+    sm.CmdCalibrate();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+    sm.CmdDisable();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, disable_from_fault_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    sm.CmdDisable();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+// --- CmdClearFault forbidden source states ---
+
+TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_idle_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    sm.CmdClearFault();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_calibrating_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>&) {}));
+    auto sm = CreateStateMachine();
+    sm.CmdCalibrate();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+    sm.CmdClearFault();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_ready_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    sm.CmdClearFault();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, clear_fault_from_idle_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    sm.CmdClearFault();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, clear_fault_from_calibrating_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>&) {}));
+    auto sm = CreateStateMachine();
+    sm.CmdCalibrate();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+    sm.CmdClearFault();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, clear_fault_from_ready_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    sm.CmdClearFault();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+// --- CmdClearCalibration forbidden source states ---
+
+TEST_F(FocStateMachineTorqueCliTest, clear_cal_from_fault_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    sm.CmdClearCalibration();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueAutoTest, clear_cal_from_fault_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    sm.CmdClearCalibration();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}

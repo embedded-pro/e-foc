@@ -43,6 +43,10 @@ namespace integration
         void InjectCanStart();
         void InjectCanStop();
         void InjectCanClearFault();
+        void InjectCanEmergencyStop();
+
+        void DeferClearCalibration();
+        void CompleteInvalidate(services::NvmStatus status);
 
         void CompletePolePairsEstimation(std::size_t polePairs);
         void CompleteRLEstimation(foc::Ohm resistance, foc::MilliHenry inductance);

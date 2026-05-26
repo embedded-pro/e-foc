@@ -261,6 +261,10 @@ namespace application
 
         nvm.InvalidateCalibration([this](services::NvmStatus status)
             {
+                if (!std::holds_alternative<state_machine::Idle>(currentState) &&
+                    !std::holds_alternative<state_machine::Ready>(currentState))
+                    return;
+
                 if (status != services::NvmStatus::Ok)
                 {
                     EnterFault(state_machine::FaultCode::hardwareFault);

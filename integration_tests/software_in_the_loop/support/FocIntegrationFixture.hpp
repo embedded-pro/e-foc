@@ -47,6 +47,12 @@ namespace integration
         void InjectCanStart();
         void InjectCanStop();
         void InjectCanClearFault();
+        void InjectCanEmergencyStop();
+
+        // Defer the NVM invalidation triggered by CmdClearCalibration so the state can
+        // change before the callback fires.
+        void DeferClearCalibration();
+        void CompleteInvalidate(services::NvmStatus status);
 
         // Complete a previously captured calibration step callback.
         void CompletePolePairsEstimation(std::size_t polePairs);

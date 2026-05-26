@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/foc/interfaces/Units.hpp"
+#include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include <functional>
 #include <optional>
@@ -20,7 +21,12 @@ namespace integration
         std::function<void()> injectCanStart;
         std::function<void()> injectCanStop;
         std::function<void()> injectCanClearFault;
+        std::function<void()> injectCanEmergencyStop;
         std::function<void()> triggerHardwareFault;
+
+        // Async-race helpers: defer the NVM invalidation so state can change before it completes.
+        std::function<void()> deferClearCalibration;
+        std::function<void(services::NvmStatus)> completeInvalidate;
 
         bool calibrationExpectationsConfigured{ false };
 

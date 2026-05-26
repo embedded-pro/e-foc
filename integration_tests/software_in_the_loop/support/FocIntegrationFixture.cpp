@@ -66,7 +66,8 @@ namespace integration
     {
         calibrationExpectationsConfigured = true;
         EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
-            .WillOnce(Invoke([this](const auto&, const auto& cb)
+            .Times(AnyNumber())
+            .WillRepeatedly(Invoke([this](const auto&, const auto& cb)
                 {
                     capturedPolePairsCallback = cb;
                 }));
@@ -107,6 +108,27 @@ namespace integration
         hal::Can::Message data;
         data.push_back(0x01);
         motorCategoryServer->HandleMessage(services::focClearFaultId, data);
+        ExecuteAllActions();
+    }
+
+    void FocIntegrationFixture::InjectCanEmergencyStop()
+    {
+        hal::Can::Message data;
+        data.push_back(0x01);
+        motorCategoryServer->HandleMessage(services::focEmergencyStopId, data);
+        ExecuteAllActions();
+    }
+
+    void FocIntegrationFixture::DeferClearCalibration()
+    {
+        eepromStub.DeferNextErase();
+        motorStateMachine->CmdClearCalibration();
+        ExecuteAllActions();
+    }
+
+    void FocIntegrationFixture::CompleteInvalidate(services::NvmStatus /* status */)
+    {
+        eepromStub.CompleteDeferredErase();
         ExecuteAllActions();
     }
 
