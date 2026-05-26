@@ -209,10 +209,10 @@ All setpoint and telemetry values exchanged over CAN use signed 16-bit integers.
 | Angular position  | 1 000        | 1 mrad              | −32 768 … +32 767  | ≈ ±32.767 rad            |
 | Bus voltage       | 10           | 0.1 V               | 0 … +32 767        | 0 … 3 276.7 V           |
 
-Encoding: `wire_int16 = clamp(round(physical × scale), INT16_MIN, INT16_MAX)`.  
+Encoding: `wire_int16 = clamp(trunc(physical × scale), INT16_MIN, INT16_MAX)`, where `trunc` means truncation toward zero (matching `static_cast<int32_t>(physical * scale)` in C++).  
 Decoding: `physical = wire_int16 / scale` (using floating-point division).
 
-Clamping before the cast to `int16_t` is mandatory to prevent signed integer overflow (undefined behaviour in C++).
+Clamping the truncated intermediate value before the cast to `int16_t` is mandatory to prevent signed integer overflow (undefined behaviour in C++).
 
 #### C2 — Re-entrancy Guard for In-Flight Selection
 
