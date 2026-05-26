@@ -1,0 +1,54 @@
+---
+# Minimum requirements for CAN-commanded control mode selection and typed setpoints.
+# These are integration-level requirements verified by software-in-the-loop tests.
+
+- id: REQ-INT-CM-001
+  title: SelectControlMode switches the active controller
+  description: >
+    When the CAN SelectControlMode command is received, the coordinator shall
+    activate the corresponding inner FOC state machine (torque, speed, or position)
+    and emit a SelectControlModeResponse on the CAN bus.
+  acceptance_criteria:
+    - The active control mode changes to the requested mode.
+    - A SelectControlModeResponse frame is sent.
+  tags: [can, control-mode, coordinator]
+
+- id: REQ-INT-CM-002
+  title: SelectControlMode is rejected while motor is enabled
+  description: >
+    The coordinator shall reject a SelectControlMode command while the motor is in
+    the Enabled state. A SelectControlModeResponse with reason "busy" shall be sent.
+    No mode transition shall occur.
+  acceptance_criteria:
+    - No mode transition occurs.
+    - A SelectControlModeResponse frame is emitted with reason busy.
+  tags: [can, control-mode, coordinator, safety]
+
+- id: REQ-INT-CM-003
+  title: Selected control mode is persisted across power cycles
+  description: >
+    After a successful mode switch, the coordinator shall save the new mode to
+    non-volatile memory so that the same mode is restored on the next power cycle.
+  acceptance_criteria:
+    - After a restart, the active mode equals the mode that was selected before the restart.
+  tags: [can, control-mode, coordinator, nvm]
+
+- id: REQ-INT-CM-004
+  title: Typed setpoint is rejected when control mode does not match
+  description: >
+    A SetTorqueSetpoint, SetSpeedSetpoint, or SetPositionSetpoint CAN frame shall be
+    rejected with a CommandRejected frame (reason: controlModeMismatch) whenever the
+    current active mode does not match the type of setpoint command.
+  acceptance_criteria:
+    - A CommandRejected frame is emitted for every mismatched setpoint.
+  tags: [can, control-mode, coordinator, safety]
+
+- id: REQ-INT-CM-005
+  title: Typed setpoint reaches the active controller when mode matches
+  description: >
+    A SetSpeedSetpoint, SetTorqueSetpoint, or SetPositionSetpoint CAN frame shall be
+    forwarded to the active inner FOC state machine when the current active mode
+    matches the type of setpoint command and no CommandRejected frame shall be emitted.
+  acceptance_criteria:
+    - No CommandRejected frame is emitted.
+  tags: [can, control-mode, coordinator]

@@ -17,6 +17,7 @@ target_sources(e_foc.services.cli PRIVATE
     TerminalBase.cpp
     TerminalBase.hpp
     TerminalHelper.hpp
+    TerminalNoOp.hpp
     TerminalPosition.cpp
     TerminalPosition.hpp
     TerminalSpeed.cpp

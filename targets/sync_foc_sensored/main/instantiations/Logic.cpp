@@ -1,4 +1,4 @@
-#include "targets/sync_foc_sensored/torque/instantiations/Logic.hpp"
+#include "targets/sync_foc_sensored/main/instantiations/Logic.hpp"
 
 namespace application
 {
@@ -6,7 +6,7 @@ namespace application
         : hardware{ hardware }
         , debugLed{ hardware.Leds().front(), std::chrono::milliseconds(50), std::chrono::milliseconds(1950) }
         , vdc{ hardware.PowerSupplyVoltage() }
-        , terminalWithStorage{ hardware.Terminal(), hardware.Tracer(), services::TerminalWithBanner::Banner{ "sync_foc_sensored:torque", vdc, hardware.SystemClock(), hardware.GetResetCause(), hardware.FaultStatus() } }
+        , terminalWithStorage{ hardware.Terminal(), hardware.Tracer(), services::TerminalWithBanner::Banner{ "sync_foc_sensored", vdc, hardware.SystemClock(), hardware.GetResetCause(), hardware.FaultStatus() } }
         , calibrationRegion{ hardware.Eeprom(), calibrationRegionOffset, calibrationRegionSize }
         , configRegion{ hardware.Eeprom(), configRegionOffset, configRegionSize }
         , nvm{ calibrationRegion, configRegion }
@@ -20,12 +20,20 @@ namespace application
                     configData = services::MakeDefaultConfigData();
                 this->hardware.SetEncoderResolution(this->configData.encoderResolution);
                 this->hardware.ConfigureCanBus(this->configData.canBaudrate, false);
-                motorStateMachine.emplace(
+                canTransport.emplace(this->hardware.CanBus(), static_cast<uint16_t>(this->configData.canNodeId));
+                motorCanServer.emplace(*canTransport);
+                controlMode.emplace(
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
                     MotorHardware{ this->hardware, this->hardware, vdc },
                     nvm,
                     CalibrationServices{ electricalIdent, motorAlignment },
-                    noOpFaultNotifier);
+                    noOpFaultNotifier,
+                    configData,
+                    ControlMode::OuterLoopArgs{
+                        this->hardware.MaxCurrentSupported(),
+                        this->hardware.BaseFrequency(),
+                        this->hardware.LowPriorityInterrupt() });
+                canBridge.emplace(*motorCanServer, *controlMode);
             });
     }
 }

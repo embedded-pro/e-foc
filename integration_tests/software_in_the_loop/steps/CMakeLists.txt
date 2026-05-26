@@ -1,6 +1,7 @@
 add_library(e_foc.integration_tests.steps OBJECT
     CalibrationSteps.cpp
     CanSteps.cpp
+    ControlModeSteps.cpp
     PositionFunctionalSteps.cpp
     PositionSteps.cpp
     SpeedFunctionalSteps.cpp

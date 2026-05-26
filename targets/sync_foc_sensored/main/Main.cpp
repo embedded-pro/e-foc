@@ -1,5 +1,5 @@
 #include PLATFORM_FACTORY_IMPL_HEADER
-#include "targets/sync_foc_sensored/speed/instantiations/Logic.hpp"
+#include "targets/sync_foc_sensored/main/instantiations/Logic.hpp"
 #include <optional>
 
 int main()

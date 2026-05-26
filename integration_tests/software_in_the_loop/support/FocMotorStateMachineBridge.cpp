@@ -42,7 +42,16 @@ namespace integration
     void FocMotorStateMachineBridge::OnSetEncoderResolution(uint16_t)
     {}
 
-    void FocMotorStateMachineBridge::OnSetTarget(const services::FocSetpoint&)
+    void FocMotorStateMachineBridge::OnSelectControlMode(services::FocMotorMode)
+    {}
+
+    void FocMotorStateMachineBridge::OnSetTorqueSetpoint(int16_t)
+    {}
+
+    void FocMotorStateMachineBridge::OnSetSpeedSetpoint(int16_t)
+    {}
+
+    void FocMotorStateMachineBridge::OnSetPositionSetpoint(int16_t)
     {}
 
     void FocMotorStateMachineBridge::OnClearFault()

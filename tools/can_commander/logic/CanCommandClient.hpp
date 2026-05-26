@@ -81,6 +81,8 @@ namespace tool
         void OnMechanicalParamsResponse(const services::FocMechanicalParams& params) override;
         void OnTelemetryElectricalResponse(const services::FocTelemetryElectrical& telemetry) override;
         void OnTelemetryStatusResponse(const services::FocTelemetryStatus& status) override;
+        void OnSelectControlModeResponse(services::FocMotorMode activeMode, services::FocRejectReason reason) override;
+        void OnCommandRejected(uint8_t origCmdId, services::FocRejectReason reason) override;
 
         // CanBusAdapterObserver
         void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) override;

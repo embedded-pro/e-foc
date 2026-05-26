@@ -36,7 +36,7 @@ date: 2026-04-07
 - **Assumption**: The motor is a BLDC or PMSM (surface or interior permanent magnet) with a sinusoidal back-EMF profile suitable for FOC.
 - **Assumption**: Rotor position is measured by a quadrature encoder. Hall-sensor support is defined in the driver interface but is a secondary configuration.
 - **Assumption**: All motor electrical and mechanical parameters (resistance, inductance, pole pairs, inertia, friction) can be identified at startup or loaded from non-volatile storage.
-- **Constraint**: The build system must be capable of producing three independent binaries — torque-only, speed-only, and position-only — as well as combinations. No unused control-mode code should be included in a given binary.
+- **Constraint**: The build system produces a single unified binary (`e_foc.sync_foc_sensored.main`) that contains all three control modes. The active mode is selected at runtime — via CAN command (`SelectControlMode`) or CLI (`active_mode`) — and persisted to NVM so it survives a power cycle. No mode switch is permitted while the motor is enabled.
 
 ---
 
@@ -114,7 +114,7 @@ The heart of the system. Decomposed into three sub-layers following a strict sep
 | Implementations | Concrete algorithm implementations for Clarke/Park transforms, Space Vector Modulation, trigonometric helpers, PID wrappers, and control loops.      |
 | Instantiations  | Wiring that combines a control-mode implementation with the execution runner to produce a ready-to-use FOC controller.                               |
 
-The three control modes are deliberately independent and composable. A given product binary includes only the mode(s) it needs:
+The three control modes are available in the same binary and are selected at runtime through `ControlModeStateMachine`. Only one mode is active at a time; switching is only permitted from `Idle` or `Ready` state and persists the new choice to NVM via `defaultControlMode`:
 
 - **Torque control** — innermost loop: regulates phase currents to produce a commanded torque (specified as Id/Iq current setpoints).
 - **Speed control** — outer loop on top of torque control: a PID regulates rotor angular velocity by commanding Id/Iq setpoints to the inner loop. The outer loop runs at a lower priority interrupt (typically 1 kHz) while the inner loop still runs at 20 kHz.
@@ -134,13 +134,14 @@ The `Runner` is the only component that interacts with the PAL inverter and enco
 
 Higher-level, non-real-time services that support commissioning and runtime operation. Each service is independently usable:
 
-| Service                          | Responsibility                                                                                                                       |
-|----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
-| Alignment                        | Forces a known electrical angle on the rotor at startup so the FOC reference frame is correctly initialised before normal operation. |
-| Electrical System Identification | Estimates phase resistance, d/q inductances, and pole pairs by injecting test signals and measuring the response.                    |
-| Mechanical System Identification | Estimates rotor inertia and viscous friction coefficient from closed-loop speed response data.                                       |
-| Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration across power cycles using MCU internal EEPROM.           |
-| CLI                              | A terminal-based command interface for triggering services, querying state, and setting parameters from a serial console.            |
+| Service                          | Responsibility                                                                                                                                       |
+|----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Alignment                        | Forces a known electrical angle on the rotor at startup so the FOC reference frame is correctly initialised before normal operation.                 |
+| Electrical System Identification | Estimates phase resistance, d/q inductances, and pole pairs by injecting test signals and measuring the response.                                    |
+| Mechanical System Identification | Estimates rotor inertia and viscous friction coefficient from closed-loop speed response data.                                                       |
+| Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration (including `defaultControlMode`) across power cycles.     |
+| CLI                              | A terminal-based command interface for triggering services, querying state, and setting parameters from a serial console.                            |
+| Control Mode                     | Owns the three `FocStateMachine` instances (torque, speed, position) as a `std::variant`; only one is live at a time. Exposes `Select(mode, onDone)` which enforces the motor-stopped precondition, persists the selection to NVM, then switches the active state machine. `FocMotorCanBridge` translates incoming CAN `SelectControlMode`, `SetTorqueSetpoint`, `SetSpeedSetpoint`, and `SetPositionSetpoint` frames into the corresponding `ControlModeStateMachine` calls. |
 
 Services communicate via asynchronous callbacks (zero-allocation closures from `embedded-infra-lib`), not return values. This allows long-running operations (identification, alignment) to yield the CPU and complete asynchronously without blocking.
 
@@ -179,7 +180,7 @@ The wiring layer. Assembles the concrete PAL implementation, the selected FOC mo
 
 The `FocStateMachine` is the central lifecycle authority. It owns the full motor commissioning and operation lifecycle: it enforces a formal five-state machine (`Idle → Calibrating → Ready ⇄ Enabled, Fault`), orchestrates the sequential calibration chain (electrical identification, alignment, and mechanical identification for speed/position modes), and responds to hardware fault notifications by immediately stopping the inverter and entering the `Fault` state. Only after `FocStateMachine` has reached `Ready` can the motor be enabled.
 
-In CLI mode, `FocStateMachine` registers the lifecycle commands `calibrate`, `enable`, `disable`, `clear_fault`, and `clear_cal` directly on the terminal. The `TerminalFocBaseInteractor` (and its control-mode subclasses) register PID tuning and setpoint commands on the same terminal, leaving lifecycle management exclusively to the state machine.
+In CLI mode, `ControlModeStateMachine` registers the lifecycle commands `calibrate`, `enable`, `disable`, `clear_fault`, `clear_cal`, `apply_estimates`, and `active_mode` on the terminal. These commands delegate to the currently active state machine. The `TerminalFocBaseInteractor` (and its control-mode subclasses) register PID tuning and setpoint commands on the same terminal.
 
 ### 5. Tools
 
