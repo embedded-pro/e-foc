@@ -83,7 +83,10 @@ namespace tool
     void CanCommandClient::SendSetTorqueSetpoint(float iqCurrent)
     {
         SetBusy(true);
-        if (focCategory.SendSetTorqueSetpoint(nodeId, static_cast<int16_t>(iqCurrent * focCurrentScale)))
+        const auto scaled = std::clamp(static_cast<int32_t>(iqCurrent * focCurrentScale),
+            static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
+            static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
+        if (focCategory.SendSetTorqueSetpoint(nodeId, static_cast<int16_t>(scaled)))
             SetBusy(false);
     }
 

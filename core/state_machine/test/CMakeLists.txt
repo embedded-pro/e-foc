@@ -15,12 +15,15 @@ target_link_libraries(e_foc.state_machine_test PUBLIC
     e_foc.services.electrical_system_ident_mock
     e_foc.services.mechanical_system_ident_mock
     e_foc.services.non_volatile_memory_mock
+    can_lite.categories.foc_motor
+    can_lite.test_util
 )
 
 target_sources(e_foc.state_machine_test PRIVATE
     TestControlMode.cpp
     TestControlModeStateMachine.cpp
     TestFaultNotifier.cpp
+    TestFocMotorCanBridge.cpp
     TestFocStateMachineTorque.cpp
     TestFocStateMachineSpeed.cpp
     TestFocStateMachinePosition.cpp

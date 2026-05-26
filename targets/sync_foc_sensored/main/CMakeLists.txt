@@ -1,5 +1,7 @@
 add_executable(e_foc.sync_foc_sensored.main)
 
+add_subdirectory(instantiations)
+
 target_include_directories(e_foc.sync_foc_sensored.main PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../../../../>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
@@ -26,5 +28,3 @@ endif()
 if(DEFINED TARGET_MCU_VENDOR)
     emil_generate_artifacts(TARGET e_foc.sync_foc_sensored.main MAP BIN HEX)
 endif()
-
-add_subdirectory(instantiations)

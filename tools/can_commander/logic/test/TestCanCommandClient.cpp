@@ -440,4 +440,143 @@ namespace
         EXPECT_EQ(capturedData[1], 0x7Fu); // high byte of INT16_MAX
         EXPECT_EQ(capturedData[2], 0xFFu); // low  byte of INT16_MAX
     }
+
+    // ---------- Adapter send failure: busy stays true ----------
+
+    class TestCanCommandClientAdapterFails
+        : public testing::Test
+        , public infra::ClockFixture
+    {
+    public:
+        struct FailingFixtureInit
+        {
+            FailingFixtureInit(StrictMock<CanBusAdapterMock>& adapter,
+                infra::Function<void(hal::Can::Id, const hal::Can::Message&)>& receiveCallback)
+            {
+                EXPECT_CALL(adapter, ReceiveData(_)).WillOnce([&receiveCallback](const auto& callback)
+                    {
+                        receiveCallback = callback;
+                    });
+                EXPECT_CALL(adapter, SendData(_, _, _))
+                    .Times(testing::AnyNumber())
+                    .WillRepeatedly(Invoke([](hal::Can::Id, const hal::Can::Message&, const infra::Function<void(bool)>& cb)
+                        {
+                            cb(false);
+                        }));
+            }
+        };
+
+        void SetUp() override
+        {
+            EXPECT_CALL(observer, OnBusyChanged(_)).Times(testing::AnyNumber());
+        }
+
+        StrictMock<CanBusAdapterMock> adapter;
+        infra::Function<void(hal::Can::Id, const hal::Can::Message&)> receiveCallback;
+        FailingFixtureInit fixtureInit{ adapter, receiveCallback };
+        CanCommandClient client{ adapter };
+        StrictMock<CanCommandClientObserverMock> observer{ client };
+    };
+
+    TEST_F(TestCanCommandClientAdapterFails, send_start_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendStartMotor();
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_stop_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendStopMotor();
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_emergency_stop_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendEmergencyStop();
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_control_mode_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetControlMode(FocMotorMode::speed);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_torque_setpoint_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetTorqueSetpoint(5.0f);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_speed_setpoint_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetSpeedSetpoint(10.0f);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_position_setpoint_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetPositionSetpoint(1.0f);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_current_id_pid_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetCurrentIdPid(1.0f, 0.1f, 0.01f);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_current_iq_pid_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetCurrentIqPid(1.0f, 0.1f, 0.01f);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_speed_pid_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetSpeedPid(1.0f, 0.1f, 0.01f);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_position_pid_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetPositionPid(1.0f, 0.1f, 0.01f);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    // ---------- No-op response handlers ----------
+
+    TEST_F(TestCanCommandClient, select_control_mode_response_received_does_not_call_any_observer)
+    {
+        EXPECT_CALL(observer, OnConnectionChanged(true));
+
+        hal::Can::Message data;
+        data.push_back(static_cast<uint8_t>(FocMotorMode::torque));
+        data.push_back(static_cast<uint8_t>(FocRejectReason::ok));
+
+        auto canId = hal::Can::Id::Create29BitId(
+            MakeCanId(CanPriority::response,
+                focMotorCategoryId,
+                focSelectControlModeResponseId,
+                1));
+        receiveCallback(canId, data);
+        // StrictMock: OnSelectControlModeResponse is a no-op — no observer calls expected
+    }
+
+    TEST_F(TestCanCommandClient, command_rejected_response_received_does_not_call_any_observer)
+    {
+        EXPECT_CALL(observer, OnConnectionChanged(true));
+
+        hal::Can::Message data;
+        data.push_back(static_cast<uint8_t>(focStartId));
+        data.push_back(static_cast<uint8_t>(FocRejectReason::busy));
+
+        auto canId = hal::Can::Id::Create29BitId(
+            MakeCanId(CanPriority::response,
+                focMotorCategoryId,
+                focCommandRejectedResponseId,
+                1));
+        receiveCallback(canId, data);
+        // StrictMock: OnCommandRejected is a no-op — no observer calls expected
+    }
 }
