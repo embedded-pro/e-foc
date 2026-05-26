@@ -11,6 +11,7 @@ permissions:
   contents: read
   pull-requests: write
   checks: write
+  packages: write
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
@@ -47,7 +48,6 @@ jobs:
           configurePreset: "host"
           buildPreset: "host-Debug-WithPackage"
           testPreset: "host"
-          configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
       - name: Run SIL integration tests
         run: |
           sil_test=$(find build/host -name "e_foc.integration_tests" -type f -executable -print -quit)
@@ -118,47 +118,50 @@ jobs:
         with:
           name: test-logs
           path: build/host/Testing/Temporary/
-  host_build_test:
-    name: Host Build & Test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
+  host_cross_windows:
+    name: Host Cross-Compile (Linux → Windows)
+    runs-on: ubuntu-latest
     steps:
       - name: Configure Git
         run: |
-          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN  }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git config --global --add safe.directory '*'
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           submodules: recursive
-      - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
-          key: ${{ github.job }}-${{ matrix.os }}
-          max-size: 2G
-          save: ${{ github.ref == 'refs/heads/main' }}
-      - name: Install Qt6
-        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.0
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Cache ccache
+        uses: actions/cache@3624ceb22c1c5a301c8db4169662070a689d9ea8 # v4.1.1
         with:
-          version: '6.7.2'
-          modules: 'qtnetworkauth'
-          cache: true
-      - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
+          path: ${{ github.workspace }}/.ccache
+          key: ${{ github.job }}-windows-cross-${{ github.sha }}
+          restore-keys: ${{ github.job }}-windows-cross-
+      - name: Cross-compile for Windows
+        uses: devcontainers/ci@8bf61b26e9c3a98f69cb6ce2f88d24ff59b785c6 # v0.3
         with:
-          configurePreset: "host-single-Debug"
-          buildPreset: "host-single-Debug"
-          testPreset: "host-single-Debug"
-          configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
-      - name: Upload test logs
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+          imageName: ghcr.io/${{ github.repository }}/devcontainer
+          cacheFrom: ghcr.io/${{ github.repository }}/devcontainer
+          push: filter
+          refFilterForPush: refs/heads/main
+          env: |
+            CCACHE_DIR=${{ github.workspace }}/.ccache
+          runCmd: cmake --preset windows && cmake --build --preset windows-RelWithDebInfo
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: test-logs
-          path: build/host/Testing/Temporary/
+          name: e_foc-windows
+          path: build/windows/**/*.exe
+          if-no-files-found: warn
   embedded_build:
     name: Embedded Build
     runs-on: ubuntu-latest
-    needs: [host_build_test_ubuntu, host_build_test]
+    needs: [host_build_test_ubuntu, host_cross_windows]
     strategy:
       matrix:
         configuration: ["RelWithDebInfo"]
@@ -197,7 +200,6 @@ jobs:
         with:
           configurePreset: ${{ matrix.target }}
           buildPreset: ${{ matrix.target }}-${{ matrix.configuration }}
-          configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
       - name: Run cycle analysis
         if: matrix.target == 'EK-TM4C1294XL'
         uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2

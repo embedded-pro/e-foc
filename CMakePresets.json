@@ -14,6 +14,8 @@
             "cacheVariables": {
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "On",
                 "CMAKE_COMPILE_WARNING_AS_ERROR": "On",
+                "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+                "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
                 "E_FOC_AUTO_TRANSITION_POLICY": false
             }
         },
@@ -42,19 +44,23 @@
         },
         {
             "name": "windows",
-            "displayName": "Windows cross compilation",
+            "displayName": "Cross-compilation Linux → Windows (clang-cl + xwin)",
             "inherits": "defaults",
             "toolchainFile": "${sourceDir}/infra/embedded-infra-lib/cmake/toolchain-clang-x86_64-pc-windows-msvc.cmake",
+            "environment": {
+                "CCACHE_DEPEND": "true",
+                "CCACHE_COMPILERTYPE": "clang-cl"
+            },
             "cacheVariables": {
                 "CMAKE_COMPILE_WARNING_AS_ERROR": "Off",
                 "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo;MinSizeRel",
                 "CMAKE_PREFIX_PATH": "/opt/qt6-windows/6.4.2/msvc2019_64",
-                "CMAKE_CXX_FLAGS": "/EHsc -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH",
-                "CMAKE_C_FLAGS": "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH",
                 "QT_HOST_PATH": "/usr",
                 "QT_HOST_PATH_CMAKE_DIR": "/usr/lib/x86_64-linux-gnu/cmake",
+                "WINDOWS_SDK_ROOT": "/winsdk",
                 "E_FOC_TARGET_PLATFORM": "host",
-                "E_FOC_BUILD_TESTS": true,
+                "E_FOC_BUILD_TESTS": "Off",
+                "E_FOC_BUILD_HIL_TESTS": "Off",
                 "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": false
             },
             "generator": "Ninja Multi-Config"
@@ -212,6 +218,16 @@
         {
             "name": "windows-Debug",
             "configuration": "Debug",
+            "configurePreset": "windows"
+        },
+        {
+            "name": "windows-Release",
+            "configuration": "Release",
+            "configurePreset": "windows"
+        },
+        {
+            "name": "windows-MinSizeRel",
+            "configuration": "MinSizeRel",
             "configurePreset": "windows"
         },
         {

@@ -3,7 +3,7 @@ Feature: Position Controller Calibration Flow
   resistance/inductance, encoder alignment, and mechanical parameters,
   then persists the result to non-volatile memory.
 
-  # REQ-POS-001, REQ-SM-003, REQ-SM-004, REQ-SM-011
+  @REQ-POS-001 @REQ-SM-003 @REQ-SM-004 @REQ-SM-011
   Scenario: Full position calibration sequence succeeds and transitions to Ready
     Given the position motor system is initialised with no valid calibration data
     And calibration service expectations are configured
@@ -14,7 +14,7 @@ Feature: Position Controller Calibration Flow
     And the mechanical identification completes successfully
     Then the state machine shall be in the Ready state
 
-  # REQ-SM-005
+  @REQ-SM-005
   Scenario: Position calibration fails when pole-pairs estimation returns no result
     Given the position motor system is initialised with no valid calibration data
     And calibration service expectations are configured
