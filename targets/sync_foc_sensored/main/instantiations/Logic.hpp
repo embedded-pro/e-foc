@@ -1,27 +1,24 @@
 #pragma once
 
+#include "can-lite/categories/foc_motor/FocMotorCategoryServer.hpp"
+#include "can-lite/core/CanFrameTransport.hpp"
+#include "core/foc/implementations/FocPositionImpl.hpp"
+#include "core/foc/implementations/FocSpeedImpl.hpp"
 #include "core/foc/implementations/FocTorqueImpl.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
-#include "core/services/cli/TerminalTorque.hpp"
 #include "core/services/cli/TerminalWithBanner.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
+#include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
-#include "core/state_machine/FocStateMachineImpl.hpp"
-#include "core/state_machine/TransitionPolicies.hpp"
+#include "core/state_machine/FocMotorCanBridge.hpp"
 #include "services/peripheral/DebugLed.hpp"
 #include <optional>
 
 namespace application
 {
-#ifdef E_FOC_AUTO_TRANSITION_POLICY
-    using SelectedTransitionPolicy = state_machine::AutoTransitionPolicy;
-#else
-    using SelectedTransitionPolicy = state_machine::CliTransitionPolicy;
-#endif
-
     class Logic
     {
     public:
@@ -35,6 +32,11 @@ namespace application
         static constexpr uint32_t controlLoopFrequencyHz = 10000;
         static constexpr uint32_t pwmDeadTimeNs = 500;
 
+        using ControlMode = state_machine::ControlModeStateMachine<
+            foc::FocTorqueImpl,
+            foc::FocSpeedImpl,
+            foc::FocPositionImpl>;
+
         application::PlatformFactory& hardware;
         services::DebugLed debugLed;
         foc::Volts vdc;
@@ -46,6 +48,14 @@ namespace application
         services::MotorAlignmentImpl motorAlignment;
         state_machine::NoOpFaultNotifier noOpFaultNotifier;
         services::ConfigData configData;
-        std::optional<FocStateMachineImpl<foc::FocTorqueImpl, services::TerminalFocTorqueInteractor, SelectedTransitionPolicy>> motorStateMachine;
+
+        std::optional<services::CanFrameTransport> canTransport;
+        std::optional<services::FocMotorCategoryServer> motorCanServer;
+        std::optional<ControlMode> controlMode;
+        std::optional<state_machine::FocMotorCanBridge<
+            foc::FocTorqueImpl,
+            foc::FocSpeedImpl,
+            foc::FocPositionImpl>>
+            canBridge;
     };
 }

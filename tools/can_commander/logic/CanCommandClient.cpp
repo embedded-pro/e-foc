@@ -76,14 +76,17 @@ namespace tool
     void CanCommandClient::SendSetControlMode(FocMotorMode mode)
     {
         SetBusy(true);
-        if (focCategory.SendSetTarget(nodeId, FocSetpoint{ mode, 0 }))
+        if (focCategory.SendSelectControlMode(nodeId, mode))
             SetBusy(false);
     }
 
     void CanCommandClient::SendSetTorqueSetpoint(float iqCurrent)
     {
         SetBusy(true);
-        if (focCategory.SendSetTarget(nodeId, FocSetpoint{ FocMotorMode::torque, static_cast<int16_t>(iqCurrent * focCurrentScale) }))
+        const auto scaled = std::clamp(static_cast<int32_t>(iqCurrent * focCurrentScale),
+            static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
+            static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
+        if (focCategory.SendSetTorqueSetpoint(nodeId, static_cast<int16_t>(scaled)))
             SetBusy(false);
     }
 
@@ -93,7 +96,7 @@ namespace tool
         const auto scaled = std::clamp(static_cast<int32_t>(speedRadPerSec * focSpeedScale),
             static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
             static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
-        if (focCategory.SendSetTarget(nodeId, FocSetpoint{ FocMotorMode::speed, static_cast<int16_t>(scaled) }))
+        if (focCategory.SendSetSpeedSetpoint(nodeId, static_cast<int16_t>(scaled)))
             SetBusy(false);
     }
 
@@ -103,7 +106,7 @@ namespace tool
         const auto scaled = std::clamp(static_cast<int32_t>(positionRad * focPositionScale),
             static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
             static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
-        if (focCategory.SendSetTarget(nodeId, FocSetpoint{ FocMotorMode::position, static_cast<int16_t>(scaled) }))
+        if (focCategory.SendSetPositionSetpoint(nodeId, static_cast<int16_t>(scaled)))
             SetBusy(false);
     }
 
@@ -180,6 +183,12 @@ namespace tool
     {}
 
     void CanCommandClient::OnMechanicalParamsResponse(const FocMechanicalParams& /*params*/)
+    {}
+
+    void CanCommandClient::OnSelectControlModeResponse(FocMotorMode /*activeMode*/, FocRejectReason /*reason*/)
+    {}
+
+    void CanCommandClient::OnCommandRejected(uint8_t /*origCmdId*/, FocRejectReason /*reason*/)
     {}
 
     void CanCommandClient::OnTelemetryStatusResponse(const FocTelemetryStatus& status)

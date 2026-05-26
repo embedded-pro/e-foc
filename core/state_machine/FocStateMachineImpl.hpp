@@ -68,7 +68,6 @@ namespace application
         : public state_machine::FocStateMachineBase
     {
         static_assert(std::is_base_of_v<foc::FocBase, FocImpl>, "FocImpl must inherit from foc::FocBase");
-        static_assert(std::is_base_of_v<services::TerminalFocBaseInteractor, TerminalImpl>, "TerminalImpl must inherit from services::TerminalFocBaseInteractor");
 
         static constexpr bool hasMechanicalIdent = HasSpeedLoop<FocImpl>;
         static constexpr float nyquistFactor = 15.0f;
@@ -92,6 +91,7 @@ namespace application
         void CmdClearFault() override;
         void CmdClearCalibration() override;
         void ApplyOnlineEstimates() override;
+        FocImpl& GetFoc();
 
     private:
         void EnterCalibrating();
@@ -531,6 +531,12 @@ namespace application
         if (!std::holds_alternative<state_machine::Enabled>(currentState))
             return;
         ApplyOnlineEstimatesImpl();
+    }
+
+    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
+    FocImpl& FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::GetFoc()
+    {
+        return focController;
     }
 
     template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>

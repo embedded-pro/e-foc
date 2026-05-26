@@ -19,6 +19,8 @@ namespace integration
         void ReadBuffer(infra::ByteRange buffer, uint32_t address, infra::Function<void()> onDone) override;
         void Erase(infra::Function<void()> onDone) override;
 
+        std::size_t writeCount{ 0 };
+
     private:
         std::array<uint8_t, stubSize> storage;
     };

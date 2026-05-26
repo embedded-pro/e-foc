@@ -14,19 +14,23 @@ target_include_directories(e_foc.state_machine ${E_FOC_STATE_MACHINE_VISIBILITY}
 )
 
 target_link_libraries(e_foc.state_machine ${E_FOC_STATE_MACHINE_VISIBILITY}
-    infra.util
+    can_lite.categories.foc_motor
     e_foc.foc.instantiations
-    e_foc.services.cli
-    e_foc.services.non_volatile_memory
     e_foc.services.alignment
+    e_foc.services.cli
     e_foc.services.electrical_system_ident
     e_foc.services.mechanical_system_ident
+    e_foc.services.non_volatile_memory
+    infra.util
     services.tracer
     services.util
 )
 
 target_sources(e_foc.state_machine ${E_FOC_STATE_MACHINE_VISIBILITY}
+    ControlMode.hpp
+    ControlModeStateMachine.hpp
     FaultNotifier.hpp
+    FocMotorCanBridge.hpp
     FocStateMachine.hpp
     FocStateMachineImpl.hpp
     TransitionPolicies.hpp
