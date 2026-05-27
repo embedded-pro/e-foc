@@ -25,6 +25,8 @@ namespace integration
         // Complete the deferred NVM erase completion (WriteBuffer callback). Must only be called after DeferNextErase().
         void CompleteDeferredErase();
 
+        std::size_t writeCount{ 0 };
+
     private:
         std::array<uint8_t, stubSize> storage;
         bool deferNextErase{ false };

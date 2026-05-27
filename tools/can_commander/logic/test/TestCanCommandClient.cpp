@@ -279,9 +279,9 @@ namespace
         data[0] = static_cast<uint8_t>(FocMotorState::running);
         data[1] = static_cast<uint8_t>(FocFaultCode::none);
         data[2] = 0;
-        data[3] = 10;
-        data[4] = 0;
-        data[5] = 100;
+        data[3] = 100; // speed wire = 100 → physical = 100 / 10 = 10.0 rad/s
+        data[4] = 3;
+        data[5] = 232; // position wire = 1000 → physical = 1000 / 1000 = 1.0 rad
 
         auto canId = hal::Can::Id::Create29BitId(
             MakeCanId(CanPriority::telemetry,
@@ -325,13 +325,13 @@ namespace
         hal::Can::Message data;
         data.resize(8, 0);
         data[0] = 0;
-        data[1] = 240;
+        data[1] = 240; // voltage wire = 240 → physical = 240 / 10 = 24.0 V
         data[2] = 0;
         data[3] = 0;
-        data[4] = 0;
-        data[5] = 50;
-        data[6] = 0;
-        data[7] = 30;
+        data[4] = 1;
+        data[5] = 244; // iq wire = 500 → physical = 500 / 100 = 5.0 A
+        data[6] = 1;
+        data[7] = 44; // id wire = 300 → physical = 300 / 100 = 3.0 A
 
         auto canId = hal::Can::Id::Create29BitId(
             MakeCanId(CanPriority::telemetry,
@@ -464,6 +464,147 @@ namespace
                 1));
         receiveCallback(canId, data);
 
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    // ---------- Encoding: torque setpoint uses focCurrentScale ----------
+
+    TEST_F(TestCanCommandClient, send_torque_setpoint_encodes_with_correct_scale)
+    {
+        hal::Can::Message capturedData;
+        EXPECT_CALL(adapter, SendData(_, _, _))
+            .WillOnce(Invoke([&capturedData](hal::Can::Id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
+                {
+                    capturedData = msg;
+                    cb(true);
+                }));
+
+        client.SendSetTorqueSetpoint(5.0f); // 5.0 A * focCurrentScale(100) = 500 = 0x01F4
+
+        ASSERT_EQ(capturedData.size(), 3u);
+        EXPECT_EQ(capturedData[1], 0x01u); // high byte of 500
+        EXPECT_EQ(capturedData[2], 0xF4u); // low  byte of 500
+    }
+
+    // ---------- Encoding: speed setpoint clamps to INT16_MAX when overrange ----------
+
+    TEST_F(TestCanCommandClient, send_speed_setpoint_overrange_wire_value_clamped_to_int16_max)
+    {
+        hal::Can::Message capturedData;
+        EXPECT_CALL(adapter, SendData(_, _, _))
+            .WillOnce(Invoke([&capturedData](hal::Can::Id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
+                {
+                    capturedData = msg;
+                    cb(true);
+                }));
+
+        client.SendSetSpeedSetpoint(100000.0f); // 100000 * 10 = 1000000 > INT16_MAX → clamped to 32767 = 0x7FFF
+
+        ASSERT_EQ(capturedData.size(), 3u);
+        EXPECT_EQ(capturedData[1], 0x7Fu); // high byte of INT16_MAX
+        EXPECT_EQ(capturedData[2], 0xFFu); // low  byte of INT16_MAX
+    }
+
+    // ---------- Adapter send failure: busy stays true ----------
+
+    class TestCanCommandClientAdapterFails
+        : public testing::Test
+        , public infra::ClockFixture
+    {
+    public:
+        struct FailingFixtureInit
+        {
+            FailingFixtureInit(StrictMock<CanBusAdapterMock>& adapter,
+                infra::Function<void(hal::Can::Id, const hal::Can::Message&)>& receiveCallback)
+            {
+                EXPECT_CALL(adapter, ReceiveData(_)).WillOnce([&receiveCallback](const auto& callback)
+                    {
+                        receiveCallback = callback;
+                    });
+                EXPECT_CALL(adapter, SendData(_, _, _))
+                    .Times(testing::AnyNumber())
+                    .WillRepeatedly(Invoke([](hal::Can::Id, const hal::Can::Message&, const infra::Function<void(bool)>& cb)
+                        {
+                            cb(false);
+                        }));
+            }
+        };
+
+        void SetUp() override
+        {
+            EXPECT_CALL(observer, OnBusyChanged(_)).Times(testing::AnyNumber());
+        }
+
+        StrictMock<CanBusAdapterMock> adapter;
+        infra::Function<void(hal::Can::Id, const hal::Can::Message&)> receiveCallback;
+        FailingFixtureInit fixtureInit{ adapter, receiveCallback };
+        CanCommandClient client{ adapter };
+        StrictMock<CanCommandClientObserverMock> observer{ client };
+    };
+
+    TEST_F(TestCanCommandClientAdapterFails, send_start_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendStartMotor();
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_stop_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendStopMotor();
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_emergency_stop_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendEmergencyStop();
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_control_mode_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetControlMode(FocMotorMode::speed);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_torque_setpoint_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetTorqueSetpoint(5.0f);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_speed_setpoint_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetSpeedSetpoint(10.0f);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_position_setpoint_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetPositionSetpoint(1.0f);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_current_id_pid_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetCurrentIdPid(1.0f, 0.1f, 0.01f);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_current_iq_pid_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetCurrentIqPid(1.0f, 0.1f, 0.01f);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_speed_pid_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetSpeedPid(1.0f, 0.1f, 0.01f);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, send_set_position_pid_clears_busy_even_when_adapter_reports_failure)
+    {
+        client.SendSetPositionPid(1.0f, 0.1f, 0.01f);
         EXPECT_FALSE(client.IsBusy());
     }
 }

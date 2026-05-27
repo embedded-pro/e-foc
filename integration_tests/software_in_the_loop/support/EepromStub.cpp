@@ -17,6 +17,7 @@ namespace integration
     {
         really_assert(address + buffer.size() <= stubSize);
         std::copy(buffer.begin(), buffer.end(), storage.begin() + static_cast<std::ptrdiff_t>(address));
+        ++writeCount;
         if (deferNextErase)
         {
             deferNextErase = false;
