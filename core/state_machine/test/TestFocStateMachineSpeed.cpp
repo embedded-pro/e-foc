@@ -900,8 +900,6 @@ TEST_F(FocStateMachineSpeedCliTest, clear_cal_invalidate_failure_callback_after_
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
 
-
-
 TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_does_not_change_state_when_enabled)
 {
     GivenFaultNotifierRegistered();
@@ -1683,8 +1681,6 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_cal_invalidate_failure_callback_after
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
 
-
-
 // --- CmdCalibrate forbidden source states ---
 
 TEST_F(FocStateMachineSpeedCliTest, calibrate_from_calibrating_is_rejected)
@@ -2022,5 +2018,3 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_cal_from_fault_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
-
-

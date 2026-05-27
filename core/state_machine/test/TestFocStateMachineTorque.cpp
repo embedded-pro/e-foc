@@ -1512,8 +1512,6 @@ TEST_F(FocStateMachineTorqueAutoTest, nvm_boot_callback_ignored_if_calibration_s
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-
-
 // --- CmdCalibrate forbidden source states ---
 
 TEST_F(FocStateMachineTorqueCliTest, calibrate_from_calibrating_is_rejected)
