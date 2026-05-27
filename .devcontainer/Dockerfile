@@ -3,13 +3,13 @@ FROM gabrielfrasantos/embedded-devcontainer-cpp:latest@sha256:52930380ffae6dbb5d
 HEALTHCHECK NONE
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gnuplot-qt \
-    qt6-base-dev \
-    libgl1-mesa-dev \
-    libxkbcommon-dev \
-    libxkbcommon-x11-0 \
-    libxcb-xinerama0 \
-    libxcb-cursor0 \
+    gnuplot-qt=6.0.2+dfsg1-2ubuntu2 \
+    qt6-base-dev=6.10.2+dfsg-7 \
+    libgl1-mesa-dev=26.0.3-1ubuntu1 \
+    libxkbcommon-dev=1.13.1-1 \
+    libxkbcommon-x11-0=1.13.1-1 \
+    libxcb-xinerama0=1.17.0-2ubuntu1 \
+    libxcb-cursor0=0.1.6-1 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN xwin --accept-license splat --include-debug-libs --preserve-ms-arch-notation --output /winsdk \
