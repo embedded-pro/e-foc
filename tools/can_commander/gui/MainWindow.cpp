@@ -188,8 +188,8 @@ namespace tool
     void MainWindow::OnCommandRejected(uint8_t origCmdId, services::FocRejectReason reason)
     {
         logView->appendPlainText(QString("Command rejected: cmdId=0x%1 reason=%2")
-                                     .arg(origCmdId, 2, 16, QChar('0'))
-                                     .arg(static_cast<int>(reason)));
+                .arg(origCmdId, 2, 16, QChar('0'))
+                .arg(static_cast<int>(reason)));
     }
 
     void MainWindow::OnMotorStatusReceived(services::FocMotorState state, services::FocFaultCode fault)
