@@ -11,7 +11,7 @@ permissions:
   contents: read
   pull-requests: write
   checks: write
-  packages: write
+  packages: read
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
@@ -131,12 +131,6 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Cache ccache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -146,10 +140,9 @@ jobs:
       - name: Cross-compile for Windows
         uses: devcontainers/ci@8bf61b26e9c3a98f69cb6ce2f88d24ff59b785c6 # v0.3
         with:
-          imageName: ghcr.io/${{ github.repository }}/devcontainer
-          cacheFrom: ghcr.io/${{ github.repository }}/devcontainer
-          push: filter
-          refFilterForPush: refs/heads/main
+          imageName: gabrielfrasantos/embedded-devcontainer-cpp
+          cacheFrom: gabrielfrasantos/embedded-devcontainer-cpp
+          push: never
           env: |
             CCACHE_DIR=${{ github.workspace }}/.ccache
           runCmd: cmake --preset windows && cmake --build --preset windows-RelWithDebInfo
