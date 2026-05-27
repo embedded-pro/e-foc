@@ -279,9 +279,9 @@ namespace
         data[0] = static_cast<uint8_t>(FocMotorState::running);
         data[1] = static_cast<uint8_t>(FocFaultCode::none);
         data[2] = 0;
-        data[3] = 100; // speed wire = 100 → physical = 100 / 10 = 10.0 rad/s
-        data[4] = 3;
-        data[5] = 232; // position wire = 1000 → physical = 1000 / 1000 = 1.0 rad
+        data[3] = 10; // speed wire = 10 → physical = 10 / focSpeedScale(10) = 1.0 rad/s
+        data[4] = 0;
+        data[5] = 100; // position wire = 100 → physical = 100 / focPositionScale(1000) = 0.1 rad
 
         auto canId = hal::Can::Id::Create29BitId(
             MakeCanId(CanPriority::telemetry,
@@ -328,10 +328,10 @@ namespace
         data[1] = 240; // voltage wire = 240 → physical = 240 / 10 = 24.0 V
         data[2] = 0;
         data[3] = 0;
-        data[4] = 1;
-        data[5] = 244; // iq wire = 500 → physical = 500 / 100 = 5.0 A
-        data[6] = 1;
-        data[7] = 44; // id wire = 300 → physical = 300 / 100 = 3.0 A
+        data[4] = 0;
+        data[5] = 50; // iq wire = 50 → physical = 50 / focCurrentScale(100) = 0.5 A
+        data[6] = 0;
+        data[7] = 30; // id wire = 30 → physical = 30 / focCurrentScale(100) = 0.3 A
 
         auto canId = hal::Can::Id::Create29BitId(
             MakeCanId(CanPriority::telemetry,
