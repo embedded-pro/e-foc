@@ -2061,3 +2061,57 @@ TEST_F(FocStateMachinePositionAutoTest, clear_cal_invalidate_failure_callback_af
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
+
+// --- ApplyOnlineEstimates and GetFoc ---
+
+TEST_F(FocStateMachinePositionCliTest, apply_online_estimates_does_not_change_state_when_enabled)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithPositionGains();
+    auto sm = CreatePositionStateMachine();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    sm.CmdEnable();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+
+    sm.ApplyOnlineEstimates();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachinePositionCliTest, apply_online_estimates_is_ignored_when_not_enabled)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithPositionGains();
+    auto sm = CreatePositionStateMachine();
+
+    sm.ApplyOnlineEstimates();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachinePositionCliTest, get_foc_returns_foc_controller)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreatePositionStateMachine();
+
+    auto& foc = sm.GetFoc();
+
+    EXPECT_EQ(&foc, &sm.GetFoc());
+}
+
+TEST_F(FocStateMachinePositionAutoTest, apply_online_estimates_does_not_change_state_when_enabled)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithPositionGains();
+    auto sm = CreatePositionAutoStateMachine();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    sm.CmdEnable();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+
+    sm.ApplyOnlineEstimates();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}

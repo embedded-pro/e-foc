@@ -513,4 +513,271 @@ namespace
 
         InvokeCliCommand("am");
     }
+
+    // ---- Full lifecycle tests covering all 3 NoOp FocStateMachineImpl types ----
+
+    class ControlModeStateMachineLifecycleTest
+        : public ControlModeStateMachineExtTest
+    {
+    public:
+        infra::Function<void(std::optional<std::size_t>)> capturedPolePairsCb;
+        infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)> capturedResistanceCb;
+        infra::Function<void(std::optional<foc::Radians>)> capturedAlignmentCb;
+        infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
+            std::optional<foc::NewtonMeterSecondSquared>)>
+            capturedMechIdentCb;
+        infra::Function<void(services::NvmStatus)> capturedNvmSaveCb;
+
+        void SetUpTorqueCalibrationCaptures()
+        {
+            EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+                .WillOnce(Invoke([this](const auto&, const auto& cb)
+                    {
+                        capturedPolePairsCb = cb;
+                    }));
+            EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+                .WillOnce(Invoke([this](const auto&, const auto& cb)
+                    {
+                        capturedResistanceCb = cb;
+                    }));
+            EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+                .WillOnce(Invoke([this](auto, const auto&, const auto& cb)
+                    {
+                        capturedAlignmentCb = cb;
+                    }));
+            EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+                .WillOnce(Invoke([this](const auto&, const auto& cb)
+                    {
+                        capturedNvmSaveCb = cb;
+                    }));
+            EXPECT_CALL(encoderMock, Set(_)).Times(1);
+        }
+
+        void SetUpMechIdentCalibrationCaptures()
+        {
+            SetUpTorqueCalibrationCaptures();
+            EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+                .WillOnce(Invoke([this](const auto&, auto, const auto&, const auto& cb)
+                    {
+                        capturedMechIdentCb = cb;
+                    }));
+        }
+
+        void CompleteCalibration_Torque()
+        {
+            capturedPolePairsCb(7);
+            capturedResistanceCb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+            capturedAlignmentCb(foc::Radians{ 0.0f });
+            capturedNvmSaveCb(services::NvmStatus::Ok);
+        }
+
+        void CompleteCalibration_WithMechIdent()
+        {
+            capturedPolePairsCb(7);
+            capturedResistanceCb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+            capturedAlignmentCb(foc::Radians{ 0.0f });
+            capturedMechIdentCb(foc::NewtonMeterSecondPerRadian{ 0.005f }, foc::NewtonMeterSecondSquared{ 0.01f });
+            capturedNvmSaveCb(services::NvmStatus::Ok);
+        }
+    };
+
+    // ---- Torque mode full lifecycle ----
+
+    TEST_F(ControlModeStateMachineLifecycleTest, Full_Calibration_Completes_To_Ready_In_Torque_Mode)
+    {
+        GivenNvmAlwaysInvalid();
+        SetUpTorqueCalibrationCaptures();
+        ConstructSubject();
+
+        subject->ActiveStateMachine().CmdCalibrate();
+        CompleteCalibration_Torque();
+
+        EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
+            subject->ActiveStateMachine().CurrentState()));
+    }
+
+    TEST_F(ControlModeStateMachineLifecycleTest, CmdEnable_And_Disable_From_Ready_In_Torque_Mode)
+    {
+        GivenNvmAlwaysInvalid();
+        SetUpTorqueCalibrationCaptures();
+        ConstructSubject();
+
+        subject->ActiveStateMachine().CmdCalibrate();
+        CompleteCalibration_Torque();
+
+        EXPECT_CALL(inverterMock, Start()).Times(1);
+        subject->ActiveStateMachine().CmdEnable();
+        EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(
+            subject->ActiveStateMachine().CurrentState()));
+
+        subject->ActiveStateMachine().CmdDisable();
+        EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
+            subject->ActiveStateMachine().CurrentState()));
+    }
+
+    TEST_F(ControlModeStateMachineLifecycleTest, Fault_And_ClearFault_In_Torque_Mode)
+    {
+        GivenNvmAlwaysInvalid();
+        SetUpTorqueCalibrationCaptures();
+        ConstructSubject();
+
+        subject->ActiveStateMachine().CmdCalibrate();
+        CompleteCalibration_Torque();
+
+        EXPECT_CALL(inverterMock, Start()).Times(1);
+        subject->ActiveStateMachine().CmdEnable();
+
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+        EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(
+            subject->ActiveStateMachine().CurrentState()));
+        EXPECT_EQ(subject->ActiveStateMachine().LastFaultCode(), state_machine::FaultCode::hardwareFault);
+
+        subject->ActiveStateMachine().CmdClearFault();
+        EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
+            subject->ActiveStateMachine().CurrentState()));
+    }
+
+    // ---- Speed mode full lifecycle ----
+
+    TEST_F(ControlModeStateMachineLifecycleTest, Full_Calibration_Completes_To_Ready_In_Speed_Mode)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigSucceeds();
+        SetUpMechIdentCalibrationCaptures();
+        ConstructSubject();
+        subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+        subject->ActiveStateMachine().CmdCalibrate();
+        CompleteCalibration_WithMechIdent();
+
+        EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
+            subject->ActiveStateMachine().CurrentState()));
+    }
+
+    TEST_F(ControlModeStateMachineLifecycleTest, CmdEnable_And_Disable_From_Ready_In_Speed_Mode)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigSucceeds();
+        SetUpMechIdentCalibrationCaptures();
+        ConstructSubject();
+        subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+        subject->ActiveStateMachine().CmdCalibrate();
+        CompleteCalibration_WithMechIdent();
+
+        EXPECT_CALL(inverterMock, Start()).Times(1);
+        subject->ActiveStateMachine().CmdEnable();
+        EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(
+            subject->ActiveStateMachine().CurrentState()));
+
+        subject->ActiveStateMachine().CmdDisable();
+        EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
+            subject->ActiveStateMachine().CurrentState()));
+    }
+
+    TEST_F(ControlModeStateMachineLifecycleTest, Fault_And_ClearFault_In_Speed_Mode)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigSucceeds();
+        SetUpMechIdentCalibrationCaptures();
+        ConstructSubject();
+        subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+        subject->ActiveStateMachine().CmdCalibrate();
+        CompleteCalibration_WithMechIdent();
+
+        EXPECT_CALL(inverterMock, Start()).Times(1);
+        subject->ActiveStateMachine().CmdEnable();
+
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+        EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(
+            subject->ActiveStateMachine().CurrentState()));
+        EXPECT_EQ(subject->ActiveStateMachine().LastFaultCode(), state_machine::FaultCode::hardwareFault);
+
+        subject->ActiveStateMachine().CmdClearFault();
+        EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
+            subject->ActiveStateMachine().CurrentState()));
+    }
+
+    TEST_F(ControlModeStateMachineLifecycleTest, ApplyOnlineEstimates_When_Enabled_In_Speed_Mode)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigSucceeds();
+        SetUpMechIdentCalibrationCaptures();
+        ConstructSubject();
+        subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+        subject->ActiveStateMachine().CmdCalibrate();
+        CompleteCalibration_WithMechIdent();
+
+        EXPECT_CALL(inverterMock, Start()).Times(1);
+        subject->ActiveStateMachine().CmdEnable();
+
+        subject->ActiveStateMachine().ApplyOnlineEstimates();
+
+        EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(
+            subject->ActiveStateMachine().CurrentState()));
+    }
+
+    // ---- Position mode full lifecycle ----
+
+    TEST_F(ControlModeStateMachineLifecycleTest, Full_Calibration_Completes_To_Ready_In_Position_Mode)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigSucceeds();
+        SetUpMechIdentCalibrationCaptures();
+        ConstructSubject();
+        subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+        subject->ActiveStateMachine().CmdCalibrate();
+        CompleteCalibration_WithMechIdent();
+
+        EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
+            subject->ActiveStateMachine().CurrentState()));
+    }
+
+    TEST_F(ControlModeStateMachineLifecycleTest, CmdEnable_And_Disable_From_Ready_In_Position_Mode)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigSucceeds();
+        SetUpMechIdentCalibrationCaptures();
+        ConstructSubject();
+        subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+        subject->ActiveStateMachine().CmdCalibrate();
+        CompleteCalibration_WithMechIdent();
+
+        EXPECT_CALL(inverterMock, Start()).Times(1);
+        subject->ActiveStateMachine().CmdEnable();
+        EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(
+            subject->ActiveStateMachine().CurrentState()));
+
+        subject->ActiveStateMachine().CmdDisable();
+        EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
+            subject->ActiveStateMachine().CurrentState()));
+    }
+
+    TEST_F(ControlModeStateMachineLifecycleTest, Fault_And_ClearFault_In_Position_Mode)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigSucceeds();
+        SetUpMechIdentCalibrationCaptures();
+        ConstructSubject();
+        subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+        subject->ActiveStateMachine().CmdCalibrate();
+        CompleteCalibration_WithMechIdent();
+
+        EXPECT_CALL(inverterMock, Start()).Times(1);
+        subject->ActiveStateMachine().CmdEnable();
+
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+        EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(
+            subject->ActiveStateMachine().CurrentState()));
+        EXPECT_EQ(subject->ActiveStateMachine().LastFaultCode(), state_machine::FaultCode::hardwareFault);
+
+        subject->ActiveStateMachine().CmdClearFault();
+        EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
+            subject->ActiveStateMachine().CurrentState()));
+    }
 }

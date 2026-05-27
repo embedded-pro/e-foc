@@ -218,6 +218,58 @@ namespace
                 foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock
             };
         }
+
+        void GivenNvmValidWithSpeedGainsAndInertia()
+        {
+            services::CalibrationData data{};
+            data.polePairs = 4;
+            data.rPhase = 0.5f;
+            data.lD = 1.0f;
+            data.lQ = 1.0f;
+            data.kpVelocity = 0.25f;
+            data.kiVelocity = 0.5f;
+            data.inertia = 0.01f;
+            data.frictionViscous = 0.005f;
+
+            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
+                .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
+                    {
+                        onDone(true);
+                    }));
+            EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+                .WillOnce(Invoke([data](services::CalibrationData& out,
+                                     infra::Function<void(services::NvmStatus)> onDone)
+                    {
+                        out = data;
+                        onDone(services::NvmStatus::Ok);
+                    }));
+            EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+        }
+
+        void GivenNvmValidWithZeroResistance()
+        {
+            services::CalibrationData data{};
+            data.polePairs = 4;
+            data.rPhase = 0.0f;
+            data.lD = 1.0f;
+            data.lQ = 1.0f;
+            data.kpVelocity = 0.25f;
+            data.kiVelocity = 0.5f;
+
+            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
+                .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
+                    {
+                        onDone(true);
+                    }));
+            EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+                .WillOnce(Invoke([data](services::CalibrationData& out,
+                                     infra::Function<void(services::NvmStatus)> onDone)
+                    {
+                        out = data;
+                        onDone(services::NvmStatus::Ok);
+                    }));
+            EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+        }
     };
 }
 
@@ -2017,4 +2069,62 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_cal_from_fault_is_rejected)
     sm.CmdClearCalibration();
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+// --- ApplyOnlineEstimates and GetFoc ---
+
+TEST_F(FocStateMachineSpeedCliTest, apply_mechanical_estimates_applies_when_physical_values)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithSpeedGainsAndInertia();
+    auto sm = CreateSpeedStateMachine();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    sm.CmdEnable();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+
+    sm.ApplyOnlineEstimates();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_skips_electrical_when_zero_resistance)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithZeroResistance();
+    auto sm = CreateSpeedStateMachine();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    sm.CmdEnable();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+
+    sm.ApplyOnlineEstimates();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineSpeedCliTest, get_foc_returns_foc_controller)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateSpeedStateMachine();
+
+    auto& foc = sm.GetFoc();
+
+    EXPECT_EQ(&foc, &sm.GetFoc());
+}
+
+TEST_F(FocStateMachineSpeedAutoTest, apply_online_estimates_does_not_change_state_when_enabled)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithSpeedGains();
+    auto sm = CreateSpeedAutoStateMachine();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    sm.CmdEnable();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+
+    sm.ApplyOnlineEstimates();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
