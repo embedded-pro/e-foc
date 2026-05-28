@@ -34,6 +34,7 @@ namespace integration
             nvm,
             application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
             faultNotifierMock,
+            state_machine::TransitionPolicy::Auto,
             foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock);
 
         ExecuteAllActions();
@@ -61,6 +62,7 @@ namespace integration
             nvm,
             application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
             faultNotifierMock,
+            state_machine::TransitionPolicy::Auto,
             foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock);
 
         ExecuteAllActions();
@@ -70,7 +72,8 @@ namespace integration
     {
         calibrationExpectationsConfigured = true;
         EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
-            .WillOnce(Invoke([this](const auto&, const auto& cb)
+            .Times(AnyNumber())
+            .WillRepeatedly(Invoke([this](const auto&, const auto& cb)
                 {
                     capturedPolePairsCallback = cb;
                 }));
@@ -111,6 +114,27 @@ namespace integration
         hal::Can::Message data;
         data.push_back(0x01);
         motorCategoryServer->HandleMessage(services::focClearFaultId, data);
+        ExecuteAllActions();
+    }
+
+    void SpeedIntegrationFixture::InjectCanEmergencyStop()
+    {
+        hal::Can::Message data;
+        data.push_back(0x01);
+        motorCategoryServer->HandleMessage(services::focEmergencyStopId, data);
+        ExecuteAllActions();
+    }
+
+    void SpeedIntegrationFixture::DeferClearCalibration()
+    {
+        eepromStub.DeferNextErase();
+        motorStateMachine->CmdClearCalibration();
+        ExecuteAllActions();
+    }
+
+    void SpeedIntegrationFixture::CompleteInvalidate(services::NvmStatus /* status */)
+    {
+        eepromStub.CompleteDeferredErase();
         ExecuteAllActions();
     }
 

@@ -1,15 +1,15 @@
 #pragma once
 
+#include <cstdint>
+
 namespace state_machine
 {
-    // Tag struct: transitions are driven by CLI terminal commands.
-    // FocStateMachineImpl registers Cmd* methods as terminal commands in CLI mode.
-    struct CliTransitionPolicy
-    {};
-
-    // Tag struct: transitions are driven programmatically via CmdCalibrate(), CmdEnable(), etc.
-    // No terminal commands are registered. The caller is responsible for invoking transition
-    // methods at the appropriate time (e.g., from CAN commands or automated sequences).
-    struct AutoTransitionPolicy
-    {};
+    // Controls whether FocStateMachineImpl registers state-transition commands on the CLI terminal.
+    // Cli:  CmdCalibrate/CmdEnable/CmdDisable/etc. are registered as terminal commands.
+    // Auto: no CLI commands are registered; the caller invokes transition methods directly.
+    enum class TransitionPolicy : uint8_t
+    {
+        Cli,
+        Auto
+    };
 }

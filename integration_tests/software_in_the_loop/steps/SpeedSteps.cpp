@@ -33,6 +33,18 @@ static void PopulateSpeedAccessor(StateMachineAccessor& accessor, SpeedIntegrati
     {
         fixture.InjectCanClearFault();
     };
+    accessor.injectCanEmergencyStop = [&fixture]()
+    {
+        fixture.InjectCanEmergencyStop();
+    };
+    accessor.deferClearCalibration = [&fixture]()
+    {
+        fixture.DeferClearCalibration();
+    };
+    accessor.completeInvalidate = [&fixture](services::NvmStatus status)
+    {
+        fixture.CompleteInvalidate(status);
+    };
     accessor.triggerHardwareFault = [&fixture]()
     {
         fixture.faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);

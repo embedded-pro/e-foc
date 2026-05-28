@@ -32,6 +32,9 @@ namespace tool
 
         virtual void OnConnectionChanged(bool connected) = 0;
         virtual void OnAdapterError(infra::BoundedConstString message) = 0;
+
+        virtual void OnControlModeAcknowledged(services::FocMotorMode activeMode, services::FocRejectReason reason) = 0;
+        virtual void OnCommandRejected(uint8_t origCmdId, services::FocRejectReason reason) = 0;
     };
 
     class CanCommandClient
@@ -60,9 +63,6 @@ namespace tool
         void SendSetCurrentIqPid(float kp, float ki, float kd);
         void SendSetSpeedPid(float kp, float ki, float kd);
         void SendSetPositionPid(float kp, float ki, float kd);
-
-        void SendSetSupplyVoltage(float volts) const;
-        void SendSetMaxCurrent(float amps) const;
 
         void RequestData();
 

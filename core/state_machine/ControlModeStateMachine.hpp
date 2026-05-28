@@ -2,7 +2,6 @@
 
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Units.hpp"
-#include "core/services/cli/TerminalNoOp.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
 #include "core/state_machine/ControlMode.hpp"
@@ -18,12 +17,10 @@ namespace state_machine
     template<typename TorqueFoc, typename SpeedFoc, typename PositionFoc>
     class ControlModeStateMachine
     {
-        using NoOp = services::TerminalFocNoOpInteractor;
-
     public:
-        using TorqueSM = application::FocStateMachineImpl<TorqueFoc, NoOp, AutoTransitionPolicy>;
-        using SpeedSM = application::FocStateMachineImpl<SpeedFoc, NoOp, AutoTransitionPolicy>;
-        using PositionSM = application::FocStateMachineImpl<PositionFoc, NoOp, AutoTransitionPolicy>;
+        using TorqueSM = application::FocStateMachineImpl<TorqueFoc>;
+        using SpeedSM = application::FocStateMachineImpl<SpeedFoc>;
+        using PositionSM = application::FocStateMachineImpl<PositionFoc>;
         using ActiveSM = std::variant<std::monostate, TorqueSM, SpeedSM, PositionSM>;
 
         struct OuterLoopArgs
@@ -216,7 +213,8 @@ namespace state_machine
                     hardware,
                     nvm,
                     calibServices,
-                    faultNotifier);
+                    faultNotifier,
+                    state_machine::TransitionPolicy::Auto);
                 break;
             case ControlMode::speed:
                 activeSm.template emplace<SpeedSM>(
@@ -225,6 +223,7 @@ namespace state_machine
                     nvm,
                     calibServices,
                     faultNotifier,
+                    state_machine::TransitionPolicy::Auto,
                     outerLoopArgs.maxCurrent,
                     outerLoopArgs.baseFrequency,
                     outerLoopArgs.lowPriorityInterrupt);
@@ -236,6 +235,7 @@ namespace state_machine
                     nvm,
                     calibServices,
                     faultNotifier,
+                    state_machine::TransitionPolicy::Auto,
                     outerLoopArgs.maxCurrent,
                     outerLoopArgs.baseFrequency,
                     outerLoopArgs.lowPriorityInterrupt);
@@ -246,7 +246,8 @@ namespace state_machine
                     hardware,
                     nvm,
                     calibServices,
-                    faultNotifier);
+                    faultNotifier,
+                    state_machine::TransitionPolicy::Auto);
                 break;
         }
     }

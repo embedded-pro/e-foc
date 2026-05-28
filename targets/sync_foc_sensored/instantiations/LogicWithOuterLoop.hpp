@@ -15,9 +15,9 @@
 namespace application
 {
 #ifdef E_FOC_AUTO_TRANSITION_POLICY
-    using SelectedTransitionPolicy = state_machine::AutoTransitionPolicy;
+    static constexpr state_machine::TransitionPolicy selectedTransitionPolicy = state_machine::TransitionPolicy::Auto;
 #else
-    using SelectedTransitionPolicy = state_machine::CliTransitionPolicy;
+    static constexpr state_machine::TransitionPolicy selectedTransitionPolicy = state_machine::TransitionPolicy::Cli;
 #endif
 
     template<typename FocImpl, typename TerminalImpl>
@@ -48,7 +48,9 @@ namespace application
                         nvm,
                         CalibrationServices{ electricalIdent, motorAlignment },
                         noOpFaultNotifier,
+                        selectedTransitionPolicy,
                         this->hardware.MaxCurrentSupported(), this->hardware.BaseFrequency(), this->hardware.LowPriorityInterrupt());
+                    terminalInteractor.emplace(terminalWithStorage, vdc, motorStateMachine->GetFoc());
                 });
         }
 
@@ -71,6 +73,7 @@ namespace application
         services::MotorAlignmentImpl motorAlignment;
         state_machine::NoOpFaultNotifier noOpFaultNotifier;
         services::ConfigData configData;
-        std::optional<FocStateMachineImpl<FocImpl, TerminalImpl, SelectedTransitionPolicy>> motorStateMachine;
+        std::optional<FocStateMachineImpl<FocImpl>> motorStateMachine;
+        std::optional<TerminalImpl> terminalInteractor;
     };
 }

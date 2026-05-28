@@ -5,7 +5,6 @@
 #include "can-lite/core/test/CanMock.hpp"
 #include "core/foc/implementations/FocTorqueImpl.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
-#include "core/services/cli/TerminalTorque.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
@@ -47,6 +46,12 @@ namespace integration
         void InjectCanStart();
         void InjectCanStop();
         void InjectCanClearFault();
+        void InjectCanEmergencyStop();
+
+        // Defer the NVM invalidation triggered by CmdClearCalibration so the state can
+        // change before the callback fires.
+        void DeferClearCalibration();
+        void CompleteInvalidate(services::NvmStatus status);
 
         // Complete a previously captured calibration step callback.
         void CompletePolePairsEstimation(std::size_t polePairs);
@@ -58,9 +63,7 @@ namespace integration
         static const foc::Volts testVdc;
 
         using TorqueStateMachine = application::FocStateMachineImpl<
-            foc::FocTorqueImpl,
-            services::TerminalFocTorqueInteractor,
-            state_machine::AutoTransitionPolicy>;
+            foc::FocTorqueImpl>;
 
         testing::StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterMock };

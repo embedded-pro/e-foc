@@ -18,6 +18,12 @@ namespace integration
         really_assert(address + buffer.size() <= stubSize);
         std::copy(buffer.begin(), buffer.end(), storage.begin() + static_cast<std::ptrdiff_t>(address));
         ++writeCount;
+        if (deferNextErase)
+        {
+            deferNextErase = false;
+            deferredEraseCallback = onDone;
+            return;
+        }
         onDone();
     }
 
@@ -34,5 +40,18 @@ namespace integration
     {
         storage.fill(0xFF);
         onDone();
+    }
+
+    void EepromStub::DeferNextErase()
+    {
+        deferNextErase = true;
+    }
+
+    void EepromStub::CompleteDeferredErase()
+    {
+        really_assert(deferredEraseCallback);
+        infra::Function<void()> callback = deferredEraseCallback;
+        deferredEraseCallback = nullptr;
+        callback();
     }
 }

@@ -26,9 +26,6 @@
 #include "core/foc/implementations/FocPositionImpl.hpp"
 #include "core/foc/implementations/FocSpeedImpl.hpp"
 #include "core/foc/implementations/FocTorqueImpl.hpp"
-#include "core/services/cli/TerminalPosition.hpp"
-#include "core/services/cli/TerminalSpeed.hpp"
-#include "core/services/cli/TerminalTorque.hpp"
 #endif
 
 namespace application
@@ -63,7 +60,7 @@ namespace application
     template<typename FocImpl>
     inline constexpr bool HasAutoMechIdent = std::is_base_of_v<foc::FocSpeed, FocImpl>;
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy = state_machine::CliTransitionPolicy>
+    template<typename FocImpl>
     class FocStateMachineImpl
         : public state_machine::FocStateMachineBase
     {
@@ -80,6 +77,7 @@ namespace application
             services::NonVolatileMemory& nvm,
             const CalibrationServices& calibServices,
             state_machine::FaultNotifier& faultNotifier,
+            state_machine::TransitionPolicy transitionPolicy,
             FocArgs&&... focArgs);
 
         const state_machine::State& CurrentState() const override;
@@ -127,7 +125,6 @@ namespace application
 
         foc::FocController<FocImpl> focController;
         foc::WithAutomaticCurrentPidGains pidAutoTuner{ focController };
-        TerminalImpl terminalInteractor;
 
         state_machine::State currentState{ state_machine::Idle{} };
         state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::hardwareFault };
@@ -143,14 +140,15 @@ namespace application
 
     // Implementation
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
+    template<typename FocImpl>
     template<typename... FocArgs>
-    FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::FocStateMachineImpl(
+    FocStateMachineImpl<FocImpl>::FocStateMachineImpl(
         const TerminalAndTracer& terminalAndTracer,
         const MotorHardware& hardware,
         services::NonVolatileMemory& nvm,
         const CalibrationServices& calibServices,
         state_machine::FaultNotifier& faultNotifier,
+        state_machine::TransitionPolicy transitionPolicy,
         FocArgs&&... focArgs)
         : terminal(terminalAndTracer.terminal)
         , tracer(terminalAndTracer.tracer)
@@ -161,7 +159,6 @@ namespace application
         , electricalIdent(calibServices.electricalIdent)
         , motorAlignment(calibServices.motorAlignment)
         , focController(inverter, encoder, std::forward<FocArgs>(focArgs)...)
-        , terminalInteractor(terminalAndTracer.terminal, vdc, focController)
         , mechTorqueConstant(calibServices.mechTorqueConstant)
     {
         if constexpr (hasMechanicalIdent)
@@ -187,7 +184,7 @@ namespace application
                 EnterFault(code);
             });
 
-        if constexpr (std::is_same_v<TransitionPolicy, state_machine::CliTransitionPolicy>)
+        if (transitionPolicy == state_machine::TransitionPolicy::Cli)
         {
             RegisterCliCommands();
         }
@@ -195,20 +192,20 @@ namespace application
         CheckNvmOnBoot();
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    const state_machine::State& FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::CurrentState() const
+    template<typename FocImpl>
+    const state_machine::State& FocStateMachineImpl<FocImpl>::CurrentState() const
     {
         return currentState;
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    state_machine::FaultCode FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::LastFaultCode() const
+    template<typename FocImpl>
+    state_machine::FaultCode FocStateMachineImpl<FocImpl>::LastFaultCode() const
     {
         return lastFaultCode;
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::CmdCalibrate()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::CmdCalibrate()
     {
         if (!std::holds_alternative<state_machine::Idle>(currentState) &&
             !std::holds_alternative<state_machine::Ready>(currentState))
@@ -218,8 +215,8 @@ namespace application
         EnterCalibrating();
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::CmdEnable()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::CmdEnable()
     {
         if (!std::holds_alternative<state_machine::Ready>(currentState))
         {
@@ -228,8 +225,8 @@ namespace application
         EnterEnabled();
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::CmdDisable()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::CmdDisable()
     {
         if (!std::holds_alternative<state_machine::Enabled>(currentState))
         {
@@ -239,8 +236,8 @@ namespace application
         EnterReady(calibrationData);
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::CmdClearFault()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::CmdClearFault()
     {
         if (!std::holds_alternative<state_machine::Fault>(currentState))
         {
@@ -250,8 +247,8 @@ namespace application
         currentState = state_machine::Idle{};
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::CmdClearCalibration()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::CmdClearCalibration()
     {
         if (!std::holds_alternative<state_machine::Idle>(currentState) &&
             !std::holds_alternative<state_machine::Ready>(currentState))
@@ -261,6 +258,10 @@ namespace application
 
         nvm.InvalidateCalibration([this](services::NvmStatus status)
             {
+                if (!std::holds_alternative<state_machine::Idle>(currentState) &&
+                    !std::holds_alternative<state_machine::Ready>(currentState))
+                    return;
+
                 if (status != services::NvmStatus::Ok)
                 {
                     EnterFault(state_machine::FaultCode::hardwareFault);
@@ -271,24 +272,24 @@ namespace application
             });
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::EnterCalibrating()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::EnterCalibrating()
     {
         tracer.Trace() << "[SM] Entering Calibrating";
         currentState = state_machine::Calibrating{};
         RunPolePairsStep();
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::EnterReady(const services::CalibrationData& data)
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::EnterReady(const services::CalibrationData& data)
     {
         tracer.Trace() << "[SM] Entering Ready";
         calibrationData = data;
         currentState = state_machine::Ready{ data };
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::EnterEnabled()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::EnterEnabled()
     {
         tracer.Trace() << "[SM] Entering Enabled";
         if constexpr (hasMechanicalIdent)
@@ -300,8 +301,8 @@ namespace application
         currentState = state_machine::Enabled{};
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::EnterFault(state_machine::FaultCode code)
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::EnterFault(state_machine::FaultCode code)
     {
         tracer.Trace() << "[SM] Entering Fault";
         if (std::holds_alternative<state_machine::Enabled>(currentState) ||
@@ -313,8 +314,8 @@ namespace application
         currentState = state_machine::Fault{ code };
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::RunPolePairsStep()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::RunPolePairsStep()
     {
         tracer.Trace() << "[SM] Identifying pole pairs";
         auto& calibrating = std::get<state_machine::Calibrating>(currentState);
@@ -335,8 +336,8 @@ namespace application
             });
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::RunResistanceAndInductanceStep()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::RunResistanceAndInductanceStep()
     {
         tracer.Trace() << "[SM] Identifying resistance and inductance";
         auto& calibrating = std::get<state_machine::Calibrating>(currentState);
@@ -360,8 +361,8 @@ namespace application
             });
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::RunAlignmentStep()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::RunAlignmentStep()
     {
         tracer.Trace() << "[SM] Aligning motor";
         auto& calibrating = std::get<state_machine::Calibrating>(currentState);
@@ -387,8 +388,8 @@ namespace application
             });
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::OnCalibrationComplete()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::OnCalibrationComplete()
     {
         if (!std::holds_alternative<state_machine::Calibrating>(currentState))
             return;
@@ -411,8 +412,8 @@ namespace application
             });
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::RunMechanicalIdentStep()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::RunMechanicalIdentStep()
     {
         tracer.Trace() << "[SM] Estimating mechanical parameters";
 
@@ -449,8 +450,8 @@ namespace application
             });
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::ApplyCalibrationData(const services::CalibrationData& data)
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::ApplyCalibrationData(const services::CalibrationData& data)
     {
         focController.SetPolePairs(data.polePairs);
         encoder.Set(foc::Radians{ std::bit_cast<float>(data.encoderZeroOffset) });
@@ -477,16 +478,16 @@ namespace application
         }
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    bool FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::IsCalibrating(state_machine::CalibrationStep expected) const
+    template<typename FocImpl>
+    bool FocStateMachineImpl<FocImpl>::IsCalibrating(state_machine::CalibrationStep expected) const
     {
         if (!std::holds_alternative<state_machine::Calibrating>(currentState))
             return false;
         return std::get<state_machine::Calibrating>(currentState).step == expected;
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::CheckNvmOnBoot()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::CheckNvmOnBoot()
     {
         nvm.IsCalibrationValid([this](bool valid)
             {
@@ -494,8 +495,8 @@ namespace application
             });
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::OnNvmValidationResult(bool valid)
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::OnNvmValidationResult(bool valid)
     {
         if (!std::holds_alternative<state_machine::Idle>(currentState))
             return;
@@ -511,8 +512,8 @@ namespace application
             });
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::OnNvmLoadResult(services::NvmStatus status)
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::OnNvmLoadResult(services::NvmStatus status)
     {
         if (!std::holds_alternative<state_machine::Idle>(currentState))
             return;
@@ -525,22 +526,22 @@ namespace application
         EnterReady(calibrationData);
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::ApplyOnlineEstimates()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::ApplyOnlineEstimates()
     {
         if (!std::holds_alternative<state_machine::Enabled>(currentState))
             return;
         ApplyOnlineEstimatesImpl();
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    FocImpl& FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::GetFoc()
+    template<typename FocImpl>
+    FocImpl& FocStateMachineImpl<FocImpl>::GetFoc()
     {
         return focController;
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::ApplyOnlineEstimatesImpl()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::ApplyOnlineEstimatesImpl()
     {
         if constexpr (hasMechanicalIdent)
         {
@@ -578,60 +579,57 @@ namespace application
         }
     }
 
-    template<typename FocImpl, typename TerminalImpl, typename TransitionPolicy>
-    void FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>::RegisterCliCommands()
+    template<typename FocImpl>
+    void FocStateMachineImpl<FocImpl>::RegisterCliCommands()
     {
-        if constexpr (std::is_same_v<TransitionPolicy, state_machine::CliTransitionPolicy>)
-        {
-            terminal.AddCommand({ { "calibrate", "cal", "Run full calibration sequence" },
-                [this](const infra::BoundedConstString&)
-                {
-                    CmdCalibrate();
-                } });
-
-            terminal.AddCommand({ { "enable", "en", "Enable FOC controller" },
-                [this](const infra::BoundedConstString&)
-                {
-                    CmdEnable();
-                } });
-
-            terminal.AddCommand({ { "disable", "dis", "Disable FOC controller" },
-                [this](const infra::BoundedConstString&)
-                {
-                    CmdDisable();
-                } });
-
-            terminal.AddCommand({ { "clear_fault", "cf", "Clear fault and return to Idle" },
-                [this](const infra::BoundedConstString&)
-                {
-                    CmdClearFault();
-                } });
-
-            terminal.AddCommand({ { "clear_cal", "cc", "Clear calibration data from NVM" },
-                [this](const infra::BoundedConstString&)
-                {
-                    CmdClearCalibration();
-                } });
-
-            if constexpr (hasMechanicalIdent)
+        terminal.AddCommand({ { "calibrate", "cal", "Run full calibration sequence" },
+            [this](const infra::BoundedConstString&)
             {
-                terminal.AddCommand({ { "apply_estimates", "ae", "Apply online estimates to PID gains" },
-                    [this](const infra::BoundedConstString&)
-                    {
-                        ApplyOnlineEstimates();
-                    } });
+                CmdCalibrate();
+            } });
 
-                terminal.AddCommand({ { "estimate_status", "es", "Print current online estimates" },
-                    [this](const infra::BoundedConstString&)
-                    {
-                        if (optOnlineMechEstimator.has_value())
-                            tracer.Trace() << "[EST] Mech: J=" << optOnlineMechEstimator->CurrentInertia().Value()
-                                           << " B=" << optOnlineMechEstimator->CurrentFriction().Value();
-                        if (optOnlineElecEstimator.has_value())
-                            tracer.Trace() << "[EST] Elec: R=" << optOnlineElecEstimator->CurrentResistance().Value()
-                                           << " L=" << optOnlineElecEstimator->CurrentInductance().Value();
-                    } });
-            }
+        terminal.AddCommand({ { "enable", "en", "Enable FOC controller" },
+            [this](const infra::BoundedConstString&)
+            {
+                CmdEnable();
+            } });
+
+        terminal.AddCommand({ { "disable", "dis", "Disable FOC controller" },
+            [this](const infra::BoundedConstString&)
+            {
+                CmdDisable();
+            } });
+
+        terminal.AddCommand({ { "clear_fault", "cf", "Clear fault and return to Idle" },
+            [this](const infra::BoundedConstString&)
+            {
+                CmdClearFault();
+            } });
+
+        terminal.AddCommand({ { "clear_cal", "cc", "Clear calibration data from NVM" },
+            [this](const infra::BoundedConstString&)
+            {
+                CmdClearCalibration();
+            } });
+
+        if constexpr (hasMechanicalIdent)
+        {
+            terminal.AddCommand({ { "apply_estimates", "ae", "Apply online estimates to PID gains" },
+                [this](const infra::BoundedConstString&)
+                {
+                    ApplyOnlineEstimates();
+                } });
+
+            terminal.AddCommand({ { "estimate_status", "es", "Print current online estimates" },
+                [this](const infra::BoundedConstString&)
+                {
+                    if (optOnlineMechEstimator.has_value())
+                        tracer.Trace() << "[EST] Mech: J=" << optOnlineMechEstimator->CurrentInertia().Value()
+                                       << " B=" << optOnlineMechEstimator->CurrentFriction().Value();
+                    if (optOnlineElecEstimator.has_value())
+                        tracer.Trace() << "[EST] Elec: R=" << optOnlineElecEstimator->CurrentResistance().Value()
+                                       << " L=" << optOnlineElecEstimator->CurrentInductance().Value();
+                } });
         }
     }
 }
@@ -640,11 +638,8 @@ namespace application
 
 namespace application
 {
-    extern template class FocStateMachineImpl<foc::FocTorqueImpl, services::TerminalFocTorqueInteractor, state_machine::CliTransitionPolicy>;
-    extern template class FocStateMachineImpl<foc::FocTorqueImpl, services::TerminalFocTorqueInteractor, state_machine::AutoTransitionPolicy>;
-    extern template class FocStateMachineImpl<foc::FocSpeedImpl, services::TerminalFocSpeedInteractor, state_machine::CliTransitionPolicy>;
-    extern template class FocStateMachineImpl<foc::FocSpeedImpl, services::TerminalFocSpeedInteractor, state_machine::AutoTransitionPolicy>;
-    extern template class FocStateMachineImpl<foc::FocPositionImpl, services::TerminalFocPositionInteractor, state_machine::CliTransitionPolicy>;
-    extern template class FocStateMachineImpl<foc::FocPositionImpl, services::TerminalFocPositionInteractor, state_machine::AutoTransitionPolicy>;
+    extern template class FocStateMachineImpl<foc::FocTorqueImpl>;
+    extern template class FocStateMachineImpl<foc::FocSpeedImpl>;
+    extern template class FocStateMachineImpl<foc::FocPositionImpl>;
 }
 #endif

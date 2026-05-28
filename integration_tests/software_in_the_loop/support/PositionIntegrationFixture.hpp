@@ -6,7 +6,6 @@
 #include "core/foc/implementations/FocPositionImpl.hpp"
 #include "core/foc/implementations/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
-#include "core/services/cli/TerminalPosition.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/mechanical_system_ident/test_doubles/MechanicalParametersIdentificationMock.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
@@ -43,6 +42,10 @@ namespace integration
         void InjectCanStart();
         void InjectCanStop();
         void InjectCanClearFault();
+        void InjectCanEmergencyStop();
+
+        void DeferClearCalibration();
+        void CompleteInvalidate(services::NvmStatus status);
 
         void CompletePolePairsEstimation(std::size_t polePairs);
         void CompleteRLEstimation(foc::Ohm resistance, foc::MilliHenry inductance);
@@ -56,9 +59,7 @@ namespace integration
         static const foc::Volts testVdc;
 
         using PositionStateMachine = application::FocStateMachineImpl<
-            foc::FocPositionImpl,
-            services::TerminalFocPositionInteractor,
-            state_machine::AutoTransitionPolicy>;
+            foc::FocPositionImpl>;
 
         testing::StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterMock };

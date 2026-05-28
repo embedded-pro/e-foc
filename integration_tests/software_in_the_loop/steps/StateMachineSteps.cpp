@@ -30,9 +30,21 @@ static void PopulateTorqueAccessor(StateMachineAccessor& accessor, FocIntegratio
             fixture.InjectCanStop();
         };
     accessor.injectCanClearFault = [&fixture]()
-        {
-            fixture.InjectCanClearFault();
-        };
+    {
+        fixture.InjectCanClearFault();
+    };
+    accessor.injectCanEmergencyStop = [&fixture]()
+    {
+        fixture.InjectCanEmergencyStop();
+    };
+    accessor.deferClearCalibration = [&fixture]()
+    {
+        fixture.DeferClearCalibration();
+    };
+    accessor.completeInvalidate = [&fixture](services::NvmStatus status)
+    {
+        fixture.CompleteInvalidate(status);
+    };
     accessor.triggerHardwareFault = [&fixture]()
         {
             fixture.faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
