@@ -18,7 +18,7 @@ jobs:
   sonar:
     name: SonarCloud
     runs-on: ubuntu-latest
-    container: gabrielfrasantos/embedded-devcontainer-cpp:latest@sha256:bd4f1eb7556fad821b0a2f5ba7326fed5c19c88b4ee8475ae8f8db21e7c09b64 # 5.1.4
+    container: gabrielfrasantos/embedded-devcontainer-cpp:latest@sha256:85854c7e916648f94b3587aa8e306b951ff80189184cdfa1191338160562b6f5
     env:
       SONAR_SCANNER_VERSION: 5.0.1.3006
       SONAR_SERVER_URL: "https://sonarcloud.io"
@@ -45,7 +45,6 @@ jobs:
           save: ${{ github.ref == 'refs/heads/main' }}
       - name: Build & Collect Coverage
         run: |
-          apt-get update && apt-get install -y --no-install-recommends qt6-base-dev libgl1-mesa-dev
           cmake --preset coverage
           cmake --build --preset coverage
           GTEST_OUTPUT="xml:${PWD}/testresults/" ctest --preset coverage

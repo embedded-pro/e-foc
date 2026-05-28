@@ -25,6 +25,7 @@ jobs:
   host_build_test_ubuntu:
     name: Host Build & Test (ubuntu-latest)
     runs-on: ubuntu-latest
+    container: gabrielfrasantos/embedded-devcontainer-cpp:latest@sha256:85854c7e916648f94b3587aa8e306b951ff80189184cdfa1191338160562b6f5
     steps:
       - name: Configure Git
         run: |
@@ -40,9 +41,6 @@ jobs:
           key: ${{ github.job }}-ubuntu-latest
           max-size: 2G
           save: ${{ github.ref == 'refs/heads/main' }}
-      - uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
-      - name: Install Qt6
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qt6-base-dev libgl1-mesa-dev
       - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
         with:
           configurePreset: "host"
@@ -121,6 +119,7 @@ jobs:
   host_cross_windows:
     name: Host Cross-Compile (Linux → Windows)
     runs-on: ubuntu-latest
+    container: gabrielfrasantos/embedded-devcontainer-cpp:latest@sha256:85854c7e916648f94b3587aa8e306b951ff80189184cdfa1191338160562b6f5
     steps:
       - name: Configure Git
         run: |
@@ -138,14 +137,9 @@ jobs:
           key: ${{ github.job }}-windows-cross-${{ github.sha }}
           restore-keys: ${{ github.job }}-windows-cross-
       - name: Cross-compile for Windows
-        uses: devcontainers/ci@8bf61b26e9c3a98f69cb6ce2f88d24ff59b785c6 # v0.3
-        with:
-          imageName: gabrielfrasantos/embedded-devcontainer-cpp
-          cacheFrom: gabrielfrasantos/embedded-devcontainer-cpp
-          push: never
-          env: |
-            CCACHE_DIR=${{ github.workspace }}/.ccache
-          runCmd: cmake --preset windows && cmake --build --preset windows-RelWithDebInfo
+        run: cmake --preset windows && cmake --build --preset windows-RelWithDebInfo
+        env:
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: e_foc-windows
