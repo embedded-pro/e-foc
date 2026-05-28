@@ -1,6 +1,5 @@
 #include "TestFocStateMachineHelper.hpp"
 #include "core/foc/implementations/FocPositionImpl.hpp"
-#include "core/services/cli/TerminalPosition.hpp"
 
 namespace
 {
@@ -12,8 +11,7 @@ namespace
     {
     public:
         using PositionStateMachine = application::FocStateMachineImpl<
-            foc::FocPositionImpl,
-            services::TerminalFocPositionInteractor>;
+            foc::FocPositionImpl>;
 
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
@@ -215,6 +213,7 @@ namespace
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
                 faultNotifierMock,
+                state_machine::TransitionPolicy::Cli,
                 foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock
             };
         }
@@ -332,6 +331,7 @@ TEST_F(FocStateMachinePositionCliTest, no_mech_ident_override_enters_fault)
         nvmMock,
         application::CalibrationServices{ electricalIdentMock, alignmentMock },
         faultNotifierMock,
+        state_machine::TransitionPolicy::Cli,
         foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock
     };
 
@@ -641,9 +641,7 @@ namespace
     {
     public:
         using PositionAutoStateMachine = application::FocStateMachineImpl<
-            foc::FocPositionImpl,
-            services::TerminalFocPositionInteractor,
-            state_machine::AutoTransitionPolicy>;
+            foc::FocPositionImpl>;
 
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
@@ -845,6 +843,7 @@ namespace
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
                 faultNotifierMock,
+                state_machine::TransitionPolicy::Auto,
                 foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock
             };
         }
@@ -1735,6 +1734,7 @@ TEST_F(FocStateMachinePositionAutoTest, no_mech_ident_override_enters_fault)
         nvmMock,
         application::CalibrationServices{ electricalIdentMock, alignmentMock },
         faultNotifierMock,
+        state_machine::TransitionPolicy::Auto,
         foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock
     };
 

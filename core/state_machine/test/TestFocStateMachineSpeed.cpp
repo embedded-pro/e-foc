@@ -1,6 +1,5 @@
 #include "TestFocStateMachineHelper.hpp"
 #include "core/foc/implementations/FocSpeedImpl.hpp"
-#include "core/services/cli/TerminalSpeed.hpp"
 
 namespace
 {
@@ -12,8 +11,7 @@ namespace
     {
     public:
         using SpeedStateMachine = application::FocStateMachineImpl<
-            foc::FocSpeedImpl,
-            services::TerminalFocSpeedInteractor>;
+            foc::FocSpeedImpl>;
 
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
@@ -215,6 +213,7 @@ namespace
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
                 faultNotifierMock,
+                state_machine::TransitionPolicy::Cli,
                 foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock
             };
         }
@@ -1004,9 +1003,7 @@ namespace
     {
     public:
         using SpeedAutoStateMachine = application::FocStateMachineImpl<
-            foc::FocSpeedImpl,
-            services::TerminalFocSpeedInteractor,
-            state_machine::AutoTransitionPolicy>;
+            foc::FocSpeedImpl>;
 
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
@@ -1208,6 +1205,7 @@ namespace
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
                 faultNotifierMock,
+                state_machine::TransitionPolicy::Auto,
                 foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock
             };
         }

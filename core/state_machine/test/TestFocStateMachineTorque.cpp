@@ -1,6 +1,5 @@
 #include "TestFocStateMachineHelper.hpp"
 #include "core/foc/implementations/FocTorqueImpl.hpp"
-#include "core/services/cli/TerminalTorque.hpp"
 
 namespace
 {
@@ -11,7 +10,7 @@ namespace
         , public infra::EventDispatcherWithWeakPtrFixture
     {
     public:
-        using TestedStateMachine = application::FocStateMachineImpl<foc::FocTorqueImpl, services::TerminalFocTorqueInteractor>;
+        using TestedStateMachine = application::FocStateMachineImpl<foc::FocTorqueImpl>;
 
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
@@ -175,7 +174,8 @@ namespace
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock },
-                faultNotifierMock
+                faultNotifierMock,
+                state_machine::TransitionPolicy::Cli
             };
         }
     };
@@ -812,9 +812,7 @@ namespace
         , public infra::EventDispatcherWithWeakPtrFixture
     {
     public:
-        using AutoStateMachine = application::FocStateMachineImpl<foc::FocTorqueImpl,
-            services::TerminalFocTorqueInteractor,
-            state_machine::AutoTransitionPolicy>;
+        using AutoStateMachine = application::FocStateMachineImpl<foc::FocTorqueImpl>;
 
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
@@ -978,7 +976,8 @@ namespace
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock },
-                faultNotifierMock
+                faultNotifierMock,
+                state_machine::TransitionPolicy::Auto
             };
         }
     };

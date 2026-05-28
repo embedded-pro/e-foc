@@ -31,7 +31,8 @@ namespace integration
             application::MotorHardware{ platformFactory, platformFactory, testVdc },
             nvm,
             application::CalibrationServices{ electricalIdentMock, alignmentMock },
-            faultNotifierMock);
+            faultNotifierMock,
+            state_machine::TransitionPolicy::Auto);
 
         ExecuteAllActions();
     }
@@ -57,7 +58,8 @@ namespace integration
             application::MotorHardware{ platformFactory, platformFactory, testVdc },
             nvm,
             application::CalibrationServices{ electricalIdentMock, alignmentMock },
-            faultNotifierMock);
+            faultNotifierMock,
+            state_machine::TransitionPolicy::Auto);
 
         ExecuteAllActions();
     }

@@ -34,6 +34,7 @@ namespace integration
             nvm,
             application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
             faultNotifierMock,
+            state_machine::TransitionPolicy::Auto,
             foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock);
 
         ExecuteAllActions();
@@ -61,6 +62,7 @@ namespace integration
             nvm,
             application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
             faultNotifierMock,
+            state_machine::TransitionPolicy::Auto,
             foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock);
 
         ExecuteAllActions();
