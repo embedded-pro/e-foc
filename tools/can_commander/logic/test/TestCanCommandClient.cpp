@@ -391,15 +391,14 @@ namespace
 
     // ---------- SelectControlModeResponse forwarding ----------
 
-    TEST_F(TestCanCommandClient, select_control_mode_response_ok_notifies_control_mode_acknowledged)
+    TEST_F(TestCanCommandClient, select_control_mode_response_notifies_control_mode_acknowledged)
     {
         EXPECT_CALL(observer, OnConnectionChanged(true));
-        EXPECT_CALL(observer, OnControlModeAcknowledged(FocMotorMode::speed, FocRejectReason::ok));
+        EXPECT_CALL(observer, OnControlModeAcknowledged(FocMotorMode::speed));
 
         hal::Can::Message data;
-        data.resize(2, 0);
+        data.resize(1, 0);
         data[0] = static_cast<uint8_t>(FocMotorMode::speed);
-        data[1] = static_cast<uint8_t>(FocRejectReason::ok);
 
         auto canId = hal::Can::Id::Create29BitId(
             MakeCanId(CanPriority::response,
@@ -407,64 +406,6 @@ namespace
                 focSelectControlModeResponseId,
                 1));
         receiveCallback(canId, data);
-    }
-
-    TEST_F(TestCanCommandClient, select_control_mode_response_rejected_notifies_acknowledged_with_reason)
-    {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
-        EXPECT_CALL(observer, OnControlModeAcknowledged(FocMotorMode::speed, FocRejectReason::busy));
-
-        hal::Can::Message data;
-        data.resize(2, 0);
-        data[0] = static_cast<uint8_t>(FocMotorMode::speed);
-        data[1] = static_cast<uint8_t>(FocRejectReason::busy);
-
-        auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::response,
-                focMotorCategoryId,
-                focSelectControlModeResponseId,
-                1));
-        receiveCallback(canId, data);
-    }
-
-    // ---------- CommandRejectedResponse forwarding ----------
-
-    TEST_F(TestCanCommandClient, command_rejected_response_notifies_observer)
-    {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
-        EXPECT_CALL(observer, OnCommandRejected(0x10u, FocRejectReason::controlModeMismatch));
-
-        hal::Can::Message data;
-        data.resize(2, 0);
-        data[0] = 0x10;
-        data[1] = static_cast<uint8_t>(FocRejectReason::controlModeMismatch);
-
-        auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::response,
-                focMotorCategoryId,
-                focCommandRejectedResponseId,
-                1));
-        receiveCallback(canId, data);
-    }
-
-    TEST_F(TestCanCommandClient, command_rejected_response_leaves_client_not_busy)
-    {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
-        EXPECT_CALL(observer, OnCommandRejected(_, _));
-
-        hal::Can::Message data;
-        data.resize(2, 0);
-        data[0] = 0x01;
-        data[1] = static_cast<uint8_t>(FocRejectReason::busy);
-
-        auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::response,
-                focMotorCategoryId,
-                focCommandRejectedResponseId,
-                1));
-        receiveCallback(canId, data);
-
-        EXPECT_FALSE(client.IsBusy());
     }
 
     // ---------- Encoding: torque setpoint uses focCurrentScale ----------

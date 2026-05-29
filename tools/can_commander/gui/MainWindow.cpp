@@ -177,19 +177,18 @@ namespace tool
         logView->appendPlainText(QString("ERROR: %1").arg(QString::fromUtf8(message.data(), static_cast<int>(message.size()))));
     }
 
-    void MainWindow::OnControlModeAcknowledged(services::FocMotorMode activeMode, services::FocRejectReason reason)
+    void MainWindow::OnControlModeAcknowledged(services::FocMotorMode activeMode)
     {
-        if (reason == services::FocRejectReason::ok)
-            logView->appendPlainText(QString("Mode accepted: %1").arg(static_cast<int>(activeMode)));
-        else
-            logView->appendPlainText(QString("Mode rejected: reason=%1").arg(static_cast<int>(reason)));
+        logView->appendPlainText(QString("Active control mode: %1").arg(static_cast<int>(activeMode)));
     }
 
-    void MainWindow::OnCommandRejected(uint8_t origCmdId, services::FocRejectReason reason)
+    void MainWindow::OnCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status)
     {
-        logView->appendPlainText(QString("Command rejected: cmdId=0x%1 reason=%2")
-                .arg(origCmdId, 2, 16, QChar('0'))
-                .arg(static_cast<int>(reason)));
+        logView->appendPlainText(QString("ACK: cat=0x%1 cmd=0x%2 status=%3 (%4)")
+                .arg(categoryId, 2, 16, QChar('0'))
+                .arg(commandType, 2, 16, QChar('0'))
+                .arg(static_cast<int>(status))
+                .arg(QString::fromUtf8(services::CanAckStatusToString(status))));
     }
 
     void MainWindow::OnMotorStatusReceived(services::FocMotorState state, services::FocFaultCode fault)

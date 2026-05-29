@@ -20,7 +20,7 @@ namespace tool
         MOCK_METHOD(void, OnFrameLog, (bool transmitted, uint32_t id, const CanFrame& data), (override));
         MOCK_METHOD(void, OnConnectionChanged, (bool connected), (override));
         MOCK_METHOD(void, OnAdapterError, (infra::BoundedConstString message), (override));
-        MOCK_METHOD(void, OnControlModeAcknowledged, (services::FocMotorMode activeMode, services::FocRejectReason reason), (override));
-        MOCK_METHOD(void, OnCommandRejected, (uint8_t origCmdId, services::FocRejectReason reason), (override));
+        MOCK_METHOD(void, OnControlModeAcknowledged, (services::FocMotorMode activeMode), (override));
+        MOCK_METHOD(void, OnCommandAck, (uint8_t categoryId, uint8_t commandType, services::CanAckStatus status), (override));
     };
 }

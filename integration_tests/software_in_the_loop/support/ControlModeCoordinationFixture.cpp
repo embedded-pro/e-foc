@@ -42,7 +42,7 @@ namespace integration
             application::TerminalAndTracer{ terminal, tracer },
             application::MotorHardware{ platformFactory, platformFactory, testVdc },
             nvm,
-            application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
+            application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
             faultNotifierMock,
             data,
             CoordinatorType::OuterLoopArgs{
@@ -78,7 +78,7 @@ namespace integration
             application::TerminalAndTracer{ freshTerminal, tracer },
             application::MotorHardware{ platformFactory, platformFactory, testVdc },
             nvm,
-            application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
+            application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
             faultNotifierMock,
             savedData,
             CoordinatorType::OuterLoopArgs{
@@ -91,43 +91,53 @@ namespace integration
 
     void ControlModeCoordinationFixture::SetupCanIntegration()
     {
-        commandRejectedSent = false;
+        commandAckSent = false;
         selectResponseSent = false;
         lastSentMessageType = 0;
-        lastSelectResponseReason = services::FocRejectReason::ok;
-        lastCommandRejectedReason = services::FocRejectReason::ok;
-        lastCommandRejectedOrigCmdId = 0;
+        lastCommandAckStatus = services::CanAckStatus::success;
+        lastCommandAckMessageType = 0;
+        categoryErrorSent = false;
 
         EXPECT_CALL(transportCanMock, SendData(_, _, _))
             .Times(AnyNumber())
             .WillRepeatedly(Invoke([this](hal::Can::Id id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
                 {
                     lastSentMessageType = services::ExtractCanMessageType(id.Get29BitId());
-                    if (lastSentMessageType == services::focCommandRejectedResponseId)
-                    {
-                        commandRejectedSent = true;
-                        lastCommandRejectedOrigCmdId = msg[0];
-                        lastCommandRejectedReason = static_cast<services::FocRejectReason>(msg[1]);
-                    }
                     if (lastSentMessageType == services::focSelectControlModeResponseId)
-                    {
                         selectResponseSent = true;
-                        lastSelectResponseReason = static_cast<services::FocRejectReason>(msg[1]);
+                    if (lastSentMessageType == services::focCategoryErrorResponseId && msg.size() >= 2)
+                    {
+                        categoryErrorSent = true;
+                        lastCategoryErrorOriginCmd = msg[0];
+                        lastCategoryErrorReason = static_cast<services::FocMotorCategoryError>(msg[1]);
                     }
                     cb(true);
                 }));
 
         canTransport.emplace(transportCanMock, 1);
         motorCategoryServer.emplace(*canTransport);
+        motorCategoryServer->SetAcknowledger(*this);
         motorBridge.emplace(*motorCategoryServer, *coordinator);
+    }
+
+    void ControlModeCoordinationFixture::SendCommandAck(uint8_t /*categoryId*/, uint8_t commandType, services::CanAckStatus status)
+    {
+        commandAckSent = true;
+        lastCommandAckMessageType = commandType;
+        lastCommandAckStatus = status;
+    }
+
+    void ControlModeCoordinationFixture::DispatchToMotor(uint8_t messageType, const hal::Can::Message& data)
+    {
+        motorCategoryServer->HandleMessage(messageType, data);
     }
 
     void ControlModeCoordinationFixture::InjectCanStart()
     {
-        commandRejectedSent = false;
+        commandAckSent = false;
         hal::Can::Message data;
         data.push_back(0x01);
-        motorCategoryServer->HandleMessage(services::focStartId, data);
+        DispatchToMotor(services::focStartId, data);
         ExecuteAllActions();
     }
 
@@ -135,60 +145,60 @@ namespace integration
     {
         hal::Can::Message data;
         data.push_back(0x01);
-        motorCategoryServer->HandleMessage(services::focStopId, data);
+        DispatchToMotor(services::focStopId, data);
         ExecuteAllActions();
     }
 
     void ControlModeCoordinationFixture::InjectCanSelectControlMode(services::FocMotorMode mode)
     {
-        commandRejectedSent = false;
+        commandAckSent = false;
         selectResponseSent = false;
-        lastSelectResponseReason = services::FocRejectReason::ok;
+        lastCommandAckStatus = services::CanAckStatus::success;
 
         hal::Can::Message data;
         data.resize(2, 0);
         data[0] = 0;
         data[1] = static_cast<uint8_t>(mode);
-        motorCategoryServer->HandleMessage(services::focSelectControlModeId, data);
+        DispatchToMotor(services::focSelectControlModeId, data);
         ExecuteAllActions();
     }
 
     void ControlModeCoordinationFixture::InjectCanSetTorqueSetpoint(int16_t value)
     {
-        commandRejectedSent = false;
-        lastCommandRejectedReason = services::FocRejectReason::ok;
-        lastCommandRejectedOrigCmdId = 0;
+        commandAckSent = false;
+        lastCommandAckStatus = services::CanAckStatus::success;
+        lastCommandAckMessageType = 0;
         hal::Can::Message data;
         data.resize(3, 0);
         data[0] = 0;
         services::CanFrameCodec::WriteInt16(data, 1, value);
-        motorCategoryServer->HandleMessage(services::focSetTorqueSetpointId, data);
+        DispatchToMotor(services::focSetTorqueSetpointId, data);
         ExecuteAllActions();
     }
 
     void ControlModeCoordinationFixture::InjectCanSetSpeedSetpoint(int16_t value)
     {
-        commandRejectedSent = false;
-        lastCommandRejectedReason = services::FocRejectReason::ok;
-        lastCommandRejectedOrigCmdId = 0;
+        commandAckSent = false;
+        lastCommandAckStatus = services::CanAckStatus::success;
+        lastCommandAckMessageType = 0;
         hal::Can::Message data;
         data.resize(3, 0);
         data[0] = 0;
         services::CanFrameCodec::WriteInt16(data, 1, value);
-        motorCategoryServer->HandleMessage(services::focSetSpeedSetpointId, data);
+        DispatchToMotor(services::focSetSpeedSetpointId, data);
         ExecuteAllActions();
     }
 
     void ControlModeCoordinationFixture::InjectCanSetPositionSetpoint(int16_t value)
     {
-        commandRejectedSent = false;
-        lastCommandRejectedReason = services::FocRejectReason::ok;
-        lastCommandRejectedOrigCmdId = 0;
+        commandAckSent = false;
+        lastCommandAckStatus = services::CanAckStatus::success;
+        lastCommandAckMessageType = 0;
         hal::Can::Message data;
         data.resize(3, 0);
         data[0] = 0;
         services::CanFrameCodec::WriteInt16(data, 1, value);
-        motorCategoryServer->HandleMessage(services::focSetPositionSetpointId, data);
+        DispatchToMotor(services::focSetPositionSetpointId, data);
         ExecuteAllActions();
     }
 
