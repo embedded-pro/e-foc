@@ -109,8 +109,10 @@ namespace integration
 
         struct NullAcknowledger : services::CanCommandAcknowledger
         {
-            void SendCommandAck(uint8_t, uint8_t, services::CanAckStatus) override {}
+            void SendCommandAck(uint8_t, uint8_t, services::CanAckStatus) override
+            {}
         };
+
         NullAcknowledger nullAcknowledger;
     };
 }
