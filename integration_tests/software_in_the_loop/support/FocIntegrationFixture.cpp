@@ -86,6 +86,7 @@ namespace integration
 
         canTransport.emplace(transportCanMock, 1);
         motorCategoryServer.emplace(*canTransport);
+        motorCategoryServer->SetAcknowledger(nullAcknowledger);
         motorBridge.emplace(*motorCategoryServer, *motorStateMachine);
     }
 
@@ -124,7 +125,7 @@ namespace integration
     void FocIntegrationFixture::DeferClearCalibration()
     {
         eepromStub.DeferNextErase();
-        motorStateMachine->CmdClearCalibration();
+        motorStateMachine->CmdClearCalibration([](state_machine::CommandResult) {});
         ExecuteAllActions();
     }
 

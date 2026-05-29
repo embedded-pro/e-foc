@@ -109,7 +109,7 @@ WHEN(R"(the calibrate command is issued)")
         accessor.setupCalibrationExpectations();
         accessor.calibrationExpectationsConfigured = true;
     }
-    accessor.stateMachine->CmdCalibrate();
+    accessor.stateMachine->CmdCalibrate([](state_machine::CommandResult) {});
     accessor.executeAll();
 }
 

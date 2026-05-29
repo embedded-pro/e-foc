@@ -20,10 +20,7 @@ namespace
 {
     using namespace testing;
 
-    using TestedControlMode = state_machine::ControlModeStateMachine<
-        foc::FocTorqueImpl,
-        foc::FocSpeedImpl,
-        foc::FocPositionImpl>;
+    using TestedControlMode = state_machine::ControlModeStateMachine;
 
     class ControlModeStateMachineTest
         : public ::testing::Test
@@ -111,7 +108,7 @@ namespace
                 application::TerminalAndTracer{ terminal, tracer },
                 application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
                 nvmMock,
-                application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
                 faultNotifierMock,
                 config,
                 TestedControlMode::OuterLoopArgs{
@@ -589,7 +586,7 @@ namespace
         SetUpTorqueCalibrationCaptures();
         ConstructSubject();
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_Torque();
 
         EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
@@ -602,7 +599,7 @@ namespace
         SetUpTorqueCalibrationCaptures();
         ConstructSubject();
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_Torque();
 
         EXPECT_CALL(inverterMock, Start()).Times(1);
@@ -621,7 +618,7 @@ namespace
         SetUpTorqueCalibrationCaptures();
         ConstructSubject();
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_Torque();
 
         EXPECT_CALL(inverterMock, Start()).Times(1);
@@ -647,7 +644,7 @@ namespace
         ConstructSubject();
         subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_WithMechIdent();
 
         EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
@@ -662,7 +659,7 @@ namespace
         ConstructSubject();
         subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_WithMechIdent();
 
         EXPECT_CALL(inverterMock, Start()).Times(1);
@@ -683,7 +680,7 @@ namespace
         ConstructSubject();
         subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_WithMechIdent();
 
         EXPECT_CALL(inverterMock, Start()).Times(1);
@@ -707,7 +704,7 @@ namespace
         ConstructSubject();
         subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_WithMechIdent();
 
         EXPECT_CALL(inverterMock, Start()).Times(1);
@@ -729,7 +726,7 @@ namespace
         ConstructSubject();
         subject->Select(state_machine::ControlMode::position, [](auto) {});
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_WithMechIdent();
 
         EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
@@ -744,7 +741,7 @@ namespace
         ConstructSubject();
         subject->Select(state_machine::ControlMode::position, [](auto) {});
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_WithMechIdent();
 
         EXPECT_CALL(inverterMock, Start()).Times(1);
@@ -765,7 +762,7 @@ namespace
         ConstructSubject();
         subject->Select(state_machine::ControlMode::position, [](auto) {});
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_WithMechIdent();
 
         EXPECT_CALL(inverterMock, Start()).Times(1);

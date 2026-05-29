@@ -32,7 +32,7 @@ namespace integration
             application::TerminalAndTracer{ terminal, tracer },
             application::MotorHardware{ platformFactory, platformFactory, testVdc },
             nvm,
-            application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
+            application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
             faultNotifierMock,
             state_machine::TransitionPolicy::Auto,
             foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock);
@@ -60,7 +60,7 @@ namespace integration
             application::TerminalAndTracer{ terminal, tracer },
             application::MotorHardware{ platformFactory, platformFactory, testVdc },
             nvm,
-            application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
+            application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
             faultNotifierMock,
             state_machine::TransitionPolicy::Auto,
             foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock);
@@ -90,6 +90,7 @@ namespace integration
 
         canTransport.emplace(transportCanMock, 1);
         motorCategoryServer.emplace(*canTransport);
+        motorCategoryServer->SetAcknowledger(nullAcknowledger);
         motorBridge.emplace(*motorCategoryServer, *motorStateMachine);
     }
 
@@ -128,7 +129,7 @@ namespace integration
     void PositionIntegrationFixture::DeferClearCalibration()
     {
         eepromStub.DeferNextErase();
-        motorStateMachine->CmdClearCalibration();
+        motorStateMachine->CmdClearCalibration([](state_machine::CommandResult) {});
         ExecuteAllActions();
     }
 

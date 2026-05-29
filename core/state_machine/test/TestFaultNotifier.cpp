@@ -30,11 +30,12 @@ namespace
             return state_machine::FaultCode::hardwareFault;
         }
 
-        void CmdCalibrate() override {}
+        void CmdCalibrate(const infra::Function<void(state_machine::CommandResult)>&) override {}
         void CmdEnable() override {}
         void CmdDisable() override {}
         void CmdClearFault() override {}
-        void CmdClearCalibration() override {}
+        void CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>&) override {}
+        void CmdEmergencyStop() override {}
 
     private:
         state_machine::State state{ state_machine::Idle{} };

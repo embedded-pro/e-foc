@@ -2,6 +2,7 @@
 
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
+#include "infra/util/Function.hpp"
 #include <cstdint>
 #include <variant>
 
@@ -39,16 +40,32 @@ namespace state_machine
 
     using State = std::variant<Idle, Calibrating, Ready, Enabled, Fault>;
 
+    enum class CommandResult : uint8_t
+    {
+        ok,
+        rejected,
+        calibrationFailed,
+        nvmFailed,
+        abortedByFault
+    };
+
+    inline bool IsStopped(const State& state)
+    {
+        return std::holds_alternative<Idle>(state) || std::holds_alternative<Ready>(state);
+    }
+
     class FocStateMachineBase
     {
     public:
         virtual const State& CurrentState() const = 0;
         virtual FaultCode LastFaultCode() const = 0;
-        virtual void CmdCalibrate() = 0;
+
+        virtual void CmdCalibrate(const infra::Function<void(CommandResult)>& onDone) = 0;
         virtual void CmdEnable() = 0;
         virtual void CmdDisable() = 0;
         virtual void CmdClearFault() = 0;
-        virtual void CmdClearCalibration() = 0;
+        virtual void CmdClearCalibration(const infra::Function<void(CommandResult)>& onDone) = 0;
+        virtual void CmdEmergencyStop() = 0;
 
         virtual void ApplyOnlineEstimates()
         {}

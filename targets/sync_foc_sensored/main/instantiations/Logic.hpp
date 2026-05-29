@@ -32,10 +32,7 @@ namespace application
         static constexpr uint32_t controlLoopFrequencyHz = 10000;
         static constexpr uint32_t pwmDeadTimeNs = 500;
 
-        using ControlMode = state_machine::ControlModeStateMachine<
-            foc::FocTorqueImpl,
-            foc::FocSpeedImpl,
-            foc::FocPositionImpl>;
+        using ControlMode = state_machine::ControlModeStateMachine;
 
         application::PlatformFactory& hardware;
         services::DebugLed debugLed;
@@ -52,10 +49,6 @@ namespace application
         std::optional<services::CanFrameTransport> canTransport;
         std::optional<services::FocMotorCategoryServer> motorCanServer;
         std::optional<ControlMode> controlMode;
-        std::optional<state_machine::FocMotorCanBridge<
-            foc::FocTorqueImpl,
-            foc::FocSpeedImpl,
-            foc::FocPositionImpl>>
-            canBridge;
+        std::optional<state_machine::FocMotorCanBridge> canBridge;
     };
 }
