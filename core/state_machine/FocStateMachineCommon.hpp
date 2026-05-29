@@ -88,8 +88,6 @@ namespace application
 
         bool IsCalibrating(state_machine::CalibrationStep expected) const;
 
-        void ApplyCalibrationDataCommon(const services::CalibrationData& data);
-
         services::Tracer& GetTracer();
         foc::ThreePhaseInverter& GetInverter();
         foc::Volts GetVdc() const;
@@ -99,9 +97,6 @@ namespace application
         static constexpr float nyquistFactor = 15.0f;
 
     private:
-        void OnNvmValidationResult(bool valid);
-        void OnNvmLoadResult(services::NvmStatus status);
-
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
         foc::ThreePhaseInverter& inverter;

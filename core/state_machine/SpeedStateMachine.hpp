@@ -23,9 +23,7 @@ namespace application
             const CalibrationServices& calibServices,
             state_machine::FaultNotifier& faultNotifier,
             state_machine::TransitionPolicy transitionPolicy,
-            foc::Ampere maxCurrent,
-            hal::Hertz baseFrequency,
-            foc::LowPriorityInterrupt& lowPriorityInterrupt);
+            const OuterLoopArgs& outerLoopArgs);
 
         foc::FocSpeed& GetController();
 

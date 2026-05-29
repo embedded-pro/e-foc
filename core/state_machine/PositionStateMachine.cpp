@@ -10,21 +10,19 @@ namespace application
         const CalibrationServices& calibServices,
         state_machine::FaultNotifier& faultNotifier,
         state_machine::TransitionPolicy transitionPolicy,
-        foc::Ampere maxCurrent,
-        hal::Hertz baseFrequency,
-        foc::LowPriorityInterrupt& lowPriorityInterrupt)
+        const OuterLoopArgs& outerLoopArgs)
         : OuterLoopStateMachine(terminalAndTracer, hardware, nvm,
               calibServices.electricalIdent, calibServices.motorAlignment,
               calibServices.mechTorqueConstant)
-        , focController(hardware.inverter, hardware.encoder, maxCurrent, baseFrequency, lowPriorityInterrupt)
+        , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt)
         , pidAutoTuner(focController)
         , speedAutoTuner(focController)
-        , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, baseFrequency)
-        , onlineElecEstimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, baseFrequency)
+        , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, outerLoopArgs.baseFrequency)
+        , onlineElecEstimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, outerLoopArgs.baseFrequency)
         , mechIdentPtr(calibServices.mechIdentOverride)
     {
-        OnlineEstimable().SetOnlineMechanicalEstimator(onlineMechEstimator);
-        OnlineEstimable().SetOnlineElectricalEstimator(onlineElecEstimator);
+        focController.SetOnlineMechanicalEstimator(onlineMechEstimator);
+        focController.SetOnlineElectricalEstimator(onlineElecEstimator);
         RegisterFaultHandler(faultNotifier);
         RegisterCliIfNeeded(transitionPolicy);
         CheckNvmOnBoot();

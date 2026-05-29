@@ -213,7 +213,7 @@ namespace
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
                 faultNotifierMock,
                 state_machine::TransitionPolicy::Cli,
-                foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock
+                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
             };
         }
 
@@ -1204,7 +1204,7 @@ namespace
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
                 faultNotifierMock,
                 state_machine::TransitionPolicy::Auto,
-                foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock
+                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
             };
         }
     };

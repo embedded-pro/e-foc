@@ -213,7 +213,7 @@ namespace
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
                 faultNotifierMock,
                 state_machine::TransitionPolicy::Cli,
-                foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock
+                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
             };
         }
     };
@@ -331,7 +331,7 @@ TEST_F(FocStateMachinePositionCliTest, no_mech_ident_override_enters_fault)
         application::CalibrationServices{ electricalIdentMock, alignmentMock },
         faultNotifierMock,
         state_machine::TransitionPolicy::Cli,
-        foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock
+        application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
     };
 
     EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
@@ -842,7 +842,7 @@ namespace
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
                 faultNotifierMock,
                 state_machine::TransitionPolicy::Auto,
-                foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock
+                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
             };
         }
     };
@@ -1733,7 +1733,7 @@ TEST_F(FocStateMachinePositionAutoTest, no_mech_ident_override_enters_fault)
         application::CalibrationServices{ electricalIdentMock, alignmentMock },
         faultNotifierMock,
         state_machine::TransitionPolicy::Auto,
-        foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock
+        application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
     };
 
     EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))

@@ -466,6 +466,40 @@ namespace
         EXPECT_EQ(capturedData[2], 0xFFu); // low  byte of INT16_MAX
     }
 
+    TEST_F(TestCanCommandClient, send_speed_setpoint_overrange_negative_wire_value_clamped_to_int16_min)
+    {
+        hal::Can::Message capturedData;
+        EXPECT_CALL(adapter, SendData(_, _, _))
+            .WillOnce(Invoke([&capturedData](hal::Can::Id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
+                {
+                    capturedData = msg;
+                    cb(true);
+                }));
+
+        client.SendSetSpeedSetpoint(-100000.0f); // -100000 * 10 = -1000000 < INT16_MIN → clamped to -32768 = 0x8000
+
+        ASSERT_EQ(capturedData.size(), 3u);
+        EXPECT_EQ(capturedData[1], 0x80u); // high byte of INT16_MIN
+        EXPECT_EQ(capturedData[2], 0x00u); // low  byte of INT16_MIN
+    }
+
+    TEST_F(TestCanCommandClient, send_position_setpoint_encodes_with_correct_scale)
+    {
+        hal::Can::Message capturedData;
+        EXPECT_CALL(adapter, SendData(_, _, _))
+            .WillOnce(Invoke([&capturedData](hal::Can::Id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
+                {
+                    capturedData = msg;
+                    cb(true);
+                }));
+
+        client.SendSetPositionSetpoint(0.1f); // 0.1 * focPositionScale(1000) = 100 = 0x0064
+
+        ASSERT_EQ(capturedData.size(), 3u);
+        EXPECT_EQ(capturedData[1], 0x00u); // high byte of 100
+        EXPECT_EQ(capturedData[2], 0x64u); // low  byte of 100
+    }
+
     // ---------- Adapter send failure: busy stays true ----------
 
     class TestCanCommandClientAdapterFails

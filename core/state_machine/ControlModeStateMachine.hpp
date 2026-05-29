@@ -18,12 +18,7 @@ namespace state_machine
     class ControlModeStateMachine
     {
     public:
-        struct OuterLoopArgs
-        {
-            foc::Ampere maxCurrent;
-            hal::Hertz baseFrequency;
-            foc::LowPriorityInterrupt& lowPriorityInterrupt;
-        };
+        using OuterLoopArgs = application::OuterLoopArgs;
 
         ControlModeStateMachine(
             const application::TerminalAndTracer& terminalAndTracer,

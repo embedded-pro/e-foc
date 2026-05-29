@@ -294,7 +294,12 @@ namespace application
                 else
                 {
                     auto data = std::get<state_machine::Calibrating>(currentState).pendingData;
-                    ApplyCalibrationDataCommon(data);
+                    GetFoc().SetPolePairs(data.polePairs);
+                    encoder.Set(foc::Radians{ std::bit_cast<float>(data.encoderZeroOffset) });
+                    GetCurrentLoopTuner().SetPidBasedOnResistanceAndInductance(
+                        vdc, foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD },
+                        inverter.BaseFrequency(), nyquistFactor);
+                    ApplyModeSpecificCalibration(data);
                     EnterReady(data);
                     CompletePendingCommand(state_machine::CommandResult::ok);
                 }
@@ -308,50 +313,35 @@ namespace application
         return std::get<state_machine::Calibrating>(currentState).step == expected;
     }
 
-    void FocStateMachineCommon::ApplyCalibrationDataCommon(const services::CalibrationData& data)
-    {
-        GetFoc().SetPolePairs(data.polePairs);
-        encoder.Set(foc::Radians{ std::bit_cast<float>(data.encoderZeroOffset) });
-        GetCurrentLoopTuner().SetPidBasedOnResistanceAndInductance(
-            vdc, foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD },
-            inverter.BaseFrequency(), nyquistFactor);
-        ApplyModeSpecificCalibration(data);
-    }
-
     void FocStateMachineCommon::CheckNvmOnBoot()
     {
         nvm.IsCalibrationValid([this](bool valid)
             {
-                OnNvmValidationResult(valid);
+                if (!std::holds_alternative<state_machine::Idle>(currentState))
+                    return;
+
+                if (!valid)
+                    tracer.Trace() << "[SM] NVM invalid, starting in Idle";
+                else
+                    nvm.LoadCalibration(calibrationData, [this](services::NvmStatus status)
+                        {
+                            if (!std::holds_alternative<state_machine::Idle>(currentState))
+                                return;
+
+                            if (status != services::NvmStatus::Ok)
+                                tracer.Trace() << "[SM] NVM load failed, starting in Idle";
+                            else
+                            {
+                                GetFoc().SetPolePairs(calibrationData.polePairs);
+                                encoder.Set(foc::Radians{ std::bit_cast<float>(calibrationData.encoderZeroOffset) });
+                                GetCurrentLoopTuner().SetPidBasedOnResistanceAndInductance(
+                                    vdc, foc::Ohm{ calibrationData.rPhase }, foc::MilliHenry{ calibrationData.lD },
+                                    inverter.BaseFrequency(), nyquistFactor);
+                                ApplyModeSpecificCalibration(calibrationData);
+                                EnterReady(calibrationData);
+                            }
+                        });
             });
-    }
-
-    void FocStateMachineCommon::OnNvmValidationResult(bool valid)
-    {
-        if (!std::holds_alternative<state_machine::Idle>(currentState))
-            return;
-
-        if (!valid)
-            tracer.Trace() << "[SM] NVM invalid, starting in Idle";
-        else
-            nvm.LoadCalibration(calibrationData, [this](services::NvmStatus status)
-                {
-                    OnNvmLoadResult(status);
-                });
-    }
-
-    void FocStateMachineCommon::OnNvmLoadResult(services::NvmStatus status)
-    {
-        if (!std::holds_alternative<state_machine::Idle>(currentState))
-            return;
-
-        if (status != services::NvmStatus::Ok)
-            tracer.Trace() << "[SM] NVM load failed, starting in Idle";
-        else
-        {
-            ApplyCalibrationDataCommon(calibrationData);
-            EnterReady(calibrationData);
-        }
     }
 
     services::Tracer& FocStateMachineCommon::GetTracer()

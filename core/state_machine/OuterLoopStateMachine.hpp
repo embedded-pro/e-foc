@@ -9,6 +9,13 @@
 
 namespace application
 {
+    struct OuterLoopArgs
+    {
+        foc::Ampere maxCurrent;
+        hal::Hertz baseFrequency;
+        foc::LowPriorityInterrupt& lowPriorityInterrupt;
+    };
+
     class OuterLoopStateMachine
         : public FocStateMachineCommon
     {

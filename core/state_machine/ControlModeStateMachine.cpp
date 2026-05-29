@@ -183,43 +183,32 @@ namespace state_machine
         if (!std::holds_alternative<std::monostate>(activeSm))
             ActiveStateMachine().CmdEmergencyStop();
 
-        switch (mode)
-        {
-            case ControlMode::speed:
-                activeSm.emplace<application::SpeedStateMachine>(
-                    terminalAndTracer,
-                    hardware,
-                    nvm,
-                    calibServices,
-                    faultNotifier,
-                    TransitionPolicy::Auto,
-                    outerLoopArgs.maxCurrent,
-                    outerLoopArgs.baseFrequency,
-                    outerLoopArgs.lowPriorityInterrupt);
-                break;
-            case ControlMode::position:
-                activeSm.emplace<application::PositionStateMachine>(
-                    terminalAndTracer,
-                    hardware,
-                    nvm,
-                    calibServices,
-                    faultNotifier,
-                    TransitionPolicy::Auto,
-                    outerLoopArgs.maxCurrent,
-                    outerLoopArgs.baseFrequency,
-                    outerLoopArgs.lowPriorityInterrupt);
-                break;
-            case ControlMode::torque:
-            default:
-                activeSm.emplace<application::TorqueStateMachine>(
-                    terminalAndTracer,
-                    hardware,
-                    nvm,
-                    calibServices,
-                    faultNotifier,
-                    TransitionPolicy::Auto);
-                break;
-        }
+        if (mode == ControlMode::speed)
+            activeSm.emplace<application::SpeedStateMachine>(
+                terminalAndTracer,
+                hardware,
+                nvm,
+                calibServices,
+                faultNotifier,
+                TransitionPolicy::Auto,
+                outerLoopArgs);
+        else if (mode == ControlMode::position)
+            activeSm.emplace<application::PositionStateMachine>(
+                terminalAndTracer,
+                hardware,
+                nvm,
+                calibServices,
+                faultNotifier,
+                TransitionPolicy::Auto,
+                outerLoopArgs);
+        else
+            activeSm.emplace<application::TorqueStateMachine>(
+                terminalAndTracer,
+                hardware,
+                nvm,
+                calibServices,
+                faultNotifier,
+                TransitionPolicy::Auto);
     }
 
     void ControlModeStateMachine::RegisterCliCommands()
@@ -241,19 +230,13 @@ namespace state_machine
         terminal.AddCommand({ { "active_mode", "am", "Print the active control mode" },
             [this](const infra::BoundedConstString&)
             {
-                switch (Active())
-                {
-                    case ControlMode::speed:
-                        terminalAndTracer.tracer.Trace() << "Active mode: speed";
-                        break;
-                    case ControlMode::position:
-                        terminalAndTracer.tracer.Trace() << "Active mode: position";
-                        break;
-                    case ControlMode::torque:
-                    default:
-                        terminalAndTracer.tracer.Trace() << "Active mode: torque";
-                        break;
-                }
+                const auto activeMode = Active();
+                if (activeMode == ControlMode::speed)
+                    terminalAndTracer.tracer.Trace() << "Active mode: speed";
+                else if (activeMode == ControlMode::position)
+                    terminalAndTracer.tracer.Trace() << "Active mode: position";
+                else
+                    terminalAndTracer.tracer.Trace() << "Active mode: torque";
             } });
     }
 }
