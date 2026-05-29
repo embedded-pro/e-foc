@@ -24,26 +24,19 @@ namespace state_machine
 
     void ControlModeStateMachine::Select(ControlMode mode, const infra::Function<void(SelectResult)>& onDone)
     {
-        if (pendingSelectCallback != nullptr)
-        {
+        if ((pendingSelectCallback != nullptr) || !IsStopped(ActiveStateMachine().CurrentState()))
             onDone(SelectResult::busy);
-            return;
-        }
-
-        if (!IsMotorStopped())
+        else
         {
-            onDone(SelectResult::busy);
-            return;
+            previousDefaultControlMode = configData.defaultControlMode;
+            configData.defaultControlMode = static_cast<uint8_t>(mode);
+            pendingSelectMode = mode;
+            pendingSelectCallback = onDone;
+            nvm.SaveConfig(configData, [this](services::NvmStatus status)
+                {
+                    OnSaveConfigDone(status);
+                });
         }
-
-        previousDefaultControlMode = configData.defaultControlMode;
-        configData.defaultControlMode = static_cast<uint8_t>(mode);
-        pendingSelectMode = mode;
-        pendingSelectCallback = onDone;
-        nvm.SaveConfig(configData, [this](services::NvmStatus status)
-            {
-                OnSaveConfigDone(status);
-            });
     }
 
     void ControlModeStateMachine::OnSaveConfigDone(services::NvmStatus status)
@@ -51,22 +44,13 @@ namespace state_machine
         if (status != services::NvmStatus::Ok)
         {
             configData.defaultControlMode = previousDefaultControlMode;
-            auto callback = std::move(pendingSelectCallback);
-            pendingSelectCallback = nullptr;
-            callback(SelectResult::nvmFailed);
+            pendingSelectCallback(SelectResult::nvmFailed);
         }
         else
         {
             Activate(pendingSelectMode);
-            auto callback = std::move(pendingSelectCallback);
-            pendingSelectCallback = nullptr;
-            callback(SelectResult::ok);
+            pendingSelectCallback(SelectResult::ok);
         }
-    }
-
-    bool ControlModeStateMachine::SelectInProgress() const
-    {
-        return pendingSelectCallback != nullptr;
     }
 
     ControlMode ControlModeStateMachine::Active() const
@@ -121,11 +105,6 @@ namespace state_machine
             return false;
         sm->GetController().SetPoint(setpoint);
         return true;
-    }
-
-    bool ControlModeStateMachine::IsMotorStopped() const
-    {
-        return IsStopped(ActiveStateMachine().CurrentState());
     }
 
     void ControlModeStateMachine::Activate(ControlMode mode)

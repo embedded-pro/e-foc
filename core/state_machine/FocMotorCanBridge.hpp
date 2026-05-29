@@ -2,8 +2,6 @@
 
 #include "can-lite/categories/foc_motor/FocMotorCategoryServer.hpp"
 #include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
-#include "can-lite/core/CanProtocolDefinitions.hpp"
-#include "core/state_machine/ControlMode.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "infra/util/Function.hpp"
 
@@ -13,9 +11,7 @@ namespace state_machine
         : public services::FocMotorCategoryServerObserver
     {
     public:
-        FocMotorCanBridge(
-            services::FocMotorCategoryServer& server,
-            ControlModeStateMachine& controlMode);
+        FocMotorCanBridge(services::FocMotorCategoryServer& server, ControlModeStateMachine& controlMode);
 
         void OnQueryMotorType(const infra::Function<void(services::FocMotorMode)>&) override;
         void OnStart(const infra::Function<void()>& onDone) override;

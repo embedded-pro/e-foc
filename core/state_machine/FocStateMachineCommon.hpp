@@ -4,7 +4,6 @@
 #include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/services/alignment/MotorAlignment.hpp"
-#include "core/services/cli/TerminalBase.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"

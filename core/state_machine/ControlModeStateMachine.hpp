@@ -9,9 +9,7 @@
 #include "core/state_machine/PositionStateMachine.hpp"
 #include "core/state_machine/SpeedStateMachine.hpp"
 #include "core/state_machine/TorqueStateMachine.hpp"
-#include "core/state_machine/TransitionPolicies.hpp"
 #include "infra/util/Function.hpp"
-#include "services/util/TerminalWithStorage.hpp"
 #include <variant>
 
 namespace state_machine
@@ -36,7 +34,6 @@ namespace state_machine
             OuterLoopArgs outerLoopArgs);
 
         void Select(ControlMode mode, const infra::Function<void(SelectResult)>& onDone);
-        bool SelectInProgress() const;
 
         ControlMode Active() const;
         FocStateMachineBase& ActiveStateMachine();
@@ -47,7 +44,6 @@ namespace state_machine
         bool TrySetPosition(foc::Radians setpoint);
 
     private:
-        bool IsMotorStopped() const;
         void Activate(ControlMode mode);
         void RegisterCliCommands();
         void OnSaveConfigDone(services::NvmStatus status);
@@ -61,12 +57,13 @@ namespace state_machine
 
         services::ConfigData configData;
         ControlMode pendingSelectMode{ ControlMode::torque };
-        infra::Function<void(SelectResult)> pendingSelectCallback;
+        infra::AutoResetFunction<void(SelectResult)> pendingSelectCallback;
         uint8_t previousDefaultControlMode{ 0 };
 
         std::variant<std::monostate,
             application::TorqueStateMachine,
             application::SpeedStateMachine,
-            application::PositionStateMachine> activeSm;
+            application::PositionStateMachine>
+            activeSm;
     };
 }

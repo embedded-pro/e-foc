@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/foc/implementations/FocPositionImpl.hpp"
 #include "core/foc/implementations/WithAutomaticCurrentPidGains.hpp"
 #include "core/foc/implementations/WithAutomaticSpeedPidGains.hpp"
 #include "core/foc/instantiations/FocController.hpp"
