@@ -219,35 +219,22 @@ namespace
 
     // ---- C2: In-flight select guard ----
 
-    TEST_F(ControlModeStateMachineTest, Select_While_Previous_Select_Pending_Returns_Busy)
+    TEST_F(ControlModeStateMachineTest, Select_While_Previous_Select_Pending_Aborts)
     {
         GivenNvmAlwaysInvalid();
 
-        infra::Function<void(services::NvmStatus)> capturedNvmCallback;
         EXPECT_CALL(nvmMock, SaveConfig(_, _))
-            .WillOnce(Invoke([&capturedNvmCallback](const services::ConfigData&, infra::Function<void(services::NvmStatus)> cb)
+            .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)>)
                 {
-                    capturedNvmCallback = cb;
                 }));
 
         ConstructSubject();
 
-        state_machine::SelectResult firstResult{ state_machine::SelectResult::ok };
-        subject->Select(state_machine::ControlMode::speed, [&firstResult](state_machine::SelectResult r)
-            {
-                firstResult = r;
-            });
+        subject->Select(state_machine::ControlMode::speed, [](state_machine::SelectResult) {});
 
-        state_machine::SelectResult secondResult{ state_machine::SelectResult::ok };
-        subject->Select(state_machine::ControlMode::speed, [&secondResult](state_machine::SelectResult r)
-            {
-                secondResult = r;
-            });
-
-        EXPECT_EQ(secondResult, state_machine::SelectResult::busy);
-
-        capturedNvmCallback(services::NvmStatus::WriteFailed);
-        EXPECT_EQ(firstResult, state_machine::SelectResult::nvmFailed);
+        EXPECT_DEATH(
+            subject->Select(state_machine::ControlMode::speed, [](state_machine::SelectResult) {}),
+            ".*");
     }
 
     // ---- Additional helpers ----

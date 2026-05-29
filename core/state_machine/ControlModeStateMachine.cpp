@@ -1,4 +1,5 @@
 #include "core/state_machine/ControlModeStateMachine.hpp"
+#include "infra/util/ReallyAssert.hpp"
 
 namespace state_machine
 {
@@ -24,19 +25,22 @@ namespace state_machine
 
     void ControlModeStateMachine::Select(ControlMode mode, const infra::Function<void(SelectResult)>& onDone)
     {
-        if ((pendingSelectCallback != nullptr) || !IsStopped(ActiveStateMachine().CurrentState()))
-            onDone(SelectResult::busy);
-        else
+        really_assert(pendingSelectCallback == nullptr);
+
+        if (!IsStopped(ActiveStateMachine().CurrentState()))
         {
-            previousDefaultControlMode = configData.defaultControlMode;
-            configData.defaultControlMode = static_cast<uint8_t>(mode);
-            pendingSelectMode = mode;
-            pendingSelectCallback = onDone;
-            nvm.SaveConfig(configData, [this](services::NvmStatus status)
-                {
-                    OnSaveConfigDone(status);
-                });
+            onDone(SelectResult::busy);
+            return;
         }
+
+        previousDefaultControlMode = configData.defaultControlMode;
+        configData.defaultControlMode = static_cast<uint8_t>(mode);
+        pendingSelectMode = mode;
+        pendingSelectCallback = onDone;
+        nvm.SaveConfig(configData, [this](services::NvmStatus status)
+            {
+                OnSaveConfigDone(status);
+            });
     }
 
     void ControlModeStateMachine::OnSaveConfigDone(services::NvmStatus status)

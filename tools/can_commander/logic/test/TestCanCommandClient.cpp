@@ -266,6 +266,26 @@ namespace
         ForwardTime(std::chrono::seconds(4));
     }
 
+    TEST_F(TestCanCommandClient, command_ack_frame_forwards_to_observer_and_keeps_busy_false)
+    {
+        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnCommandAck(focMotorCategoryId, focStartId, CanAckStatus::success));
+
+        hal::Can::Message ackPayload;
+        ackPayload.push_back(focMotorCategoryId);
+        ackPayload.push_back(focStartId);
+        ackPayload.push_back(static_cast<uint8_t>(CanAckStatus::success));
+
+        auto canId = hal::Can::Id::Create29BitId(
+            MakeCanId(CanPriority::response,
+                canSystemCategoryId,
+                canCommandAckMessageTypeId,
+                1));
+        receiveCallback(canId, ackPayload);
+
+        EXPECT_FALSE(client.IsBusy());
+    }
+
     // ---------- Telemetry ----------
 
     TEST_F(TestCanCommandClient, telemetry_status_notifies_motor_status_and_speed_position)

@@ -1,4 +1,5 @@
 #include "core/state_machine/FocMotorCanBridge.hpp"
+#include "infra/util/ReallyAssert.hpp"
 
 namespace state_machine
 {
@@ -65,6 +66,7 @@ namespace state_machine
 
     void FocMotorCanBridge::OnSelectControlMode(services::FocMotorMode requestedMode, const infra::Function<void(services::FocMotorMode)>& onActivated)
     {
+        really_assert(pendingSelectCallback == nullptr);
         pendingSelectCallback = onActivated;
         controlMode.Select(FromCanMode(requestedMode), [this](SelectResult result)
             {
