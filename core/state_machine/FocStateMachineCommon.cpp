@@ -51,12 +51,14 @@ namespace application
 
     void FocStateMachineCommon::CmdCalibrate(const infra::Function<void(state_machine::CommandResult)>& onDone)
     {
-        pendingCommandCallback = onDone;
-
         if (!state_machine::IsStopped(currentState) || HasPendingCommand())
-            CompletePendingCommand(state_machine::CommandResult::rejected);
-        else
-            EnterCalibrating();
+        {
+            onDone(state_machine::CommandResult::rejected);
+            return;
+        }
+
+        pendingCommandCallback = onDone;
+        EnterCalibrating();
     }
 
     void FocStateMachineCommon::CmdEnable()
@@ -88,33 +90,34 @@ namespace application
 
     void FocStateMachineCommon::CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>& onDone)
     {
-        pendingCommandCallback = onDone;
-
         if (!state_machine::IsStopped(currentState) || HasPendingCommand())
-            CompletePendingCommand(state_machine::CommandResult::rejected);
+        {
+            onDone(state_machine::CommandResult::rejected);
+            return;
+        }
 
-        else
-            nvm.InvalidateCalibration([this](services::NvmStatus status)
+        pendingCommandCallback = onDone;
+        nvm.InvalidateCalibration([this](services::NvmStatus status)
+            {
+                // Drop stale callbacks: a fault, mode-switch or other intervening
+                // command may have already moved the SM elsewhere and cleared the
+                // pending callback. Acting now would corrupt state.
+                if (!HasPendingCommand() || !state_machine::IsStopped(currentState))
+                    return;
+
+                if (status != services::NvmStatus::Ok)
                 {
-                    // Drop stale callbacks: a fault, mode-switch or other intervening
-                    // command may have already moved the SM elsewhere and cleared the
-                    // pending callback. Acting now would corrupt state.
-                    if (!HasPendingCommand() || !state_machine::IsStopped(currentState))
-                        return;
-
-                    if (status != services::NvmStatus::Ok)
-                    {
-                        CompletePendingCommand(state_machine::CommandResult::nvmFailed);
-                        EnterFault(state_machine::FaultCode::hardwareFault);
-                    }
-                    else
-                    {
-                        tracer.Trace() << "[SM] Calibration invalidated in NVM";
-                        calibrationData = services::CalibrationData{};
-                        currentState = state_machine::Idle{};
-                        CompletePendingCommand(state_machine::CommandResult::ok);
-                    }
-                });
+                    CompletePendingCommand(state_machine::CommandResult::nvmFailed);
+                    EnterFault(state_machine::FaultCode::hardwareFault);
+                }
+                else
+                {
+                    tracer.Trace() << "[SM] Calibration invalidated in NVM";
+                    calibrationData = services::CalibrationData{};
+                    currentState = state_machine::Idle{};
+                    CompletePendingCommand(state_machine::CommandResult::ok);
+                }
+            });
     }
 
     void FocStateMachineCommon::CmdEmergencyStop()
