@@ -764,4 +764,46 @@ namespace
         EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
             subject->ActiveStateMachine().CurrentState()));
     }
+
+    // ---- TrySet*PidGains: accepted by matching mode(s) ----
+
+    TEST_F(ControlModeStateMachineExtTest, TrySetCurrentPidGains_AcceptedInTorqueMode)
+    {
+        GivenNvmAlwaysInvalid();
+        ConstructSubject();
+
+        EXPECT_TRUE(subject->TrySetCurrentPidGains(services::FocPidGains{ 100, 10, 0 }));
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, TrySetSpeedPidGains_RejectedInTorqueMode)
+    {
+        GivenNvmAlwaysInvalid();
+        ConstructSubject();
+
+        EXPECT_FALSE(subject->TrySetSpeedPidGains(services::FocPidGains{ 100, 10, 0 }));
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, TrySetSpeedPidGains_AcceptedInSpeedMode)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigSucceeds();
+        ConstructSubject();
+
+        subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+        EXPECT_TRUE(subject->TrySetSpeedPidGains(services::FocPidGains{ 100, 10, 0 }));
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, TrySetPositionPidGains_AcceptedOnlyInPositionMode)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigSucceeds();
+        ConstructSubject();
+
+        EXPECT_FALSE(subject->TrySetPositionPidGains(services::FocPidGains{ 100, 10, 0 }));
+
+        subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+        EXPECT_TRUE(subject->TrySetPositionPidGains(services::FocPidGains{ 100, 10, 0 }));
+    }
 }

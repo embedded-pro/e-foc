@@ -197,9 +197,9 @@ namespace
         }
     };
 
-    // ---- No-op handlers: each should ACK with notImplemented ----
+    // ---- QueryMotorType: returns current active mode ----
 
-    TEST_F(FocMotorCanBridgeTest, OnQueryMotorType_AcksNotImplemented)
+    TEST_F(FocMotorCanBridgeTest, OnQueryMotorType_ReturnsTorqueByDefault)
     {
         ConstructFixture();
         ResetCaptures();
@@ -207,11 +207,14 @@ namespace
         Dispatch(services::focQueryMotorTypeId, {});
 
         ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::notImplemented);
         EXPECT_EQ(ackSpy.last->commandType, services::focQueryMotorTypeId);
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+        EXPECT_EQ(lastSentMessageType, services::focMotorTypeResponseId);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_AcksNotImplemented)
+    // ---- SetPid*: accepted in matching mode, modeMismatch otherwise ----
+
+    TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_InTorqueMode_AcksSuccess)
     {
         ConstructFixture();
         ResetCaptures();
@@ -221,10 +224,11 @@ namespace
         Dispatch(services::focSetPidCurrentId, data);
 
         ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::notImplemented);
+        EXPECT_EQ(ackSpy.last->commandType, services::focSetPidCurrentId);
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnSetPidSpeed_AcksNotImplemented)
+    TEST_F(FocMotorCanBridgeTest, OnSetPidSpeed_InTorqueMode_SendsModeMismatch)
     {
         ConstructFixture();
         ResetCaptures();
@@ -234,10 +238,14 @@ namespace
         Dispatch(services::focSetPidSpeedId, data);
 
         ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::notImplemented);
+        EXPECT_EQ(ackSpy.last->commandType, services::focSetPidSpeedId);
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryErrorOriginCmd, services::focSetPidSpeedId);
+        EXPECT_EQ(lastCategoryErrorReason, services::FocMotorCategoryError::modeMismatch);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnSetPidPosition_AcksNotImplemented)
+    TEST_F(FocMotorCanBridgeTest, OnSetPidPosition_InTorqueMode_SendsModeMismatch)
     {
         ConstructFixture();
         ResetCaptures();
@@ -247,7 +255,11 @@ namespace
         Dispatch(services::focSetPidPositionId, data);
 
         ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::notImplemented);
+        EXPECT_EQ(ackSpy.last->commandType, services::focSetPidPositionId);
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryErrorOriginCmd, services::focSetPidPositionId);
+        EXPECT_EQ(lastCategoryErrorReason, services::FocMotorCategoryError::modeMismatch);
     }
 
     TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_AcksNotImplemented)

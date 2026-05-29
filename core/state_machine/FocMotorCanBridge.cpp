@@ -11,9 +11,9 @@ namespace state_machine
         , controlMode(controlMode)
     {}
 
-    void FocMotorCanBridge::OnQueryMotorType(const infra::Function<void(services::FocMotorMode)>&)
+    void FocMotorCanBridge::OnQueryMotorType(const infra::Function<void(services::FocMotorMode)>& onResult)
     {
-        server.SendCommandAck(services::focQueryMotorTypeId, services::CanAckStatus::notImplemented);
+        onResult(ToCanMode(controlMode.Active()));
     }
 
     void FocMotorCanBridge::OnStart(const infra::Function<void()>& onDone)
@@ -28,19 +28,28 @@ namespace state_machine
         onDone();
     }
 
-    void FocMotorCanBridge::OnSetPidCurrent(const services::FocPidGains&, const infra::Function<void()>&)
+    void FocMotorCanBridge::OnSetPidCurrent(const services::FocPidGains& gains, const infra::Function<void()>& onDone)
     {
-        server.SendCommandAck(services::focSetPidCurrentId, services::CanAckStatus::notImplemented);
+        if (controlMode.TrySetCurrentPidGains(gains))
+            onDone();
+        else
+            server.SendCategoryError(services::focSetPidCurrentId, services::FocMotorCategoryError::modeMismatch);
     }
 
-    void FocMotorCanBridge::OnSetPidSpeed(const services::FocPidGains&, const infra::Function<void()>&)
+    void FocMotorCanBridge::OnSetPidSpeed(const services::FocPidGains& gains, const infra::Function<void()>& onDone)
     {
-        server.SendCommandAck(services::focSetPidSpeedId, services::CanAckStatus::notImplemented);
+        if (controlMode.TrySetSpeedPidGains(gains))
+            onDone();
+        else
+            server.SendCategoryError(services::focSetPidSpeedId, services::FocMotorCategoryError::modeMismatch);
     }
 
-    void FocMotorCanBridge::OnSetPidPosition(const services::FocPidGains&, const infra::Function<void()>&)
+    void FocMotorCanBridge::OnSetPidPosition(const services::FocPidGains& gains, const infra::Function<void()>& onDone)
     {
-        server.SendCommandAck(services::focSetPidPositionId, services::CanAckStatus::notImplemented);
+        if (controlMode.TrySetPositionPidGains(gains))
+            onDone();
+        else
+            server.SendCategoryError(services::focSetPidPositionId, services::FocMotorCategoryError::modeMismatch);
     }
 
     void FocMotorCanBridge::OnIdentifyElectrical(const infra::Function<void(services::FocElectricalParams)>&)

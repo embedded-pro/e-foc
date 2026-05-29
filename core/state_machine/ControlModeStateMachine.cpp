@@ -1,5 +1,6 @@
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "infra/util/ReallyAssert.hpp"
+#include "numerical/controllers/interfaces/PidController.hpp"
 
 namespace state_machine
 {
@@ -108,6 +109,72 @@ namespace state_machine
         if (sm == nullptr)
             return false;
         sm->GetController().SetPoint(setpoint);
+        return true;
+    }
+
+    namespace
+    {
+        foc::IdAndIqTunings ToCurrentTunings(const services::FocPidGains& gains)
+        {
+            controllers::PidTunings<float> t{
+                static_cast<float>(gains.kp),
+                static_cast<float>(gains.ki),
+                static_cast<float>(gains.kd)
+            };
+            return { t, t };
+        }
+
+        controllers::PidTunings<float> ToSpeedOrPositionTunings(const services::FocPidGains& gains)
+        {
+            return {
+                static_cast<float>(gains.kp),
+                static_cast<float>(gains.ki),
+                static_cast<float>(gains.kd)
+            };
+        }
+    }
+
+    bool ControlModeStateMachine::TrySetCurrentPidGains(const services::FocPidGains& gains)
+    {
+        if (auto* sm = std::get_if<application::TorqueStateMachine>(&activeSm))
+        {
+            sm->GetController().SetCurrentTunings(hardware.vdc, ToCurrentTunings(gains));
+            return true;
+        }
+        if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
+        {
+            sm->GetController().SetCurrentTunings(hardware.vdc, ToCurrentTunings(gains));
+            return true;
+        }
+        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
+        {
+            sm->GetController().SetCurrentTunings(hardware.vdc, ToCurrentTunings(gains));
+            return true;
+        }
+        return false;
+    }
+
+    bool ControlModeStateMachine::TrySetSpeedPidGains(const services::FocPidGains& gains)
+    {
+        if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
+        {
+            sm->GetController().SetSpeedTunings(hardware.vdc, ToSpeedOrPositionTunings(gains));
+            return true;
+        }
+        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
+        {
+            sm->GetController().SetSpeedTunings(hardware.vdc, ToSpeedOrPositionTunings(gains));
+            return true;
+        }
+        return false;
+    }
+
+    bool ControlModeStateMachine::TrySetPositionPidGains(const services::FocPidGains& gains)
+    {
+        auto* sm = std::get_if<application::PositionStateMachine>(&activeSm);
+        if (sm == nullptr)
+            return false;
+        sm->GetController().SetPositionTunings(ToSpeedOrPositionTunings(gains));
         return true;
     }
 

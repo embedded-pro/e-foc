@@ -1,5 +1,6 @@
 #pragma once
 
+#include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
@@ -42,6 +43,10 @@ namespace state_machine
         bool TrySetTorque(foc::IdAndIqPoint setpoint);
         bool TrySetSpeed(foc::RadiansPerSecond setpoint);
         bool TrySetPosition(foc::Radians setpoint);
+
+        bool TrySetCurrentPidGains(const services::FocPidGains& gains);
+        bool TrySetSpeedPidGains(const services::FocPidGains& gains);
+        bool TrySetPositionPidGains(const services::FocPidGains& gains);
 
     private:
         void Activate(ControlMode mode);
