@@ -1,16 +1,16 @@
 #pragma once
 
 #include "can-lite/categories/foc_motor/FocMotorCategoryServer.hpp"
+#include "can-lite/core/CanCategory.hpp"
 #include "can-lite/core/CanFrameTransport.hpp"
 #include "can-lite/core/test/CanMock.hpp"
 #include "core/foc/implementations/FocTorqueImpl.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
-#include "core/services/cli/TerminalTorque.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
-#include "core/state_machine/FocStateMachineImpl.hpp"
+#include "core/state_machine/TorqueStateMachine.hpp"
 #include "core/state_machine/test_doubles/FaultNotifierMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
@@ -47,6 +47,12 @@ namespace integration
         void InjectCanStart();
         void InjectCanStop();
         void InjectCanClearFault();
+        void InjectCanEmergencyStop();
+
+        // Defer the NVM invalidation triggered by CmdClearCalibration so the state can
+        // change before the callback fires.
+        void DeferClearCalibration();
+        void CompleteInvalidate(services::NvmStatus status);
 
         // Complete a previously captured calibration step callback.
         void CompletePolePairsEstimation(std::size_t polePairs);
@@ -57,10 +63,7 @@ namespace integration
 
         static const foc::Volts testVdc;
 
-        using TorqueStateMachine = application::FocStateMachineImpl<
-            foc::FocTorqueImpl,
-            services::TerminalFocTorqueInteractor,
-            state_machine::AutoTransitionPolicy>;
+        using TorqueStateMachine = application::TorqueStateMachine;
 
         testing::StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterMock };
@@ -103,5 +106,13 @@ namespace integration
         std::optional<services::CanFrameTransport> canTransport;
         std::optional<services::FocMotorCategoryServer> motorCategoryServer;
         std::optional<FocMotorStateMachineBridge> motorBridge;
+
+        struct NullAcknowledger : services::CanCommandAcknowledger
+        {
+            void SendCommandAck(uint8_t, uint8_t, services::CanAckStatus) override
+            {}
+        };
+
+        NullAcknowledger nullAcknowledger;
     };
 }

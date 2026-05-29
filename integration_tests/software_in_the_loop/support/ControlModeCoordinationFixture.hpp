@@ -15,7 +15,6 @@
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/FocMotorCanBridge.hpp"
-#include "core/state_machine/FocStateMachineImpl.hpp"
 #include "core/state_machine/test_doubles/FaultNotifierMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
@@ -33,16 +32,11 @@ namespace integration
 {
     struct ControlModeCoordinationFixture
         : infra::EventDispatcherWithWeakPtrFixture
+        , services::CanCommandAcknowledger
     {
-        using CoordinatorType = state_machine::ControlModeStateMachine<
-            foc::FocTorqueImpl,
-            foc::FocSpeedImpl,
-            foc::FocPositionImpl>;
+        using CoordinatorType = state_machine::ControlModeStateMachine;
 
-        using BridgeType = state_machine::FocMotorCanBridge<
-            foc::FocTorqueImpl,
-            foc::FocSpeedImpl,
-            foc::FocPositionImpl>;
+        using BridgeType = state_machine::FocMotorCanBridge;
 
         ControlModeCoordinationFixture();
 
@@ -56,6 +50,12 @@ namespace integration
         void InjectCanSetTorqueSetpoint(int16_t value);
         void InjectCanSetSpeedSetpoint(int16_t value);
         void InjectCanSetPositionSetpoint(int16_t value);
+
+        // CanCommandAcknowledger
+        void SendCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status) override;
+
+        // Helper: dispatch a message through the motor category server and emit ACK like CanProtocolServer would.
+        void DispatchToMotor(uint8_t messageType, const hal::Can::Message& data);
 
         static services::CalibrationData MakeDefaultCalibrationData();
 
@@ -99,11 +99,13 @@ namespace integration
         std::optional<CoordinatorType> coordinator;
 
         uint8_t lastSentMessageType{ 0 };
-        bool commandRejectedSent{ false };
+        bool commandAckSent{ false };
         bool selectResponseSent{ false };
-        services::FocRejectReason lastSelectResponseReason{ services::FocRejectReason::ok };
-        services::FocRejectReason lastCommandRejectedReason{ services::FocRejectReason::ok };
-        uint8_t lastCommandRejectedOrigCmdId{ 0 };
+        services::CanAckStatus lastCommandAckStatus{ services::CanAckStatus::success };
+        uint8_t lastCommandAckMessageType{ 0 };
+        bool categoryErrorSent{ false };
+        uint8_t lastCategoryErrorOriginCmd{ 0 };
+        services::FocMotorCategoryError lastCategoryErrorReason{ services::FocMotorCategoryError::busy };
 
         testing::StrictMock<hal::CanMock> transportCanMock;
         std::optional<services::CanFrameTransport> canTransport;

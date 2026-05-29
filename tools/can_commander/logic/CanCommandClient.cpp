@@ -12,6 +12,10 @@ namespace tool
         , focCategory(focTransport, protocolClient)
     {
         protocolClient.RegisterCategory(focCategory);
+        protocolClient.SystemCategory().onCommandAck = [this](uint8_t categoryId, uint8_t commandType, CanAckStatus status)
+        {
+            HandleCommandAck(categoryId, commandType, status);
+        };
         CanProtocolClientObserver::Attach(protocolClient);
         FocMotorCategoryClientObserver::Attach(focCategory);
         CanBusAdapterObserver::Attach(adapter);
@@ -136,16 +140,6 @@ namespace tool
             SetBusy(false);
     }
 
-    void CanCommandClient::SendSetSupplyVoltage(float /*volts*/) const
-    {
-        // No equivalent in can-lite FocMotorCategoryClient; intentional no-op
-    }
-
-    void CanCommandClient::SendSetMaxCurrent(float /*amps*/) const
-    {
-        // No equivalent in can-lite FocMotorCategoryClient; intentional no-op
-    }
-
     void CanCommandClient::RequestData()
     {
         focCategory.SendRequestTelemetry(nodeId);
@@ -185,12 +179,6 @@ namespace tool
     void CanCommandClient::OnMechanicalParamsResponse(const FocMechanicalParams& /*params*/)
     {}
 
-    void CanCommandClient::OnSelectControlModeResponse(FocMotorMode /*activeMode*/, FocRejectReason /*reason*/)
-    {}
-
-    void CanCommandClient::OnCommandRejected(uint8_t /*origCmdId*/, FocRejectReason /*reason*/)
-    {}
-
     void CanCommandClient::OnTelemetryStatusResponse(const FocTelemetryStatus& status)
     {
         NotifyObservers([&status](auto& observer)
@@ -227,6 +215,24 @@ namespace tool
         NotifyObservers([voltage](auto& observer)
             {
                 observer.OnBusVoltageReceived(voltage);
+            });
+    }
+
+    void CanCommandClient::OnSelectControlModeResponse(FocMotorMode activeMode)
+    {
+        SetBusy(false);
+        NotifyObservers([activeMode](auto& observer)
+            {
+                observer.OnControlModeAcknowledged(activeMode);
+            });
+    }
+
+    void CanCommandClient::HandleCommandAck(uint8_t categoryId, uint8_t commandType, CanAckStatus status)
+    {
+        SetBusy(false);
+        NotifyObservers([categoryId, commandType, status](auto& observer)
+            {
+                observer.OnCommandAck(categoryId, commandType, status);
             });
     }
 

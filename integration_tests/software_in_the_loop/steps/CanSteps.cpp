@@ -24,3 +24,8 @@ WHEN(R"(the CAN ClearFault command is received)")
 {
     context.Get<StateMachineAccessor>().injectCanClearFault();
 }
+
+WHEN(R"(the CAN EmergencyStop command is received)")
+{
+    context.Get<StateMachineAccessor>().injectCanEmergencyStop();
+}

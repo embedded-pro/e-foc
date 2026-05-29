@@ -213,42 +213,6 @@ namespace tool
     {
         auto* page = new QWidget();
         auto* layout = new QVBoxLayout(page);
-
-        auto* systemGroup = new QGroupBox("System Parameters");
-        auto* systemLayout = new QFormLayout(systemGroup);
-
-        auto* voltageSpin = new QDoubleSpinBox();
-        voltageSpin->setRange(0.0, 327.0);
-        voltageSpin->setDecimals(2);
-        voltageSpin->setSuffix(" V");
-        voltageSpin->setValue(24.0);
-        systemLayout->addRow("Supply Voltage:", voltageSpin);
-        auto* voltageButton = new QPushButton("Set");
-        systemLayout->addRow(voltageButton);
-
-        commandButtons.push_back(voltageButton);
-        connect(voltageButton, &QPushButton::clicked, [this, voltageSpin]()
-            {
-                emit SetSupplyVoltageRequested(static_cast<float>(voltageSpin->value()));
-            });
-
-        auto* maxCurrentSpin = new QDoubleSpinBox();
-        maxCurrentSpin->setRange(0.0, 32.0);
-        maxCurrentSpin->setDecimals(3);
-        maxCurrentSpin->setSuffix(" A");
-        maxCurrentSpin->setValue(10.0);
-        systemLayout->addRow("Max Current:", maxCurrentSpin);
-        auto* maxCurrentButton = new QPushButton("Set");
-        systemLayout->addRow(maxCurrentButton);
-
-        commandButtons.push_back(maxCurrentButton);
-        connect(maxCurrentButton, &QPushButton::clicked, [this, maxCurrentSpin]()
-            {
-                emit SetMaxCurrentRequested(static_cast<float>(maxCurrentSpin->value()));
-            });
-
-        layout->addWidget(systemGroup);
-
         layout->addStretch();
         return page;
     }

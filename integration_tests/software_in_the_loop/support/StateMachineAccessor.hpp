@@ -1,7 +1,9 @@
 #pragma once
 
 #include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
+#include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
 #include "core/state_machine/ControlMode.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include <functional>
@@ -21,7 +23,12 @@ namespace integration
         std::function<void()> injectCanStart;
         std::function<void()> injectCanStop;
         std::function<void()> injectCanClearFault;
+        std::function<void()> injectCanEmergencyStop;
         std::function<void()> triggerHardwareFault;
+
+        // Async-race helpers: defer the NVM invalidation so state can change before it completes.
+        std::function<void()> deferClearCalibration;
+        std::function<void(services::NvmStatus)> completeInvalidate;
 
         // Coordinator-specific (populated only by ControlModeCoordinationFixture).
         std::function<void()> setupCanIntegrationWithCoordinator;
@@ -31,10 +38,13 @@ namespace integration
         std::function<void(int16_t)> injectCanSetPositionSetpoint;
         std::function<void()> restartSystem;
         std::function<state_machine::ControlMode()> getActiveMode;
-        std::function<bool()> wasCommandRejectedSent;
+        std::function<bool()> wasCommandAckSent;
         std::function<bool()> wasSelectResponseSent;
-        std::function<services::FocRejectReason()> lastCommandRejectedReason;
-        std::function<services::FocRejectReason()> lastSelectResponseReason;
+        std::function<services::CanAckStatus()> lastCommandAckStatus;
+        std::function<uint8_t()> lastCommandAckMessageType;
+        std::function<bool()> wasCategoryErrorSent;
+        std::function<services::FocMotorCategoryError()> lastCategoryErrorReason;
+        std::function<uint8_t()> lastCategoryErrorOriginCmd;
         std::function<std::size_t()> nvmWriteCount;
         std::size_t nvmWriteBaseline{ 0 };
 

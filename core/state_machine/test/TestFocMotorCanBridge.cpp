@@ -1,10 +1,9 @@
 #include "can-lite/categories/foc_motor/FocMotorCategoryServer.hpp"
 #include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
+#include "can-lite/core/CanCategory.hpp"
 #include "can-lite/core/CanFrameTransport.hpp"
+#include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "can-lite/core/test/CanMock.hpp"
-#include "core/foc/implementations/FocPositionImpl.hpp"
-#include "core/foc/implementations/FocSpeedImpl.hpp"
-#include "core/foc/implementations/FocTorqueImpl.hpp"
 #include "core/foc/implementations/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
@@ -19,21 +18,44 @@
 #include "services/tracer/Tracer.hpp"
 #include "services/util/Terminal.hpp"
 #include <gtest/gtest.h>
+#include <optional>
 
 namespace
 {
     using namespace testing;
     using namespace services;
 
-    using TestedControlMode = state_machine::ControlModeStateMachine<
-        foc::FocTorqueImpl,
-        foc::FocSpeedImpl,
-        foc::FocPositionImpl>;
+    using TestedControlMode = state_machine::ControlModeStateMachine;
 
-    using BridgeType = state_machine::FocMotorCanBridge<
-        foc::FocTorqueImpl,
-        foc::FocSpeedImpl,
-        foc::FocPositionImpl>;
+    using BridgeType = state_machine::FocMotorCanBridge;
+
+    // Captures ACKs emitted by the bridge so the tests can assert on the
+    // universal ACK reason without needing the full CanProtocolServer.
+    struct AcknowledgerSpy
+        : public services::CanCommandAcknowledger
+    {
+        struct Entry
+        {
+            uint8_t category{ 0 };
+            uint8_t commandType{ 0 };
+            services::CanAckStatus status{ services::CanAckStatus::success };
+        };
+
+        std::optional<Entry> last;
+        std::size_t count{ 0 };
+
+        void SendCommandAck(uint8_t category, uint8_t commandType, services::CanAckStatus status) override
+        {
+            last = Entry{ category, commandType, status };
+            ++count;
+        }
+
+        void Reset()
+        {
+            last.reset();
+            count = 0;
+        }
+    };
 
     class FocMotorCanBridgeTest
         : public ::testing::Test
@@ -84,11 +106,11 @@ namespace
             } };
 
         uint8_t lastSentMessageType{ 0 };
-        bool commandRejectedSent{ false };
-        bool selectResponseSent{ false };
-        services::FocRejectReason lastSelectResponseReason{ services::FocRejectReason::ok };
-        services::FocRejectReason lastCommandRejectedReason{ services::FocRejectReason::ok };
-        uint8_t lastCommandRejectedOrigCmdId{ 0 };
+        bool selectModeResponseSent{ false };
+        services::FocMotorMode lastSelectModeResponseActiveMode{ services::FocMotorMode::torque };
+        bool categoryErrorSent{ false };
+        uint8_t lastCategoryErrorOriginCmd{ 0 };
+        services::FocMotorCategoryError lastCategoryErrorReason{ services::FocMotorCategoryError::busy };
 
         StrictMock<hal::CanMock> canMock;
 
@@ -99,16 +121,16 @@ namespace
                     .WillRepeatedly(Invoke([this](hal::Can::Id id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
                         {
                             lastSentMessageType = services::ExtractCanMessageType(id.Get29BitId());
-                            if (lastSentMessageType == services::focCommandRejectedResponseId)
+                            if (lastSentMessageType == services::focSelectControlModeResponseId && !msg.empty())
                             {
-                                commandRejectedSent = true;
-                                lastCommandRejectedOrigCmdId = msg[0];
-                                lastCommandRejectedReason = static_cast<services::FocRejectReason>(msg[1]);
+                                selectModeResponseSent = true;
+                                lastSelectModeResponseActiveMode = static_cast<services::FocMotorMode>(msg[0]);
                             }
-                            if (lastSentMessageType == services::focSelectControlModeResponseId)
+                            if (lastSentMessageType == services::focCategoryErrorResponseId && msg.size() >= 2)
                             {
-                                selectResponseSent = true;
-                                lastSelectResponseReason = static_cast<services::FocRejectReason>(msg[1]);
+                                categoryErrorSent = true;
+                                lastCategoryErrorOriginCmd = msg[0];
+                                lastCategoryErrorReason = static_cast<services::FocMotorCategoryError>(msg[1]);
                             }
                             cb(true);
                         }));
@@ -116,6 +138,7 @@ namespace
 
         services::CanFrameTransport canTransport{ canMock, 1 };
         services::FocMotorCategoryServer motorServer{ canTransport };
+        AcknowledgerSpy ackSpy;
 
         std::optional<TestedControlMode> coordinator;
         std::optional<BridgeType> bridge;
@@ -140,7 +163,7 @@ namespace
                 application::TerminalAndTracer{ terminal, tracer },
                 application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
                 nvmMock,
-                application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
                 faultNotifierMock,
                 config,
                 TestedControlMode::OuterLoopArgs{
@@ -149,144 +172,173 @@ namespace
                     lowPriorityInterruptMock });
 
             bridge.emplace(motorServer, *coordinator);
+            motorServer.SetAcknowledger(ackSpy);
             ExecuteAllActions();
         }
 
-        void ResetSentFlags()
+        void ResetCaptures()
         {
             lastSentMessageType = 0;
-            commandRejectedSent = false;
-            selectResponseSent = false;
-            lastSelectResponseReason = services::FocRejectReason::ok;
-            lastCommandRejectedReason = services::FocRejectReason::ok;
-            lastCommandRejectedOrigCmdId = 0;
+            selectModeResponseSent = false;
+            lastSelectModeResponseActiveMode = services::FocMotorMode::torque;
+            categoryErrorSent = false;
+            lastCategoryErrorOriginCmd = 0;
+            lastCategoryErrorReason = services::FocMotorCategoryError::busy;
+            ackSpy.Reset();
         }
 
-        void InjectMessage(uint8_t msgType, hal::Can::Message data)
+        void Dispatch(uint8_t msgType, hal::Can::Message data)
         {
             motorServer.HandleMessage(msgType, data);
             ExecuteAllActions();
         }
     };
 
-    // ---- No-op handlers: verify no crash and no rejection ----
+    // ---- QueryMotorType: returns current active mode ----
 
-    TEST_F(FocMotorCanBridgeTest, OnQueryMotorType_IsNoOp)
+    TEST_F(FocMotorCanBridgeTest, OnQueryMotorType_ReturnsTorqueByDefault)
     {
         ConstructFixture();
-        ResetSentFlags();
+        ResetCaptures();
 
-        InjectMessage(services::focQueryMotorTypeId, {});
+        Dispatch(services::focQueryMotorTypeId, {});
 
-        EXPECT_FALSE(commandRejectedSent);
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->commandType, services::focQueryMotorTypeId);
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+        EXPECT_EQ(lastSentMessageType, services::focMotorTypeResponseId);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_IsNoOp)
+    // ---- SetPid*: accepted in matching mode, modeMismatch otherwise ----
+
+    TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_InTorqueMode_AcksSuccess)
     {
         ConstructFixture();
-        ResetSentFlags();
+        ResetCaptures();
 
         hal::Can::Message data;
-        data.resize(6, 0);
-        InjectMessage(services::focSetPidCurrentId, data);
+        data.resize(7, 0);
+        Dispatch(services::focSetPidCurrentId, data);
 
-        EXPECT_FALSE(commandRejectedSent);
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->commandType, services::focSetPidCurrentId);
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnSetPidSpeed_IsNoOp)
+    TEST_F(FocMotorCanBridgeTest, OnSetPidSpeed_InTorqueMode_SendsModeMismatch)
     {
         ConstructFixture();
-        ResetSentFlags();
+        ResetCaptures();
 
         hal::Can::Message data;
-        data.resize(6, 0);
-        InjectMessage(services::focSetPidSpeedId, data);
+        data.resize(7, 0);
+        Dispatch(services::focSetPidSpeedId, data);
 
-        EXPECT_FALSE(commandRejectedSent);
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->commandType, services::focSetPidSpeedId);
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryErrorOriginCmd, services::focSetPidSpeedId);
+        EXPECT_EQ(lastCategoryErrorReason, services::FocMotorCategoryError::modeMismatch);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnSetPidPosition_IsNoOp)
+    TEST_F(FocMotorCanBridgeTest, OnSetPidPosition_InTorqueMode_SendsModeMismatch)
     {
         ConstructFixture();
-        ResetSentFlags();
+        ResetCaptures();
 
         hal::Can::Message data;
-        data.resize(6, 0);
-        InjectMessage(services::focSetPidPositionId, data);
+        data.resize(7, 0);
+        Dispatch(services::focSetPidPositionId, data);
 
-        EXPECT_FALSE(commandRejectedSent);
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->commandType, services::focSetPidPositionId);
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryErrorOriginCmd, services::focSetPidPositionId);
+        EXPECT_EQ(lastCategoryErrorReason, services::FocMotorCategoryError::modeMismatch);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_IsNoOp)
+    TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_AcksNotImplemented)
     {
         ConstructFixture();
-        ResetSentFlags();
+        ResetCaptures();
 
-        InjectMessage(services::focIdentifyMechanicalId, {});
+        Dispatch(services::focIdentifyMechanicalId, {});
 
-        EXPECT_FALSE(commandRejectedSent);
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::notImplemented);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_IsNoOp)
+    TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_AcksNotImplemented)
     {
         ConstructFixture();
-        ResetSentFlags();
+        ResetCaptures();
 
-        InjectMessage(services::focRequestTelemetryId, {});
+        Dispatch(services::focRequestTelemetryId, {});
 
-        EXPECT_FALSE(commandRejectedSent);
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::notImplemented);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnSetEncoderResolution_IsNoOp)
+    TEST_F(FocMotorCanBridgeTest, OnSetEncoderResolution_AcksNotImplemented)
     {
         ConstructFixture();
-        ResetSentFlags();
+        ResetCaptures();
+
+        hal::Can::Message data;
+        data.resize(3, 0);
+        Dispatch(services::focSetEncoderResolutionId, data);
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::notImplemented);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_AcksNotImplemented)
+    {
+        ConstructFixture();
+        ResetCaptures();
 
         hal::Can::Message data;
         data.resize(2, 0);
-        InjectMessage(services::focSetEncoderResolutionId, data);
+        data[1] = 10;
+        Dispatch(services::focConfigureTelemetryRateId, data);
 
-        EXPECT_FALSE(commandRejectedSent);
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::notImplemented);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_IsNoOp)
+    // ---- Start/Stop: delegate to active state machine, ACK success ----
+
+    TEST_F(FocMotorCanBridgeTest, OnStart_DelegatesToCmdEnable_NoCrashInIdle)
     {
         ConstructFixture();
-        ResetSentFlags();
+        ResetCaptures();
 
-        hal::Can::Message data;
-        data.push_back(10);
-        InjectMessage(services::focConfigureTelemetryRateId, data);
-
-        EXPECT_FALSE(commandRejectedSent);
-    }
-
-    // ---- Start/Stop: delegate to active state machine ----
-
-    TEST_F(FocMotorCanBridgeTest, OnStart_Calls_CmdEnable_Is_NoOp_In_Idle)
-    {
-        ConstructFixture();
-
-        // CmdEnable() from Idle is a no-op — no crash expected
-        InjectMessage(services::focStartId, {});
+        Dispatch(services::focStartId, {});
 
         EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
             coordinator->ActiveStateMachine().CurrentState()));
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnStop_Calls_CmdDisable_Is_NoOp_In_Idle)
+    TEST_F(FocMotorCanBridgeTest, OnStop_DelegatesToCmdDisable_NoCrashInIdle)
     {
         ConstructFixture();
+        ResetCaptures();
 
-        InjectMessage(services::focStopId, {});
+        Dispatch(services::focStopId, {});
 
         EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
             coordinator->ActiveStateMachine().CurrentState()));
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
     // ---- IdentifyElectrical: delegates to CmdCalibrate ----
 
-    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_Calls_CmdCalibrate)
+    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_TransitionsToCalibrating)
     {
         ConstructFixture();
 
@@ -298,39 +350,43 @@ namespace
                     capturedCb = cb;
                 }));
 
-        InjectMessage(services::focIdentifyElectricalId, {});
+        Dispatch(services::focIdentifyElectricalId, {});
 
         EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(
             coordinator->ActiveStateMachine().CurrentState()));
     }
 
-    // ---- ClearFault: delegates to CmdClearFault ----
+    // ---- ClearFault / EmergencyStop ----
 
-    TEST_F(FocMotorCanBridgeTest, OnClearFault_Calls_CmdClearFault_Is_NoOp_In_Idle)
+    TEST_F(FocMotorCanBridgeTest, OnClearFault_NoCrashInIdle)
     {
         ConstructFixture();
+        ResetCaptures();
 
-        InjectMessage(services::focClearFaultId, {});
+        Dispatch(services::focClearFaultId, {});
 
         EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
             coordinator->ActiveStateMachine().CurrentState()));
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
-    // ---- EmergencyStop: delegates to CmdDisable ----
-
-    TEST_F(FocMotorCanBridgeTest, OnEmergencyStop_Calls_CmdDisable_Is_NoOp_In_Idle)
+    TEST_F(FocMotorCanBridgeTest, OnEmergencyStop_DelegatesToCmdDisable_NoCrashInIdle)
     {
         ConstructFixture();
+        ResetCaptures();
 
-        InjectMessage(services::focEmergencyStopId, {});
+        Dispatch(services::focEmergencyStopId, {});
 
         EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
             coordinator->ActiveStateMachine().CurrentState()));
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
-    // ---- SelectControlMode: sends response ----
+    // ---- SelectControlMode: defers ACK, emits success ACK + response on OK ----
 
-    TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_Speed_Sends_Response)
+    TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_Speed_AcksSuccess_AndEmitsResponse)
     {
         ConstructFixture();
 
@@ -340,17 +396,20 @@ namespace
                     onDone(services::NvmStatus::Ok);
                 }));
 
-        ResetSentFlags();
+        ResetCaptures();
         hal::Can::Message data;
         data.resize(2, 0);
         data[1] = static_cast<uint8_t>(services::FocMotorMode::speed);
-        InjectMessage(services::focSelectControlModeId, data);
+        Dispatch(services::focSelectControlModeId, data);
 
-        EXPECT_TRUE(selectResponseSent);
-        EXPECT_EQ(lastSelectResponseReason, services::FocRejectReason::ok);
+        EXPECT_TRUE(selectModeResponseSent);
+        EXPECT_EQ(lastSelectModeResponseActiveMode, services::FocMotorMode::speed);
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->commandType, services::focSelectControlModeId);
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_NvmFailed_Sends_Response_With_NvmFailed_Reason)
+    TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_NvmFailed_AcksPersistenceFailed)
     {
         ConstructFixture();
 
@@ -360,59 +419,37 @@ namespace
                     onDone(services::NvmStatus::WriteFailed);
                 }));
 
-        ResetSentFlags();
+        ResetCaptures();
         hal::Can::Message data;
         data.resize(2, 0);
         data[1] = static_cast<uint8_t>(services::FocMotorMode::speed);
-        InjectMessage(services::focSelectControlModeId, data);
+        Dispatch(services::focSelectControlModeId, data);
 
-        EXPECT_TRUE(selectResponseSent);
-        EXPECT_EQ(lastSelectResponseReason, services::FocRejectReason::nvmFailed);
+        EXPECT_FALSE(selectModeResponseSent);
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->commandType, services::focSelectControlModeId);
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryErrorOriginCmd, services::focSelectControlModeId);
+        EXPECT_EQ(lastCategoryErrorReason, services::FocMotorCategoryError::persistenceFailed);
     }
 
-    // ---- SetTorqueSetpoint ----
+    // ---- Setpoint mismatch produces modeMismatch ACK ----
 
-    TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_Accepted_In_Default_Torque_Mode)
+    TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_AcceptedInTorqueModeDefault)
     {
         ConstructFixture();
-        ResetSentFlags();
+        ResetCaptures();
 
         hal::Can::Message data;
         data.resize(3, 0);
-        InjectMessage(services::focSetTorqueSetpointId, data);
+        Dispatch(services::focSetTorqueSetpointId, data);
 
-        EXPECT_FALSE(commandRejectedSent);
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_Rejected_In_Speed_Mode)
-    {
-        ConstructFixture();
-
-        EXPECT_CALL(nvmMock, SaveConfig(_, _))
-            .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
-                {
-                    onDone(services::NvmStatus::Ok);
-                }));
-
-        hal::Can::Message selectData;
-        selectData.resize(2, 0);
-        selectData[1] = static_cast<uint8_t>(services::FocMotorMode::speed);
-        InjectMessage(services::focSelectControlModeId, selectData);
-
-        ResetSentFlags();
-
-        hal::Can::Message data;
-        data.resize(3, 0);
-        InjectMessage(services::focSetTorqueSetpointId, data);
-
-        EXPECT_TRUE(commandRejectedSent);
-        EXPECT_EQ(lastCommandRejectedOrigCmdId, services::focSetTorqueSetpointId);
-        EXPECT_EQ(lastCommandRejectedReason, services::FocRejectReason::controlModeMismatch);
-    }
-
-    // ---- SetSpeedSetpoint ----
-
-    TEST_F(FocMotorCanBridgeTest, OnSetSpeedSetpoint_Accepted_In_Speed_Mode)
+    TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_RejectedInSpeedMode)
     {
         ConstructFixture();
 
@@ -425,34 +462,61 @@ namespace
         hal::Can::Message selectData;
         selectData.resize(2, 0);
         selectData[1] = static_cast<uint8_t>(services::FocMotorMode::speed);
-        InjectMessage(services::focSelectControlModeId, selectData);
+        Dispatch(services::focSelectControlModeId, selectData);
 
-        ResetSentFlags();
-
+        ResetCaptures();
         hal::Can::Message data;
         data.resize(3, 0);
-        InjectMessage(services::focSetSpeedSetpointId, data);
+        Dispatch(services::focSetTorqueSetpointId, data);
 
-        EXPECT_FALSE(commandRejectedSent);
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->commandType, services::focSetTorqueSetpointId);
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryErrorReason, services::FocMotorCategoryError::modeMismatch);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnSetSpeedSetpoint_Rejected_In_Default_Torque_Mode)
+    TEST_F(FocMotorCanBridgeTest, OnSetSpeedSetpoint_AcceptedInSpeedMode)
     {
         ConstructFixture();
-        ResetSentFlags();
+
+        EXPECT_CALL(nvmMock, SaveConfig(_, _))
+            .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
+                {
+                    onDone(services::NvmStatus::Ok);
+                }));
+
+        hal::Can::Message selectData;
+        selectData.resize(2, 0);
+        selectData[1] = static_cast<uint8_t>(services::FocMotorMode::speed);
+        Dispatch(services::focSelectControlModeId, selectData);
+
+        ResetCaptures();
+        hal::Can::Message data;
+        data.resize(3, 0);
+        Dispatch(services::focSetSpeedSetpointId, data);
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnSetSpeedSetpoint_RejectedInDefaultTorqueMode)
+    {
+        ConstructFixture();
+        ResetCaptures();
 
         hal::Can::Message data;
         data.resize(3, 0);
-        InjectMessage(services::focSetSpeedSetpointId, data);
+        Dispatch(services::focSetSpeedSetpointId, data);
 
-        EXPECT_TRUE(commandRejectedSent);
-        EXPECT_EQ(lastCommandRejectedOrigCmdId, services::focSetSpeedSetpointId);
-        EXPECT_EQ(lastCommandRejectedReason, services::FocRejectReason::controlModeMismatch);
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->commandType, services::focSetSpeedSetpointId);
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryErrorReason, services::FocMotorCategoryError::modeMismatch);
     }
 
-    // ---- SetPositionSetpoint ----
-
-    TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_Accepted_In_Position_Mode)
+    TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_AcceptedInPositionMode)
     {
         ConstructFixture();
 
@@ -465,28 +529,30 @@ namespace
         hal::Can::Message selectData;
         selectData.resize(2, 0);
         selectData[1] = static_cast<uint8_t>(services::FocMotorMode::position);
-        InjectMessage(services::focSelectControlModeId, selectData);
+        Dispatch(services::focSelectControlModeId, selectData);
 
-        ResetSentFlags();
-
+        ResetCaptures();
         hal::Can::Message data;
         data.resize(3, 0);
-        InjectMessage(services::focSetPositionSetpointId, data);
+        Dispatch(services::focSetPositionSetpointId, data);
 
-        EXPECT_FALSE(commandRejectedSent);
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_Rejected_In_Default_Torque_Mode)
+    TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_RejectedInDefaultTorqueMode)
     {
         ConstructFixture();
-        ResetSentFlags();
+        ResetCaptures();
 
         hal::Can::Message data;
         data.resize(3, 0);
-        InjectMessage(services::focSetPositionSetpointId, data);
+        Dispatch(services::focSetPositionSetpointId, data);
 
-        EXPECT_TRUE(commandRejectedSent);
-        EXPECT_EQ(lastCommandRejectedOrigCmdId, services::focSetPositionSetpointId);
-        EXPECT_EQ(lastCommandRejectedReason, services::FocRejectReason::controlModeMismatch);
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->commandType, services::focSetPositionSetpointId);
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryErrorReason, services::FocMotorCategoryError::modeMismatch);
     }
 }

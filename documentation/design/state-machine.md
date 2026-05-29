@@ -127,6 +127,56 @@ Entering `Fault` always stops the inverter when the machine was in `Enabled` or 
 
 The last fault code is preserved in `LastFaultCode()` and remains readable even after the fault is cleared via `CmdClearFault`.
 
+### Async-Callback State Invariant
+
+Every asynchronous callback registered with a service (NVM, electrical ident, mechanical ident, motor alignment) **must check the current state before mutating it**. A hardware fault, an operator command, or a second calibration attempt may have moved the state machine to a different state between the moment the service call was issued and the moment the callback fires.
+
+The invariant is: **a callback may only apply its result if the state machine is still in the state that issued the service call.**
+
+Specifically:
+
+- Callbacks from calibration steps (`EstimateNumberOfPolePairs`, `EstimateResistanceAndInductance`, `ForceAlignment`, `EstimateFrictionAndInertia`) check that the machine is still in `Calibrating` **and** that the expected calibration sub-step is active.
+- The `SaveCalibration` callback checks that the machine is still in `Calibrating`.
+- The `IsCalibrationValid` and `LoadCalibration` callbacks from the boot-time NVM check verify that the machine is still in `Idle`.
+- The `InvalidateCalibration` callback from `CmdClearCalibration` verifies that the machine is still in `Idle` or `Ready` before transitioning to `Idle` (on success) or `Fault` (on failure).
+
+Any callback that fires after the state has moved away from the expected source state **returns silently**. It must never overwrite a later state (such as `Enabled` or `Fault`) with a stale result.
+
+```mermaid
+sequenceDiagram
+    participant Op as Operator
+    participant SM as FOC State Machine
+    participant NVM as NVM Service
+
+    Op->>SM: CmdClearCalibration (from Ready)
+    SM->>NVM: InvalidateCalibration(callback)
+    note over SM: State may change here
+
+    Op->>SM: CmdEnable
+    SM-->>SM: State → Enabled
+
+    NVM-->>SM: callback(Ok)
+    note over SM: Guard: not in Idle or Ready → silently ignore
+    note over SM: State remains Enabled ✓
+```
+
+A matching race with a hardware fault that arrives between the `CmdClearCalibration` call and the `InvalidateCalibration` callback:
+
+```mermaid
+sequenceDiagram
+    participant HW as Fault Notifier
+    participant SM as FOC State Machine
+    participant NVM as NVM Service
+
+    SM->>NVM: InvalidateCalibration(callback)
+    HW-->>SM: fault notification
+    SM-->>SM: State → Fault
+
+    NVM-->>SM: callback(Ok)
+    note over SM: Guard: not in Idle or Ready → silently ignore
+    note over SM: State remains Fault ✓
+```
+
 ### Transition Policies
 
 The state machine supports two transition policies, selected at build time via the `E_FOC_AUTO_TRANSITION_POLICY` CMake cache variable:
@@ -274,7 +324,7 @@ sequenceDiagram
 | `CmdEnable()`           | Requests enabling the FOC controller                             | Only effective from `Ready`; ignored from all other states                                                                       |
 | `CmdDisable()`          | Requests disabling the FOC controller                            | Only effective from `Enabled`; ignored from all other states                                                                     |
 | `CmdClearFault()`       | Clears the fault and returns to `Idle`                           | Only effective from `Fault`; ignored from all other states                                                                       |
-| `CmdClearCalibration()` | Invalidates NVM calibration and returns to `Idle`                | Ignored when in `Enabled`; effective from all other states                                                                       |
+| `CmdClearCalibration()` | Invalidates NVM calibration and returns to `Idle`                | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`. |
 | `ApplyOnlineEstimates()`| Retunes speed and current PID gains from online estimators       | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only.                                |
 
 ### Required

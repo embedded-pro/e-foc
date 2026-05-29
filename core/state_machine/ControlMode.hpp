@@ -1,6 +1,7 @@
 #pragma once
 
 #include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
+#include "can-lite/core/CanProtocolDefinitions.hpp"
 #include <cstdint>
 
 namespace state_machine
@@ -62,19 +63,30 @@ namespace state_machine
         }
     }
 
-    inline services::FocRejectReason ToRejectReason(SelectResult result)
+    inline services::CanAckStatus ToAckStatus(SelectResult result)
     {
         switch (result)
         {
             case SelectResult::ok:
-                return services::FocRejectReason::ok;
-            case SelectResult::busy:
-                return services::FocRejectReason::busy;
-            case SelectResult::nvmFailed:
-                return services::FocRejectReason::nvmFailed;
+                return services::CanAckStatus::success;
             case SelectResult::invalidMode:
+                return services::CanAckStatus::invalidPayload;
+            case SelectResult::busy:
+            case SelectResult::nvmFailed:
             default:
-                return services::FocRejectReason::invalidPayload;
+                return services::CanAckStatus::categoryError;
+        }
+    }
+
+    inline services::FocMotorCategoryError ToCategoryError(SelectResult result)
+    {
+        switch (result)
+        {
+            case SelectResult::nvmFailed:
+                return services::FocMotorCategoryError::persistenceFailed;
+            case SelectResult::busy:
+            default:
+                return services::FocMotorCategoryError::busy;
         }
     }
 }

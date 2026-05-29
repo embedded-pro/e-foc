@@ -32,9 +32,10 @@ namespace integration
             application::TerminalAndTracer{ terminal, tracer },
             application::MotorHardware{ platformFactory, platformFactory, testVdc },
             nvm,
-            application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
+            application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
             faultNotifierMock,
-            foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock);
+            state_machine::TransitionPolicy::Auto,
+            application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock });
 
         ExecuteAllActions();
     }
@@ -59,9 +60,10 @@ namespace integration
             application::TerminalAndTracer{ terminal, tracer },
             application::MotorHardware{ platformFactory, platformFactory, testVdc },
             nvm,
-            application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
+            application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
             faultNotifierMock,
-            foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock);
+            state_machine::TransitionPolicy::Auto,
+            application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock });
 
         ExecuteAllActions();
     }
@@ -70,7 +72,8 @@ namespace integration
     {
         calibrationExpectationsConfigured = true;
         EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
-            .WillOnce(Invoke([this](const auto&, const auto& cb)
+            .Times(AnyNumber())
+            .WillRepeatedly(Invoke([this](const auto&, const auto& cb)
                 {
                     capturedPolePairsCallback = cb;
                 }));
@@ -87,6 +90,7 @@ namespace integration
 
         canTransport.emplace(transportCanMock, 1);
         motorCategoryServer.emplace(*canTransport);
+        motorCategoryServer->SetAcknowledger(nullAcknowledger);
         motorBridge.emplace(*motorCategoryServer, *motorStateMachine);
     }
 
@@ -111,6 +115,27 @@ namespace integration
         hal::Can::Message data;
         data.push_back(0x01);
         motorCategoryServer->HandleMessage(services::focClearFaultId, data);
+        ExecuteAllActions();
+    }
+
+    void SpeedIntegrationFixture::InjectCanEmergencyStop()
+    {
+        hal::Can::Message data;
+        data.push_back(0x01);
+        motorCategoryServer->HandleMessage(services::focEmergencyStopId, data);
+        ExecuteAllActions();
+    }
+
+    void SpeedIntegrationFixture::DeferClearCalibration()
+    {
+        eepromStub.DeferNextErase();
+        motorStateMachine->CmdClearCalibration([](state_machine::CommandResult) {});
+        ExecuteAllActions();
+    }
+
+    void SpeedIntegrationFixture::CompleteInvalidate(services::NvmStatus /* status */)
+    {
+        eepromStub.CompleteDeferredErase();
         ExecuteAllActions();
     }
 

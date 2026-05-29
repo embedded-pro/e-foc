@@ -45,26 +45,28 @@ namespace
             EXPECT_EQ(ToCanMode(FromCanMode(mode)), mode);
     }
 
-    // -------- ToRejectReason --------
+    // -------- ToAckStatus --------
 
-    TEST(TestControlMode, ToRejectReason_Ok_ReturnsOk)
+    TEST(TestControlMode, ToAckStatus_Ok_ReturnsSuccess)
     {
-        EXPECT_EQ(ToRejectReason(SelectResult::ok), FocRejectReason::ok);
+        EXPECT_EQ(ToAckStatus(SelectResult::ok), CanAckStatus::success);
     }
 
-    TEST(TestControlMode, ToRejectReason_Busy_ReturnsBusy)
+    TEST(TestControlMode, ToAckStatus_Busy_ReturnsCategoryError)
     {
-        EXPECT_EQ(ToRejectReason(SelectResult::busy), FocRejectReason::busy);
+        EXPECT_EQ(ToAckStatus(SelectResult::busy), CanAckStatus::categoryError);
+        EXPECT_EQ(ToCategoryError(SelectResult::busy), services::FocMotorCategoryError::busy);
     }
 
-    TEST(TestControlMode, ToRejectReason_NvmFailed_ReturnsNvmFailed)
+    TEST(TestControlMode, ToAckStatus_NvmFailed_ReturnsCategoryError)
     {
-        EXPECT_EQ(ToRejectReason(SelectResult::nvmFailed), FocRejectReason::nvmFailed);
+        EXPECT_EQ(ToAckStatus(SelectResult::nvmFailed), CanAckStatus::categoryError);
+        EXPECT_EQ(ToCategoryError(SelectResult::nvmFailed), services::FocMotorCategoryError::persistenceFailed);
     }
 
-    TEST(TestControlMode, ToRejectReason_InvalidMode_ReturnsInvalidPayload)
+    TEST(TestControlMode, ToAckStatus_InvalidMode_ReturnsInvalidPayload)
     {
-        EXPECT_EQ(ToRejectReason(SelectResult::invalidMode), FocRejectReason::invalidPayload);
+        EXPECT_EQ(ToAckStatus(SelectResult::invalidMode), CanAckStatus::invalidPayload);
     }
 
     // -------- ControlModeFromRaw --------

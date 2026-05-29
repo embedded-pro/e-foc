@@ -215,20 +215,6 @@ namespace
         EXPECT_FALSE(client.IsBusy());
     }
 
-    // ---------- No-op setters ----------
-
-    TEST_F(TestCanCommandClient, send_set_supply_voltage_does_not_change_state)
-    {
-        client.SendSetSupplyVoltage(24.0f);
-        EXPECT_FALSE(client.IsBusy());
-    }
-
-    TEST_F(TestCanCommandClient, send_set_max_current_does_not_change_state)
-    {
-        client.SendSetMaxCurrent(10.0f);
-        EXPECT_FALSE(client.IsBusy());
-    }
-
     // ---------- Request data ----------
 
     TEST_F(TestCanCommandClient, request_data_does_not_change_busy_state)
@@ -280,22 +266,42 @@ namespace
         ForwardTime(std::chrono::seconds(4));
     }
 
+    TEST_F(TestCanCommandClient, command_ack_frame_forwards_to_observer_and_keeps_busy_false)
+    {
+        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnCommandAck(focMotorCategoryId, focStartId, CanAckStatus::success));
+
+        hal::Can::Message ackPayload;
+        ackPayload.push_back(focMotorCategoryId);
+        ackPayload.push_back(focStartId);
+        ackPayload.push_back(static_cast<uint8_t>(CanAckStatus::success));
+
+        auto canId = hal::Can::Id::Create29BitId(
+            MakeCanId(CanPriority::response,
+                canSystemCategoryId,
+                canCommandAckMessageTypeId,
+                1));
+        receiveCallback(canId, ackPayload);
+
+        EXPECT_FALSE(client.IsBusy());
+    }
+
     // ---------- Telemetry ----------
 
     TEST_F(TestCanCommandClient, telemetry_status_notifies_motor_status_and_speed_position)
     {
         EXPECT_CALL(observer, OnConnectionChanged(true));
         EXPECT_CALL(observer, OnMotorStatusReceived(FocMotorState::running, FocFaultCode::none));
-        EXPECT_CALL(observer, OnSpeedPositionReceived(testing::FloatNear(10.0f, 0.01f), testing::FloatNear(1.0f, 0.01f)));
+        EXPECT_CALL(observer, OnSpeedPositionReceived(testing::FloatNear(1.0f, 0.01f), testing::FloatNear(0.1f, 0.01f)));
 
         hal::Can::Message data;
         data.resize(6, 0);
         data[0] = static_cast<uint8_t>(FocMotorState::running);
         data[1] = static_cast<uint8_t>(FocFaultCode::none);
         data[2] = 0;
-        data[3] = 100; // speed wire = 100 → physical = 100 / 10 = 10.0 rad/s
-        data[4] = 3;
-        data[5] = 232; // position wire = 1000 → physical = 1000 / 1000 = 1.0 rad
+        data[3] = 10; // speed wire = 10 → physical = 10 / focSpeedScale(10) = 1.0 rad/s
+        data[4] = 0;
+        data[5] = 100; // position wire = 100 → physical = 100 / focPositionScale(1000) = 0.1 rad
 
         auto canId = hal::Can::Id::Create29BitId(
             MakeCanId(CanPriority::telemetry,
@@ -332,8 +338,8 @@ namespace
     TEST_F(TestCanCommandClient, telemetry_electrical_notifies_current_and_voltage)
     {
         EXPECT_CALL(observer, OnConnectionChanged(true));
-        EXPECT_CALL(observer, OnCurrentMeasurementReceived(testing::FloatNear(3.0f, 0.01f),
-                                  testing::FloatNear(5.0f, 0.01f)));
+        EXPECT_CALL(observer, OnCurrentMeasurementReceived(testing::FloatNear(0.3f, 0.01f),
+                                  testing::FloatNear(0.5f, 0.01f)));
         EXPECT_CALL(observer, OnBusVoltageReceived(testing::FloatNear(24.0f, 0.01f)));
 
         hal::Can::Message data;
@@ -342,10 +348,10 @@ namespace
         data[1] = 240; // voltage wire = 240 → physical = 240 / 10 = 24.0 V
         data[2] = 0;
         data[3] = 0;
-        data[4] = 1;
-        data[5] = 244; // iq wire = 500 → physical = 500 / 100 = 5.0 A
-        data[6] = 1;
-        data[7] = 44; // id wire = 300 → physical = 300 / 100 = 3.0 A
+        data[4] = 0;
+        data[5] = 50; // iq wire = 50 → physical = 50 / focCurrentScale(100) = 0.5 A
+        data[6] = 0;
+        data[7] = 30; // id wire = 30 → physical = 30 / focCurrentScale(100) = 0.3 A
 
         auto canId = hal::Can::Id::Create29BitId(
             MakeCanId(CanPriority::telemetry,
@@ -403,6 +409,25 @@ namespace
         // StrictMock: no observer method should be called — OnMechanicalParamsResponse is a no-op
     }
 
+    // ---------- SelectControlModeResponse forwarding ----------
+
+    TEST_F(TestCanCommandClient, select_control_mode_response_notifies_control_mode_acknowledged)
+    {
+        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnControlModeAcknowledged(FocMotorMode::speed));
+
+        hal::Can::Message data;
+        data.resize(1, 0);
+        data[0] = static_cast<uint8_t>(FocMotorMode::speed);
+
+        auto canId = hal::Can::Id::Create29BitId(
+            MakeCanId(CanPriority::response,
+                focMotorCategoryId,
+                focSelectControlModeResponseId,
+                1));
+        receiveCallback(canId, data);
+    }
+
     // ---------- Encoding: torque setpoint uses focCurrentScale ----------
 
     TEST_F(TestCanCommandClient, send_torque_setpoint_encodes_with_correct_scale)
@@ -439,6 +464,40 @@ namespace
         ASSERT_EQ(capturedData.size(), 3u);
         EXPECT_EQ(capturedData[1], 0x7Fu); // high byte of INT16_MAX
         EXPECT_EQ(capturedData[2], 0xFFu); // low  byte of INT16_MAX
+    }
+
+    TEST_F(TestCanCommandClient, send_speed_setpoint_overrange_negative_wire_value_clamped_to_int16_min)
+    {
+        hal::Can::Message capturedData;
+        EXPECT_CALL(adapter, SendData(_, _, _))
+            .WillOnce(Invoke([&capturedData](hal::Can::Id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
+                {
+                    capturedData = msg;
+                    cb(true);
+                }));
+
+        client.SendSetSpeedSetpoint(-100000.0f); // -100000 * 10 = -1000000 < INT16_MIN → clamped to -32768 = 0x8000
+
+        ASSERT_EQ(capturedData.size(), 3u);
+        EXPECT_EQ(capturedData[1], 0x80u); // high byte of INT16_MIN
+        EXPECT_EQ(capturedData[2], 0x00u); // low  byte of INT16_MIN
+    }
+
+    TEST_F(TestCanCommandClient, send_position_setpoint_encodes_with_correct_scale)
+    {
+        hal::Can::Message capturedData;
+        EXPECT_CALL(adapter, SendData(_, _, _))
+            .WillOnce(Invoke([&capturedData](hal::Can::Id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
+                {
+                    capturedData = msg;
+                    cb(true);
+                }));
+
+        client.SendSetPositionSetpoint(0.1f); // 0.1 * focPositionScale(1000) = 100 = 0x0064
+
+        ASSERT_EQ(capturedData.size(), 3u);
+        EXPECT_EQ(capturedData[1], 0x00u); // high byte of 100
+        EXPECT_EQ(capturedData[2], 0x64u); // low  byte of 100
     }
 
     // ---------- Adapter send failure: busy stays true ----------
@@ -542,41 +601,5 @@ namespace
     {
         client.SendSetPositionPid(1.0f, 0.1f, 0.01f);
         EXPECT_FALSE(client.IsBusy());
-    }
-
-    // ---------- No-op response handlers ----------
-
-    TEST_F(TestCanCommandClient, select_control_mode_response_received_does_not_call_any_observer)
-    {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
-
-        hal::Can::Message data;
-        data.push_back(static_cast<uint8_t>(FocMotorMode::torque));
-        data.push_back(static_cast<uint8_t>(FocRejectReason::ok));
-
-        auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::response,
-                focMotorCategoryId,
-                focSelectControlModeResponseId,
-                1));
-        receiveCallback(canId, data);
-        // StrictMock: OnSelectControlModeResponse is a no-op — no observer calls expected
-    }
-
-    TEST_F(TestCanCommandClient, command_rejected_response_received_does_not_call_any_observer)
-    {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
-
-        hal::Can::Message data;
-        data.push_back(static_cast<uint8_t>(focStartId));
-        data.push_back(static_cast<uint8_t>(FocRejectReason::busy));
-
-        auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::response,
-                focMotorCategoryId,
-                focCommandRejectedResponseId,
-                1));
-        receiveCallback(canId, data);
-        // StrictMock: OnCommandRejected is a no-op — no observer calls expected
     }
 }
