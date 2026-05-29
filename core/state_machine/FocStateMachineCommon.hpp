@@ -60,7 +60,9 @@ namespace application
             services::ElectricalParametersIdentification& electricalIdent,
             services::MotorAlignment& motorAlignment);
 
-        void Initialize(state_machine::FaultNotifier& faultNotifier, state_machine::TransitionPolicy transitionPolicy);
+        void RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier);
+        void RegisterCliIfNeeded(state_machine::TransitionPolicy transitionPolicy);
+        void CheckNvmOnBoot();
 
         virtual foc::FocBase& GetFoc() = 0;
         virtual foc::Controllable& GetFocControl() = 0;
@@ -97,7 +99,6 @@ namespace application
         static constexpr float nyquistFactor = 15.0f;
 
     private:
-        void CheckNvmOnBoot();
         void OnNvmValidationResult(bool valid);
         void OnNvmLoadResult(services::NvmStatus status);
 

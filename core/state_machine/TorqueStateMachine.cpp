@@ -14,7 +14,9 @@ namespace application
         , focController(hardware.inverter, hardware.encoder)
         , pidAutoTuner(focController)
     {
-        Initialize(faultNotifier, transitionPolicy);
+        RegisterFaultHandler(faultNotifier);
+        RegisterCliIfNeeded(transitionPolicy);
+        CheckNvmOnBoot();
     }
 
     foc::FocTorque& TorqueStateMachine::GetController()

@@ -25,7 +25,9 @@ namespace application
     {
         OnlineEstimable().SetOnlineMechanicalEstimator(onlineMechEstimator);
         OnlineEstimable().SetOnlineElectricalEstimator(onlineElecEstimator);
-        Initialize(faultNotifier, transitionPolicy);
+        RegisterFaultHandler(faultNotifier);
+        RegisterCliIfNeeded(transitionPolicy);
+        CheckNvmOnBoot();
     }
 
     foc::FocSpeed& SpeedStateMachine::GetController()

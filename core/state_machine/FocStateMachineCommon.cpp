@@ -19,23 +19,24 @@ namespace application
         , motorAlignment(motorAlignment)
     {}
 
-    void FocStateMachineCommon::Initialize(state_machine::FaultNotifier& faultNotifier, state_machine::TransitionPolicy transitionPolicy)
+    void FocStateMachineCommon::RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier)
     {
         faultNotifier.Register([this](state_machine::FaultCode code)
             {
                 EnterFault(code);
             });
+    }
 
-        if (transitionPolicy == state_machine::TransitionPolicy::Cli)
-        {
-            RegisterLifecycleCliCommands(terminal, [this]() -> state_machine::FocStateMachineBase&
-                {
-                    return *this;
-                });
-            RegisterModeSpecificCli(terminal);
-        }
+    void FocStateMachineCommon::RegisterCliIfNeeded(state_machine::TransitionPolicy transitionPolicy)
+    {
+        if (transitionPolicy != state_machine::TransitionPolicy::Cli)
+            return;
 
-        CheckNvmOnBoot();
+        RegisterLifecycleCliCommands(terminal, [this]() -> state_machine::FocStateMachineBase&
+            {
+                return *this;
+            });
+        RegisterModeSpecificCli(terminal);
     }
 
     const state_machine::State& FocStateMachineCommon::CurrentState() const
