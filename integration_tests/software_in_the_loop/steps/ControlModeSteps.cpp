@@ -34,19 +34,34 @@ namespace
         throw std::invalid_argument("Unknown control mode: " + mode);
     }
 
-    services::FocRejectReason ReasonFromString(const std::string& reason)
+    services::CanAckStatus StatusFromString(const std::string& reason)
     {
-        if (reason == "ok")
-            return services::FocRejectReason::ok;
-        if (reason == "busy")
-            return services::FocRejectReason::busy;
-        if (reason == "controlModeMismatch")
-            return services::FocRejectReason::controlModeMismatch;
-        if (reason == "nvmFailed")
-            return services::FocRejectReason::nvmFailed;
+        if (reason == "ok" || reason == "success")
+            return services::CanAckStatus::success;
         if (reason == "invalidPayload")
-            return services::FocRejectReason::invalidPayload;
-        throw std::invalid_argument("Unknown reject reason: " + reason);
+            return services::CanAckStatus::invalidPayload;
+        if (reason == "invalidState")
+            return services::CanAckStatus::invalidState;
+        if (reason == "notImplemented")
+            return services::CanAckStatus::notImplemented;
+        if (reason == "busy" || reason == "controlModeMismatch" || reason == "modeMismatch" || reason == "nvmFailed" || reason == "persistenceFailed" || reason == "categoryError")
+            return services::CanAckStatus::categoryError;
+        throw std::invalid_argument("Unknown ack status: " + reason);
+    }
+
+    services::FocMotorCategoryError CategoryErrorFromString(const std::string& reason)
+    {
+        if (reason == "busy")
+            return services::FocMotorCategoryError::busy;
+        if (reason == "nvmFailed" || reason == "persistenceFailed")
+            return services::FocMotorCategoryError::persistenceFailed;
+        if (reason == "controlModeMismatch" || reason == "modeMismatch")
+            return services::FocMotorCategoryError::modeMismatch;
+        if (reason == "calibrationFailed")
+            return services::FocMotorCategoryError::calibrationFailed;
+        if (reason == "abortedByFault")
+            return services::FocMotorCategoryError::abortedByFault;
+        throw std::invalid_argument("Unknown category-error reason: " + reason);
     }
 
     void PopulateCoordinatorAccessor(StateMachineAccessor& accessor, ControlModeCoordinationFixture& fixture)
@@ -88,21 +103,33 @@ namespace
         {
             return fixture.coordinator->Active();
         };
-        accessor.wasCommandRejectedSent = [&fixture]() -> bool
+        accessor.wasCommandAckSent = [&fixture]() -> bool
         {
-            return fixture.commandRejectedSent;
+            return fixture.commandAckSent;
         };
         accessor.wasSelectResponseSent = [&fixture]() -> bool
         {
             return fixture.selectResponseSent;
         };
-        accessor.lastCommandRejectedReason = [&fixture]() -> services::FocRejectReason
+        accessor.lastCommandAckStatus = [&fixture]() -> services::CanAckStatus
         {
-            return fixture.lastCommandRejectedReason;
+            return fixture.lastCommandAckStatus;
         };
-        accessor.lastSelectResponseReason = [&fixture]() -> services::FocRejectReason
+        accessor.lastCommandAckMessageType = [&fixture]() -> uint8_t
         {
-            return fixture.lastSelectResponseReason;
+            return fixture.lastCommandAckMessageType;
+        };
+        accessor.wasCategoryErrorSent = [&fixture]() -> bool
+        {
+            return fixture.categoryErrorSent;
+        };
+        accessor.lastCategoryErrorReason = [&fixture]() -> services::FocMotorCategoryError
+        {
+            return fixture.lastCategoryErrorReason;
+        };
+        accessor.lastCategoryErrorOriginCmd = [&fixture]() -> uint8_t
+        {
+            return fixture.lastCategoryErrorOriginCmd;
         };
         accessor.nvmWriteCount = [&fixture]() -> std::size_t
         {
@@ -187,20 +214,32 @@ THEN(R"(a SelectControlModeResponse shall be emitted)")
 THEN(R"(a SelectControlModeResponse shall be emitted with reason {word})", (std::string reason))
 {
     const auto& accessor = context.Get<StateMachineAccessor>();
-    EXPECT_TRUE(accessor.wasSelectResponseSent());
-    EXPECT_EQ(accessor.lastSelectResponseReason(), ReasonFromString(reason));
+    const auto expected = StatusFromString(reason);
+    EXPECT_TRUE(accessor.wasCommandAckSent());
+    EXPECT_EQ(accessor.lastCommandAckStatus(), expected);
+    if (expected == services::CanAckStatus::success)
+        EXPECT_TRUE(accessor.wasSelectResponseSent());
+    else if (expected == services::CanAckStatus::categoryError)
+    {
+        EXPECT_TRUE(accessor.wasCategoryErrorSent());
+        EXPECT_EQ(accessor.lastCategoryErrorReason(), CategoryErrorFromString(reason));
+    }
 }
 
 THEN(R"(a CommandRejected frame shall be emitted with reason controlModeMismatch)")
 {
     const auto& accessor = context.Get<StateMachineAccessor>();
-    EXPECT_TRUE(accessor.wasCommandRejectedSent());
-    EXPECT_EQ(accessor.lastCommandRejectedReason(), services::FocRejectReason::controlModeMismatch);
+    EXPECT_TRUE(accessor.wasCommandAckSent());
+    EXPECT_EQ(accessor.lastCommandAckStatus(), services::CanAckStatus::categoryError);
+    EXPECT_TRUE(accessor.wasCategoryErrorSent());
+    EXPECT_EQ(accessor.lastCategoryErrorReason(), services::FocMotorCategoryError::modeMismatch);
 }
 
 THEN(R"(no CommandRejected frame shall be emitted)")
 {
-    EXPECT_FALSE(context.Get<StateMachineAccessor>().wasCommandRejectedSent());
+    const auto& accessor = context.Get<StateMachineAccessor>();
+    if (accessor.wasCommandAckSent())
+        EXPECT_EQ(accessor.lastCommandAckStatus(), services::CanAckStatus::success);
 }
 
 THEN(R"(no NVM write shall occur)")

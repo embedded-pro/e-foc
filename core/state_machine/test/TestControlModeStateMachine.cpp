@@ -20,10 +20,7 @@ namespace
 {
     using namespace testing;
 
-    using TestedControlMode = state_machine::ControlModeStateMachine<
-        foc::FocTorqueImpl,
-        foc::FocSpeedImpl,
-        foc::FocPositionImpl>;
+    using TestedControlMode = state_machine::ControlModeStateMachine;
 
     class ControlModeStateMachineTest
         : public ::testing::Test
@@ -111,7 +108,7 @@ namespace
                 application::TerminalAndTracer{ terminal, tracer },
                 application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
                 nvmMock,
-                application::CalibrationServices{ electricalIdentMock, alignmentMock, &mechIdentMock },
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
                 faultNotifierMock,
                 config,
                 TestedControlMode::OuterLoopArgs{
@@ -222,35 +219,22 @@ namespace
 
     // ---- C2: In-flight select guard ----
 
-    TEST_F(ControlModeStateMachineTest, Select_While_Previous_Select_Pending_Returns_Busy)
+    TEST_F(ControlModeStateMachineTest, Select_While_Previous_Select_Pending_Aborts)
     {
         GivenNvmAlwaysInvalid();
 
-        infra::Function<void(services::NvmStatus)> capturedNvmCallback;
         EXPECT_CALL(nvmMock, SaveConfig(_, _))
-            .WillOnce(Invoke([&capturedNvmCallback](const services::ConfigData&, infra::Function<void(services::NvmStatus)> cb)
+            .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)>)
                 {
-                    capturedNvmCallback = cb;
                 }));
 
         ConstructSubject();
 
-        state_machine::SelectResult firstResult{ state_machine::SelectResult::ok };
-        subject->Select(state_machine::ControlMode::speed, [&firstResult](state_machine::SelectResult r)
-            {
-                firstResult = r;
-            });
+        subject->Select(state_machine::ControlMode::speed, [](state_machine::SelectResult) {});
 
-        state_machine::SelectResult secondResult{ state_machine::SelectResult::ok };
-        subject->Select(state_machine::ControlMode::speed, [&secondResult](state_machine::SelectResult r)
-            {
-                secondResult = r;
-            });
-
-        EXPECT_EQ(secondResult, state_machine::SelectResult::busy);
-
-        capturedNvmCallback(services::NvmStatus::WriteFailed);
-        EXPECT_EQ(firstResult, state_machine::SelectResult::nvmFailed);
+        EXPECT_DEATH(
+            subject->Select(state_machine::ControlMode::speed, [](state_machine::SelectResult) {}),
+            ".*");
     }
 
     // ---- Additional helpers ----
@@ -589,7 +573,7 @@ namespace
         SetUpTorqueCalibrationCaptures();
         ConstructSubject();
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_Torque();
 
         EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
@@ -602,7 +586,7 @@ namespace
         SetUpTorqueCalibrationCaptures();
         ConstructSubject();
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_Torque();
 
         EXPECT_CALL(inverterMock, Start()).Times(1);
@@ -621,7 +605,7 @@ namespace
         SetUpTorqueCalibrationCaptures();
         ConstructSubject();
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_Torque();
 
         EXPECT_CALL(inverterMock, Start()).Times(1);
@@ -647,7 +631,7 @@ namespace
         ConstructSubject();
         subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_WithMechIdent();
 
         EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
@@ -662,7 +646,7 @@ namespace
         ConstructSubject();
         subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_WithMechIdent();
 
         EXPECT_CALL(inverterMock, Start()).Times(1);
@@ -683,7 +667,7 @@ namespace
         ConstructSubject();
         subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_WithMechIdent();
 
         EXPECT_CALL(inverterMock, Start()).Times(1);
@@ -707,7 +691,7 @@ namespace
         ConstructSubject();
         subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_WithMechIdent();
 
         EXPECT_CALL(inverterMock, Start()).Times(1);
@@ -729,7 +713,7 @@ namespace
         ConstructSubject();
         subject->Select(state_machine::ControlMode::position, [](auto) {});
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_WithMechIdent();
 
         EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
@@ -744,7 +728,7 @@ namespace
         ConstructSubject();
         subject->Select(state_machine::ControlMode::position, [](auto) {});
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_WithMechIdent();
 
         EXPECT_CALL(inverterMock, Start()).Times(1);
@@ -765,7 +749,7 @@ namespace
         ConstructSubject();
         subject->Select(state_machine::ControlMode::position, [](auto) {});
 
-        subject->ActiveStateMachine().CmdCalibrate();
+        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
         CompleteCalibration_WithMechIdent();
 
         EXPECT_CALL(inverterMock, Start()).Times(1);
@@ -779,5 +763,47 @@ namespace
         subject->ActiveStateMachine().CmdClearFault();
         EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
             subject->ActiveStateMachine().CurrentState()));
+    }
+
+    // ---- TrySet*PidGains: accepted by matching mode(s) ----
+
+    TEST_F(ControlModeStateMachineExtTest, TrySetCurrentPidGains_AcceptedInTorqueMode)
+    {
+        GivenNvmAlwaysInvalid();
+        ConstructSubject();
+
+        EXPECT_TRUE(subject->TrySetCurrentPidGains(services::FocPidGains{ 100, 10, 0 }));
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, TrySetSpeedPidGains_RejectedInTorqueMode)
+    {
+        GivenNvmAlwaysInvalid();
+        ConstructSubject();
+
+        EXPECT_FALSE(subject->TrySetSpeedPidGains(services::FocPidGains{ 100, 10, 0 }));
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, TrySetSpeedPidGains_AcceptedInSpeedMode)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigSucceeds();
+        ConstructSubject();
+
+        subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+        EXPECT_TRUE(subject->TrySetSpeedPidGains(services::FocPidGains{ 100, 10, 0 }));
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, TrySetPositionPidGains_AcceptedOnlyInPositionMode)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigSucceeds();
+        ConstructSubject();
+
+        EXPECT_FALSE(subject->TrySetPositionPidGains(services::FocPidGains{ 100, 10, 0 }));
+
+        subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+        EXPECT_TRUE(subject->TrySetPositionPidGains(services::FocPidGains{ 100, 10, 0 }));
     }
 }

@@ -13,6 +13,3 @@ target_link_libraries(e_foc.sync_foc_sensored.instantiations INTERFACE
     services.peripheral
 )
 
-target_sources(e_foc.sync_foc_sensored.instantiations INTERFACE
-    LogicWithOuterLoop.hpp
-)

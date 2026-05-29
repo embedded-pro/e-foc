@@ -266,6 +266,26 @@ namespace
         ForwardTime(std::chrono::seconds(4));
     }
 
+    TEST_F(TestCanCommandClient, command_ack_frame_forwards_to_observer_and_keeps_busy_false)
+    {
+        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnCommandAck(focMotorCategoryId, focStartId, CanAckStatus::success));
+
+        hal::Can::Message ackPayload;
+        ackPayload.push_back(focMotorCategoryId);
+        ackPayload.push_back(focStartId);
+        ackPayload.push_back(static_cast<uint8_t>(CanAckStatus::success));
+
+        auto canId = hal::Can::Id::Create29BitId(
+            MakeCanId(CanPriority::response,
+                canSystemCategoryId,
+                canCommandAckMessageTypeId,
+                1));
+        receiveCallback(canId, ackPayload);
+
+        EXPECT_FALSE(client.IsBusy());
+    }
+
     // ---------- Telemetry ----------
 
     TEST_F(TestCanCommandClient, telemetry_status_notifies_motor_status_and_speed_position)
@@ -391,15 +411,14 @@ namespace
 
     // ---------- SelectControlModeResponse forwarding ----------
 
-    TEST_F(TestCanCommandClient, select_control_mode_response_ok_notifies_control_mode_acknowledged)
+    TEST_F(TestCanCommandClient, select_control_mode_response_notifies_control_mode_acknowledged)
     {
         EXPECT_CALL(observer, OnConnectionChanged(true));
-        EXPECT_CALL(observer, OnControlModeAcknowledged(FocMotorMode::speed, FocRejectReason::ok));
+        EXPECT_CALL(observer, OnControlModeAcknowledged(FocMotorMode::speed));
 
         hal::Can::Message data;
-        data.resize(2, 0);
+        data.resize(1, 0);
         data[0] = static_cast<uint8_t>(FocMotorMode::speed);
-        data[1] = static_cast<uint8_t>(FocRejectReason::ok);
 
         auto canId = hal::Can::Id::Create29BitId(
             MakeCanId(CanPriority::response,
@@ -407,64 +426,6 @@ namespace
                 focSelectControlModeResponseId,
                 1));
         receiveCallback(canId, data);
-    }
-
-    TEST_F(TestCanCommandClient, select_control_mode_response_rejected_notifies_acknowledged_with_reason)
-    {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
-        EXPECT_CALL(observer, OnControlModeAcknowledged(FocMotorMode::speed, FocRejectReason::busy));
-
-        hal::Can::Message data;
-        data.resize(2, 0);
-        data[0] = static_cast<uint8_t>(FocMotorMode::speed);
-        data[1] = static_cast<uint8_t>(FocRejectReason::busy);
-
-        auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::response,
-                focMotorCategoryId,
-                focSelectControlModeResponseId,
-                1));
-        receiveCallback(canId, data);
-    }
-
-    // ---------- CommandRejectedResponse forwarding ----------
-
-    TEST_F(TestCanCommandClient, command_rejected_response_notifies_observer)
-    {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
-        EXPECT_CALL(observer, OnCommandRejected(0x10u, FocRejectReason::controlModeMismatch));
-
-        hal::Can::Message data;
-        data.resize(2, 0);
-        data[0] = 0x10;
-        data[1] = static_cast<uint8_t>(FocRejectReason::controlModeMismatch);
-
-        auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::response,
-                focMotorCategoryId,
-                focCommandRejectedResponseId,
-                1));
-        receiveCallback(canId, data);
-    }
-
-    TEST_F(TestCanCommandClient, command_rejected_response_leaves_client_not_busy)
-    {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
-        EXPECT_CALL(observer, OnCommandRejected(_, _));
-
-        hal::Can::Message data;
-        data.resize(2, 0);
-        data[0] = 0x01;
-        data[1] = static_cast<uint8_t>(FocRejectReason::busy);
-
-        auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::response,
-                focMotorCategoryId,
-                focCommandRejectedResponseId,
-                1));
-        receiveCallback(canId, data);
-
-        EXPECT_FALSE(client.IsBusy());
     }
 
     // ---------- Encoding: torque setpoint uses focCurrentScale ----------
@@ -503,6 +464,40 @@ namespace
         ASSERT_EQ(capturedData.size(), 3u);
         EXPECT_EQ(capturedData[1], 0x7Fu); // high byte of INT16_MAX
         EXPECT_EQ(capturedData[2], 0xFFu); // low  byte of INT16_MAX
+    }
+
+    TEST_F(TestCanCommandClient, send_speed_setpoint_overrange_negative_wire_value_clamped_to_int16_min)
+    {
+        hal::Can::Message capturedData;
+        EXPECT_CALL(adapter, SendData(_, _, _))
+            .WillOnce(Invoke([&capturedData](hal::Can::Id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
+                {
+                    capturedData = msg;
+                    cb(true);
+                }));
+
+        client.SendSetSpeedSetpoint(-100000.0f); // -100000 * 10 = -1000000 < INT16_MIN → clamped to -32768 = 0x8000
+
+        ASSERT_EQ(capturedData.size(), 3u);
+        EXPECT_EQ(capturedData[1], 0x80u); // high byte of INT16_MIN
+        EXPECT_EQ(capturedData[2], 0x00u); // low  byte of INT16_MIN
+    }
+
+    TEST_F(TestCanCommandClient, send_position_setpoint_encodes_with_correct_scale)
+    {
+        hal::Can::Message capturedData;
+        EXPECT_CALL(adapter, SendData(_, _, _))
+            .WillOnce(Invoke([&capturedData](hal::Can::Id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
+                {
+                    capturedData = msg;
+                    cb(true);
+                }));
+
+        client.SendSetPositionSetpoint(0.1f); // 0.1 * focPositionScale(1000) = 100 = 0x0064
+
+        ASSERT_EQ(capturedData.size(), 3u);
+        EXPECT_EQ(capturedData[1], 0x00u); // high byte of 100
+        EXPECT_EQ(capturedData[2], 0x64u); // low  byte of 100
     }
 
     // ---------- Adapter send failure: busy stays true ----------
