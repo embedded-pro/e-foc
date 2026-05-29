@@ -127,7 +127,7 @@ namespace application
         GetFocControl().Stop();
 
         const bool wasActive = std::holds_alternative<state_machine::Enabled>(currentState) ||
-            std::holds_alternative<state_machine::Calibrating>(currentState);
+                               std::holds_alternative<state_machine::Calibrating>(currentState);
 
         CompletePendingCommand(state_machine::CommandResult::abortedByFault);
 

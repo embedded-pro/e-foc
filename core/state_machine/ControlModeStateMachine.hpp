@@ -67,6 +67,7 @@ namespace state_machine
         std::variant<std::monostate,
             application::TorqueStateMachine,
             application::SpeedStateMachine,
-            application::PositionStateMachine> activeSm;
+            application::PositionStateMachine>
+            activeSm;
     };
 }
