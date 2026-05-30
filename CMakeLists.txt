@@ -7,7 +7,7 @@ endif()
 option(CMAKE_COMPILE_WARNING_AS_ERROR "Enable warnings-as-error" On)
 option(E_FOC_INCLUDE_DEFAULT_INIT "Include default initialization code; turn off when providing custom initialization" On)
 option(E_FOC_BUILD_TESTS "Enable build of the examples" Off)
-
+option(E_FOC_EMBEDDED_BUILD "Building for an embedded target" Off)
 
 if (E_FOC_BUILD_TESTS)
     set(BUILD_TESTING On)
@@ -93,8 +93,10 @@ endif()
 
 set(E_FOC_CLANGFORMAT_DIRS core targets)
 
-add_subdirectory(tools)
-list(APPEND E_FOC_CLANGFORMAT_DIRS tools)
+if (NOT E_FOC_EMBEDDED_BUILD)
+    add_subdirectory(tools)
+    list(APPEND E_FOC_CLANGFORMAT_DIRS tools)
+endif()
 
 
 emil_clangformat_directories(e_foc DIRECTORIES ${E_FOC_CLANGFORMAT_DIRS})

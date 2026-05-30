@@ -16,7 +16,8 @@
                 "CMAKE_COMPILE_WARNING_AS_ERROR": "On",
                 "CMAKE_C_COMPILER_LAUNCHER": "ccache",
                 "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
-                "E_FOC_AUTO_TRANSITION_POLICY": false
+                "E_FOC_AUTO_TRANSITION_POLICY": false,
+                "E_FOC_EMBEDDED_BUILD": false
             }
         },
         {
@@ -86,7 +87,8 @@
                 "EMIL_GENERATE_PACKAGE_CONFIG": false,
                 "EMIL_INCLUDE_SEGGER_RTT": "On",
                 "EMIL_SEGGER_RTT_BUFFER_SIZE_UP": "2048",
-                "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": true
+                "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": true,
+                "E_FOC_EMBEDDED_BUILD": true
             },
             "generator": "Ninja Multi-Config"
         },
