@@ -149,6 +149,7 @@ jobs:
     name: Embedded Build
     runs-on: ubuntu-latest
     container: gabrielfrasantos/embedded-devcontainer-cpp:v7.1.0@sha256:b52d8527953ea8ee5c71c8b3b26c213dc61fc5c407ce0b387602f1740141b629
+    needs: [host_build_test_ubuntu, host_build_test]
     strategy:
       matrix:
         configuration: ["RelWithDebInfo"]
