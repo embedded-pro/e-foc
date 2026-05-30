@@ -63,6 +63,12 @@ if (E_FOC_BUILD_TESTS)
         GIT_TAG        v4.0.0
     )
     FetchContent_MakeAvailable(cucumber_cpp)
+
+    # cucumber_gherkin uses std::wstring_convert which is deprecated in C++17/GCC15.
+    # Suppress -Werror=deprecated-declarations for this third-party target only.
+    if (TARGET cucumber_cpp.library.api)
+        target_compile_options(cucumber_cpp.library.api PRIVATE -Wno-deprecated-declarations)
+    endif()
 endif()
 
 add_subdirectory(infra/can-lite)
@@ -87,10 +93,9 @@ endif()
 
 set(E_FOC_CLANGFORMAT_DIRS core targets)
 
-if (NOT CMAKE_CROSSCOMPILING)
-    add_subdirectory(tools)
-    list(APPEND E_FOC_CLANGFORMAT_DIRS tools)
-endif()
+add_subdirectory(tools)
+list(APPEND E_FOC_CLANGFORMAT_DIRS tools)
+
 
 emil_clangformat_directories(e_foc DIRECTORIES ${E_FOC_CLANGFORMAT_DIRS})
 emil_folderize_all_targets()
