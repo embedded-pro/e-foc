@@ -18,7 +18,7 @@ jobs:
   sonar:
     name: SonarCloud
     runs-on: ubuntu-latest
-    container: gabrielfrasantos/embedded-devcontainer-cpp:latest@sha256:bd4f1eb7556fad821b0a2f5ba7326fed5c19c88b4ee8475ae8f8db21e7c09b64 # 5.1.4
+    container: gabrielfrasantos/embedded-devcontainer-cpp:v7.2.0@sha256:e8a23c738637da0009ab5f9d73488c5e27e6309d4f577082368dacfab49d0cf5
     env:
       SONAR_SCANNER_VERSION: 5.0.1.3006
       SONAR_SERVER_URL: "https://sonarcloud.io"
@@ -45,8 +45,7 @@ jobs:
           save: ${{ github.ref == 'refs/heads/main' }}
       - name: Build & Collect Coverage
         run: |
-          apt-get update && apt-get install -y --no-install-recommends qt6-base-dev libgl1-mesa-dev
-          cmake --preset coverage -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake --preset coverage
           cmake --build --preset coverage
           GTEST_OUTPUT="xml:${PWD}/testresults/" ctest --preset coverage
           gcovr --sonarqube=coverage.xml --exclude-lines-by-pattern '.*assert\(.*\);|.*really_assert\(.*\);|.*std::abort();' --exclude-unreachable-branches --exclude-throw-branches -j 2 --exclude=.*/generated/.* --exclude=.*/examples/.* --exclude=.*/tracing/.* --exclude=.*/test/.*

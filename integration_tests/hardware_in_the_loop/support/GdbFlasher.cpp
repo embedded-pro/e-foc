@@ -6,9 +6,14 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#ifdef _WIN32
+#include <io.h>
+#include <windows.h>
+#else
 #include <sys/wait.h>
-#include <thread>
 #include <unistd.h>
+#endif
+#include <thread>
 
 namespace hil
 {
@@ -20,18 +25,28 @@ namespace hil
 
             ScopedTempFile()
             {
+#ifdef _WIN32
+                char tempDir[MAX_PATH];
+                char buffer[MAX_PATH];
+                if (GetTempPathA(MAX_PATH, tempDir) == 0)
+                    throw std::runtime_error{ "GetTempPathA failed" };
+                if (GetTempFileNameA(tempDir, "efoc_hil_gdb", 0, buffer) == 0)
+                    throw std::runtime_error{ "GetTempFileNameA failed" };
+                path = buffer;
+#else
                 char buffer[] = "/tmp/efoc_hil_gdbXXXXXX";
                 const int fd = ::mkstemp(buffer);
                 if (fd < 0)
                     throw std::runtime_error{ std::string{ "mkstemp failed: " } + std::strerror(errno) };
                 ::close(fd);
                 path = buffer;
+#endif
             }
 
             ~ScopedTempFile()
             {
                 if (!path.empty())
-                    ::unlink(path.c_str());
+                    std::remove(path.c_str());
             }
         };
 
@@ -67,7 +82,11 @@ namespace hil
         int RunAndCapture(const std::string& command, std::string& outOutput)
         {
             outOutput.clear();
+#ifdef _WIN32
+            std::FILE* pipe = ::_popen(command.c_str(), "r");
+#else
             std::FILE* pipe = ::popen(command.c_str(), "r");
+#endif
             if (pipe == nullptr)
                 throw std::runtime_error{ "popen failed for: " + command };
 
@@ -75,13 +94,17 @@ namespace hil
             while (std::fgets(buffer.data(), static_cast<int>(buffer.size()), pipe) != nullptr)
                 outOutput += buffer.data();
 
+#ifdef _WIN32
+            const int rc = ::_pclose(pipe);
+            return rc;
+#else
             const int rc = ::pclose(pipe);
             if (rc < 0)
                 throw std::runtime_error{ "pclose failed for: " + command };
-
             if (WIFEXITED(rc))
                 return WEXITSTATUS(rc);
             return -1;
+#endif
         }
     }
 

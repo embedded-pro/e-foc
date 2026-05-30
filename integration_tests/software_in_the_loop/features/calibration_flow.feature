@@ -2,7 +2,7 @@ Feature: FOC Motor Calibration Flow
   The calibration sequence estimates pole pairs, resistance/inductance, and
   encoder alignment offset, then persists the result to non-volatile memory.
 
-  # REQ-SM-003, REQ-SM-004, REQ-SM-011
+  @REQ-SM-003 @REQ-SM-004 @REQ-SM-011
   Scenario: Full calibration sequence succeeds and transitions state machine to Ready
     Given the system is initialised with no valid calibration data
     And calibration service expectations are configured
@@ -12,7 +12,7 @@ Feature: FOC Motor Calibration Flow
     And the alignment estimation completes with offset 0 radians
     Then the state machine shall be in the Ready state
 
-  # REQ-SM-005: calibration failure → Fault
+  @REQ-SM-005
   Scenario: Calibration fails when pole-pairs estimation returns no result
     Given the system is initialised with no valid calibration data
     And calibration service expectations are configured

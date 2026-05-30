@@ -2,10 +2,15 @@
 #include "integration_tests/hardware_in_the_loop/support/SerialLogger.hpp"
 #include "integration_tests/hardware_in_the_loop/support/Timeouts.hpp"
 #include "tools/hardware_bridge/client/common/ParseIPv4.hpp"
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
 #include <arpa/inet.h>
+#include <netdb.h>
+#endif
 #include <chrono>
 #include <cstring>
-#include <netdb.h>
 #include <sstream>
 #include <stdexcept>
 
