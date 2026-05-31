@@ -29,6 +29,7 @@
                 "E_FOC_TARGET_PLATFORM": "host",
                 "E_FOC_BUILD_TESTS": true,
                 "E_FOC_BUILD_HIL_TESTS": true,
+                "E_FOC_BUILD_SIMULATOR": true,
                 "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": false
             },
             "generator": "Ninja Multi-Config"
