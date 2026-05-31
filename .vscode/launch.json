@@ -155,11 +155,8 @@
                 }
             ]
         }
-      ],
-      "externalConsole": false,
-      "MIMode": "gdb",
-      "miDebuggerPath": "/usr/bin/gdb",
-      "setupCommands": [
+    ],
+    "inputs": [
         {
             "id": "boardType",
             "type": "pickString",
