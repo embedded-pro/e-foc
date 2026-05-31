@@ -1,3 +1,6 @@
+if(NOT E_FOC_TARGET_PLATFORM STREQUAL "host")
+    add_subdirectory(platform_implementations/motor_boards)
+endif()
 add_subdirectory(platform_implementations/${E_FOC_TARGET_PLATFORM})
 add_subdirectory(platform_implementations/error_handling_cortex_m)
 

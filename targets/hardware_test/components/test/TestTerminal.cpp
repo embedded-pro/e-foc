@@ -1,11 +1,10 @@
+#include "core/platform_abstraction/test_doubles/CanBusAdapterMock.hpp"
 #include "foc/interfaces/Driver.hpp"
 #include "hal/interfaces/test_doubles/EepromMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
 #include "infra/stream/test/StreamMock.hpp"
 #include "infra/util/test_helper/MockHelpers.hpp"
-#include "infra/util/test_helper/ProxyCreatorMock.hpp"
-#include "platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "targets/hardware_test/components/Terminal.hpp"
 #include "gmock/gmock.h"
@@ -24,67 +23,31 @@ namespace
         MOCK_METHOD(hal::PerformanceTracker&, PerformanceTimer, (), (override));
         MOCK_METHOD(hal::Hertz, SystemClock, (), (const, override));
         MOCK_METHOD(foc::Volts, PowerSupplyVoltage, (), (override));
-        MOCK_METHOD(foc::Ampere, MaxCurrentSupported, (), (override));
-        MOCK_METHOD((foc::LowPriorityInterrupt&), LowPriorityInterrupt, (), (override));
-        MOCK_METHOD((infra::CreatorBase<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds, hal::Hertz)>&), SynchronousThreeChannelsPwmCreator, (), (override));
-        MOCK_METHOD((infra::CreatorBase<application::AdcPhaseCurrentMeasurement, void(SampleAndHold)>&), AdcMultiChannelCreator, (), (override));
-        MOCK_METHOD((infra::CreatorBase<application::QuadratureEncoderDecorator, void()>&), SynchronousQuadratureEncoderCreator, (), (override));
-        MOCK_METHOD((infra::CreatorBase<application::CanBusAdapter, void(uint32_t, bool)>&), CanBusCreator, (), (override));
+        MOCK_METHOD(foc::LowPriorityInterrupt&, LowPriorityInterrupt, (), (override));
         MOCK_METHOD(hal::Eeprom&, Eeprom, (), (override));
+        MOCK_METHOD(void, RegisterBoardProtection, (const infra::Function<void(application::PlatformFactory::BoardProtectionReason)>&), (override));
         MOCK_METHOD(void, Reset, (), (override));
         MOCK_METHOD(application::ResetCause, GetResetCause, (), (const, override));
         MOCK_METHOD(infra::BoundedConstString, FaultStatus, (), (const, override));
-    };
 
-    class PwmMock
-        : public hal::SynchronousThreeChannelsPwm
-    {
-    public:
-        MOCK_METHOD(void, SetBaseFrequency, (hal::Hertz baseFrequency), (override));
+        // Configuration
+        MOCK_METHOD(void, ConfigureAdcAndPwm, (hal::Hertz, std::chrono::nanoseconds, SampleAndHold), (override));
+        MOCK_METHOD(void, SetEncoderResolution, (uint32_t), (override));
+        MOCK_METHOD(void, ConfigureCanBus, (uint32_t, bool), (override));
+        MOCK_METHOD(application::CanBusAdapter&, CanBus, (), (override));
+
+        // ThreePhaseInverter
+        MOCK_METHOD(void, PhaseCurrentsReady, (hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>&), (override));
+        MOCK_METHOD(void, ThreePhasePwmOutput, (const foc::PhasePwmDutyCycles&), (override));
+        MOCK_METHOD(void, Start, (), (override));
         MOCK_METHOD(void, Stop, (), (override));
-        MOCK_METHOD(void, Start, (hal::Percent dutyCycle1, hal::Percent dutyCycle2, hal::Percent dutyCycle3), (override));
-    };
+        MOCK_METHOD(hal::Hertz, BaseFrequency, (), (const, override));
+        MOCK_METHOD(foc::Ampere, MaxCurrentSupported, (), (const, override));
 
-    class AdcMock
-        : public hal::AdcMultiChannel
-    {
-    public:
-        MOCK_METHOD(void, Measure, (const infra::Function<void(Samples)>& onDone), (override));
-        MOCK_METHOD(void, Stop, (), (override));
-    };
-
-    class EncoderMock
-        : public hal::SynchronousQuadratureEncoder
-    {
-    public:
-        MOCK_METHOD(uint32_t, Position, (), (override));
-        MOCK_METHOD(uint32_t, Resolution, (), (override));
-        MOCK_METHOD(MotionDirection, Direction, (), (override));
-        MOCK_METHOD(uint32_t, Speed, (), (override));
-    };
-
-    class AdcPhaseCurrentMeasurementMock
-        : public application::AdcPhaseCurrentMeasurement
-    {
-    public:
-        MOCK_METHOD(void, Measure, ((const infra::Function<void(foc::Ampere phaseA, foc::Ampere phaseB, foc::Ampere phaseC)>& onDone)), (override));
-        MOCK_METHOD(void, Stop, (), (override));
-    };
-
-    class QuadratureEncoderDecoratorMock
-        : public application::QuadratureEncoderDecorator
-    {
-    public:
+        // Encoder
         MOCK_METHOD(foc::Radians, Read, (), (override));
-    };
-
-    class CanBusAdapterMock
-        : public application::CanBusAdapter
-    {
-    public:
-        MOCK_METHOD(void, SendData, (Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion), (override));
-        MOCK_METHOD(void, ReceiveData, (const infra::Function<void(Id id, const Message& data)>& receivedAction), (override));
-        MOCK_METHOD(void, SetOnError, (const infra::Function<void(CanError)>& handler), (override));
+        MOCK_METHOD(void, Set, (foc::Radians), (override));
+        MOCK_METHOD(void, SetZero, (), (override));
     };
 
     class PerformanceTrackerMock
@@ -123,10 +86,6 @@ namespace
         {
             EXPECT_CALL(platformFactoryMock, Terminal()).WillRepeatedly(testing::ReturnRef(terminalWithCommands));
             EXPECT_CALL(platformFactoryMock, Tracer()).WillRepeatedly(testing::ReturnRef(tracer));
-            EXPECT_CALL(platformFactoryMock, SynchronousThreeChannelsPwmCreator()).WillRepeatedly(testing::ReturnRef(pwmCreator));
-            EXPECT_CALL(platformFactoryMock, AdcMultiChannelCreator()).WillRepeatedly(testing::ReturnRef(adcCreator));
-            EXPECT_CALL(platformFactoryMock, SynchronousQuadratureEncoderCreator()).WillRepeatedly(testing::ReturnRef(encoderCreator));
-            EXPECT_CALL(platformFactoryMock, CanBusCreator()).WillRepeatedly(testing::ReturnRef(canCreator));
             EXPECT_CALL(platformFactoryMock, PerformanceTimer()).WillRepeatedly(testing::ReturnRef(performanceTrackerMock));
             EXPECT_CALL(platformFactoryMock, PowerSupplyVoltage()).WillRepeatedly(testing::Return(foc::Volts{ 24.0f }));
             EXPECT_CALL(platformFactoryMock, MaxCurrentSupported()).WillRepeatedly(testing::Return(foc::Ampere{ 5.0f }));
@@ -136,20 +95,15 @@ namespace
             EXPECT_CALL(platformFactoryMock, GetResetCause()).WillRepeatedly(testing::Return(application::ResetCause::powerUp));
             EXPECT_CALL(platformFactoryMock, FaultStatus()).WillRepeatedly(testing::Return(infra::BoundedConstString{}));
 
-            EXPECT_CALL(encoderCreator, Constructed());
-            EXPECT_CALL(pwmCreator, Constructed(std::chrono::nanoseconds{ 500 }, hal::Hertz{ 10000 }));
-            EXPECT_CALL(adcCreator, Constructed(application::PlatformFactory::SampleAndHold::shortest));
-
-            EXPECT_CALL(adcDecoratorMock, Measure(testing::_)).WillRepeatedly(testing::SaveArg<0>(&onAdcMeasurementDone));
+            EXPECT_CALL(platformFactoryMock, SetEncoderResolution(4000)).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::shortest)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillRepeatedly(testing::SaveArg<1>(&onPhaseCurrentsReady));
 
             terminalInteractor.emplace(terminal, platformFactoryMock);
         }
 
         ~TestHardwareTerminal()
         {
-            EXPECT_CALL(encoderCreator, Destructed()).Times(1);
-            EXPECT_CALL(pwmCreator, Destructed()).Times(testing::AtLeast(1));
-            EXPECT_CALL(adcCreator, Destructed()).Times(testing::AtLeast(1));
         }
 
         testing::StrictMock<PlatformFactoryMock> platformFactoryMock;
@@ -165,22 +119,12 @@ namespace
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
         services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
-        testing::StrictMock<PwmMock> pwmMock;
-        testing::StrictMock<AdcMock> adcMock;
-        testing::StrictMock<EncoderMock> encoderMock;
         testing::StrictMock<PerformanceTrackerMock> performanceTrackerMock;
-        testing::StrictMock<AdcPhaseCurrentMeasurementMock> adcDecoratorMock;
-        testing::StrictMock<QuadratureEncoderDecoratorMock> encoderDecoratorMock;
         testing::StrictMock<hal::CleanEepromMock> eepromMock;
-
-        infra::CreatorMock<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds, hal::Hertz)> pwmCreator{ pwmMock };
-        infra::CreatorMock<application::AdcPhaseCurrentMeasurement, void(application::PlatformFactory::SampleAndHold)> adcCreator{ adcDecoratorMock };
-        infra::CreatorMock<application::QuadratureEncoderDecorator, void()> encoderCreator{ encoderDecoratorMock };
-        testing::StrictMock<CanBusAdapterMock> canAdapterMock;
-        infra::CreatorMock<application::CanBusAdapter, void(uint32_t, bool)> canCreator{ canAdapterMock };
+        testing::StrictMock<application::CanBusAdapterMock> canAdapterMock;
 
         std::optional<application::TerminalInteractor> terminalInteractor;
-        infra::Function<void(foc::Ampere, foc::Ampere, foc::Ampere)> onAdcMeasurementDone;
+        infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
 
         void InvokeCommand(std::string command, const std::function<void()>& onCommandReceived)
         {
@@ -218,7 +162,7 @@ TEST_F(TestHardwareTerminal, stop_command)
 {
     InvokeCommand("stop", [this]()
         {
-            EXPECT_CALL(pwmMock, Stop());
+            EXPECT_CALL(platformFactoryMock, Stop());
         });
 
     ExecuteAllActions();
@@ -228,7 +172,7 @@ TEST_F(TestHardwareTerminal, stop_alias)
 {
     InvokeCommand("stp", [this]()
         {
-            EXPECT_CALL(pwmMock, Stop());
+            EXPECT_CALL(platformFactoryMock, Stop());
         });
 
     ExecuteAllActions();
@@ -238,7 +182,7 @@ TEST_F(TestHardwareTerminal, duty_command)
 {
     InvokeCommand("duty 10 20 30", [this]()
         {
-            EXPECT_CALL(pwmMock, Start(hal::Percent{ 10 }, hal::Percent{ 20 }, hal::Percent{ 30 }));
+            EXPECT_CALL(platformFactoryMock, ThreePhasePwmOutput(testing::_));
         });
 
     ExecuteAllActions();
@@ -248,7 +192,7 @@ TEST_F(TestHardwareTerminal, duty_alias)
 {
     InvokeCommand("d 15 25 35", [this]()
         {
-            EXPECT_CALL(pwmMock, Start(hal::Percent{ 15 }, hal::Percent{ 25 }, hal::Percent{ 35 }));
+            EXPECT_CALL(platformFactoryMock, ThreePhasePwmOutput(testing::_));
         });
 
     ExecuteAllActions();
@@ -276,8 +220,8 @@ TEST_F(TestHardwareTerminal, pwm_command)
 {
     InvokeCommand("pwm 500 10000", [this]()
         {
-            EXPECT_CALL(pwmCreator, Destructed()).Times(1);
-            EXPECT_CALL(pwmCreator, Constructed(std::chrono::nanoseconds{ 500 }, hal::Hertz{ 10000 })).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillRepeatedly(testing::SaveArg<1>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -287,8 +231,8 @@ TEST_F(TestHardwareTerminal, pwm_alias)
 {
     InvokeCommand("p 750 15000", [this]()
         {
-            EXPECT_CALL(pwmCreator, Destructed()).Times(1);
-            EXPECT_CALL(pwmCreator, Constructed(std::chrono::nanoseconds{ 750 }, hal::Hertz{ 15000 })).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 15000 }, std::chrono::nanoseconds{ 750 }, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillRepeatedly(testing::SaveArg<1>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -298,8 +242,9 @@ TEST_F(TestHardwareTerminal, adc_command)
 {
     InvokeCommand("adc medium", [this]()
         {
-            EXPECT_CALL(adcCreator, Constructed(application::PlatformFactory::SampleAndHold::medium)).Times(1);
-            EXPECT_CALL(adcDecoratorMock, Measure(testing::_)).Times(1);
+            ::testing::InSequence _;
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::medium)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -309,8 +254,9 @@ TEST_F(TestHardwareTerminal, adc_alias)
 {
     InvokeCommand("a shortest", [this]()
         {
-            EXPECT_CALL(adcCreator, Constructed(application::PlatformFactory::SampleAndHold::shortest)).Times(1);
-            EXPECT_CALL(adcDecoratorMock, Measure(testing::_)).Times(1);
+            ::testing::InSequence _;
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::shortest)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -848,8 +794,9 @@ TEST_F(TestHardwareTerminal, adc_shorter)
 {
     InvokeCommand("adc shorter", [this]()
         {
-            EXPECT_CALL(adcCreator, Constructed(application::PlatformFactory::SampleAndHold::shorter)).Times(1);
-            EXPECT_CALL(adcDecoratorMock, Measure(testing::_)).Times(1);
+            ::testing::InSequence _;
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::shorter)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -859,8 +806,9 @@ TEST_F(TestHardwareTerminal, adc_longer)
 {
     InvokeCommand("adc longer", [this]()
         {
-            EXPECT_CALL(adcCreator, Constructed(application::PlatformFactory::SampleAndHold::longer)).Times(1);
-            EXPECT_CALL(adcDecoratorMock, Measure(testing::_)).Times(1);
+            ::testing::InSequence _;
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::longer)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -870,8 +818,9 @@ TEST_F(TestHardwareTerminal, adc_longest)
 {
     InvokeCommand("adc longest", [this]()
         {
-            EXPECT_CALL(adcCreator, Constructed(application::PlatformFactory::SampleAndHold::longest)).Times(1);
-            EXPECT_CALL(adcDecoratorMock, Measure(testing::_)).Times(1);
+            ::testing::InSequence _;
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::longest)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -1061,8 +1010,8 @@ TEST_F(TestHardwareTerminal, pwm_boundary_values_valid)
 {
     InvokeCommand("pwm 2000 20000", [this]()
         {
-            EXPECT_CALL(pwmCreator, Destructed()).Times(1);
-            EXPECT_CALL(pwmCreator, Constructed(std::chrono::nanoseconds{ 2000 }, hal::Hertz{ 20000 })).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 20000 }, std::chrono::nanoseconds{ 2000 }, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillRepeatedly(testing::SaveArg<1>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -1072,7 +1021,7 @@ TEST_F(TestHardwareTerminal, duty_boundary_values_valid)
 {
     InvokeCommand("duty 1 50 99", [this]()
         {
-            EXPECT_CALL(pwmMock, Start(hal::Percent{ 1 }, hal::Percent{ 50 }, hal::Percent{ 99 }));
+            EXPECT_CALL(platformFactoryMock, ThreePhasePwmOutput(testing::_));
         });
 
     ExecuteAllActions();
@@ -1080,54 +1029,45 @@ TEST_F(TestHardwareTerminal, duty_boundary_values_valid)
 
 TEST_F(TestHardwareTerminal, adc_samples_stored_when_buffer_not_full)
 {
-    foc::Ampere phaseA{ 1.0f };
-    foc::Ampere phaseB{ 2.0f };
-    foc::Ampere phaseC{ 3.0f };
-
-    onAdcMeasurementDone(phaseA, phaseB, phaseC);
+    onPhaseCurrentsReady(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ 2.0f }, foc::Ampere{ 3.0f } });
 
     ExecuteAllActions();
 }
 
 TEST_F(TestHardwareTerminal, adc_buffer_full_triggers_processing)
 {
-    foc::Ampere phaseA{ 1.0f };
-    foc::Ampere phaseB{ 2.0f };
-    foc::Ampere phaseC{ 3.0f };
+    foc::PhaseCurrents phases{ foc::Ampere{ 1.0f }, foc::Ampere{ 2.0f }, foc::Ampere{ 3.0f } };
 
     for (std::size_t i = 0; i < 100; ++i)
-        onAdcMeasurementDone(phaseA, phaseB, phaseC);
+        onPhaseCurrentsReady(phases);
 
-    EXPECT_CALL(adcDecoratorMock, Stop()).Times(1);
-    EXPECT_CALL(adcCreator, Destructed()).Times(1);
     EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+    EXPECT_CALL(platformFactoryMock, Stop());
 
-    onAdcMeasurementDone(phaseA, phaseB, phaseC);
+    onPhaseCurrentsReady(phases);
 
     ExecuteAllActions();
 }
 
 TEST_F(TestHardwareTerminal, adc_reconfigure_after_buffer_full)
 {
-    foc::Ampere phaseA{ 1.0f };
-    foc::Ampere phaseB{ 2.0f };
-    foc::Ampere phaseC{ 3.0f };
+    foc::PhaseCurrents phases{ foc::Ampere{ 1.0f }, foc::Ampere{ 2.0f }, foc::Ampere{ 3.0f } };
 
     for (std::size_t i = 0; i < 100; ++i)
-        onAdcMeasurementDone(phaseA, phaseB, phaseC);
+        onPhaseCurrentsReady(phases);
 
-    EXPECT_CALL(adcDecoratorMock, Stop()).Times(1);
-    EXPECT_CALL(adcCreator, Destructed()).Times(1);
     EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+    EXPECT_CALL(platformFactoryMock, Stop());
 
-    onAdcMeasurementDone(phaseA, phaseB, phaseC);
+    onPhaseCurrentsReady(phases);
 
     ExecuteAllActions();
 
     InvokeCommand("adc medium", [this]()
         {
-            EXPECT_CALL(adcCreator, Constructed(application::PlatformFactory::SampleAndHold::medium)).Times(1);
-            EXPECT_CALL(adcDecoratorMock, Measure(testing::_)).WillOnce(testing::SaveArg<0>(&onAdcMeasurementDone));
+            ::testing::InSequence _;
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, application::PlatformFactory::SampleAndHold::medium)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
         });
 
     ExecuteAllActions();
@@ -1135,26 +1075,16 @@ TEST_F(TestHardwareTerminal, adc_reconfigure_after_buffer_full)
 
 TEST_F(TestHardwareTerminal, adc_multiple_samples_before_full)
 {
-    foc::Ampere phaseA1{ 1.0f };
-    foc::Ampere phaseB1{ 2.0f };
-    foc::Ampere phaseC1{ 3.0f };
-    foc::Ampere phaseA2{ 4.0f };
-    foc::Ampere phaseB2{ 5.0f };
-    foc::Ampere phaseC2{ 6.0f };
-    foc::Ampere phaseA3{ 7.0f };
-    foc::Ampere phaseB3{ 8.0f };
-    foc::Ampere phaseC3{ 9.0f };
-
-    onAdcMeasurementDone(phaseA1, phaseB1, phaseC1);
-    onAdcMeasurementDone(phaseA2, phaseB2, phaseC2);
-    onAdcMeasurementDone(phaseA3, phaseB3, phaseC3);
+    onPhaseCurrentsReady(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ 2.0f }, foc::Ampere{ 3.0f } });
+    onPhaseCurrentsReady(foc::PhaseCurrents{ foc::Ampere{ 4.0f }, foc::Ampere{ 5.0f }, foc::Ampere{ 6.0f } });
+    onPhaseCurrentsReady(foc::PhaseCurrents{ foc::Ampere{ 7.0f }, foc::Ampere{ 8.0f }, foc::Ampere{ 9.0f } });
 
     ExecuteAllActions();
 }
 
 TEST_F(TestHardwareTerminal, encoder_command)
 {
-    EXPECT_CALL(encoderDecoratorMock, Read()).WillOnce(testing::Return(foc::Radians{ 1.57f }));
+    EXPECT_CALL(platformFactoryMock, Read()).WillOnce(testing::Return(foc::Radians{ 1.57f }));
 
     InvokeCommand("enc", [this]()
         {
@@ -1166,7 +1096,7 @@ TEST_F(TestHardwareTerminal, encoder_command)
 
 TEST_F(TestHardwareTerminal, encoder_alias)
 {
-    EXPECT_CALL(encoderDecoratorMock, Read()).WillOnce(testing::Return(foc::Radians{ 3.14f }));
+    EXPECT_CALL(platformFactoryMock, Read()).WillOnce(testing::Return(foc::Radians{ 3.14f }));
 
     InvokeCommand("e", [this]()
         {
@@ -1178,7 +1108,7 @@ TEST_F(TestHardwareTerminal, encoder_alias)
 
 TEST_F(TestHardwareTerminal, encoder_returns_zero_position)
 {
-    EXPECT_CALL(encoderDecoratorMock, Read()).WillOnce(testing::Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(platformFactoryMock, Read()).WillOnce(testing::Return(foc::Radians{ 0.0f }));
 
     InvokeCommand("enc", [this]()
         {
@@ -1190,7 +1120,7 @@ TEST_F(TestHardwareTerminal, encoder_returns_zero_position)
 
 TEST_F(TestHardwareTerminal, encoder_returns_negative_position)
 {
-    EXPECT_CALL(encoderDecoratorMock, Read()).WillOnce(testing::Return(foc::Radians{ -1.57f }));
+    EXPECT_CALL(platformFactoryMock, Read()).WillOnce(testing::Return(foc::Radians{ -1.57f }));
 
     InvokeCommand("enc", [this]()
         {
@@ -1204,11 +1134,10 @@ TEST_F(TestHardwareTerminal, encoder_returns_negative_position)
 
 TEST_F(TestHardwareTerminal, can_start_command)
 {
-    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
-
     InvokeCommand("can_start 500000", [this]()
         {
-            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(platformFactoryMock, ConfigureCanBus(500000u, false));
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1218,11 +1147,10 @@ TEST_F(TestHardwareTerminal, can_start_command)
 
 TEST_F(TestHardwareTerminal, can_start_with_test_mode)
 {
-    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
-
     InvokeCommand("can_start 250000 test", [this]()
         {
-            EXPECT_CALL(canCreator, Constructed(250000u, true));
+            EXPECT_CALL(platformFactoryMock, ConfigureCanBus(250000u, true));
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1256,7 +1184,7 @@ TEST_F(TestHardwareTerminal, can_start_invalid_bitrate)
 
             std::string newline{ "\r\n" };
             std::string header{ "ERROR: " };
-            std::string payload{ "invalid bitrate. It should be between 125000 and 1000000." };
+            std::string payload{ "invalid bitrate. It should be between 100000 and 1000000." };
 
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
@@ -1286,11 +1214,10 @@ TEST_F(TestHardwareTerminal, can_start_invalid_option)
 
 TEST_F(TestHardwareTerminal, can_stop_command)
 {
-    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
-
     InvokeCommand("can_start 500000", [this]()
         {
-            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(platformFactoryMock, ConfigureCanBus(500000u, false));
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1343,11 +1270,10 @@ TEST_F(TestHardwareTerminal, can_listen_without_start_returns_error)
 
 TEST_F(TestHardwareTerminal, can_send_calls_send_data)
 {
-    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
-
     InvokeCommand("can_start 500000", [this]()
         {
-            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(platformFactoryMock, ConfigureCanBus(500000u, false));
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1356,6 +1282,7 @@ TEST_F(TestHardwareTerminal, can_send_calls_send_data)
 
     InvokeCommand("can_send 100 1 2 3", [this]()
         {
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SendData(testing::_, testing::_, testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1365,11 +1292,10 @@ TEST_F(TestHardwareTerminal, can_send_calls_send_data)
 
 TEST_F(TestHardwareTerminal, can_send_invalid_argument_count)
 {
-    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
-
     InvokeCommand("can_start 500000", [this]()
         {
-            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(platformFactoryMock, ConfigureCanBus(500000u, false));
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1394,11 +1320,10 @@ TEST_F(TestHardwareTerminal, can_send_invalid_argument_count)
 
 TEST_F(TestHardwareTerminal, can_listen_calls_receive_data)
 {
-    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
-
     InvokeCommand("can_start 500000", [this]()
         {
-            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(platformFactoryMock, ConfigureCanBus(500000u, false));
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1407,6 +1332,7 @@ TEST_F(TestHardwareTerminal, can_listen_calls_receive_data)
 
     InvokeCommand("can_listen", [this]()
         {
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, ReceiveData(testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1416,11 +1342,10 @@ TEST_F(TestHardwareTerminal, can_listen_calls_receive_data)
 
 TEST_F(TestHardwareTerminal, can_send_after_stop_returns_error)
 {
-    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
-
     InvokeCommand("can_start 500000", [this]()
         {
-            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(platformFactoryMock, ConfigureCanBus(500000u, false));
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1452,11 +1377,10 @@ TEST_F(TestHardwareTerminal, can_send_after_stop_returns_error)
 
 TEST_F(TestHardwareTerminal, can_send_invalid_id_returns_error)
 {
-    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
-
     InvokeCommand("can_start 500000", [this]()
         {
-            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(platformFactoryMock, ConfigureCanBus(500000u, false));
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1481,11 +1405,10 @@ TEST_F(TestHardwareTerminal, can_send_invalid_id_returns_error)
 
 TEST_F(TestHardwareTerminal, can_send_invalid_data_byte_returns_error)
 {
-    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
-
     InvokeCommand("can_start 500000", [this]()
         {
-            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(platformFactoryMock, ConfigureCanBus(500000u, false));
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1510,11 +1433,10 @@ TEST_F(TestHardwareTerminal, can_send_invalid_data_byte_returns_error)
 
 TEST_F(TestHardwareTerminal, can_send_success_callback_traces_message)
 {
-    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
-
     InvokeCommand("can_start 500000", [this]()
         {
-            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(platformFactoryMock, ConfigureCanBus(500000u, false));
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1525,6 +1447,7 @@ TEST_F(TestHardwareTerminal, can_send_success_callback_traces_message)
 
     InvokeCommand("can_send 100 1 2", [this, &sendCallback]()
         {
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SendData(testing::_, testing::_, testing::_))
                 .WillOnce(testing::SaveArg<2>(&sendCallback));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
@@ -1538,11 +1461,10 @@ TEST_F(TestHardwareTerminal, can_send_success_callback_traces_message)
 
 TEST_F(TestHardwareTerminal, can_send_failure_callback_traces_message)
 {
-    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
-
     InvokeCommand("can_start 500000", [this]()
         {
-            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(platformFactoryMock, ConfigureCanBus(500000u, false));
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1553,6 +1475,7 @@ TEST_F(TestHardwareTerminal, can_send_failure_callback_traces_message)
 
     InvokeCommand("can_send 100 1 2", [this, &sendCallback]()
         {
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SendData(testing::_, testing::_, testing::_))
                 .WillOnce(testing::SaveArg<2>(&sendCallback));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
@@ -1566,11 +1489,10 @@ TEST_F(TestHardwareTerminal, can_send_failure_callback_traces_message)
 
 TEST_F(TestHardwareTerminal, can_listen_receive_callback_traces_11bit_message)
 {
-    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
-
     InvokeCommand("can_start 500000", [this]()
         {
-            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(platformFactoryMock, ConfigureCanBus(500000u, false));
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1581,6 +1503,7 @@ TEST_F(TestHardwareTerminal, can_listen_receive_callback_traces_11bit_message)
 
     InvokeCommand("can_listen", [this, &receiveCallback]()
         {
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, ReceiveData(testing::_))
                 .WillOnce(testing::SaveArg<0>(&receiveCallback));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
@@ -1598,11 +1521,10 @@ TEST_F(TestHardwareTerminal, can_listen_receive_callback_traces_11bit_message)
 
 TEST_F(TestHardwareTerminal, can_listen_receive_callback_traces_29bit_message)
 {
-    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
-
     InvokeCommand("can_start 500000", [this]()
         {
-            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(platformFactoryMock, ConfigureCanBus(500000u, false));
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1613,6 +1535,7 @@ TEST_F(TestHardwareTerminal, can_listen_receive_callback_traces_29bit_message)
 
     InvokeCommand("can_listen", [this, &receiveCallback]()
         {
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, ReceiveData(testing::_))
                 .WillOnce(testing::SaveArg<0>(&receiveCallback));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
@@ -1629,13 +1552,12 @@ TEST_F(TestHardwareTerminal, can_listen_receive_callback_traces_29bit_message)
 
 TEST_F(TestHardwareTerminal, can_error_callback_traces_error)
 {
-    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
-
     infra::Function<void(application::CanBusAdapter::CanError)> errorCallback;
 
     InvokeCommand("can_start 500000", [this, &errorCallback]()
         {
-            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(platformFactoryMock, ConfigureCanBus(500000u, false));
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SetOnError(testing::_))
                 .WillOnce(testing::SaveArg<0>(&errorCallback));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
@@ -1649,11 +1571,10 @@ TEST_F(TestHardwareTerminal, can_error_callback_traces_error)
 
 TEST_F(TestHardwareTerminal, can_send_with_29bit_id)
 {
-    EXPECT_CALL(canCreator, Destructed()).Times(testing::AnyNumber());
-
     InvokeCommand("can_start 500000", [this]()
         {
-            EXPECT_CALL(canCreator, Constructed(500000u, false));
+            EXPECT_CALL(platformFactoryMock, ConfigureCanBus(500000u, false));
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SetOnError(testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -1662,6 +1583,7 @@ TEST_F(TestHardwareTerminal, can_send_with_29bit_id)
 
     InvokeCommand("can_send 2048 1", [this]()
         {
+            EXPECT_CALL(platformFactoryMock, CanBus()).WillRepeatedly(testing::ReturnRef(canAdapterMock));
             EXPECT_CALL(canAdapterMock, SendData(hal::Can::Id::Create29BitId(2048), testing::_, testing::_));
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });

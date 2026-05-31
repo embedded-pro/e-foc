@@ -8,53 +8,66 @@ namespace integration
         , stateMachine(stateMachine)
     {}
 
-    void FocMotorStateMachineBridge::OnQueryMotorType()
+    void FocMotorStateMachineBridge::OnQueryMotorType(const infra::Function<void(services::FocMotorMode)>&)
     {}
 
-    void FocMotorStateMachineBridge::OnStart()
+    void FocMotorStateMachineBridge::OnStart(const infra::Function<void()>& onDone)
     {
         stateMachine.CmdEnable();
+        onDone();
     }
 
-    void FocMotorStateMachineBridge::OnStop()
+    void FocMotorStateMachineBridge::OnStop(const infra::Function<void()>& onDone)
     {
         stateMachine.CmdDisable();
+        onDone();
     }
 
-    void FocMotorStateMachineBridge::OnSetPidCurrent(const services::FocPidGains&)
+    void FocMotorStateMachineBridge::OnSetPidCurrent(const services::FocPidGains&, const infra::Function<void()>&)
     {}
 
-    void FocMotorStateMachineBridge::OnSetPidSpeed(const services::FocPidGains&)
+    void FocMotorStateMachineBridge::OnSetPidSpeed(const services::FocPidGains&, const infra::Function<void()>&)
     {}
 
-    void FocMotorStateMachineBridge::OnSetPidPosition(const services::FocPidGains&)
+    void FocMotorStateMachineBridge::OnSetPidPosition(const services::FocPidGains&, const infra::Function<void()>&)
     {}
 
-    void FocMotorStateMachineBridge::OnIdentifyElectrical()
+    void FocMotorStateMachineBridge::OnIdentifyElectrical(const infra::Function<void(services::FocElectricalParams)>&)
     {}
 
-    void FocMotorStateMachineBridge::OnIdentifyMechanical()
+    void FocMotorStateMachineBridge::OnIdentifyMechanical(const infra::Function<void(services::FocMechanicalParams)>&)
     {}
 
-    void FocMotorStateMachineBridge::OnRequestTelemetry()
+    void FocMotorStateMachineBridge::OnRequestTelemetry(const infra::Function<void(services::FocTelemetryElectrical, services::FocTelemetryStatus)>&)
     {}
 
-    void FocMotorStateMachineBridge::OnSetEncoderResolution(uint16_t)
+    void FocMotorStateMachineBridge::OnSetEncoderResolution(uint16_t, const infra::Function<void()>&)
     {}
 
-    void FocMotorStateMachineBridge::OnSetTarget(const services::FocSetpoint&)
+    void FocMotorStateMachineBridge::OnSelectControlMode(services::FocMotorMode, const infra::Function<void(services::FocMotorMode)>&)
     {}
 
-    void FocMotorStateMachineBridge::OnClearFault()
+    void FocMotorStateMachineBridge::OnSetTorqueSetpoint(int16_t, const infra::Function<void()>&)
+    {}
+
+    void FocMotorStateMachineBridge::OnSetSpeedSetpoint(int16_t, const infra::Function<void()>&)
+    {}
+
+    void FocMotorStateMachineBridge::OnSetPositionSetpoint(int16_t, const infra::Function<void()>&)
+    {}
+
+    void FocMotorStateMachineBridge::OnClearFault(const infra::Function<void()>& onDone)
     {
         stateMachine.CmdClearFault();
+        onDone();
     }
 
-    void FocMotorStateMachineBridge::OnEmergencyStop()
+    void FocMotorStateMachineBridge::OnEmergencyStop(const infra::Function<void()>& onDone)
     {
         stateMachine.CmdDisable();
+        onDone();
     }
 
-    void FocMotorStateMachineBridge::OnConfigureTelemetryRate(uint8_t)
+    void FocMotorStateMachineBridge::OnConfigureTelemetryRate(uint8_t, const infra::Function<void()>&)
     {}
 }

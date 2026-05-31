@@ -5,6 +5,8 @@
 #include "hal_tiva/tiva/ClockTm4c129.hpp"
 #include "hal_tiva/tiva/Gpio.hpp"
 #include "hal_tiva/tiva/PinoutTableDefaultTm4c129.hpp"
+#include "hal_tiva/tiva/Pwm.hpp"
+#include MOTOR_BOARD_CHARACTERISTICS_HEADER
 
 namespace application
 {
@@ -33,33 +35,55 @@ namespace application
 
         static hal::tiva::GpioPin led1{ hal::tiva::Port::N, 0 };
 
-        static hal::tiva::GpioPin uartRx{ hal::tiva::Port::A, 0 };
-        static hal::tiva::GpioPin uartTx{ hal::tiva::Port::A, 1 };
+        static hal::tiva::GpioPin uartRx{ hal::tiva::Port::D, 4 };
+        static hal::tiva::GpioPin uartTx{ hal::tiva::Port::D, 5 };
 
-        static hal::tiva::GpioPin canRx{ hal::tiva::Port::B, 0 };
-        static hal::tiva::GpioPin canTx{ hal::tiva::Port::B, 1 };
+        static hal::tiva::GpioPin canRx{ hal::tiva::Port::A, 0 };
+        static hal::tiva::GpioPin canTx{ hal::tiva::Port::A, 1 };
 
         static hal::tiva::GpioPin performance{ hal::tiva::Port::N, 4 };
     }
 
     namespace Peripheral
     {
-        using hal_pwm = hal::tiva::SynchronousPwm;
+        using hal_pwm = hal::tiva::Pwm;
 
         constexpr static uint8_t QeiIndex = 0;
         constexpr static uint8_t AdcIndex = 0;
         constexpr static uint8_t AdcSequencerIndex = 0;
-        constexpr static uint8_t UartIndex = 0;
+        constexpr static uint8_t UartIndex = 2;
         constexpr static uint8_t PwmIndex = 0;
         constexpr static uint8_t CanIndex = 0;
 
+        // ADC digital comparator indices mapped to PWM FLTSRC1 lines.
+        // DCMP0 (PB4 / ADC10) → overcurrent trip; DCMP1 (PB5 / ADC11) → overvoltage trip.
+        constexpr static bool hasFaultComparators = true;
+        constexpr static uint8_t OvercurrentComparatorIndex = 0;
+        constexpr static uint8_t OvervoltageComparatorIndex = 1;
+
+        constexpr static float adcReferenceVoltage{ 3.3f };
+        constexpr static float adcResolution{ 4096.0f };
+
+        // Fault trip thresholds derived from motor board shield characteristics.
+        constexpr static uint16_t overvoltageThresholdCounts =
+            application::BoardCharacteristics::OvervoltageThresholdCounts(adcReferenceVoltage, adcResolution);
+        constexpr static uint16_t overcurrentThresholdCounts =
+            application::BoardCharacteristics::OvercurrentThresholdCounts(adcResolution);
+
         static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator1;
 
-        static hal_pwm::PinChannel pwmPhase1{ hal_pwm::GeneratorIndex::generator1, Pins::pwmPhase1a, Pins::pwmPhase1b, true, true, std::make_optional(hal::tiva::SynchronousPwm::PinChannel::Trigger::countZero) };
-        static hal_pwm::PinChannel pwmPhase2{ hal_pwm::GeneratorIndex::generator2, Pins::pwmPhase2a, Pins::pwmPhase2b, true, true, std::nullopt };
-        static hal_pwm::PinChannel pwmPhase3{ hal_pwm::GeneratorIndex::generator3, Pins::pwmPhase3a, Pins::pwmPhase3b, true, true, std::nullopt };
+        static hal_pwm::PinChannel asyncPwmPhase1{ hal_pwm::GeneratorIndex::generator1, Pins::pwmPhase1a, Pins::pwmPhase1b, true, true, std::make_optional(hal::tiva::Pwm::PinChannel::Trigger::countZero) };
+        static hal_pwm::PinChannel asyncPwmPhase2{ hal_pwm::GeneratorIndex::generator2, Pins::pwmPhase2a, Pins::pwmPhase2b, true, true, std::nullopt };
+        static hal_pwm::PinChannel asyncPwmPhase3{ hal_pwm::GeneratorIndex::generator3, Pins::pwmPhase3a, Pins::pwmPhase3b, true, true, std::nullopt };
 
-        static std::array<hal_pwm::PinChannel, 3> pwmPhases{ { pwmPhase1, pwmPhase2, pwmPhase3 } };
+        static std::array<hal_pwm::PinChannel, 3> asyncPwmPhases{ { asyncPwmPhase1, asyncPwmPhase2, asyncPwmPhase3 } };
+
+        // Synchronous PWM stubs — not used on this board; required for compilation only.
+        static hal::tiva::SynchronousPwm::PinChannel syncPwmPhase1{ hal::tiva::SynchronousPwm::GeneratorIndex::generator0, Pins::pwmPhase1a, Pins::pwmPhase1b, true, true, std::nullopt };
+        static hal::tiva::SynchronousPwm::PinChannel syncPwmPhase2{ hal::tiva::SynchronousPwm::GeneratorIndex::generator1, Pins::pwmPhase2a, Pins::pwmPhase2b, true, true, std::nullopt };
+        static hal::tiva::SynchronousPwm::PinChannel syncPwmPhase3{ hal::tiva::SynchronousPwm::GeneratorIndex::generator2, Pins::pwmPhase3a, Pins::pwmPhase3b, true, true, std::nullopt };
+
+        static std::array<hal::tiva::SynchronousPwm::PinChannel, 3> syncPwmPhases{ { syncPwmPhase1, syncPwmPhase2, syncPwmPhase3 } };
     }
 
     namespace Clocks

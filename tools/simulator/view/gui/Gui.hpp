@@ -22,7 +22,7 @@ namespace simulator
         Q_OBJECT
 
     public:
-        Gui(ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
+        Gui(ThreePhaseMotorModel& motorModel, foc::Controllable& motorController, infra::EventDispatcherWithWeakPtr& dispatcher,
             const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
             const ControlPanel::SetpointConfig& setpointConfig, foc::Volts powerSupplyVoltage, QWidget* parent = nullptr);
 

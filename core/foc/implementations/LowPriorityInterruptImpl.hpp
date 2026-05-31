@@ -9,9 +9,9 @@ namespace foc
         : public LowPriorityInterrupt
     {
     public:
-        void Register(const infra::Function<void()>& handler) override
+        void Register(const infra::Function<void()>& _handler) override
         {
-            this->handler = handler;
+            this->handler = _handler;
         }
 
         void Trigger() override

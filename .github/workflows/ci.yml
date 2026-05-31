@@ -11,6 +11,7 @@ permissions:
   contents: read
   pull-requests: write
   checks: write
+  packages: read
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
@@ -24,6 +25,7 @@ jobs:
   host_build_test_ubuntu:
     name: Host Build & Test (ubuntu-latest)
     runs-on: ubuntu-latest
+    container: gabrielfrasantos/embedded-devcontainer-cpp:v7.2.0@sha256:e8a23c738637da0009ab5f9d73488c5e27e6309d4f577082368dacfab49d0cf5
     steps:
       - name: Configure Git
         run: |
@@ -34,20 +36,16 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      - uses: hendrikmuhs/ccache-action@33522472633dbd32578e909b315f5ee43ba878ce # v1.2.22
+      - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
         with:
           key: ${{ github.job }}-ubuntu-latest
           max-size: 2G
           save: ${{ github.ref == 'refs/heads/main' }}
-      - uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
-      - name: Install Qt6
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qt6-base-dev libgl1-mesa-dev
       - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
         with:
           configurePreset: "host"
           buildPreset: "host-Debug-WithPackage"
           testPreset: "host"
-          configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
       - name: Run SIL integration tests
         run: |
           sil_test=$(find build/host -name "e_foc.integration_tests" -type f -executable -print -quit)
@@ -118,45 +116,43 @@ jobs:
         with:
           name: test-logs
           path: build/host/Testing/Temporary/
-  host_build_test:
-    name: Host Build & Test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
+  host_cross_windows:
+    name: Host Cross-Compile (Linux → Windows)
+    runs-on: ubuntu-latest
+    container: gabrielfrasantos/embedded-devcontainer-cpp:v7.2.0@sha256:e8a23c738637da0009ab5f9d73488c5e27e6309d4f577082368dacfab49d0cf5
     steps:
       - name: Configure Git
         run: |
-          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN  }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git config --global --add safe.directory '*'
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           submodules: recursive
-      - uses: hendrikmuhs/ccache-action@33522472633dbd32578e909b315f5ee43ba878ce # v1.2.22
+      - name: Cache ccache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          key: ${{ github.job }}-${{ matrix.os }}
-          max-size: 2G
-          save: ${{ github.ref == 'refs/heads/main' }}
-      - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
+          path: ${{ github.workspace }}/.ccache
+          key: ${{ github.job }}-windows-cross-${{ github.sha }}
+          restore-keys: ${{ github.job }}-windows-cross-
+      - name: Cross-compile for Windows
+        run: cmake --preset windows && cmake --build --preset windows-RelWithDebInfo
+        env:
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          configurePreset: "host-single-Debug"
-          buildPreset: "host-single-Debug"
-          testPreset: "host-single-Debug"
-          configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
-      - name: Upload test logs
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: test-logs
-          path: build/host/Testing/Temporary/
+          name: e_foc-windows
+          path: build/windows/**/*.exe
+          if-no-files-found: warn
   embedded_build:
     name: Embedded Build
     runs-on: ubuntu-latest
-    needs: [host_build_test_ubuntu, host_build_test]
+    container: gabrielfrasantos/embedded-devcontainer-cpp:v7.2.0@sha256:e8a23c738637da0009ab5f9d73488c5e27e6309d4f577082368dacfab49d0cf5
+    needs: [host_build_test_ubuntu, host_cross_windows]
     strategy:
       matrix:
         configuration: ["RelWithDebInfo"]
-        gcc: ["13.2.Rel1"]
         target:
           [
             "EK-TM4C1294XL",
@@ -168,18 +164,14 @@ jobs:
       - name: Configure Git
         run: |
           git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN  }}@github.com/".insteadOf "https://github.com/"
+          git config --global --add safe.directory '*'
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Install GNU Arm Embedded Toolchain ${{ matrix.gcc }}
-        uses: carlosperate/arm-none-eabi-gcc-action@0725d97b026acf7fc8e22dfd5bee912998879ba8 # v1.12.3
+      - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
         with:
-          release: ${{ matrix.gcc }}
-      - run: sudo apt-get update && sudo apt-get install ninja-build xsltproc
-      - uses: hendrikmuhs/ccache-action@33522472633dbd32578e909b315f5ee43ba878ce # v1.2.22
-        with:
-          key: ${{ matrix.gcc }}-${{ matrix.configuration }}-${{ matrix.target }}
+          key: ${{ matrix.configuration }}-${{ matrix.target }}
           max-size: 2G
           save: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -191,39 +183,51 @@ jobs:
         with:
           configurePreset: ${{ matrix.target }}
           buildPreset: ${{ matrix.target }}-${{ matrix.configuration }}
-          configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
       - name: Run cycle analysis
         if: matrix.target == 'EK-TM4C1294XL'
-        uses: ./.github/actions/cycle-analysis
+        uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
         with:
+          comment-marker: '<!-- cycle-analysis-comment -->'
           analyses-json: |
             [
               {
-                "label": "Torque mode",
-                "elf_path": "build/${{ matrix.target }}/targets/sync_foc_sensored/torque/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.torque.main.elf",
-                "config_path": "targets/sync_foc_sensored/torque/cycle-analysis.json",
-                "output_dir": "cycle-analysis-combined/torque"
-              },
-              {
-                "label": "Speed mode",
-                "elf_path": "build/${{ matrix.target }}/targets/sync_foc_sensored/speed/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.speed.main.elf",
-                "config_path": "targets/sync_foc_sensored/speed/cycle-analysis.json",
-                "output_dir": "cycle-analysis-combined/speed"
-              },
-              {
-                "label": "Position mode",
-                "elf_path": "build/${{ matrix.target }}/targets/sync_foc_sensored/position/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.position.main.elf",
-                "config_path": "targets/sync_foc_sensored/position/cycle-analysis.json",
-                "output_dir": "cycle-analysis-combined/position"
+                "label": "Worst case (position)",
+                "elf_path": "build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf",
+                "config_path": "targets/sync_foc_sensored/main/cycle-analysis.json",
+                "output_dir": "cycle-analysis"
               }
             ]
           target: ${{ matrix.target }}
           build-config: ${{ matrix.configuration }}
           clock-mhz: "120"
           cortex: "m4"
-          output-dir: cycle-analysis-combined
-          post-pr-comment: "true"
+          output-dir: cycle-analysis
+          post-comment: "true"
           artifact-name: cycle-analysis
       - name: Cycle analysis summary
         if: matrix.target == 'EK-TM4C1294XL'
-        run: cat cycle-analysis-combined/combined_step_summary.md >> "$GITHUB_STEP_SUMMARY"
+        run: cat cycle-analysis/combined_step_summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Run memory analysis
+        if: matrix.target == 'EK-TM4C1294XL'
+        uses: embedded-pro/cortex-memory-budget@cc5057b824ad7a5c340dfa6a3c8d22be0b89b35c
+        with:
+          comment-marker: '<!-- memory-analysis-comment -->'
+          analyses-json: |
+            [
+              {
+                "label": "Unified binary",
+                "elf_path": "build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf",
+                "config_path": "targets/sync_foc_sensored/main/memory-analysis.json",
+                "linker_script": "infra/hal/ti/tiva/ldscripts/mem_tm4c1294ncpdt.ld",
+                "output_dir": "memory-analysis"
+              }
+            ]
+          target: ${{ matrix.target }}
+          build-config: ${{ matrix.configuration }}
+          cortex: "m4"
+          output-dir: memory-analysis
+          post-comment: "true"
+          artifact-name: memory-analysis
+      - name: Memory analysis summary
+        if: matrix.target == 'EK-TM4C1294XL'
+        run: cat memory-analysis/combined_step_summary.md >> "$GITHUB_STEP_SUMMARY"

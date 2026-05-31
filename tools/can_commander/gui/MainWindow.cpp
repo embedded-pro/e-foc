@@ -121,15 +121,6 @@ namespace tool
                 timeoutTimer.start(2000);
             });
 
-        connect(commandPanel, &CommandPanel::SetSupplyVoltageRequested, [this](float v)
-            {
-                client.SendSetSupplyVoltage(v);
-            });
-        connect(commandPanel, &CommandPanel::SetMaxCurrentRequested, [this](float a)
-            {
-                client.SendSetMaxCurrent(a);
-            });
-
         connect(commandPanel, &CommandPanel::RequestDataRequested, [this]()
             {
                 client.RequestData();
@@ -186,6 +177,20 @@ namespace tool
         logView->appendPlainText(QString("ERROR: %1").arg(QString::fromUtf8(message.data(), static_cast<int>(message.size()))));
     }
 
+    void MainWindow::OnControlModeAcknowledged(services::FocMotorMode activeMode)
+    {
+        logView->appendPlainText(QString("Active control mode: %1").arg(static_cast<int>(activeMode)));
+    }
+
+    void MainWindow::OnCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status)
+    {
+        logView->appendPlainText(QString("ACK: cat=0x%1 cmd=0x%2 status=%3 (%4)")
+                .arg(categoryId, 2, 16, QChar('0'))
+                .arg(commandType, 2, 16, QChar('0'))
+                .arg(static_cast<int>(status))
+                .arg(QString::fromUtf8(services::CanAckStatusToString(status))));
+    }
+
     void MainWindow::OnMotorStatusReceived(services::FocMotorState state, services::FocFaultCode fault)
     {
         telemetryPanel->OnMotorStatus(state, fault);
@@ -211,14 +216,14 @@ namespace tool
         telemetryPanel->OnFaultEvent(fault);
     }
 
-    void MainWindow::OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data)
+    void MainWindow::OnFrameLog(bool transmitted, uint32_t id, const CanFrame& _data)
     {
         QString hex;
-        for (std::size_t i = 0; i < data.size(); ++i)
+        for (std::size_t i = 0; i < _data.size(); ++i)
         {
             if (i > 0)
                 hex += " ";
-            hex += QString("%1").arg(data[i], 2, 16, QChar('0')).toUpper();
+            hex += QString("%1").arg(_data[i], 2, 16, QChar('0')).toUpper();
         }
 
         logView->appendPlainText(

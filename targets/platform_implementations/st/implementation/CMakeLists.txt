@@ -12,6 +12,7 @@ target_link_libraries(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PUBLIC
     services.tracer
     e_foc.error_handling_cortex_m
     e_foc.platform_abstraction_${E_FOC_TARGET_BOARD}
+    e_foc.motor_board
 )
 
 target_compile_definitions(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PUBLIC

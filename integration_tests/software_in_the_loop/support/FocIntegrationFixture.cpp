@@ -8,26 +8,14 @@ namespace integration
 
     FocIntegrationFixture::FocIntegrationFixture()
     {
-        EXPECT_CALL(platformFactory, AdcMultiChannelCreator()).WillRepeatedly(ReturnRef(adcCreator));
-        EXPECT_CALL(platformFactory, SynchronousThreeChannelsPwmCreator()).WillRepeatedly(ReturnRef(pwmCreator));
-        EXPECT_CALL(platformFactory, SynchronousQuadratureEncoderCreator()).WillRepeatedly(ReturnRef(encoderCreator));
-
-        EXPECT_CALL(adcCreator, Constructed(application::PlatformFactory::SampleAndHold::shorter));
-        EXPECT_CALL(pwmCreator, Constructed(std::chrono::nanoseconds{ 500 }, hal::Hertz{ 10000 }));
-        EXPECT_CALL(encoderCreator, Constructed());
-
-        EXPECT_CALL(adcCreator, Destructed()).Times(AtLeast(1));
-        EXPECT_CALL(pwmCreator, Destructed()).Times(AtLeast(1));
-        EXPECT_CALL(encoderCreator, Destructed()).Times(AtLeast(1));
-
-        EXPECT_CALL(pwmMock, SetBaseFrequency(_)).Times(AnyNumber());
-        EXPECT_CALL(pwmMock, Start(_, _, _)).Times(AnyNumber());
-        EXPECT_CALL(pwmMock, Stop()).Times(AnyNumber());
-        EXPECT_CALL(adcPhaseCurrentMock, Measure(_)).Times(AnyNumber());
-        EXPECT_CALL(adcPhaseCurrentMock, Stop()).Times(AnyNumber());
-        EXPECT_CALL(encoderDecoratorMock, Read()).Times(AnyNumber()).WillRepeatedly(Return(foc::Radians{ 0.0f }));
-
-        platformAdapter.emplace(platformFactory);
+        EXPECT_CALL(platformFactory, PhaseCurrentsReady(_, _)).Times(AnyNumber());
+        EXPECT_CALL(platformFactory, ThreePhasePwmOutput(_)).Times(AnyNumber());
+        EXPECT_CALL(platformFactory, BaseFrequency()).Times(AnyNumber()).WillRepeatedly(Return(hal::Hertz{ 10000 }));
+        EXPECT_CALL(platformFactory, Start()).Times(AnyNumber());
+        EXPECT_CALL(platformFactory, Stop()).Times(AnyNumber());
+        EXPECT_CALL(platformFactory, Read()).Times(AnyNumber()).WillRepeatedly(Return(foc::Radians{ 0.0f }));
+        EXPECT_CALL(platformFactory, Set(_)).Times(AnyNumber());
+        EXPECT_CALL(platformFactory, SetZero()).Times(AnyNumber());
     }
 
     void FocIntegrationFixture::ConstructWithInvalidNvm()
@@ -40,10 +28,11 @@ namespace integration
 
         motorStateMachine.emplace(
             application::TerminalAndTracer{ terminal, tracer },
-            application::MotorHardware{ *platformAdapter, *platformAdapter, testVdc },
+            application::MotorHardware{ platformFactory, platformFactory, testVdc },
             nvm,
             application::CalibrationServices{ electricalIdentMock, alignmentMock },
-            faultNotifierMock);
+            faultNotifierMock,
+            state_machine::TransitionPolicy::Auto);
 
         ExecuteAllActions();
     }
@@ -66,10 +55,11 @@ namespace integration
 
         motorStateMachine.emplace(
             application::TerminalAndTracer{ terminal, tracer },
-            application::MotorHardware{ *platformAdapter, *platformAdapter, testVdc },
+            application::MotorHardware{ platformFactory, platformFactory, testVdc },
             nvm,
             application::CalibrationServices{ electricalIdentMock, alignmentMock },
-            faultNotifierMock);
+            faultNotifierMock,
+            state_machine::TransitionPolicy::Auto);
 
         ExecuteAllActions();
     }
@@ -78,7 +68,8 @@ namespace integration
     {
         calibrationExpectationsConfigured = true;
         EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
-            .WillOnce(Invoke([this](const auto&, const auto& cb)
+            .Times(AnyNumber())
+            .WillRepeatedly(Invoke([this](const auto&, const auto& cb)
                 {
                     capturedPolePairsCallback = cb;
                 }));
@@ -95,6 +86,7 @@ namespace integration
 
         canTransport.emplace(transportCanMock, 1);
         motorCategoryServer.emplace(*canTransport);
+        motorCategoryServer->SetAcknowledger(nullAcknowledger);
         motorBridge.emplace(*motorCategoryServer, *motorStateMachine);
     }
 
@@ -119,6 +111,27 @@ namespace integration
         hal::Can::Message data;
         data.push_back(0x01);
         motorCategoryServer->HandleMessage(services::focClearFaultId, data);
+        ExecuteAllActions();
+    }
+
+    void FocIntegrationFixture::InjectCanEmergencyStop()
+    {
+        hal::Can::Message data;
+        data.push_back(0x01);
+        motorCategoryServer->HandleMessage(services::focEmergencyStopId, data);
+        ExecuteAllActions();
+    }
+
+    void FocIntegrationFixture::DeferClearCalibration()
+    {
+        eepromStub.DeferNextErase();
+        motorStateMachine->CmdClearCalibration([](state_machine::CommandResult) {});
+        ExecuteAllActions();
+    }
+
+    void FocIntegrationFixture::CompleteInvalidate(services::NvmStatus /* status */)
+    {
+        eepromStub.CompleteDeferredErase();
         ExecuteAllActions();
     }
 

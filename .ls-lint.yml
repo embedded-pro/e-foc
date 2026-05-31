@@ -7,7 +7,6 @@ ignore:
   - .git
   - .github
   - .vscode
-  - .gitlab
   - megalinter-reports
   - infra
   - hal

@@ -1,16 +1,16 @@
 #include "targets/hardware_test/components/Terminal.hpp"
 #include "foc/interfaces/Driver.hpp"
-#include "hal/synchronous_interfaces/SynchronousPwm.hpp"
+#include "hal/interfaces/Pwm.hpp"
 #include "infra/stream/StringInputStream.hpp"
 #include "infra/stream/StringOutputStream.hpp"
 #include "infra/util/BoundedString.hpp"
+#include "infra/util/Function.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
 #include <algorithm>
 #include <chrono>
 #include <numbers>
 #include <optional>
-#include <ranges>
 
 namespace
 {
@@ -78,10 +78,6 @@ namespace application
         : terminal{ terminal }
         , tracer{ hardware.Tracer() }
         , hardware{ hardware }
-        , pwmCreator{ hardware.SynchronousThreeChannelsPwmCreator() }
-        , adcCreator{ hardware.AdcMultiChannelCreator() }
-        , encoderCreator{ hardware.SynchronousQuadratureEncoderCreator() }
-        , canCreator{ hardware.CanBusCreator() }
         , performanceTimer{ hardware.PerformanceTimer() }
         , Vdc{ hardware.PowerSupplyVoltage() }
         , systemClock{ hardware.SystemClock() }
@@ -136,7 +132,7 @@ namespace application
                 this->terminal.ProcessResult(SetMotorParameters(param));
             } });
 
-        terminal.AddCommand({ { "can_start", "cs", "Start CAN bus [bitrate [125000;1000000]] [test]. Ex: can_start 500000" },
+        terminal.AddCommand({ { "can_start", "cs", "Start CAN bus [bitrate [100000;1000000]] [test]. Ex: can_start 500000" },
             [this](const infra::BoundedConstString& param)
             {
                 this->terminal.ProcessResult(CanStart(param));
@@ -202,8 +198,8 @@ namespace application
                 this->terminal.ProcessResult(ForceHardfault());
             } });
 
-        encoderCreator.Emplace();
-        pwmCreator.Emplace(std::chrono::nanoseconds{ 500 }, hal::Hertz{ 10000 });
+        hardware.SetEncoderResolution(4000);
+        hardware.ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, PlatformFactory::SampleAndHold::shortest);
         StartAdc(PlatformFactory::SampleAndHold::shortest);
     }
 
@@ -222,8 +218,11 @@ namespace application
         if (!frequency.has_value())
             return { error, "invalid value. It should be a float between 10000 and 20000." };
 
-        pwmCreator.Destroy();
-        pwmCreator.Emplace(std::chrono::nanoseconds{ *deadTime }, hal::Hertz{ *frequency });
+        currentPwmDeadTime_ = std::chrono::nanoseconds{ *deadTime };
+        currentPwmFrequency_ = hal::Hertz{ *frequency };
+        adcActive_ = false;
+        hardware.ConfigureAdcAndPwm(currentPwmFrequency_, currentPwmDeadTime_, currentSah_);
+        StartAdc(currentSah_);
 
         return { success };
     }
@@ -239,6 +238,8 @@ namespace application
         if (!sampleAndHold)
             return { error, "invalid value. It should be one of: shortest, shorter, medium, longer, longest." };
 
+        adcActive_ = false;
+        hardware.ConfigureAdcAndPwm(currentPwmFrequency_, currentPwmDeadTime_, ToSampleAndHold(*sampleAndHold));
         StartAdc(ToSampleAndHold(*sampleAndHold));
 
         return { success };
@@ -287,7 +288,7 @@ namespace application
     TerminalInteractor::StatusWithMessage TerminalInteractor::ReadEncoder()
     {
         tracer.Trace() << "  Encoder Readings:";
-        tracer.Trace() << "    Position:  " << encoderCreator->Read().Value() << " radians";
+        tracer.Trace() << "    Position:  " << hardware.Read().Value() << " radians";
 
         return { success };
     }
@@ -347,14 +348,14 @@ namespace application
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::Stop()
     {
-        pwmCreator->Stop();
+        hardware.Stop();
         return { success };
     }
 
     void TerminalInteractor::ProcessAdcSamples()
     {
-        adcCreator->Stop();
-        adcCreator.Destroy();
+        adcActive_ = false;
+        hardware.Stop();
 
         tracer.Trace() << "  Current Phases [A;B;C] ampere";
 
@@ -383,7 +384,7 @@ namespace application
         if (!dutyC.has_value())
             return { error, "invalid value for phase C. It should be a float between 1 and 99." };
 
-        pwmCreator->Start(hal::Percent{ *dutyA }, hal::Percent{ *dutyB }, hal::Percent{ *dutyC });
+        hardware.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{ hal::Percent{ *dutyA }, hal::Percent{ *dutyB }, hal::Percent{ *dutyC } });
 
         return { success };
     }
@@ -407,11 +408,14 @@ namespace application
 
     void TerminalInteractor::StartAdc(PlatformFactory::SampleAndHold sampleAndHold)
     {
-        adcCreator.Emplace(sampleAndHold);
-        adcCreator->Measure([this](auto phaseA, auto phaseB, auto phaseC)
+        currentSah_ = sampleAndHold;
+        adcActive_ = true;
+        hardware.PhaseCurrentsReady(currentPwmFrequency_, [this](foc::PhaseCurrents phases)
             {
+                if (!adcActive_)
+                    return;
                 if (!queueOfPhaseCurrents.full())
-                    queueOfPhaseCurrents.emplace_back(foc::PhaseCurrents{ phaseA, phaseB, phaseC });
+                    queueOfPhaseCurrents.emplace_back(phases);
                 else
                     ProcessAdcSamples();
             });
@@ -424,9 +428,9 @@ namespace application
         if (tokenizer.Size() < 1 || tokenizer.Size() > 2)
             return { error, "invalid number of arguments" };
 
-        auto bitRate = ParseInput<uint32_t>(tokenizer.Token(0), 125000, 1000000);
+        auto bitRate = ParseInput<uint32_t>(tokenizer.Token(0), 100000, 1000000);
         if (!bitRate.has_value())
-            return { error, "invalid bitrate. It should be between 125000 and 1000000." };
+            return { error, "invalid bitrate. It should be between 100000 and 1000000." };
 
         bool testMode = false;
         if (tokenizer.Size() == 2)
@@ -437,11 +441,10 @@ namespace application
                 return { error, "invalid option. Use 'test' for loopback mode." };
         }
 
-        canCreator.Destroy();
-        canCreator.Emplace(*bitRate, testMode);
+        hardware.ConfigureCanBus(*bitRate, testMode);
         canStarted = true;
 
-        canCreator->SetOnError([this](CanBusAdapter::CanError error)
+        hardware.CanBus().SetOnError([this](CanBusAdapter::CanError error)
             {
                 tracer.Trace() << "  CAN Error: " << error;
             });
@@ -453,7 +456,6 @@ namespace application
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::CanStop()
     {
-        canCreator.Destroy();
         canStarted = false;
         tracer.Trace() << "  CAN stopped";
         return { success };
@@ -484,7 +486,7 @@ namespace application
 
         hal::Can::Id canId = *id > 0x7FF ? hal::Can::Id::Create29BitId(*id) : hal::Can::Id::Create11BitId(*id);
 
-        canCreator->SendData(canId, message, [this](bool success)
+        hardware.CanBus().SendData(canId, message, [this](bool success)
             {
                 if (success)
                     tracer.Trace() << "  CAN frame sent";
@@ -500,7 +502,7 @@ namespace application
         if (!canStarted)
             return { error, "CAN not started. Run 'can_start' first." };
 
-        canCreator->ReceiveData([this](hal::Can::Id id, const hal::Can::Message& data)
+        hardware.CanBus().ReceiveData([this](hal::Can::Id id, const hal::Can::Message& data)
             {
                 uint32_t idValue = id.Is29BitId() ? id.Get29BitId() : id.Get11BitId();
                 tracer.Trace() << "  CAN RX [" << (id.Is29BitId() ? "29b" : "11b") << " ID:" << idValue << "] data:";

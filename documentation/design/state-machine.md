@@ -127,6 +127,56 @@ Entering `Fault` always stops the inverter when the machine was in `Enabled` or 
 
 The last fault code is preserved in `LastFaultCode()` and remains readable even after the fault is cleared via `CmdClearFault`.
 
+### Async-Callback State Invariant
+
+Every asynchronous callback registered with a service (NVM, electrical ident, mechanical ident, motor alignment) **must check the current state before mutating it**. A hardware fault, an operator command, or a second calibration attempt may have moved the state machine to a different state between the moment the service call was issued and the moment the callback fires.
+
+The invariant is: **a callback may only apply its result if the state machine is still in the state that issued the service call.**
+
+Specifically:
+
+- Callbacks from calibration steps (`EstimateNumberOfPolePairs`, `EstimateResistanceAndInductance`, `ForceAlignment`, `EstimateFrictionAndInertia`) check that the machine is still in `Calibrating` **and** that the expected calibration sub-step is active.
+- The `SaveCalibration` callback checks that the machine is still in `Calibrating`.
+- The `IsCalibrationValid` and `LoadCalibration` callbacks from the boot-time NVM check verify that the machine is still in `Idle`.
+- The `InvalidateCalibration` callback from `CmdClearCalibration` verifies that the machine is still in `Idle` or `Ready` before transitioning to `Idle` (on success) or `Fault` (on failure).
+
+Any callback that fires after the state has moved away from the expected source state **returns silently**. It must never overwrite a later state (such as `Enabled` or `Fault`) with a stale result.
+
+```mermaid
+sequenceDiagram
+    participant Op as Operator
+    participant SM as FOC State Machine
+    participant NVM as NVM Service
+
+    Op->>SM: CmdClearCalibration (from Ready)
+    SM->>NVM: InvalidateCalibration(callback)
+    note over SM: State may change here
+
+    Op->>SM: CmdEnable
+    SM-->>SM: State → Enabled
+
+    NVM-->>SM: callback(Ok)
+    note over SM: Guard: not in Idle or Ready → silently ignore
+    note over SM: State remains Enabled ✓
+```
+
+A matching race with a hardware fault that arrives between the `CmdClearCalibration` call and the `InvalidateCalibration` callback:
+
+```mermaid
+sequenceDiagram
+    participant HW as Fault Notifier
+    participant SM as FOC State Machine
+    participant NVM as NVM Service
+
+    SM->>NVM: InvalidateCalibration(callback)
+    HW-->>SM: fault notification
+    SM-->>SM: State → Fault
+
+    NVM-->>SM: callback(Ok)
+    note over SM: Guard: not in Idle or Ready → silently ignore
+    note over SM: State remains Fault ✓
+```
+
 ### Transition Policies
 
 The state machine supports two transition policies, selected at build time via the `E_FOC_AUTO_TRANSITION_POLICY` CMake cache variable:
@@ -194,6 +244,71 @@ If called from any state other than `Enabled`, the call is silently ignored.
 | `apply_estimates` | `ae`  | Apply online estimates to speed and current PID gains |
 | `estimate_status` | `es`  | Print current J, B, R, Ld values to the tracer        |
 
+### Control Mode Selection (`ControlModeStateMachine`)
+
+`ControlModeStateMachine` is a higher-level coordinator that owns one `FocStateMachineImpl` per supported control mode (Torque, Speed, Position). At any given time exactly one mode's state machine is the **active** instance; the others are idle. This section documents three behavioral invariants introduced to make runtime mode switching safe and predictable.
+
+#### C1 — CAN Wire-Scale Convention
+
+All setpoint and telemetry values exchanged over CAN use signed 16-bit integers. The physical value is recovered by dividing the wire integer by a mode-specific scale factor. The authoritative scale constants are defined once in `FocMotorDefinitions` (in the `services` namespace) and shared by every consumer:
+
+| Physical Quantity | Scale Factor | Resolution | Wire Range (int16) | Physical Range   |
+|-------------------|--------------|------------|--------------------|------------------|
+| Phase current     | 100          | 10 mA      | −32 768 … +32 767  | ≈ ±327.67 A      |
+| Angular velocity  | 10           | 0.1 rad/s  | −32 768 … +32 767  | ≈ ±3 276.7 rad/s |
+| Angular position  | 1 000        | 1 mrad     | −32 768 … +32 767  | ≈ ±32.767 rad    |
+| Bus voltage       | 10           | 0.1 V      | 0 … +32 767        | 0 … 3 276.7 V    |
+
+Encoding: `wire_int16 = clamp(trunc(physical × scale), INT16_MIN, INT16_MAX)`, where `trunc` means truncation toward zero (matching `static_cast<int32_t>(physical * scale)` in C++).  
+Decoding: `physical = wire_int16 / scale` (using floating-point division).
+
+Clamping the truncated intermediate value before the cast to `int16_t` is mandatory to prevent signed integer overflow (undefined behaviour in C++).
+
+#### C2 — Re-entrancy Guard for In-Flight Selection
+
+Switching control mode involves an asynchronous NVM write to persist the new default. A second `Select()` call issued while this write is still outstanding must not be applied until the first operation completes, since the NVM driver does not support concurrent write requests.
+
+Behavioral rule: if a `Select()` is called while a previous `Select()` callback has not yet fired, the call returns `SelectResult::busy` immediately and takes no other action. The caller is responsible for retrying.
+
+```mermaid
+sequenceDiagram
+    participant Caller
+    participant CSM as ControlModeStateMachine
+    participant NVM
+
+    Caller->>CSM: Select(Speed, cb1)
+    CSM->>NVM: SaveConfig(...)
+    Caller->>CSM: Select(Position, cb2)
+    CSM-->>Caller: cb2(busy)  [immediate — no NVM write]
+    NVM-->>CSM: WriteDone(Ok)
+    CSM-->>Caller: cb1(ok)
+```
+
+#### C3 — NVM Failure Rollback
+
+If `SaveConfig` returns a write failure after a `Select()` call, the active mode is **rolled back** to the mode that was active before the `Select()`. This ensures that:
+
+1. The in-memory active mode always agrees with what is persisted in NVM.
+2. A transient NVM error does not silently leave the active mode in an inconsistent state across a power cycle.
+
+Rollback does not trigger a new NVM write; the NVM already holds the previous (still-valid) default.
+
+Behavioral rule: `Select(newMode, cb)` → if `SaveConfig` fails → restore previous mode → invoke `cb(nvmFailed)`.
+
+```mermaid
+sequenceDiagram
+    participant Caller
+    participant CSM as ControlModeStateMachine
+    participant NVM
+
+    Caller->>CSM: Select(Speed, cb)
+    note over CSM: previousMode = Torque\nactiveMode  = Speed (optimistic)
+    CSM->>NVM: SaveConfig(defaultMode=Speed)
+    NVM-->>CSM: WriteFailed
+    note over CSM: rollback: activeMode = Torque
+    CSM-->>Caller: cb(nvmFailed)
+```
+
 ---
 
 ## Interfaces
@@ -209,7 +324,7 @@ If called from any state other than `Enabled`, the call is silently ignored.
 | `CmdEnable()`           | Requests enabling the FOC controller                             | Only effective from `Ready`; ignored from all other states                                                                       |
 | `CmdDisable()`          | Requests disabling the FOC controller                            | Only effective from `Enabled`; ignored from all other states                                                                     |
 | `CmdClearFault()`       | Clears the fault and returns to `Idle`                           | Only effective from `Fault`; ignored from all other states                                                                       |
-| `CmdClearCalibration()` | Invalidates NVM calibration and returns to `Idle`                | Ignored when in `Enabled`; effective from all other states                                                                       |
+| `CmdClearCalibration()` | Invalidates NVM calibration and returns to `Idle`                | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`. |
 | `ApplyOnlineEstimates()`| Retunes speed and current PID gains from online estimators       | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only.                                |
 
 ### Required

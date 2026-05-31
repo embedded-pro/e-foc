@@ -20,7 +20,7 @@ target_sources(e_foc.tool.hardware_bridge.common PRIVATE
 )
 
 if(MSVC)
-    target_compile_options(e_foc.tool.hardware_bridge.common PRIVATE /W4)
+    target_compile_options(e_foc.tool.hardware_bridge.common PRIVATE /W4 /WX- /wd4996)
 else()
     target_compile_options(e_foc.tool.hardware_bridge.common PRIVATE
         -Wno-error

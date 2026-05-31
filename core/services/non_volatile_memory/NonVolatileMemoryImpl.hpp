@@ -1,8 +1,8 @@
 #pragma once
 
-#include "infra/util/AutoResetFunction.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
 #include "core/services/non_volatile_memory/NvmRegion.hpp"
+#include "infra/util/AutoResetFunction.hpp"
 #include <array>
 #include <cstdint>
 
@@ -13,7 +13,7 @@ namespace services
     static constexpr uint32_t CalibrationMagic = 0xCAFEF00D;
     static constexpr uint32_t ConfigMagic = 0xDEADBEEF;
     static constexpr uint8_t CalibrationLayoutVersion = 1;
-    static constexpr uint8_t ConfigLayoutVersion = 1;
+    static constexpr uint8_t ConfigLayoutVersion = 2;
 
     class NonVolatileMemoryImpl
         : public NonVolatileMemory

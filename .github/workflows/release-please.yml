@@ -27,12 +27,12 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: token
         with:
           app-id: ${{ vars.FOREST_RELEASER_APP_ID }}
           private-key: ${{ secrets.FOREST_RELEASER_APP_PRIVATE_KEY }}
-      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
         with:
           token: ${{ steps.token.outputs.token }}
@@ -109,7 +109,7 @@ jobs:
           submodules: recursive
       - uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
       - name: Install Qt6
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@v4.3.1
         with:
           version: "6.7.*"
           cache: true
@@ -119,7 +119,6 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_COMPILE_WARNING_AS_ERROR=On
           -DE_FOC_TARGET_PLATFORM=Host
-          -DE_FOC_BUILD_SIMULATOR=On
           -DE_FOC_BUILD_TESTS=Off
           -DNUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS=Off
       - name: Build
@@ -223,19 +222,18 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Generate documentation PDFs
-        uses: ./.github/actions/build-documentation
+      - name: Generate documentation PDFs and traceability matrix
+        uses: embedded-pro/project-documentation@54fca1cb9925af16e53bd9d2640d1285560d295b # v0.2.0
         with:
+          run-build-documentation-pdfs: 'true'
+          run-traceability-matrix: 'true'
           version: ${{ needs.release_please.outputs.tag_name }}
           output-dir: docs-pdf
           artifact-name: documentation-pdfs
-      - name: Generate traceability matrix
-        uses: ./.github/actions/traceability-matrix
-        with:
           requirements-dir: documentation/requirements
           features-dir: integration_tests/software_in_the_loop/features
-          output: docs-pdf/traceability-matrix.md
-          pdf-output: docs-pdf/e_foc-traceability-matrix-${{ needs.release_please.outputs.tag_name }}.pdf
+          matrix-output: docs-pdf/traceability-matrix.md
+          matrix-pdf-output: docs-pdf/e_foc-traceability-matrix-${{ needs.release_please.outputs.tag_name }}.pdf
 
   publish_release_assets:
     name: Publish Release Assets

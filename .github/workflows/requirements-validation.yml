@@ -23,21 +23,13 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Validate requirements
-        uses: ./.github/actions/validate-requirements
+      - name: Validate requirements and generate PDF
+        uses: embedded-pro/project-documentation@54fca1cb9925af16e53bd9d2640d1285560d295b # v0.2.0
         with:
+          run-validate-requirements: 'true'
+          run-generate-requirements-pdf: 'true'
+          upload-requirements-pdf: 'true'
           schema-path: documentation/tools/requirement.schema.json
           requirements-dir: documentation/requirements
-
-      - name: Generate PDF
-        uses: ./.github/actions/generate-requirements-pdf
-        with:
-          requirements-dir: documentation/requirements
           template-path: documentation/templates/requirements.md
-          output-path: documentation/output/requirements.pdf
-
-      - name: Upload PDF
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: requirements-pdf
-          path: documentation/output/requirements.pdf
+          requirements-pdf-output: documentation/output/requirements.pdf

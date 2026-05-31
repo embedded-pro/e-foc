@@ -12,6 +12,10 @@ namespace tool
         , focCategory(focTransport, protocolClient)
     {
         protocolClient.RegisterCategory(focCategory);
+        protocolClient.SystemCategory().onCommandAck = [this](uint8_t categoryId, uint8_t commandType, CanAckStatus status)
+        {
+            HandleCommandAck(categoryId, commandType, status);
+        };
         CanProtocolClientObserver::Attach(protocolClient);
         FocMotorCategoryClientObserver::Attach(focCategory);
         CanBusAdapterObserver::Attach(adapter);
@@ -76,14 +80,17 @@ namespace tool
     void CanCommandClient::SendSetControlMode(FocMotorMode mode)
     {
         SetBusy(true);
-        if (focCategory.SendSetTarget(nodeId, FocSetpoint{ mode, 0 }))
+        if (focCategory.SendSelectControlMode(nodeId, mode))
             SetBusy(false);
     }
 
     void CanCommandClient::SendSetTorqueSetpoint(float iqCurrent)
     {
         SetBusy(true);
-        if (focCategory.SendSetTarget(nodeId, FocSetpoint{ FocMotorMode::torque, static_cast<int16_t>(iqCurrent * focCurrentScale) }))
+        const auto scaled = std::clamp(static_cast<int32_t>(iqCurrent * focCurrentScale),
+            static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
+            static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
+        if (focCategory.SendSetTorqueSetpoint(nodeId, static_cast<int16_t>(scaled)))
             SetBusy(false);
     }
 
@@ -93,7 +100,7 @@ namespace tool
         const auto scaled = std::clamp(static_cast<int32_t>(speedRadPerSec * focSpeedScale),
             static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
             static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
-        if (focCategory.SendSetTarget(nodeId, FocSetpoint{ FocMotorMode::speed, static_cast<int16_t>(scaled) }))
+        if (focCategory.SendSetSpeedSetpoint(nodeId, static_cast<int16_t>(scaled)))
             SetBusy(false);
     }
 
@@ -103,7 +110,7 @@ namespace tool
         const auto scaled = std::clamp(static_cast<int32_t>(positionRad * focPositionScale),
             static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
             static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
-        if (focCategory.SendSetTarget(nodeId, FocSetpoint{ FocMotorMode::position, static_cast<int16_t>(scaled) }))
+        if (focCategory.SendSetPositionSetpoint(nodeId, static_cast<int16_t>(scaled)))
             SetBusy(false);
     }
 
@@ -131,16 +138,6 @@ namespace tool
         SetBusy(true);
         if (focCategory.SendSetPidPosition(nodeId, FocPidGains{ static_cast<int16_t>(kp * focPidScale), static_cast<int16_t>(ki * focPidScale), static_cast<int16_t>(kd * focPidScale) }))
             SetBusy(false);
-    }
-
-    void CanCommandClient::SendSetSupplyVoltage(float /*volts*/) const
-    {
-        // No equivalent in can-lite FocMotorCategoryClient; intentional no-op
-    }
-
-    void CanCommandClient::SendSetMaxCurrent(float /*amps*/) const
-    {
-        // No equivalent in can-lite FocMotorCategoryClient; intentional no-op
     }
 
     void CanCommandClient::RequestData()
@@ -218,6 +215,24 @@ namespace tool
         NotifyObservers([voltage](auto& observer)
             {
                 observer.OnBusVoltageReceived(voltage);
+            });
+    }
+
+    void CanCommandClient::OnSelectControlModeResponse(FocMotorMode activeMode)
+    {
+        SetBusy(false);
+        NotifyObservers([activeMode](auto& observer)
+            {
+                observer.OnControlModeAcknowledged(activeMode);
+            });
+    }
+
+    void CanCommandClient::HandleCommandAck(uint8_t categoryId, uint8_t commandType, CanAckStatus status)
+    {
+        SetBusy(false);
+        NotifyObservers([categoryId, commandType, status](auto& observer)
+            {
+                observer.OnCommandAck(categoryId, commandType, status);
             });
     }
 

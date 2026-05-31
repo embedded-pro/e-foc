@@ -59,6 +59,12 @@ namespace tool
         : TcpClient(factory, address, port)
     {}
 
+    TcpClientCanbus::~TcpClientCanbus()
+    {
+        if (connectionHandlerPtr)
+            connectionHandlerPtr->Subject().AbortAndDestroy();
+    }
+
     void TcpClientCanbus::SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion)
     {
         if (IsConnected() && connectionHandler)
@@ -87,8 +93,8 @@ namespace tool
             connectionHandlerPtr = nullptr;
     }
 
-    TcpClientCanbus::ConnectionHandler::ConnectionHandler(TcpClientCanbus& parent)
-        : parent(parent)
+    TcpClientCanbus::ConnectionHandler::ConnectionHandler(TcpClientCanbus& owner)
+        : parent(owner)
     {}
 
     void TcpClientCanbus::ConnectionHandler::SendStreamAvailable(infra::SharedPtr<infra::StreamWriter>&& streamWriter)
@@ -115,10 +121,12 @@ namespace tool
 
         while (!dataStream.Empty())
         {
-            auto bytesToRead = std::min(canFrameSize - accumulatedBytes, static_cast<std::size_t>(dataStream.Available()));
-            infra::ByteRange range(receiveAccumulator.data() + accumulatedBytes, receiveAccumulator.data() + accumulatedBytes + bytesToRead);
-            dataStream >> range;
-            accumulatedBytes += bytesToRead;
+            auto chunk = dataStream.ContiguousRange(canFrameSize - accumulatedBytes);
+            if (chunk.empty())
+                break;
+
+            std::memcpy(receiveAccumulator.data() + accumulatedBytes, chunk.begin(), chunk.size());
+            accumulatedBytes += chunk.size();
 
             if (accumulatedBytes >= canFrameSize)
             {

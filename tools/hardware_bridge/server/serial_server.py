@@ -1,53 +1,99 @@
 """SerialOverTcpServer: bridges a local serial port to a single TCP client."""
 
 import asyncio
+import errno
 import logging
 import serial
+
+from server_errors import HardwareUnavailableError, PortUnavailableError
 
 logger = logging.getLogger(__name__)
 
 
 class SerialOverTcpServer:
-    def __init__(self, serial_port: str, baudrate: int, tcp_port: int):
+    def __init__(
+        self,
+        serial_port: str,
+        baudrate: int,
+        tcp_port: int,
+        serial_factory=serial.Serial,
+        server_factory=asyncio.start_server,
+    ):
         self.serial_port = serial_port
         self.baudrate = baudrate
         self.tcp_port = tcp_port
+        self._serial_factory = serial_factory
+        self._server_factory = server_factory
         self._serial: serial.Serial | None = None
         self._server: asyncio.AbstractServer | None = None
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
 
     async def start(self) -> None:
-        self._serial = serial.Serial(
-            self.serial_port,
-            self.baudrate,
-            timeout=0,
-        )
-        self._serial.reset_input_buffer()
+        try:
+            self._serial = self._serial_factory(
+                self.serial_port,
+                self.baudrate,
+                timeout=0.05,
+            )
+            self._serial.reset_input_buffer()
+        except Exception as exc:
+            raise HardwareUnavailableError(
+                f"Cannot open serial port {self.serial_port}: {exc}"
+            ) from exc
+
         logger.info(
             "Serial port %s opened at %d baud", self.serial_port, self.baudrate
         )
 
-        self._server = await asyncio.start_server(
-            self._handle_client, "0.0.0.0", self.tcp_port
-        )
+        try:
+            self._server = await self._server_factory(
+                self._handle_client, "0.0.0.0", self.tcp_port
+            )
+        except OSError as exc:
+            await self._close_serial()
+            if exc.errno in (errno.EADDRINUSE, errno.EACCES):
+                raise PortUnavailableError(
+                    f"Cannot listen for serial bridge on TCP port {self.tcp_port}: {exc.strerror}"
+                ) from exc
+            raise
+        except Exception:
+            await self._close_serial()
+            raise
+
         logger.info("Serial TCP server listening on port %d", self.tcp_port)
 
     async def stop(self) -> None:
-        if self._writer is not None:
-            self._writer.close()
-            await self._writer.wait_closed()
-            self._writer = None
-            self._reader = None
+        await self._close_writer(self._writer)
 
         if self._server is not None:
             self._server.close()
             await self._server.wait_closed()
             self._server = None
 
+        await self._close_serial()
+
+    async def _close_serial(self) -> None:
         if self._serial is not None:
-            self._serial.close()
+            try:
+                self._serial.close()
+            except Exception:
+                logger.warning("Error while closing serial port", exc_info=True)
             self._serial = None
+
+    async def _close_writer(self, writer: asyncio.StreamWriter | None) -> None:
+        if writer is None:
+            return
+
+        if self._writer is writer:
+            self._writer = None
+            self._reader = None
+
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except (ConnectionError, OSError, RuntimeError):
+            logger.debug("TCP writer already closed", exc_info=True)
 
     async def _handle_client(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -57,8 +103,7 @@ class SerialOverTcpServer:
 
         if self._writer is not None:
             logger.warning("Rejecting second client %s — only one allowed", peer)
-            writer.close()
-            await writer.wait_closed()
+            await self._close_writer(writer)
             return
 
         self._reader = reader
@@ -77,6 +122,8 @@ class SerialOverTcpServer:
                 task.result()
         except asyncio.CancelledError:
             pass
+        except (ConnectionError, OSError) as exc:
+            logger.warning("Serial bridge session ended: %s", exc)
         except Exception:
             logger.exception("Serial bridge error")
         finally:
@@ -91,10 +138,7 @@ class SerialOverTcpServer:
             )
 
             logger.info("Serial client disconnected: %s", peer)
-            self._writer.close()
-            await self._writer.wait_closed()
-            self._writer = None
-            self._reader = None
+            await self._close_writer(writer)
 
     async def _serial_to_tcp(self) -> None:
         loop = asyncio.get_running_loop()
@@ -109,7 +153,6 @@ class SerialOverTcpServer:
 
     def _serial_read_blocking(self) -> bytes:
         assert self._serial is not None
-        self._serial.timeout = 0.05
         data = self._serial.read(1)
         if data:
             remaining = self._serial.in_waiting

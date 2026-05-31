@@ -22,14 +22,14 @@ namespace simulator
         }
     }
 
-    Gui::Gui(ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
+    Gui::Gui(ThreePhaseMotorModel& motorModel, foc::Controllable& motorController, infra::EventDispatcherWithWeakPtr& dispatcher,
         const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
         const ControlPanel::SetpointConfig& setpointConfig, foc::Volts powerSupplyVoltage, QWidget* parent)
         : QMainWindow(parent)
-        , ThreePhaseMotorModelObserver(model)
-        , model(model)
-        , controller(controller)
-        , eventDispatcher(eventDispatcher)
+        , ThreePhaseMotorModelObserver(motorModel)
+        , model(motorModel)
+        , controller(motorController)
+        , eventDispatcher(dispatcher)
     {
         setWindowTitle("e-foc Simulator");
         resize(windowWidth, windowHeight);

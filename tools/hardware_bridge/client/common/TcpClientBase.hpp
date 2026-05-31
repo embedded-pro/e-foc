@@ -23,7 +23,7 @@ namespace tool
         , private services::ClientConnectionObserverFactory
     {
     public:
-        TcpClient(services::ConnectionFactory& factory, services::IPAddress address, uint16_t port);
+        TcpClient(services::ConnectionFactory& factory, services::IPAddress ipAddress, uint16_t portNum);
         virtual ~TcpClient() = default;
 
         bool IsConnected() const;

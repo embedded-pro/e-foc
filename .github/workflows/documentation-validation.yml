@@ -6,12 +6,10 @@ on:
     branches: [main]
     paths:
       - "documentation/**"
-      - ".github/actions/validate-documents/**"
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - "documentation/**"
-      - ".github/actions/validate-documents/**"
 
 permissions:
   contents: read
@@ -30,8 +28,9 @@ jobs:
           persist-credentials: false
 
       - name: Validate architecture documents
-        uses: ./.github/actions/validate-documents
+        uses: embedded-pro/project-documentation@54fca1cb9925af16e53bd9d2640d1285560d295b # v0.2.0
         with:
+          run-validate-documents: 'true'
           documents-dir: documentation
           doc-type: architecture
 
@@ -44,8 +43,9 @@ jobs:
           persist-credentials: false
 
       - name: Validate design documents
-        uses: ./.github/actions/validate-documents
+        uses: embedded-pro/project-documentation@54fca1cb9925af16e53bd9d2640d1285560d295b # v0.2.0
         with:
+          run-validate-documents: 'true'
           documents-dir: documentation
           doc-type: design
 
@@ -58,7 +58,8 @@ jobs:
           persist-credentials: false
 
       - name: Validate theory documents
-        uses: ./.github/actions/validate-documents
+        uses: embedded-pro/project-documentation@54fca1cb9925af16e53bd9d2640d1285560d295b # v0.2.0
         with:
+          run-validate-documents: 'true'
           documents-dir: documentation
           doc-type: theory

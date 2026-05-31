@@ -32,6 +32,9 @@ namespace tool
 
         virtual void OnConnectionChanged(bool connected) = 0;
         virtual void OnAdapterError(infra::BoundedConstString message) = 0;
+
+        virtual void OnControlModeAcknowledged(services::FocMotorMode activeMode) = 0;
+        virtual void OnCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status) = 0;
     };
 
     class CanCommandClient
@@ -61,9 +64,6 @@ namespace tool
         void SendSetSpeedPid(float kp, float ki, float kd);
         void SendSetPositionPid(float kp, float ki, float kd);
 
-        void SendSetSupplyVoltage(float volts) const;
-        void SendSetMaxCurrent(float amps) const;
-
         void RequestData();
 
         void HandleTimeout();
@@ -81,6 +81,10 @@ namespace tool
         void OnMechanicalParamsResponse(const services::FocMechanicalParams& params) override;
         void OnTelemetryElectricalResponse(const services::FocTelemetryElectrical& telemetry) override;
         void OnTelemetryStatusResponse(const services::FocTelemetryStatus& status) override;
+        void OnSelectControlModeResponse(services::FocMotorMode activeMode) override;
+
+        // System command ACK
+        void HandleCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status);
 
         // CanBusAdapterObserver
         void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) override;

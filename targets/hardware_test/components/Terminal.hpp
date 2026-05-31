@@ -3,10 +3,8 @@
 #include "core/foc/implementations/FocSpeedImpl.hpp"
 #include "core/foc/interfaces/Driver.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
-#include "foc/implementations/FocTorqueImpl.hpp"
-#include "hal/interfaces/AdcMultiChannel.hpp"
 #include "hal/interfaces/Eeprom.hpp"
-#include "hal/synchronous_interfaces/SynchronousPwm.hpp"
+#include "hal/interfaces/Pwm.hpp"
 #include "infra/util/BoundedDeque.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
@@ -56,10 +54,10 @@ namespace application
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
         application::PlatformFactory& hardware;
-        infra::DelayedProxyCreator<hal::SynchronousThreeChannelsPwm, void(std::chrono::nanoseconds, hal::Hertz)> pwmCreator;
-        infra::DelayedProxyCreator<AdcPhaseCurrentMeasurement, void(PlatformFactory::SampleAndHold)> adcCreator;
-        infra::DelayedProxyCreator<QuadratureEncoderDecorator, void()> encoderCreator;
-        infra::DelayedProxyCreator<CanBusAdapter, void(uint32_t, bool)> canCreator;
+        hal::Hertz currentPwmFrequency_{ 10000 };
+        std::chrono::nanoseconds currentPwmDeadTime_{ 500 };
+        PlatformFactory::SampleAndHold currentSah_{ PlatformFactory::SampleAndHold::shortest };
+        bool adcActive_{ false };
         bool canStarted = false;
         QueueOfPhaseCurrents queueOfPhaseCurrents;
         hal::PerformanceTracker& performanceTimer;

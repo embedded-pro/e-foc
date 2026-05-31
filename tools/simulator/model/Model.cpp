@@ -25,11 +25,11 @@ namespace simulator
         }
     }
 
-    ThreePhaseMotorModel::ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency, std::optional<std::size_t> maxIterations)
+    ThreePhaseMotorModel::ThreePhaseMotorModel(const Parameters& params, foc::Volts supplyVoltage, hal::Hertz pwmFrequency, std::optional<std::size_t> iterationLimit)
         : parameters(params)
-        , baseFrequency(baseFrequency)
-        , powerSupplyVoltage(powerSupplyVoltage)
-        , maxIterations(maxIterations)
+        , baseFrequency(pwmFrequency)
+        , powerSupplyVoltage(supplyVoltage)
+        , maxIterations(iterationLimit)
     {
     }
 

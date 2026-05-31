@@ -34,9 +34,6 @@ namespace tool
         void SetSpeedPidRequested(float kp, float ki, float kd);
         void SetPositionPidRequested(float kp, float ki, float kd);
 
-        void SetSupplyVoltageRequested(float volts);
-        void SetMaxCurrentRequested(float amps);
-
         void RequestDataRequested();
 
     public slots:
