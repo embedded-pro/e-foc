@@ -162,20 +162,15 @@ cmake --preset host
 cmake --build --preset host-Debug
 ```
 
-Run the speed control simulator:
+Run the simulator:
 ```bash
-./build/host/bin/Debug/e_foc.tool.simulator.speed_control
+./build/host/bin/Debug/e_foc.tool.simulator
 ```
 
-Run the torque control simulator:
-```bash
-./build/host/bin/Debug/e_foc.tool.simulator.torque_control
-```
-
-Run with custom parameters (example):
-```bash
-./build/host/bin/Debug/e_foc.tool.simulator.speed_control --help
-```
+On launch, a dialog asks which controller to simulate (Torque, Speed, or Position).
+The chosen controller assembles the corresponding loops; the main window provides
+tabbed Parameters/Configuration and Phase Signals/RLS Estimates panels around an
+always-visible SVPWM hexagon.
 
 ### Troubleshooting
 

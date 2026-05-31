@@ -9,6 +9,7 @@
 #include "infra/util/Observer.hpp"
 #include <cstddef>
 #include <optional>
+#include <random>
 
 namespace simulator
 {
@@ -21,7 +22,8 @@ namespace simulator
         using infra::Observer<ThreePhaseMotorModelObserver, ThreePhaseMotorModel>::Observer;
 
         virtual void Started() = 0;
-        virtual void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta) = 0;
+        virtual void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta, foc::RadiansPerSecond omegaMech) = 0;
+        virtual void StatorVoltages(foc::ThreePhase phaseVoltages, foc::TwoPhase alphaBeta) = 0;
         virtual void Finished() = 0;
     };
 
@@ -45,9 +47,48 @@ namespace simulator
             foc::NewtonMeterSecondPerRadian B; // Viscous friction coefficient [N·m·s/rad]
         };
 
-        ThreePhaseMotorModel(const Parameters& params, foc::Volts supplyVoltage, hal::Hertz pwmFrequency, std::optional<std::size_t> iterationLimit);
+        struct NoiseConfig
+        {
+            float sigmaAmpere{ 0.0f };
+            float biasAmpereA{ 0.0f };
+            float biasAmpereB{ 0.0f };
+            float biasAmpereC{ 0.0f };
+        };
+
+        struct ThermalConfig
+        {
+            float ambientCelsius{ 25.0f };
+            float thermalResistance{ 2.0f };   // °C/W
+            float thermalCapacitance{ 25.0f }; // J/°C
+            float copperTempCoeff{ 0.00393f }; // 1/°C
+            float ironInductanceCoeff{ 0.0f }; // 1/°C
+        };
+
+        struct EncoderNoiseConfig
+        {
+            float sigmaRadians{ 0.0f };
+            float biasRadians{ 0.0f };
+        };
+
+        ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency, std::optional<std::size_t> maxIterations);
 
         void SetLoad(foc::NewtonMeter load);
+        void SetAdcNoise(const NoiseConfig& config);
+        void SetEncoderNoise(const EncoderNoiseConfig& config);
+        void SetThermalConfig(const ThermalConfig& config);
+        void ResetTemperature();
+        float WindingTemperatureCelsius() const;
+        foc::Ohm EffectiveResistance() const;
+        foc::Henry EffectiveInductanceD() const;
+        foc::Henry EffectiveInductanceQ() const;
+        void SetWindingTemperatureForTest(float celsius);
+
+        // Enables continuous PWM cycling driven by the event dispatcher. Mirrors the
+        // behavior of a real PWM peripheral whose carrier keeps running once enabled.
+        // Once enabled, every call to ThreePhasePwmOutput becomes a duty-cycle register
+        // update; the model schedules its own next sample via the dispatcher. Tests that
+        // drive the model synchronously must NOT enable self-driving (use StepForTest).
+        void EnableSelfDriving();
 
         // Implementation of foc::ThreePhaseInverter
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone) override;
@@ -62,30 +103,77 @@ namespace simulator
         void Set(foc::Radians value) override;
         void SetZero() override;
 
-    private:
-        void Model(const foc::PhasePwmDutyCycles& dutyPhases);
+        // Synchronous single-cycle execution for unit tests. Bypasses the event
+        // dispatcher and the controller callback so legacy step-driven tests can
+        // observe the model state directly.
+        void StepForTest(const foc::PhasePwmDutyCycles& dutyPhases);
 
     private:
+        void Model(const foc::PhasePwmDutyCycles& dutyPhases);
+        void RunOneCycle(const foc::PhasePwmDutyCycles& dutyPhases);
+        void ScheduleNextCycle();
+        float SampleNoise();
+
+    private:
+        struct MotorState
+        {
+            foc::Ampere ia{ 0.0f };
+            foc::Ampere ib{ 0.0f };
+            foc::Ampere ic{ 0.0f };
+            foc::Radians theta{ 0.0f };
+            foc::Radians theta_mech{ 0.0f };
+            foc::RadiansPerSecond omega{ 0.0f };
+            foc::RadiansPerSecond omega_mech{ 0.0f };
+        };
+
+        struct CurrentNoiseState
+        {
+            NoiseConfig config{};
+            std::mt19937 engine{ 0xc0ffeeU };
+            std::normal_distribution<float> distribution{ 0.0f, 1.0f };
+            foc::Ampere iaLast{ 0.0f };
+            foc::Ampere ibLast{ 0.0f };
+            foc::Ampere icLast{ 0.0f };
+        };
+
+        struct ThermalState
+        {
+            ThermalConfig config{};
+            float windingTempCelsius{ 25.0f };
+        };
+
+        struct EncoderNoiseState
+        {
+            EncoderNoiseConfig config{};
+            std::mt19937 engine{ 0xbaadf00dU };
+            std::normal_distribution<float> distribution{ 0.0f, 1.0f };
+        };
+
+        struct SelfDriveState
+        {
+            bool driving{ false };
+            bool cycleScheduled{ false };
+            foc::PhasePwmDutyCycles pendingDuties{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } };
+        };
+
         Parameters parameters;
         hal::Hertz baseFrequency;
         foc::Volts powerSupplyVoltage;
-
-        foc::Ampere ia{ 0.0f };
-        foc::Ampere ib{ 0.0f };
-        foc::Ampere ic{ 0.0f };
-        foc::Radians theta{ 0.0f };
-        foc::Radians theta_mech{ 0.0f };
-        foc::RadiansPerSecond omega{ 0.0f };
-        foc::RadiansPerSecond omega_mech{ 0.0f };
+        MotorState motorState;
 
         [[no_unique_address]] foc::Clarke clarke;
         [[no_unique_address]] foc::Park park;
 
         infra::Function<void(foc::PhaseCurrents)> onCurrentPhasesReady;
-        bool running = false;
+        bool running{ false };
         std::optional<foc::NewtonMeter> load;
         const std::optional<std::size_t> maxIterations;
         std::optional<std::size_t> counter;
+
+        CurrentNoiseState currentNoise;
+        ThermalState thermal;
+        EncoderNoiseState encoderNoise;
+        SelfDriveState selfDrive;
     };
 
     class SimulationFinishedObserver
@@ -95,7 +183,8 @@ namespace simulator
         SimulationFinishedObserver(ThreePhaseMotorModel& model, const infra::Function<void()>& onFinished);
 
         void Started() override;
-        void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta) override;
+        void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta, foc::RadiansPerSecond omegaMech) override;
+        void StatorVoltages(foc::ThreePhase phaseVoltages, foc::TwoPhase alphaBeta) override;
         void Finished() override;
 
     private:

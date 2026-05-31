@@ -7,6 +7,7 @@ endif()
 option(CMAKE_COMPILE_WARNING_AS_ERROR "Enable warnings-as-error" On)
 option(E_FOC_INCLUDE_DEFAULT_INIT "Include default initialization code; turn off when providing custom initialization" On)
 option(E_FOC_BUILD_TESTS "Enable build of the examples" Off)
+option(E_FOC_BUILD_SIMULATOR "Enable build of the Qt simulator applications" Off)
 option(E_FOC_EMBEDDED_BUILD "Building for an embedded target" Off)
 
 if (E_FOC_BUILD_TESTS)
