@@ -6,6 +6,7 @@ target_link_libraries(e_foc.state_machine_test PUBLIC
     gmock_main
     e_foc.state_machine
     e_foc.foc.implementations
+    e_foc.platform_abstraction_mock
     hal.interfaces_test_doubles
     infra.timer_test_helper
     infra.event_test_helper
@@ -20,6 +21,7 @@ target_link_libraries(e_foc.state_machine_test PUBLIC
 )
 
 target_sources(e_foc.state_machine_test PRIVATE
+    TestBoardProtectionFaultNotifier.cpp
     TestControlMode.cpp
     TestControlModeStateMachine.cpp
     TestFaultNotifier.cpp

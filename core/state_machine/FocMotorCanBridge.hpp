@@ -3,6 +3,7 @@
 #include "can-lite/categories/foc_motor/FocMotorCategoryServer.hpp"
 #include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
+#include "core/state_machine/FaultNotifier.hpp"
 #include "infra/util/Function.hpp"
 
 namespace state_machine
@@ -12,6 +13,8 @@ namespace state_machine
     {
     public:
         FocMotorCanBridge(services::FocMotorCategoryServer& server, ControlModeStateMachine& controlMode);
+
+        void OnFault(FaultCode code);
 
         void OnQueryMotorType(const infra::Function<void(services::FocMotorMode)>&) override;
         void OnStart(const infra::Function<void()>& onDone) override;
@@ -32,6 +35,8 @@ namespace state_machine
         void OnConfigureTelemetryRate(uint8_t, const infra::Function<void()>&) override;
 
     private:
+        static services::FocFaultCode ToCanFaultCode(FaultCode code);
+
         services::FocMotorCategoryServer& server;
         ControlModeStateMachine& controlMode;
         infra::Function<void(services::FocMotorMode)> pendingSelectCallback;

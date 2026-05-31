@@ -24,3 +24,14 @@
     All CAN motor commands shall be dispatched through the FocMotorCategoryServer
     observer interface. No CAN protocol internals shall be exposed to the state
     machine layer.
+
+- id: REQ-INT-005
+  title: Hardware board-protection event triggers Fault and unsolicited CAN broadcast
+  shall: >
+    When a hardware board-protection event (over-current, over-voltage, or
+    over-temperature) is detected by the platform, the state machine shall
+    immediately transition to the Fault state with the corresponding fault code,
+    and the FocMotorCategoryServer shall broadcast an unsolicited
+    focTelemetryStatusResponseId frame with state=fault and the mapped FocFaultCode,
+    without requiring any client request. PWM is already disabled in hardware before
+    this software reaction occurs.
