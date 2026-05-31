@@ -23,7 +23,7 @@ namespace simulator
                 alignment.ForceAlignment(motorParams.p, services::MotorAlignment::AlignmentConfig{},
                     [&gui](std::optional<foc::Radians> offset)
                     {
-                        if (offset)
+                        if (offset.has_value())
                             gui.SetAlignmentOffset(*offset);
                         gui.CalibrationFinished();
                         gui.SetState(state_machine::Ready{});
@@ -37,14 +37,12 @@ namespace simulator
                 electricalIdent.EstimateResistanceAndInductance(services::ElectricalParametersIdentification::ResistanceAndInductanceConfig{},
                     [&gui, &electricalIdent](std::optional<foc::Ohm> r, std::optional<foc::MilliHenry> l)
                     {
-                        if (r && l)
-                            gui.SetIdentifiedElectrical(*r, *l);
-
-                        gui.SetState(state_machine::Calibrating{ state_machine::CalibrationStep::polePairs });
+                        if (r.has_value() && l.has_value())
+                            gui.SetState(state_machine::Calibrating{ state_machine::CalibrationStep::polePairs });
                         electricalIdent.EstimateNumberOfPolePairs(services::ElectricalParametersIdentification::PolePairsConfig{},
                             [&gui](std::optional<std::size_t> p)
                             {
-                                if (p)
+                                if (p.has_value())
                                     gui.SetIdentifiedPolePairs(*p);
                                 gui.CalibrationFinished();
                                 gui.SetState(state_machine::Ready{});

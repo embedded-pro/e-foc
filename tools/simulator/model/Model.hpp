@@ -115,44 +115,65 @@ namespace simulator
         float SampleNoise();
 
     private:
+        struct MotorState
+        {
+            foc::Ampere ia{ 0.0f };
+            foc::Ampere ib{ 0.0f };
+            foc::Ampere ic{ 0.0f };
+            foc::Radians theta{ 0.0f };
+            foc::Radians theta_mech{ 0.0f };
+            foc::RadiansPerSecond omega{ 0.0f };
+            foc::RadiansPerSecond omega_mech{ 0.0f };
+        };
+
+        struct CurrentNoiseState
+        {
+            NoiseConfig config{};
+            std::mt19937 engine{ 0xc0ffeeU };
+            std::normal_distribution<float> distribution{ 0.0f, 1.0f };
+            foc::Ampere iaLast{ 0.0f };
+            foc::Ampere ibLast{ 0.0f };
+            foc::Ampere icLast{ 0.0f };
+        };
+
+        struct ThermalState
+        {
+            ThermalConfig config{};
+            float windingTempCelsius{ 25.0f };
+        };
+
+        struct EncoderNoiseState
+        {
+            EncoderNoiseConfig config{};
+            std::mt19937 engine{ 0xbaadf00dU };
+            std::normal_distribution<float> distribution{ 0.0f, 1.0f };
+        };
+
+        struct SelfDriveState
+        {
+            bool driving{ false };
+            bool cycleScheduled{ false };
+            foc::PhasePwmDutyCycles pendingDuties{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } };
+        };
+
         Parameters parameters;
         hal::Hertz baseFrequency;
         foc::Volts powerSupplyVoltage;
-
-        foc::Ampere ia{ 0.0f };
-        foc::Ampere ib{ 0.0f };
-        foc::Ampere ic{ 0.0f };
-        foc::Radians theta{ 0.0f };
-        foc::Radians theta_mech{ 0.0f };
-        foc::RadiansPerSecond omega{ 0.0f };
-        foc::RadiansPerSecond omega_mech{ 0.0f };
+        MotorState motorState;
 
         [[no_unique_address]] foc::Clarke clarke;
         [[no_unique_address]] foc::Park park;
 
         infra::Function<void(foc::PhaseCurrents)> onCurrentPhasesReady;
-        bool running = false;
+        bool running{ false };
         std::optional<foc::NewtonMeter> load;
         const std::optional<std::size_t> maxIterations;
         std::optional<std::size_t> counter;
 
-        NoiseConfig noiseConfig{};
-        std::mt19937 noiseEngine{ 0xc0ffeeU };
-        std::normal_distribution<float> noiseDistribution{ 0.0f, 1.0f };
-        foc::Ampere iaNoisyLast{ 0.0f };
-        foc::Ampere ibNoisyLast{ 0.0f };
-        foc::Ampere icNoisyLast{ 0.0f };
-
-        ThermalConfig thermalConfig{};
-        float windingTempCelsius{ 25.0f };
-
-        EncoderNoiseConfig encoderNoiseConfig{};
-        std::mt19937 encoderNoiseEngine{ 0xbaadf00dU };
-        std::normal_distribution<float> encoderNoiseDistribution{ 0.0f, 1.0f };
-
-        bool selfDriving{ false };
-        bool cycleScheduled{ false };
-        foc::PhasePwmDutyCycles pendingDuties{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } };
+        CurrentNoiseState currentNoise;
+        ThermalState thermal;
+        EncoderNoiseState encoderNoise;
+        SelfDriveState selfDrive;
     };
 
     class SimulationFinishedObserver

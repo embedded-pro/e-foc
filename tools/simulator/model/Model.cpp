@@ -40,55 +40,55 @@ namespace simulator
 
     void ThreePhaseMotorModel::SetAdcNoise(const NoiseConfig& config)
     {
-        noiseConfig = config;
+        currentNoise.config = config;
     }
 
     void ThreePhaseMotorModel::SetEncoderNoise(const EncoderNoiseConfig& config)
     {
-        encoderNoiseConfig = config;
+        encoderNoise.config = config;
     }
 
     void ThreePhaseMotorModel::SetThermalConfig(const ThermalConfig& config)
     {
-        thermalConfig = config;
+        thermal.config = config;
     }
 
     void ThreePhaseMotorModel::ResetTemperature()
     {
-        windingTempCelsius = thermalConfig.ambientCelsius;
+        thermal.windingTempCelsius = thermal.config.ambientCelsius;
     }
 
     float ThreePhaseMotorModel::WindingTemperatureCelsius() const
     {
-        return windingTempCelsius;
+        return thermal.windingTempCelsius;
     }
 
     foc::Ohm ThreePhaseMotorModel::EffectiveResistance() const
     {
-        const float deltaT = windingTempCelsius - thermalConfig.ambientCelsius;
-        return foc::Ohm{ parameters.R.Value() * (1.0f + thermalConfig.copperTempCoeff * deltaT) };
+        const float deltaT = thermal.windingTempCelsius - thermal.config.ambientCelsius;
+        return foc::Ohm{ parameters.R.Value() * (1.0f + thermal.config.copperTempCoeff * deltaT) };
     }
 
     foc::Henry ThreePhaseMotorModel::EffectiveInductanceD() const
     {
-        const float deltaT = windingTempCelsius - thermalConfig.ambientCelsius;
-        return foc::Henry{ parameters.Ld.Value() * (1.0f - thermalConfig.ironInductanceCoeff * deltaT) };
+        const float deltaT = thermal.windingTempCelsius - thermal.config.ambientCelsius;
+        return foc::Henry{ parameters.Ld.Value() * (1.0f - thermal.config.ironInductanceCoeff * deltaT) };
     }
 
     foc::Henry ThreePhaseMotorModel::EffectiveInductanceQ() const
     {
-        const float deltaT = windingTempCelsius - thermalConfig.ambientCelsius;
-        return foc::Henry{ parameters.Lq.Value() * (1.0f - thermalConfig.ironInductanceCoeff * deltaT) };
+        const float deltaT = thermal.windingTempCelsius - thermal.config.ambientCelsius;
+        return foc::Henry{ parameters.Lq.Value() * (1.0f - thermal.config.ironInductanceCoeff * deltaT) };
     }
 
     void ThreePhaseMotorModel::SetWindingTemperatureForTest(float celsius)
     {
-        windingTempCelsius = celsius;
+        thermal.windingTempCelsius = celsius;
     }
 
     float ThreePhaseMotorModel::SampleNoise()
     {
-        return noiseConfig.sigmaAmpere * noiseDistribution(noiseEngine);
+        return currentNoise.config.sigmaAmpere * currentNoise.distribution(currentNoise.engine);
     }
 
     void ThreePhaseMotorModel::PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone)
@@ -103,13 +103,13 @@ namespace simulator
         // duties and (re-)arms the carrier. The carrier keeps cycling at the base
         // frequency until Stop() is called. Re-entrant calls from within the
         // controller callback simply update the latched duties.
-        pendingDuties = dutyPhases;
+        selfDrive.pendingDuties = dutyPhases;
         EnableSelfDriving();
     }
 
     void ThreePhaseMotorModel::StepForTest(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        pendingDuties = dutyPhases;
+        selfDrive.pendingDuties = dutyPhases;
         RunOneCycle(dutyPhases);
     }
 
@@ -124,12 +124,12 @@ namespace simulator
             justFinished = true;
         }
 
-        const auto iaNoise = foc::Ampere{ ia.Value() + noiseConfig.biasAmpereA + SampleNoise() };
-        const auto ibNoise = foc::Ampere{ ib.Value() + noiseConfig.biasAmpereB + SampleNoise() };
-        const auto icNoise = foc::Ampere{ ic.Value() + noiseConfig.biasAmpereC + SampleNoise() };
-        iaNoisyLast = iaNoise;
-        ibNoisyLast = ibNoise;
-        icNoisyLast = icNoise;
+        const auto iaNoise = foc::Ampere{ motorState.ia.Value() + currentNoise.config.biasAmpereA + SampleNoise() };
+        const auto ibNoise = foc::Ampere{ motorState.ib.Value() + currentNoise.config.biasAmpereB + SampleNoise() };
+        const auto icNoise = foc::Ampere{ motorState.ic.Value() + currentNoise.config.biasAmpereC + SampleNoise() };
+        currentNoise.iaLast = iaNoise;
+        currentNoise.ibLast = ibNoise;
+        currentNoise.icLast = icNoise;
 
         const auto va = (dutyPhases.a.Value() / percentToFraction - half) * powerSupplyVoltage.Value();
         const auto vb = (dutyPhases.b.Value() / percentToFraction - half) * powerSupplyVoltage.Value();
@@ -139,7 +139,7 @@ namespace simulator
 
         NotifyObservers([this, &vAbc, &vAlphaBeta](auto& observer)
             {
-                observer.PhaseCurrentsWithMechanicalAngle({ iaNoisyLast, ibNoisyLast, icNoisyLast }, theta_mech, omega_mech);
+                observer.PhaseCurrentsWithMechanicalAngle({ currentNoise.iaLast, currentNoise.ibLast, currentNoise.icLast }, motorState.theta_mech, motorState.omega_mech);
                 observer.StatorVoltages(vAbc, vAlphaBeta);
             });
 
@@ -147,11 +147,11 @@ namespace simulator
         // ThreePhasePwmOutput from inside the callback only updates pendingDuties,
         // so the dispatcher queue never grows.
         if (onCurrentPhasesReady && !justFinished)
-            onCurrentPhasesReady({ iaNoisyLast, ibNoisyLast, icNoisyLast });
+            onCurrentPhasesReady({ currentNoise.iaLast, currentNoise.ibLast, currentNoise.icLast });
 
         if (justFinished)
         {
-            selfDriving = false;
+            selfDrive.driving = false;
             NotifyObservers([](auto& observer)
                 {
                     observer.Finished();
@@ -161,25 +161,25 @@ namespace simulator
 
     void ThreePhaseMotorModel::EnableSelfDriving()
     {
-        if (selfDriving)
+        if (selfDrive.driving)
             return;
 
-        selfDriving = true;
+        selfDrive.driving = true;
         ScheduleNextCycle();
     }
 
     void ThreePhaseMotorModel::ScheduleNextCycle()
     {
-        if (cycleScheduled || !selfDriving)
+        if (selfDrive.cycleScheduled || !selfDrive.driving)
             return;
 
-        cycleScheduled = true;
+        selfDrive.cycleScheduled = true;
         infra::EventDispatcherWithWeakPtr::Instance().Schedule([this]()
             {
-                cycleScheduled = false;
-                if (!selfDriving)
+                selfDrive.cycleScheduled = false;
+                if (!selfDrive.driving)
                     return;
-                RunOneCycle(pendingDuties);
+                RunOneCycle(selfDrive.pendingDuties);
                 ScheduleNextCycle();
             });
     }
@@ -191,15 +191,15 @@ namespace simulator
 
         running = true;
         counter = maxIterations;
-        ia = foc::Ampere{ 0.0f };
-        ib = foc::Ampere{ 0.0f };
-        ic = foc::Ampere{ 0.0f };
-        theta = foc::Radians{ 0.0f };
-        theta_mech = foc::Radians{ 0.0f };
-        omega = foc::RadiansPerSecond{ 0.0f };
-        omega_mech = foc::RadiansPerSecond{ 0.0f };
+        motorState.ia = foc::Ampere{ 0.0f };
+        motorState.ib = foc::Ampere{ 0.0f };
+        motorState.ic = foc::Ampere{ 0.0f };
+        motorState.theta = foc::Radians{ 0.0f };
+        motorState.theta_mech = foc::Radians{ 0.0f };
+        motorState.omega = foc::RadiansPerSecond{ 0.0f };
+        motorState.omega_mech = foc::RadiansPerSecond{ 0.0f };
         ResetTemperature();
-        pendingDuties = foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 49 }, hal::Percent{ 51 } };
+        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 49 }, hal::Percent{ 51 } };
 
         NotifyObservers([](auto& observer)
             {
@@ -214,12 +214,12 @@ namespace simulator
     void ThreePhaseMotorModel::Stop()
     {
         running = false;
-        selfDriving = false;
+        selfDrive.driving = false;
         counter = std::nullopt;
-        ia = foc::Ampere{ 0.0f };
-        ib = foc::Ampere{ 0.0f };
-        ic = foc::Ampere{ 0.0f };
-        pendingDuties = foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } };
+        motorState.ia = foc::Ampere{ 0.0f };
+        motorState.ib = foc::Ampere{ 0.0f };
+        motorState.ic = foc::Ampere{ 0.0f };
+        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } };
         // Drop the callback so a stale controller cannot be invoked when a calibration
         // service writes new duties before installing its own callback.
         onCurrentPhasesReady = nullptr;
@@ -237,20 +237,20 @@ namespace simulator
 
     foc::Radians ThreePhaseMotorModel::Read()
     {
-        const float noise = encoderNoiseConfig.sigmaRadians * encoderNoiseDistribution(encoderNoiseEngine);
-        return foc::Radians{ WrapAngle(theta_mech.Value() + encoderNoiseConfig.biasRadians + noise) };
+        const float noise = encoderNoise.config.sigmaRadians * encoderNoise.distribution(encoderNoise.engine);
+        return foc::Radians{ WrapAngle(motorState.theta_mech.Value() + encoderNoise.config.biasRadians + noise) };
     }
 
     void ThreePhaseMotorModel::Set(foc::Radians value)
     {
-        theta_mech = value;
-        theta = foc::Radians{ parameters.p * theta_mech.Value() };
+        motorState.theta_mech = value;
+        motorState.theta = foc::Radians{ parameters.p * motorState.theta_mech.Value() };
     }
 
     void ThreePhaseMotorModel::SetZero()
     {
-        theta_mech = foc::Radians{ 0.0f };
-        theta = foc::Radians{ 0.0f };
+        motorState.theta_mech = foc::Radians{ 0.0f };
+        motorState.theta = foc::Radians{ 0.0f };
     }
 
     void ThreePhaseMotorModel::Model(const foc::PhasePwmDutyCycles& dutyPhases)
@@ -264,11 +264,11 @@ namespace simulator
         auto vb = (duty_b - half) * powerSupplyVoltage;
         auto vc = (duty_c - half) * powerSupplyVoltage;
 
-        auto cos_theta = foc::FastTrigonometry::Cosine(theta.Value());
-        auto sin_theta = foc::FastTrigonometry::Sine(theta.Value());
+        auto cos_theta = foc::FastTrigonometry::Cosine(motorState.theta.Value());
+        auto sin_theta = foc::FastTrigonometry::Sine(motorState.theta.Value());
 
         auto v_dq = park.Forward(clarke.Forward(foc::ThreePhase{ va.Value(), vb.Value(), vc.Value() }), cos_theta, sin_theta);
-        auto i_dq = park.Forward(clarke.Forward(foc::ThreePhase{ ia.Value(), ib.Value(), ic.Value() }), cos_theta, sin_theta);
+        auto i_dq = park.Forward(clarke.Forward(foc::ThreePhase{ motorState.ia.Value(), motorState.ib.Value(), motorState.ic.Value() }), cos_theta, sin_theta);
 
         auto id = i_dq.d;
         auto iq = i_dq.q;
@@ -277,37 +277,37 @@ namespace simulator
         const auto ldEff = EffectiveInductanceD().Value();
         const auto lqEff = EffectiveInductanceQ().Value();
 
-        auto dId_dt = (v_dq.d - rEff * id + omega.Value() * lqEff * iq) / ldEff;
-        auto dIq_dt = (v_dq.q - rEff * iq - omega.Value() * ldEff * id - omega.Value() * parameters.psi_f.Value()) / lqEff;
+        auto dId_dt = (v_dq.d - rEff * id + motorState.omega.Value() * lqEff * iq) / ldEff;
+        auto dIq_dt = (v_dq.q - rEff * iq - motorState.omega.Value() * ldEff * id - motorState.omega.Value() * parameters.psi_f.Value()) / lqEff;
 
         id += dId_dt * dt;
         iq += dIq_dt * dt;
 
         auto i_abc = clarke.Inverse(park.Inverse(foc::RotatingFrame{ id, iq }, cos_theta, sin_theta));
 
-        ia = foc::Ampere{ i_abc.a };
-        ib = foc::Ampere{ i_abc.b };
-        ic = foc::Ampere{ i_abc.c };
+        motorState.ia = foc::Ampere{ i_abc.a };
+        motorState.ib = foc::Ampere{ i_abc.b };
+        motorState.ic = foc::Ampere{ i_abc.c };
 
         // Thermal update
-        const auto pCu = rEff * (ia.Value() * ia.Value() + ib.Value() * ib.Value() + ic.Value() * ic.Value());
-        windingTempCelsius += dt * (pCu - (windingTempCelsius - thermalConfig.ambientCelsius) / thermalConfig.thermalResistance) / thermalConfig.thermalCapacitance;
+        const auto pCu = rEff * (motorState.ia.Value() * motorState.ia.Value() + motorState.ib.Value() * motorState.ib.Value() + motorState.ic.Value() * motorState.ic.Value());
+        thermal.windingTempCelsius += dt * (pCu - (thermal.windingTempCelsius - thermal.config.ambientCelsius) / thermal.config.thermalResistance) / thermal.config.thermalCapacitance;
 
         auto torqueElec = torqueConstant * parameters.p * (parameters.psi_f.Value() * iq + (ldEff - lqEff) * id * iq);
 
         auto loadTorque = load.value_or(foc::NewtonMeter{ 0.0f }).Value();
-        auto loadOpposing = (omega_mech.Value() >= 0.0f) ? loadTorque : -loadTorque;
+        auto loadOpposing = (motorState.omega_mech.Value() >= 0.0f) ? loadTorque : -loadTorque;
 
-        auto d_omega_mech_dt = (torqueElec - parameters.B.Value() * omega_mech.Value() - loadOpposing) / parameters.J.Value();
+        auto d_omega_mech_dt = (torqueElec - parameters.B.Value() * motorState.omega_mech.Value() - loadOpposing) / parameters.J.Value();
 
-        omega_mech += foc::RadiansPerSecond{ d_omega_mech_dt * dt };
-        omega = foc::RadiansPerSecond{ parameters.p * omega_mech.Value() };
+        motorState.omega_mech += foc::RadiansPerSecond{ d_omega_mech_dt * dt };
+        motorState.omega = foc::RadiansPerSecond{ parameters.p * motorState.omega_mech.Value() };
 
-        theta_mech += foc::Radians{ omega_mech.Value() * dt };
-        theta += foc::Radians{ omega.Value() * dt };
+        motorState.theta_mech += foc::Radians{ motorState.omega_mech.Value() * dt };
+        motorState.theta += foc::Radians{ motorState.omega.Value() * dt };
 
-        theta_mech = foc::Radians{ WrapAngle(theta_mech.Value()) };
-        theta = foc::Radians{ WrapAngle(theta.Value()) };
+        motorState.theta_mech = foc::Radians{ WrapAngle(motorState.theta_mech.Value()) };
+        motorState.theta = foc::Radians{ WrapAngle(motorState.theta.Value()) };
     }
 
     SimulationFinishedObserver::SimulationFinishedObserver(ThreePhaseMotorModel& model, const infra::Function<void()>& onFinished)
