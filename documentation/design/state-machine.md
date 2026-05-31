@@ -133,11 +133,11 @@ The platform gate driver and analog comparators detect three hardware protection
 
 These events are surfaced to the state machine through the `BoardProtectionFaultNotifier` adapter, which translates a `PlatformFactory::BoardProtectionReason` into the corresponding `state_machine::FaultCode`:
 
-| Hardware reason      | `state_machine::FaultCode` | CAN `FocFaultCode`  |
-|----------------------|---------------------------|---------------------|
-| `overCurrent`        | `overcurrent`             | `overCurrent`       |
-| `overVoltage`        | `overvoltage`             | `overVoltage`       |
-| `overTemperature`    | `overtemperature`         | `overTemperature`   |
+| Hardware reason   | `state_machine::FaultCode` | CAN `FocFaultCode` |
+|-------------------|----------------------------|--------------------|
+| `overCurrent`     | `overcurrent`              | `overCurrent`      |
+| `overVoltage`     | `overvoltage`              | `overVoltage`      |
+| `overTemperature` | `overtemperature`          | `overTemperature`  |
 
 When a board-protection event fires:
 
