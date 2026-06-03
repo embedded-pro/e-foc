@@ -136,7 +136,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 ### 10. Error Handling (WARNING)
 
 - [ ] `std::optional<T>` for values that may not exist
-- [ ] Error codes or status enums — no exceptions
+- [ ] Error codes or status enums — no exceptions in embedded/runtime code (host tools/tests may use exceptions where appropriate)
 - [ ] `assert()` or `really_assert()` for debug preconditions
 - [ ] No silently swallowed errors
 

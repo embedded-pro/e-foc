@@ -140,7 +140,7 @@ namespace foc
 ### Error Handling
 
 - `std::optional<T>` for functions that may not return a value
-- Return error codes or status enums — **NO EXCEPTIONS**
+- Return error codes or status enums in embedded/runtime code — **NO EXCEPTIONS** (host tools/tests may use exceptions where appropriate)
 - `assert()` or `really_assert()` for precondition checks in debug builds
 
 ### Testing

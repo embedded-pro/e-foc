@@ -79,7 +79,7 @@ Apply `OPTIMIZE_FOR_SPEED` (from `numerical/math/CompilerOptimizations.hpp`) to 
 ### Other Constraints
 
 - Prefer fixed-size integer types (`uint8_t`, `int32_t`).
-- No implementation in headers — only templated classes may have method bodies in `.hpp` files.
+- Avoid large implementations in headers; keep non-trivial logic in `.cpp` files. Small `inline`/`constexpr` helpers in headers are allowed (and common in hot paths).
 - Prefer `{}` initialization over `()` for all variables and member data.
 - `const` on all non-mutating methods, `constexpr` for motor constants and lookup tables.
 
@@ -170,7 +170,7 @@ namespace foc
 - **SOLID**: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
 - **DRY**: Reuse `infra/numerical-toolbox/` PID, filters, and transforms — do not duplicate
 - **Constructor injection**: all hardware dependencies via `PlatformFactory` / constructor, never global state
-- **Error handling**: `std::optional<T>` for nullable returns; return error codes/enums; no exceptions; `assert()` for debug preconditions
+- **Error handling**: `std::optional<T>` for nullable returns; return error codes/enums in embedded/runtime code (no exceptions); `assert()` for debug preconditions
 
 ## Available Agents
 
