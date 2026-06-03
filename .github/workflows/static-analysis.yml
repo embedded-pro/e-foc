@@ -22,6 +22,7 @@ jobs:
     env:
       SONAR_SCANNER_VERSION: 5.0.1.3006
       SONAR_SERVER_URL: "https://sonarcloud.io"
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - name: Configure Git
         run: |
@@ -54,8 +55,7 @@ jobs:
           { echo '<testExecutions version="1">'; xsltproc .github/formatters/gtest-to-generic-execution.xslt testresults/*.xml; echo '</testExecutions>'; } | tee execution.xml > /dev/null
           cp build/coverage/compile_commands.json compile_commands.json
       - name: Run Analysis
-        if: ${{ secrets.SONAR_TOKEN != '' }}
+        if: ${{ env.SONAR_TOKEN != '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: sonar-scanner -D sonar.host.url="${{ env.SONAR_SERVER_URL }}"
