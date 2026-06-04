@@ -40,6 +40,7 @@
   "postCreateCommand": {
     "submodule.update": "git submodule update --init --recursive",
     "config.core.autocrlf": "git config --replace-all core.autocrlf false",
-    "config.core.eol": "git config --replace-all core.eol lf"
+    "config.core.eol": "git config --replace-all core.eol lf",
+    "caveman.install": "curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash"
   }
 }
