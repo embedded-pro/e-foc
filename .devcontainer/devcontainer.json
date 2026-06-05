@@ -1,7 +1,11 @@
 {
   "build": {
     "context": "..",
-    "dockerfile": "Dockerfile"
+    "dockerfile": "Dockerfile",
+    "args": {
+      "NODEJS_VER": "20.20.2",
+      "NODE_SHA256": "df770b2a6f130ed8627c9782c988fda9669fa23898329a61a871e32f965e007d"
+    }
   },
   // GUI support: requires an X server on the host.
   //   Windows: install VcXsrv or X410, launch with "Disable access control" enabled.
@@ -41,7 +45,6 @@
     "submodule.update": "git submodule update --init --recursive",
     "config.core.autocrlf": "git config --replace-all core.autocrlf false",
     "config.core.eol": "git config --replace-all core.eol lf",
-    "config.core.editor": "git config --global core.editor 'code --wait'",
-    "caveman.install": "curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash"
+    "config.core.editor": "git config --global core.editor 'code --wait'"
   }
 }
