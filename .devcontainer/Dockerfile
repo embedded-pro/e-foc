@@ -3,7 +3,6 @@ FROM gabrielfrasantos/embedded-devcontainer-cpp:v7.2.0@sha256:5fe0d1ae0ab020db87
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-<<<<<<< HEAD
 RUN --mount=type=bind,source=.devcontainer/apt-requirements.json,target=/tmp/apt-requirements.json \
     apt-get update \
     && apt-get install -y --no-install-recommends jq \
@@ -24,19 +23,5 @@ ARG CAVEMAN_SHA256=8ddef49c15f089c26affed3c31d97142c683e1d37a1499ae557281ca09c27
 ADD --checksum=sha256:${CAVEMAN_SHA256} https://raw.githubusercontent.com/JuliusBrussee/caveman/${CAVEMAN_COMMIT}/install.sh /tmp/caveman-install.sh
 RUN bash /tmp/caveman-install.sh \
     && rm /tmp/caveman-install.sh
-=======
-ARG CURL_VER
-RUN apt-get update \
-    && : "${CURL_VER:?Set CURL_VER to an explicit apt version (see: apt-cache madison curl)}" \
-    && apt-get install -y --no-install-recommends curl="${CURL_VER}" \
-    && rm -rf /var/lib/apt/lists/*
-
-ARG NODEJS_VER
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get update \
-    && : "${NODEJS_VER:?Set NODEJS_VER to an explicit apt version (see: apt-cache madison nodejs)}" \
-    && apt-get install -y --no-install-recommends nodejs="${NODEJS_VER}" \
-    && rm -rf /var/lib/apt/lists/*
->>>>>>> 767f8782387aa058a6587d54e5793eb67a9a4c1a
 
 HEALTHCHECK NONE
