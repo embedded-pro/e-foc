@@ -1,8 +1,8 @@
-# syntax=docker/dockerfile:1
 FROM gabrielfrasantos/embedded-devcontainer-cpp:v7.2.0@sha256:5fe0d1ae0ab020db875964752d4e9e07e54718ea54733b5f7a8c81753cd48027
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# hadolint ignore=DL3008
 RUN --mount=type=bind,source=.devcontainer/apt-requirements.json,target=/tmp/apt-requirements.json \
     apt-get update \
     && apt-get install -y --no-install-recommends jq \
