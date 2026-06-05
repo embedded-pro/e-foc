@@ -8,3 +8,7 @@ install/
 .venv/
 output/
 cucumber.toml
+
+.claude/settings.local.json
+.claude/skills/
+.agents/

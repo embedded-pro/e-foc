@@ -1,7 +1,11 @@
 {
   "build": {
     "context": "..",
-    "dockerfile": "Dockerfile"
+    "dockerfile": "Dockerfile",
+    "args": {
+      "NODEJS_VER": "20.20.2",
+      "NODE_SHA256": "df770b2a6f130ed8627c9782c988fda9669fa23898329a61a871e32f965e007d"
+    }
   },
   // GUI support: requires an X server on the host.
   //   Windows: install VcXsrv or X410, launch with "Disable access control" enabled.
@@ -25,7 +29,7 @@
       "extensions": [
         "JacquesLucke.gcov-viewer@0.5.0",
         "matepek.vscode-catch2-test-adapter@4.12.2",
-        "anthropic.claude-code"
+        "anthropic.claude-code@2.1.162"
       ],
       "settings": {
         "editor.formatOnSave": true,
@@ -40,6 +44,7 @@
   "postCreateCommand": {
     "submodule.update": "git submodule update --init --recursive",
     "config.core.autocrlf": "git config --replace-all core.autocrlf false",
-    "config.core.eol": "git config --replace-all core.eol lf"
+    "config.core.eol": "git config --replace-all core.eol lf",
+    "config.core.editor": "git config --global core.editor 'code --wait'"
   }
 }
