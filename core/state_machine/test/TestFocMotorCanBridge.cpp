@@ -111,6 +111,9 @@ namespace
         bool categoryErrorSent{ false };
         uint8_t lastCategoryErrorOriginCmd{ 0 };
         services::FocMotorCategoryError lastCategoryErrorReason{ services::FocMotorCategoryError::busy };
+        bool telemetryStatusBroadcastSent{ false };
+        services::FocMotorState lastTelemetryStatusState{ services::FocMotorState::idle };
+        services::FocFaultCode lastTelemetryStatusFaultCode{ services::FocFaultCode::none };
 
         StrictMock<hal::CanMock> canMock;
 
@@ -131,6 +134,12 @@ namespace
                                 categoryErrorSent = true;
                                 lastCategoryErrorOriginCmd = msg[0];
                                 lastCategoryErrorReason = static_cast<services::FocMotorCategoryError>(msg[1]);
+                            }
+                            if (lastSentMessageType == services::focTelemetryStatusResponseId && msg.size() >= 2)
+                            {
+                                telemetryStatusBroadcastSent = true;
+                                lastTelemetryStatusState = static_cast<services::FocMotorState>(msg[0]);
+                                lastTelemetryStatusFaultCode = static_cast<services::FocFaultCode>(msg[1]);
                             }
                             cb(true);
                         }));
@@ -184,6 +193,9 @@ namespace
             categoryErrorSent = false;
             lastCategoryErrorOriginCmd = 0;
             lastCategoryErrorReason = services::FocMotorCategoryError::busy;
+            telemetryStatusBroadcastSent = false;
+            lastTelemetryStatusState = services::FocMotorState::idle;
+            lastTelemetryStatusFaultCode = services::FocFaultCode::none;
             ackSpy.Reset();
         }
 
@@ -554,5 +566,68 @@ namespace
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
         EXPECT_TRUE(categoryErrorSent);
         EXPECT_EQ(lastCategoryErrorReason, services::FocMotorCategoryError::modeMismatch);
+    }
+
+    // ---- OnFault: broadcasts unsolicited focTelemetryStatusResponseId with state=fault ----
+
+    TEST_F(FocMotorCanBridgeTest, OnFault_Overcurrent_BroadcastsTelemetryStatusWithFaultState)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        bridge->OnFault(state_machine::FaultCode::overcurrent);
+
+        EXPECT_TRUE(telemetryStatusBroadcastSent);
+        EXPECT_EQ(lastSentMessageType, services::focTelemetryStatusResponseId);
+        EXPECT_EQ(lastTelemetryStatusState, services::FocMotorState::fault);
+        EXPECT_EQ(lastTelemetryStatusFaultCode, services::FocFaultCode::overCurrent);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnFault_Overvoltage_BroadcastsOverVoltageFaultCode)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        bridge->OnFault(state_machine::FaultCode::overvoltage);
+
+        EXPECT_TRUE(telemetryStatusBroadcastSent);
+        EXPECT_EQ(lastTelemetryStatusState, services::FocMotorState::fault);
+        EXPECT_EQ(lastTelemetryStatusFaultCode, services::FocFaultCode::overVoltage);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnFault_Overtemperature_BroadcastsOverTemperatureFaultCode)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        bridge->OnFault(state_machine::FaultCode::overtemperature);
+
+        EXPECT_TRUE(telemetryStatusBroadcastSent);
+        EXPECT_EQ(lastTelemetryStatusState, services::FocMotorState::fault);
+        EXPECT_EQ(lastTelemetryStatusFaultCode, services::FocFaultCode::overTemperature);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnFault_EncoderLoss_BroadcastsSensorFaultCode)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        bridge->OnFault(state_machine::FaultCode::encoderLoss);
+
+        EXPECT_TRUE(telemetryStatusBroadcastSent);
+        EXPECT_EQ(lastTelemetryStatusState, services::FocMotorState::fault);
+        EXPECT_EQ(lastTelemetryStatusFaultCode, services::FocFaultCode::sensorFault);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnFault_HardwareFault_BroadcastsNoneFaultCode)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        bridge->OnFault(state_machine::FaultCode::hardwareFault);
+
+        EXPECT_TRUE(telemetryStatusBroadcastSent);
+        EXPECT_EQ(lastTelemetryStatusState, services::FocMotorState::fault);
+        EXPECT_EQ(lastTelemetryStatusFaultCode, services::FocFaultCode::none);
     }
 }

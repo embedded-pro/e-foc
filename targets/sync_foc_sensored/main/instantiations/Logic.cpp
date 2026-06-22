@@ -12,6 +12,7 @@ namespace application
         , nvm{ calibrationRegion, configRegion }
         , electricalIdent{ hardware, hardware, vdc }
         , motorAlignment{ hardware, hardware }
+        , boardProtectionNotifier{ hardware }
     {
         hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shorter);
         nvm.LoadConfig(configData, [this](services::NvmStatus status)
@@ -27,13 +28,17 @@ namespace application
                     MotorHardware{ this->hardware, this->hardware, vdc },
                     nvm,
                     CalibrationServices{ electricalIdent, motorAlignment },
-                    noOpFaultNotifier,
+                    boardProtectionNotifier,
                     configData,
                     ControlMode::OuterLoopArgs{
                         this->hardware.MaxCurrentSupported(),
                         this->hardware.BaseFrequency(),
                         this->hardware.LowPriorityInterrupt() });
                 canBridge.emplace(*motorCanServer, *controlMode);
+                boardProtectionNotifier.OnFaultBroadcast([this](state_machine::FaultCode code)
+                    {
+                        canBridge->OnFault(code);
+                    });
             });
     }
 }
