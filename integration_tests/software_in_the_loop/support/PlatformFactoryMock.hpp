@@ -13,7 +13,11 @@ namespace integration
         MOCK_METHOD(void, Run, (), (override));
         MOCK_METHOD(services::Tracer&, Tracer, (), (override));
         MOCK_METHOD(services::TerminalWithCommands&, Terminal, (), (override));
-        MOCK_METHOD(infra::MemoryRange<hal::GpioPin>, Leds, (), (override));
+        MOCK_METHOD(hal::GpioPin&, OperationalLed, (), (override));
+        MOCK_METHOD(hal::GpioPin&, WarningLed, (), (override));
+        MOCK_METHOD(hal::GpioPin&, FailureLed, (), (override));
+        MOCK_METHOD(uint8_t, BoardId, (), (const, override));
+        MOCK_METHOD(bool, PowerStatus, (), (const, override));
         MOCK_METHOD(hal::PerformanceTracker&, PerformanceTimer, (), (override));
         MOCK_METHOD(hal::Hertz, SystemClock, (), (const, override));
         MOCK_METHOD(foc::Volts, PowerSupplyVoltage, (), (override));

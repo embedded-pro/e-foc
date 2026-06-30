@@ -32,7 +32,9 @@ namespace application
         static hal::tiva::GpioPin pwmPhase3a{ hal::tiva::Port::E, 4 };
         static hal::tiva::GpioPin pwmPhase3b{ hal::tiva::Port::E, 5 };
 
-        static hal::tiva::GpioPin led1{ hal::tiva::Port::F, 1 };
+        static hal::tiva::GpioPin operationalLed{ hal::tiva::Port::F, 1 };
+        static hal::tiva::GpioPin warningLed{ hal::tiva::Port::F, 2 };
+        static hal::tiva::GpioPin failureLed{ hal::tiva::Port::F, 2 }; // PF3 = canTx; alias to blue LED (PF2)
 
         static hal::tiva::GpioPin uartTx{ hal::tiva::Port::A, 0 };
         static hal::tiva::GpioPin uartRx{ hal::tiva::Port::A, 1 };
@@ -56,6 +58,9 @@ namespace application
 
         // Fault comparator support is not available on EK-TM4C123GXL.
         constexpr static bool hasFaultComparators{ false };
+        // boardId pins (PK0-2) and powerStatus pin (PC6) are not available on EK-TM4C123GXL.
+        constexpr static bool hasBoardIdPins{ false };
+        constexpr static bool hasPowerStatusPin{ false };
         constexpr static uint8_t OvercurrentComparatorIndex{ 0 };
         constexpr static uint8_t OvervoltageComparatorIndex{ 1 };
         constexpr static float adcReferenceVoltage{ 3.3f };

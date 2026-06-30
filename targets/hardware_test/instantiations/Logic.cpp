@@ -5,6 +5,6 @@ namespace application
     Logic::Logic(application::PlatformFactory& hardware)
         : terminalWithStorage{ hardware.Terminal(), hardware.Tracer(), services::TerminalWithBanner::Banner{ "hardware_test", hardware.PowerSupplyVoltage(), hardware.SystemClock(), hardware.GetResetCause(), hardware.FaultStatus() } }
         , terminal{ terminalWithStorage, hardware }
-        , debugLed{ hardware.Leds().front(), std::chrono::milliseconds(50), std::chrono::milliseconds(1950) }
+        , debugLed{ hardware.OperationalLed(), std::chrono::milliseconds(50), std::chrono::milliseconds(1950) }
     {}
 }

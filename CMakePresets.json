@@ -146,6 +146,15 @@
             }
         },
         {
+            "name": "EK-TM4C1294XL-efoc",
+            "displayName": "EK-TM4C1294XL with E-FOC-HARDWARE motor board",
+            "description": "Build for tm4c1294ncpdt with E-FOC-HARDWARE motor control board",
+            "inherits": "EK-TM4C1294XL",
+            "cacheVariables": {
+                "E_FOC_MOTOR_BOARD": "E-FOC-HARDWARE"
+            }
+        },
+        {
             "name": "STM32F407G-DISC1",
             "displayName": "STM32F407G-DISC1",
             "description": "Build for stm32f407",
@@ -252,6 +261,16 @@
             "name": "EK-TM4C123GXL-Debug",
             "configuration": "Debug",
             "configurePreset": "EK-TM4C123GXL"
+        },
+        {
+            "name": "EK-TM4C1294XL-efoc-RelWithDebInfo",
+            "configuration": "RelWithDebInfo",
+            "configurePreset": "EK-TM4C1294XL-efoc"
+        },
+        {
+            "name": "EK-TM4C1294XL-efoc-Debug",
+            "configuration": "Debug",
+            "configurePreset": "EK-TM4C1294XL-efoc"
         },
         {
             "name": "STM32F407G-DISC1-RelWithDebInfo",
