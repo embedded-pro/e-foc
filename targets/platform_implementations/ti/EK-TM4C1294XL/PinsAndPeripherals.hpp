@@ -33,9 +33,9 @@ namespace application
         static hal::tiva::GpioPin pwmPhase3a{ hal::tiva::Port::K, 4 };
         static hal::tiva::GpioPin pwmPhase3b{ hal::tiva::Port::K, 5 };
 
-        static hal::tiva::GpioPin operationalLed{ hal::tiva::Port::N, 2 };
-        static hal::tiva::GpioPin failureLed{ hal::tiva::Port::N, 3 };
-        static hal::tiva::GpioPin warningLed{ hal::tiva::Port::P, 2 };
+        static hal::tiva::GpioPin warningLed{ hal::tiva::Port::N, 2 };
+        static hal::tiva::GpioPin operationalLed{ hal::tiva::Port::N, 3 };
+        static hal::tiva::GpioPin failureLed{ hal::tiva::Port::P, 2 };
 
         static hal::tiva::GpioPin boardId0{ hal::tiva::Port::K, 0, hal::tiva::Drive::Up };
         static hal::tiva::GpioPin boardId1{ hal::tiva::Port::K, 1, hal::tiva::Drive::Up };

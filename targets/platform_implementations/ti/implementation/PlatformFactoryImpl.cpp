@@ -101,11 +101,10 @@ namespace application
         if constexpr (!Peripheral::hasBoardIdPins)
             return 0;
 
-        // Switches pull pins to ground; internal pull-ups make idle state high.
-        // Invert to get active-low encoding: pin low → bit set.
-        const uint8_t bit0 = Pins::boardId0.Get() ? 0u : 1u;
-        const uint8_t bit1 = Pins::boardId1.Get() ? 0u : 1u;
-        const uint8_t bit2 = Pins::boardId2.Get() ? 0u : 1u;
+        const uint8_t bit0 = peripherals->boardId.boardId0.Get() ? 0u : 1u;
+        const uint8_t bit1 = peripherals->boardId.boardId1.Get() ? 0u : 1u;
+        const uint8_t bit2 = peripherals->boardId.boardId2.Get() ? 0u : 1u;
+
         return static_cast<uint8_t>((bit2 << 2u) | (bit1 << 1u) | bit0);
     }
 
@@ -114,9 +113,7 @@ namespace application
         if constexpr (!Peripheral::hasPowerStatusPin)
             return true;
 
-        // LM5164 open-drain PG line with internal pull-up.
-        // High level = power good.
-        return Pins::powerStatus.Get();
+        return peripherals->powerStatus.Get();
     }
 
     hal::PerformanceTracker& PlatformFactoryImpl::PerformanceTimer()
