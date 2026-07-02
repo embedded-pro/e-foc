@@ -34,7 +34,7 @@ namespace application
 
         static hal::tiva::GpioPin operationalLed{ hal::tiva::Port::F, 1 };
         static hal::tiva::GpioPin warningLed{ hal::tiva::Port::F, 2 };
-        static hal::tiva::GpioPin failureLed{ hal::tiva::Port::F, 2 }; // PF3 = canTx; alias to blue LED (PF2)
+        static hal::tiva::GpioPin failureLed{ hal::tiva::Port::F, 1 }; // PF3 = canTx; alias to red LED (PF1)
 
         static hal::tiva::GpioPin uartTx{ hal::tiva::Port::A, 0 };
         static hal::tiva::GpioPin uartRx{ hal::tiva::Port::A, 1 };
