@@ -1,5 +1,4 @@
 #include "targets/platform_implementations/st/implementation/PlatformFactoryImpl.hpp"
-#include "infra/util/MemoryRange.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
 
@@ -76,9 +75,29 @@ namespace application
         return terminalAndTracer.terminal;
     }
 
-    infra::MemoryRange<hal::GpioPin> PlatformFactoryImpl::Leds()
+    hal::GpioPin& PlatformFactoryImpl::OperationalLed()
     {
-        return infra::MakeRangeFromSingleObject(pin);
+        return pin;
+    }
+
+    hal::GpioPin& PlatformFactoryImpl::WarningLed()
+    {
+        return pin;
+    }
+
+    hal::GpioPin& PlatformFactoryImpl::FailureLed()
+    {
+        return pin;
+    }
+
+    uint8_t PlatformFactoryImpl::BoardId() const
+    {
+        return 0;
+    }
+
+    bool PlatformFactoryImpl::PowerStatus() const
+    {
+        return true;
     }
 
     hal::PerformanceTracker& PlatformFactoryImpl::PerformanceTimer()

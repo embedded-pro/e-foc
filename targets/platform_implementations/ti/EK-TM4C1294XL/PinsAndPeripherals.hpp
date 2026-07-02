@@ -33,7 +33,15 @@ namespace application
         static hal::tiva::GpioPin pwmPhase3a{ hal::tiva::Port::K, 4 };
         static hal::tiva::GpioPin pwmPhase3b{ hal::tiva::Port::K, 5 };
 
-        static hal::tiva::GpioPin led1{ hal::tiva::Port::N, 0 };
+        static hal::tiva::GpioPin warningLed{ hal::tiva::Port::N, 2 };
+        static hal::tiva::GpioPin operationalLed{ hal::tiva::Port::N, 3 };
+        static hal::tiva::GpioPin failureLed{ hal::tiva::Port::P, 2 };
+
+        static hal::tiva::GpioPin boardId0{ hal::tiva::Port::K, 0, hal::tiva::Drive::Up };
+        static hal::tiva::GpioPin boardId1{ hal::tiva::Port::K, 1, hal::tiva::Drive::Up };
+        static hal::tiva::GpioPin boardId2{ hal::tiva::Port::K, 2, hal::tiva::Drive::Up };
+
+        static hal::tiva::GpioPin powerStatus{ hal::tiva::Port::C, 6, hal::tiva::Drive::Up };
 
         static hal::tiva::GpioPin uartRx{ hal::tiva::Port::D, 4 };
         static hal::tiva::GpioPin uartTx{ hal::tiva::Port::D, 5 };
@@ -57,7 +65,9 @@ namespace application
 
         // ADC digital comparator indices mapped to PWM FLTSRC1 lines.
         // DCMP0 (PB4 / ADC10) → overcurrent trip; DCMP1 (PB5 / ADC11) → overvoltage trip.
-        constexpr static bool hasFaultComparators = true;
+        constexpr static bool hasFaultComparators{ true };
+        constexpr static bool hasBoardIdPins{ true };
+        constexpr static bool hasPowerStatusPin{ true };
         constexpr static uint8_t OvercurrentComparatorIndex = 0;
         constexpr static uint8_t OvervoltageComparatorIndex = 1;
 

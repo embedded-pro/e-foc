@@ -157,6 +157,9 @@ The PAL provides a single platform-facing abstraction that groups creation and a
 | CAN bus                                     | CAN 2.0B communication interface                                |
 | Performance timer                           | Cycle/timestamp measurement interface for profiling             |
 | Serial terminal                             | Diagnostic trace and command-line interaction interface         |
+| Status LEDs                                 | Three discrete GPIO outputs: `OperationalLed` (heartbeat blink during normal operation), `WarningLed` (non-fatal condition), `FailureLed` (fault / safe-state) |
+| Board identity                              | `BoardId() const` — returns a 3-bit board ID (0–7) encoded on three active-low GPIO inputs (internal pull-ups), used as the CAN node address                   |
+| Power status                                | `PowerStatus() const` — returns `true` when the power-good signal from the power stage is asserted (high = good on an open-drain PG line with pull-up)         |
 
 Concrete implementations exist for:
 - **TI Tiva (EK-TM4C1294XL, EK-TM4C123GXL)**: platform-specific peripheral adapters under `targets/platform_implementations/ti/`.

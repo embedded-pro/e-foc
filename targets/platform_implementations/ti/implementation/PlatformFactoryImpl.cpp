@@ -1,6 +1,5 @@
 #include "targets/platform_implementations/ti/implementation/PlatformFactoryImpl.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
-#include "infra/util/MemoryRange.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
@@ -82,9 +81,39 @@ namespace application
         return peripherals->terminalAndTracer.terminal;
     }
 
-    infra::MemoryRange<hal::GpioPin> PlatformFactoryImpl::Leds()
+    hal::GpioPin& PlatformFactoryImpl::OperationalLed()
     {
-        return infra::MakeRangeFromSingleObject(application::Pins::led1);
+        return Pins::operationalLed;
+    }
+
+    hal::GpioPin& PlatformFactoryImpl::WarningLed()
+    {
+        return Pins::warningLed;
+    }
+
+    hal::GpioPin& PlatformFactoryImpl::FailureLed()
+    {
+        return Pins::failureLed;
+    }
+
+    uint8_t PlatformFactoryImpl::BoardId() const
+    {
+        if constexpr (!Peripheral::hasBoardIdPins)
+            return 0;
+
+        const uint8_t bit0 = peripherals->boardId.boardId0.Get() ? 0u : 1u;
+        const uint8_t bit1 = peripherals->boardId.boardId1.Get() ? 0u : 1u;
+        const uint8_t bit2 = peripherals->boardId.boardId2.Get() ? 0u : 1u;
+
+        return static_cast<uint8_t>((bit2 << 2u) | (bit1 << 1u) | bit0);
+    }
+
+    bool PlatformFactoryImpl::PowerStatus() const
+    {
+        if constexpr (!Peripheral::hasPowerStatusPin)
+            return true;
+
+        return peripherals->powerStatus.Get();
     }
 
     hal::PerformanceTracker& PlatformFactoryImpl::PerformanceTimer()

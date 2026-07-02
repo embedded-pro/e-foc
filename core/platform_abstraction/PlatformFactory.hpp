@@ -6,7 +6,6 @@
 #include "hal/interfaces/Gpio.hpp"
 #include "infra/stream/OutputStream.hpp"
 #include "infra/util/BoundedString.hpp"
-#include "infra/util/MemoryRange.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/Terminal.hpp"
 #include <chrono>
@@ -64,7 +63,11 @@ namespace application
         virtual void Run() = 0;
         virtual services::Tracer& Tracer() = 0;
         virtual services::TerminalWithCommands& Terminal() = 0;
-        virtual infra::MemoryRange<hal::GpioPin> Leds() = 0;
+        virtual hal::GpioPin& OperationalLed() = 0;
+        virtual hal::GpioPin& WarningLed() = 0;
+        virtual hal::GpioPin& FailureLed() = 0;
+        virtual uint8_t BoardId() const = 0;
+        virtual bool PowerStatus() const = 0;
         virtual hal::PerformanceTracker& PerformanceTimer() = 0;
         virtual hal::Hertz SystemClock() const = 0;
         virtual foc::Volts PowerSupplyVoltage() = 0;

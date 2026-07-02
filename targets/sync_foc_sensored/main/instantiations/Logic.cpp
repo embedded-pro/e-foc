@@ -4,7 +4,7 @@ namespace application
 {
     Logic::Logic(application::PlatformFactory& hardware)
         : hardware{ hardware }
-        , debugLed{ hardware.Leds().front(), std::chrono::milliseconds(50), std::chrono::milliseconds(1950) }
+        , debugLed{ hardware.OperationalLed(), std::chrono::milliseconds(50), std::chrono::milliseconds(1950) }
         , vdc{ hardware.PowerSupplyVoltage() }
         , terminalWithStorage{ hardware.Terminal(), hardware.Tracer(), services::TerminalWithBanner::Banner{ "sync_foc_sensored", vdc, hardware.SystemClock(), hardware.GetResetCause(), hardware.FaultStatus() } }
         , calibrationRegion{ hardware.Eeprom(), calibrationRegionOffset, calibrationRegionSize }

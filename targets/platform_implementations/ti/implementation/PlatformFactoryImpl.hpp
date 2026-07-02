@@ -45,7 +45,11 @@ namespace application
         void Run() override;
         services::Tracer& Tracer() override;
         services::TerminalWithCommands& Terminal() override;
-        infra::MemoryRange<hal::GpioPin> Leds() override;
+        hal::GpioPin& OperationalLed() override;
+        hal::GpioPin& WarningLed() override;
+        hal::GpioPin& FailureLed() override;
+        uint8_t BoardId() const override;
+        bool PowerStatus() const override;
         hal::PerformanceTracker& PerformanceTimer() override;
         hal::Hertz SystemClock() const override;
         foc::Volts PowerSupplyVoltage() override;
@@ -124,22 +128,20 @@ namespace application
             static constexpr auto currentSensingOversampling = hal::tiva::Adc::Oversampling::oversampling2;
 
             // Steps 0–2 go to the ADC FIFO (phase currents A/B/C).
-            // Steps 3–4 are redirected to DCMP units 0 and 1 via the SSOP register and
-            // do NOT appear in the FIFO, so AdcPhaseCurrentMeasurementImpl still receives
-            // exactly 3 samples.  DCMP0/1 outputs connect to PWM FLTSRC1 bits 0/1 and
-            // tristate all motor PWM outputs instantly when a threshold is exceeded.
-            static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 5> digitalComparators{ {
+            // Step 3 is redirected to DCMP0 via the SSOP register and does NOT appear in
+            // the FIFO. DCMP0 connects to PWM FLTSRC1 bit 0 and tristates all motor PWM
+            // outputs instantly when the overcurrent threshold is exceeded.
+            // Overvoltage is detected in software via PowerSupplyVoltage() on ADC1.
+            static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 4> digitalComparators{ {
                 {}, // step 0: currentPhaseA  → FIFO (noComparator)
                 {}, // step 1: currentPhaseB  → FIFO (noComparator)
                 {}, // step 2: currentPhaseC  → FIFO (noComparator)
                 { Peripheral::OvercurrentComparatorIndex, 0, Peripheral::overcurrentThresholdCounts,
                     hal::tiva::Adc::ComparatorCondition::highBand, hal::tiva::Adc::ComparatorMode::always },
-                { Peripheral::OvervoltageComparatorIndex, 0, Peripheral::overvoltageThresholdCounts,
-                    hal::tiva::Adc::ComparatorCondition::highBand, hal::tiva::Adc::ComparatorMode::always },
             } };
 
             hal::tiva::Adc::Config adcConfig{ false, 0, Peripheral::adcTrigger, hal::tiva::Adc::SampleAndHold::sampleAndHold8, std::make_optional(currentSensingOversampling), phaseDelay };
-            std::array<hal::tiva::AnalogPin, 5> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC }, hal::tiva::AnalogPin{ Pins::currentTotal }, hal::tiva::AnalogPin{ Pins::powerSupplyVoltage } } };
+            std::array<hal::tiva::AnalogPin, 4> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC }, hal::tiva::AnalogPin{ Pins::currentTotal } } };
         };
 
         struct AsyncPwmConfig
@@ -198,11 +200,17 @@ namespace application
             }
         }
 
+        struct BoardIdentificationPins
+        {
+            hal::InputPin boardId0{ Pins::boardId0 };
+            hal::InputPin boardId1{ Pins::boardId1 };
+            hal::InputPin boardId2{ Pins::boardId2 };
+        };
+
         struct Peripherals
         {
-            Peripherals() {};
-
             hal::OutputPin performance{ Pins::performance };
+            hal::InputPin powerStatus{ Pins::powerStatus };
             Cortex cortex;
             TerminalAndTracer terminalAndTracer;
             AdcForPowerSupplyMeasurementImpl adcForPowerSupplyMeasurementImpl;
@@ -210,6 +218,7 @@ namespace application
             AsyncPwmConfig asyncPwmConfig;
             SyncPwmConfig syncPwmConfig;
             hal::tiva::Eeprom eepromPeripheral;
+            BoardIdentificationPins boardId;
 
             std::optional<AdcPhaseCurrentMeasurementImpl<hal::tiva::Adc>> phaseCurrentAdc;
             std::optional<hal::tiva::Pwm> asyncPwm;

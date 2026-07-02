@@ -128,6 +128,15 @@
                 "TARGET_MCU_FAMILY": "TM4C129",
                 "TARGET_MCU": "tm4c1294ncpdt",
                 "E_FOC_TARGET_BOARD": "EK-TM4C1294XL",
+                "E_FOC_MOTOR_BOARD": "E-FOC-HARDWARE"
+            }
+        },
+        {
+            "name": "EK-TM4C1294XL-FRDM",
+            "displayName": "EK-TM4C1294XL with FRDM-MC-LVPMSM motor board",
+            "description": "Build for tm4c1294ncpdt with FRDM-MC-LVPMSM motor control board",
+            "inherits": "EK-TM4C1294XL",
+            "cacheVariables": {
                 "E_FOC_MOTOR_BOARD": "FRDM-MC-LVPMSM"
             }
         },
@@ -252,6 +261,16 @@
             "name": "EK-TM4C123GXL-Debug",
             "configuration": "Debug",
             "configurePreset": "EK-TM4C123GXL"
+        },
+        {
+            "name": "EK-TM4C1294XL-FRDM-RelWithDebInfo",
+            "configuration": "RelWithDebInfo",
+            "configurePreset": "EK-TM4C1294XL-FRDM"
+        },
+        {
+            "name": "EK-TM4C1294XL-FRDM-Debug",
+            "configuration": "Debug",
+            "configurePreset": "EK-TM4C1294XL-FRDM"
         },
         {
             "name": "STM32F407G-DISC1-RelWithDebInfo",
