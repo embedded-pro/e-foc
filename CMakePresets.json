@@ -141,20 +141,6 @@
             }
         },
         {
-            "name": "EK-TM4C123GXL",
-            "displayName": "EK-TM4C123GXL",
-            "description": "Build for tm4c123gh6pm",
-            "inherits": "tiva",
-            "toolchainFile": "${sourceDir}/infra/embedded-infra-lib/cmake/toolchain-arm-gcc-m4-fpv4-sp-d16.cmake",
-            "cacheVariables": {
-                "TARGET_CORTEX": "m4",
-                "TARGET_MCU_FAMILY": "TM4C123",
-                "TARGET_MCU": "tm4c123gh6pm",
-                "E_FOC_TARGET_BOARD": "EK-TM4C123GXL",
-                "E_FOC_MOTOR_BOARD": "FRDM-MC-LVPMSM"
-            }
-        },
-        {
             "name": "STM32F407G-DISC1",
             "displayName": "STM32F407G-DISC1",
             "description": "Build for stm32f407",
@@ -251,16 +237,6 @@
             "name": "EK-TM4C1294XL-Debug",
             "configuration": "Debug",
             "configurePreset": "EK-TM4C1294XL"
-        },
-        {
-            "name": "EK-TM4C123GXL-RelWithDebInfo",
-            "configuration": "RelWithDebInfo",
-            "configurePreset": "EK-TM4C123GXL"
-        },
-        {
-            "name": "EK-TM4C123GXL-Debug",
-            "configuration": "Debug",
-            "configurePreset": "EK-TM4C123GXL"
         },
         {
             "name": "EK-TM4C1294XL-FRDM-RelWithDebInfo",

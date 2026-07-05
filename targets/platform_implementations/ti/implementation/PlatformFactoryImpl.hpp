@@ -11,8 +11,6 @@
 #include "hal_tiva/cortex/DataWatchpointAndTrace.hpp"
 #include "hal_tiva/cortex/SystemTickTimerService.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousAdc.hpp"
-#include "hal_tiva/synchronous_tiva/SynchronousPwm.hpp"
-#include "hal_tiva/synchronous_tiva/SynchronousQuadratureEncoder.hpp"
 #include "hal_tiva/tiva/Adc.hpp"
 #include "hal_tiva/tiva/Can.hpp"
 #include "hal_tiva/tiva/Dma.hpp"
@@ -163,14 +161,6 @@ namespace application
             hal::tiva::Pwm::Config pwmConfig{ false, false, controlConfig, clockDivisor, std::make_optional(deadTimeConfig), std::make_optional(interruptConfig) };
         };
 
-        struct SyncPwmConfig
-        {
-            hal::tiva::SynchronousPwm::Config::ClockDivisor clockDivisor{ hal::tiva::SynchronousPwm::Config::ClockDivisor::divisor8 };
-            hal::tiva::SynchronousPwm::Config::Control controlConfig{ hal::tiva::SynchronousPwm::Config::Control::Mode::centerAligned, hal::tiva::SynchronousPwm::Config::Control::UpdateMode::globally, false };
-            hal::tiva::SynchronousPwm::Config::DeadTime deadTimeConfig{ hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(1000ns, clockDivisor), hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(1000ns, clockDivisor) };
-            hal::tiva::SynchronousPwm::Config pwmConfig{ false, false, controlConfig, clockDivisor, std::make_optional(deadTimeConfig) };
-        };
-
         static CanBusAdapter::CanError ToAdapterError(hal::tiva::Can::Error error)
         {
             switch (error)
@@ -216,13 +206,11 @@ namespace application
             AdcForPowerSupplyMeasurementImpl adcForPowerSupplyMeasurementImpl;
             AdcForPhaseCurrentMeasurementImpl adcForPhaseCurrentMeasurementImpl;
             AsyncPwmConfig asyncPwmConfig;
-            SyncPwmConfig syncPwmConfig;
             hal::tiva::Eeprom eepromPeripheral;
             BoardIdentificationPins boardId;
 
             std::optional<AdcPhaseCurrentMeasurementImpl<hal::tiva::Adc>> phaseCurrentAdc;
             std::optional<hal::tiva::Pwm> asyncPwm;
-            std::optional<hal::tiva::SynchronousPwm> syncPwm;
             std::optional<QuadratureEncoderDecoratorImpl<hal::tiva::QuadratureEncoder>> encoder;
             std::optional<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<32>>> canBus;
 

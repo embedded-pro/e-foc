@@ -1,6 +1,5 @@
 #pragma once
 
-#include "hal_tiva/synchronous_tiva/SynchronousPwm.hpp"
 #include "hal_tiva/tiva/Adc.hpp"
 #include "hal_tiva/tiva/ClockTm4c129.hpp"
 #include "hal_tiva/tiva/Gpio.hpp"
@@ -65,7 +64,6 @@ namespace application
 
         // ADC digital comparator indices mapped to PWM FLTSRC1 lines.
         // DCMP0 (PB4 / ADC10) → overcurrent trip; DCMP1 (PB5 / ADC11) → overvoltage trip.
-        constexpr static bool hasFaultComparators{ true };
         constexpr static bool hasBoardIdPins{ true };
         constexpr static bool hasPowerStatusPin{ true };
         constexpr static uint8_t OvercurrentComparatorIndex = 0;
@@ -87,13 +85,6 @@ namespace application
         static hal_pwm::PinChannel asyncPwmPhase3{ hal_pwm::GeneratorIndex::generator3, Pins::pwmPhase3a, Pins::pwmPhase3b, true, true, std::nullopt };
 
         static std::array<hal_pwm::PinChannel, 3> asyncPwmPhases{ { asyncPwmPhase1, asyncPwmPhase2, asyncPwmPhase3 } };
-
-        // Synchronous PWM stubs — not used on this board; required for compilation only.
-        static hal::tiva::SynchronousPwm::PinChannel syncPwmPhase1{ hal::tiva::SynchronousPwm::GeneratorIndex::generator0, Pins::pwmPhase1a, Pins::pwmPhase1b, true, true, std::nullopt };
-        static hal::tiva::SynchronousPwm::PinChannel syncPwmPhase2{ hal::tiva::SynchronousPwm::GeneratorIndex::generator1, Pins::pwmPhase2a, Pins::pwmPhase2b, true, true, std::nullopt };
-        static hal::tiva::SynchronousPwm::PinChannel syncPwmPhase3{ hal::tiva::SynchronousPwm::GeneratorIndex::generator2, Pins::pwmPhase3a, Pins::pwmPhase3b, true, true, std::nullopt };
-
-        static std::array<hal::tiva::SynchronousPwm::PinChannel, 3> syncPwmPhases{ { syncPwmPhase1, syncPwmPhase2, syncPwmPhase3 } };
     }
 
     namespace Clocks

@@ -156,7 +156,6 @@ jobs:
         target:
           [
             "EK-TM4C1294XL",
-            "EK-TM4C123GXL",
             "STM32F407G-DISC1",
             "NUCLEO-H563ZI"
           ]

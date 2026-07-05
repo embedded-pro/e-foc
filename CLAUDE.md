@@ -42,7 +42,7 @@ cmake --preset coverage
 cmake --build --preset coverage
 ```
 
-All presets are defined in `CMakePresets.json`. Available configure presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1`, `NUCLEO-H563ZI`.
+All presets are defined in `CMakePresets.json`. Available configure presets: `host`, `coverage`, `EK-TM4C1294XL`, `STM32F407G-DISC1`, `NUCLEO-H563ZI`.
 
 ## 3. Project-Specific Constraints (must follow)
 
