@@ -1,7 +1,7 @@
 ---
 name: executor
 description: Use when implementing code changes in e-foc. Writes production code and tests following all project constraints: no heap allocation in embedded code, bounded containers, real-time determinism, FOC theory correctness, motor control best practices, SOLID principles, and documentation alignment.
-model: claude-sonnet-4-6
+model: opus
 tools:
   - Read
   - Edit

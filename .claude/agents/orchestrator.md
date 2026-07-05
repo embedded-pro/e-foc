@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: Use when starting a new development task in e-foc. Triages requests and routes to the appropriate specialist agent: planner for design, executor for implementation, or reviewer for code review. This agent should be invoked first for any non-trivial task.
-model: claude-sonnet-4-6
+model: opus
 tools:
   - Read
   - Bash

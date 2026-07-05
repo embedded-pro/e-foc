@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Use when reviewing code changes in e-foc. Performs structured code review against all project standards: memory safety (no heap in embedded code), real-time determinism, FOC theory correctness, motor control best practices, embedded optimizations, documentation alignment, SOLID principles, and test coverage. Does NOT modify files.
-model: claude-sonnet-4-6
+model: opus
 tools:
   - Read
   - Bash
