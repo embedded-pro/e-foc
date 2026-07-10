@@ -13,7 +13,11 @@
   "containerEnv": {
     "DISPLAY": "host.docker.internal:0.0",
     "QT_X11_NO_MITSHM": "1",
-    "LIBGL_ALWAYS_INDIRECT": "1"
+    "LIBGL_ALWAYS_INDIRECT": "1",
+    // GDB 17.1 has debuginfod enabled; the container's default DEBUGINFOD_URLS
+    // points at debuginfod.ubuntu.com, which is unreachable offline and stalls
+    // debug sessions during shared-library loading. Empty it so debuginfod is a no-op.
+    "DEBUGINFOD_URLS": ""
   },
   "runArgs": [
     "--add-host=host.docker.internal:host-gateway",
