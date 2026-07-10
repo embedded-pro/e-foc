@@ -12,3 +12,4 @@ ignore:
   - infra
   - hal
   - source/hardware/Host
+  - .megalinter_github_conf
