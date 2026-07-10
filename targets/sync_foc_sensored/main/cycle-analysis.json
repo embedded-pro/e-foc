@@ -21,7 +21,7 @@
         {
             "label": "Encoder Read",
             "patterns": [
-                "PlatformAdapter::Read",
+                "PlatformFactoryImpl::Read",
                 "QuadratureEncoderDecorator.*::Read",
                 "QuadratureEncoder::Position",
                 "QuadratureEncoder::Resolution"
@@ -84,10 +84,10 @@
         {
             "label": "PWM Output",
             "patterns": [
-                "PlatformAdapter::ThreePhasePwmOutput",
-                "SynchronousPwm::Start.*Percent.*Percent.*Percent",
-                "SynchronousPwm::SetComparator",
-                "SynchronousPwm::Sync"
+                "PlatformFactoryImpl::ThreePhasePwmOutput",
+                "hal::tiva::Pwm::Start\\(infra::Quantity<infra::UnitBase<infra::List<infra::Unit<6u, 1> >, infra::StaticRationalBase<0ull, 1ull> >, unsigned char>, infra::Quantity<infra::UnitBase<infra::List<infra::Unit<6u, 1> >, infra::StaticRationalBase<0ull, 1ull> >, unsigned char>, infra::Quantity<infra::UnitBase<infra::List<infra::Unit<6u, 1> >, infra::StaticRationalBase<0ull, 1ull> >, unsigned char>\\)",
+                "hal::tiva::Pwm::SetComparator",
+                "hal::tiva::Pwm::Sync"
             ]
         },
         {
