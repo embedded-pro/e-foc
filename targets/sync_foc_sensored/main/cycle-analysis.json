@@ -85,7 +85,7 @@
             "label": "PWM Output",
             "patterns": [
                 "PlatformFactoryImpl::ThreePhasePwmOutput",
-                "hal::tiva::Pwm::Start\\(infra::Quantity<infra::UnitBase<infra::List<infra::Unit<6u, 1> >, infra::StaticRationalBase<0ull, 1ull> >, unsigned char>, infra::Quantity<infra::UnitBase<infra::List<infra::Unit<6u, 1> >, infra::StaticRationalBase<0ull, 1ull> >, unsigned char>, infra::Quantity<infra::UnitBase<infra::List<infra::Unit<6u, 1> >, infra::StaticRationalBase<0ull, 1ull> >, unsigned char>\\)",
+                "hal::tiva::Pwm::Start\\(.*Quantity.*Quantity.*Quantity.*\\)",
                 "hal::tiva::Pwm::SetComparator",
                 "hal::tiva::Pwm::Sync"
             ]
