@@ -15,6 +15,11 @@ CAVEMAN_COMMIT="63a91ecadbf4c4719a4602a5abb00883f9966034"
 CAVEMAN_SHA256="8ddef49c15f089c26affed3c31d97142c683e1d37a1499ae557281ca09c2712c"
 CAVEMAN_URL="https://raw.githubusercontent.com/JuliusBrussee/caveman/${CAVEMAN_COMMIT}/install.sh"
 
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Error: This script must be run as root (use sudo)." >&2
+    exit 1
+fi
+
 # ── Node.js ────────────────────────────────────────────────────────────────
 if command -v node >/dev/null 2>&1; then
     NODE_MAJOR=$(node -p "process.versions.node.split('.')[0]")

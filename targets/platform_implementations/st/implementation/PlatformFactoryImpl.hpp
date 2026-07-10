@@ -218,7 +218,9 @@ namespace application
         infra::Function<void()> onInitialized;
         PendSvLowPriorityInterrupt pendSvLowPriorityInterrupt;
         static constexpr uint32_t timerId = 1;
-        GpioPinStub pin;
+        GpioPinStub operationalPin;
+        GpioPinStub warningPin;
+        GpioPinStub failurePin;
         SerialCommunicationStub serial;
         TerminalAndTracer terminalAndTracer{ serial };
         std::optional<AdcPhaseCurrentMeasurementImpl<AdcMultiChannelStub>> phaseCurrentAdc;

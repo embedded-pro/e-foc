@@ -227,7 +227,9 @@ namespace application
     private:
         infra::Function<void()> onInitialized;
         SimpleLowPriorityInterrupt simpleLowPriorityInterrupt;
-        GpioPinStub pin;
+        GpioPinStub operationalPin;
+        GpioPinStub warningPin;
+        GpioPinStub failurePin;
         SerialCommunicationStub serial;
         TerminalAndTracer terminalAndTracer{ serial };
         std::optional<AdcPhaseCurrentMeasurementImpl<AdcMultiChannelStub>> phaseCurrentAdc;

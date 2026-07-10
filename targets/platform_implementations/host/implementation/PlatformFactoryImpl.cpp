@@ -24,17 +24,17 @@ namespace application
 
     hal::GpioPin& PlatformFactoryImpl::OperationalLed()
     {
-        return pin;
+        return operationalPin;
     }
 
     hal::GpioPin& PlatformFactoryImpl::WarningLed()
     {
-        return pin;
+        return warningPin;
     }
 
     hal::GpioPin& PlatformFactoryImpl::FailureLed()
     {
-        return pin;
+        return failurePin;
     }
 
     uint8_t PlatformFactoryImpl::BoardId() const

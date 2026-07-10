@@ -11,6 +11,7 @@
 #include "hal_tiva/cortex/DataWatchpointAndTrace.hpp"
 #include "hal_tiva/cortex/SystemTickTimerService.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousAdc.hpp"
+#include "hal_tiva/synchronous_tiva/SynchronousQuadratureEncoder.hpp"
 #include "hal_tiva/tiva/Adc.hpp"
 #include "hal_tiva/tiva/Can.hpp"
 #include "hal_tiva/tiva/Dma.hpp"
@@ -129,17 +130,21 @@ namespace application
             // Step 3 is redirected to DCMP0 via the SSOP register and does NOT appear in
             // the FIFO. DCMP0 connects to PWM FLTSRC1 bit 0 and tristates all motor PWM
             // outputs instantly when the overcurrent threshold is exceeded.
-            // Overvoltage is detected in software via PowerSupplyVoltage() on ADC1.
-            static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 4> digitalComparators{ {
+            // Step 4 is likewise redirected to DCMP1 and tristates all motor PWM outputs
+            // instantly when the overvoltage threshold is exceeded — same hardware
+            // mechanism as DCMP0 for overcurrent.
+            static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 5> digitalComparators{ {
                 {}, // step 0: currentPhaseA  → FIFO (noComparator)
                 {}, // step 1: currentPhaseB  → FIFO (noComparator)
                 {}, // step 2: currentPhaseC  → FIFO (noComparator)
                 { Peripheral::OvercurrentComparatorIndex, 0, Peripheral::overcurrentThresholdCounts,
                     hal::tiva::Adc::ComparatorCondition::highBand, hal::tiva::Adc::ComparatorMode::always },
+                { Peripheral::OvervoltageComparatorIndex, 0, Peripheral::overvoltageThresholdCounts,
+                    hal::tiva::Adc::ComparatorCondition::highBand, hal::tiva::Adc::ComparatorMode::always },
             } };
 
             hal::tiva::Adc::Config adcConfig{ false, 0, Peripheral::adcTrigger, hal::tiva::Adc::SampleAndHold::sampleAndHold8, std::make_optional(currentSensingOversampling), phaseDelay };
-            std::array<hal::tiva::AnalogPin, 4> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC }, hal::tiva::AnalogPin{ Pins::currentTotal } } };
+            std::array<hal::tiva::AnalogPin, 5> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC }, hal::tiva::AnalogPin{ Pins::currentTotal }, hal::tiva::AnalogPin{ Pins::powerSupplyVoltage } } };
         };
 
         struct AsyncPwmConfig
