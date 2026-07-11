@@ -225,12 +225,12 @@ namespace application
         calibrating.step = state_machine::CalibrationStep::resistanceAndInductance;
 
         electricalIdent.EstimateResistanceAndInductance({},
-            [this](std::optional<foc::Ohm> r, std::optional<foc::MilliHenry> l)
+            [this](std::optional<services::ElectricalParametersIdentification::ResistanceInductanceResult> result)
             {
                 if (!IsCalibrating(state_machine::CalibrationStep::resistanceAndInductance))
                     return;
 
-                if (!r || !l)
+                if (!result)
                 {
                     CompletePendingCommand(state_machine::CommandResult::calibrationFailed);
                     EnterFault(state_machine::FaultCode::calibrationFailed);
@@ -238,9 +238,9 @@ namespace application
                 else
                 {
                     auto& cal = std::get<state_machine::Calibrating>(currentState);
-                    cal.pendingData.rPhase = r->Value();
-                    cal.pendingData.lD = l->Value();
-                    cal.pendingData.lQ = l->Value();
+                    cal.pendingData.rPhase = result->resistance.Value();
+                    cal.pendingData.lD = result->inductance.Value();
+                    cal.pendingData.lQ = result->inductance.Value();
                     RunAlignmentStep();
                 }
             });

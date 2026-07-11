@@ -125,7 +125,7 @@ sequenceDiagram
     EIM-->>Fixture: capturedRLCallback = cb
 
     Step->>Fixture: CompleteRLEstimation(R, L)
-    Fixture->>SM: capturedRLCallback(R, L)
+    Fixture->>SM: capturedRLCallback(result)
     SM->>AMK: ForceAlignment(polePairs, cfg, cb)
     AMK-->>Fixture: capturedAlignmentCallback = cb
 

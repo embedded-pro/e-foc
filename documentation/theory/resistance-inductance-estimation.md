@@ -2,9 +2,9 @@
 title: "Electrical Parameters Identification — Resistance and Inductance"
 type: theory
 status: approved
-version: 1.0.0
+version: 2.0.0
 component: "service-electrical-ident"
-date: 2025-01-01
+date: 2026-07-11
 ---
 
 | Field     | Value                                          |
@@ -12,9 +12,9 @@ date: 2025-01-01
 | Title     | Electrical Parameters Identification — R and L |
 | Type      | theory                                         |
 | Status    | approved                                       |
-| Version   | 1.0.0                                          |
+| Version   | 2.0.0                                          |
 | Component | service-electrical-ident                       |
-| Date      | 2025-01-01                                     |
+| Date      | 2026-07-11                                     |
 
 ## Overview
 
@@ -24,10 +24,13 @@ parameters are used to:
 2. Implement feed-forward decoupling of the dq cross-coupling terms.
 3. Estimate motor temperature from measured $R_s$ (since $R_s \propto T$).
 
-This identification procedure applies a DC voltage step to the motor aligned on the **d-axis** and
-measures the current transient. Alignment to the d-axis suppresses the back-EMF (which only appears
-on the q-axis), yielding a clean RL circuit step response. Resistance is derived from the DC
-steady-state, and inductance from the measured time constant.
+This identification procedure applies a sequence of DC voltage steps to a single stator axis and
+measures the resulting current. Because the rotor is stationary throughout, back-EMF is zero and the
+excited axis behaves as a first-order RL circuit. Resistance is derived from a **multi-point
+differential fit** ($\Delta V / \Delta I$) that cancels constant inverter and sensor offsets, and
+inductance from the **integral of the current transient**. The excitation levels are **auto-scaled**
+to the motor using a coarse pre-probe so that each level reaches a target fraction of the drive's
+maximum current.
 
 ---
 
@@ -38,106 +41,105 @@ steady-state, and inductance from the measured time constant.
 | $R_s$      | Stator resistance per phase                         | Ω       |
 | $L_s$      | Stator inductance (d-axis, $L_d$)                   | H       |
 | $\tau$     | Electrical time constant = $L_s / R_s$              | s       |
-| $V_{step}$ | Applied step voltage (d-axis)                       | V       |
-| $I_{ss}$   | Steady-state current = $V_{step} / R_s$             | A       |
-| $I_\tau$   | Current at time $\tau$: $I_{ss} \cdot (1 - e^{-1})$ | A       |
+| $V_j$      | Applied step voltage at level $j$                   | V       |
+| $I_{ss,j}$ | Steady-state current at level $j$                   | A       |
+| $V_{err}$  | Inverter voltage error (fit intercept)              | V       |
+| $V_{probe}$| Coarse pre-probe voltage                            | V       |
+| $I_{ss}$   | Steady-state current of the probe transient         | A       |
 | $f_s$      | Sampling frequency                                  | Hz      |
 | $T_s$      | Sampling period = $1/f_s$                           | s       |
-| $N_{avg}$  | Moving average filter length                        | samples |
-| $N_{buf}$  | Total sample buffer size                            | samples |
+| $N_{levels}$ | Number of $\Delta V/\Delta I$ levels               | —       |
+| $N_{buf}$  | Probe transient buffer size                         | samples |
 
 ---
 
 ## Mathematical Foundation
 
-### 1. d-Axis Alignment and Back-EMF Suppression
+### 1. Single-Axis Excitation and Back-EMF Suppression
 
-Before applying the voltage step, the motor is aligned to $\theta_e = 0$ (rotor d-axis aligned
-with stator $\alpha$-axis). In this condition:
+The procedure energises one stator axis with a DC field (high duty on phase A, neutral on B and C).
+Because every step is a DC level, the rotor is **stationary** at the moment of measurement, so:
 
-- The back-EMF is $e_\alpha = -\psi_f \omega_e \sin(0) = 0$.
-- The q-axis current is forced to zero: $i_q = 0$.
-- Only the d-axis RL circuit is excited.
+- The electrical speed is $\omega_e = 0$, hence the back-EMF $e = \psi_f \omega_e = 0$.
+- Only the excited RL circuit carries current.
 
-The stator d-axis circuit model reduces to:
+The rotor is pulled into alignment with the applied field during the coarse pre-probe and the first
+graduated levels. Because every level shares the **same** stator axis, the equilibrium angle never
+changes between levels — so the rotor does not move during the transient used for inductance. No
+explicit alignment routine is required; a poor regression fit (Section 3) flags any residual motion.
+
+The excited-axis circuit model reduces to:
 
 $$
-v_d = R_s\, i_d + L_s \frac{di_d}{dt}
+v = R_s\, i + L_s \frac{di}{dt}
 $$
 
-This is a first-order linear system driven by a unit step of amplitude $V_{step}$.
+This is a first-order linear system driven by a step of amplitude $V$.
 
 ### 2. RL Step Response
 
-For a step input $v_d(t) = V_{step} \cdot u(t)$ with zero initial conditions ($i_d(0) = 0$):
+For a step input $v(t) = V \cdot u(t)$ with zero initial conditions ($i(0) = 0$):
 
 $$
-\boxed{i_d(t) = \frac{V_{step}}{R_s}\!\left(1 - e^{-t/\tau}\right)}, \qquad \tau = \frac{L_s}{R_s}
+\boxed{i(t) = \frac{V}{R_s}\!\left(1 - e^{-t/\tau}\right)}, \qquad \tau = \frac{L_s}{R_s}
 $$
 
 Key properties of this response:
-- At $t = \tau$: $i_d(\tau) = I_{ss}(1 - e^{-1}) \approx 0.6321 \cdot I_{ss}$
-- At $t = 5\tau$: $i_d(5\tau) \approx 0.9933 \cdot I_{ss}$ (essentially settled)
-- Slope at $t = 0$: $\left.\frac{di_d}{dt}\right|_{t=0} = \frac{V_{step}}{L_s}$
+- At $t = \tau$: $i(\tau) = I_{ss}(1 - e^{-1}) \approx 0.6321 \cdot I_{ss}$
+- At $t = 5\tau$: $i(5\tau) \approx 0.9933 \cdot I_{ss}$ (essentially settled)
+- Slope at $t = 0$: $\left.\frac{di}{dt}\right|_{t=0} = \frac{V}{L_s}$
 
-See: `documentation/theory/images/rl_step_response.svg` (generated by `documentation/tools/generate_plots.gp`)
+### 3. Resistance Estimation — Multi-Point Differential Fit
 
-### 3. Resistance Estimation
-
-Once the current has fully settled to steady state (after $5\tau$):
-
-$$
-\boxed{R_s = \frac{V_{step}}{I_{ss}}}
-$$
-
-where $I_{ss}$ is measured from the mean of the last 10% of the sample buffer (to average out noise).
-
-**Noise considerations**: $R_s$ estimation is straightforward but requires:
-- Accurate current sensor calibration (ADC offset error directly biases $I_{ss}$).
-- Stable $V_{step}$ (DC bus voltage variation during measurement corrupts the result).
-- Sufficient settling time in the buffer ($N_{buf} \geq 5\tau / T_s$ samples).
-
-### 4. Inductance Estimation — Time-Constant Method
-
-The time constant $\tau = L_s / R_s$ is found by identifying the sample index $n_\tau$ where the
-current first reaches the 63.2% threshold:
+A single-point estimate $R_s = V/I_{ss}$ bakes every constant error — inverter dead-time, MOSFET and
+body-diode drops, and current-sensor DC offset — directly into $R_s$. Instead, $N_{levels}$ steps are
+applied and the steady-state pairs $(I_{ss,j}, V_j)$ are fit by ordinary least squares to a line:
 
 $$
-i_d[n_\tau] \geq 0.6321 \cdot I_{ss}
+V_j = R_s\, I_{ss,j} + V_{err}
 $$
 
-The time constant is then:
+- The **slope** $R_s$ is immune to any constant voltage error or current offset — they cancel in the
+  differential $\Delta V/\Delta I$.
+- The **intercept** $V_{err}$ estimates the total inverter voltage error, exported as free diagnostic
+  data (usable later for dead-time compensation).
+
+**Auto-scaling.** A coarse pre-probe at $V_{probe}$ yields $R_{coarse} = V_{probe}/I_{probe}$. Each
+level then targets a current fraction $f_j$ of the drive maximum $I_{max}$, choosing the duty so that
+$V_j \approx f_j\, I_{max}\, R_{coarse}$ (clamped to a safe duty range). This keeps the currents high
+enough to escape the worst dead-time non-linearity regardless of the motor.
+
+**Fit quality.** The maximum normalised residual
+$\max_j |V_j - (R_s I_{ss,j} + V_{err})| / R_s$ is reported. A large value indicates the $V$–$I$
+relationship was not linear — typically rotor motion or ADC saturation — and the estimate is
+rejected.
+
+**Winding topology.** For a Delta connection the terminals measure $\tfrac{2}{3}$ of the per-phase
+value for both resistance and inductance; the phase quantities are recovered with
+$R_\phi = R_{terminal} \cdot k_\Delta$ and $L_\phi = L_{terminal} \cdot k_\Delta$, $k_\Delta = 1.5$.
+
+### 4. Inductance Estimation — Integral Method
+
+Rather than locating the 63.2% threshold crossing (which quantises $\tau$ to one sample and is
+sensitive to a single noisy point), the inductance is obtained from the integral identity of a
+first-order rise. For $i(t) = I_{ss}(1 - e^{-t/\tau})$:
 
 $$
-\tau = n_\tau \cdot T_s
+\int_0^\infty \bigl(I_{ss} - i(t)\bigr)\,dt = I_{ss}\,\tau
+\quad\Longrightarrow\quad
+\boxed{L_s = R_s \cdot \frac{\displaystyle\sum_k \bigl(I_{ss} - i[k]\bigr)\,T_s}{I_{ss}}}
 $$
 
-and the inductance:
+The sum runs over the full probe transient (from step onset to plateau). Properties:
 
-$$
-\boxed{L_s = R_s \cdot \tau = R_s \cdot n_\tau \cdot T_s}
-$$
+- **Every sample contributes**, so noise averages out and the result has sub-sample-period
+  resolution — it removes both weaknesses of the threshold method.
+- The integrand is a **difference** $(I_{ss} - i[k])$, so any constant current-sensor offset cancels.
+- The probe step starts from near-zero current, so the denominator is the probe $I_{ss}$ and $R_s$ is
+  the value fitted in Section 3.
 
-#### Moving Average Filter Correction
-
-A causal moving average filter of length $N_{avg}$ is applied to the raw current samples before
-threshold detection:
-
-$$
-\bar{i}[n] = \frac{1}{N_{avg}} \sum_{k=0}^{N_{avg}-1} i[n-k]
-$$
-
-This FIR filter introduces a lag of $(N_{avg} - 1)/2$ samples. The threshold index is corrected:
-
-$$
-n_\tau^{corrected} = n_\tau - \left\lfloor \frac{N_{avg} - 1}{2} \right\rfloor - 1
-$$
-
-Without this correction, $\tau$ is overestimated by the filter group delay, leading to an overestimate
-of $L_s$.
-
-**Filter trade-off**: larger $N_{avg}$ reduces noise variance $\propto 1/N_{avg}$ but increases the
-index correction and requires a corresponding increase in buffer size $N_{buf}$.
+**Requirement**: the buffer must span the transient to a true plateau ($N_{buf} \gtrsim 5\tau/T_s$).
+If $\tau$ is large relative to the buffer, increase $N_{buf}$ or the probe voltage.
 
 ### 5. Pole Pair Estimation
 
@@ -163,25 +165,25 @@ where $\Delta\theta_{mech,total}$ is the measured total mechanical rotation duri
 ### 6. Complete Identification Sequence
 
 ```
-1. Drive alignment: rotate field through N_steps to θ_e = 0.
-   Record encoder offset θ_offset (see alignment theory).
+1. Coarse pre-probe: apply V_probe on one axis, collect the full transient,
+   take I_probe from the last 10% -> R_coarse = V_probe / I_probe.
+   (This step also settles/aligns the rotor to the excited axis.)
 
-2. Apply step voltage V_step on d-axis (i_q* = 0, v_d = V_step).
+2. For each level j in [0 .. N_levels-1]:
+     a. Auto-scale duty so the current targets f_j * I_max (using R_coarse).
+     b. Settle for settlePerLevel, then average a steady-state batch -> I_ss_j.
+   Record the applied voltage V_j.
 
-3. Sample i_d at f_s = 10 kHz for N_buf samples.
+3. Fit V_j = R_s * I_ss_j + V_err by least squares.
+   Reject if any I_ss_j is near zero, if the slope R_s <= 0, or if the
+   normalised residual exceeds the fit-quality threshold.
 
-4. Apply moving average filter (length N_avg = 5) to samples.
+4. Inductance from the probe transient integral:
+   L_s = R_s * sum((I_ss - i[k]) * T_s) / I_ss.
 
-5. Find steady-state current I_ss from mean of last 10% of buffer.
+5. Apply the Delta winding correction (k = 1.5) to both R_s and L_s when configured.
 
-6. Compute R_s = V_step / I_ss.
-
-7. Find first index n_τ where i_d[n] ≥ 0.6321 · I_ss.
-
-8. Correct for filter delay: n_τ_corr = n_τ − ⌊(N_avg−1)/2⌋ − 1.
-
-9. Compute τ = n_τ_corr · T_s, L_s = R_s · τ [H].
-   Express L_s in mH: L_s_mH = R_s · n_τ_corr / f_s · 1000.
+6. Report { R_s, L_s, V_err, fit_quality }.
 ```
 
 ---
@@ -192,14 +194,15 @@ where $\Delta\theta_{mech,total}$ is the measured total mechanical rotation duri
 
 ```mermaid
 graph TD
-    A[Set θ_e = 0\nAlign rotor to d-axis] --> B[Apply V_step\non d-axis\ni_q* = 0]
-    B --> C[Sample i_d\nf_s = 10 kHz\nN_buf samples]
-    C --> D[Moving Average\nFilter\nN_avg = 5]
-    D --> E[Find I_ss\nmean of last 10%]
-    D --> F[Find n_τ\nfirst sample ≥ 63.2% I_ss]
-    E --> G[R_s = V_step / I_ss]
-    F --> H[n_τ_corr = n_τ − delay]
-    G --> I[L_s = R_s · n_τ_corr · T_s]
+    A[Coarse pre-probe\nV_probe on one axis] --> B[R_coarse = V_probe / I_probe\nrotor settles on axis]
+    B --> C[For each level j:\nauto-scale duty to f_j * I_max]
+    C --> D[Settle + average\nI_ss_j]
+    D --> E{More levels?}
+    E -- yes --> C
+    E -- no --> F[LS fit\nV_j = R_s I_ss_j + V_err]
+    F --> G[Integral method\nL_s = R_s Σ(I_ss − i)Ts / I_ss]
+    F --> H[Fit quality\n+ Delta correction]
+    G --> I[Report R_s, L_s, V_err, quality]
     H --> I
 ```
 
@@ -222,8 +225,8 @@ i_d (normalised: I_ss = 1.0)
 0.0├───────────
    └───────────────────────────────── samples (n·T_s)
        0      τ/T_s   2τ/T_s  5τ/T_s
-              ↑
-          n_τ (63.2% crossing) — filter delay correction applied
+
+The whole shaded area between I_ss and i(t) is integrated: L_s = R_s · area / I_ss.
 ```
 
 ---
@@ -233,60 +236,64 @@ i_d (normalised: I_ss = 1.0)
 | Property             | Value / Condition                                            |
 |----------------------|--------------------------------------------------------------|
 | Sampling rate        | $f_s = 10\ \text{kHz}$, $T_s = 100\ \mu\text{s}$             |
-| Filter length        | $N_{avg} = 5$ samples                                        |
-| Filter group delay   | $(N_{avg}-1)/2 = 2$ samples = $200\ \mu\text{s}$             |
-| Threshold            | $0.6321 \cdot I_{ss}$ (i.e. $1 - e^{-1}$)                    |
+| Probe buffer         | $N_{buf} = 512$ samples ($51.2\ \text{ms}$)                 |
+| Resistance levels    | $N_{levels} = 3$ (default fractions $0.3, 0.5, 0.7$)        |
+| Steady-state batch   | $32$ samples per level                                       |
+| Threshold            | integral method — no fixed threshold                        |
 | $R_s$ range          | Nominally $0.1\ \Omega$ to $50\ \Omega$ (ADC current range)  |
-| $L_s$ resolution     | $R_s \cdot T_s$ (one sample step) = depends on $R_s$         |
-| $L_s$ min detectable | Approx. $R_s \cdot 2 T_s$ (due to filter delay correction)   |
-| Trigger voltage      | $V_{step}$ must be small enough to avoid magnetic saturation |
+| $L_s$ resolution     | sub-sample (integral of the full transient)                 |
+| Fit-quality gate     | reject if normalised residual $> 0.1$                       |
+| Trigger voltage      | auto-scaled to target current fraction of $I_{max}$          |
 
 ### Sensitivity Analysis
 
-| Source of Error            | Effect on $R_s$                      | Effect on $L_s$                          |
-|----------------------------|--------------------------------------|------------------------------------------|
-| ADC current offset         | Directly biases $I_{ss}$             | Indirect via $R_s$ error                 |
-| $V_{dc}$ variation         | Biases $V_{step}$                    | Indirect via $R_s$ error                 |
-| Thermal drift in $R_s$     | Measurement valid at $T_{meas}$ only | —                                        |
-| Filter delay not corrected | —                                    | $L_s$ overestimated by $N_{avg}/2$ steps |
-| Insufficient buffer        | $I_{ss}$ underestimated              | $\tau$ underestimated                    |
-| Magnetic saturation        | $R_s$ underestimated                 | $L_s$ underestimated (nonlinear)         |
+| Source of Error            | Effect on $R_s$                          | Effect on $L_s$                          |
+|----------------------------|------------------------------------------|------------------------------------------|
+| ADC current offset         | Cancelled by the differential fit        | Cancelled in the integrand difference    |
+| Inverter dead-time / drops | Cancelled (lands in $V_{err}$ intercept) | Indirect via $R_s$ error                 |
+| $V_{dc}$ variation         | Biases $V_j$ (kept brief to limit drift) | Indirect via $R_s$ error                 |
+| Thermal drift in $R_s$     | Measurement valid at $T_{meas}$ only     | —                                        |
+| Rotor motion in transient  | Flagged by fit-quality residual          | Corrupts integral; rejected if flagged   |
+| Insufficient buffer        | —                                        | $\tau$ / area underestimated             |
+| Magnetic saturation        | $R_s$ underestimated                     | $L_s$ underestimated (nonlinear)         |
 
 ---
 
 ## Worked Example
 
-Motor: $V_{step} = 2\ \text{V}$, $R_s = 1.2\ \Omega$, $L_s = 0.6\ \text{mH}$,
-$f_s = 10\ \text{kHz}$, $N_{avg} = 5$.
+Motor: $R_s = 1.2\ \Omega$, $L_s = 0.6\ \text{mH}$, $f_s = 10\ \text{kHz}$,
+three levels at $V_1 = 1.2\,\text{V}$, $V_2 = 2.0\,\text{V}$, $V_3 = 2.8\,\text{V}$ with a
+constant inverter error $V_{err} = 0.3\,\text{V}$.
 
-**Expected results:**
+**Steady-state currents** ($I_{ss,j} = (V_j - V_{err})/R_s$):
 
-$$I_{ss} = \frac{2}{1.2} \approx 1.667\ \text{A}$$
+$$I_{ss,1} = 0.75\,\text{A},\quad I_{ss,2} = 1.417\,\text{A},\quad I_{ss,3} = 2.083\,\text{A}$$
 
-$$\tau = \frac{L_s}{R_s} = \frac{0.6 \times 10^{-3}}{1.2} = 0.5\ \text{ms} = 5\ T_s$$
+**Resistance** — the least-squares slope through the three points:
 
-At the 63.2% threshold: $i_d[n_\tau] \geq 0.6321 \times 1.667 = 1.054\ \text{A}$
+$$R_s = \frac{\Delta V}{\Delta I} = \frac{2.8 - 1.2}{2.083 - 0.75} = 1.2\ \Omega,\qquad V_{err} = 0.3\,\text{V}$$
 
-The raw crossing occurs at $n_\tau = 5$. Filter delay correction: $n_\tau^{corr} = 5 - 2 - 1 = 2$.
+A single-point estimate at level 1 would instead give $1.2/0.75 = 1.6\ \Omega$ — a **33% error** —
+showing why the differential fit matters.
 
-$$L_{s,\mathrm{mH}} = 1.2 \times 2 \times 100 \times 10^{-6} \times 1000 = 0.24\ \text{mH}$$
+**Inductance** — integrating the probe transient ($\tau = L_s/R_s = 0.5\,\text{ms} = 5\,T_s$):
 
-> The example shows that a very short $\tau$ (5 samples) combined with a 5-tap filter and a
-> 2-sample delay correction can yield significant estimation error. In practice $\tau$ should be
-> at least 15–20 samples for accurate identification.
+$$L_s = R_s \cdot \frac{\sum_k (I_{ss} - i[k])\,T_s}{I_{ss}} = R_s \cdot \tau = 1.2 \times 0.5\times10^{-3} = 0.6\ \text{mH}$$
+
+The integral recovers $\tau$ with sub-sample resolution, independent of any single noisy point.
 
 ---
 
 ## Limitations & Assumptions
 
-- **Assumes**: The rotor is aligned to the d-axis ($\theta_e = 0$, $\dot\theta = 0$). Any rotor
-  motion during identification overlays a back-EMF on the d-axis current.
+- **Assumes**: The rotor is stationary during each transient. The pre-probe and same-axis graduated
+  steps ensure this; residual motion is caught by the fit-quality residual.
 - **Assumes**: $L_d \approx L_q$ (surface-mounted PMSM). For interior PMSM, the step must be
   repeated on both axes if the design requires both $L_d$ and $L_q$.
-- **Assumes**: Magnetic linearity (no saturation). The identification current $I_d^{step}$ must
-  be kept below the saturation current.
+- **Assumes**: Magnetic linearity (no saturation). The identification current must be kept below the
+  saturation current.
 - **Does not handle**: Temperature-dependent $R_s$ variation during operation.
-- **Does not handle**: Identification at running speed where back-EMF cannot be zeroed by alignment alone.
+- **Does not handle**: Identification at running speed where back-EMF cannot be zeroed by standstill.
 
 ## References
 

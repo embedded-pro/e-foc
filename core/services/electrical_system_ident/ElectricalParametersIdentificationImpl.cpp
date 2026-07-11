@@ -1,9 +1,9 @@
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "numerical/math/Matrix.hpp"
 #include <cmath>
 #include <numbers>
-#include <numeric>
 
 namespace
 {
@@ -11,13 +11,13 @@ namespace
     constexpr std::size_t stepsPerRevolution = 12;
     constexpr auto anglePerStep = twoPi / static_cast<float>(stepsPerRevolution);
     constexpr float minRotationThreshold = std::numbers::pi_v<float> / 2.0f;
-    constexpr float timeConstantThreshold = 0.632f;
+    constexpr float minSteadyStateCurrent = 0.001f;
+    constexpr float safeMinDutyPercent = 5.0f;
+    constexpr float safeMaxDutyPercent = 80.0f;
     const hal::Hertz samplingFrequency{ 10000 };
     const auto samplingPeriod = 1.0f / static_cast<float>(samplingFrequency.Value());
-    ;
 
-    foc::PhasePwmDutyCycles
-    NormalizedDutyCycles(foc::ThreePhase voltages)
+    foc::PhasePwmDutyCycles NormalizedDutyCycles(foc::ThreePhase voltages)
     {
         auto offset = 50.0f;
         auto dutyA = static_cast<uint8_t>(std::clamp(offset + voltages.a * 50.0f, 0.0f, 100.0f));
@@ -26,53 +26,29 @@ namespace
         return foc::PhasePwmDutyCycles{ hal::Percent{ dutyA }, hal::Percent{ dutyB }, hal::Percent{ dutyC } };
     }
 
-    float AverageAndRemoveFront(infra::BoundedDeque<float>& deque)
+    float MeanMagnitude(const infra::BoundedVector<float>& samples)
     {
         float sum = 0.0f;
-
-        for (const auto& samples : deque)
-            sum += samples;
-
-        float average = sum / static_cast<float>(deque.size());
-
-        deque.pop_front();
-
-        return average;
+        for (const auto& v : samples)
+            sum += std::abs(v);
+        return sum / static_cast<float>(samples.size());
     }
 
-    float GetSteadyStateCurrent(const infra::BoundedVector<float>& samples)
+    float SteadyStateMagnitude(const infra::BoundedVector<float>& transient)
     {
-        auto lastQuarter = static_cast<std::size_t>(static_cast<float>(samples.size()) * 0.9f);
-
-        return std::accumulate(samples.begin() + lastQuarter, samples.end(), 0.0f) / static_cast<float>(samples.size() - lastQuarter);
+        const auto start = static_cast<std::size_t>(static_cast<float>(transient.size()) * 0.9f);
+        float sum = 0.0f;
+        for (std::size_t i = start; i < transient.size(); ++i)
+            sum += transient[i];
+        return sum / static_cast<float>(transient.size() - start);
     }
 
-    std::optional<float> GetTauFromCurrentSamples(const infra::BoundedVector<float>& samples, float steadyStateCurrent, std::size_t averageFilter)
+    float IntegralInductance(const infra::BoundedVector<float>& transient, float steadyState, float resistance)
     {
-        auto targetCurrent = timeConstantThreshold * steadyStateCurrent;
-
-        for (std::size_t i = 0; i < samples.size(); ++i)
-        {
-            if (samples[i] >= targetCurrent)
-            {
-                if (i >= averageFilter)
-                    return static_cast<float>(i - averageFilter);
-                else
-                    return static_cast<float>(i);
-            }
-        }
-
-        return std::nullopt;
-    }
-
-    std::optional<foc::Ohm> CalculateResistance(float voltage, float current)
-    {
-        return foc::Ohm{ voltage / current };
-    }
-
-    std::optional<foc::MilliHenry> CalculateInductance(foc::Ohm resistance, float tau)
-    {
-        return foc::MilliHenry{ resistance.Value() * tau * samplingPeriod * 1000.0f };
+        float integral = 0.0f;
+        for (const auto& v : transient)
+            integral += (steadyState - v) * samplingPeriod;
+        return resistance * integral / steadyState;
     }
 }
 
@@ -85,59 +61,152 @@ namespace services
     {
     }
 
-    void ElectricalParametersIdentificationImpl::EstimateResistanceAndInductance(const ResistanceAndInductanceConfig& config, const infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)>& onDone)
+    void ElectricalParametersIdentificationImpl::EstimateResistanceAndInductance(const ResistanceAndInductanceConfig& config, const infra::Function<void(std::optional<ResistanceInductanceResult>)>& onDone)
     {
-        resistanceAndInductanceConfig = config;
+        rlConfig = config;
         onResistanceAndInductanceDone = onDone;
-        currentSamples.clear();
-        filteredCurrentSample.clear();
+        probeBuffer.clear();
 
+        StartProbeStep();
+    }
+
+    void ElectricalParametersIdentificationImpl::StartProbeStep()
+    {
         driver.PhaseCurrentsReady(samplingFrequency, [](auto) {});
         driver.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{
-            hal::Percent{ neutralDuty },
+            hal::Percent{ rlConfig.probeVoltagePercent.Value() },
             hal::Percent{ neutralDuty },
             hal::Percent{ neutralDuty } });
 
-        settleTimer.Start(resistanceAndInductanceConfig.settleTime, [this]()
+        driver.PhaseCurrentsReady(samplingFrequency, [this](auto currentPhases)
             {
-                driver.PhaseCurrentsReady(samplingFrequency, [this](auto currentPhases)
-                    {
-                        currentSamples.push_back(currentPhases.a.Value());
-
-                        if (currentSamples.full())
-                            filteredCurrentSample.push_back(AverageAndRemoveFront(currentSamples));
-
-                        if (filteredCurrentSample.full())
-                            AnalyzeInductanceMeasures();
-                    });
-
-                driver.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{
-                    hal::Percent{ resistanceAndInductanceConfig.testVoltagePercent.Value() },
-                    hal::Percent{ neutralDuty },
-                    hal::Percent{ neutralDuty } });
+                probeBuffer.push_back(std::abs(currentPhases.a.Value()));
+                if (probeBuffer.full())
+                    OnProbeBufferFull();
             });
     }
 
-    void ElectricalParametersIdentificationImpl::AnalyzeInductanceMeasures()
+    void ElectricalParametersIdentificationImpl::OnProbeBufferFull()
     {
-        driver.Stop();
+        const float probeCurrent = SteadyStateMagnitude(probeBuffer);
+        if (probeCurrent < minSteadyStateCurrent)
+        {
+            driver.Stop();
+            onResistanceAndInductanceDone(std::nullopt);
+            return;
+        }
 
-        auto steadyStateCurrent = GetSteadyStateCurrent(filteredCurrentSample);
+        const float probeVoltage = static_cast<float>(rlConfig.probeVoltagePercent.Value()) / 100.0f * vdc.Value();
+        rCoarse = probeVoltage / probeCurrent;
 
-        if (steadyStateCurrent <= 0.0f)
-            onResistanceAndInductanceDone(std::nullopt, std::nullopt);
+        StartLevel(0);
+    }
+
+    void ElectricalParametersIdentificationImpl::StartLevel(std::size_t level)
+    {
+        levelBatch.clear();
+
+        const float targetCurrent = rlConfig.targetCurrentFractions[level] * driver.MaxCurrentSupported().Value();
+        const float rawDuty = (targetCurrent * rCoarse / vdc.Value()) * 100.0f + static_cast<float>(neutralDuty);
+        const auto duty = static_cast<uint8_t>(std::clamp(rawDuty, safeMinDutyPercent, safeMaxDutyPercent));
+
+        levelVoltages[level] = (static_cast<float>(duty) - static_cast<float>(neutralDuty)) / 100.0f * vdc.Value();
+
+        driver.PhaseCurrentsReady(samplingFrequency, [](auto) {});
+        driver.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{
+            hal::Percent{ duty },
+            hal::Percent{ neutralDuty },
+            hal::Percent{ neutralDuty } });
+
+        settleTimer.Start(rlConfig.settlePerLevel, [this, level]()
+            {
+                driver.PhaseCurrentsReady(samplingFrequency, [this, level](auto currentPhases)
+                    {
+                        levelBatch.push_back(std::abs(currentPhases.a.Value()));
+                        if (levelBatch.full())
+                            OnLevelBatchFull(level);
+                    });
+            });
+    }
+
+    void ElectricalParametersIdentificationImpl::OnLevelBatchFull(std::size_t level)
+    {
+        levelSteadyStateCurrents[level] = MeanMagnitude(levelBatch);
+
+        if (level + 1 < numLevels)
+            StartLevel(level + 1);
         else
         {
-            auto tau = GetTauFromCurrentSamples(filteredCurrentSample, steadyStateCurrent, averageFilter);
-            auto resistance = CalculateResistance(resistanceAndInductanceConfig.testVoltagePercent.Value() * vdc.Value() / 100.0f, steadyStateCurrent);
-
-            if (resistance.has_value() && tau.has_value())
-                onResistanceAndInductanceDone(resistance, CalculateInductance(resistance.value(), tau.value_or(0.0f)));
-            else
-                onResistanceAndInductanceDone(std::nullopt, std::nullopt);
-
-            filteredCurrentSample.clear();
+            driver.Stop();
+            ComputeAndReport();
         }
+    }
+
+    bool ElectricalParametersIdentificationImpl::FitResistance()
+    {
+        math::Matrix<float, numLevels, 1> currents;
+        math::Matrix<float, numLevels, 1> voltages;
+        for (std::size_t j = 0; j < numLevels; ++j)
+        {
+            if (levelSteadyStateCurrents[j] < minSteadyStateCurrent)
+                return false;
+            currents.at(j, 0) = levelSteadyStateCurrents[j];
+            voltages.at(j, 0) = levelVoltages[j];
+        }
+
+        estimators::LinearRegression<float, numLevels, 1> regression;
+        regression.Fit(currents, voltages);
+
+        fittedVoltageOffset = regression.Coefficients().at(0, 0);
+        fittedResistance = regression.Coefficients().at(1, 0);
+
+        return fittedResistance > 0.0f;
+    }
+
+    float ElectricalParametersIdentificationImpl::ResistanceFitResidual() const
+    {
+        float maxResidual = 0.0f;
+        for (std::size_t j = 0; j < numLevels; ++j)
+        {
+            const float predicted = fittedResistance * levelSteadyStateCurrents[j] + fittedVoltageOffset;
+            maxResidual = std::max(maxResidual, std::abs(levelVoltages[j] - predicted));
+        }
+        return maxResidual / fittedResistance;
+    }
+
+    void ElectricalParametersIdentificationImpl::ComputeAndReport()
+    {
+        if (!FitResistance())
+        {
+            onResistanceAndInductanceDone(std::nullopt);
+            return;
+        }
+
+        const float fitQuality = ResistanceFitResidual();
+        if (fitQuality > maxAcceptableFitResidual)
+        {
+            onResistanceAndInductanceDone(std::nullopt);
+            return;
+        }
+
+        const float steadyState = SteadyStateMagnitude(probeBuffer);
+        const float inductance = IntegralInductance(probeBuffer, steadyState, fittedResistance);
+
+        const float correction = (rlConfig.windingConfig == WindingConfiguration::Delta) ? deltaCoefficient : 1.0f;
+        const float resistancePhase = fittedResistance * correction;
+        const float inductancePhase = inductance * correction;
+
+        if (inductancePhase <= 0.0f)
+        {
+            onResistanceAndInductanceDone(std::nullopt);
+            return;
+        }
+
+        onResistanceAndInductanceDone(ResistanceInductanceResult{
+            foc::Ohm{ resistancePhase },
+            foc::MilliHenry{ inductancePhase * 1000.0f },
+            foc::Volts{ fittedVoltageOffset },
+            fitQuality });
     }
 
     void ElectricalParametersIdentificationImpl::EstimateNumberOfPolePairs(const PolePairsConfig& config, const infra::Function<void(std::optional<std::size_t>)>& onDone)

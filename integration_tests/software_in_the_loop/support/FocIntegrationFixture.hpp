@@ -99,7 +99,7 @@ namespace integration
 
         bool calibrationExpectationsConfigured{ false };
         infra::Function<void(std::optional<std::size_t>)> capturedPolePairsCallback;
-        infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)> capturedRLCallback;
+        infra::Function<void(std::optional<services::ElectricalParametersIdentification::ResistanceInductanceResult>)> capturedRLCallback;
         infra::Function<void(std::optional<foc::Radians>)> capturedAlignmentCallback;
 
         testing::StrictMock<hal::CanMock> transportCanMock;
