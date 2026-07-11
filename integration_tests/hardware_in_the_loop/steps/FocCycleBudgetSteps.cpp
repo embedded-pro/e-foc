@@ -13,7 +13,7 @@ static constexpr uint32_t kMaxAllowedCycles{ 4500 };
 WHEN(R"(the FOC loop CPU utilisation is sampled for one control cycle)")
 {
     auto& fixture = context.Get<HilFixture>();
-    ASSERT_TRUE(fixture.SendCommand("foc 0.0 0.0 0.0 0.0", timeouts::slowCommand))
+    ASSERT_TRUE(fixture.SendCommand("foc 7 0.0 0.0 0.0 0.0", timeouts::slowCommand))
         << "FOC simulation command did not receive a response";
 }
 

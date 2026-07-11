@@ -3,6 +3,8 @@
 #include "core/foc/implementations/FocSpeedImpl.hpp"
 #include "core/foc/interfaces/Driver.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
+#include "core/services/alignment/MotorAlignmentImpl.hpp"
+#include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "hal/interfaces/Eeprom.hpp"
 #include "hal/interfaces/Pwm.hpp"
 #include "infra/util/BoundedDeque.hpp"
@@ -19,6 +21,13 @@ namespace application
     private:
         using StatusWithMessage = services::TerminalWithStorage::StatusWithMessage;
 
+        struct IdentificationResults
+        {
+            services::ElectricalParametersIdentification::ResistanceInductanceResult rl{
+                foc::Ohm{ 0.0f }, foc::MilliHenry{ 0.0f }, foc::Volts{ 0.0f }, 0.0f };
+            std::size_t polePairs{ 0 };
+        };
+
         StatusWithMessage ConfigurePwm(const infra::BoundedConstString& param);
         StatusWithMessage ConfigureAdc(const infra::BoundedConstString& param);
         StatusWithMessage SimulateFoc(const infra::BoundedConstString& param);
@@ -27,7 +36,8 @@ namespace application
         StatusWithMessage Stop();
         void ProcessAdcSamples();
         StatusWithMessage SetPwmDuty(const infra::BoundedConstString& param);
-        StatusWithMessage SetMotorParameters(const infra::BoundedConstString& param);
+        StatusWithMessage IdentifyElectricalParameters(const infra::BoundedConstString& param);
+        StatusWithMessage AlignMotor(const infra::BoundedConstString& param);
         StatusWithMessage CanStart(const infra::BoundedConstString& param);
         StatusWithMessage CanStop();
         StatusWithMessage CanSend(const infra::BoundedConstString& param);
@@ -39,6 +49,8 @@ namespace application
         StatusWithMessage GetResetCauseStatus();
         StatusWithMessage GetFaultStatus();
         StatusWithMessage ForceHardfault();
+        void RunPolePairEstimation();
+        void ReportIdentificationResults();
 
     private:
         static constexpr std::size_t averageSampleSize = 100;
@@ -70,5 +82,9 @@ namespace application
         hal::Eeprom& eeprom;
         std::array<uint8_t, 64> eepromBuffer{};
         uint32_t eepromCurrentReadSize{ 0 };
+        services::ElectricalParametersIdentificationImpl electricalIdent;
+        services::MotorAlignmentImpl motorAlignment;
+        std::optional<IdentificationResults> identificationResults;
+        services::ElectricalParametersIdentification::PolePairsConfig pendingPolePairsConfig;
     };
 }

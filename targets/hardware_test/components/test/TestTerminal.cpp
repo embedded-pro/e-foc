@@ -4,6 +4,7 @@
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
 #include "infra/stream/test/StreamMock.hpp"
+#include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/test_helper/MockHelpers.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "targets/hardware_test/components/Terminal.hpp"
@@ -83,7 +84,7 @@ namespace
 
     class TestHardwareTerminal
         : public testing::Test
-        , public infra::EventDispatcherWithWeakPtrFixture
+        , public infra::ClockFixture
     {
     public:
         TestHardwareTerminal()
@@ -121,7 +122,7 @@ namespace
                 EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
+        services::TerminalWithStorage::WithMaxSize<22> terminal{ terminalWithCommands, tracer };
 
         testing::StrictMock<PerformanceTrackerMock> performanceTrackerMock;
         testing::StrictMock<hal::CleanEepromMock> eepromMock;
@@ -360,7 +361,7 @@ TEST_F(TestHardwareTerminal, pid_invalid_dq_ki)
 
 TEST_F(TestHardwareTerminal, foc_command)
 {
-    InvokeCommand("foc 45.0 1.5 2.0 2.5", [this]()
+    InvokeCommand("foc 7 45.0 1.5 2.0 2.5", [this]()
         {
             EXPECT_CALL(performanceTrackerMock, Start());
             EXPECT_CALL(performanceTrackerMock, ElapsedCycles()).WillOnce(testing::Return(1000));
@@ -372,7 +373,7 @@ TEST_F(TestHardwareTerminal, foc_command)
 
 TEST_F(TestHardwareTerminal, foc_alias)
 {
-    InvokeCommand("f 90.0 2.0 3.0 4.0", [this]()
+    InvokeCommand("f 7 90.0 2.0 3.0 4.0", [this]()
         {
             EXPECT_CALL(performanceTrackerMock, Start());
             EXPECT_CALL(performanceTrackerMock, ElapsedCycles()).WillOnce(testing::Return(1500));
@@ -400,9 +401,27 @@ TEST_F(TestHardwareTerminal, foc_invalid_argument_count)
     ExecuteAllActions();
 }
 
+TEST_F(TestHardwareTerminal, foc_invalid_pole_pairs)
+{
+    InvokeCommand("foc 0 45.0 1.5 2.0 2.5", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid value for pole pairs. It should be an integer between 1 and 8." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
 TEST_F(TestHardwareTerminal, foc_invalid_angle)
 {
-    InvokeCommand("foc 400.0 1.5 2.0 2.5", [this]()
+    InvokeCommand("foc 7 400.0 1.5 2.0 2.5", [this]()
         {
             ::testing::InSequence _;
 
@@ -420,7 +439,7 @@ TEST_F(TestHardwareTerminal, foc_invalid_angle)
 
 TEST_F(TestHardwareTerminal, foc_invalid_phase_a_current)
 {
-    InvokeCommand("foc 45.0 invalid 2.0 2.5", [this]()
+    InvokeCommand("foc 7 45.0 invalid 2.0 2.5", [this]()
         {
             ::testing::InSequence _;
 
@@ -438,7 +457,7 @@ TEST_F(TestHardwareTerminal, foc_invalid_phase_a_current)
 
 TEST_F(TestHardwareTerminal, foc_invalid_phase_c_current)
 {
-    InvokeCommand("foc 45.0 1.5 2.0 1500.0", [this]()
+    InvokeCommand("foc 7 45.0 1.5 2.0 1500.0", [this]()
         {
             ::testing::InSequence _;
 
@@ -456,7 +475,7 @@ TEST_F(TestHardwareTerminal, foc_invalid_phase_c_current)
 
 TEST_F(TestHardwareTerminal, foc_with_negative_angle)
 {
-    InvokeCommand("foc -90.0 1.5 2.0 2.5", [this]()
+    InvokeCommand("foc 7 -90.0 1.5 2.0 2.5", [this]()
         {
             EXPECT_CALL(performanceTrackerMock, Start());
             EXPECT_CALL(performanceTrackerMock, ElapsedCycles()).WillOnce(testing::Return(1200));
@@ -468,7 +487,7 @@ TEST_F(TestHardwareTerminal, foc_with_negative_angle)
 
 TEST_F(TestHardwareTerminal, foc_with_negative_currents)
 {
-    InvokeCommand("foc 45.0 -1.5 -2.0 -2.5", [this]()
+    InvokeCommand("foc 7 45.0 -1.5 -2.0 -2.5", [this]()
         {
             EXPECT_CALL(performanceTrackerMock, Start());
             EXPECT_CALL(performanceTrackerMock, ElapsedCycles()).WillOnce(testing::Return(1100));
@@ -480,7 +499,7 @@ TEST_F(TestHardwareTerminal, foc_with_negative_currents)
 
 TEST_F(TestHardwareTerminal, foc_simulation_output_format)
 {
-    InvokeCommand("foc 0.0 0.0 0.0 0.0", [this]()
+    InvokeCommand("foc 7 0.0 0.0 0.0 0.0", [this]()
         {
             ::testing::InSequence _;
 
@@ -495,7 +514,7 @@ TEST_F(TestHardwareTerminal, foc_simulation_output_format)
 
 TEST_F(TestHardwareTerminal, foc_with_maximum_angle)
 {
-    InvokeCommand("foc 360.0 1.0 2.0 3.0", [this]()
+    InvokeCommand("foc 7 360.0 1.0 2.0 3.0", [this]()
         {
             EXPECT_CALL(performanceTrackerMock, Start());
             EXPECT_CALL(performanceTrackerMock, ElapsedCycles()).WillOnce(testing::Return(1300));
@@ -507,7 +526,7 @@ TEST_F(TestHardwareTerminal, foc_with_maximum_angle)
 
 TEST_F(TestHardwareTerminal, foc_with_minimum_angle)
 {
-    InvokeCommand("foc -360.0 1.0 2.0 3.0", [this]()
+    InvokeCommand("foc 7 -360.0 1.0 2.0 3.0", [this]()
         {
             EXPECT_CALL(performanceTrackerMock, Start());
             EXPECT_CALL(performanceTrackerMock, ElapsedCycles()).WillOnce(testing::Return(1250));
@@ -519,7 +538,7 @@ TEST_F(TestHardwareTerminal, foc_with_minimum_angle)
 
 TEST_F(TestHardwareTerminal, foc_with_maximum_currents)
 {
-    InvokeCommand("foc 45.0 1000.0 1000.0 1000.0", [this]()
+    InvokeCommand("foc 7 45.0 1000.0 1000.0 1000.0", [this]()
         {
             EXPECT_CALL(performanceTrackerMock, Start());
             EXPECT_CALL(performanceTrackerMock, ElapsedCycles()).WillOnce(testing::Return(1400));
@@ -531,7 +550,7 @@ TEST_F(TestHardwareTerminal, foc_with_maximum_currents)
 
 TEST_F(TestHardwareTerminal, foc_with_minimum_currents)
 {
-    InvokeCommand("foc 45.0 -1000.0 -1000.0 -1000.0", [this]()
+    InvokeCommand("foc 7 45.0 -1000.0 -1000.0 -1000.0", [this]()
         {
             EXPECT_CALL(performanceTrackerMock, Start());
             EXPECT_CALL(performanceTrackerMock, ElapsedCycles()).WillOnce(testing::Return(1350));
@@ -543,7 +562,7 @@ TEST_F(TestHardwareTerminal, foc_with_minimum_currents)
 
 TEST_F(TestHardwareTerminal, foc_multiple_simulations)
 {
-    InvokeCommand("foc 30.0 1.0 2.0 3.0", [this]()
+    InvokeCommand("foc 7 30.0 1.0 2.0 3.0", [this]()
         {
             EXPECT_CALL(performanceTrackerMock, Start());
             EXPECT_CALL(performanceTrackerMock, ElapsedCycles()).WillOnce(testing::Return(1050));
@@ -552,7 +571,7 @@ TEST_F(TestHardwareTerminal, foc_multiple_simulations)
 
     ExecuteAllActions();
 
-    InvokeCommand("foc 60.0 2.0 3.0 4.0", [this]()
+    InvokeCommand("foc 7 60.0 2.0 3.0 4.0", [this]()
         {
             EXPECT_CALL(performanceTrackerMock, Start());
             EXPECT_CALL(performanceTrackerMock, ElapsedCycles()).WillOnce(testing::Return(1150));
@@ -564,7 +583,7 @@ TEST_F(TestHardwareTerminal, foc_multiple_simulations)
 
 TEST_F(TestHardwareTerminal, foc_with_fractional_values)
 {
-    InvokeCommand("foc 45.5 1.234 2.567 3.891", [this]()
+    InvokeCommand("foc 7 45.5 1.234 2.567 3.891", [this]()
         {
             EXPECT_CALL(performanceTrackerMock, Start());
             EXPECT_CALL(performanceTrackerMock, ElapsedCycles()).WillOnce(testing::Return(1075));
@@ -574,29 +593,27 @@ TEST_F(TestHardwareTerminal, foc_with_fractional_values)
     ExecuteAllActions();
 }
 
-TEST_F(TestHardwareTerminal, motor_command)
+TEST_F(TestHardwareTerminal, ident_invalid_winding)
 {
-    InvokeCommand("motor 14", [this]()
+    InvokeCommand("ident foo", [this]()
         {
-            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid winding. Use wye or delta." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
         });
 
     ExecuteAllActions();
 }
 
-TEST_F(TestHardwareTerminal, motor_alias)
+TEST_F(TestHardwareTerminal, ident_invalid_too_many_args)
 {
-    InvokeCommand("m 8", [this]()
-        {
-            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TestHardwareTerminal, motor_invalid_argument_count)
-{
-    InvokeCommand("motor 14 8", [this]()
+    InvokeCommand("ident wye 1 2 3 4 5 6", [this]()
         {
             ::testing::InSequence _;
 
@@ -612,15 +629,15 @@ TEST_F(TestHardwareTerminal, motor_invalid_argument_count)
     ExecuteAllActions();
 }
 
-TEST_F(TestHardwareTerminal, motor_invalid_poles_too_low)
+TEST_F(TestHardwareTerminal, ident_invalid_probe_voltage_out_of_range)
 {
-    InvokeCommand("motor 1", [this]()
+    InvokeCommand("ident wye 250", [this]()
         {
             ::testing::InSequence _;
 
             std::string newline{ "\r\n" };
             std::string header{ "ERROR: " };
-            std::string payload{ "invalid value for poles. It should be an integer between 2 and 16." };
+            std::string payload{ "invalid value for probe voltage. It should be an integer between 1 and 100." };
 
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
@@ -630,57 +647,59 @@ TEST_F(TestHardwareTerminal, motor_invalid_poles_too_low)
     ExecuteAllActions();
 }
 
-TEST_F(TestHardwareTerminal, motor_invalid_poles_too_high)
+TEST_F(TestHardwareTerminal, ident_wye_starts_identification)
 {
-    InvokeCommand("motor 18", [this]()
+    InvokeCommand("ident wye", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, ThreePhasePwmOutput(testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, ident_delta_starts_identification)
+{
+    InvokeCommand("ident delta", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, ThreePhasePwmOutput(testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, ident_alias)
+{
+    InvokeCommand("id wye", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, ThreePhasePwmOutput(testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, ident_with_all_optional_args)
+{
+    InvokeCommand("ident wye 15 2000 10 5 50", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, ThreePhasePwmOutput(testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, align_fails_without_identification)
+{
+    InvokeCommand("align", [this]()
         {
             ::testing::InSequence _;
 
             std::string newline{ "\r\n" };
             std::string header{ "ERROR: " };
-            std::string payload{ "invalid value for poles. It should be an integer between 2 and 16." };
+            std::string payload{ "no pole pairs identified. Run 'ident' first." };
 
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TestHardwareTerminal, motor_invalid_poles_not_a_number)
-{
-    InvokeCommand("motor invalid", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string newline{ "\r\n" };
-            std::string header{ "ERROR: " };
-            std::string payload{ "invalid value for poles. It should be an integer between 2 and 16." };
-
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TestHardwareTerminal, motor_minimum_valid_poles)
-{
-    InvokeCommand("motor 2", [this]()
-        {
-            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TestHardwareTerminal, motor_maximum_valid_poles)
-{
-    InvokeCommand("motor 16", [this]()
-        {
-            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
 
     ExecuteAllActions();
@@ -976,7 +995,7 @@ TEST_F(TestHardwareTerminal, duty_invalid_phase_c)
 
 TEST_F(TestHardwareTerminal, foc_invalid_phase_b_current)
 {
-    InvokeCommand("foc 45.0 1.5 invalid 2.5", [this]()
+    InvokeCommand("foc 7 45.0 1.5 invalid 2.5", [this]()
         {
             ::testing::InSequence _;
 
@@ -994,7 +1013,7 @@ TEST_F(TestHardwareTerminal, foc_invalid_phase_b_current)
 
 TEST_F(TestHardwareTerminal, foc_invalid_angle_non_numeric)
 {
-    InvokeCommand("foc invalid 1.5 2.0 2.5", [this]()
+    InvokeCommand("foc 7 invalid 1.5 2.0 2.5", [this]()
         {
             ::testing::InSequence _;
 

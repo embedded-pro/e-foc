@@ -1,4 +1,5 @@
 #include "targets/hardware_test/components/Terminal.hpp"
+#include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "foc/interfaces/Driver.hpp"
 #include "hal/interfaces/Pwm.hpp"
 #include "infra/stream/StringInputStream.hpp"
@@ -68,6 +69,15 @@ namespace
         else
             return {};
     }
+
+    std::optional<services::WindingConfiguration> ParseWinding(const infra::BoundedConstString& value)
+    {
+        if (value == "wye")
+            return services::WindingConfiguration::Wye;
+        if (value == "delta")
+            return services::WindingConfiguration::Delta;
+        return std::nullopt;
+    }
 }
 
 namespace application
@@ -83,6 +93,8 @@ namespace application
         , systemClock{ hardware.SystemClock() }
         , foc{ hardware.MaxCurrentSupported(), hal::Hertz{ 1000 }, hardware.LowPriorityInterrupt() }
         , eeprom{ hardware.Eeprom() }
+        , electricalIdent{ hardware, hardware, Vdc }
+        , motorAlignment{ hardware, hardware }
     {
         terminal.AddCommand({ { "enc", "e", "Read encoder. stop. Ex: enc" },
             [this](const auto&)
@@ -120,16 +132,22 @@ namespace application
                 this->terminal.ProcessResult(ConfigurePid(param));
             } });
 
-        terminal.AddCommand({ { "foc", "f", "Simulate foc [angle ia ib ic]. Ex: foc param" },
+        terminal.AddCommand({ { "foc", "f", "Simulate foc [pole_pairs angle ia ib ic]. Ex: foc 7 30 1 2 3" },
             [this](const infra::BoundedConstString& param)
             {
                 this->terminal.ProcessResult(SimulateFoc(param));
             } });
 
-        terminal.AddCommand({ { "motor", "m", "Set motor parameters [poles [2; 16]]. Ex: motor 14" },
+        terminal.AddCommand({ { "ident", "id", "Identify R, L and pole pairs. ident <wye|delta> [probe_v%] [settle_ms] [pp_v%] [pp_revs] [pp_settle_ms]. Ex: ident wye 5 300 10 5 50" },
             [this](const infra::BoundedConstString& param)
             {
-                this->terminal.ProcessResult(SetMotorParameters(param));
+                this->terminal.ProcessResult(IdentifyElectricalParameters(param));
+            } });
+
+        terminal.AddCommand({ { "align", "al", "Align rotor using identified pole pairs. align [v%] [samp_hz] [max_samp] [thresh_rad] [count]. Ex: align 20 1000 500 0.001 10" },
+            [this](const infra::BoundedConstString& param)
+            {
+                this->terminal.ProcessResult(AlignMotor(param));
             } });
 
         terminal.AddCommand({ { "can_start", "cs", "Start CAN bus [bitrate [100000;1000000]] [test]. Ex: can_start 500000" },
@@ -297,25 +315,31 @@ namespace application
     {
         infra::Tokenizer tokenizer(param, ' ');
 
-        if (tokenizer.Size() != 4)
+        if (tokenizer.Size() != 5)
             return { error, "invalid number of arguments" };
 
-        auto angle = ParseInput<float>(tokenizer.Token(0), -360.0f, 360.0f);
+        auto pp = ParseInput<uint8_t>(tokenizer.Token(0), 1, 8);
+        if (!pp.has_value())
+            return { error, "invalid value for pole pairs. It should be an integer between 1 and 8." };
+
+        auto angle = ParseInput<float>(tokenizer.Token(1), -360.0f, 360.0f);
         if (!angle.has_value())
             return { error, "invalid value for angle. It should be a float between -360 and 360." };
 
-        auto currentA = ParseInput<float>(tokenizer.Token(1), -1000.0f, 1000.0f);
+        auto currentA = ParseInput<float>(tokenizer.Token(2), -1000.0f, 1000.0f);
         if (!currentA.has_value())
             return { error, "invalid value for phase A current. It should be a float between -1000 and 1000." };
 
-        auto currentB = ParseInput<float>(tokenizer.Token(2), -1000.0f, 1000.0f);
+        auto currentB = ParseInput<float>(tokenizer.Token(3), -1000.0f, 1000.0f);
         if (!currentB.has_value())
             return { error, "invalid value for phase B current. It should be a float between -1000 and 1000." };
 
-        auto currentC = ParseInput<float>(tokenizer.Token(3), -1000.0f, 1000.0f);
+        auto currentC = ParseInput<float>(tokenizer.Token(4), -1000.0f, 1000.0f);
         if (!currentC.has_value())
             return { error, "invalid value for phase C current. It should be a float between -1000 and 1000." };
 
+        polePairs = static_cast<std::size_t>(*pp);
+        foc.SetPolePairs(polePairs.value());
         RunFocSimulation(foc::PhaseCurrents{ foc::Ampere{ *currentA }, foc::Ampere{ *currentB }, foc::Ampere{ *currentC } }, foc::Radians{ *angle * pi_div_180 });
 
         return { success };
@@ -389,21 +413,166 @@ namespace application
         return { success };
     }
 
-    TerminalInteractor::StatusWithMessage TerminalInteractor::SetMotorParameters(const infra::BoundedConstString& param)
+    TerminalInteractor::StatusWithMessage TerminalInteractor::IdentifyElectricalParameters(const infra::BoundedConstString& param)
     {
         infra::Tokenizer tokenizer(param, ' ');
 
-        if (tokenizer.Size() != 1)
+        if (tokenizer.Size() < 1 || tokenizer.Size() > 6)
             return { error, "invalid number of arguments" };
 
-        auto poles = ParseInput<uint8_t>(tokenizer.Token(0), 2, 16);
-        if (!poles.has_value())
-            return { error, "invalid value for poles. It should be an integer between 2 and 16." };
+        auto winding = ParseWinding(tokenizer.Token(0));
+        if (!winding.has_value())
+            return { error, "invalid winding. Use wye or delta." };
 
-        polePairs = static_cast<std::size_t>(*poles / 2);
-        foc.SetPolePairs(polePairs.value());
+        services::ElectricalParametersIdentification::ResistanceAndInductanceConfig rlConfig;
+        rlConfig.windingConfig = *winding;
+
+        if (tokenizer.Size() >= 2)
+        {
+            auto probeVoltage = ParseInput<uint8_t>(tokenizer.Token(1), 1, 100);
+            if (!probeVoltage.has_value())
+                return { error, "invalid value for probe voltage. It should be an integer between 1 and 100." };
+            rlConfig.probeVoltagePercent = hal::Percent{ *probeVoltage };
+        }
+
+        if (tokenizer.Size() >= 3)
+        {
+            auto settlems = ParseInput<uint32_t>(tokenizer.Token(2), 1u, 10000u);
+            if (!settlems.has_value())
+                return { error, "invalid value for settle time. It should be an integer between 1 and 10000 ms." };
+            rlConfig.settlePerLevel = std::chrono::milliseconds{ *settlems };
+        }
+
+        pendingPolePairsConfig = {};
+
+        if (tokenizer.Size() >= 4)
+        {
+            auto ppVoltage = ParseInput<uint8_t>(tokenizer.Token(3), 1, 100);
+            if (!ppVoltage.has_value())
+                return { error, "invalid value for pole-pairs test voltage. It should be an integer between 1 and 100." };
+            pendingPolePairsConfig.testVoltagePercent = hal::Percent{ *ppVoltage };
+        }
+
+        if (tokenizer.Size() >= 5)
+        {
+            auto ppRevs = ParseInput<uint32_t>(tokenizer.Token(4), 1u, 50u);
+            if (!ppRevs.has_value())
+                return { error, "invalid value for electrical revolutions. It should be an integer between 1 and 50." };
+            pendingPolePairsConfig.electricalRevolutions = static_cast<std::size_t>(*ppRevs);
+        }
+
+        if (tokenizer.Size() >= 6)
+        {
+            auto ppSettle = ParseInput<uint32_t>(tokenizer.Token(5), 1u, 10000u);
+            if (!ppSettle.has_value())
+                return { error, "invalid value for pole-pairs step settle time. It should be an integer between 1 and 10000 ms." };
+            pendingPolePairsConfig.settleTimeBetweenSteps = std::chrono::milliseconds{ *ppSettle };
+        }
+
+        identificationResults.reset();
+
+        electricalIdent.EstimateResistanceAndInductance(rlConfig, [this](std::optional<services::ElectricalParametersIdentification::ResistanceInductanceResult> result)
+            {
+                if (!result.has_value())
+                {
+                    tracer.Trace() << "  Identification failed: could not estimate R and L.";
+                    return;
+                }
+
+                identificationResults = IdentificationResults{ *result, 0 };
+                RunPolePairEstimation();
+            });
 
         return { success };
+    }
+
+    TerminalInteractor::StatusWithMessage TerminalInteractor::AlignMotor(const infra::BoundedConstString& param)
+    {
+        if (!identificationResults.has_value() || identificationResults->polePairs == 0)
+            return { error, "no pole pairs identified. Run 'ident' first." };
+
+        infra::Tokenizer tokenizer(param, ' ');
+
+        if (tokenizer.Size() > 5)
+            return { error, "invalid number of arguments" };
+
+        services::MotorAlignment::AlignmentConfig config;
+
+        if (tokenizer.Size() >= 1)
+        {
+            auto voltage = ParseInput<uint8_t>(tokenizer.Token(0), 1, 100);
+            if (!voltage.has_value())
+                return { error, "invalid value for test voltage. It should be an integer between 1 and 100." };
+            config.testVoltagePercent = hal::Percent{ *voltage };
+        }
+
+        if (tokenizer.Size() >= 2)
+        {
+            auto samplingHz = ParseInput<uint32_t>(tokenizer.Token(1), 100u, 20000u);
+            if (!samplingHz.has_value())
+                return { error, "invalid value for sampling frequency. It should be between 100 and 20000 Hz." };
+            config.samplingFrequency = hal::Hertz{ *samplingHz };
+        }
+
+        if (tokenizer.Size() >= 3)
+        {
+            auto maxSamples = ParseInput<uint32_t>(tokenizer.Token(2), 1u, 5000u);
+            if (!maxSamples.has_value())
+                return { error, "invalid value for max samples. It should be between 1 and 5000." };
+            config.maxSamples = static_cast<std::size_t>(*maxSamples);
+        }
+
+        if (tokenizer.Size() >= 4)
+        {
+            auto threshold = ParseInput<float>(tokenizer.Token(3), 0.0001f, 1.0f);
+            if (!threshold.has_value())
+                return { error, "invalid value for settled threshold. It should be between 0.0001 and 1.0 radians." };
+            config.settledThreshold = foc::Radians{ *threshold };
+        }
+
+        if (tokenizer.Size() >= 5)
+        {
+            auto count = ParseInput<uint32_t>(tokenizer.Token(4), 1u, 1000u);
+            if (!count.has_value())
+                return { error, "invalid value for settled count. It should be between 1 and 1000." };
+            config.settledCount = static_cast<std::size_t>(*count);
+        }
+
+        motorAlignment.ForceAlignment(identificationResults->polePairs, config, [this](std::optional<foc::Radians> offset)
+            {
+                if (!offset.has_value())
+                    tracer.Trace() << "  Alignment failed: rotor did not converge.";
+                else
+                    tracer.Trace() << "  Alignment complete. Offset: " << offset->Value() << " radians.";
+            });
+
+        return { success };
+    }
+
+    void TerminalInteractor::RunPolePairEstimation()
+    {
+        electricalIdent.EstimateNumberOfPolePairs(pendingPolePairsConfig, [this](std::optional<std::size_t> pp)
+            {
+                if (!pp.has_value())
+                {
+                    tracer.Trace() << "  Identification failed: could not estimate pole pairs.";
+                    identificationResults.reset();
+                    return;
+                }
+
+                identificationResults->polePairs = *pp;
+                ReportIdentificationResults();
+            });
+    }
+
+    void TerminalInteractor::ReportIdentificationResults()
+    {
+        tracer.Trace() << "  Identification Results:";
+        tracer.Trace() << "    Resistance:         " << identificationResults->rl.resistance.Value() << " Ohm";
+        tracer.Trace() << "    Inductance:         " << identificationResults->rl.inductance.Value() << " mH";
+        tracer.Trace() << "    Inverter V offset:  " << identificationResults->rl.inverterVoltageOffset.Value() << " V";
+        tracer.Trace() << "    Fit quality:        " << identificationResults->rl.fitQuality;
+        tracer.Trace() << "    Pole Pairs:         " << identificationResults->polePairs;
     }
 
     void TerminalInteractor::StartAdc(PlatformFactory::SampleAndHold sampleAndHold)
