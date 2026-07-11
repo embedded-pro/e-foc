@@ -1,7 +1,7 @@
 ---
 description: "Use when implementing code changes in e-foc. Writes production code and tests following all project constraints: no heap allocation, bounded containers, real-time determinism, FOC theory correctness, motor control best practices, SOLID principles, and documentation alignment."
 tools: [read, edit, search, execute, todo]
-model: "Claude Sonnet 4.6"
+model: "Claude Opus 4.8"
 handoffs:
   - label: "Review Changes"
     agent: reviewer
