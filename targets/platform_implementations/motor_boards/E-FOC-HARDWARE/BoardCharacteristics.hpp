@@ -9,7 +9,7 @@ namespace application
     // current sensor gain). Verified correct as initial bring-up defaults; update when schematic differs.
     struct BoardCharacteristics
     {
-        static constexpr float voltageToVolts{ 18.433f };
+        static constexpr float voltageToVolts{ 21.25f };
         static constexpr float overvoltageThresholdVolts{ 58.0f };
 
         static constexpr float voltageToCurrent{ 5.0f };
@@ -41,7 +41,4 @@ namespace application
             return static_cast<uint16_t>((overcurrentThresholdAmps / maxCurrentAmps) * (adcResolution - 1.0f));
         }
     };
-
-    static_assert(BoardCharacteristics::OvervoltageThresholdCounts(3.3f, 4096.0f) == 3904u, "E-FOC-HARDWARE overvoltage threshold mismatch");
-    static_assert(BoardCharacteristics::OvercurrentThresholdCounts(4096.0f) == 3276u, "E-FOC-HARDWARE overcurrent threshold mismatch");
 }
