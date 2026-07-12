@@ -11,6 +11,28 @@ namespace state_machine
         , controlMode(controlMode)
     {}
 
+    void FocMotorCanBridge::OnFault(FaultCode code)
+    {
+        server.BroadcastFaultStatus(ToCanFaultCode(code));
+    }
+
+    services::FocFaultCode FocMotorCanBridge::ToCanFaultCode(FaultCode code)
+    {
+        switch (code)
+        {
+            case FaultCode::overcurrent:
+                return services::FocFaultCode::overCurrent;
+            case FaultCode::overvoltage:
+                return services::FocFaultCode::overVoltage;
+            case FaultCode::overtemperature:
+                return services::FocFaultCode::overTemperature;
+            case FaultCode::encoderLoss:
+                return services::FocFaultCode::sensorFault;
+            default:
+                return services::FocFaultCode::none;
+        }
+    }
+
     void FocMotorCanBridge::OnQueryMotorType(const infra::Function<void(services::FocMotorMode)>& onResult)
     {
         onResult(ToCanMode(controlMode.Active()));

@@ -127,6 +127,42 @@ Entering `Fault` always stops the inverter when the machine was in `Enabled` or 
 
 The last fault code is preserved in `LastFaultCode()` and remains readable even after the fault is cleared via `CmdClearFault`.
 
+#### Hardware Board-Protection Events
+
+The platform gate driver and analog comparators detect three hardware protection conditions autonomously — over-current, over-voltage, and over-temperature — and **disable PWM in hardware** before software is notified. Software reaction is therefore for supervisory state consistency and network notification, not for stopping current flow.
+
+These events are surfaced to the state machine through the `BoardProtectionFaultNotifier` adapter, which translates a `PlatformFactory::BoardProtectionReason` into the corresponding `state_machine::FaultCode`:
+
+| Hardware reason   | `state_machine::FaultCode` | CAN `FocFaultCode` |
+|-------------------|----------------------------|--------------------|
+| `overCurrent`     | `overcurrent`              | `overCurrent`      |
+| `overVoltage`     | `overvoltage`              | `overVoltage`      |
+| `overTemperature` | `overtemperature`          | `overTemperature`  |
+
+When a board-protection event fires:
+
+1. PWM is already off (hardware enforced).
+2. `BoardProtectionFaultNotifier` invokes the state machine's fault sink → `EnterFault(code)` → state transitions to `Fault`.
+3. `BoardProtectionFaultNotifier` simultaneously invokes the CAN broadcast sink → `FocMotorCanBridge::OnFault(code)` → the CAN server emits an unsolicited `focTelemetryStatusResponseId` frame with `state=fault` and the mapped `FocFaultCode`.
+
+```mermaid
+sequenceDiagram
+    participant HW as Gate Driver / Comparator
+    participant BP as BoardProtectionFaultNotifier
+    participant SM as FOC State Machine
+    participant CAN as FocMotorCanBridge / CAN Server
+
+    HW->>BP: onProtection(overCurrent)
+    note over HW: PWM already disabled in hardware
+    BP->>SM: stateMachineSink(overcurrent)
+    SM-->>SM: EnterFault(overcurrent)\nState → Fault
+    BP->>CAN: broadcastSink(overcurrent)
+    CAN->>CAN: ToCanFaultCode → overCurrent
+    CAN-->>CAN: BroadcastFaultStatus(overCurrent)\nSend focTelemetryStatusResponseId
+```
+
+Recovery follows the normal fault-clear path: a `CmdClearFault` (CLI or CAN) is required before the motor can be re-enabled.
+
 ### Async-Callback State Invariant
 
 Every asynchronous callback registered with a service (NVM, electrical ident, mechanical ident, motor alignment) **must check the current state before mutating it**. A hardware fault, an operator command, or a second calibration attempt may have moved the state machine to a different state between the moment the service call was issued and the moment the callback fires.
