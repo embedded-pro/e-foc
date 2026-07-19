@@ -29,9 +29,9 @@ date: 2026-04-07
 ## Responsibilities
 
 **Is responsible for:**
-- Automatically measuring phase resistance (R), d-axis inductance (Ld), and q-axis inductance (Lq) without external instruments, using a DC voltage injection technique followed by a transient step response
+- Automatically measuring phase resistance (R) and stator inductance (Ls) without external instruments, using a high-frequency (HF) sinusoidal impedance-injection technique on a fixed stator axis
 - Estimating the motor's number of pole pairs by rotating an open-loop voltage vector through multiple full electrical revolutions and comparing the total electrical angle swept with the total encoder mechanical angle swept
-- Protecting against heap allocation by using bounded containers for all internal buffers
+- Recovering R and Ls online with O(1) memory (a small fixed set of running sums), requiring no per-sample data buffer
 - Delivering results exactly once per initiated procedure via a completion callback containing typed physical quantities (Ohm, MilliHenry, or size_t)
 - Enforcing that the two procedures (resistance/inductance and pole pairs) cannot run concurrently
 - Stopping the inverter cleanly before invoking any completion callback
@@ -39,8 +39,10 @@ date: 2026-04-07
 **Is NOT responsible for:**
 - Persisting the identified parameters — the caller decides what to do with the results
 - Encoder zero-offset calibration — that is performed by the Motor Alignment service
+- Separating Ld from Lq on a salient (interior PMSM) rotor — the fixed-axis HF method reports a single Ls valid for non-salient surface PMSM; saliency separation is future work
 - Performing any closed-loop current control — all voltage application is open-loop
 - Running concurrently with the normal FOC loop — the FOC loop must be stopped before either procedure begins
+- Aligning or clamping the rotor before measurement — the zero-mean HF injection exerts no net torque, so no rotor alignment is required
 
 ---
 
@@ -48,57 +50,86 @@ date: 2026-04-07
 
 ### Procedure 1 — Resistance and Inductance Estimation
 
-This procedure uses two distinct phases — a DC settle phase and a transient sampling phase — each triggered by ADC callbacks from the inverter without busy-waiting.
+This procedure injects a single high-frequency sinusoidal voltage on the stationary α-axis (β = 0) and recovers R and Ls from the amplitude and phase of the resulting current. It runs as one continuous burst driven by the ADC/PWM callbacks, with no busy-waiting and no per-sample data buffer.
 
-#### Phase 1a: DC Settle and Resistance Measurement
+#### Rationale — Why HF Injection Instead of a DC Step
 
-A known DC voltage is applied to the d-axis of the motor (q-axis voltage = 0, electrical angle = 0°) at a level configured by the caller. A `TimerSingleShot` fires after the configured settle time (default 2 s) to allow transients to decay and the phase current to reach its steady-state value.
+A DC field on a single stator axis exerts a constant torque on the rotor magnet. If the rotor is free to move it swings and oscillates about the alignment point, and that motion induces a low-frequency back-EMF. The DC measurement model assumes zero back-EMF, so the estimate is corrupted whenever the rotor is not clamped.
 
-At the end of the settle period, the steady-state phase current is captured from the ADC. Because the motor is stationary and the current is DC, the only impedance in the circuit is the winding resistance:
+A zero-mean sinusoid has no DC component, so it exerts **no net torque** and never pumps the rotor. On a surface PMSM (non-salient: Ld ≈ Lq = Ls) a fixed-axis injection sees a **constant** Ls independent of rotor angle, so **no alignment is required**. Any residual rotor oscillation is a low-frequency disturbance that synchronous demodulation at the injection frequency rejects.
 
-```
-R = V_applied / I_steady_state
-```
+#### Injection and Circuit Model
 
-The result is stored internally. If the measured current is zero or below a noise floor, the procedure fails immediately and the callback is invoked with absent values.
+The service commands an α-axis voltage `V_alpha(t) = A · sin(ω t)` with `V_beta = 0`, where `ω = 2π · f_inj`. The command is produced by an inverse-Clarke transform of `(V_alpha, 0)` into three phase duties, all centered at 50 % duty so the low-side current shunts stay samplable and the bipolar current sense stays centered.
 
-#### Phase 1b: Inductance Estimation via Transient Step Response
-
-Immediately after the DC settle phase, an additional voltage step is applied and the current transient is sampled. Each ADC callback appends one sample to an `infra::BoundedVector` (capacity 128). A 5-sample moving-average (using an `infra::BoundedDeque` of capacity 5) is applied in-flight to each incoming sample before storage, reducing high-frequency noise on the measurement.
-
-Once the buffer is full, the inductance is derived from the first-order step-response approximation:
+At AC steady state the excited-axis behaves as a series RL impedance (the low-frequency back-EMF `e_alpha` is treated as an out-of-band disturbance):
 
 ```
-L = V_step × Δt / ΔI
+V_alpha = R · i_alpha + Ls · di_alpha/dt + e_alpha(t)
+i_alpha(t) = I · sin(ω t − φ)
+Z = A / I = sqrt(R² + (ω · Ls)²)
+φ = atan2(ω · Ls, R)
 ```
 
-where Δt is the total sampling interval and ΔI is the change in current over that interval. This single-time-constant model is accurate for unsaturated surface PMSM windings.
+#### Synchronous Demodulation and Closed-Form Recovery
 
-For surface PMSM, Lq ≈ Ld, so both values are reported as the same measured inductance. For interior PMSM, the approximation introduces an error that must be accepted or corrected by the caller.
+The measured α-axis current (obtained by a forward Clarke transform of the three sampled phase currents) is correlated against sine and cosine references at the injection frequency. After a warm-up interval that lets the AC transient decay, the service accumulates, over an **integer** number of injection periods (N samples total), three running sums:
+
+```
+sumSin = Σ i_alpha[k] · sin(θ_k)
+sumCos = Σ i_alpha[k] · cos(θ_k)
+sumSq  = Σ i_alpha[k]²                  θ_k = ω · k / f_s (wrapped to [0, 2π))
+```
+
+Only three floats are retained regardless of burst length (O(1) memory). The in-phase and quadrature current components and the closed-form parameters follow directly:
+
+```
+I_re = 2 · sumSin / N = I · cos φ
+I_im = 2 · sumCos / N = −I · sin φ
+D    = I_re² + I_im² = I²
+
+R  = A · I_re / D
+Ls = −A · I_im / (ω · D)
+```
+
+**PWM→ADC pipeline lag.** The duty commanded in one callback drives the current sampled in the next, so the sampled current reflects a voltage commanded roughly one sample earlier. The applied voltage uses the live injection phase, but the demodulation reference uses that phase lagged by `voltageToCurrentDelaySamples` phase increments (default 1). This removes the `ε = 2π·f_inj/f_s` phase error that would otherwise bias R by `cos(φ+ε)/cos(φ)`. The delay is rig-calibrated: the operator tunes it until the measured R matches a multimeter DC-resistance reading.
+
+**Back-EMF rejection.** Because the accumulation spans an integer number of injection periods, any component at a frequency other than `f_inj` (in particular the ~1–2 Hz rotor-oscillation back-EMF) integrates toward zero in both sums. A larger measurement window drives the residual leakage lower.
+
+**Amplitude scaling.** For a center-aligned half-bridge the phase-to-midpoint voltage amplitude is `modIndex · Vdc / 2`, where `modIndex` is the α modulation index (`injectionVoltagePercent / 100`, internally clamped so every leg duty stays within a samplable window). The applied α voltage amplitude used in the closed form is therefore `A = modIndex · Vdc / 2`.
+
+**Winding topology.** For a Delta connection the terminals measure ⅔ of the per-phase value for both R and Ls; the phase quantities are recovered with `R_phi = R_terminal · 1.5` and `Ls_phi = Ls_terminal · 1.5`.
+
+**Injection-frequency selection.** `f_inj` must divide the sampling frequency (10 kHz) so that each measurement window is an exact integer number of samples; valid options are 200 / 250 / 500 Hz. Conditioning is best when `ω · Ls ≈ (1–3) · R` (phase 45°–70°), which keeps the current well above the shunt noise floor while separating R and Ls. For the reference rig (R ≈ 1.5 Ω, Ls ≈ 2 mH) the default is **250 Hz**, leaving a ~125× margin over the rotor-oscillation frequency.
 
 ```mermaid
 sequenceDiagram
     participant Caller
     participant Service
     participant Inverter
-    participant Timer
 
     Caller->>Service: EstimateResistanceAndInductance(config, onDone)
-    Service->>Inverter: apply Vd=test_voltage, Vq=0
-    Service->>Timer: start settle timer (2 s)
-    Timer-->>Service: settled
-    Service->>Inverter: read steady-state current → compute R
-    Service->>Inverter: apply voltage step, start sampling
-    loop 128 samples
-        Inverter-->>Service: ADC callback → filter → buffer
+    Service->>Inverter: stop, then arm current sampling at f_s
+    loop warm-up periods
+        Inverter-->>Service: current sample
+        Service->>Inverter: apply V_alpha = A·sin(θ) (samples discarded)
+    end
+    loop measurement periods (integer)
+        Inverter-->>Service: current sample
+        Service->>Service: i_alpha = Clarke.Forward(phases)
+        Service->>Service: accumulate sumSin, sumCos, sumSq
+        Service->>Inverter: apply V_alpha = A·sin(θ)
     end
     Service->>Inverter: stop
-    Service-->>Caller: onDone(R, L)
+    Service->>Service: I_re, I_im, D → R, Ls, fitQuality
+    Service-->>Caller: onDone(R, Ls) or nullopt
 ```
 
-#### Error Conditions
+#### Fit Quality and Error Conditions
 
-If the settle timer expires but the ADC current reading is below the noise floor, the procedure fails (both output values absent). If the sample buffer fills but the current change is too small to yield a sensible inductance (e.g., ΔI < noise floor), the inductance is reported absent while resistance may still be valid.
+A THD-like residual `fitQuality = |sumSq − N · I² / 2| / (N · I² / 2)` is reported (0 = perfect sinusoid). It is a **diagnostic only**: because demodulation already rejects out-of-band content from R and Ls, a raised residual flags a disturbance (e.g., rotor motion or distortion) without invalidating the recovered parameters. The inverter-voltage-offset field is not measured by the HF method and is reported as zero for API compatibility.
+
+The procedure returns absent values when the demodulated current magnitude is below the minimum-current floor (sized to the shunt/ADC SNR, ~0.05 A; compared as a squared magnitude to avoid a square root), or when the recovered R or Ls is non-positive. The configured injection frequency is validated at start: if it is zero or does not divide the sampling frequency the completion callback fires immediately with an absent result (no division is attempted). As a safety guard, every incoming sample (warm-up and measurement) is checked against the driver's maximum supported current; if the peak measured phase current exceeds it, the drive is stopped and the procedure aborts once with an absent result.
 
 ### Procedure 2 — Pole Pairs Estimation
 
@@ -135,20 +166,53 @@ flowchart TD
     VALID -->|No| CB_FAIL["onDone(nullopt)"]
 ```
 
-### Internal Buffer Constraints
+### Internal State Constraints
 
-All internal state is statically allocated:
+All internal state is statically allocated and O(1) in size. The HF resistance/inductance procedure keeps no per-sample data buffer at all — it retains only a fixed set of running accumulators:
 
-| Buffer                | Container              | Capacity    | Purpose                                                     |
-|-----------------------|------------------------|-------------|-------------------------------------------------------------|
-| Current samples       | `infra::BoundedVector` | 128 entries | Stores filtered current transient for inductance estimation |
-| Moving-average window | `infra::BoundedDeque`  | 5 entries   | Rolling window for in-flight noise reduction on ADC samples |
+| State                 | Type          | Purpose                                                                 |
+|-----------------------|---------------|-------------------------------------------------------------------------|
+| `sumSin`, `sumCos`    | float         | In-phase / quadrature synchronous-demodulation accumulators             |
+| `sumSq`               | float         | Sum of squared current, used for the THD-like fit-quality diagnostic    |
+| phase, phase increment | float        | Injection-oscillator state advanced once per sample                     |
+| sample / period counts | integer      | Warm-up and measurement window bookkeeping                              |
 
-No heap allocation is used. Buffers are members of the service object and are reused across repeated procedure invocations.
+No heap allocation is used, and memory usage is independent of the number of injection periods. The accumulators are members of the service object and are reset at the start of each procedure invocation.
 
 ### Concurrency Invariant
 
 The two procedures are independent state machines. Neither may be started while the other is in the Running state. An attempt to start one while the other is already Running causes the new request to be rejected (callback invoked immediately with absent values). The two state machines share no mutable state beyond the inverter and encoder references.
+
+### Acquisition / Actuation Sequencing Invariant
+
+Each measurement phase of both procedures drives the motor through a strict ordering:
+
+1. **Stop the drive.** Excitation is removed first. Because current acquisition is slaved to the drive excitation, stopping the drive also stops acquisition — no separate action is needed to silence sampling.
+2. **Arm acquisition.** The service prepares to receive current samples for the upcoming phase. Acquisition is only ever re-armed while the drive is stopped.
+3. **Apply excitation.** The drive is energised for the phase.
+
+This ordering guarantees acquisition is ready before any current can flow, and that samples belonging to a previous phase can never be attributed to a new excitation.
+
+For the HF resistance/inductance procedure the excitation is applied inside the sampling callback itself, so a warm-up window (an integer number of injection periods) precedes measurement: while the AC transient decays, incoming samples are demodulated-but-discarded; afterwards the accumulators integrate over an integer number of measurement periods. Once the total sample budget is reached the drive is stopped and any further samples are ignored, so completion happens exactly once and remains safe even if a sample arrives just after the drive has been stopped. (The pole-pairs procedure instead uses a per-step settle timer, described in Procedure 2.)
+
+```mermaid
+sequenceDiagram
+    participant Service
+    participant Drive as Motor Drive
+    Note over Service,Drive: HF resistance/inductance burst
+    Service->>Drive: Stop excitation (acquisition follows)
+    Service->>Drive: Arm acquisition
+    loop warm-up periods
+        Drive-->>Service: current sample
+        Service->>Drive: apply V_alpha = A·sin(θ) (sample discarded)
+    end
+    loop measurement periods (integer)
+        Drive-->>Service: current sample
+        Service->>Service: accumulate sumSin, sumCos, sumSq
+        Service->>Drive: apply V_alpha = A·sin(θ)
+    end
+    Service->>Drive: Stop excitation (before completion)
+```
 
 ### State Machine (Both Procedures)
 
@@ -156,8 +220,8 @@ The two procedures are independent state machines. Neither may be started while 
 stateDiagram-v2
     [*] --> Idle
     Idle --> Running : procedure initiated
-    Running --> Complete : all samples captured,\nresult computed
-    Running --> Failed : noise floor violation\nor timeout
+    Running --> Complete : sample budget reached,\nresult computed
+    Running --> Failed : current below floor,\nnon-positive R/Ls,\nor peak over max current
     Complete --> Idle : onDone fired
     Failed --> Idle : onDone(nullopt) fired
 ```
@@ -170,7 +234,7 @@ stateDiagram-v2
 
 | Interface                                         | Purpose                                                                                           | Contract                                                                                                                                         |
 |---------------------------------------------------|---------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
-| `EstimateResistanceAndInductance(config, onDone)` | Runs the DC settle and transient-step procedure; delivers `(optional<Ohm>, optional<MilliHenry>)` | Rejected (immediate failure callback) if the pole-pairs procedure is already Running; inverter stopped before callback fires; fires exactly once |
+| `EstimateResistanceAndInductance(config, onDone)` | Runs the HF sinusoidal impedance-injection procedure; delivers `optional<{Ohm, MilliHenry, ...}>` | Rejected (immediate failure callback) if the pole-pairs procedure is already Running; inverter stopped before callback fires; fires exactly once |
 | `EstimateNumberOfPolePairs(config, onDone)`       | Sweeps an open-loop rotating vector and delivers `optional<size_t>` pole pairs                    | Rejected if the R/L procedure is already Running; inverter stopped before callback fires; fires exactly once                                     |
 
 ### Required

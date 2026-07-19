@@ -1,3 +1,4 @@
+#include "core/foc/implementations/TransformsClarkePark.hpp"
 #include "core/foc/implementations/test_doubles/DriversMock.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
@@ -9,23 +10,13 @@ namespace
 {
     using namespace testing;
 
-    MATCHER_P(PhasePwmDutyCyclesEq, expected, "")
-    {
-        return arg.a.Value() == expected.a.Value() &&
-               arg.b.Value() == expected.b.Value() &&
-               arg.c.Value() == expected.c.Value();
-    }
-
-    float SimulateRLModelCurrent(float voltage, float resistance, float inductance, float time)
-    {
-        return (voltage / resistance) * (1.0f - std::exp(-time / (inductance / resistance)));
-    }
+    constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
 
     float MechanicalAngle(std::size_t stepIndex, std::size_t totalSteps, std::size_t expectedPolePairs)
     {
         constexpr std::size_t stepsPerRevolution = 12;
         auto electricalRevolutions = totalSteps / stepsPerRevolution;
-        auto electricalAngle = (static_cast<float>(stepIndex) / static_cast<float>(totalSteps)) * (static_cast<float>(electricalRevolutions) * 2.0f * std::numbers::pi_v<float>);
+        auto electricalAngle = (static_cast<float>(stepIndex) / static_cast<float>(totalSteps)) * (static_cast<float>(electricalRevolutions) * twoPi);
         return electricalAngle / static_cast<float>(expectedPolePairs);
     }
 
@@ -35,144 +26,196 @@ namespace
     {
     public:
         static constexpr float vdcValue = 24.0f;
-        static constexpr float maxCurrent = 5.0f;
-        static constexpr float probeVoltage = 5.0f / 100.0f * vdcValue;
-        static constexpr std::size_t probeBufferSize = 512;
-        static constexpr std::size_t steadyStateSamples = 32;
-        static constexpr std::size_t numLevels = 3;
-        static constexpr float samplingPeriod = 0.0001f;
+        static constexpr float maxCurrent = 3.0f;
+        static constexpr float samplingFrequency = 10000.0f;
+        static constexpr std::size_t injectionFrequency = 250;
+        static constexpr std::size_t injectionVoltagePercent = 15;
+        static constexpr std::size_t warmupPeriods = 10;
+        static constexpr std::size_t measurementPeriods = 50;
+        static constexpr std::size_t voltageToCurrentDelaySamples = 1;
+
+        // Phase-to-midpoint amplitude for a center-aligned half-bridge is modIndex * Vdc / 2.
+        // The alpha modulation index equals injectionVoltagePercent / 100.
+        static constexpr float voltsPerModulation = vdcValue / 2.0f;
+        static constexpr float injectionAmplitude = static_cast<float>(injectionVoltagePercent) / 100.0f * voltsPerModulation;
+        static constexpr float omega = twoPi * static_cast<float>(injectionFrequency);
+        static constexpr float samplingPeriod = 1.0f / samplingFrequency;
+        static constexpr std::size_t samplesPerPeriod = static_cast<std::size_t>(samplingFrequency) / injectionFrequency;
 
         std::size_t encoderStepIndex = 0;
 
         StrictMock<foc::FieldOrientedControllerInterfaceMock> driverMock;
         StrictMock<foc::EncoderMock> encoderMock;
         foc::Volts vdc{ vdcValue };
+        foc::Clarke clarke;
         services::ElectricalParametersIdentificationImpl identification{ driverMock, encoderMock, vdc };
 
-        void FeedProbeTransient(float resistance, float inductance)
+        services::ElectricalParametersIdentification::ResistanceAndInductanceConfig DefaultConfig() const
         {
-            for (std::size_t i = 0; i < probeBufferSize; ++i)
+            services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config;
+            config.injectionFrequency = hal::Hertz{ injectionFrequency };
+            config.injectionVoltagePercent = hal::Percent{ injectionVoltagePercent };
+            config.warmupPeriods = warmupPeriods;
+            config.measurementPeriods = measurementPeriods;
+            config.voltageToCurrentDelaySamples = voltageToCurrentDelaySamples;
+            return config;
+        }
+
+        // Feed the analytic AC steady-state current i_alpha[k] = I*sin(applied_phase[k - delay] - phi),
+        // inverse-Clarke'd to (Ia, Ib, Ic), for the full warmup + measurement window. The current at
+        // sample k is produced by the applied-voltage phase from `delay` samples earlier, modelling the
+        // one-sample PWM->ADC pipeline lag the demodulation compensates for. Before the burst starts the
+        // applied voltage is zero, so the first `delay` samples carry no injected current. An optional
+        // low-frequency back-EMF disturbance current can be superimposed to test demod rejection.
+        void FeedHfBurst(float resistance, float inductance, float backEmfCurrentAmplitude = 0.0f, float backEmfFrequency = 0.0f, std::size_t delaySamples = voltageToCurrentDelaySamples)
+        {
+            const float impedance = std::sqrt(resistance * resistance + (omega * inductance) * (omega * inductance));
+            const float current = injectionAmplitude / impedance;
+            const float phi = std::atan2(omega * inductance, resistance);
+            const float backEmfOmega = twoPi * backEmfFrequency;
+
+            const std::size_t totalSamples = (warmupPeriods + measurementPeriods) * samplesPerPeriod;
+            for (std::size_t k = 0; k < totalSamples; ++k)
             {
-                float t = static_cast<float>(i) * samplingPeriod;
-                float current = SimulateRLModelCurrent(probeVoltage, resistance, inductance, t);
-                driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ current }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+                float iAlpha = 0.0f;
+                if (k >= delaySamples)
+                {
+                    const float appliedPhase = static_cast<float>(k - delaySamples) * omega * samplingPeriod;
+                    iAlpha = current * std::sin(appliedPhase - phi);
+                }
+
+                if (backEmfCurrentAmplitude != 0.0f)
+                    iAlpha += backEmfCurrentAmplitude * std::sin(backEmfOmega * static_cast<float>(k) * samplingPeriod);
+
+                const auto phases = clarke.Inverse(foc::TwoPhase{ iAlpha, 0.0f });
+                driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ phases.a }, foc::Ampere{ phases.b }, foc::Ampere{ phases.c } });
             }
-        }
-
-        void FeedLevelSteadyState(float iSs)
-        {
-            ForwardTime(std::chrono::milliseconds{ 300 });
-            for (std::size_t s = 0; s < steadyStateSamples; ++s)
-                driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ iSs }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
-        }
-
-        float ComputeLevelDuty(float rCoarse, float targetFraction) const
-        {
-            constexpr float neutralDuty = 1.0f;
-            float rawDuty = targetFraction * maxCurrent * rCoarse / vdcValue * 100.0f + neutralDuty;
-            return std::clamp(rawDuty, 5.0f, 80.0f);
-        }
-
-        float ComputeLevelVoltage(float duty) const
-        {
-            return (duty - 1.0f) / 100.0f * vdcValue;
         }
     };
 }
 
-TEST_F(ElectricalParametersIdentificationTest, probe_step_sets_probe_duty_and_starts_collecting_immediately)
+TEST_F(ElectricalParametersIdentificationTest, arms_phase_currents_before_pwm_output_after_stop)
 {
-    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config;
+    Sequence seq;
+    EXPECT_CALL(driverMock, MaxCurrentSupported())
+        .WillRepeatedly(Return(foc::Ampere{ maxCurrent }));
+    EXPECT_CALL(driverMock, Stop())
+        .InSequence(seq);
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, _))
+        .InSequence(seq)
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_))
+        .Times(AnyNumber())
+        .InSequence(seq);
+
+    identification.EstimateResistanceAndInductance(DefaultConfig(), [](auto) {});
+}
+
+TEST_F(ElectricalParametersIdentificationTest, phase_currents_callback_is_inert_after_completion)
+{
+    const float trueR = 1.5f;
+    const float trueLs = 0.002f;
+    int completions = 0;
 
     EXPECT_CALL(driverMock, MaxCurrentSupported())
         .WillRepeatedly(Return(foc::Ampere{ maxCurrent }));
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, _))
-        .Times(2)
-        .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(
-        foc::PhasePwmDutyCycles{ hal::Percent{ 5 }, hal::Percent{ 1 }, hal::Percent{ 1 } })));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .Times(AnyNumber())
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(AnyNumber());
+    EXPECT_CALL(driverMock, Stop()).Times(AnyNumber());
 
-    identification.EstimateResistanceAndInductance(config, [](auto) {});
+    identification.EstimateResistanceAndInductance(DefaultConfig(), [&](auto)
+        {
+            ++completions;
+        });
+
+    FeedHfBurst(trueR, trueLs);
+
+    ASSERT_EQ(completions, 1);
+
+    for (std::size_t i = 0; i < samplesPerPeriod * 4; ++i)
+        driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 100.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    EXPECT_EQ(completions, 1);
 }
 
 TEST_F(ElectricalParametersIdentificationTest, estimates_resistance_and_inductance_accurately)
 {
     const float trueR = 1.5f;
-    const float trueL = 0.002f;
-    const std::array<float, numLevels> fractions{ 0.3f, 0.5f, 0.7f };
+    const float trueLs = 0.002f;
 
-    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config;
     std::optional<services::ElectricalParametersIdentification::ResistanceInductanceResult> result;
 
     EXPECT_CALL(driverMock, MaxCurrentSupported())
         .WillRepeatedly(Return(foc::Ampere{ maxCurrent }));
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .Times(AnyNumber())
-        .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(4);
-    EXPECT_CALL(driverMock, Stop());
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(AnyNumber());
+    EXPECT_CALL(driverMock, Stop()).Times(AnyNumber());
 
-    identification.EstimateResistanceAndInductance(config, [&](auto r) { result = r; });
+    identification.EstimateResistanceAndInductance(DefaultConfig(), [&](auto r)
+        {
+            result = r;
+        });
 
-    FeedProbeTransient(trueR, trueL);
-
-    const float rCoarse = trueR;
-    for (std::size_t j = 0; j < numLevels; ++j)
-    {
-        float duty = ComputeLevelDuty(rCoarse, fractions[j]);
-        float vj = ComputeLevelVoltage(duty);
-        FeedLevelSteadyState(vj / trueR);
-    }
+    FeedHfBurst(trueR, trueLs);
 
     ASSERT_TRUE(result.has_value());
     EXPECT_NEAR(result->resistance.Value(), trueR, trueR * 0.05f);
-    EXPECT_NEAR(result->inductance.Value(), trueL * 1000.0f, trueL * 1000.0f * 0.10f);
-    EXPECT_NEAR(result->inverterVoltageOffset.Value(), 0.0f, 0.05f);
+    EXPECT_NEAR(result->inductance.Value(), trueLs * 1000.0f, trueLs * 1000.0f * 0.10f);
+    EXPECT_NEAR(result->inverterVoltageOffset.Value(), 0.0f, 1e-6f);
     EXPECT_LT(result->fitQuality, 0.05f);
 }
 
-TEST_F(ElectricalParametersIdentificationTest, r_fit_cancels_constant_inverter_voltage_offset)
+TEST_F(ElectricalParametersIdentificationTest, rejects_low_frequency_back_emf_disturbance)
 {
     const float trueR = 1.5f;
-    const float trueL = 0.002f;
-    const float vOffset = 0.3f;
-    const std::array<float, numLevels> fractions{ 0.3f, 0.5f, 0.7f };
+    const float trueLs = 0.002f;
+    const float backEmfAmplitude = 0.5f;
+    const float backEmfFrequency = 2.0f;
 
-    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config;
     std::optional<services::ElectricalParametersIdentification::ResistanceInductanceResult> result;
 
     EXPECT_CALL(driverMock, MaxCurrentSupported())
         .WillRepeatedly(Return(foc::Ampere{ maxCurrent }));
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .Times(AnyNumber())
-        .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(4);
-    EXPECT_CALL(driverMock, Stop());
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(AnyNumber());
+    EXPECT_CALL(driverMock, Stop()).Times(AnyNumber());
 
-    identification.EstimateResistanceAndInductance(config, [&](auto r) { result = r; });
+    identification.EstimateResistanceAndInductance(DefaultConfig(), [&](auto r)
+        {
+            result = r;
+        });
 
-    FeedProbeTransient(trueR, trueL);
-
-    const float rCoarse = trueR;
-    for (std::size_t j = 0; j < numLevels; ++j)
-    {
-        float duty = ComputeLevelDuty(rCoarse, fractions[j]);
-        float vj = ComputeLevelVoltage(duty);
-        FeedLevelSteadyState((vj - vOffset) / trueR);
-    }
+    FeedHfBurst(trueR, trueLs, backEmfAmplitude, backEmfFrequency);
 
     ASSERT_TRUE(result.has_value());
     EXPECT_NEAR(result->resistance.Value(), trueR, trueR * 0.05f);
-    EXPECT_NEAR(result->inverterVoltageOffset.Value(), vOffset, 0.1f);
+    EXPECT_NEAR(result->inductance.Value(), trueLs * 1000.0f, trueLs * 1000.0f * 0.10f);
 }
 
 TEST_F(ElectricalParametersIdentificationTest, applies_delta_winding_correction)
 {
     const float terminalR = 1.0f;
-    const float trueL = 0.001f;
-    const std::array<float, numLevels> fractions{ 0.3f, 0.5f, 0.7f };
+    const float terminalLs = 0.001f;
 
-    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config;
+    auto config = DefaultConfig();
     config.windingConfig = services::WindingConfiguration::Delta;
     std::optional<services::ElectricalParametersIdentification::ResistanceInductanceResult> result;
 
@@ -180,73 +223,120 @@ TEST_F(ElectricalParametersIdentificationTest, applies_delta_winding_correction)
         .WillRepeatedly(Return(foc::Ampere{ maxCurrent }));
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .Times(AnyNumber())
-        .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(4);
-    EXPECT_CALL(driverMock, Stop());
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(AnyNumber());
+    EXPECT_CALL(driverMock, Stop()).Times(AnyNumber());
 
-    identification.EstimateResistanceAndInductance(config, [&](auto r) { result = r; });
+    identification.EstimateResistanceAndInductance(config, [&](auto r)
+        {
+            result = r;
+        });
 
-    FeedProbeTransient(terminalR, trueL);
-
-    const float rCoarse = terminalR;
-    for (std::size_t j = 0; j < numLevels; ++j)
-    {
-        float duty = ComputeLevelDuty(rCoarse, fractions[j]);
-        float vj = ComputeLevelVoltage(duty);
-        FeedLevelSteadyState(vj / terminalR);
-    }
+    FeedHfBurst(terminalR, terminalLs);
 
     ASSERT_TRUE(result.has_value());
     EXPECT_NEAR(result->resistance.Value(), terminalR * 1.5f, terminalR * 1.5f * 0.05f);
+    EXPECT_NEAR(result->inductance.Value(), terminalLs * 1000.0f * 1.5f, terminalLs * 1000.0f * 1.5f * 0.10f);
 }
 
-TEST_F(ElectricalParametersIdentificationTest, returns_nullopt_when_probe_current_is_zero)
+TEST_F(ElectricalParametersIdentificationTest, returns_nullopt_when_current_is_below_floor)
 {
-    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config;
     std::optional<services::ElectricalParametersIdentification::ResistanceInductanceResult> result;
+    bool completed = false;
 
     EXPECT_CALL(driverMock, MaxCurrentSupported())
         .WillRepeatedly(Return(foc::Ampere{ maxCurrent }));
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .Times(AnyNumber())
-        .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
-    EXPECT_CALL(driverMock, Stop());
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(AnyNumber());
+    EXPECT_CALL(driverMock, Stop()).Times(AnyNumber());
 
-    identification.EstimateResistanceAndInductance(config, [&](auto r) { result = r; });
+    identification.EstimateResistanceAndInductance(DefaultConfig(), [&](auto r)
+        {
+            completed = true;
+            result = r;
+        });
 
-    for (std::size_t i = 0; i < probeBufferSize; ++i)
+    const std::size_t totalSamples = (warmupPeriods + measurementPeriods) * samplesPerPeriod;
+    for (std::size_t k = 0; k < totalSamples; ++k)
         driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
+    ASSERT_TRUE(completed);
     EXPECT_FALSE(result.has_value());
 }
 
-TEST_F(ElectricalParametersIdentificationTest, returns_nullopt_when_level_current_is_zero)
+TEST_F(ElectricalParametersIdentificationTest, aborts_once_with_nullopt_when_peak_current_exceeds_max)
 {
-    const float trueR = 1.5f;
-    const float trueL = 0.002f;
-    const std::array<float, numLevels> fractions{ 0.3f, 0.5f, 0.7f };
+    // A very low-impedance motor draws a steady current whose peak exceeds MaxCurrentSupported.
+    const float lowR = 0.05f;
+    const float lowLs = 0.00002f;
 
-    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config;
     std::optional<services::ElectricalParametersIdentification::ResistanceInductanceResult> result;
+    int completions = 0;
 
     EXPECT_CALL(driverMock, MaxCurrentSupported())
         .WillRepeatedly(Return(foc::Ampere{ maxCurrent }));
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .Times(AnyNumber())
-        .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(AnyNumber());
-    EXPECT_CALL(driverMock, Stop());
+    EXPECT_CALL(driverMock, Stop()).Times(AnyNumber());
 
-    identification.EstimateResistanceAndInductance(config, [&](auto r) { result = r; });
+    identification.EstimateResistanceAndInductance(DefaultConfig(), [&](auto r)
+        {
+            ++completions;
+            result = r;
+        });
 
-    FeedProbeTransient(trueR, trueL);
+    FeedHfBurst(lowR, lowLs);
 
-    const float rCoarse = trueR;
-    FeedLevelSteadyState(ComputeLevelVoltage(ComputeLevelDuty(rCoarse, fractions[0])) / trueR);
-    FeedLevelSteadyState(ComputeLevelVoltage(ComputeLevelDuty(rCoarse, fractions[1])) / trueR);
-    FeedLevelSteadyState(0.0f);
+    EXPECT_EQ(completions, 1);
+    EXPECT_FALSE(result.has_value());
+}
 
+TEST_F(ElectricalParametersIdentificationTest, returns_nullopt_when_injection_frequency_is_zero)
+{
+    std::optional<services::ElectricalParametersIdentification::ResistanceInductanceResult> result;
+    bool completed = false;
+
+    auto config = DefaultConfig();
+    config.injectionFrequency = hal::Hertz{ 0 };
+
+    identification.EstimateResistanceAndInductance(config, [&](auto r)
+        {
+            completed = true;
+            result = r;
+        });
+
+    ASSERT_TRUE(completed);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST_F(ElectricalParametersIdentificationTest, returns_nullopt_when_injection_frequency_does_not_divide_sampling)
+{
+    std::optional<services::ElectricalParametersIdentification::ResistanceInductanceResult> result;
+    bool completed = false;
+
+    auto config = DefaultConfig();
+    config.injectionFrequency = hal::Hertz{ 333 };
+
+    identification.EstimateResistanceAndInductance(config, [&](auto r)
+        {
+            completed = true;
+            result = r;
+        });
+
+    ASSERT_TRUE(completed);
     EXPECT_FALSE(result.has_value());
 }
 
@@ -262,6 +352,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_ini
         .WillOnce(Return(foc::Radians{ 0.0f }));
     EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, _));
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, Stop()).Times(AnyNumber());
 
     identification.EstimateNumberOfPolePairs(config, [](auto) {});
 }
@@ -288,9 +379,12 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_cal
             });
     EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, _));
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(totalSteps);
-    EXPECT_CALL(driverMock, Stop());
+    EXPECT_CALL(driverMock, Stop()).Times(AnyNumber());
 
-    identification.EstimateNumberOfPolePairs(config, [&](auto result) { resultPolePairs = result; });
+    identification.EstimateNumberOfPolePairs(config, [&](auto result)
+        {
+            resultPolePairs = result;
+        });
 
     for (std::size_t i = 0; i < totalSteps; ++i)
         ForwardTime(std::chrono::milliseconds{ 50 });
@@ -321,9 +415,12 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_cal
             });
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _));
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(totalSteps);
-    EXPECT_CALL(driverMock, Stop());
+    EXPECT_CALL(driverMock, Stop()).Times(AnyNumber());
 
-    identification.EstimateNumberOfPolePairs(config, [&](auto result) { resultPolePairs = result; });
+    identification.EstimateNumberOfPolePairs(config, [&](auto result)
+        {
+            resultPolePairs = result;
+        });
 
     for (std::size_t i = 0; i < totalSteps; ++i)
         ForwardTime(std::chrono::milliseconds{ 50 });

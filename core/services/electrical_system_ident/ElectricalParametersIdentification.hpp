@@ -1,10 +1,9 @@
 #pragma once
 
+#include "core/foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/Function.hpp"
-#include "core/foc/interfaces/Units.hpp"
-#include <array>
 #include <chrono>
 #include <optional>
 
@@ -21,9 +20,11 @@ namespace services
     public:
         struct ResistanceAndInductanceConfig
         {
-            std::array<float, 3> targetCurrentFractions{ 0.3f, 0.5f, 0.7f };
-            hal::Percent probeVoltagePercent{ 5 };
-            infra::Duration settlePerLevel{ std::chrono::milliseconds{ 300 } };
+            hal::Hertz injectionFrequency{ 250 };       // must divide the sampling frequency (10 kHz)
+            hal::Percent injectionVoltagePercent{ 15 }; // peak alpha modulation; clamped so duty stays samplable
+            std::size_t warmupPeriods{ 10 };
+            std::size_t measurementPeriods{ 50 };
+            std::size_t voltageToCurrentDelaySamples{ 1 }; // PWM->ADC pipeline lag; rig-calibrated (see theory doc)
             WindingConfiguration windingConfig{ WindingConfiguration::Wye };
         };
 

@@ -24,7 +24,8 @@ namespace application
         struct IdentificationResults
         {
             services::ElectricalParametersIdentification::ResistanceInductanceResult rl{
-                foc::Ohm{ 0.0f }, foc::MilliHenry{ 0.0f }, foc::Volts{ 0.0f }, 0.0f };
+                foc::Ohm{ 0.0f }, foc::MilliHenry{ 0.0f }, foc::Volts{ 0.0f }, 0.0f
+            };
             std::size_t polePairs{ 0 };
         };
 

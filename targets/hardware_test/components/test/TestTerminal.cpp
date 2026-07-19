@@ -629,15 +629,51 @@ TEST_F(TestHardwareTerminal, ident_invalid_too_many_args)
     ExecuteAllActions();
 }
 
-TEST_F(TestHardwareTerminal, ident_invalid_probe_voltage_out_of_range)
+TEST_F(TestHardwareTerminal, ident_invalid_injection_voltage_out_of_range)
 {
-    InvokeCommand("ident wye 250", [this]()
+    InvokeCommand("ident wye 250 200", [this]()
         {
             ::testing::InSequence _;
 
             std::string newline{ "\r\n" };
             std::string header{ "ERROR: " };
-            std::string payload{ "invalid value for probe voltage. It should be an integer between 1 and 100." };
+            std::string payload{ "invalid value for injection voltage. It should be an integer between 1 and 100." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, ident_invalid_injection_frequency_too_low)
+{
+    InvokeCommand("ident wye 0", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid value for injection frequency. It should be an integer between 1 and 5000 Hz." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, ident_invalid_injection_frequency_too_high)
+{
+    InvokeCommand("ident wye 6000", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid value for injection frequency. It should be an integer between 1 and 5000 Hz." };
 
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
@@ -651,6 +687,7 @@ TEST_F(TestHardwareTerminal, ident_wye_starts_identification)
 {
     InvokeCommand("ident wye", [this]()
         {
+            EXPECT_CALL(platformFactoryMock, Stop());
             EXPECT_CALL(platformFactoryMock, ThreePhasePwmOutput(testing::_));
         });
 
@@ -661,6 +698,7 @@ TEST_F(TestHardwareTerminal, ident_delta_starts_identification)
 {
     InvokeCommand("ident delta", [this]()
         {
+            EXPECT_CALL(platformFactoryMock, Stop());
             EXPECT_CALL(platformFactoryMock, ThreePhasePwmOutput(testing::_));
         });
 
@@ -671,6 +709,7 @@ TEST_F(TestHardwareTerminal, ident_alias)
 {
     InvokeCommand("id wye", [this]()
         {
+            EXPECT_CALL(platformFactoryMock, Stop());
             EXPECT_CALL(platformFactoryMock, ThreePhasePwmOutput(testing::_));
         });
 
@@ -679,8 +718,9 @@ TEST_F(TestHardwareTerminal, ident_alias)
 
 TEST_F(TestHardwareTerminal, ident_with_all_optional_args)
 {
-    InvokeCommand("ident wye 15 2000 10 5 50", [this]()
+    InvokeCommand("ident wye 250 15 10 5 50", [this]()
         {
+            EXPECT_CALL(platformFactoryMock, Stop());
             EXPECT_CALL(platformFactoryMock, ThreePhasePwmOutput(testing::_));
         });
 

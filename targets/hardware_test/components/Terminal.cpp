@@ -138,7 +138,7 @@ namespace application
                 this->terminal.ProcessResult(SimulateFoc(param));
             } });
 
-        terminal.AddCommand({ { "ident", "id", "Identify R, L and pole pairs. ident <wye|delta> [probe_v%] [settle_ms] [pp_v%] [pp_revs] [pp_settle_ms]. Ex: ident wye 5 300 10 5 50" },
+        terminal.AddCommand({ { "ident", "id", "Identify R, L and pole pairs. ident <wye|delta> [inj_freq_hz] [inj_v%] [pp_v%] [pp_revs] [pp_settle_ms]. Ex: ident wye 250 15 10 5 50" },
             [this](const infra::BoundedConstString& param)
             {
                 this->terminal.ProcessResult(IdentifyElectricalParameters(param));
@@ -429,18 +429,18 @@ namespace application
 
         if (tokenizer.Size() >= 2)
         {
-            auto probeVoltage = ParseInput<uint8_t>(tokenizer.Token(1), 1, 100);
-            if (!probeVoltage.has_value())
-                return { error, "invalid value for probe voltage. It should be an integer between 1 and 100." };
-            rlConfig.probeVoltagePercent = hal::Percent{ *probeVoltage };
+            auto injectionFrequency = ParseInput<uint32_t>(tokenizer.Token(1), 1u, 5000u);
+            if (!injectionFrequency.has_value())
+                return { error, "invalid value for injection frequency. It should be an integer between 1 and 5000 Hz." };
+            rlConfig.injectionFrequency = hal::Hertz{ *injectionFrequency };
         }
 
         if (tokenizer.Size() >= 3)
         {
-            auto settlems = ParseInput<uint32_t>(tokenizer.Token(2), 1u, 10000u);
-            if (!settlems.has_value())
-                return { error, "invalid value for settle time. It should be an integer between 1 and 10000 ms." };
-            rlConfig.settlePerLevel = std::chrono::milliseconds{ *settlems };
+            auto injectionVoltage = ParseInput<uint8_t>(tokenizer.Token(2), 1, 100);
+            if (!injectionVoltage.has_value())
+                return { error, "invalid value for injection voltage. It should be an integer between 1 and 100." };
+            rlConfig.injectionVoltagePercent = hal::Percent{ *injectionVoltage };
         }
 
         pendingPolePairsConfig = {};
