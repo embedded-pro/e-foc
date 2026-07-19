@@ -15,8 +15,6 @@ target_sources(e_foc.services.alignment PRIVATE
     MotorAlignmentImpl.cpp
     MotorAlignmentImpl.hpp
     MotorAlignment.hpp
-    TerminalMotorAlignment.cpp
-    TerminalMotorAlignment.hpp
 )
 
 add_subdirectory(test)
