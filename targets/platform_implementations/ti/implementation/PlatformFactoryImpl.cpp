@@ -135,7 +135,7 @@ namespace application
 
     foc::Ampere PlatformFactoryImpl::MaxCurrentSupported() const
     {
-        return foc::Ampere(15.0f);
+        return foc::Ampere(BoardCharacteristics::maxCurrentAmps);
     }
 
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
@@ -178,7 +178,6 @@ namespace application
 
         auto& adcCfg = impl.adcConfig;
         adcCfg.sampleAndHold = impl.toSampleAndHold.at(static_cast<std::size_t>(sampleAndHold));
-        adcCfg.digitalComparators = infra::MakeRange(impl.digitalComparators);
 
         peripherals->phaseCurrentAdc.reset();
         peripherals->phaseCurrentAdc.emplace(

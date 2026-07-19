@@ -13,8 +13,8 @@ namespace application
         static constexpr float overvoltageThresholdVolts{ 58.0f };
 
         static constexpr float voltageToCurrent{ 5.0f };
-        static constexpr float maxCurrentAmps{ 15.0f };
-        static constexpr float overcurrentThresholdAmps{ 12.0f };
+        static constexpr float maxCurrentAmps{ 3.0f };
+        static constexpr float overcurrentThresholdAmps{ 3.0f };
 
         static constexpr float AdcToVoltsFactor(float adcReferenceVoltage, float adcResolution)
         {
