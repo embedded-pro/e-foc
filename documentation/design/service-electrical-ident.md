@@ -170,12 +170,12 @@ flowchart TD
 
 All internal state is statically allocated and O(1) in size. The HF resistance/inductance procedure keeps no per-sample data buffer at all — it retains only a fixed set of running accumulators:
 
-| State                 | Type          | Purpose                                                                 |
-|-----------------------|---------------|-------------------------------------------------------------------------|
-| `sumSin`, `sumCos`    | float         | In-phase / quadrature synchronous-demodulation accumulators             |
-| `sumSq`               | float         | Sum of squared current, used for the THD-like fit-quality diagnostic    |
-| phase, phase increment | float        | Injection-oscillator state advanced once per sample                     |
-| sample / period counts | integer      | Warm-up and measurement window bookkeeping                              |
+| State                  | Type    | Purpose                                                              |
+|------------------------|---------|----------------------------------------------------------------------|
+| `sumSin`, `sumCos`     | float   | In-phase / quadrature synchronous-demodulation accumulators          |
+| `sumSq`                | float   | Sum of squared current, used for the THD-like fit-quality diagnostic |
+| phase, phase increment | float   | Injection-oscillator state advanced once per sample                  |
+| sample / period counts | integer | Warm-up and measurement window bookkeeping                           |
 
 No heap allocation is used, and memory usage is independent of the number of injection periods. The accumulators are members of the service object and are reset at the start of each procedure invocation.
 
