@@ -127,12 +127,20 @@ namespace application
             static constexpr auto currentSensingOversampling = hal::tiva::Adc::Oversampling::oversampling2;
 
             // Steps 0-2 (phase currents A/B/C) go to the ADC FIFO.
-            // NOTE: the step-3 currentTotal -> DCMP0 overcurrent redirect is temporarily
-            // disabled while investigating current-measurement bias — hardware overcurrent
-            // trip via the ADC digital comparator is OFF in this configuration.
+            // Step 3 is redirected to DCMP0 via the SSOP register and does NOT appear in the FIFO.
+            // DCMP0 connects to PWM FLTSRC1 bit 0 and tristates all motor PWM outputs instantly
+            // when the overcurrent threshold is exceeded. Overvoltage is monitored separately by
+            // AdcForPowerSupplyMeasurementImpl (synchronous ADC1, sequencer 0).
+            static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 4> digitalComparators{ {
+                {}, // step 0: currentPhaseA -> FIFO (noComparator)
+                {}, // step 1: currentPhaseB -> FIFO (noComparator)
+                {}, // step 2: currentPhaseC -> FIFO (noComparator)
+                { Peripheral::OvercurrentComparatorIndex, 0, Peripheral::overcurrentThresholdCounts,
+                    hal::tiva::Adc::ComparatorCondition::highBand, hal::tiva::Adc::ComparatorMode::always },
+            } };
 
             hal::tiva::Adc::Config adcConfig{ false, 0, Peripheral::adcTrigger, hal::tiva::Adc::SampleAndHold::sampleAndHold8, std::make_optional(currentSensingOversampling), phaseDelay };
-            std::array<hal::tiva::AnalogPin, 3> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC } } };
+            std::array<hal::tiva::AnalogPin, 4> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC }, hal::tiva::AnalogPin{ Pins::currentTotal } } };
         };
 
         struct AsyncPwmConfig

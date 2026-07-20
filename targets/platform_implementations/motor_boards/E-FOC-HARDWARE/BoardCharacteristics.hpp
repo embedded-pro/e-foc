@@ -13,8 +13,12 @@ namespace application
         static constexpr float overvoltageThresholdVolts{ 58.0f };
 
         static constexpr float voltageToCurrent{ 5.0f };
-        static constexpr float maxCurrentAmps{ 3.0f };
-        static constexpr float overcurrentThresholdAmps{ 3.0f };
+        // maxCurrentAmps is the ADC/comparator full-scale (the denominator of the overcurrent
+        // threshold); ratedCurrentAmps is the usable limit reported to the application. Keeping
+        // full-scale above the rated current leaves headroom for a meaningful overcurrent trip.
+        static constexpr float maxCurrentAmps{ 15.0f };
+        static constexpr float ratedCurrentAmps{ 3.0f };
+        static constexpr float overcurrentThresholdAmps{ 12.0f };
 
         static constexpr float AdcToVoltsFactor(float adcReferenceVoltage, float adcResolution)
         {
