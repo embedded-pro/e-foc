@@ -8,3 +8,4 @@ install/
 .venv/
 output/
 cucumber.toml
+.claude/plans/

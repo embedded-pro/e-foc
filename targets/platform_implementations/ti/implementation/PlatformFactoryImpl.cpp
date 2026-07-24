@@ -61,6 +61,9 @@ namespace application
         }
 
         application::Clocks::Initialize();
+
+        NVIC_SetPriority(PendSV_IRQn, static_cast<uint32_t>(hal::InterruptPriority::Lowest));
+
         peripherals.emplace();
         services::SetGlobalTracerInstance(peripherals->terminalAndTracer.tracer);
         this->onInitialized();
@@ -179,6 +182,7 @@ namespace application
         auto& adcCfg = impl.adcConfig;
         adcCfg.sampleAndHold = impl.toSampleAndHold.at(static_cast<std::size_t>(sampleAndHold));
         adcCfg.digitalComparators = infra::MakeRange(impl.digitalComparators);
+        adcCfg.interruptPriority = hal::InterruptPriority::Highest;
 
         peripherals->phaseCurrentAdc.reset();
         peripherals->phaseCurrentAdc.emplace(
@@ -230,6 +234,7 @@ namespace application
         hal::tiva::Can::Config canConfig;
         canConfig.timing = hal::tiva::Can::BitRate{ bitRate };
         canConfig.testMode = testMode;
+        canConfig.interruptPriority = hal::InterruptPriority::Low;
 
         peripherals->canBus.reset();
         peripherals->canBus.emplace(

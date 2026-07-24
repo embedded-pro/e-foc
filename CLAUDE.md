@@ -82,6 +82,7 @@ Apply `OPTIMIZE_FOR_SPEED` (from `numerical/math/CompilerOptimizations.hpp`) to 
 - Avoid large implementations in headers; keep non-trivial logic in `.cpp` files. Small `inline`/`constexpr` helpers in headers are allowed (and common in hot paths).
 - Prefer `{}` initialization over `()` for all variables and member data.
 - `const` on all non-mutating methods, `constexpr` for motor constants and lookup tables.
+- **Comments**: add one only when the *why* is non-obvious. Never write comments that restate what the code does, narrate steps, or label the obvious — no filler. When in doubt, leave it out.
 
 ## 4. FOC Theory — Correctness
 

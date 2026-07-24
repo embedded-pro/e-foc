@@ -8,11 +8,23 @@
 #include "infra/util/test_helper/MockHelpers.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "targets/hardware_test/components/Terminal.hpp"
+#include "core/foc/implementations/TransformsClarkePark.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <cmath>
+#include <numbers>
 
 namespace
 {
+    constexpr float identTwoPi = 2.0f * std::numbers::pi_v<float>;
+
+    float IdentMechanicalAngle(std::size_t stepIndex, std::size_t totalSteps, std::size_t expectedPolePairs)
+    {
+        constexpr std::size_t stepsPerRevolution = 12;
+        auto electricalRevolutions = totalSteps / stepsPerRevolution;
+        auto electricalAngle = (static_cast<float>(stepIndex) / static_cast<float>(totalSteps)) * (static_cast<float>(electricalRevolutions) * identTwoPi);
+        return electricalAngle / static_cast<float>(expectedPolePairs);
+    }
     class PlatformFactoryMock
         : public application::PlatformFactory
     {
@@ -95,6 +107,7 @@ namespace
             EXPECT_CALL(platformFactoryMock, PowerSupplyVoltage()).WillRepeatedly(testing::Return(foc::Volts{ 24.0f }));
             EXPECT_CALL(platformFactoryMock, MaxCurrentSupported()).WillRepeatedly(testing::Return(foc::Ampere{ 5.0f }));
             EXPECT_CALL(platformFactoryMock, SystemClock()).WillRepeatedly(testing::Return(hal::Hertz{ 10000 }));
+            EXPECT_CALL(platformFactoryMock, BaseFrequency()).WillRepeatedly(testing::Return(hal::Hertz{ 10000 }));
             EXPECT_CALL(platformFactoryMock, LowPriorityInterrupt()).WillRepeatedly(testing::ReturnRef(simpleLowPriorityInterrupt));
             EXPECT_CALL(platformFactoryMock, Eeprom()).WillRepeatedly(testing::ReturnRef(eepromMock));
             EXPECT_CALL(platformFactoryMock, GetResetCause()).WillRepeatedly(testing::Return(application::ResetCause::powerUp));
@@ -122,7 +135,7 @@ namespace
                 EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<22> terminal{ terminalWithCommands, tracer };
+        services::TerminalWithStorage::WithMaxSize<24> terminal{ terminalWithCommands, tracer };
 
         testing::StrictMock<PerformanceTrackerMock> performanceTrackerMock;
         testing::StrictMock<hal::CleanEepromMock> eepromMock;
@@ -159,6 +172,122 @@ namespace
                 EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>{ static_cast<uint8_t>(c) }), testing::_));
 
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(footer.begin(), footer.end())), testing::_));
+        }
+
+        // Drives a full electrical identification (R/L injection + pole-pairs sweep) so the speed command's guard passes.
+        static constexpr float identSamplingFrequency = 10000.0f;
+        static constexpr std::size_t identInjectionFrequency = 250;
+        static constexpr std::size_t identInjectionVoltagePercent = 15;
+        static constexpr std::size_t identWarmupPeriods = 10;
+        static constexpr std::size_t identMeasurementPeriods = 50;
+        static constexpr std::size_t identVoltageToCurrentDelaySamples = 1;
+        static constexpr float identVoltsPerModulation = 24.0f / 2.0f;
+        static constexpr float identInjectionAmplitude = static_cast<float>(identInjectionVoltagePercent) / 100.0f * identVoltsPerModulation;
+        static constexpr float identOmega = identTwoPi * static_cast<float>(identInjectionFrequency);
+        static constexpr float identSamplingPeriod = 1.0f / identSamplingFrequency;
+        static constexpr std::size_t identSamplesPerPeriod = static_cast<std::size_t>(identSamplingFrequency) / identInjectionFrequency;
+
+        void FeedIdentHfBurst(float resistance, float inductance)
+        {
+            foc::Clarke clarke;
+            const float impedance = std::sqrt(resistance * resistance + (identOmega * inductance) * (identOmega * inductance));
+            const float current = identInjectionAmplitude / impedance;
+            const float phi = std::atan2(identOmega * inductance, resistance);
+
+            const std::size_t totalSamples = (identWarmupPeriods + identMeasurementPeriods) * identSamplesPerPeriod;
+            for (std::size_t k = 0; k < totalSamples; ++k)
+            {
+                float iAlpha = 0.0f;
+                if (k >= identVoltageToCurrentDelaySamples)
+                {
+                    const float appliedPhase = static_cast<float>(k - identVoltageToCurrentDelaySamples) * identOmega * identSamplingPeriod;
+                    iAlpha = current * std::sin(appliedPhase - phi);
+                }
+
+                const auto phases = clarke.Inverse(foc::TwoPhase{ iAlpha, 0.0f });
+                onPhaseCurrentsReady(foc::PhaseCurrents{ foc::Ampere{ phases.a }, foc::Ampere{ phases.b }, foc::Ampere{ phases.c } });
+            }
+        }
+
+        void CompleteIdentification(std::size_t expectedPolePairs)
+        {
+            constexpr std::size_t totalSteps = 5 * 12;
+
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(testing::AnyNumber());
+            EXPECT_CALL(platformFactoryMock, ThreePhasePwmOutput(testing::_)).Times(testing::AnyNumber());
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+
+            std::size_t encoderStepIndex = 0;
+            EXPECT_CALL(platformFactoryMock, Read())
+                .WillOnce(testing::Return(foc::Radians{ 0.0f }))
+                .WillRepeatedly([&encoderStepIndex, expectedPolePairs]()
+                    {
+                        ++encoderStepIndex;
+                        return foc::Radians{ IdentMechanicalAngle(encoderStepIndex, totalSteps, expectedPolePairs) };
+                    });
+
+            communication.dataReceived(infra::MakeStringByteRange(std::string("ident wye\r")));
+            ExecuteAllActions();
+
+            FeedIdentHfBurst(1.5f, 0.002f);
+
+            for (std::size_t i = 0; i < totalSteps; ++i)
+                ForwardTime(std::chrono::milliseconds{ 50 });
+
+            ExecuteAllActions();
+
+            // Clear transient ident expectations so the command under test starts from a clean mock, then restore fixture stubs.
+            testing::Mock::VerifyAndClearExpectations(&streamWriterMock);
+            testing::Mock::VerifyAndClearExpectations(&platformFactoryMock);
+            EXPECT_CALL(platformFactoryMock, Terminal()).WillRepeatedly(testing::ReturnRef(terminalWithCommands));
+            EXPECT_CALL(platformFactoryMock, Tracer()).WillRepeatedly(testing::ReturnRef(tracer));
+            EXPECT_CALL(platformFactoryMock, BaseFrequency()).WillRepeatedly(testing::Return(hal::Hertz{ 10000 }));
+        }
+
+        // Completes only the R/L stage, leaving polePairs at 0, to exercise the speed guard that R/L alone is insufficient.
+        void CompleteResistanceInductanceOnly()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(testing::AnyNumber());
+            EXPECT_CALL(platformFactoryMock, ThreePhasePwmOutput(testing::_)).Times(testing::AnyNumber());
+            EXPECT_CALL(platformFactoryMock, Read()).WillRepeatedly(testing::Return(foc::Radians{ 0.0f }));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+
+            communication.dataReceived(infra::MakeStringByteRange(std::string("ident wye\r")));
+            ExecuteAllActions();
+
+            FeedIdentHfBurst(1.5f, 0.002f);
+            ExecuteAllActions();
+
+            testing::Mock::VerifyAndClearExpectations(&streamWriterMock);
+            testing::Mock::VerifyAndClearExpectations(&platformFactoryMock);
+            EXPECT_CALL(platformFactoryMock, Terminal()).WillRepeatedly(testing::ReturnRef(terminalWithCommands));
+            EXPECT_CALL(platformFactoryMock, Tracer()).WillRepeatedly(testing::ReturnRef(tracer));
+            EXPECT_CALL(platformFactoryMock, BaseFrequency()).WillRepeatedly(testing::Return(hal::Hertz{ 10000 }));
+        }
+
+        // Drives align to convergence (stable encoder, zeroed at the d-axis) so the speed command's alignment guard passes.
+        void CompleteAlignment()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(testing::AnyNumber());
+            EXPECT_CALL(platformFactoryMock, ThreePhasePwmOutput(testing::_)).Times(testing::AnyNumber());
+            EXPECT_CALL(platformFactoryMock, Read()).WillRepeatedly(testing::Return(foc::Radians{ 0.0f }));
+            EXPECT_CALL(platformFactoryMock, SetZero()).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillRepeatedly(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+
+            communication.dataReceived(infra::MakeStringByteRange(std::string("align\r")));
+            ExecuteAllActions();
+
+            constexpr std::size_t defaultSettledCount = 10;
+            for (std::size_t i = 0; i < defaultSettledCount; ++i)
+                onPhaseCurrentsReady(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+            ExecuteAllActions();
+
+            testing::Mock::VerifyAndClearExpectations(&streamWriterMock);
+            testing::Mock::VerifyAndClearExpectations(&platformFactoryMock);
+            EXPECT_CALL(platformFactoryMock, Terminal()).WillRepeatedly(testing::ReturnRef(terminalWithCommands));
+            EXPECT_CALL(platformFactoryMock, Tracer()).WillRepeatedly(testing::ReturnRef(tracer));
+            EXPECT_CALL(platformFactoryMock, BaseFrequency()).WillRepeatedly(testing::Return(hal::Hertz{ 10000 }));
         }
     };
 }
@@ -1820,6 +1949,464 @@ TEST_F(TestHardwareTerminal, eeprom_read_address_out_of_range_returns_error)
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, speed_without_identification_returns_error)
+{
+    InvokeCommand("speed 300 0.05", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "no pole pairs identified. Run 'ident' first." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, speed_invalid_argument_count)
+{
+    CompleteIdentification(2);
+    CompleteAlignment();
+
+    InvokeCommand("speed 300", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid number of arguments" };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, speed_invalid_rpm)
+{
+    CompleteIdentification(2);
+    CompleteAlignment();
+
+    InvokeCommand("speed invalid 0.05", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid value for target speed. It should be an integer between -20000 and 20000 RPM." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, speed_invalid_torque_constant)
+{
+    CompleteIdentification(2);
+    CompleteAlignment();
+
+    InvokeCommand("speed 300 invalid", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid value for torque constant. It should be a float between 0.001 and 10." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, speed_installs_live_loop_after_identification)
+{
+    CompleteIdentification(2);
+    CompleteAlignment();
+
+    InvokeCommand("speed 300 0.05", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, testing::_, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, Start()).Times(1);
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, speed_alias_installs_live_loop)
+{
+    CompleteIdentification(2);
+    CompleteAlignment();
+
+    InvokeCommand("s 300 0.05 150", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, testing::_, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, Start()).Times(1);
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, speed_live_loop_drives_calculate_and_pwm_output)
+{
+    CompleteIdentification(2);
+    CompleteAlignment();
+
+    InvokeCommand("speed 300 0.05", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, testing::_, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, Start()).Times(1);
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    EXPECT_CALL(platformFactoryMock, Read()).WillOnce(testing::Return(foc::Radians{ 0.5f }));
+    EXPECT_CALL(platformFactoryMock, ThreePhasePwmOutput(testing::_)).Times(1);
+
+    onPhaseCurrentsReady(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, stop_disables_foc_after_speed_run)
+{
+    CompleteIdentification(2);
+    CompleteAlignment();
+
+    InvokeCommand("speed 300 0.05", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, testing::_, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, Start()).Times(1);
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    InvokeCommand("stop", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(1);
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, speed_after_only_resistance_inductance_returns_error)
+{
+    CompleteResistanceInductanceOnly();
+
+    InvokeCommand("speed 300 0.05", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "no pole pairs identified. Run 'ident' first." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, speed_without_alignment_returns_error)
+{
+    CompleteIdentification(2);
+
+    InvokeCommand("speed 300 0.05", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "motor not aligned. Run 'align' first." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, speed_while_already_running_returns_error)
+{
+    CompleteIdentification(2);
+    CompleteAlignment();
+
+    InvokeCommand("speed 300 0.05", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, testing::_, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, Start()).Times(1);
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    // A second speed while active must not re-register the ISR callback or reconfigure/restart the stage;
+    // StrictMock leaves ConfigureAdcAndPwm/PhaseCurrentsReady/Start/Stop unexpected so any such call fails.
+    InvokeCommand("speed 300 0.05", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "motor spinning. Run 'stop' first." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, spinning_blocks_ident_without_touching_hardware)
+{
+    CompleteIdentification(2);
+    CompleteAlignment();
+
+    InvokeCommand("speed 300 0.05", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, testing::_, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, Start()).Times(1);
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    // ident must be blocked while spinning; StrictMock leaves Stop/ThreePhasePwmOutput unexpected so any hardware touch fails.
+    InvokeCommand("ident wye", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "motor spinning. Run 'stop' first." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, spinning_blocks_pwm_without_touching_hardware)
+{
+    CompleteIdentification(2);
+    CompleteAlignment();
+
+    InvokeCommand("speed 300 0.05", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, testing::_, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, Start()).Times(1);
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    // pwm must be blocked while spinning; a StrictMock ConfigureAdcAndPwm/PhaseCurrentsReady would fail if reached.
+    InvokeCommand("pwm 500 10000", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "motor spinning. Run 'stop' first." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, spinning_allows_speedstat)
+{
+    CompleteIdentification(2);
+    CompleteAlignment();
+
+    InvokeCommand("speed 300 0.05", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, testing::_, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, Start()).Times(1);
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    InvokeCommand("speedstat", [this]()
+        {
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, spinning_allows_stop)
+{
+    CompleteIdentification(2);
+    CompleteAlignment();
+
+    InvokeCommand("speed 300 0.05", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, testing::_, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, Start()).Times(1);
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    InvokeCommand("stop", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(1);
+        });
+
+    ExecuteAllActions();
+
+    // After stop clears speedActive_, a previously blocked command runs again (pwm reconfigures the stage).
+    InvokeCommand("pwm 500 10000", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, std::chrono::nanoseconds{ 500 }, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(testing::_, testing::_)).WillRepeatedly(testing::SaveArg<1>(&onPhaseCurrentsReady));
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, spinning_allows_enc)
+{
+    CompleteIdentification(2);
+    CompleteAlignment();
+
+    InvokeCommand("speed 300 0.05", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, testing::_, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, Start()).Times(1);
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    EXPECT_CALL(platformFactoryMock, Read()).WillOnce(testing::Return(foc::Radians{ 1.57f }));
+
+    InvokeCommand("enc", [this]()
+        {
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, spinning_allows_reset_cause)
+{
+    CompleteIdentification(2);
+    CompleteAlignment();
+
+    InvokeCommand("speed 300 0.05", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, testing::_, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, Start()).Times(1);
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    EXPECT_CALL(platformFactoryMock, GetResetCause()).WillOnce(testing::Return(application::ResetCause::powerUp));
+
+    InvokeCommand("reset_cause", [this]()
+        {
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, spinning_allows_fault_status)
+{
+    CompleteIdentification(2);
+    CompleteAlignment();
+
+    InvokeCommand("speed 300 0.05", [this]()
+        {
+            EXPECT_CALL(platformFactoryMock, Stop()).Times(1);
+            EXPECT_CALL(platformFactoryMock, ConfigureAdcAndPwm(hal::Hertz{ 10000 }, testing::_, testing::_)).Times(1);
+            EXPECT_CALL(platformFactoryMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, testing::_)).WillOnce(testing::SaveArg<1>(&onPhaseCurrentsReady));
+            EXPECT_CALL(platformFactoryMock, Start()).Times(1);
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+
+    EXPECT_CALL(platformFactoryMock, FaultStatus()).WillOnce(testing::Return(infra::BoundedConstString{}));
+
+    InvokeCommand("fault_status", [this]()
+        {
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, speedstat_traces_estimates)
+{
+    InvokeCommand("speedstat", [this]()
+        {
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, speedstat_alias_traces_estimates)
+{
+    InvokeCommand("ss", [this]()
+        {
+            EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
 
     ExecuteAllActions();
