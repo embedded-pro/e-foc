@@ -43,7 +43,6 @@ _PROBED_INTERFACES = [
     "usb2can",
     "iscan",
     "nixnet",
-    "pcan",
     "systec",
 ]
 

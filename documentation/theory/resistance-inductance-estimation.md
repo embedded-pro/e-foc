@@ -288,16 +288,16 @@ phi = atan2(w Ls, R);  R = Z cos phi;  w Ls = Z sin phi
 
 ### Sensitivity Analysis
 
-| Source of Error            | Effect on $R_s$                          | Effect on $L_s$                          |
-|----------------------------|------------------------------------------|------------------------------------------|
-| Low-frequency back-EMF     | Rejected by integer-period demodulation  | Rejected by integer-period demodulation  |
-| ADC current offset (DC)    | Rejected (orthogonal to $\sin/\cos$)     | Rejected (orthogonal to $\sin/\cos$)     |
-| PWM→ADC pipeline lag       | $\varepsilon = 2\pi f_{inj}/f_s$ biases $R$ ($\cos(\varphi+\varepsilon)/\cos\varphi$); compensated via `voltageToCurrentDelaySamples` | Compensated with the same lagged reference |
-| Inverter dead-time         | Small apparent-$R$ bias (in phase)       | Indirect                                 |
-| $V_{dc}$ variation         | Biases $A$ (kept brief to limit drift)   | Biases $A$                               |
-| High $f_{inj}$             | Poor $R_s$ separation (low current)      | Well conditioned                         |
-| Magnetic saturation        | $R_s$ / $L_s$ underestimated (nonlinear) | $L_s$ underestimated (nonlinear)         |
-| Rotor saliency (IPMSM)     | Axis-dependent $L$ — not separated       | Reports a single blended $L_s$           |
+| Source of Error         | Effect on $R_s$                                                                                                                       | Effect on $L_s$                            |
+|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------|
+| Low-frequency back-EMF  | Rejected by integer-period demodulation                                                                                               | Rejected by integer-period demodulation    |
+| ADC current offset (DC) | Rejected (orthogonal to $\sin/\cos$)                                                                                                  | Rejected (orthogonal to $\sin/\cos$)       |
+| PWM→ADC pipeline lag    | $\varepsilon = 2\pi f_{inj}/f_s$ biases $R$ ($\cos(\varphi+\varepsilon)/\cos\varphi$); compensated via `voltageToCurrentDelaySamples` | Compensated with the same lagged reference |
+| Inverter dead-time      | Small apparent-$R$ bias (in phase)                                                                                                    | Indirect                                   |
+| $V_{dc}$ variation      | Biases $A$ (kept brief to limit drift)                                                                                                | Biases $A$                                 |
+| High $f_{inj}$          | Poor $R_s$ separation (low current)                                                                                                   | Well conditioned                           |
+| Magnetic saturation     | $R_s$ / $L_s$ underestimated (nonlinear)                                                                                              | $L_s$ underestimated (nonlinear)           |
+| Rotor saliency (IPMSM)  | Axis-dependent $L$ — not separated                                                                                                    | Reports a single blended $L_s$             |
 
 ---
 
