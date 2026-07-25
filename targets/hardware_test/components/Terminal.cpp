@@ -91,7 +91,6 @@ namespace application
         , hardware{ hardware }
         , performanceTimer{ hardware.PerformanceTimer() }
         , Vdc{ hardware.PowerSupplyVoltage() }
-        , systemClock{ hardware.SystemClock() }
         , foc{ hardware.MaxCurrentSupported(), baseFrequency_, hardware.LowPriorityInterrupt() }
         , onlineMechEstimator{ services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, foc.OuterLoopFrequency() }
         , onlineElecEstimator{ services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, foc.OuterLoopFrequency() }
@@ -250,7 +249,7 @@ namespace application
             [this, index](const infra::BoundedConstString& params)
             {
                 const auto& command = guardedCommands[index];
-                if (speedActive_ && !command.allowedWhileSpinning)
+                if (runtimeState.speedActive && !command.allowedWhileSpinning)
                     terminal.ProcessResult({ error, "motor spinning. Run 'stop' first." });
                 else
                     command.handler(params);
@@ -272,11 +271,11 @@ namespace application
         if (!frequency.has_value())
             return { error, "invalid value. It should be a float between 10000 and 20000." };
 
-        currentPwmDeadTime_ = std::chrono::nanoseconds{ *deadTime };
-        currentPwmFrequency_ = hal::Hertz{ *frequency };
-        adcActive_ = false;
-        hardware.ConfigureAdcAndPwm(currentPwmFrequency_, currentPwmDeadTime_, currentSah_);
-        StartAdc(currentSah_);
+        pwmAdcConfig.deadTime = std::chrono::nanoseconds{ *deadTime };
+        pwmAdcConfig.frequency = hal::Hertz{ *frequency };
+        pwmAdcConfig.active = false;
+        hardware.ConfigureAdcAndPwm(pwmAdcConfig.frequency, pwmAdcConfig.deadTime, pwmAdcConfig.sah);
+        StartAdc(pwmAdcConfig.sah);
 
         return { success };
     }
@@ -292,8 +291,8 @@ namespace application
         if (!sampleAndHold)
             return { error, "invalid value. It should be one of: shortest, shorter, medium, longer, longest." };
 
-        adcActive_ = false;
-        hardware.ConfigureAdcAndPwm(currentPwmFrequency_, currentPwmDeadTime_, ToSampleAndHold(*sampleAndHold));
+        pwmAdcConfig.active = false;
+        hardware.ConfigureAdcAndPwm(pwmAdcConfig.frequency, pwmAdcConfig.deadTime, ToSampleAndHold(*sampleAndHold));
         StartAdc(ToSampleAndHold(*sampleAndHold));
 
         return { success };
@@ -330,11 +329,11 @@ namespace application
         if (!qKd.has_value())
             return { error, "invalid value for DQ-axis Kd" };
 
-        speedPidTunings = controllers::PidTunings<float>{ *dKp, *dKi, *dKd };
-        dqPidTunings = controllers::PidTunings<float>{ *qKp, *qKi, *qKd };
+        pidTunings.speed = controllers::PidTunings<float>{ *dKp, *dKi, *dKd };
+        pidTunings.dq = controllers::PidTunings<float>{ *qKp, *qKi, *qKd };
 
-        foc.SetSpeedTunings(Vdc, speedPidTunings);
-        foc.SetCurrentTunings(Vdc, { dqPidTunings, dqPidTunings });
+        foc.SetSpeedTunings(Vdc, pidTunings.speed);
+        foc.SetCurrentTunings(Vdc, { pidTunings.dq, pidTunings.dq });
 
         return { success };
     }
@@ -374,8 +373,8 @@ namespace application
         if (!currentC.has_value())
             return { error, "invalid value for phase C current. It should be a float between -1000 and 1000." };
 
-        polePairs = static_cast<std::size_t>(*pp);
-        foc.SetPolePairs(polePairs.value());
+        runtimeState.polePairs = static_cast<std::size_t>(*pp);
+        foc.SetPolePairs(runtimeState.polePairs.value());
         RunFocSimulation(foc::PhaseCurrents{ foc::Ampere{ *currentA }, foc::Ampere{ *currentB }, foc::Ampere{ *currentC } }, foc::Radians{ *angle * pi_div_180 });
 
         return { success };
@@ -389,15 +388,15 @@ namespace application
 
         tracer.Trace() << "  FOC Simulation Results:";
         tracer.Trace() << "    Vdc:              " << Vdc.Value() << " V";
-        tracer.Trace() << "    Pole Pairs:       " << polePairs.value_or(0);
+        tracer.Trace() << "    Pole Pairs:       " << runtimeState.polePairs.value_or(0);
         tracer.Trace() << "    Inputs:";
         tracer.Trace() << "      Angle:            " << angle.Value() << " degrees";
         tracer.Trace() << "      Phase A Current:  " << input.a.Value() << " mA";
         tracer.Trace() << "      Phase B Current:  " << input.b.Value() << " mA";
         tracer.Trace() << "      Phase C Current:  " << input.c.Value() << " mA";
         tracer.Trace() << "    PID Tunings:";
-        tracer.Trace() << "      Speed PID:         [P: " << speedPidTunings.kp << ", I: " << speedPidTunings.ki << ", D: " << speedPidTunings.kd << "]";
-        tracer.Trace() << "      DQ-axis PID:       [P: " << dqPidTunings.kp << ", I: " << dqPidTunings.ki << ", D: " << dqPidTunings.kd << "]";
+        tracer.Trace() << "      Speed PID:         [P: " << pidTunings.speed.kp << ", I: " << pidTunings.speed.ki << ", D: " << pidTunings.speed.kd << "]";
+        tracer.Trace() << "      DQ-axis PID:       [P: " << pidTunings.dq.kp << ", I: " << pidTunings.dq.ki << ", D: " << pidTunings.dq.kd << "]";
         tracer.Trace() << "    PWM Outputs:";
         tracer.Trace() << "      Phase A PWM:      " << result.a.Value() << " %";
         tracer.Trace() << "      Phase B PWM:      " << result.b.Value() << " %";
@@ -410,10 +409,10 @@ namespace application
     {
         hardware.Stop();
 
-        if (speedActive_)
+        if (runtimeState.speedActive)
         {
             foc.Disable();
-            speedActive_ = false;
+            runtimeState.speedActive = false;
         }
 
         return { success };
@@ -421,7 +420,7 @@ namespace application
 
     void TerminalInteractor::ProcessAdcSamples()
     {
-        adcActive_ = false;
+        pwmAdcConfig.active = false;
         hardware.Stop();
 
         tracer.Trace() << "  Current Phases [A;B;C] ampere";
@@ -486,14 +485,14 @@ namespace application
             rlConfig.injectionVoltagePercent = hal::Percent{ *injectionVoltage };
         }
 
-        pendingPolePairsConfig = {};
+        motorIdentState.pendingPolePairsConfig = {};
 
         if (tokenizer.Size() >= 4)
         {
             auto ppVoltage = ParseInput<uint8_t>(tokenizer.Token(3), 1, 100);
             if (!ppVoltage.has_value())
                 return { error, "invalid value for pole-pairs test voltage. It should be an integer between 1 and 100." };
-            pendingPolePairsConfig.testVoltagePercent = hal::Percent{ *ppVoltage };
+            motorIdentState.pendingPolePairsConfig.testVoltagePercent = hal::Percent{ *ppVoltage };
         }
 
         if (tokenizer.Size() >= 5)
@@ -501,7 +500,7 @@ namespace application
             auto ppRevs = ParseInput<uint32_t>(tokenizer.Token(4), 1u, 50u);
             if (!ppRevs.has_value())
                 return { error, "invalid value for electrical revolutions. It should be an integer between 1 and 50." };
-            pendingPolePairsConfig.electricalRevolutions = static_cast<std::size_t>(*ppRevs);
+            motorIdentState.pendingPolePairsConfig.electricalRevolutions = static_cast<std::size_t>(*ppRevs);
         }
 
         if (tokenizer.Size() >= 6)
@@ -509,11 +508,11 @@ namespace application
             auto ppSettle = ParseInput<uint32_t>(tokenizer.Token(5), 1u, 10000u);
             if (!ppSettle.has_value())
                 return { error, "invalid value for pole-pairs step settle time. It should be an integer between 1 and 10000 ms." };
-            pendingPolePairsConfig.settleTimeBetweenSteps = std::chrono::milliseconds{ *ppSettle };
+            motorIdentState.pendingPolePairsConfig.settleTimeBetweenSteps = std::chrono::milliseconds{ *ppSettle };
         }
 
-        identificationResults.reset();
-        motorAligned = false;
+        motorIdentState.results.reset();
+        motorIdentState.aligned = false;
 
         electricalIdent.EstimateResistanceAndInductance(rlConfig, [this](std::optional<services::ElectricalParametersIdentification::ResistanceInductanceResult> result)
             {
@@ -523,7 +522,7 @@ namespace application
                     return;
                 }
 
-                identificationResults = IdentificationResults{ *result, 0 };
+                motorIdentState.results = IdentificationResults{ *result, 0 };
                 RunPolePairEstimation();
             });
 
@@ -532,7 +531,7 @@ namespace application
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::AlignMotor(const infra::BoundedConstString& param)
     {
-        if (!identificationResults.has_value() || identificationResults->polePairs == 0)
+        if (!motorIdentState.results.has_value() || motorIdentState.results->polePairs == 0)
             return { error, "no pole pairs identified. Run 'ident' first." };
 
         infra::Tokenizer tokenizer(param, ' ');
@@ -582,18 +581,18 @@ namespace application
             config.settledCount = static_cast<std::size_t>(*count);
         }
 
-        motorAlignment.ForceAlignment(identificationResults->polePairs, config, [this](std::optional<foc::Radians> offset)
+        motorAlignment.ForceAlignment(motorIdentState.results->polePairs, config, [this](std::optional<foc::Radians> offset)
             {
                 if (!offset.has_value())
                 {
-                    motorAligned = false;
+                    motorIdentState.aligned = false;
                     tracer.Trace() << "  Alignment failed: rotor did not converge.";
                     return;
                 }
 
                 // Rotor is held at the d-axis (electrical angle 0), so zero the encoder here to lock the FOC frame.
                 hardware.SetZero();
-                motorAligned = true;
+                motorIdentState.aligned = true;
                 tracer.Trace() << "  Alignment complete. Offset: " << offset->Value() << " radians.";
             });
 
@@ -602,10 +601,10 @@ namespace application
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::RunSpeedFoc(const infra::BoundedConstString& param)
     {
-        if (!identificationResults.has_value() || identificationResults->polePairs == 0)
+        if (!motorIdentState.results.has_value() || motorIdentState.results->polePairs == 0)
             return { error, "no pole pairs identified. Run 'ident' first." };
 
-        if (!motorAligned)
+        if (!motorIdentState.aligned)
             return { error, "motor not aligned. Run 'align' first." };
 
         infra::Tokenizer tokenizer(param, ' ');
@@ -634,11 +633,11 @@ namespace application
         const foc::NewtonMeterSecondPerRadian defaultFriction{ defaultFrictionValue };
         const auto controlFrequency = baseFrequency_;
 
-        foc.SetPolePairs(identificationResults->polePairs);
-        foc::WithAutomaticCurrentPidGains{ foc }.SetPidBasedOnResistanceAndInductance(Vdc, identificationResults->rl.resistance, identificationResults->rl.inductance, controlFrequency, currentLoopNyquistFactor);
+        foc.SetPolePairs(motorIdentState.results->polePairs);
+        foc::WithAutomaticCurrentPidGains{ foc }.SetPidBasedOnResistanceAndInductance(Vdc, motorIdentState.results->rl.resistance, motorIdentState.results->rl.inductance, controlFrequency, currentLoopNyquistFactor);
         foc::WithAutomaticSpeedPidGains{ foc }.SetPidBasedOnInertiaAndFriction(Vdc, defaultInertia, defaultFriction, bandwidth);
 
-        onlineElecEstimator.SetInitialEstimate(identificationResults->rl.resistance, identificationResults->rl.inductance);
+        onlineElecEstimator.SetInitialEstimate(motorIdentState.results->rl.resistance, motorIdentState.results->rl.inductance);
         onlineMechEstimator.SetTorqueConstant(foc::NewtonMeter{ *kt });
         onlineMechEstimator.SetInitialEstimate(defaultInertia, defaultFriction);
         foc.SetOnlineMechanicalEstimator(onlineMechEstimator);
@@ -647,8 +646,8 @@ namespace application
         foc.SetPoint(foc::RadiansPerSecond{ static_cast<float>(*rpm) * (2.0f * std::numbers::pi_v<float>) / 60.0f });
 
         hardware.Stop();
-        adcActive_ = false;
-        hardware.ConfigureAdcAndPwm(controlFrequency, currentPwmDeadTime_, currentSah_);
+        pwmAdcConfig.active = false;
+        hardware.ConfigureAdcAndPwm(controlFrequency, pwmAdcConfig.deadTime, pwmAdcConfig.sah);
         hardware.PhaseCurrentsReady(controlFrequency, [this](foc::PhaseCurrents currentPhases)
             {
                 auto position = hardware.Read();
@@ -656,7 +655,7 @@ namespace application
             });
         foc.Enable();
         hardware.Start();
-        speedActive_ = true;
+        runtimeState.speedActive = true;
 
         tracer.Trace() << "  Speed FOC running at " << *rpm << " RPM";
 
@@ -676,16 +675,16 @@ namespace application
 
     void TerminalInteractor::RunPolePairEstimation()
     {
-        electricalIdent.EstimateNumberOfPolePairs(pendingPolePairsConfig, [this](std::optional<std::size_t> pp)
+        electricalIdent.EstimateNumberOfPolePairs(motorIdentState.pendingPolePairsConfig, [this](std::optional<std::size_t> pp)
             {
                 if (!pp.has_value())
                 {
                     tracer.Trace() << "  Identification failed: could not estimate pole pairs.";
-                    identificationResults.reset();
+                    motorIdentState.results.reset();
                     return;
                 }
 
-                identificationResults->polePairs = *pp;
+                motorIdentState.results->polePairs = *pp;
                 ReportIdentificationResults();
             });
     }
@@ -693,20 +692,20 @@ namespace application
     void TerminalInteractor::ReportIdentificationResults()
     {
         tracer.Trace() << "  Identification Results:";
-        tracer.Trace() << "    Resistance:         " << identificationResults->rl.resistance.Value() << " Ohm";
-        tracer.Trace() << "    Inductance:         " << identificationResults->rl.inductance.Value() << " mH";
-        tracer.Trace() << "    Inverter V offset:  " << identificationResults->rl.inverterVoltageOffset.Value() << " V";
-        tracer.Trace() << "    Fit quality:        " << identificationResults->rl.fitQuality;
-        tracer.Trace() << "    Pole Pairs:         " << identificationResults->polePairs;
+        tracer.Trace() << "    Resistance:         " << motorIdentState.results->rl.resistance.Value() << " Ohm";
+        tracer.Trace() << "    Inductance:         " << motorIdentState.results->rl.inductance.Value() << " mH";
+        tracer.Trace() << "    Inverter V offset:  " << motorIdentState.results->rl.inverterVoltageOffset.Value() << " V";
+        tracer.Trace() << "    Fit quality:        " << motorIdentState.results->rl.fitQuality;
+        tracer.Trace() << "    Pole Pairs:         " << motorIdentState.results->polePairs;
     }
 
     void TerminalInteractor::StartAdc(PlatformFactory::SampleAndHold sampleAndHold)
     {
-        currentSah_ = sampleAndHold;
-        adcActive_ = true;
-        hardware.PhaseCurrentsReady(currentPwmFrequency_, [this](foc::PhaseCurrents phases)
+        pwmAdcConfig.sah = sampleAndHold;
+        pwmAdcConfig.active = true;
+        hardware.PhaseCurrentsReady(pwmAdcConfig.frequency, [this](foc::PhaseCurrents phases)
             {
-                if (!adcActive_)
+                if (!pwmAdcConfig.active)
                     return;
                 if (!queueOfPhaseCurrents.full())
                     queueOfPhaseCurrents.emplace_back(phases);
@@ -736,7 +735,7 @@ namespace application
         }
 
         hardware.ConfigureCanBus(*bitRate, testMode);
-        canStarted = true;
+        runtimeState.canStarted = true;
 
         hardware.CanBus().SetOnError([this](CanBusAdapter::CanError error)
             {
@@ -750,14 +749,14 @@ namespace application
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::CanStop()
     {
-        canStarted = false;
+        runtimeState.canStarted = false;
         tracer.Trace() << "  CAN stopped";
         return { success };
     }
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::CanSend(const infra::BoundedConstString& param)
     {
-        if (!canStarted)
+        if (!runtimeState.canStarted)
             return { error, "CAN not started. Run 'can_start' first." };
 
         infra::Tokenizer tokenizer(param, ' ');
@@ -793,7 +792,7 @@ namespace application
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::CanListen()
     {
-        if (!canStarted)
+        if (!runtimeState.canStarted)
             return { error, "CAN not started. Run 'can_start' first." };
 
         hardware.CanBus().ReceiveData([this](hal::Can::Id id, const hal::Can::Message& data)
@@ -826,7 +825,7 @@ namespace application
         }
 
         const std::size_t byteCount = tokenizer.Size() - 1;
-        if (byteCount > eepromBuffer.size())
+        if (byteCount > eepromData.buffer.size())
         {
             terminal.ProcessResult({ error, "too many bytes" });
             return;
@@ -840,7 +839,7 @@ namespace application
                 terminal.ProcessResult({ error, "invalid byte value" });
                 return;
             }
-            eepromBuffer[i] = static_cast<uint8_t>(*byte);
+            eepromData.buffer[i] = static_cast<uint8_t>(*byte);
         }
 
         const std::size_t eepromSize = eeprom.Size();
@@ -850,7 +849,7 @@ namespace application
             return;
         }
 
-        eeprom.WriteBuffer(infra::ConstByteRange{ eepromBuffer.data(), eepromBuffer.data() + byteCount }, *addr, [this]()
+        eeprom.WriteBuffer(infra::ConstByteRange{ eepromData.buffer.data(), eepromData.buffer.data() + byteCount }, *addr, [this]()
             {
                 tracer.Trace() << "  Written to EEPROM";
                 this->terminal.ProcessResult({ success });
@@ -875,7 +874,7 @@ namespace application
             return;
         }
 
-        auto size = ParseInput<uint32_t>(tokenizer.Token(1), 1u, static_cast<uint32_t>(eepromBuffer.size()));
+        auto size = ParseInput<uint32_t>(tokenizer.Token(1), 1u, static_cast<uint32_t>(eepromData.buffer.size()));
         if (!size.has_value())
         {
             terminal.ProcessResult({ error, "invalid size" });
@@ -889,11 +888,11 @@ namespace application
             return;
         }
 
-        eepromCurrentReadSize = *size;
-        eeprom.ReadBuffer(infra::ByteRange{ eepromBuffer.data(), eepromBuffer.data() + eepromCurrentReadSize }, *addr, [this]()
+        eepromData.currentReadSize = *size;
+        eeprom.ReadBuffer(infra::ByteRange{ eepromData.buffer.data(), eepromData.buffer.data() + eepromData.currentReadSize }, *addr, [this]()
             {
-                for (uint32_t i = 0; i < this->eepromCurrentReadSize; ++i)
-                    this->tracer.Trace() << "  [" << i << "] = " << static_cast<uint32_t>(this->eepromBuffer[i]);
+                for (uint32_t i = 0; i < this->eepromData.currentReadSize; ++i)
+                    this->tracer.Trace() << "  [" << i << "] = " << static_cast<uint32_t>(this->eepromData.buffer[i]);
                 this->terminal.ProcessResult({ success });
             });
     }

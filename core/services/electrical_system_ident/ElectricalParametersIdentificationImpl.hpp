@@ -38,22 +38,31 @@ namespace services
         ResistanceAndInductanceConfig rlConfig;
         PolePairsConfig polePairsConfig;
 
-        float injectionModIndex{ 0.0f };
-        float phase{ 0.0f };
-        float demodPhase{ 0.0f };
-        float phaseIncrement{ 0.0f };
-        float angularFrequency{ 0.0f };
-        float maxCurrentSquared{ 0.0f };
-        std::size_t sampleIndex{ 0 };
-        std::size_t warmupSamples{ 0 };
-        std::size_t measurementSamples{ 0 };
-        float sumSin{ 0.0f };
-        float sumCos{ 0.0f };
-        float sumSq{ 0.0f };
+        struct RlMeasurementState
+        {
+            float injectionModIndex{ 0.0f };
+            float phase{ 0.0f };
+            float demodPhase{ 0.0f };
+            float phaseIncrement{ 0.0f };
+            float angularFrequency{ 0.0f };
+            float maxCurrentSquared{ 0.0f };
+            std::size_t sampleIndex{ 0 };
+            std::size_t warmupSamples{ 0 };
+            std::size_t measurementSamples{ 0 };
+            float sumSin{ 0.0f };
+            float sumCos{ 0.0f };
+            float sumSq{ 0.0f };
+        };
 
-        std::size_t currentSampleIndex{ 0 };
-        foc::Radians previousPosition{ 0.0f };
-        float accumulatedRotation{ 0.0f };
+        struct PolePairMeasurementState
+        {
+            std::size_t currentSampleIndex{ 0 };
+            foc::Radians previousPosition{ 0.0f };
+            float accumulatedRotation{ 0.0f };
+        };
+
+        RlMeasurementState rl;
+        PolePairMeasurementState pp;
 
         infra::AutoResetFunction<void(std::optional<ResistanceInductanceResult>)> onResistanceAndInductanceDone;
         infra::AutoResetFunction<void(std::optional<std::size_t>)> onPolePairsDone;

@@ -119,7 +119,7 @@ class TestDetectPythonCanConfigs(unittest.TestCase):
         result = list_can_interfaces.detect_python_can_configs(interfaces=["pcan"])
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["supports_fd"], True)
+        self.assertTrue(result[0]["supports_fd"])
 
     def test_returns_empty_list_when_no_configs_found(self):
         self._can.detect_available_configs.return_value = []

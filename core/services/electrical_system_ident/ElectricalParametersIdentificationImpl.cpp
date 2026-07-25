@@ -57,25 +57,25 @@ namespace services
 
         const auto samplesPerPeriod = samplingFrequencyHz / injectionHz;
 
-        injectionModIndex = std::min(static_cast<float>(rlConfig.injectionVoltagePercent.Value()) / 100.0f, maxSafeModIndex);
-        angularFrequency = twoPi * static_cast<float>(injectionHz);
-        phaseIncrement = angularFrequency / static_cast<float>(samplingFrequencyHz);
-        warmupSamples = rlConfig.warmupPeriods * samplesPerPeriod;
-        measurementSamples = rlConfig.measurementPeriods * samplesPerPeriod;
+        rl.injectionModIndex = std::min(static_cast<float>(rlConfig.injectionVoltagePercent.Value()) / 100.0f, maxSafeModIndex);
+        rl.angularFrequency = twoPi * static_cast<float>(injectionHz);
+        rl.phaseIncrement = rl.angularFrequency / static_cast<float>(samplingFrequencyHz);
+        rl.warmupSamples = rlConfig.warmupPeriods * samplesPerPeriod;
+        rl.measurementSamples = rlConfig.measurementPeriods * samplesPerPeriod;
 
         const auto maxCurrent = driver.MaxCurrentSupported().Value();
-        maxCurrentSquared = maxCurrent * maxCurrent;
+        rl.maxCurrentSquared = maxCurrent * maxCurrent;
 
-        phase = 0.0f;
+        rl.phase = 0.0f;
         // Demod reference lags the applied phase by the PWM->ADC pipeline delay, cancelling the
         // ~2*pi*f_inj/f_s phase error that would otherwise bias R.
-        demodPhase = std::fmod(-static_cast<float>(rlConfig.voltageToCurrentDelaySamples) * phaseIncrement, twoPi);
-        if (demodPhase < 0.0f)
-            demodPhase += twoPi;
-        sampleIndex = 0;
-        sumSin = 0.0f;
-        sumCos = 0.0f;
-        sumSq = 0.0f;
+        rl.demodPhase = std::fmod(-static_cast<float>(rlConfig.voltageToCurrentDelaySamples) * rl.phaseIncrement, twoPi);
+        if (rl.demodPhase < 0.0f)
+            rl.demodPhase += twoPi;
+        rl.sampleIndex = 0;
+        rl.sumSin = 0.0f;
+        rl.sumCos = 0.0f;
+        rl.sumSq = 0.0f;
 
         driver.Stop();
         driver.PhaseCurrentsReady(hal::Hertz{ static_cast<uint32_t>(samplingFrequencyHz) }, [this](auto currentPhases)
@@ -89,12 +89,12 @@ namespace services
 
     OPTIMIZE_FOR_SPEED void ElectricalParametersIdentificationImpl::ApplyInjectionVoltage()
     {
-        driver.ThreePhasePwmOutput(NormalizedDutyCycles(clarke.Inverse(foc::TwoPhase{ injectionModIndex * foc::FastTrigonometry::Sine(phase), 0.0f })));
+        driver.ThreePhasePwmOutput(NormalizedDutyCycles(clarke.Inverse(foc::TwoPhase{ rl.injectionModIndex * foc::FastTrigonometry::Sine(rl.phase), 0.0f })));
     }
 
     OPTIMIZE_FOR_SPEED void ElectricalParametersIdentificationImpl::OnHfSample(const foc::PhaseCurrents& currentPhases)
     {
-        if (sampleIndex >= warmupSamples + measurementSamples)
+        if (rl.sampleIndex >= rl.warmupSamples + rl.measurementSamples)
             return;
 
         const float a = currentPhases.a.Value();
@@ -102,7 +102,7 @@ namespace services
         const float c = currentPhases.c.Value();
 
         const float peakSquared = std::max({ a * a, b * b, c * c });
-        if (peakSquared > maxCurrentSquared)
+        if (peakSquared > rl.maxCurrentSquared)
         {
             AbortResistanceAndInductance();
             return;
@@ -110,24 +110,24 @@ namespace services
 
         ApplyInjectionVoltage();
 
-        if (sampleIndex >= warmupSamples)
+        if (rl.sampleIndex >= rl.warmupSamples)
         {
             const float iAlpha = clarke.Forward(foc::ThreePhase{ a, b, c }).alpha;
-            sumSin += iAlpha * foc::FastTrigonometry::Sine(demodPhase);
-            sumCos += iAlpha * foc::FastTrigonometry::Cosine(demodPhase);
-            sumSq += iAlpha * iAlpha;
+            rl.sumSin += iAlpha * foc::FastTrigonometry::Sine(rl.demodPhase);
+            rl.sumCos += iAlpha * foc::FastTrigonometry::Cosine(rl.demodPhase);
+            rl.sumSq += iAlpha * iAlpha;
         }
 
-        phase += phaseIncrement;
-        if (phase >= twoPi)
-            phase -= twoPi;
+        rl.phase += rl.phaseIncrement;
+        if (rl.phase >= twoPi)
+            rl.phase -= twoPi;
 
-        demodPhase += phaseIncrement;
-        if (demodPhase >= twoPi)
-            demodPhase -= twoPi;
+        rl.demodPhase += rl.phaseIncrement;
+        if (rl.demodPhase >= twoPi)
+            rl.demodPhase -= twoPi;
 
-        ++sampleIndex;
-        if (sampleIndex >= warmupSamples + measurementSamples)
+        ++rl.sampleIndex;
+        if (rl.sampleIndex >= rl.warmupSamples + rl.measurementSamples)
         {
             driver.Stop();
             ComputeAndReport();
@@ -136,7 +136,7 @@ namespace services
 
     void ElectricalParametersIdentificationImpl::AbortResistanceAndInductance()
     {
-        sampleIndex = warmupSamples + measurementSamples;
+        rl.sampleIndex = rl.warmupSamples + rl.measurementSamples;
         driver.Stop();
         if (onResistanceAndInductanceDone)
             onResistanceAndInductanceDone(std::nullopt);
@@ -147,9 +147,9 @@ namespace services
         if (!onResistanceAndInductanceDone)
             return;
 
-        const auto n = static_cast<float>(measurementSamples);
-        const float iRe = 2.0f * sumSin / n;
-        const float iIm = 2.0f * sumCos / n;
+        const auto n = static_cast<float>(rl.measurementSamples);
+        const float iRe = 2.0f * rl.sumSin / n;
+        const float iIm = 2.0f * rl.sumCos / n;
         const float magnitudeSquared = iRe * iRe + iIm * iIm;
 
         if (magnitudeSquared < minDemodulatedCurrent * minDemodulatedCurrent)
@@ -158,14 +158,14 @@ namespace services
             return;
         }
 
-        const float amplitude = injectionModIndex * voltsPerModulation * vdc.Value();
+        const float amplitude = rl.injectionModIndex * voltsPerModulation * vdc.Value();
         float resistance = amplitude * iRe / magnitudeSquared;
-        float inductance = -amplitude * iIm / (angularFrequency * magnitudeSquared);
+        float inductance = -amplitude * iIm / (rl.angularFrequency * magnitudeSquared);
 
         // THD-like residual (0 = perfect sinusoid), diagnostic only: demod already rejects the
         // low-frequency back-EMF, so a raised residual flags a disturbance without invalidating R/Ls.
         const float fundamentalEnergy = n * magnitudeSquared / 2.0f;
-        const float fitQuality = std::abs(sumSq - fundamentalEnergy) / fundamentalEnergy;
+        const float fitQuality = std::abs(rl.sumSq - fundamentalEnergy) / fundamentalEnergy;
 
         const float correction = (rlConfig.windingConfig == WindingConfiguration::Delta) ? deltaCoefficient : 1.0f;
         resistance *= correction;
@@ -188,10 +188,10 @@ namespace services
     {
         polePairsConfig = config;
         onPolePairsDone = onDone;
-        currentSampleIndex = 0;
-        accumulatedRotation = 0.0f;
+        pp.currentSampleIndex = 0;
+        pp.accumulatedRotation = 0.0f;
 
-        previousPosition = encoder.Read();
+        pp.previousPosition = encoder.Read();
 
         driver.Stop();
         driver.PhaseCurrentsReady(hal::Hertz{ static_cast<uint32_t>(samplingFrequencyHz) }, [](auto) {});
@@ -202,7 +202,7 @@ namespace services
     {
         const std::size_t totalSteps = polePairsConfig.electricalRevolutions * stepsPerRevolution;
 
-        if (currentSampleIndex < totalSteps)
+        if (pp.currentSampleIndex < totalSteps)
             RunPolePairLogic();
         else
             CalculatePolePairs();
@@ -210,7 +210,7 @@ namespace services
 
     void ElectricalParametersIdentificationImpl::RunPolePairLogic()
     {
-        auto electricalAngle = static_cast<float>(currentSampleIndex) * anglePerStep;
+        auto electricalAngle = static_cast<float>(pp.currentSampleIndex) * anglePerStep;
         auto voltage = static_cast<float>(polePairsConfig.testVoltagePercent.Value()) / 100.0f;
 
         driver.ThreePhasePwmOutput(NormalizedDutyCycles(transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, std::cos(electricalAngle), std::sin(electricalAngle))));
@@ -218,14 +218,14 @@ namespace services
         settleTimer.Start(polePairsConfig.settleTimeBetweenSteps, [this]()
             {
                 auto currentPosition = encoder.Read();
-                auto delta = currentPosition.Value() - previousPosition.Value();
+                auto delta = currentPosition.Value() - pp.previousPosition.Value();
 
                 delta = delta - twoPi * std::floor((delta + std::numbers::pi_v<float>) / twoPi);
 
-                accumulatedRotation += delta;
-                previousPosition = currentPosition;
+                pp.accumulatedRotation += delta;
+                pp.previousPosition = currentPosition;
 
-                currentSampleIndex++;
+                pp.currentSampleIndex++;
                 ApplyNextElectricalAngle();
             });
     }
@@ -236,7 +236,7 @@ namespace services
 
         if (onPolePairsDone)
         {
-            auto mechanicalRotation = std::abs(accumulatedRotation);
+            auto mechanicalRotation = std::abs(pp.accumulatedRotation);
 
             if (mechanicalRotation > minRotationThreshold)
             {

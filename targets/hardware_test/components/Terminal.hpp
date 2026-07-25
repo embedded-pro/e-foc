@@ -29,6 +29,11 @@ namespace application
 
         struct GuardedCommand
         {
+            GuardedCommand(CommandHandler h, bool allowed)
+                : handler(std::move(h)), allowedWhileSpinning(allowed) {}
+            GuardedCommand(GuardedCommand&&) noexcept = default;
+            GuardedCommand& operator=(GuardedCommand&&) noexcept = default;
+
             CommandHandler handler;
             bool allowedWhileSpinning{ false };
         };
@@ -84,6 +89,40 @@ namespace application
         bool IsAdcBufferPopulated() const;
         void RunFocSimulation(foc::PhaseCurrents input, foc::Radians angle);
 
+        struct PwmAdcConfig
+        {
+            hal::Hertz frequency{ 10000 };
+            std::chrono::nanoseconds deadTime{ 500 };
+            PlatformFactory::SampleAndHold sah{ PlatformFactory::SampleAndHold::shortest };
+            bool active{ false };
+        };
+
+        struct EepromData
+        {
+            std::array<uint8_t, 64> buffer{};
+            uint32_t currentReadSize{ 0 };
+        };
+
+        struct MotorPidTunings
+        {
+            controllers::PidTunings<float> speed;
+            controllers::PidTunings<float> dq;
+        };
+
+        struct RuntimeState
+        {
+            std::optional<std::size_t> polePairs{ 0 };
+            bool speedActive{ false };
+            bool canStarted{ false };
+        };
+
+        struct MotorIdentState
+        {
+            std::optional<IdentificationResults> results;
+            bool aligned{ false };
+            services::ElectricalParametersIdentification::PolePairsConfig pendingPolePairsConfig;
+        };
+
     private:
         const infra::BoundedVector<infra::BoundedConstString>::WithMaxSize<5> acceptedAdcValues{ { "shortest", "shorter", "medium", "longer", "longest" } };
         infra::BoundedVector<GuardedCommand>::WithMaxSize<24> guardedCommands;
@@ -91,31 +130,21 @@ namespace application
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
         application::PlatformFactory& hardware;
-        hal::Hertz currentPwmFrequency_{ 10000 };
-        std::chrono::nanoseconds currentPwmDeadTime_{ 500 };
-        PlatformFactory::SampleAndHold currentSah_{ PlatformFactory::SampleAndHold::shortest };
-        bool adcActive_{ false };
-        bool canStarted = false;
+        PwmAdcConfig pwmAdcConfig;
         QueueOfPhaseCurrents queueOfPhaseCurrents;
         hal::PerformanceTracker& performanceTimer;
         foc::Volts Vdc;
-        hal::Hertz systemClock;
-        controllers::PidTunings<float> speedPidTunings;
-        controllers::PidTunings<float> dqPidTunings;
-        std::optional<std::size_t> polePairs = 0;
+        MotorPidTunings pidTunings;
+        RuntimeState runtimeState;
         // foc's current-PID dt is fixed at this rate, so the live loop always reconfigures back to it.
         hal::Hertz baseFrequency_{ hardware.BaseFrequency() };
         foc::FocSpeedImpl foc;
         services::RealTimeFrictionAndInertiaEstimator onlineMechEstimator;
         services::RealTimeResistanceAndInductanceEstimator onlineElecEstimator;
-        bool speedActive_{ false };
         hal::Eeprom& eeprom;
-        std::array<uint8_t, 64> eepromBuffer{};
-        uint32_t eepromCurrentReadSize{ 0 };
+        EepromData eepromData;
         services::ElectricalParametersIdentificationImpl electricalIdent;
         services::MotorAlignmentImpl motorAlignment;
-        std::optional<IdentificationResults> identificationResults;
-        bool motorAligned{ false };
-        services::ElectricalParametersIdentification::PolePairsConfig pendingPolePairsConfig;
+        MotorIdentState motorIdentState;
     };
 }
