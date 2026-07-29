@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     container: gabrielfrasantos/embedded-devcontainer-cpp:v7.2.0@sha256:e8a23c738637da0009ab5f9d73488c5e27e6309d4f577082368dacfab49d0cf5
     env:
-      SONAR_SCANNER_VERSION: 5.0.1.3006
+      SONAR_SCANNER_VERSION: 6.2.1.4610
       SONAR_SERVER_URL: "https://sonarcloud.io"
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
@@ -36,9 +36,9 @@ jobs:
           submodules: true
       - name: Install Sonar Scanner
         run: |
-          wget -qN "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${{ env.SONAR_SCANNER_VERSION }}-linux.zip"
-          unzip -qqo "sonar-scanner-cli-${{ env.SONAR_SCANNER_VERSION }}-linux.zip"
-          echo "${PWD}/sonar-scanner-${{ env.SONAR_SCANNER_VERSION }}-linux/bin" >> "$GITHUB_PATH"
+          wget -qN "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${{ env.SONAR_SCANNER_VERSION }}-linux-x64.zip"
+          unzip -qqo "sonar-scanner-cli-${{ env.SONAR_SCANNER_VERSION }}-linux-x64.zip"
+          echo "${PWD}/sonar-scanner-${{ env.SONAR_SCANNER_VERSION }}-linux-x64/bin" >> "$GITHUB_PATH"
       - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
         with:
           key: ${{ github.job }}
