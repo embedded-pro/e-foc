@@ -11,7 +11,6 @@
 #include "hal_tiva/cortex/DataWatchpointAndTrace.hpp"
 #include "hal_tiva/cortex/SystemTickTimerService.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousAdc.hpp"
-#include "hal_tiva/synchronous_tiva/SynchronousPwm.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousQuadratureEncoder.hpp"
 #include "hal_tiva/tiva/Adc.hpp"
 #include "hal_tiva/tiva/Can.hpp"
@@ -45,7 +44,11 @@ namespace application
         void Run() override;
         services::Tracer& Tracer() override;
         services::TerminalWithCommands& Terminal() override;
-        infra::MemoryRange<hal::GpioPin> Leds() override;
+        hal::GpioPin& OperationalLed() override;
+        hal::GpioPin& WarningLed() override;
+        hal::GpioPin& FailureLed() override;
+        uint8_t BoardId() const override;
+        bool PowerStatus() const override;
         hal::PerformanceTracker& PerformanceTimer() override;
         hal::Hertz SystemClock() const override;
         foc::Volts PowerSupplyVoltage() override;
@@ -92,7 +95,7 @@ namespace application
         struct TerminalAndTracer
         {
             hal::tiva::Dma dma{ infra::emptyFunction };
-            hal::tiva::UartWithDma::Config uartConfig{ true, true, hal::tiva::UartWithDma::Baudrate::_921000_bps, hal::tiva::UartWithDma::FlowControl::none, hal::tiva::UartWithDma::Parity::none, hal::tiva::UartWithDma::StopBits::one, hal::tiva::UartWithDma::NumberOfBytes::_8_bytes, std::nullopt };
+            hal::tiva::UartWithDma::Config uartConfig{ true, true, hal::tiva::UartWithDma::Baudrate::_921000_bps, hal::tiva::UartWithDma::FlowControl::none, hal::tiva::UartWithDma::Parity::none, hal::tiva::UartWithDma::StopBits::one, hal::tiva::UartWithDma::NumberOfBytes::_8_bytes, hal::InterruptPriority::Low };
             hal::tiva::UartWithDma::WithRxBuffer<256> uart{ Peripheral::UartIndex, Pins::uartTx, Pins::uartRx, dma, uartConfig };
             services::StreamWriterOnSerialCommunication::WithStorage<8192> streamWriterOnSerialCommunication{ uart };
             infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterOnSerialCommunication };
@@ -123,23 +126,21 @@ namespace application
             static constexpr hal::tiva::Adc::SamplingDelay phaseDelay{ 4 };
             static constexpr auto currentSensingOversampling = hal::tiva::Adc::Oversampling::oversampling2;
 
-            // Steps 0–2 go to the ADC FIFO (phase currents A/B/C).
-            // Steps 3–4 are redirected to DCMP units 0 and 1 via the SSOP register and
-            // do NOT appear in the FIFO, so AdcPhaseCurrentMeasurementImpl still receives
-            // exactly 3 samples.  DCMP0/1 outputs connect to PWM FLTSRC1 bits 0/1 and
-            // tristate all motor PWM outputs instantly when a threshold is exceeded.
-            static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 5> digitalComparators{ {
-                {}, // step 0: currentPhaseA  → FIFO (noComparator)
-                {}, // step 1: currentPhaseB  → FIFO (noComparator)
-                {}, // step 2: currentPhaseC  → FIFO (noComparator)
+            // Steps 0-2 (phase currents A/B/C) go to the ADC FIFO.
+            // Step 3 is redirected to DCMP0 via the SSOP register and does NOT appear in the FIFO.
+            // DCMP0 connects to PWM FLTSRC1 bit 0 and tristates all motor PWM outputs instantly
+            // when the overcurrent threshold is exceeded. Overvoltage is monitored separately by
+            // AdcForPowerSupplyMeasurementImpl (synchronous ADC1, sequencer 0).
+            static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 4> digitalComparators{ {
+                {}, // step 0: currentPhaseA -> FIFO (noComparator)
+                {}, // step 1: currentPhaseB -> FIFO (noComparator)
+                {}, // step 2: currentPhaseC -> FIFO (noComparator)
                 { Peripheral::OvercurrentComparatorIndex, 0, Peripheral::overcurrentThresholdCounts,
-                    hal::tiva::Adc::ComparatorCondition::highBand, hal::tiva::Adc::ComparatorMode::always },
-                { Peripheral::OvervoltageComparatorIndex, 0, Peripheral::overvoltageThresholdCounts,
                     hal::tiva::Adc::ComparatorCondition::highBand, hal::tiva::Adc::ComparatorMode::always },
             } };
 
             hal::tiva::Adc::Config adcConfig{ false, 0, Peripheral::adcTrigger, hal::tiva::Adc::SampleAndHold::sampleAndHold8, std::make_optional(currentSensingOversampling), phaseDelay };
-            std::array<hal::tiva::AnalogPin, 5> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC }, hal::tiva::AnalogPin{ Pins::currentTotal }, hal::tiva::AnalogPin{ Pins::powerSupplyVoltage } } };
+            std::array<hal::tiva::AnalogPin, 4> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC }, hal::tiva::AnalogPin{ Pins::currentTotal } } };
         };
 
         struct AsyncPwmConfig
@@ -155,18 +156,10 @@ namespace application
                     hal::tiva::Pwm::Config::InterruptConfig::FaultConfig{ hal::tiva::Pwm::GeneratorIndex::generator2, uint8_t{ 0x00 }, uint8_t{ static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator0) | static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1) }, true, uint16_t{ 0 } },
                     hal::tiva::Pwm::Config::InterruptConfig::FaultConfig{ hal::tiva::Pwm::GeneratorIndex::generator3, uint8_t{ 0x00 }, uint8_t{ static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator0) | static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1) }, true, uint16_t{ 0 } },
                 } },
-                hal::InterruptPriority::Normal,
+                hal::InterruptPriority::High,
             };
 
             hal::tiva::Pwm::Config pwmConfig{ false, false, controlConfig, clockDivisor, std::make_optional(deadTimeConfig), std::make_optional(interruptConfig) };
-        };
-
-        struct SyncPwmConfig
-        {
-            hal::tiva::SynchronousPwm::Config::ClockDivisor clockDivisor{ hal::tiva::SynchronousPwm::Config::ClockDivisor::divisor8 };
-            hal::tiva::SynchronousPwm::Config::Control controlConfig{ hal::tiva::SynchronousPwm::Config::Control::Mode::centerAligned, hal::tiva::SynchronousPwm::Config::Control::UpdateMode::globally, false };
-            hal::tiva::SynchronousPwm::Config::DeadTime deadTimeConfig{ hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(1000ns, clockDivisor), hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(1000ns, clockDivisor) };
-            hal::tiva::SynchronousPwm::Config pwmConfig{ false, false, controlConfig, clockDivisor, std::make_optional(deadTimeConfig) };
         };
 
         static CanBusAdapter::CanError ToAdapterError(hal::tiva::Can::Error error)
@@ -198,22 +191,27 @@ namespace application
             }
         }
 
+        struct BoardIdentificationPins
+        {
+            hal::InputPin boardId0{ Pins::boardId0 };
+            hal::InputPin boardId1{ Pins::boardId1 };
+            hal::InputPin boardId2{ Pins::boardId2 };
+        };
+
         struct Peripherals
         {
-            Peripherals() {};
-
             hal::OutputPin performance{ Pins::performance };
+            hal::InputPin powerStatus{ Pins::powerStatus };
             Cortex cortex;
             TerminalAndTracer terminalAndTracer;
             AdcForPowerSupplyMeasurementImpl adcForPowerSupplyMeasurementImpl;
             AdcForPhaseCurrentMeasurementImpl adcForPhaseCurrentMeasurementImpl;
             AsyncPwmConfig asyncPwmConfig;
-            SyncPwmConfig syncPwmConfig;
             hal::tiva::Eeprom eepromPeripheral;
+            BoardIdentificationPins boardId;
 
             std::optional<AdcPhaseCurrentMeasurementImpl<hal::tiva::Adc>> phaseCurrentAdc;
             std::optional<hal::tiva::Pwm> asyncPwm;
-            std::optional<hal::tiva::SynchronousPwm> syncPwm;
             std::optional<QuadratureEncoderDecoratorImpl<hal::tiva::QuadratureEncoder>> encoder;
             std::optional<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<32>>> canBus;
 

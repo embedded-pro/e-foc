@@ -113,19 +113,17 @@ namespace
             if (resistanceOk)
                 EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
                     .WillOnce(Invoke([](const auto&,
-                                         const infra::Function<void(std::optional<foc::Ohm>,
-                                             std::optional<foc::MilliHenry>)>& cb)
+                                         const auto& cb)
                         {
-                            cb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+                            cb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, foc::Volts{ 0.0f }, 0.0f });
                         }));
             else
             {
                 EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
                     .WillOnce(Invoke([](const auto&,
-                                         const infra::Function<void(std::optional<foc::Ohm>,
-                                             std::optional<foc::MilliHenry>)>& cb)
+                                         const auto& cb)
                         {
-                            cb(std::nullopt, std::nullopt);
+                            cb(std::nullopt);
                         }));
                 return;
             }
@@ -648,7 +646,7 @@ TEST_F(FocStateMachineTorqueCliTest, late_resistance_callback_after_fault_is_ign
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
-    infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)> capturedCb;
+    infra::Function<void(std::optional<services::ElectricalParametersIdentification::ResistanceInductanceResult>)> capturedCb;
     EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
         .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
             {
@@ -656,8 +654,7 @@ TEST_F(FocStateMachineTorqueCliTest, late_resistance_callback_after_fault_is_ign
             }));
     EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
         .WillOnce(Invoke([&capturedCb](const auto&,
-                             const infra::Function<void(std::optional<foc::Ohm>,
-                                 std::optional<foc::MilliHenry>)>& cb)
+                             const auto& cb)
             {
                 capturedCb = cb;
             }));
@@ -668,7 +665,7 @@ TEST_F(FocStateMachineTorqueCliTest, late_resistance_callback_after_fault_is_ign
     faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 
-    capturedCb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+    capturedCb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, foc::Volts{ 0.0f }, 0.0f });
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
@@ -684,10 +681,9 @@ TEST_F(FocStateMachineTorqueCliTest, late_alignment_callback_after_fault_is_igno
             }));
     EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
         .WillOnce(Invoke([](const auto&,
-                             const infra::Function<void(std::optional<foc::Ohm>,
-                                 std::optional<foc::MilliHenry>)>& cb)
+                             const auto& cb)
             {
-                cb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+                cb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, foc::Volts{ 0.0f }, 0.0f });
             }));
     EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
         .WillOnce(Invoke([&capturedCb](std::size_t, const auto&,
@@ -718,10 +714,9 @@ TEST_F(FocStateMachineTorqueCliTest, late_nvm_save_callback_after_fault_is_ignor
             }));
     EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
         .WillOnce(Invoke([](const auto&,
-                             const infra::Function<void(std::optional<foc::Ohm>,
-                                 std::optional<foc::MilliHenry>)>& cb)
+                             const auto& cb)
             {
-                cb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+                cb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, foc::Volts{ 0.0f }, 0.0f });
             }));
     EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
         .WillOnce(Invoke([](std::size_t, const auto&,
@@ -915,19 +910,17 @@ namespace
             if (resistanceOk)
                 EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
                     .WillOnce(Invoke([](const auto&,
-                                         const infra::Function<void(std::optional<foc::Ohm>,
-                                             std::optional<foc::MilliHenry>)>& cb)
+                                         const auto& cb)
                         {
-                            cb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+                            cb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, foc::Volts{ 0.0f }, 0.0f });
                         }));
             else
             {
                 EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
                     .WillOnce(Invoke([](const auto&,
-                                         const infra::Function<void(std::optional<foc::Ohm>,
-                                             std::optional<foc::MilliHenry>)>& cb)
+                                         const auto& cb)
                         {
-                            cb(std::nullopt, std::nullopt);
+                            cb(std::nullopt);
                         }));
                 return;
             }
@@ -1397,7 +1390,7 @@ TEST_F(FocStateMachineTorqueAutoTest, late_resistance_callback_after_fault_is_ig
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
-    infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)> capturedCb;
+    infra::Function<void(std::optional<services::ElectricalParametersIdentification::ResistanceInductanceResult>)> capturedCb;
     EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
         .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
             {
@@ -1405,8 +1398,7 @@ TEST_F(FocStateMachineTorqueAutoTest, late_resistance_callback_after_fault_is_ig
             }));
     EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
         .WillOnce(Invoke([&capturedCb](const auto&,
-                             const infra::Function<void(std::optional<foc::Ohm>,
-                                 std::optional<foc::MilliHenry>)>& cb)
+                             const auto& cb)
             {
                 capturedCb = cb;
             }));
@@ -1416,7 +1408,7 @@ TEST_F(FocStateMachineTorqueAutoTest, late_resistance_callback_after_fault_is_ig
     faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 
-    capturedCb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+    capturedCb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, foc::Volts{ 0.0f }, 0.0f });
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
@@ -1432,10 +1424,9 @@ TEST_F(FocStateMachineTorqueAutoTest, late_alignment_callback_after_fault_is_ign
             }));
     EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
         .WillOnce(Invoke([](const auto&,
-                             const infra::Function<void(std::optional<foc::Ohm>,
-                                 std::optional<foc::MilliHenry>)>& cb)
+                             const auto& cb)
             {
-                cb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+                cb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, foc::Volts{ 0.0f }, 0.0f });
             }));
     EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
         .WillOnce(Invoke([&capturedCb](std::size_t, const auto&,
@@ -1465,10 +1456,9 @@ TEST_F(FocStateMachineTorqueAutoTest, late_nvm_save_callback_after_fault_is_igno
             }));
     EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
         .WillOnce(Invoke([](const auto&,
-                             const infra::Function<void(std::optional<foc::Ohm>,
-                                 std::optional<foc::MilliHenry>)>& cb)
+                             const auto& cb)
             {
-                cb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+                cb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, foc::Volts{ 0.0f }, 0.0f });
             }));
     EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
         .WillOnce(Invoke([](std::size_t, const auto&,

@@ -13,3 +13,6 @@
 [submodule "infra/can-lite"]
 	path = infra/can-lite
 	url = https://github.com/embedded-pro/can-lite.git
+[submodule "infra/e-foc-hardware"]
+	path = infra/e-foc-hardware
+	url = https://github.com/embedded-pro/e-foc-hardware

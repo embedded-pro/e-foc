@@ -159,7 +159,7 @@ namespace integration
                     capturedAlignmentCallback = cb;
                 }));
 
-        capturedRLCallback(std::optional<foc::Ohm>{ resistance }, std::optional<foc::MilliHenry>{ inductance });
+        capturedRLCallback(services::ElectricalParametersIdentification::ResistanceInductanceResult{ resistance, inductance, foc::Volts{ 0.0f }, 0.0f });
         ExecuteAllActions();
     }
 

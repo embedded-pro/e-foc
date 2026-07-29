@@ -1,7 +1,7 @@
 ---
 description: "Use when reviewing code changes in e-foc. Performs structured code review against all project standards: memory safety (no heap), real-time determinism, FOC theory correctness, motor control best practices, embedded optimizations, documentation alignment, SOLID principles, and test coverage."
 tools: [read, search]
-model: "GPT-5.4"
+model: "Claude Opus 4.8"
 handoffs:
   - label: "Fix Issues"
     agent: executor

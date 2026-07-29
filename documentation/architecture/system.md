@@ -157,9 +157,12 @@ The PAL provides a single platform-facing abstraction that groups creation and a
 | CAN bus                                     | CAN 2.0B communication interface                                |
 | Performance timer                           | Cycle/timestamp measurement interface for profiling             |
 | Serial terminal                             | Diagnostic trace and command-line interaction interface         |
+| Status LEDs                                 | Three discrete GPIO outputs: `OperationalLed` (heartbeat blink during normal operation), `WarningLed` (non-fatal condition), `FailureLed` (fault / safe-state) |
+| Board identity                              | `BoardId() const` — returns a 3-bit board ID (0–7) encoded on three active-low GPIO inputs (internal pull-ups), used as the CAN node address                   |
+| Power status                                | `PowerStatus() const` — returns `true` when the power-good signal from the power stage is asserted (high = good on an open-drain PG line with pull-up)         |
 
 Concrete implementations exist for:
-- **TI Tiva (EK-TM4C1294XL, EK-TM4C123GXL)**: platform-specific peripheral adapters under `targets/platform_implementations/ti/`.
+- **TI Tiva (EK-TM4C1294XL)**: platform-specific peripheral adapters under `targets/platform_implementations/ti/`. The TI target uses asynchronous PWM with hardware fault comparators as the only supported PWM path.
 - **ST STM32 (STM32F407G-DISC1, NUCLEO-H563ZI)**: platform-specific peripheral adapters under `targets/platform_implementations/st/`.
 - **Host / Simulator**: a software-backed platform implementation that emulates the motor-control I/O needed to run the closed-loop algorithm on a development machine, located under `targets/platform_implementations/host/`.
 

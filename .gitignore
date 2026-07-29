@@ -8,4 +8,5 @@ install/
 .venv/
 output/
 cucumber.toml
+.claude/plans/
 .megalinter_github_conf/

@@ -14,6 +14,5 @@ target_link_libraries(e_foc.services.electrical_system_ident_test PUBLIC
 
 target_sources(e_foc.services.electrical_system_ident_test PRIVATE
     TestElectricalParametersIdentification.cpp
-    TestTerminalElectricalParametersIdentification.cpp
     TestRealTimeResistanceAndInductanceEstimator.cpp
 )

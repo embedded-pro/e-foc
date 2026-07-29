@@ -15,5 +15,4 @@ target_link_libraries(e_foc.services.mechanical_system_ident_test PUBLIC
 target_sources(e_foc.services.mechanical_system_ident_test PRIVATE
     TestRealTimeFrictionAndInertiaEstimator.cpp
     TestMechanicalParametersIdentification.cpp
-    TestTerminalMechanicalParametersIdentification.cpp
 )

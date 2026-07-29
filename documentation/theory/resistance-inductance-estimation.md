@@ -2,9 +2,9 @@
 title: "Electrical Parameters Identification — Resistance and Inductance"
 type: theory
 status: approved
-version: 1.0.0
+version: 3.0.0
 component: "service-electrical-ident"
-date: 2025-01-01
+date: 2026-07-19
 ---
 
 | Field     | Value                                          |
@@ -12,9 +12,9 @@ date: 2025-01-01
 | Title     | Electrical Parameters Identification — R and L |
 | Type      | theory                                         |
 | Status    | approved                                       |
-| Version   | 1.0.0                                          |
+| Version   | 3.0.0                                          |
 | Component | service-electrical-ident                       |
-| Date      | 2025-01-01                                     |
+| Date      | 2026-07-19                                     |
 
 ## Overview
 
@@ -24,10 +24,11 @@ parameters are used to:
 2. Implement feed-forward decoupling of the dq cross-coupling terms.
 3. Estimate motor temperature from measured $R_s$ (since $R_s \propto T$).
 
-This identification procedure applies a DC voltage step to the motor aligned on the **d-axis** and
-measures the current transient. Alignment to the d-axis suppresses the back-EMF (which only appears
-on the q-axis), yielding a clean RL circuit step response. Resistance is derived from the DC
-steady-state, and inductance from the measured time constant.
+This identification procedure injects a **high-frequency (HF) sinusoidal voltage** on a fixed stator
+axis (the stationary $\alpha$-axis) and recovers $R_s$ and $L_s$ from the amplitude and phase of the
+resulting current using **synchronous demodulation**. Unlike a DC-step method, the injection is
+zero-mean so it produces **no net torque**, the rotor is not required to be clamped or aligned, and
+the demodulation **rejects** any low-frequency back-EMF caused by residual rotor motion.
 
 ---
 
@@ -36,152 +37,201 @@ steady-state, and inductance from the measured time constant.
 | Symbol     | Meaning                                             | Unit    |
 |------------|-----------------------------------------------------|---------|
 | $R_s$      | Stator resistance per phase                         | Ω       |
-| $L_s$      | Stator inductance (d-axis, $L_d$)                   | H       |
-| $\tau$     | Electrical time constant = $L_s / R_s$              | s       |
-| $V_{step}$ | Applied step voltage (d-axis)                       | V       |
-| $I_{ss}$   | Steady-state current = $V_{step} / R_s$             | A       |
-| $I_\tau$   | Current at time $\tau$: $I_{ss} \cdot (1 - e^{-1})$ | A       |
+| $L_s$      | Stator inductance ($L_d \approx L_q$ for SPMSM)     | H       |
+| $A$        | Injected $\alpha$-axis voltage amplitude            | V       |
+| $f_{inj}$  | Injection frequency                                 | Hz      |
+| $\omega$   | Injection angular frequency = $2\pi f_{inj}$        | rad/s   |
+| $I$        | Steady-state current amplitude                      | A       |
+| $\varphi$  | Current phase lag                                   | rad     |
+| $Z$        | Impedance magnitude $A/I$                            | Ω       |
 | $f_s$      | Sampling frequency                                  | Hz      |
-| $T_s$      | Sampling period = $1/f_s$                           | s       |
-| $N_{avg}$  | Moving average filter length                        | samples |
-| $N_{buf}$  | Total sample buffer size                            | samples |
+| $N$        | Number of accumulated samples (integer periods)     | samples |
+| $M$        | Number of measurement injection periods             | —       |
 
 ---
 
 ## Mathematical Foundation
 
-### 1. d-Axis Alignment and Back-EMF Suppression
+### 1. Fixed-Axis Injection and the SPMSM Non-Saliency Assumption
 
-Before applying the voltage step, the motor is aligned to $\theta_e = 0$ (rotor d-axis aligned
-with stator $\alpha$-axis). In this condition:
-
-- The back-EMF is $e_\alpha = -\psi_f \omega_e \sin(0) = 0$.
-- The q-axis current is forced to zero: $i_q = 0$.
-- Only the d-axis RL circuit is excited.
-
-The stator d-axis circuit model reduces to:
+The service injects on the stationary $\alpha$-axis with $\beta = 0$:
 
 $$
-v_d = R_s\, i_d + L_s \frac{di_d}{dt}
+V_\alpha(t) = A \sin(\omega t), \qquad V_\beta = 0, \qquad \omega = 2\pi f_{inj}
 $$
 
-This is a first-order linear system driven by a unit step of amplitude $V_{step}$.
-
-### 2. RL Step Response
-
-For a step input $v_d(t) = V_{step} \cdot u(t)$ with zero initial conditions ($i_d(0) = 0$):
+For a **surface-mounted PMSM** the rotor is magnetically non-salient ($L_d \approx L_q = L_s$), so the
+inductance seen along any fixed stator axis is the same constant $L_s$ **regardless of rotor angle**.
+No rotor alignment is therefore required. The excited-axis voltage equation is
 
 $$
-\boxed{i_d(t) = \frac{V_{step}}{R_s}\!\left(1 - e^{-t/\tau}\right)}, \qquad \tau = \frac{L_s}{R_s}
+V_\alpha = R_s\, i_\alpha + L_s \frac{di_\alpha}{dt} + e_\alpha(t)
 $$
 
-Key properties of this response:
-- At $t = \tau$: $i_d(\tau) = I_{ss}(1 - e^{-1}) \approx 0.6321 \cdot I_{ss}$
-- At $t = 5\tau$: $i_d(5\tau) \approx 0.9933 \cdot I_{ss}$ (essentially settled)
-- Slope at $t = 0$: $\left.\frac{di_d}{dt}\right|_{t=0} = \frac{V_{step}}{L_s}$
+where $e_\alpha(t)$ is the (low-frequency) back-EMF, treated below as an out-of-band disturbance.
 
-See: `documentation/theory/images/rl_step_response.svg` (generated by `documentation/tools/generate_plots.gp`)
+**Zero net torque.** A DC field on one axis exerts a constant torque that swings a free rotor,
+inducing back-EMF that corrupts a DC measurement. A zero-mean sinusoid has no DC component, exerts no
+net torque, and never pumps the rotor — which is why HF injection needs no clamp.
 
-### 3. Resistance Estimation
+### 2. AC Steady-State Impedance
 
-Once the current has fully settled to steady state (after $5\tau$):
-
-$$
-\boxed{R_s = \frac{V_{step}}{I_{ss}}}
-$$
-
-where $I_{ss}$ is measured from the mean of the last 10% of the sample buffer (to average out noise).
-
-**Noise considerations**: $R_s$ estimation is straightforward but requires:
-- Accurate current sensor calibration (ADC offset error directly biases $I_{ss}$).
-- Stable $V_{step}$ (DC bus voltage variation during measurement corrupts the result).
-- Sufficient settling time in the buffer ($N_{buf} \geq 5\tau / T_s$ samples).
-
-### 4. Inductance Estimation — Time-Constant Method
-
-The time constant $\tau = L_s / R_s$ is found by identifying the sample index $n_\tau$ where the
-current first reaches the 63.2% threshold:
+Ignoring $e_\alpha$, the linear RL circuit driven at $\omega$ has the steady-state solution
 
 $$
-i_d[n_\tau] \geq 0.6321 \cdot I_{ss}
+i_\alpha(t) = I \sin(\omega t - \varphi), \qquad
+Z = \frac{A}{I} = \sqrt{R_s^2 + (\omega L_s)^2}, \qquad
+\varphi = \operatorname{atan2}(\omega L_s,\, R_s)
 $$
 
-The time constant is then:
+so the resistance and inductance are the real and imaginary parts of the impedance:
 
 $$
-\tau = n_\tau \cdot T_s
+R_s = Z \cos\varphi, \qquad \omega L_s = Z \sin\varphi
 $$
 
-and the inductance:
+### 3. Synchronous Demodulation (Online, O(1) Memory)
+
+The measured $\alpha$-axis current (a forward Clarke transform of the three sampled phase currents) is
+correlated with sine and cosine references at $\omega$. Over an **integer** number of injection
+periods ($N = M \cdot f_s / f_{inj}$ samples), three running sums are accumulated — no per-sample
+buffer is stored:
 
 $$
-\boxed{L_s = R_s \cdot \tau = R_s \cdot n_\tau \cdot T_s}
+S = \sum_{k} i_\alpha[k]\sin\theta_k, \quad
+C = \sum_{k} i_\alpha[k]\cos\theta_k, \quad
+\Sigma_2 = \sum_{k} i_\alpha[k]^2, \qquad \theta_k = \omega\,k/f_s \pmod{2\pi}
 $$
 
-#### Moving Average Filter Correction
-
-A causal moving average filter of length $N_{avg}$ is applied to the raw current samples before
-threshold detection:
+Using $\langle \sin^2 \rangle = \tfrac12$ and $\langle \sin\theta\cos\theta \rangle = 0$ over integer
+periods:
 
 $$
-\bar{i}[n] = \frac{1}{N_{avg}} \sum_{k=0}^{N_{avg}-1} i[n-k]
+I_{re} = \frac{2S}{N} = I\cos\varphi, \qquad
+I_{im} = \frac{2C}{N} = -\,I\sin\varphi, \qquad
+D = I_{re}^2 + I_{im}^2 = I^2
 $$
 
-This FIR filter introduces a lag of $(N_{avg} - 1)/2$ samples. The threshold index is corrected:
+### 4. Closed-Form Recovery
+
+Substituting $A = ZI$ and the identities of Section 2:
 
 $$
-n_\tau^{corrected} = n_\tau - \left\lfloor \frac{N_{avg} - 1}{2} \right\rfloor - 1
+\boxed{R_s = \frac{A\, I_{re}}{D}}, \qquad
+\boxed{L_s = \frac{-\,A\, I_{im}}{\omega\, D}}
 $$
 
-Without this correction, $\tau$ is overestimated by the filter group delay, leading to an overestimate
-of $L_s$.
+Indeed $A I_{re}/D = (ZI)(I\cos\varphi)/I^2 = Z\cos\varphi = R_s$, and
+$-A I_{im}/(\omega D) = (ZI)(I\sin\varphi)/(\omega I^2) = Z\sin\varphi/\omega = L_s$.
 
-**Filter trade-off**: larger $N_{avg}$ reduces noise variance $\propto 1/N_{avg}$ but increases the
-index correction and requires a corresponding increase in buffer size $N_{buf}$.
+**Winding topology.** For a Delta connection the terminals measure $\tfrac{2}{3}$ of the per-phase
+value for both quantities; the phase values are recovered with $R_\phi = R_{terminal}\,k_\Delta$ and
+$L_\phi = L_{terminal}\,k_\Delta$, $k_\Delta = 1.5$.
 
-### 5. Pole Pair Estimation
+**Amplitude scaling.** For a center-aligned half-bridge the phase-to-midpoint voltage amplitude is
+$\text{modIndex}\cdot V_{dc}/2$, where the $\alpha$ modulation index equals
+$\text{injectionVoltagePercent}/100$ (inverse Clarke maps $\alpha$ to phase A one-to-one). The applied
+amplitude used in the closed form is $A = \text{modIndex}\cdot V_{dc}/2$. The modulation index is
+clamped so that every leg duty stays within a samplable window at the injection peaks.
+
+### 5. Back-EMF Rejection
+
+Because the sums span an **integer** number of injection periods, any spectral component at a
+frequency $\neq f_{inj}$ integrates toward zero. Rotor oscillation appears as a $\sim$1–2 Hz back-EMF
+(from on-rig logs); at $f_{inj} = 250\,\text{Hz}$ this is $\sim$125× away, so its contribution to
+$S$ and $C$ — and hence to $R_s$ and $L_s$ — is negligible. Increasing $M$ lowers the residual
+leakage further.
+
+### 6. Fit Quality (Diagnostic Only)
+
+A THD-like residual quantifies how sinusoidal the measured current was:
+
+$$
+\text{fitQuality} = \frac{\bigl|\,\Sigma_2 - N I^2/2\,\bigr|}{N I^2/2}
+$$
+
+The demodulated fundamental carries energy $N I^2/2$; any excess is distortion or out-of-band
+disturbance (0 = perfect sinusoid). This is **reported as a diagnostic only** and does not invalidate
+$R_s$ or $L_s$: synchronous demodulation has already rejected out-of-band content from the parameter
+estimates, so a raised residual flags a disturbance (rotor motion, saturation, dead-time distortion)
+rather than a bad measurement.
+
+### 7. PWM-to-ADC Pipeline Lag Compensation
+
+On real hardware the duty commanded in callback $k$ drives the current that is sampled in callback
+$k+1$: the current measured now was produced by a voltage commanded roughly one sample earlier.
+Demodulating the sampled current against the **current** injection phase therefore introduces a phase
+error
+
+$$
+\varepsilon = 2\pi\,\frac{f_{inj}}{f_s}
+$$
+
+($\approx 9°$ at the defaults $f_{inj}=250\,\text{Hz}$, $f_s=10\,\text{kHz}$). Uncompensated this biases
+the recovered resistance to $R_{meas} = Z\cos(\varphi + \varepsilon)$ instead of $Z\cos\varphi$ — about
+$-34\%$ at the reference rig point ($\varphi \approx 64.5°$).
+
+The **applied** voltage keeps using the live injection phase, $V_\alpha = A\sin(\theta_{inj})$. The
+**demodulation reference** instead uses the phase that produced the sampled current,
+
+$$
+\theta_{demod} = \theta_{inj} - d\cdot\Delta\theta \pmod{2\pi}, \qquad \Delta\theta = 2\pi f_{inj}/f_s
+$$
+
+where $d$ = `voltageToCurrentDelaySamples` (default **1**). With $d$ matched to the pipeline depth the
+phase error cancels and $R_{meas} = Z\cos\varphi = R_s$. The default of 1 sample fits the async
+PWM/ADC hal, but it is **rig-calibrated**: the operator can tune $d$ until the measured $R$ matches a
+multimeter DC-resistance reading of the winding.
+
+### 8. Injection-Frequency Selection
+
+Three constraints pull on $f_{inj}$:
+
+1. **Integer samples per period** — $f_{inj}$ must divide $f_s$ so each window is an exact integer
+   number of periods. At $f_s = 10\,\text{kHz}$ the valid options are 200 / 250 / 500 Hz
+   (50 / 40 / 20 samples/period).
+2. **Conditioning and current SNR** — $Z = \sqrt{R_s^2 + (\omega L_s)^2}$ becomes inductance-dominated
+   at high $f_{inj}$, shrinking the current and separating $R_s$ poorly. Best conditioning is at
+   $\omega L_s \approx (1\text{–}3) R_s$ (i.e. $\varphi \approx 45°\text{–}70°$).
+3. **Back-EMF margin** — $f_{inj}$ must sit far above the rotor-oscillation frequency.
+
+For the reference rig ($R_s \approx 1.5\,\Omega$, $L_s \approx 2\,\text{mH}$) these give $\sim$120–350 Hz;
+the default is **250 Hz** ($\omega L_s \approx 3.1\,\Omega$, $I \approx 0.3\text{–}0.5\,\text{A}$).
+
+### 9. Pole Pair Estimation
 
 The number of electrical cycles per mechanical revolution equals the number of pole pairs $p$.
-During the multi-step alignment sweep, the motor is driven through exactly 12 electrical steps over
-one full electrical revolution ($2\pi$ electrical). The encoder counts $C_{mech}$ per step multiplied
-by $N_{steps} = 12$ gives the total encoder counts per full electrical cycle. Dividing by the known
-encoder counts per mechanical revolution $C_{rev}$ gives:
+An open-loop voltage vector is rotated through a known number of full electrical revolutions and the
+total mechanical rotation is measured by the encoder. Over the sweep the total electrical angle spans
+$2\pi N_{rev}$ electrical, which corresponds to $2\pi N_{rev}/p$ mechanical, so:
 
 $$
-p = \frac{C_{rev}}{12 \cdot C_{per\_step}} \quad \text{(integer, rounded)}
+p = \operatorname{round}\!\left(\frac{N_{rev}}{\Delta\theta_{mech,total} / 2\pi}\right)
 $$
 
-or equivalently, the total electrical angle traversed over the full 12-step sweep spans exactly
-$2\pi$ electrical = $2\pi/p$ mechanical, so:
+where $\Delta\theta_{mech,total}$ is the measured total mechanical rotation. This procedure is purely
+kinematic and is unchanged by the HF impedance method.
 
-$$
-p = \frac{2\pi}{\Delta\theta_{mech,total}}
-$$
-
-where $\Delta\theta_{mech,total}$ is the measured total mechanical rotation during the sweep.
-
-### 6. Complete Identification Sequence
+### 10. Complete Identification Sequence
 
 ```
-1. Drive alignment: rotate field through N_steps to θ_e = 0.
-   Record encoder offset θ_offset (see alignment theory).
+1. Compute injection parameters: modIndex = injectionVoltagePercent/100 (clamped),
+   omega = 2*pi*f_inj, samples/period = f_s / f_inj (must be integer).
 
-2. Apply step voltage V_step on d-axis (i_q* = 0, v_d = V_step).
+2. Arm current sampling at f_s. Each callback:
+     a. Emit V_alpha = A*sin(theta_inj) via inverse Clarke + centered duties (applied phase).
+     b. After the warm-up periods, accumulate S, C, sumSq from i_alpha = Clarke.Forward(phases),
+        demodulating against theta_demod = theta_inj - d*delta_theta (d = voltageToCurrentDelaySamples).
+     c. Advance both phases; stop after (warmup + measurement) periods.
 
-3. Sample i_d at f_s = 10 kHz for N_buf samples.
+3. I_re = 2S/N, I_im = 2C/N, D = I_re^2 + I_im^2.
+   Reject if sqrt(D) is below the min-current floor.
 
-4. Apply moving average filter (length N_avg = 5) to samples.
+4. R_s = A*I_re/D,  L_s = -A*I_im/(omega*D).
+   Apply the Delta winding correction (k = 1.5) when configured.
+   Reject if R_s <= 0 or L_s <= 0.
 
-5. Find steady-state current I_ss from mean of last 10% of buffer.
-
-6. Compute R_s = V_step / I_ss.
-
-7. Find first index n_τ where i_d[n] ≥ 0.6321 · I_ss.
-
-8. Correct for filter delay: n_τ_corr = n_τ − ⌊(N_avg−1)/2⌋ − 1.
-
-9. Compute τ = n_τ_corr · T_s, L_s = R_s · τ [H].
-   Express L_s in mH: L_s_mH = R_s · n_τ_corr / f_s · 1000.
+5. Report { R_s, L_s, 0 (offset), fitQuality }.
 ```
 
 ---
@@ -192,38 +242,31 @@ where $\Delta\theta_{mech,total}$ is the measured total mechanical rotation duri
 
 ```mermaid
 graph TD
-    A[Set θ_e = 0\nAlign rotor to d-axis] --> B[Apply V_step\non d-axis\ni_q* = 0]
-    B --> C[Sample i_d\nf_s = 10 kHz\nN_buf samples]
-    C --> D[Moving Average\nFilter\nN_avg = 5]
-    D --> E[Find I_ss\nmean of last 10%]
-    D --> F[Find n_τ\nfirst sample ≥ 63.2% I_ss]
-    E --> G[R_s = V_step / I_ss]
-    F --> H[n_τ_corr = n_τ − delay]
-    G --> I[L_s = R_s · n_τ_corr · T_s]
-    H --> I
+    A[Inject V_alpha = A sin(wt)\nalpha-axis, beta = 0] --> B[Sample phase currents\ni_alpha = Clarke.Forward]
+    B --> C[Warm-up periods:\ndemodulate, discard]
+    C --> D[Measurement periods:\naccumulate S, C, sumSq]
+    D --> E[I_re = 2S/N, I_im = 2C/N\nD = I_re^2 + I_im^2]
+    E --> F{sqrt(D) above\nmin-current floor?}
+    F -- no --> G[nullopt]
+    F -- yes --> H[R_s = A I_re / D\nL_s = -A I_im / (w D)]
+    H --> I[Delta correction\n+ fitQuality diagnostic]
+    I --> J[Report R_s, L_s, 0, quality]
 ```
 
-### RL Step Response — ASCII Approximation
+### AC Steady-State Current — ASCII Approximation
 
 ```
-i_d (normalised: I_ss = 1.0)
-  │
-1.0├───────────────────────────────── I_ss = V/R (steady state)
-   │                       ──────────
-0.86├──────────────────────/
-   │                     /
-0.63├────────────────────/ ← i(τ) = 0.632·I_ss
-   │                   /
-   │                  /
-0.39├─────────────────/
-   │               /
-   │             /
-   │           /
-0.0├───────────
-   └───────────────────────────────── samples (n·T_s)
-       0      τ/T_s   2τ/T_s  5τ/T_s
-              ↑
-          n_τ (63.2% crossing) — filter delay correction applied
+V_alpha, i_alpha (normalised)
+   │      V_alpha = A sin(wt)
+ +1├      .-''-.            .-''-.
+   │    .'      '.        .'      '.
+   │   /          \      /          \
+  0├--/------------\----/------------\----  wt
+   │ /              \  /              \
+   │'                ''                '
+ -1├   i_alpha = I sin(wt - phi)  (lags by phi)
+
+phi = atan2(w Ls, R);  R = Z cos phi;  w Ls = Z sin phi
 ```
 
 ---
@@ -232,61 +275,77 @@ i_d (normalised: I_ss = 1.0)
 
 | Property             | Value / Condition                                            |
 |----------------------|--------------------------------------------------------------|
-| Sampling rate        | $f_s = 10\ \text{kHz}$, $T_s = 100\ \mu\text{s}$             |
-| Filter length        | $N_{avg} = 5$ samples                                        |
-| Filter group delay   | $(N_{avg}-1)/2 = 2$ samples = $200\ \mu\text{s}$             |
-| Threshold            | $0.6321 \cdot I_{ss}$ (i.e. $1 - e^{-1}$)                    |
-| $R_s$ range          | Nominally $0.1\ \Omega$ to $50\ \Omega$ (ADC current range)  |
-| $L_s$ resolution     | $R_s \cdot T_s$ (one sample step) = depends on $R_s$         |
-| $L_s$ min detectable | Approx. $R_s \cdot 2 T_s$ (due to filter delay correction)   |
-| Trigger voltage      | $V_{step}$ must be small enough to avoid magnetic saturation |
+| Sampling rate        | $f_s = 10\ \text{kHz}$                                       |
+| Injection frequency  | default $250\ \text{Hz}$ (must divide $f_s$)                 |
+| Injection amplitude  | default $15\%$ modulation, clamped to a safe duty window     |
+| Warm-up periods      | $10$ (AC transient decay before accumulation)               |
+| Measurement periods  | $50$ (integer — sets demodulation window $N$)               |
+| PWM→ADC delay        | `voltageToCurrentDelaySamples` default $1$ (rig-calibrated)  |
+| Memory               | O(1): three float accumulators, no sample buffer            |
+| Min-current floor    | $\approx 0.05\ \text{A}$ demodulated magnitude               |
+| $R_s$ / $L_s$ recovery | closed form from in-phase / quadrature current             |
+| Fit-quality          | THD-like residual, reported as diagnostic (not a gate)      |
 
 ### Sensitivity Analysis
 
-| Source of Error            | Effect on $R_s$                      | Effect on $L_s$                          |
-|----------------------------|--------------------------------------|------------------------------------------|
-| ADC current offset         | Directly biases $I_{ss}$             | Indirect via $R_s$ error                 |
-| $V_{dc}$ variation         | Biases $V_{step}$                    | Indirect via $R_s$ error                 |
-| Thermal drift in $R_s$     | Measurement valid at $T_{meas}$ only | —                                        |
-| Filter delay not corrected | —                                    | $L_s$ overestimated by $N_{avg}/2$ steps |
-| Insufficient buffer        | $I_{ss}$ underestimated              | $\tau$ underestimated                    |
-| Magnetic saturation        | $R_s$ underestimated                 | $L_s$ underestimated (nonlinear)         |
+| Source of Error         | Effect on $R_s$                                                                                                                       | Effect on $L_s$                            |
+|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------|
+| Low-frequency back-EMF  | Rejected by integer-period demodulation                                                                                               | Rejected by integer-period demodulation    |
+| ADC current offset (DC) | Rejected (orthogonal to $\sin/\cos$)                                                                                                  | Rejected (orthogonal to $\sin/\cos$)       |
+| PWM→ADC pipeline lag    | $\varepsilon = 2\pi f_{inj}/f_s$ biases $R$ ($\cos(\varphi+\varepsilon)/\cos\varphi$); compensated via `voltageToCurrentDelaySamples` | Compensated with the same lagged reference |
+| Inverter dead-time      | Small apparent-$R$ bias (in phase)                                                                                                    | Indirect                                   |
+| $V_{dc}$ variation      | Biases $A$ (kept brief to limit drift)                                                                                                | Biases $A$                                 |
+| High $f_{inj}$          | Poor $R_s$ separation (low current)                                                                                                   | Well conditioned                           |
+| Magnetic saturation     | $R_s$ / $L_s$ underestimated (nonlinear)                                                                                              | $L_s$ underestimated (nonlinear)           |
+| Rotor saliency (IPMSM)  | Axis-dependent $L$ — not separated                                                                                                    | Reports a single blended $L_s$             |
 
 ---
 
 ## Worked Example
 
-Motor: $V_{step} = 2\ \text{V}$, $R_s = 1.2\ \Omega$, $L_s = 0.6\ \text{mH}$,
-$f_s = 10\ \text{kHz}$, $N_{avg} = 5$.
+Motor: $R_s = 1.5\,\Omega$, $L_s = 2\,\text{mH}$, $V_{dc} = 24\,\text{V}$, $f_{inj} = 250\,\text{Hz}$,
+injection $15\%$ modulation.
 
-**Expected results:**
+**Applied amplitude:** $A = 0.15 \times 24/2 = 1.8\,\text{V}$.
 
-$$I_{ss} = \frac{2}{1.2} \approx 1.667\ \text{A}$$
+**Impedance and current:**
 
-$$\tau = \frac{L_s}{R_s} = \frac{0.6 \times 10^{-3}}{1.2} = 0.5\ \text{ms} = 5\ T_s$$
+$$
+\omega = 2\pi \cdot 250 = 1570.8\ \text{rad/s}, \quad
+\omega L_s = 3.14\,\Omega, \quad
+Z = \sqrt{1.5^2 + 3.14^2} = 3.48\,\Omega, \quad
+I = A/Z = 0.517\,\text{A}
+$$
 
-At the 63.2% threshold: $i_d[n_\tau] \geq 0.6321 \times 1.667 = 1.054\ \text{A}$
+**Phase:** $\varphi = \operatorname{atan2}(3.14, 1.5) = 1.126\ \text{rad}\ (64.5°)$.
 
-The raw crossing occurs at $n_\tau = 5$. Filter delay correction: $n_\tau^{corr} = 5 - 2 - 1 = 2$.
+**Demodulated components:** $I_{re} = I\cos\varphi = 0.223\,\text{A}$,
+$I_{im} = -I\sin\varphi = -0.467\,\text{A}$, $D = I^2 = 0.267\,\text{A}^2$.
 
-$$L_{s,\mathrm{mH}} = 1.2 \times 2 \times 100 \times 10^{-6} \times 1000 = 0.24\ \text{mH}$$
+**Recovery:**
 
-> The example shows that a very short $\tau$ (5 samples) combined with a 5-tap filter and a
-> 2-sample delay correction can yield significant estimation error. In practice $\tau$ should be
-> at least 15–20 samples for accurate identification.
+$$
+R_s = \frac{1.8 \times 0.223}{0.267} = 1.50\,\Omega, \qquad
+L_s = \frac{-1.8 \times (-0.467)}{1570.8 \times 0.267} = 2.0\times10^{-3}\,\text{H}
+$$
+
+both matching the true values exactly (the phase lag $\varphi$ carries the $R_s$/$L_s$ split; the
+amplitude carries $Z$).
 
 ---
 
 ## Limitations & Assumptions
 
-- **Assumes**: The rotor is aligned to the d-axis ($\theta_e = 0$, $\dot\theta = 0$). Any rotor
-  motion during identification overlays a back-EMF on the d-axis current.
-- **Assumes**: $L_d \approx L_q$ (surface-mounted PMSM). For interior PMSM, the step must be
-  repeated on both axes if the design requires both $L_d$ and $L_q$.
-- **Assumes**: Magnetic linearity (no saturation). The identification current $I_d^{step}$ must
-  be kept below the saturation current.
+- **Assumes**: $L_d \approx L_q$ (surface-mounted PMSM), so a fixed-axis injection sees a constant
+  $L_s$ and no alignment is needed. For interior PMSM (IPMSM), separating $L_d$ and $L_q$ requires a
+  rotating HF injection or explicit q-axis excitation — this is future work; the current method reports
+  a single blended $L_s$.
+- **Assumes**: Magnetic linearity (no saturation). The injection amplitude keeps the current below the
+  saturation current.
+- **Assumes**: $f_{inj}$ divides $f_s$ so the demodulation window is an exact integer number of periods.
+- **Does not handle**: Inverter dead-time / voltage-offset identification (a small apparent-$R$ bias
+  remains; full dead-time compensation is future work).
 - **Does not handle**: Temperature-dependent $R_s$ variation during operation.
-- **Does not handle**: Identification at running speed where back-EMF cannot be zeroed by alignment alone.
 
 ## References
 

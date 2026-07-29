@@ -75,3 +75,23 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 - Target cycle budgets: FOC loop should complete in <400 cycles at 120 MHz for 20 kHz control rate.
 
 If any section appears incomplete or you want deeper coverage (build-on-target, hardware flashing steps, or CI specifics), tell me which area to expand.
+
+11) Response style (mandatory)
+- Be maximally concise. No preamble, no recap of the request, no closing summary.
+- Never restate or re-print code you haven't changed. Show only the modified
+  lines/functions, or a diff. Do not echo entire files back.
+- When editing, make targeted edits. Never rewrite a whole file to change a few lines.
+- Explanations only when asked, and max 2-3 sentences. Prefer code over prose.
+- No bullet-point summaries of "what I did" after edits — the diff speaks for itself.
+- Do not add code comments explaining obvious things; comment only non-trivial
+  invariants (fixed-point ranges, ISR constraints).
+- One clarifying question max; otherwise proceed with the most reasonable assumption
+  and state it in one line.
+
+12) Context discipline
+- Do not scan the whole workspace unless explicitly asked. Read only the files
+  named in the prompt plus their direct interfaces in core/*/interfaces/.
+- Do not open infra/embedded-infra-lib/ or infra/numerical-toolbox/ sources unless
+  the task touches them — assume BoundedVector/BoundedString semantics are known.
+- Prefer grep/symbol search over reading entire files; read the smallest relevant range.
+- Do not re-read files already in context this session.

@@ -42,7 +42,7 @@ cmake --preset coverage
 cmake --build --preset coverage
 ```
 
-All presets are defined in `CMakePresets.json`. Available configure presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1`, `NUCLEO-H563ZI`.
+All presets are defined in `CMakePresets.json`. Available configure presets: `host`, `coverage`, `EK-TM4C1294XL`, `STM32F407G-DISC1`, `NUCLEO-H563ZI`.
 
 ## 3. Project-Specific Constraints (must follow)
 
@@ -82,10 +82,11 @@ Apply `OPTIMIZE_FOR_SPEED` (from `numerical/math/CompilerOptimizations.hpp`) to 
 - Avoid large implementations in headers; keep non-trivial logic in `.cpp` files. Small `inline`/`constexpr` helpers in headers are allowed (and common in hot paths).
 - Prefer `{}` initialization over `()` for all variables and member data.
 - `const` on all non-mutating methods, `constexpr` for motor constants and lookup tables.
+- **Comments**: add one only when the *why* is non-obvious. Never write comments that restate what the code does, narrate steps, or label the obvious — no filler. When in doubt, leave it out.
 
 ## 4. FOC Theory — Correctness
 
-- **Clarke**: `Iα = (2/3)·(Ia - (Ib+Ic)/2)`, `Iβ = (Ib - Ic)/√3` (power-invariant, all 3 phases used)
+- **Clarke**: `Iα = (2/3)·(Ia - (Ib+Ic)/2)`, `Iβ = (Ib - Ic)/√3` (amplitude-invariant, all 3 phases used)
 - **Park**: `Id = Iα·cos(θ) + Iβ·sin(θ)`, `Iq = -Iα·sin(θ) + Iβ·cos(θ)`
 - **Electrical angle**: `θe = θm · pole_pairs`
 - **Anti-windup**: All PID integrators must have clamping or back-calculation
@@ -176,7 +177,9 @@ namespace foc
 
 Use the agents in `.claude/agents/` for structured development workflows:
 
-- **orchestrator** — Triage and route incoming development tasks
-- **planner** — Create detailed implementation plans before writing code
-- **executor** — Implement code changes following all project constraints
-- **reviewer** — Review code changes against project standards
+- **orchestrator** — Returns a triage report and routing recommendation; the main agent acts on it
+- **planner** — Creates a detailed implementation plan, writes it to `.claude/plans/<task>.md`
+- **executor** — Implements code changes; reads plan from `.claude/plans/<task>.md` when available
+- **reviewer** — Reviews code changes against project standards
+
+**Before dispatching planner or executor**: confirm with the user — control mode (torque/speed/position), hardware target (EK-TM4C1294XL, STM32, or host sim), and acceptance criteria. Subagents cannot ask clarifying questions interactively.

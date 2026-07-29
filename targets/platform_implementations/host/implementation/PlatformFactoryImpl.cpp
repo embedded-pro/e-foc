@@ -1,6 +1,5 @@
 #include "targets/platform_implementations/host/implementation/PlatformFactoryImpl.hpp"
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
-#include "infra/util/MemoryRange.hpp"
 #include <cstdlib>
 
 namespace application
@@ -23,9 +22,29 @@ namespace application
         return terminalAndTracer.terminal;
     }
 
-    infra::MemoryRange<hal::GpioPin> PlatformFactoryImpl::Leds()
+    hal::GpioPin& PlatformFactoryImpl::OperationalLed()
     {
-        return infra::MakeRangeFromSingleObject(pin);
+        return operationalPin;
+    }
+
+    hal::GpioPin& PlatformFactoryImpl::WarningLed()
+    {
+        return warningPin;
+    }
+
+    hal::GpioPin& PlatformFactoryImpl::FailureLed()
+    {
+        return failurePin;
+    }
+
+    uint8_t PlatformFactoryImpl::BoardId() const
+    {
+        return 0;
+    }
+
+    bool PlatformFactoryImpl::PowerStatus() const
+    {
+        return true;
     }
 
     hal::PerformanceTracker& PlatformFactoryImpl::PerformanceTimer()
