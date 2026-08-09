@@ -10,8 +10,6 @@ namespace foc
     FocPositionImpl::FocPositionImpl(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)
         : FocWithSpeedLoop(maxCurrent, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency)
     {
-        positionPid.Enable();
-
         GetLowPriorityInterrupt().Register([this]()
             {
                 LowPriorityHandler();
@@ -66,7 +64,7 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     void FocPositionImpl::Enable()
     {
-        positionPid.Enable();
+        positionPid.Reset();
         EnableSpeedLoop();
         SetPoint(lastPositionSetPoint);
     }
@@ -74,7 +72,6 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     void FocPositionImpl::Disable()
     {
-        positionPid.Disable();
         DisableSpeedLoop();
     }
 

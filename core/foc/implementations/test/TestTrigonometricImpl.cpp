@@ -14,12 +14,6 @@ namespace
     {
     };
 
-    class TestTrigonometricFunctions
-        : public ::testing::Test
-    {
-    public:
-        foc::TrigonometricFunctions trig;
-    };
 }
 
 TEST_F(TestFastTrigonometry, sine_zero)
@@ -108,31 +102,6 @@ TEST_F(TestFastTrigonometry, phase_positive_imaginary_axis)
 TEST_F(TestFastTrigonometry, phase_negative_real_axis)
 {
     EXPECT_NEAR(foc::FastTrigonometry::Phase(-1.0f, 0.0f), pi, exactTolerance);
-}
-
-TEST_F(TestTrigonometricFunctions, sine_delegates_to_fast_trigonometry)
-{
-    float angle = pi / 4.0f;
-    EXPECT_NEAR(trig.Sine(angle), foc::FastTrigonometry::Sine(angle), exactTolerance);
-}
-
-TEST_F(TestTrigonometricFunctions, cosine_delegates_to_fast_trigonometry)
-{
-    float angle = pi / 3.0f;
-    EXPECT_NEAR(trig.Cosine(angle), foc::FastTrigonometry::Cosine(angle), exactTolerance);
-}
-
-TEST_F(TestTrigonometricFunctions, arctangent_delegates_to_fast_trigonometry)
-{
-    float value = 0.5f;
-    EXPECT_NEAR(trig.Arctangent(value), foc::FastTrigonometry::Arctangent(value), exactTolerance);
-}
-
-TEST_F(TestTrigonometricFunctions, phase_delegates_to_fast_trigonometry)
-{
-    float real = 1.0f;
-    float imag = 1.0f;
-    EXPECT_NEAR(trig.Phase(real, imag), foc::FastTrigonometry::Phase(real, imag), exactTolerance);
 }
 
 // ── Negative-angle tests ──────────────────────────────────────────────────────

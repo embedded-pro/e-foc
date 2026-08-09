@@ -17,16 +17,14 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     void FocTorqueImpl::Enable()
     {
-        dPid.Enable();
-        qPid.Enable();
+        dPid.Reset();
+        qPid.Reset();
         SetPoint(lastSetPoint);
     }
 
     OPTIMIZE_FOR_SPEED
     void FocTorqueImpl::Disable()
     {
-        dPid.Disable();
-        qPid.Disable();
     }
 
     void FocTorqueImpl::SetPolePairs(std::size_t polePairs)

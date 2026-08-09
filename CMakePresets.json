@@ -89,6 +89,7 @@
                 "EMIL_INCLUDE_SEGGER_RTT": "On",
                 "EMIL_SEGGER_RTT_BUFFER_SIZE_UP": "2048",
                 "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": true,
+                "NUMERICAL_TOOLBOX_ENABLE_CUSTOM_MATH": true,
                 "E_FOC_EMBEDDED_BUILD": true
             },
             "generator": "Ninja Multi-Config"
