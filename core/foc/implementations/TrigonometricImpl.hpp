@@ -2,7 +2,6 @@
 
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "numerical/math/Math.hpp"
-#include "numerical/math/TrigonometricFunctions.hpp"
 #include <array>
 #include <cstdint>
 #include <numbers>
@@ -126,13 +125,4 @@ namespace foc
         }
     };
 
-    class TrigonometricFunctions
-        : public math::TrigonometricFunctions<float>
-    {
-    public:
-        float Cosine(const float& angle) const override;
-        float Sine(const float& angle) const override;
-        float Arctangent(const float& value) const override;
-        float Phase(const float& real, const float& imag) const override;
-    };
 }

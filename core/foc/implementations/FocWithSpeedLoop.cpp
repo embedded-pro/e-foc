@@ -18,10 +18,6 @@ namespace foc
         really_assert(lowPriorityFrequency.Value() > 0);
         really_assert(lowPriorityFrequency.Value() <= baseFrequency.Value());
         really_assert(baseFrequency.Value() % lowPriorityFrequency.Value() == 0);
-
-        speedPid.Enable();
-        dPid.Enable();
-        qPid.Enable();
     }
 
     OPTIMIZE_FOR_SPEED
@@ -63,9 +59,9 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     void FocWithSpeedLoop::EnableSpeedLoop()
     {
-        speedPid.Enable();
-        dPid.Enable();
-        qPid.Enable();
+        speedPid.Reset();
+        dPid.Reset();
+        qPid.Reset();
 
         currentMechanicalAngle = 0.0f;
         previousSpeedPosition = 0.0f;
@@ -76,9 +72,6 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     void FocWithSpeedLoop::DisableSpeedLoop()
     {
-        speedPid.Disable();
-        dPid.Disable();
-        qPid.Disable();
     }
 
     OPTIMIZE_FOR_SPEED
