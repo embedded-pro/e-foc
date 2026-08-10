@@ -64,6 +64,24 @@ See `documentation/theory/foc-plant-models.md` for all base symbols.
 
 ---
 
+## Mathematical Foundation
+
+All three algorithms operate on the **discrete mechanical speed plant** from
+`documentation/theory/foc-plant-models.md` Section 2. Treating the current loop as ideal
+($i_q \approx i_q^*$), the speed dynamics under control input $u = i_q^*$ are:
+
+$$
+\omega_m[k+1] = A_d^o \cdot \omega_m[k] + B_d^o \cdot u[k], \quad
+A_d^o \approx 1 - \frac{B_f T_s^o}{J},\quad B_d^o = \frac{K_t T_s^o}{J}
+$$
+
+The unknown load torque $T_L/J$ enters as a state perturbation. S1 (LQI) addresses it via an
+integral augmentation state. S2 (ADRC) estimates it in real time with an Extended State Observer
+and cancels it before the control law sees it. S3 (Two-DOF) separates its rejection from the
+command-tracking design using a reference pre-filter.
+
+---
+
 ## S1 — LQI Speed Control
 
 **Motivation**: A PI speed controller is heuristically tuned and its gains have no direct physical
@@ -167,10 +185,11 @@ $1/\omega_o$ seconds — typically an order of magnitude faster than integral ac
 **Relation to toolbox**: `ActiveDisturbanceRejectionControl<float,2>` implements this ESO and
 control law. `Compute(ω_ref, ω_meas)` is called once per 1 kHz handler cycle.
 
+<!-- tikz:diagrams/speed-loop-adrc.tex -->
 ```mermaid
 graph LR
     W_REF["ω*"] --> U0["u₀ = ωc(ω*-ω̂)"]
-    ESO["ESO\n(ω_meas, u_prev)"] --> XHAT["ω̂, f̂"]
+    ESO["ESO"] --> XHAT["ω̂, f̂"]
     XHAT --> U0
     XHAT --> CANCEL["u = (u₀-f̂)/b₀"]
     U0 --> CANCEL
@@ -178,6 +197,7 @@ graph LR
     W_MEAS["ωm"] --> ESO
     IQ --> ESO
 ```
+<!-- /tikz -->
 
 ---
 

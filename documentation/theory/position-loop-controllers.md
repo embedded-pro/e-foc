@@ -70,6 +70,25 @@ See `documentation/theory/foc-plant-models.md` for all base symbols.
 
 ---
 
+## Mathematical Foundation
+
+All position-loop controllers operate on the **discrete two-state position plant** from
+`documentation/theory/foc-plant-models.md` Section 3:
+
+$$
+\begin{pmatrix} \theta_m[k+1] \\ \omega_m[k+1] \end{pmatrix}
+= A_d^p \begin{pmatrix} \theta_m[k] \\ \omega_m[k] \end{pmatrix} + B_d^p\,u[k], \quad
+A_d^p = \begin{pmatrix} 1 & T_s^o \\ 0 & A_d^o \end{pmatrix},\;
+B_d^p = \begin{pmatrix} 0 \\ B_d^o \end{pmatrix}
+$$
+
+The control input $u = i_q^*$ is passed to the speed loop (Cascade P, Two-DOF) or directly to
+the current loop (LQR/LQI in direct torque mode). P4 (ILC) augments any stable feedback
+controller with a per-sample learned feedforward. Friction compensation adds a nonlinear Iq
+correction outside the linear plant model.
+
+---
+
 ## P1 — LQR / LQI Position Control
 
 **Motivation**: A position P-controller on top of a speed PI gives ad-hoc gain selection with no
@@ -110,14 +129,16 @@ inside the unit circle. Guaranteed by the DARE solution when the plant is contro
 **Relation to toolbox**: `Lqr<float,2,1>` provides the gain container. DARE computed at configuration
 time via `DiscreteAlgebraicRiccatiEquation`. `IntegralStateFeedbackLqi` provides the LQI variant.
 
+<!-- tikz:diagrams/position-loop-lqr.tex -->
 ```mermaid
 graph LR
-    XREF["θ*, ω*"] --> ERR["Error state\n[θ*-θ, ω*-ω]"]
+    XREF["θ*, ω*"] --> ERR["Σ error state"]
     XMEAS["θm, ωm"] --> ERR
-    ERR --> GAIN["[Kθ, Kω]\n(from DARE)"]
+    ERR --> GAIN["K = Kθ, Kω\nfrom DARE"]
     GAIN --> IQ["Iq*"]
-    DARE["DARE at config"] --> GAIN
+    DARE["DARE at config\nJ, Bf, Kt"] -.-> GAIN
 ```
+<!-- /tikz -->
 
 ---
 
@@ -137,6 +158,18 @@ $$
 
 The speed reference $\omega_m^*[k]$ is passed to the selected speed-loop controller (PID, LQI,
 ADRC, or Two-DOF). Cascade P is a position-loop choice; it does not constrain the speed-loop algorithm.
+
+<!-- tikz:diagrams/position-loop-cascade-p.tex -->
+```mermaid
+graph LR
+    THR["θ*"] --> SE["Σ"]
+    TH["θm"] --> SE
+    SE -->|"eθ"| KV["Kv"]
+    KV -->|"ω*"| SFF["Σ"]
+    THDOT["θ̇* (opt.)"] --> KFF["Kff"] --> SFF
+    SFF --> SPD["Speed Controller"] --> IQ["Iq*"]
+```
+<!-- /tikz -->
 
 **Position-loop bandwidth**:
 

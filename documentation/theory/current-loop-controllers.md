@@ -61,6 +61,29 @@ See `documentation/theory/foc-plant-models.md` for all base symbols.
 
 ---
 
+## Mathematical Foundation
+
+All three algorithms in this document operate on the **decoupled per-axis RL plant** derived in
+`documentation/theory/foc-plant-models.md` Section 1. After feedforward decoupling the d- and
+q-axis current dynamics each reduce to an independent first-order system:
+
+$$
+i[k+1] = A_d^i \cdot i[k] + B_d^i \cdot v'[k]
+$$
+
+with the discrete matrices:
+
+$$
+A_d^i \approx 1 - \frac{R_s\,T_s^i}{L_s}, \qquad B_d^i \approx \frac{T_s^i}{L_s}
+$$
+
+A1 derives the feedforward law that recovers this decoupled plant from the coupled PMSM voltage
+equations and then applies a standard PI. A2 (Deadbeat) inverts this plant model directly. A3
+(Sliding-mode) treats the residual coupling and noise as a bounded disturbance bounded by the
+switching gain $K_{sw}$.
+
+---
+
 ## A1 — Decoupled PID + Feedforward
 
 **Motivation**: Plain PI controllers treat the cross-coupling terms $\omega_e L_s i_q$ and
@@ -100,21 +123,23 @@ during alignment. $V_{dc}$ is measured dynamically.
 coupling is $\omega_e L_s i_q = 2.5$ V — 10% of a 24 V bus. This is the dominant current control
 error at speed for an uncompensated PI.
 
+<!-- tikz:diagrams/current-loop-a1-feedforward.tex -->
 ```mermaid
 graph LR
-    Iref["Id*, Iq*"] --> ERRD["Error\nId*-Id"]
-    Iref --> ERRQ["Error\nIq*-Iq"]
+    Iref["Id*, Iq*"] --> ERRD["Σ Id*-Id"]
+    Iref --> ERRQ["Σ Iq*-Iq"]
     MEAS["Id, Iq"] --> ERRD
     MEAS --> ERRQ
     ERRD --> PID_D["PI d-axis"]
     ERRQ --> PID_Q["PI q-axis"]
-    PID_D --> SUM_D["Σ"]
-    PID_Q --> SUM_Q["Σ"]
-    FF["-ωe·Ls·Iq"] --> SUM_D
-    FFQ["+ωe·Ls·Id\n+ωe·ψf"] --> SUM_Q
+    PID_D --> SUM_D["Σ +fd"]
+    PID_Q --> SUM_Q["Σ +fq"]
+    FF["fd = -ωe·Ls·Iq"] --> SUM_D
+    FFQ["fq = +ωe·Ls·Id\n    +ωe·ψf"] --> SUM_Q
     SUM_D --> OUT["inv-Park + SVM"]
     SUM_Q --> OUT
 ```
+<!-- /tikz -->
 
 ---
 

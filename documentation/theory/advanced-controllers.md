@@ -38,33 +38,55 @@ interface, and NVM persistence are described in `documentation/design/controller
 
 ---
 
-## Algorithm Map
+## Mathematical Foundation
 
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│  Position loop (1 kHz)                                                        │
-│  ┌──────────────────────────────────────────────────┐                         │
-│  │ PID | Cascade P | LQR | LQI | Two-DOF | ILC      │ ──── ω*  ───────────┐  │
-│  └──────────────────────────────────────────────────┘                      │  │
-│                                                           ▼                 │  │
-│  Speed loop (1 kHz)                                                         │  │
-│  ┌──────────────────────────────────────────────────┐                       │  │
-│  │ PID | LQI | ADRC | Two-DOF                       │                       │  │
-│  │           + [Friction compensation Iq_ff]        │ ──── Iq* ───────────┐ │  │
-│  └──────────────────────────────────────────────────┘                     │ │  │
-│                                                           ▼                │ │  │
-│  Current loop (20 kHz ISR)                                                 │ │  │
-│  ┌──────────────────────────────────────────────────┐                      │ │  │
-│  │ PID | Decoupled PID | Deadbeat | Sliding-mode    │                      │ │  │
-│  │                → Vd,Vq → inv-Park → SVM → PWM   │                      │ │  │
-│  └──────────────────────────────────────────────────┘                      │ │  │
-│         ↑ Clarke/Park ← ADC currents    ↑ encoder θm ──────────────────────┘─┘ │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
+All controllers in this booklet derive from three plant models established in
+`documentation/theory/foc-plant-models.md`:
+
+| Plant | States | Input | Loop rate |
+|-------|--------|-------|-----------|
+| PMSM current (per axis, decoupled) | $i_d$, $i_q$ | normalised voltage $v'$ | 20 kHz |
+| Mechanical speed | $\omega_m$ | $i_q^*$ | 1 kHz |
+| Position (double integrator) | $\theta_m$, $\omega_m$ | $i_q^*$ | 1 kHz |
+
+The RLS estimators provide $R_s$, $L_s$, $J$, $B_f$ that populate the discrete matrices
+$A_d$, $B_d$ of each plant. Model-based controllers (LQR, LQI, Deadbeat, ADRC) are
+reconfigured from the latest RLS snapshot each time they are selected, so gains track the
+actual motor parameters without manual re-tuning.
 
 ---
 
-## Algorithm Summary
+## Algorithm Map
+
+<!-- tikz:diagrams/algorithm-map.tex -->
+```mermaid
+graph TD
+    ENC(["Encoder θm"])
+    ADC(["ADC phase currents"])
+    subgraph POS["Position loop — 1 kHz"]
+        PC["PID · Cascade P · LQR · LQI · Two-DOF · ILC"]
+    end
+    subgraph SPD["Speed loop — 1 kHz"]
+        SC["PID · LQI · ADRC · Two-DOF"]
+        FC["+ Friction comp. Iq_ff"]
+    end
+    subgraph CUR["Current loop — 20 kHz ISR"]
+        CC["PID · Decoupled PID · Deadbeat · Sliding-mode"]
+        SVM["inv-Park → SVM → PWM → Motor"]
+    end
+    POS -->|"ω*"| SPD
+    SPD -->|"Iq*"| CUR
+    CC --> SVM
+    ADC -->|"Clarke/Park"| CUR
+    ENC --> CUR
+    ENC --> SPD
+    ENC --> POS
+```
+<!-- /tikz -->
+
+---
+
+## Numerical Properties
 
 **Current loop** — 20 kHz ISR, valid only for this loop:
 

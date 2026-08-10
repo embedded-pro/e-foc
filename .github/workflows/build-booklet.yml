@@ -1,0 +1,90 @@
+---
+name: Build FOC Theory Booklet
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "documentation/theory/**"
+      - "documentation/booklet/**"
+      - "scripts/build-foc-booklet.py"
+      - ".github/workflows/build-booklet.yml"
+  pull_request:
+    paths:
+      - "documentation/theory/**"
+      - "documentation/booklet/**"
+      - "scripts/build-foc-booklet.py"
+      - ".github/workflows/build-booklet.yml"
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: booklet-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Booklet (PDF + HTML)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install Pandoc, TeX toolchain, and pdf2svg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pandoc \
+            texlive-xetex \
+            texlive-latex-extra \
+            texlive-fonts-recommended \
+            texlive-pictures \
+            lmodern \
+            librsvg2-bin \
+            pdf2svg
+
+      - name: Build booklet (PDF + HTML)
+        run: python scripts/build-foc-booklet.py --format all
+
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: foc-theory-booklet
+          path: build/booklet/FocTheory.pdf
+
+      - name: Upload Pages artifact
+        if: github.event_name == 'push' || github.event_name == 'release'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: build/booklet
+
+      - name: Attach PDF to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          files: build/booklet/FocTheory.pdf
+
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    if: github.event_name == 'push' || github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
