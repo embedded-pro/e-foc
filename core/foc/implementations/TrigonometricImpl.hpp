@@ -1,9 +1,9 @@
 #pragma once
 
 #include "numerical/math/CompilerOptimizations.hpp"
-#include "numerical/math/TrigonometricFunctions.hpp"
+#include "numerical/math/Math.hpp"
 #include <array>
-#include <cmath>
+#include <cstdint>
 #include <numbers>
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -116,22 +116,13 @@ namespace foc
 
         ALWAYS_INLINE static float Arctangent(float value) noexcept
         {
-            return std::atan(value);
+            return math::Atan(value);
         }
 
         ALWAYS_INLINE static float Phase(float real, float imag) noexcept
         {
-            return std::atan2(imag, real);
+            return math::Atan2(imag, real);
         }
     };
 
-    class TrigonometricFunctions
-        : public math::TrigonometricFunctions<float>
-    {
-    public:
-        float Cosine(const float& angle) const override;
-        float Sine(const float& angle) const override;
-        float Arctangent(const float& value) const override;
-        float Phase(const float& real, const float& imag) const override;
-    };
 }

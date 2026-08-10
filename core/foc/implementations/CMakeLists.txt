@@ -26,7 +26,6 @@ target_sources(e_foc.foc.implementations PRIVATE
     Runner.hpp
     SpaceVectorModulation.cpp
     SpaceVectorModulation.hpp
-    TrigonometricImpl.cpp
     TrigonometricImpl.hpp
     WithAutomaticCurrentPidGains.cpp
     WithAutomaticCurrentPidGains.hpp
