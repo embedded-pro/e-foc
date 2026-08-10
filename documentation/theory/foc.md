@@ -445,6 +445,27 @@ $$d_A = \mathrm{clamp}\!\left(\frac{8.165}{\sqrt{3}} + 0.5,\ 0,\ 1\right) = \mat
 
 ---
 
+## Controller Alternatives
+
+The standard PI current and PI speed regulators described above are the baseline FOC controllers.
+The system supports runtime-selectable alternative controllers for each loop:
+
+- **Current loop**: Decoupled PID with cross-coupling feedforward; Deadbeat; Sliding-mode.
+  See `documentation/theory/current-loop-controllers.md`.
+- **Speed loop**: LQI state-feedback; ADRC; Two-DOF.
+  See `documentation/theory/speed-loop-controllers.md`.
+- **Position loop**: LQR/LQI; Cascade P→PI; Two-DOF; ILC. Friction compensation augmentation.
+  See `documentation/theory/position-loop-controllers.md`.
+
+Plant models (current, speed, position) and discretization are in
+`documentation/theory/foc-plant-models.md`. An index of all controllers with algorithm map and
+parameter sources is in `documentation/theory/advanced-controllers.md`.
+
+The runtime selection mechanism — heap-free variant storage, type-aware dispatch, state gating,
+NVM persistence, and CLI/CAN interface — is documented in `documentation/design/controller-selection.md`.
+
+---
+
 ## Limitations & Assumptions
 
 - **Assumes**: Surface-mounted PMSM with $L_d = L_q$ (non-salient). For interior PMSM ($L_d \neq L_q$),

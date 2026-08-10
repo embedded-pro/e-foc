@@ -207,3 +207,14 @@ sequenceDiagram
 | LPI scheduling                 | The outer loop does not use an RTOS. The inner loop ISR triggers the LPI — no timer or task involved.      |
 | Cycle budget                   | Inner loop `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz). |
 | Setpoint atomicity             | The Iq setpoint written by the outer loop must be read atomically by the inner loop on 32-bit ARM targets. |
+
+---
+
+## Controller Alternatives
+
+The speed PID described above is one of several selectable strategies for the outer speed loop.
+Alternative controllers — LQI, ADRC, and Two-DOF — are described in
+`documentation/theory/speed-loop-controllers.md`. Plant model foundations are in
+`documentation/theory/foc-plant-models.md`.
+
+The runtime selection mechanism is described in `documentation/design/controller-selection.md`.
