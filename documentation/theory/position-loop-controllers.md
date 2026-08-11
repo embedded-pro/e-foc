@@ -7,14 +7,14 @@ component: "position-loop-controllers"
 date: 2026-08-10
 ---
 
-| Field     | Value                                          |
-|-----------|------------------------------------------------|
+| Field     | Value                                               |
+|-----------|-----------------------------------------------------|
 | Title     | Position Loop Controllers and Friction Compensation |
-| Type      | theory                                         |
-| Status    | draft                                          |
-| Version   | 0.1.0                                          |
-| Component | position-loop-controllers                      |
-| Date      | 2026-08-10                                     |
+| Type      | theory                                              |
+| Status    | draft                                               |
+| Version   | 0.1.0                                               |
+| Component | position-loop-controllers                           |
+| Date      | 2026-08-10                                          |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -43,27 +43,27 @@ $$
 The control output $u = i_q^*$ is passed to the speed loop (for Cascade P) or directly to the
 current loop (for LQR/LQI, Two-DOF, ILC used in torque mode).
 
-| Algorithm | Key Advantage |
-|-----------|---------------|
-| P1 — LQR / LQI | Optimal simultaneous position and velocity regulation; DARE-computed gains |
-| P2 — Cascade P→PI | Industry-standard servo architecture; single transparent Kv parameter |
-| P3 — Two-DOF | Decoupled command tracking and load stiffness; servo-grade positioning |
-| P4 — ILC | Near-zero residual error on repetitive tasks after a few learning cycles |
-| Friction augmentation | Cancels Coulomb and Stribeck friction; eliminates hunting at rest |
+| Algorithm             | Key Advantage                                                              |
+|-----------------------|----------------------------------------------------------------------------|
+| P1 — LQR / LQI        | Optimal simultaneous position and velocity regulation; DARE-computed gains |
+| P2 — Cascade P→PI     | Industry-standard servo architecture; single transparent Kv parameter      |
+| P3 — Two-DOF          | Decoupled command tracking and load stiffness; servo-grade positioning     |
+| P4 — ILC              | Near-zero residual error on repetitive tasks after a few learning cycles   |
+| Friction augmentation | Cancels Coulomb and Stribeck friction; eliminates hunting at rest          |
 
 ---
 
 ## Prerequisites
 
-| Symbol | Meaning | Unit |
-|--------|---------|------|
-| $A_d^p, B_d^p$ | Discrete position plant matrices | — |
-| $K_\theta, K_\omega$ | LQR position and velocity gains | A/rad, A·s/rad |
-| $K_v$ | Cascade P velocity loop gain | rad/s per rad |
-| $K_{ff}$ | Velocity feedforward fraction | — |
-| $\tau_{ff}$ | Two-DOF pre-filter time constant | s |
-| $Q, \ell$ | ILC robustness filter and learning gain | — |
-| $N$ | ILC trial length in samples | — |
+| Symbol                  | Meaning                                           | Unit            |
+|-------------------------|---------------------------------------------------|-----------------|
+| $A_d^p, B_d^p$          | Discrete position plant matrices                  | —               |
+| $K_\theta, K_\omega$    | LQR position and velocity gains                   | A/rad, A·s/rad  |
+| $K_v$                   | Cascade P velocity loop gain                      | rad/s per rad   |
+| $K_{ff}$                | Velocity feedforward fraction                     | —               |
+| $\tau_{ff}$             | Two-DOF pre-filter time constant                  | s               |
+| $Q, \ell$               | ILC robustness filter and learning gain           | —               |
+| $N$                     | ILC trial length in samples                       | —               |
 | $T_c, T_s, \omega_{st}$ | Coulomb, static, and Stribeck friction parameters | N·m, N·m, rad/s |
 
 See `documentation/theory/foc-plant-models.md` for all base symbols.
@@ -310,14 +310,14 @@ which estimates only the linear viscous coefficient $B_f$.
 
 ## Numerical Properties
 
-| Property | PID | Cascade P (P2) | LQR/LQI (P1) | Two-DOF (P3) | ILC (P4) |
-|----------|:---:|:--------------:|:------------:|:------------:|:--------:|
-| Ops per 1 kHz cycle | ~6 MACs | 2 MACs | 4 MACs | ~8 MACs | 2 MACs + array read |
-| Steady-state position error | Zero (D) | Speed-loop dep. | Zero (LQI) | Configurable | Near-zero after learning |
-| Tracking vs. stiffness | Coupled | Coupled | Coupled | Decoupled | N/A — periodic only |
-| Industry prevalence | Common | Dominant in servo | Modern servo | Modern servo | Specialist |
-| Requires J, Bf | No | No | Yes | No | No |
-| Storage | Constant | Constant | Constant | Constant | N × float (bounded array) |
+| Property                    |   PID    |  Cascade P (P2)   | LQR/LQI (P1) | Two-DOF (P3) |         ILC (P4)          |
+|-----------------------------|:--------:|:-----------------:|:------------:|:------------:|:-------------------------:|
+| Ops per 1 kHz cycle         | ~6 MACs  |      2 MACs       |    4 MACs    |   ~8 MACs    |    2 MACs + array read    |
+| Steady-state position error | Zero (D) |  Speed-loop dep.  |  Zero (LQI)  | Configurable | Near-zero after learning  |
+| Tracking vs. stiffness      | Coupled  |      Coupled      |   Coupled    |  Decoupled   |    N/A — periodic only    |
+| Industry prevalence         |  Common  | Dominant in servo | Modern servo | Modern servo |        Specialist         |
+| Requires J, Bf              |    No    |        No         |     Yes      |      No      |            No             |
+| Storage                     | Constant |     Constant      |   Constant   |   Constant   | N × float (bounded array) |
 
 ---
 

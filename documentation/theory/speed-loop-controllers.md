@@ -7,14 +7,14 @@ component: "speed-loop-controllers"
 date: 2026-08-10
 ---
 
-| Field     | Value                   |
-|-----------|-------------------------|
-| Title     | Speed Loop Controllers  |
-| Type      | theory                  |
-| Status    | draft                   |
-| Version   | 0.1.0                   |
-| Component | speed-loop-controllers  |
-| Date      | 2026-08-10              |
+| Field     | Value                  |
+|-----------|------------------------|
+| Title     | Speed Loop Controllers |
+| Type      | theory                 |
+| Status    | draft                  |
+| Version   | 0.1.0                  |
+| Component | speed-loop-controllers |
+| Date      | 2026-08-10             |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -39,26 +39,26 @@ $$
 with $A_d^o \approx 1 - B_f T_s^o / J$ and $B_d^o = K_t T_s^o / J$. The control input $u$ is the
 $i_q^*$ reference passed to the current loop.
 
-| Algorithm | Key Advantage |
-|-----------|---------------|
-| S1 — LQI state-feedback | Optimal gains computed directly from RLS estimates; systematic tuning |
-| S2 — ADRC | Explicit disturbance cancellation; fastest load-step rejection; 2 tuning knobs |
-| S3 — Two-DOF | Decoupled command tracking and load stiffness tuning |
+| Algorithm               | Key Advantage                                                                  |
+|-------------------------|--------------------------------------------------------------------------------|
+| S1 — LQI state-feedback | Optimal gains computed directly from RLS estimates; systematic tuning          |
+| S2 — ADRC               | Explicit disturbance cancellation; fastest load-step rejection; 2 tuning knobs |
+| S3 — Two-DOF            | Decoupled command tracking and load stiffness tuning                           |
 
 ---
 
 ## Prerequisites
 
-| Symbol | Meaning | Unit |
-|--------|---------|------|
-| $A_d^o, B_d^o$ | Discrete speed plant matrices | — |
-| $Q, R$ | LQR weighting matrices | — |
-| $P$ | DARE solution (optimal cost-to-go) | — |
-| $\hat{x}, \hat{f}$ | Observer state estimates | — |
-| $\omega_o$ | ESO bandwidth | rad/s |
-| $\omega_c$ | Control bandwidth | rad/s |
-| $b_0$ | ADRC plant gain $= K_t/J$ | — |
-| $\tau_{ff}$ | Two-DOF pre-filter time constant | s |
+| Symbol             | Meaning                            | Unit  |
+|--------------------|------------------------------------|-------|
+| $A_d^o, B_d^o$     | Discrete speed plant matrices      | —     |
+| $Q, R$             | LQR weighting matrices             | —     |
+| $P$                | DARE solution (optimal cost-to-go) | —     |
+| $\hat{x}, \hat{f}$ | Observer state estimates           | —     |
+| $\omega_o$         | ESO bandwidth                      | rad/s |
+| $\omega_c$         | Control bandwidth                  | rad/s |
+| $b_0$              | ADRC plant gain $= K_t/J$          | —     |
+| $\tau_{ff}$        | Two-DOF pre-filter time constant   | s     |
 
 See `documentation/theory/foc-plant-models.md` for all base symbols.
 
@@ -243,14 +243,14 @@ $\tau_{ff}$ shapes tracking speed; PI gains shape disturbance rejection. Neither
 
 ## Numerical Properties
 
-| Property | PID (baseline) | LQI (S1) | ADRC (S2) | Two-DOF (S3) |
-|----------|:--------------:|:--------:|:---------:|:------------:|
-| Ops per 1 kHz cycle | ~6 MACs | 2 MACs | 6 MACs | ~8 MACs |
-| Steady-state error | Zero (I) | Zero (I) | Zero (ESO) | Zero (I) |
-| Load disturbance rejection | PI quality | PI quality | Explicit cancellation | PI quality |
-| Tracking vs. stiffness | Coupled | Coupled | Coupled | Decoupled |
-| Tuning knobs | 3 (Kp, Ki, Kd) | 3 (qω, qI, R) | 2 (ωo, ωc) | 3 (Kp, Ki, τff) |
-| Requires mechanical RLS | No | Yes (J, Bf) | Yes (Kt, J) | No |
+| Property                   | PID (baseline) |   LQI (S1)    |       ADRC (S2)       |  Two-DOF (S3)   |
+|----------------------------|:--------------:|:-------------:|:---------------------:|:---------------:|
+| Ops per 1 kHz cycle        |    ~6 MACs     |    2 MACs     |        6 MACs         |     ~8 MACs     |
+| Steady-state error         |    Zero (I)    |   Zero (I)    |      Zero (ESO)       |    Zero (I)     |
+| Load disturbance rejection |   PI quality   |  PI quality   | Explicit cancellation |   PI quality    |
+| Tracking vs. stiffness     |    Coupled     |    Coupled    |        Coupled        |    Decoupled    |
+| Tuning knobs               | 3 (Kp, Ki, Kd) | 3 (qω, qI, R) |      2 (ωo, ωc)       | 3 (Kp, Ki, τff) |
+| Requires mechanical RLS    |       No       |  Yes (J, Bf)  |      Yes (Kt, J)      |       No        |
 
 ### DARE Timing
 

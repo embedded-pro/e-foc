@@ -7,14 +7,14 @@ component: "current-loop-controllers"
 date: 2026-08-10
 ---
 
-| Field     | Value                      |
-|-----------|----------------------------|
-| Title     | Current Loop Controllers   |
-| Type      | theory                     |
-| Status    | draft                      |
-| Version   | 0.1.0                      |
-| Component | current-loop-controllers   |
-| Date      | 2026-08-10                 |
+| Field     | Value                    |
+|-----------|--------------------------|
+| Title     | Current Loop Controllers |
+| Type      | theory                   |
+| Status    | draft                    |
+| Version   | 0.1.0                    |
+| Component | current-loop-controllers |
+| Date      | 2026-08-10               |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -37,11 +37,11 @@ $$
 
 with $A_d^i \approx 1 - R_s T_s^i / L_s$ and $B_d^i \approx T_s^i / L_s$.
 
-| Algorithm | Key Advantage |
-|-----------|---------------|
+| Algorithm                        | Key Advantage                                                 |
+|----------------------------------|---------------------------------------------------------------|
 | A1 — Decoupled PID + feedforward | Removes cross-axis coupling at high speed; reuses existing PI |
-| A2 — Deadbeat | Minimum settling time (1–2 samples); maximum servo stiffness |
-| A3 — Sliding-mode | Robust to Rs/Ls mismatch; suitable before RLS has converged |
+| A2 — Deadbeat                    | Minimum settling time (1–2 samples); maximum servo stiffness  |
+| A3 — Sliding-mode                | Robust to Rs/Ls mismatch; suitable before RLS has converged   |
 
 All three operate exclusively in the **20 kHz FOC ISR**. They are not valid for the speed or
 position loops.
@@ -50,12 +50,12 @@ position loops.
 
 ## Prerequisites
 
-| Symbol | Meaning | Unit |
-|--------|---------|------|
-| $A_d^i, B_d^i$ | Discrete current plant matrices | — |
+| Symbol               | Meaning                                | Unit       |
+|----------------------|----------------------------------------|------------|
+| $A_d^i, B_d^i$       | Discrete current plant matrices        | —          |
 | $v_d^{PI}, v_q^{PI}$ | PI controller outputs (decoupled axes) | normalised |
-| $\phi$ | Sliding-mode boundary layer width | A |
-| $K_{sw}$ | Sliding-mode switching gain | normalised |
+| $\phi$               | Sliding-mode boundary layer width      | A          |
+| $K_{sw}$             | Sliding-mode switching gain            | normalised |
 
 See `documentation/theory/foc-plant-models.md` for all base symbols.
 
@@ -233,14 +233,14 @@ boundary-layer saturation. Plant matrices $A_d^i, B_d^i$ are constructed from RL
 
 ## Numerical Properties
 
-| Property | PID (baseline) | Dec-PID (A1) | Deadbeat (A2) | SMC (A3) |
-|----------|:--------------:|:------------:|:-------------:|:--------:|
-| ISR cost (ops) | ~6 MACs | ~10 MACs | ~4 MACs | ~12 MACs |
-| Settling time | ~1/ωbw | ~1/ωbw | 1–2 samples | ~1/ωbw |
+| Property                  | PID (baseline)  |    Dec-PID (A1)     |     Deadbeat (A2)      |      SMC (A3)       |
+|---------------------------|:---------------:|:-------------------:|:----------------------:|:-------------------:|
+| ISR cost (ops)            |     ~6 MACs     |      ~10 MACs       |        ~4 MACs         |      ~12 MACs       |
+| Settling time             |     ~1/ωbw      |       ~1/ωbw        |      1–2 samples       |       ~1/ωbw        |
 | Robustness to Rs/Ls error | High (integral) | Low (FF model-dep.) | Low (exact model req.) | High (gain-bounded) |
-| Requires ψf | No | Yes | No | No |
-| Requires RLS convergence | No | Partial | Yes (tight) | Partial |
-| Tuning knobs | 3 | 1 (ωbw) | 0 (variant choice) | 2 (Ksw, φ) |
+| Requires ψf               |       No        |         Yes         |           No           |         No          |
+| Requires RLS convergence  |       No        |       Partial       |      Yes (tight)       |       Partial       |
+| Tuning knobs              |        3        |       1 (ωbw)       |   0 (variant choice)   |     2 (Ksw, φ)      |
 
 ### Cycle Budget
 
