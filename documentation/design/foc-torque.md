@@ -161,3 +161,16 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 | Gain normalisation dependency   | `SetCurrentTunings()` requires the DC bus voltage (Vdc) to be known at configuration time.                |
 | No flux weakening               | Id_setpoint ≠ 0 is structurally accepted but operational flux-weakening strategy is not yet defined.      |
 | PID state at Enable             | Integrators are always zeroed on Enable, regardless of previous state.                                    |
+
+---
+
+## Controller Alternatives
+
+The dual-PID current controller described above is one of several selectable strategies for the
+current loop. Alternative controllers — Decoupled PID, Deadbeat, and Sliding-mode — are described in
+`documentation/theory/current-loop-controllers.md`. Plant model foundations are in
+`documentation/theory/foc-plant-models.md`.
+
+The mechanism by which a controller strategy is selected at runtime, stored without heap allocation,
+dispatched in the ISR via type-aware visit, and persisted to NVM is described in
+`documentation/design/controller-selection.md`.

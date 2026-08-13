@@ -1,0 +1,62 @@
+% LaTeX preamble for the e-foc FOC Theory booklet (passed to pandoc via -H).
+\usepackage{fancyhdr}
+\usepackage{emptypage}
+\usepackage{amssymb}
+\usepackage[dvipsnames]{xcolor}
+
+% ── Unicode symbols that appear in the FOC theory docs ──────────────────────
+\usepackage{newunicodechar}
+\newunicodechar{↔}{\ensuremath{\leftrightarrow}}
+\newunicodechar{⇒}{\ensuremath{\Rightarrow}}
+\newunicodechar{≈}{\ensuremath{\approx}}
+\newunicodechar{✓}{\ensuremath{\checkmark}}
+\newunicodechar{∈}{\ensuremath{\in}}
+\newunicodechar{∇}{\ensuremath{\nabla}}
+\newunicodechar{⋯}{\ensuremath{\cdots}}
+\newunicodechar{ℝ}{\ensuremath{\mathbb{R}}}
+\newunicodechar{ᵀ}{\ensuremath{^{\mathsf{T}}}}
+\newunicodechar{β}{\ensuremath{\beta}}
+\newunicodechar{θ}{\ensuremath{\theta}}
+\newunicodechar{η}{\ensuremath{\eta}}
+\newunicodechar{λ}{\ensuremath{\lambda}}
+\newunicodechar{ε}{\ensuremath{\varepsilon}}
+\newunicodechar{ω}{\ensuremath{\omega}}
+\newunicodechar{ψ}{\ensuremath{\psi}}
+\newunicodechar{α}{\ensuremath{\alpha}}
+\newunicodechar{γ}{\ensuremath{\gamma}}
+\newunicodechar{τ}{\ensuremath{\tau}}
+\newunicodechar{σ}{\ensuremath{\sigma}}
+\newunicodechar{φ}{\ensuremath{\varphi}}
+\newunicodechar{Ω}{\ensuremath{\Omega}}
+\newunicodechar{₀}{\textsubscript{0}}
+\newunicodechar{₁}{\textsubscript{1}}
+\newunicodechar{₂}{\textsubscript{2}}
+\newunicodechar{ⁿ}{\textsuperscript{n}}
+
+% ── Running headers ──────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyhead[L]{\nouppercase{\leftmark}}
+\fancyhead[R]{\thepage}
+
+% ── Chapter title styling ────────────────────────────────────────────────────
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\color{RoyalBlue}}
+  {\chaptertitlename\ \thechapter}{20pt}{\Huge}
+
+% ── Cover page ───────────────────────────────────────────────────────────────
+\usepackage{titling}
+\pretitle{\begin{center}\vspace*{3cm}\Huge\bfseries\color{RoyalBlue}}
+\posttitle{\par\end{center}\vskip 0.8em}
+\preauthor{\begin{center}\large}
+\postauthor{\par\end{center}}
+\renewcommand{\and}{\\[0.4em]}
+\predate{\begin{center}\large}
+\postdate{\par\end{center}\vfill}
+
+% ── Boxed equations (used for key results) ──────────────────────────────────
+\usepackage{empheq}
+\usepackage[most]{tcolorbox}
+\tcbuselibrary{breakable}
