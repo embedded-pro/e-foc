@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/foc/implementations/test_doubles/DriversMock.hpp"
+#include "core/foc/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/mechanical_system_ident/test_doubles/MechanicalParametersIdentificationMock.hpp"

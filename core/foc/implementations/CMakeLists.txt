@@ -7,11 +7,12 @@ target_include_directories(e_foc.foc.implementations PUBLIC
 
 target_link_libraries(e_foc.foc.implementations PUBLIC
     e_foc.foc.interfaces
+    e_foc.foc.math
+    e_foc.foc.transforms
     numerical.controllers.implementations
 )
 
 target_sources(e_foc.foc.implementations PRIVATE
-    FocHelpers.hpp
     FocPositionImpl.cpp
     FocPositionImpl.hpp
     FocSpeedImpl.cpp
@@ -21,19 +22,12 @@ target_sources(e_foc.foc.implementations PRIVATE
     FocWithSpeedLoop.cpp
     FocWithSpeedLoop.hpp
     LowPriorityInterruptImpl.hpp
-    NormalizedAngles.hpp
     Runner.cpp
     Runner.hpp
-    SpaceVectorModulation.cpp
-    SpaceVectorModulation.hpp
-    TrigonometricImpl.hpp
     WithAutomaticCurrentPidGains.cpp
     WithAutomaticCurrentPidGains.hpp
     WithAutomaticSpeedPidGains.cpp
     WithAutomaticSpeedPidGains.hpp
-    TransformsClarkePark.cpp
-    TransformsClarkePark.hpp
 )
 
 add_subdirectory(test)
-add_subdirectory(test_doubles)

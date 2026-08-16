@@ -1,5 +1,5 @@
 #include "numerical/math/Tolerance.hpp"
-#include "core/foc/implementations/TransformsClarkePark.hpp"
+#include "core/foc/transforms/TransformsClarkePark.hpp"
 #include <gmock/gmock.h>
 #include <numbers>
 

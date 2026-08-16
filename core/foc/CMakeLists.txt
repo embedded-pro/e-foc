@@ -1,3 +1,5 @@
 add_subdirectory(interfaces)
+add_subdirectory(math)
+add_subdirectory(transforms)
 add_subdirectory(implementations)
 add_subdirectory(instantiations)

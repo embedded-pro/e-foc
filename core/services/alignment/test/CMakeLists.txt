@@ -5,7 +5,6 @@ emil_add_test(e_foc.services.alignment_test)
 target_link_libraries(e_foc.services.alignment_test PUBLIC
     gmock_main
     e_foc.services.alignment
-    e_foc.foc.implementations
     hal.interfaces_test_doubles
     infra.timer_test_helper
     infra.event_test_helper

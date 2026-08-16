@@ -1,4 +1,4 @@
-#include "core/foc/implementations/test_doubles/FocMock.hpp"
+#include "core/foc/interfaces/test_doubles/FocMock.hpp"
 #include "core/services/cli/TerminalSpeed.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"

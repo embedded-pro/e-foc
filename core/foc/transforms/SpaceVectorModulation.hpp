@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/foc/implementations/TransformsClarkePark.hpp"
+#include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc

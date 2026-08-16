@@ -1,4 +1,4 @@
-#include "core/foc/implementations/test_doubles/DriversMock.hpp"
+#include "core/foc/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include <cmath>

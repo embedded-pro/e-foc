@@ -1,5 +1,5 @@
 #include "numerical/math/Tolerance.hpp"
-#include "core/foc/implementations/SpaceVectorModulation.hpp"
+#include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include <gmock/gmock.h>
 
 namespace

@@ -1,29 +1,11 @@
 #pragma once
 
+#include "core/foc/interfaces/Signals.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <numbers>
 
 namespace foc
 {
-    struct ThreePhase
-    {
-        float a;
-        float b;
-        float c;
-    };
-
-    struct TwoPhase
-    {
-        float alpha;
-        float beta;
-    };
-
-    struct RotatingFrame
-    {
-        float d;
-        float q;
-    };
-
     class Clarke
     {
     public:

@@ -1,31 +1,12 @@
 #pragma once
 
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/util/Function.hpp"
 
 namespace foc
 {
-    struct PhaseCurrents
-    {
-        Ampere a;
-        Ampere b;
-        Ampere c;
-    };
-
-    struct PhasePwmDutyCycles
-    {
-        hal::Percent a;
-        hal::Percent b;
-        hal::Percent c;
-    };
-
-    enum class Direction : uint8_t
-    {
-        forward,
-        reverse,
-    };
-
     class LowPriorityInterrupt
     {
     public:

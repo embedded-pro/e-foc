@@ -1,5 +1,5 @@
 #include "tools/simulator/view/gui/OnlineElectricalRls.hpp"
-#include "core/foc/implementations/TrigonometricImpl.hpp"
+#include "core/foc/math/FastTrigonometry.hpp"
 
 namespace simulator
 {

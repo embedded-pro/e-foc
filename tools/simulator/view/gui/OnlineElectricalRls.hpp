@@ -1,8 +1,8 @@
 #pragma once
 
 #ifndef Q_MOC_RUN
-#include "core/foc/implementations/TransformsClarkePark.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
 #include "tools/simulator/model/Model.hpp"
 #endif

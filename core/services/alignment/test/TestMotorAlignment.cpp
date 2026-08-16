@@ -1,4 +1,4 @@
-#include "core/foc/implementations/test_doubles/DriversMock.hpp"
+#include "core/foc/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include <gmock/gmock.h>
 

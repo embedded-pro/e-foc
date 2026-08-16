@@ -1,4 +1,4 @@
-#include "core/foc/implementations/SpaceVectorModulation.hpp"
+#include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include <algorithm>
 
 #if defined(__GNUC__) || defined(__clang__)

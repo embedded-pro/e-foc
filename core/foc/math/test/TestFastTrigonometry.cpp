@@ -1,4 +1,4 @@
-#include "core/foc/implementations/TrigonometricImpl.hpp"
+#include "core/foc/math/FastTrigonometry.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>

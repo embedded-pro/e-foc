@@ -1,6 +1,6 @@
 #include "numerical/math/Tolerance.hpp"
 #include "core/foc/implementations/FocSpeedImpl.hpp"
-#include "core/foc/implementations/test_doubles/DriversMock.hpp"
+#include "core/foc/interfaces/test_doubles/DriversMock.hpp"
 #include <gmock/gmock.h>
 #include <numbers>
 

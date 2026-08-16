@@ -15,5 +15,8 @@ target_sources(e_foc.foc.interfaces PRIVATE
     Driver.hpp
     Foc.hpp
     OnlineEstimators.hpp
+    Signals.hpp
     Units.hpp
 )
+
+add_subdirectory(test_doubles)

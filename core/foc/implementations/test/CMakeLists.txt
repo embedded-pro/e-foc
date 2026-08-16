@@ -17,9 +17,6 @@ target_sources(e_foc.foc_test PRIVATE
     TestFocTorqueImpl.cpp
     TestLowPriorityInterruptImpl.cpp
     TestRunner.cpp
-    TestSpaceVectorModulation.cpp
-    TestTrigonometricImpl.cpp
     TestWithAutomaticCurrentPidGains.cpp
     TestWithAutomaticSpeedPidGains.cpp
-    TestTransformsClarkePark.cpp
 )

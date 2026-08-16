@@ -1,5 +1,5 @@
 #include "core/foc/implementations/FocTorqueImpl.hpp"
-#include "core/foc/implementations/TrigonometricImpl.hpp"
+#include "core/foc/math/FastTrigonometry.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <numbers>
 

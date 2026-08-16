@@ -1,6 +1,6 @@
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
-#include "core/foc/implementations/TrigonometricImpl.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/foc/math/FastTrigonometry.hpp"
 
 namespace services
 {

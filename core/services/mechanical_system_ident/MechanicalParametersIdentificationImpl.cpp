@@ -1,6 +1,6 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
-#include "core/foc/implementations/TrigonometricImpl.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/foc/math/FastTrigonometry.hpp"
 #include <cmath>
 #include <numbers>
 
