@@ -63,13 +63,24 @@
                 "SpeedCascade::LowPriorityHandler",
                 "CascadeWithSpeedLoop::RunSpeedLoop",
                 "CascadeWithSpeedLoop::MeasureMechanicalSpeed",
+                "CascadeWithSpeedLoop::SetSpeedReference",
+                "CascadeWithSpeedLoop::SetDirectCurrentReference",
+                "CascadeWithSpeedLoop::CurrentMechanicalAngle",
+                "CascadeWithSpeedLoop::PolePairs",
                 "PidSpeedController::Compute",
                 "LqiSpeedController::Compute",
                 "AdrcSpeedController::Compute",
                 "TwoDofSpeedController::Compute",
+                "PidPositionController::Compute",
+                "CascadePPositionController::Compute",
+                "LqrPositionController::Compute",
+                "LqiPositionController::Compute",
+                "TwoDofPositionController::Compute",
                 "PidIncrementalSynchronous.*::Process",
                 "PidIncrementalSynchronous.*::SetPoint",
-                "PositionWithWrapAround"
+                "OuterSamplePeriod",
+                "WrappedPositionError",
+                "LimitToCurrentEnvelope"
             ]
         },
         {
