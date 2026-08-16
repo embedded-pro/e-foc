@@ -7,10 +7,18 @@
 
 namespace foc
 {
-    // Every speed algorithm derives its gains from the same mechanical set, so the rule is uniform
-    bool SpeedControllerTraits::IsSelectable(SpeedAlgorithm, const MechanicalModelParameters& parameters, const SpeedLoopTunings&)
+    // Only the model-based laws need the mechanical set; PID and Two-DOF stay selectable before
+    // mechanical identification and simply hold their output at zero until gains arrive (REQ-CTRL-012).
+    bool SpeedControllerTraits::IsSelectable(SpeedAlgorithm algorithm, const MechanicalModelParameters& parameters, const SpeedLoopTunings&)
     {
-        return AreMechanicalParametersValid(parameters);
+        switch (algorithm)
+        {
+            case SpeedAlgorithm::lqi:
+            case SpeedAlgorithm::adrc:
+                return AreMechanicalParametersValid(parameters);
+            default:
+                return true;
+        }
     }
 
     SelectResult SpeedControllerSelector::Select(SpeedAlgorithm algorithm)

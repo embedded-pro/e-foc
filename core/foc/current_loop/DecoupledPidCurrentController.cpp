@@ -10,13 +10,7 @@ namespace foc
     void DecoupledPidCurrentController::Configure(const MotorModelParameters& motorParameters)
     {
         pid.Configure(motorParameters);
-
-        if (!AreElectricalParametersValid(motorParameters))
-            return;
-
-        const auto scale = NormalizationScale(motorParameters.busVoltage);
-        couplingScale = InductanceInHenry(motorParameters.inductance) * scale;
-        backEmfScale = motorParameters.fluxLinkage.Value() * scale;
+        decoupling.Configure(motorParameters);
     }
 
     void DecoupledPidCurrentController::SetTunings(const CurrentLoopTunings& tunings)

@@ -17,14 +17,17 @@ namespace foc
 
         OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context) const
         {
-            return LimitToModulationCircle({ referenceGain * context.reference.d - feedbackGain * context.measured.d,
-                referenceGain * context.reference.q - feedbackGain * context.measured.q });
+            const RotatingFrame inverted{ referenceGain * context.reference.d - feedbackGain * context.measured.d,
+                referenceGain * context.reference.q - feedbackGain * context.measured.q };
+
+            return LimitToModulationCircle(decoupling.Apply(inverted, context));
         }
 
     private:
         void ApplyGains();
 
         MotorModelParameters parameters{};
+        DecouplingFeedforward decoupling;
         bool twoStep{ CurrentLoopTunings{}.twoStepDeadbeat };
         float referenceGain{ 0.0f };
         float feedbackGain{ 0.0f };

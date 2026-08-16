@@ -15,19 +15,12 @@ namespace foc
 
         OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context)
         {
-            const auto feedback = pid.Compute(context);
-            const auto electricalSpeed = context.electricalSpeed;
-
-            const auto dFeedforward = -electricalSpeed * couplingScale * context.measured.q;
-            const auto qFeedforward = electricalSpeed * (couplingScale * context.measured.d + backEmfScale);
-
-            return LimitToModulationCircle({ feedback.d + dFeedforward, feedback.q + qFeedforward });
+            return LimitToModulationCircle(decoupling.Apply(pid.Compute(context), context));
         }
 
     private:
         PidCurrentController pid;
-        float couplingScale{ 0.0f };
-        float backEmfScale{ 0.0f };
+        DecouplingFeedforward decoupling;
     };
 
     static_assert(CurrentController<DecoupledPidCurrentController>);

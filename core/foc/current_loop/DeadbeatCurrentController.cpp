@@ -25,6 +25,7 @@ namespace foc
     void DeadbeatCurrentController::Configure(const MotorModelParameters& motorParameters)
     {
         parameters = motorParameters;
+        decoupling.Configure(motorParameters);
         ApplyGains();
     }
 
