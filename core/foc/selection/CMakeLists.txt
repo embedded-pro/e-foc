@@ -9,6 +9,6 @@ target_link_libraries(e_foc.foc.selection INTERFACE
     numerical.math
 )
 
-target_sources(e_foc.foc.selection PRIVATE
+target_sources(e_foc.foc.selection INTERFACE
     ControllerSelector.hpp
 )
