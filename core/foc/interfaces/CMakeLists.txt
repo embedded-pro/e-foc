@@ -14,6 +14,8 @@ target_link_libraries(e_foc.foc.interfaces INTERFACE
 target_sources(e_foc.foc.interfaces PRIVATE
     Execution.hpp
     Foc.hpp
+    LoopTunings.hpp
+    MotorModel.hpp
     OnlineEstimators.hpp
     Signals.hpp
     Units.hpp

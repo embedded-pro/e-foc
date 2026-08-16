@@ -1,5 +1,8 @@
 add_subdirectory(interfaces)
 add_subdirectory(math)
 add_subdirectory(transforms)
+add_subdirectory(selection)
+add_subdirectory(current_loop)
+add_subdirectory(speed_loop)
 add_subdirectory(cascade)
 add_subdirectory(instantiations)

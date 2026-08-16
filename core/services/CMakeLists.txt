@@ -1,8 +1,5 @@
 add_subdirectory(alignment)
 add_subdirectory(cli)
-add_subdirectory(controller_selection)
-add_subdirectory(current_controllers)
 add_subdirectory(electrical_system_ident)
 add_subdirectory(mechanical_system_ident)
 add_subdirectory(non_volatile_memory)
-add_subdirectory(speed_controllers)

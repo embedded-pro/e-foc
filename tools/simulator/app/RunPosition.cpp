@@ -1,6 +1,6 @@
+#include "core/foc/instantiations/LowPriorityInterruptImpl.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
-#include "core/foc/instantiations/LowPriorityInterruptImpl.hpp"
 #include "foc/instantiations/FocController.hpp"
 #include "foc/interfaces/Units.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
