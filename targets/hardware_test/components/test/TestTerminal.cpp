@@ -282,7 +282,7 @@ TEST_F(TestHardwareTerminal, adc_invalid_value)
 
 TEST_F(TestHardwareTerminal, pid_command)
 {
-    InvokeCommand("pid 1.0 0.5 0.1 2.0 1.0 0.2", [this]()
+    InvokeCommand("pid 188.5 6283.2", [this]()
         {
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -292,7 +292,7 @@ TEST_F(TestHardwareTerminal, pid_command)
 
 TEST_F(TestHardwareTerminal, pid_alias)
 {
-    InvokeCommand("c 1.5 0.75 0.15 2.5 1.5 0.25", [this]()
+    InvokeCommand("c 150.0 5000.0", [this]()
         {
             EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
         });
@@ -302,7 +302,7 @@ TEST_F(TestHardwareTerminal, pid_alias)
 
 TEST_F(TestHardwareTerminal, pid_invalid_argument_count)
 {
-    InvokeCommand("pid 1.0 0.5 0.1", [this]()
+    InvokeCommand("pid 188.5 6283.2 1.0", [this]()
         {
             ::testing::InSequence _;
 
@@ -318,33 +318,15 @@ TEST_F(TestHardwareTerminal, pid_invalid_argument_count)
     ExecuteAllActions();
 }
 
-TEST_F(TestHardwareTerminal, pid_invalid_speed_kp)
+TEST_F(TestHardwareTerminal, pid_invalid_value)
 {
-    InvokeCommand("pid invalid 0.5 0.1 2.0 1.0 0.2", [this]()
+    InvokeCommand("pid invalid 6283.2", [this]()
         {
             ::testing::InSequence _;
 
             std::string newline{ "\r\n" };
             std::string header{ "ERROR: " };
-            std::string payload{ "invalid value for Speed Kp" };
-
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TestHardwareTerminal, pid_invalid_dq_ki)
-{
-    InvokeCommand("pid 1.0 0.5 0.1 2.0 invalid 0.2", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string newline{ "\r\n" };
-            std::string header{ "ERROR: " };
-            std::string payload{ "invalid value for DQ-axis Ki" };
+            std::string payload{ "invalid value for speed loop bandwidth" };
 
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
@@ -835,78 +817,6 @@ TEST_F(TestHardwareTerminal, adc_invalid_argument_count)
             std::string newline{ "\r\n" };
             std::string header{ "ERROR: " };
             std::string payload{ "invalid number of arguments" };
-
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TestHardwareTerminal, pid_invalid_speed_ki)
-{
-    InvokeCommand("pid 1.0 invalid 0.1 2.0 1.0 0.2", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string newline{ "\r\n" };
-            std::string header{ "ERROR: " };
-            std::string payload{ "invalid value for Speed Ki" };
-
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TestHardwareTerminal, pid_invalid_speed_kd)
-{
-    InvokeCommand("pid 1.0 0.5 invalid 2.0 1.0 0.2", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string newline{ "\r\n" };
-            std::string header{ "ERROR: " };
-            std::string payload{ "invalid value for Speed Kd" };
-
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TestHardwareTerminal, pid_invalid_dq_kp)
-{
-    InvokeCommand("pid 1.0 0.5 0.1 invalid 1.0 0.2", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string newline{ "\r\n" };
-            std::string header{ "ERROR: " };
-            std::string payload{ "invalid value for DQ-axis Kp" };
-
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TestHardwareTerminal, pid_invalid_dq_kd)
-{
-    InvokeCommand("pid 1.0 0.5 0.1 2.0 1.0 invalid", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string newline{ "\r\n" };
-            std::string header{ "ERROR: " };
-            std::string payload{ "invalid value for DQ-axis Kd" };
 
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));

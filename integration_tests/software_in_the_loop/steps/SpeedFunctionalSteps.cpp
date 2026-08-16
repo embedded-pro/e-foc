@@ -53,34 +53,31 @@ THEN(R"(the setpoint is accepted without error)")
 WHEN(R"(d-axis gains kp=1.0 ki=0.1 kd=0 and q-axis gains kp=2.0 ki=0.2 kd=0 are configured)")
 {
     auto& ctx = context.Get<SpeedFunctionalContext>();
-    const foc::IdAndIqTunings tunings{
-        controllers::PidTunings<float>{ 1.0f, 0.1f, 0.0f },
-        controllers::PidTunings<float>{ 2.0f, 0.2f, 0.0f }
-    };
-    ctx.focSpeed.SetCurrentTunings(foc::Volts{ 24.0f }, tunings);
+    auto tunings = foc::CurrentLoopTunings{};
+    tunings.bandwidth = 6283.2f;
+    ctx.focSpeed.SetCurrentTunings(tunings);
 }
 
-THEN(R"(the d-axis and q-axis current tunings are stored independently)")
+THEN(R"(the current loop bandwidth is stored)")
 {
     // REQ-SPD-003: verify that d and q gains are stored independently by applying a
     // second, different set of tunings and checking that the call is accepted without
     // assertion or exception. A re-configure with swapped kp values is observable
     // through OuterLoopFrequency() remaining unchanged (not reset on SetCurrentTunings).
     auto& ctx = context.Get<SpeedFunctionalContext>();
-    const foc::IdAndIqTunings swapped{
-        controllers::PidTunings<float>{ 2.0f, 0.2f, 0.0f },
-        controllers::PidTunings<float>{ 1.0f, 0.1f, 0.0f }
-    };
-    ctx.focSpeed.SetCurrentTunings(foc::Volts{ 24.0f }, swapped);
+    auto swapped = foc::CurrentLoopTunings{};
+    swapped.bandwidth = 5000.0f;
+    ctx.focSpeed.SetCurrentTunings(swapped);
     EXPECT_EQ(ctx.focSpeed.OuterLoopFrequency(), hal::Hertz{ 1000 })
         << "OuterLoopFrequency must be unaffected by SetCurrentTunings (independent PIDs)";
 }
 
-WHEN(R"(the speed PID gains kp=5.0 ki=0.5 kd=0.01 are configured)")
+WHEN(R"(the speed loop bandwidth is configured)")
 {
     auto& ctx = context.Get<SpeedFunctionalContext>();
-    const foc::SpeedTunings gains{ 5.0f, 0.5f, 0.01f };
-    ctx.focSpeed.SetSpeedTunings(foc::Volts{ 24.0f }, gains);
+    auto gains = foc::SpeedLoopTunings{};
+    gains.bandwidth = 188.5f;
+    ctx.focSpeed.SetSpeedTunings(gains);
 }
 
 THEN(R"(the outer loop frequency is 1000 Hz)")

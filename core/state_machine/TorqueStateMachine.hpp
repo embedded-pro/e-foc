@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/foc/cascade/WithAutomaticCurrentPidGains.hpp"
 #include "core/foc/instantiations/FocController.hpp"
 #include "core/state_machine/FocStateMachineCommon.hpp"
 
@@ -23,10 +22,9 @@ namespace application
         foc::FocBase& GetFoc() override;
         foc::Controllable& GetFocControl() override;
         void RunPostAlignmentStep() override;
-        foc::WithAutomaticCurrentPidGains& GetCurrentLoopTuner() override;
+        foc::CurrentLoopTunable& CurrentTunable() override;
 
     private:
         foc::FocTorqueController focController;
-        foc::WithAutomaticCurrentPidGains pidAutoTuner;
     };
 }

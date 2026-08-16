@@ -112,69 +112,56 @@ namespace state_machine
         return true;
     }
 
-    namespace
+    bool ControlModeStateMachine::TrySetCurrentBandwidth(float bandwidth)
     {
-        foc::IdAndIqTunings ToCurrentTunings(const services::FocPidGains& gains)
-        {
-            controllers::PidTunings<float> t{
-                static_cast<float>(gains.kp),
-                static_cast<float>(gains.ki),
-                static_cast<float>(gains.kd)
-            };
-            return { t, t };
-        }
+        auto tunings = foc::CurrentLoopTunings{};
+        tunings.bandwidth = bandwidth;
 
-        controllers::PidTunings<float> ToSpeedOrPositionTunings(const services::FocPidGains& gains)
-        {
-            return {
-                static_cast<float>(gains.kp),
-                static_cast<float>(gains.ki),
-                static_cast<float>(gains.kd)
-            };
-        }
-    }
-
-    bool ControlModeStateMachine::TrySetCurrentPidGains(const services::FocPidGains& gains)
-    {
         if (auto* sm = std::get_if<application::TorqueStateMachine>(&activeSm))
         {
-            sm->GetController().SetCurrentTunings(hardware.vdc, ToCurrentTunings(gains));
+            sm->GetController().SetCurrentTunings(tunings);
             return true;
         }
         if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
         {
-            sm->GetController().SetCurrentTunings(hardware.vdc, ToCurrentTunings(gains));
+            sm->GetController().SetCurrentTunings(tunings);
             return true;
         }
         if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
         {
-            sm->GetController().SetCurrentTunings(hardware.vdc, ToCurrentTunings(gains));
+            sm->GetController().SetCurrentTunings(tunings);
             return true;
         }
         return false;
     }
 
-    bool ControlModeStateMachine::TrySetSpeedPidGains(const services::FocPidGains& gains)
+    bool ControlModeStateMachine::TrySetSpeedBandwidth(float bandwidth)
     {
+        auto tunings = foc::SpeedLoopTunings{};
+        tunings.bandwidth = bandwidth;
+
         if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
         {
-            sm->GetController().SetSpeedTunings(hardware.vdc, ToSpeedOrPositionTunings(gains));
+            sm->GetController().SetSpeedTunings(tunings);
             return true;
         }
         if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
         {
-            sm->GetController().SetSpeedTunings(hardware.vdc, ToSpeedOrPositionTunings(gains));
+            sm->GetController().SetSpeedTunings(tunings);
             return true;
         }
         return false;
     }
 
-    bool ControlModeStateMachine::TrySetPositionPidGains(const services::FocPidGains& gains)
+    bool ControlModeStateMachine::TrySetPositionBandwidth(float bandwidth)
     {
         auto* sm = std::get_if<application::PositionStateMachine>(&activeSm);
         if (sm == nullptr)
             return false;
-        sm->GetController().SetPositionTunings(ToSpeedOrPositionTunings(gains));
+
+        auto tunings = foc::PositionLoopTunings{};
+        tunings.bandwidth = bandwidth;
+        sm->GetController().SetPositionTunings(tunings);
         return true;
     }
 

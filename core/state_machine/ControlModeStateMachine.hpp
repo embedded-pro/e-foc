@@ -39,9 +39,9 @@ namespace state_machine
         bool TrySetSpeed(foc::RadiansPerSecond setpoint);
         bool TrySetPosition(foc::Radians setpoint);
 
-        bool TrySetCurrentPidGains(const services::FocPidGains& gains);
-        bool TrySetSpeedPidGains(const services::FocPidGains& gains);
-        bool TrySetPositionPidGains(const services::FocPidGains& gains);
+        bool TrySetCurrentBandwidth(float bandwidth);
+        bool TrySetSpeedBandwidth(float bandwidth);
+        bool TrySetPositionBandwidth(float bandwidth);
 
     private:
         void Activate(ControlMode mode);

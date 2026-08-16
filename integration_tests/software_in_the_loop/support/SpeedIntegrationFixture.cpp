@@ -190,8 +190,7 @@ namespace integration
         data.rPhase = 0.5f;
         data.lD = 1.0f;
         data.lQ = 1.0f;
-        data.kpVelocity = 0.25f;
-        data.kiVelocity = 0.5f;
+        data.speedLoopBandwidth = 50.0f;
         return data;
     }
 }

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "core/foc/cascade/WithAutomaticCurrentPidGains.hpp"
-#include "core/foc/cascade/WithAutomaticSpeedPidGains.hpp"
 #include "core/foc/instantiations/FocController.hpp"
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
@@ -28,19 +26,16 @@ namespace application
     protected:
         foc::FocBase& GetFoc() override;
         foc::Controllable& GetFocControl() override;
-        foc::FocSpeedTunable& SpeedTunable() override;
+        foc::SpeedLoopTunable& SpeedTunable() override;
         foc::FocOnlineEstimableBase& OnlineEstimable() override;
         services::MechanicalParametersIdentification& MechIdentImpl() override;
         void RunPostAlignmentStep() override;
-        foc::WithAutomaticCurrentPidGains& GetCurrentLoopTuner() override;
-        foc::WithAutomaticSpeedPidGains& GetSpeedAutoTuner() override;
+        foc::CurrentLoopTunable& CurrentTunable() override;
         services::RealTimeFrictionAndInertiaEstimator& GetOnlineMechEstimator() override;
         services::RealTimeResistanceAndInductanceEstimator& GetOnlineElecEstimator() override;
 
     private:
         foc::FocPositionController focController;
-        foc::WithAutomaticCurrentPidGains pidAutoTuner;
-        foc::WithAutomaticSpeedPidGains speedAutoTuner;
         services::RealTimeFrictionAndInertiaEstimator onlineMechEstimator;
         services::RealTimeResistanceAndInductanceEstimator onlineElecEstimator;
         std::optional<std::reference_wrapper<services::MechanicalParametersIdentification>> mechIdentPtr;

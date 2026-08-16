@@ -14,9 +14,23 @@ namespace application
         , mechTorqueConstant(mechTorqueConstantArg)
     {}
 
+    void OuterLoopStateMachine::ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth)
+    {
+        SpeedTunable().ConfigureMechanics(foc::MechanicalModelParameters{
+            inertia,
+            friction,
+            mechTorqueConstant,
+            foc::Ampere{ 0.0f },
+            hal::Hertz{ 0 } });
+
+        auto tunings = foc::SpeedLoopTunings{};
+        tunings.bandwidth = bandwidth > 0.0f ? bandwidth : velocityBandwidthRadPerSec;
+        SpeedTunable().SetSpeedTunings(tunings);
+    }
+
     void OuterLoopStateMachine::ApplyModeSpecificCalibration(const services::CalibrationData& data)
     {
-        SpeedTunable().SetSpeedTunings(GetVdc(), foc::SpeedTunings{ data.kpVelocity, data.kiVelocity, 0.0f });
+        ApplyMechanics(foc::NewtonMeterSecondSquared{ data.inertia }, foc::NewtonMeterSecondPerRadian{ data.frictionViscous }, data.speedLoopBandwidth);
 
         GetOnlineMechEstimator().SetInitialEstimate(foc::NewtonMeterSecondSquared{ data.inertia }, foc::NewtonMeterSecondPerRadian{ data.frictionViscous });
         GetOnlineElecEstimator().SetInitialEstimate(foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD });
@@ -51,7 +65,7 @@ namespace application
         else
         {
             GetTracer().Trace() << "[SM] Applying mechanical estimates: J=" << inertia.Value() << " B=" << friction.Value();
-            GetSpeedAutoTuner().SetPidBasedOnInertiaAndFriction(GetVdc(), inertia, friction, velocityBandwidthRadPerSec);
+            ApplyMechanics(inertia, friction, velocityBandwidthRadPerSec);
         }
 
         const auto resistance = GetOnlineElecEstimator().CurrentResistance();
@@ -62,7 +76,7 @@ namespace application
         else
         {
             GetTracer().Trace() << "[SM] Applying electrical estimates: R=" << resistance.Value() << " L=" << inductance.Value();
-            GetCurrentLoopTuner().SetPidBasedOnResistanceAndInductance(GetVdc(), resistance, inductance, GetInverter().BaseFrequency(), nyquistFactor);
+            ApplyElectricalModel(resistance, inductance, GetCalibration().polePairs, GetCalibration().currentLoopBandwidth);
         }
     }
 
@@ -95,8 +109,7 @@ namespace application
                     auto& cal = std::get<state_machine::Calibrating>(GetCurrentState());
                     cal.pendingData.inertia = inertia->Value();
                     cal.pendingData.frictionViscous = friction->Value();
-                    cal.pendingData.kpVelocity = inertia->Value() * velocityBandwidthRadPerSec;
-                    cal.pendingData.kiVelocity = friction->Value() * velocityBandwidthRadPerSec;
+                    cal.pendingData.speedLoopBandwidth = velocityBandwidthRadPerSec;
                     OnCalibrationComplete();
                 }
             });

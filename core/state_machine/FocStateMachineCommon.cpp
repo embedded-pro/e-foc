@@ -1,5 +1,6 @@
 #include "core/state_machine/FocStateMachineCommon.hpp"
 #include <bit>
+#include <numbers>
 
 namespace application
 {
@@ -294,11 +295,8 @@ namespace application
                 else
                 {
                     auto data = std::get<state_machine::Calibrating>(currentState).pendingData;
-                    GetFoc().SetPolePairs(data.polePairs);
                     encoder.Set(foc::Radians{ std::bit_cast<float>(data.encoderZeroOffset) });
-                    GetCurrentLoopTuner().SetPidBasedOnResistanceAndInductance(
-                        vdc, foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD },
-                        inverter.BaseFrequency(), nyquistFactor);
+                    ApplyElectricalCalibration(data);
                     ApplyModeSpecificCalibration(data);
                     EnterReady(data);
                     CompletePendingCommand(state_machine::CommandResult::ok);
@@ -332,11 +330,8 @@ namespace application
                                 tracer.Trace() << "[SM] NVM load failed, starting in Idle";
                             else
                             {
-                                GetFoc().SetPolePairs(calibrationData.polePairs);
                                 encoder.Set(foc::Radians{ std::bit_cast<float>(calibrationData.encoderZeroOffset) });
-                                GetCurrentLoopTuner().SetPidBasedOnResistanceAndInductance(
-                                    vdc, foc::Ohm{ calibrationData.rPhase }, foc::MilliHenry{ calibrationData.lD },
-                                    inverter.BaseFrequency(), nyquistFactor);
+                                ApplyElectricalCalibration(calibrationData);
                                 ApplyModeSpecificCalibration(calibrationData);
                                 EnterReady(calibrationData);
                             }
@@ -369,4 +364,38 @@ namespace application
         return currentState;
     }
 
+    float FocStateMachineCommon::DefaultCurrentLoopBandwidth() const
+    {
+        return (static_cast<float>(inverter.BaseFrequency().Value()) / nyquistFactor) * 2.0f * std::numbers::pi_v<float>;
+    }
+
+    foc::CurrentLoopTunings FocStateMachineCommon::CurrentTuningsFor(float bandwidth) const
+    {
+        auto tunings = foc::CurrentLoopTunings{};
+        tunings.bandwidth = bandwidth > 0.0f ? bandwidth : DefaultCurrentLoopBandwidth();
+        return tunings;
+    }
+
+    void FocStateMachineCommon::ApplyElectricalCalibration(const services::CalibrationData& data)
+    {
+        ApplyElectricalModel(foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD }, data.polePairs, data.currentLoopBandwidth);
+    }
+
+    void FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth)
+    {
+        GetFoc().Configure(foc::MotorModelParameters{
+            resistance,
+            inductance,
+            foc::Weber{ 0.0f },
+            vdc,
+            inverter.BaseFrequency(),
+            polePairs });
+
+        CurrentTunable().SetCurrentTunings(CurrentTuningsFor(bandwidth));
+    }
+
+    const services::CalibrationData& FocStateMachineCommon::GetCalibration() const
+    {
+        return calibrationData;
+    }
 }

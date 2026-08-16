@@ -15,8 +15,6 @@ namespace application
               calibServices.electricalIdent, calibServices.motorAlignment,
               calibServices.mechTorqueConstant)
         , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt)
-        , pidAutoTuner(focController)
-        , speedAutoTuner(focController)
         , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, outerLoopArgs.baseFrequency)
         , onlineElecEstimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, outerLoopArgs.baseFrequency)
         , mechIdentPtr(calibServices.mechIdentOverride)
@@ -43,7 +41,7 @@ namespace application
         return focController;
     }
 
-    foc::FocSpeedTunable& PositionStateMachine::SpeedTunable()
+    foc::SpeedLoopTunable& PositionStateMachine::SpeedTunable()
     {
         return focController;
     }
@@ -53,14 +51,9 @@ namespace application
         return focController;
     }
 
-    foc::WithAutomaticCurrentPidGains& PositionStateMachine::GetCurrentLoopTuner()
+    foc::CurrentLoopTunable& PositionStateMachine::CurrentTunable()
     {
-        return pidAutoTuner;
-    }
-
-    foc::WithAutomaticSpeedPidGains& PositionStateMachine::GetSpeedAutoTuner()
-    {
-        return speedAutoTuner;
+        return focController;
     }
 
     services::RealTimeFrictionAndInertiaEstimator& PositionStateMachine::GetOnlineMechEstimator()

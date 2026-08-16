@@ -766,23 +766,23 @@ namespace
 
     // ---- TrySet*PidGains: accepted by matching mode(s) ----
 
-    TEST_F(ControlModeStateMachineExtTest, TrySetCurrentPidGains_AcceptedInTorqueMode)
+    TEST_F(ControlModeStateMachineExtTest, TrySetCurrentBandwidth_AcceptedInTorqueMode)
     {
         GivenNvmAlwaysInvalid();
         ConstructSubject();
 
-        EXPECT_TRUE(subject->TrySetCurrentPidGains(services::FocPidGains{ 100, 10, 0 }));
+        EXPECT_TRUE(subject->TrySetCurrentBandwidth(8377.6f));
     }
 
-    TEST_F(ControlModeStateMachineExtTest, TrySetSpeedPidGains_RejectedInTorqueMode)
+    TEST_F(ControlModeStateMachineExtTest, TrySetSpeedBandwidth_RejectedInTorqueMode)
     {
         GivenNvmAlwaysInvalid();
         ConstructSubject();
 
-        EXPECT_FALSE(subject->TrySetSpeedPidGains(services::FocPidGains{ 100, 10, 0 }));
+        EXPECT_FALSE(subject->TrySetSpeedBandwidth(50.0f));
     }
 
-    TEST_F(ControlModeStateMachineExtTest, TrySetSpeedPidGains_AcceptedInSpeedMode)
+    TEST_F(ControlModeStateMachineExtTest, TrySetSpeedBandwidth_AcceptedInSpeedMode)
     {
         GivenNvmAlwaysInvalid();
         GivenNvmSaveConfigSucceeds();
@@ -790,19 +790,19 @@ namespace
 
         subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-        EXPECT_TRUE(subject->TrySetSpeedPidGains(services::FocPidGains{ 100, 10, 0 }));
+        EXPECT_TRUE(subject->TrySetSpeedBandwidth(50.0f));
     }
 
-    TEST_F(ControlModeStateMachineExtTest, TrySetPositionPidGains_AcceptedOnlyInPositionMode)
+    TEST_F(ControlModeStateMachineExtTest, TrySetPositionBandwidth_AcceptedOnlyInPositionMode)
     {
         GivenNvmAlwaysInvalid();
         GivenNvmSaveConfigSucceeds();
         ConstructSubject();
 
-        EXPECT_FALSE(subject->TrySetPositionPidGains(services::FocPidGains{ 100, 10, 0 }));
+        EXPECT_FALSE(subject->TrySetPositionBandwidth(18.8f));
 
         subject->Select(state_machine::ControlMode::position, [](auto) {});
 
-        EXPECT_TRUE(subject->TrySetPositionPidGains(services::FocPidGains{ 100, 10, 0 }));
+        EXPECT_TRUE(subject->TrySetPositionBandwidth(18.8f));
     }
 }

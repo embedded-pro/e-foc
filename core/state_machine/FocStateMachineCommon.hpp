@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/foc/cascade/WithAutomaticCurrentPidGains.hpp"
 #include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
@@ -68,7 +67,7 @@ namespace application
         virtual foc::FocBase& GetFoc() = 0;
         virtual foc::Controllable& GetFocControl() = 0;
         virtual void RunPostAlignmentStep() = 0;
-        virtual foc::WithAutomaticCurrentPidGains& GetCurrentLoopTuner() = 0;
+        virtual foc::CurrentLoopTunable& CurrentTunable() = 0;
 
         virtual void ApplyModeSpecificCalibration(const services::CalibrationData& data);
         virtual void PrepareForEnabled();
@@ -96,6 +95,12 @@ namespace application
         const state_machine::State& GetCurrentState() const;
 
         static constexpr float nyquistFactor = 15.0f;
+
+        void ApplyElectricalCalibration(const services::CalibrationData& data);
+        void ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth);
+        const services::CalibrationData& GetCalibration() const;
+        foc::CurrentLoopTunings CurrentTuningsFor(float bandwidth) const;
+        float DefaultCurrentLoopBandwidth() const;
 
     private:
         services::TerminalWithStorage& terminal;

@@ -15,7 +15,7 @@ namespace
     struct TerminalBaseImpl
         : services::TerminalFocBaseInteractor
     {
-        TerminalBaseImpl(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::FocBase& controller)
+        TerminalBaseImpl(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::CurrentLoopTunable& controller)
             : services::TerminalFocBaseInteractor(terminal, vdc, controller)
         {}
     };
@@ -54,23 +54,19 @@ namespace
     };
 }
 
-TEST_F(TerminalBaseTest, set_dq_pid)
+TEST_F(TerminalBaseTest, set_current_bandwidth)
 {
-    controllers::PidTunings<float> idTunings{ .kp = 1.0f, .ki = 0.765f, .kd = -0.56f };
-    controllers::PidTunings<float> iqTunings{ .kp = 0.5f, .ki = -0.35f, .kd = 0.75f };
-    foc::IdAndIqTunings tunings{ idTunings, iqTunings };
-
-    InvokeCommand("sdqpid 1.0 0.765 -0.56 0.5 -0.35 0.75", [this, &tunings]()
+    InvokeCommand("scbw 6283.2", [this]()
         {
-            EXPECT_CALL(controllerBaseMock, SetCurrentTunings(testing::_, testing::_));
+            EXPECT_CALL(controllerBaseMock, SetCurrentTunings(testing::_));
         });
 
     ExecuteAllActions();
 }
 
-TEST_F(TerminalBaseTest, set_dq_pid_invalid_argument_count)
+TEST_F(TerminalBaseTest, set_current_bandwidth_invalid_argument_count)
 {
-    InvokeCommand("set_dq_pid 1.0 0.765", [this]()
+    InvokeCommand("set_current_bandwidth 6283.2 1.0", [this]()
         {
             ::testing::InSequence _;
 
@@ -86,99 +82,9 @@ TEST_F(TerminalBaseTest, set_dq_pid_invalid_argument_count)
     ExecuteAllActions();
 }
 
-TEST_F(TerminalBaseTest, set_dq_pid_invalid_d_kp)
+TEST_F(TerminalBaseTest, set_current_bandwidth_invalid_value)
 {
-    InvokeCommand("set_dq_pid abc 0.765 -0.56 0.5 -0.35 0.75", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string header{ "ERROR: " };
-            std::string payload{ "invalid value. It should be a float." };
-            std::string newline{ "\r\n" };
-
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalBaseTest, set_dq_pid_invalid_d_ki)
-{
-    InvokeCommand("set_dq_pid 1.0 abc -0.56 0.5 -0.35 0.75", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string header{ "ERROR: " };
-            std::string payload{ "invalid value. It should be a float." };
-            std::string newline{ "\r\n" };
-
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalBaseTest, set_dq_pid_invalid_d_kd)
-{
-    InvokeCommand("set_dq_pid 1.0 0.765 abc 0.5 -0.35 0.75", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string header{ "ERROR: " };
-            std::string payload{ "invalid value. It should be a float." };
-            std::string newline{ "\r\n" };
-
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalBaseTest, set_dq_pid_invalid_q_kp)
-{
-    InvokeCommand("set_dq_pid 1.0 0.765 -0.56 abc -0.35 0.75", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string header{ "ERROR: " };
-            std::string payload{ "invalid value. It should be a float." };
-            std::string newline{ "\r\n" };
-
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalBaseTest, set_dq_pid_invalid_q_ki)
-{
-    InvokeCommand("set_dq_pid 1.0 0.765 -0.56 0.5 abc 0.75", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string header{ "ERROR: " };
-            std::string payload{ "invalid value. It should be a float." };
-            std::string newline{ "\r\n" };
-
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalBaseTest, set_dq_pid_invalid_q_kd)
-{
-    InvokeCommand("set_dq_pid 1.0 0.765 -0.56 0.5 -0.35 abc", [this]()
+    InvokeCommand("set_current_bandwidth abc", [this]()
         {
             ::testing::InSequence _;
 

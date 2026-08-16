@@ -47,30 +47,24 @@ namespace
     };
 }
 
-TEST_F(TerminalSpeedTest, set_speed_pid)
+TEST_F(TerminalSpeedTest, set_speed_bandwidth)
 {
-    foc::SpeedTunings tunings{
-        .kp = 0.5f,
-        .ki = 0.1f,
-        .kd = 0.01f
-    };
-
-    InvokeCommand("sspid 0.5 0.1 0.01", [this, &tunings]()
+    InvokeCommand("ssbw 188.5", [this]()
         {
-            EXPECT_CALL(focMock, SetSpeedTunings(testing::_, testing::_));
+            EXPECT_CALL(focMock, SetSpeedTunings(testing::_));
         });
 
     ExecuteAllActions();
 }
 
-TEST_F(TerminalSpeedTest, set_speed_pid_invalid_argument_count)
+TEST_F(TerminalSpeedTest, set_speed_bandwidth_invalid_argument_count)
 {
-    InvokeCommand("set_speed_pid 0.5 0.1", [this]()
+    InvokeCommand("set_speed_bandwidth 188.5 1.0", [this]()
         {
             ::testing::InSequence _;
 
             std::string header{ "ERROR: " };
-            std::string payload{ "invalid number of arguments" };
+            std::string payload{ "invalid number of arguments." };
             std::string newline{ "\r\n" };
 
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
@@ -81,45 +75,9 @@ TEST_F(TerminalSpeedTest, set_speed_pid_invalid_argument_count)
     ExecuteAllActions();
 }
 
-TEST_F(TerminalSpeedTest, set_speed_pid_invalid_kp)
+TEST_F(TerminalSpeedTest, set_speed_bandwidth_invalid_value)
 {
-    InvokeCommand("set_speed_pid abc 0.1 0.01", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string header{ "ERROR: " };
-            std::string payload{ "invalid value. It should be a float." };
-            std::string newline{ "\r\n" };
-
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalSpeedTest, set_speed_pid_invalid_ki)
-{
-    InvokeCommand("set_speed_pid 0.5 abc 0.01", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string header{ "ERROR: " };
-            std::string payload{ "invalid value. It should be a float." };
-            std::string newline{ "\r\n" };
-
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalSpeedTest, set_speed_pid_invalid_kd)
-{
-    InvokeCommand("set_speed_pid 0.5 0.1 abc", [this]()
+    InvokeCommand("set_speed_bandwidth abc", [this]()
         {
             ::testing::InSequence _;
 

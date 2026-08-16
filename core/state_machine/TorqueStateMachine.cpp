@@ -12,7 +12,6 @@ namespace application
         : FocStateMachineCommon(terminalAndTracer, hardware, nvm,
               calibServices.electricalIdent, calibServices.motorAlignment)
         , focController(hardware.inverter, hardware.encoder)
-        , pidAutoTuner(focController)
     {
         RegisterFaultHandler(faultNotifier);
         RegisterCliIfNeeded(transitionPolicy);
@@ -34,9 +33,9 @@ namespace application
         return focController;
     }
 
-    foc::WithAutomaticCurrentPidGains& TorqueStateMachine::GetCurrentLoopTuner()
+    foc::CurrentLoopTunable& TorqueStateMachine::CurrentTunable()
     {
-        return pidAutoTuner;
+        return focController;
     }
 
     void TorqueStateMachine::RunPostAlignmentStep()

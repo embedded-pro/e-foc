@@ -8,7 +8,7 @@ namespace services
         , vdc(vdc)
         , foc(foc)
     {
-        terminal.AddCommand({ { "set_speed_pid", "sspid", "Set speed PID parameters. set_speed_pid <kp> <ki> <kd>. Ex: sspid 1.0 0.2 0.01" },
+        terminal.AddCommand({ { "set_speed_bandwidth", "ssbw", "Set speed loop bandwidth in rad/s. set_speed_bandwidth <bandwidth>. Ex: ssbw 188.5" },
             [this](const auto& params)
             {
                 this->Terminal().ProcessResult(SetSpeedPid(params));
@@ -23,12 +23,18 @@ namespace services
 
     TerminalFocSpeedInteractor::StatusWithMessage TerminalFocSpeedInteractor::SetSpeedPid(const infra::BoundedConstString& input)
     {
-        controllers::PidTunings<float> pid{};
-        auto result = ParsePidTunings(input, pid);
-        if (result.result != services::TerminalWithStorage::Status::success)
-            return result;
+        infra::Tokenizer tokenizer(input, ' ');
 
-        foc.SetSpeedTunings(vdc, pid);
+        if (tokenizer.Size() != 1)
+            return { services::TerminalWithStorage::Status::error, "invalid number of arguments." };
+
+        auto bandwidth = ParseInput(tokenizer.Token(0));
+        if (!bandwidth.has_value())
+            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
+
+        auto tunings = foc::SpeedLoopTunings{};
+        tunings.bandwidth = *bandwidth;
+        foc.SetSpeedTunings(tunings);
         return StatusWithMessage();
     }
 

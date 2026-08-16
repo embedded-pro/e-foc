@@ -88,10 +88,8 @@ namespace
         EXPECT_EQ(actual.frictionCoulomb, expected.frictionCoulomb);
         EXPECT_EQ(actual.frictionViscous, expected.frictionViscous);
         EXPECT_EQ(actual.encoderZeroOffset, expected.encoderZeroOffset);
-        EXPECT_EQ(actual.kpCurrent, expected.kpCurrent);
-        EXPECT_EQ(actual.kiCurrent, expected.kiCurrent);
-        EXPECT_EQ(actual.kpVelocity, expected.kpVelocity);
-        EXPECT_EQ(actual.kiVelocity, expected.kiVelocity);
+        EXPECT_EQ(actual.currentLoopBandwidth, expected.currentLoopBandwidth);
+        EXPECT_EQ(actual.speedLoopBandwidth, expected.speedLoopBandwidth);
         EXPECT_EQ(actual.encoderDirection, expected.encoderDirection);
         EXPECT_EQ(actual.polePairs, expected.polePairs);
     }
@@ -133,10 +131,8 @@ namespace
             d.encoderZeroOffset = 1234;
             d.encoderDirection = 1;
             d.polePairs = 7;
-            d.kpCurrent = 10.0f;
-            d.kiCurrent = 500.0f;
-            d.kpVelocity = 0.5f;
-            d.kiVelocity = 20.0f;
+            d.currentLoopBandwidth = 8377.6f;
+            d.speedLoopBandwidth = 50.0f;
             return d;
         }
 

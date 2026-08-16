@@ -212,7 +212,7 @@ namespace
 
     // ---- SetPid*: accepted in matching mode, modeMismatch otherwise ----
 
-    TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_InTorqueMode_AcksSuccess)
+    TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_IsRejected)
     {
         ConstructFixture();
         ResetCaptures();
@@ -223,10 +223,13 @@ namespace
 
         ASSERT_TRUE(ackSpy.last.has_value());
         EXPECT_EQ(ackSpy.last->commandType, services::focSetPidCurrentId);
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryErrorOriginCmd, services::focSetPidCurrentId);
+        EXPECT_EQ(lastCategoryErrorReason, services::FocMotorCategoryError::applicationError);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnSetPidSpeed_InTorqueMode_SendsModeMismatch)
+    TEST_F(FocMotorCanBridgeTest, OnSetPidSpeed_IsRejected)
     {
         ConstructFixture();
         ResetCaptures();
@@ -240,10 +243,10 @@ namespace
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
         EXPECT_TRUE(categoryErrorSent);
         EXPECT_EQ(lastCategoryErrorOriginCmd, services::focSetPidSpeedId);
-        EXPECT_EQ(lastCategoryErrorReason, services::FocMotorCategoryError::modeMismatch);
+        EXPECT_EQ(lastCategoryErrorReason, services::FocMotorCategoryError::applicationError);
     }
 
-    TEST_F(FocMotorCanBridgeTest, OnSetPidPosition_InTorqueMode_SendsModeMismatch)
+    TEST_F(FocMotorCanBridgeTest, OnSetPidPosition_IsRejected)
     {
         ConstructFixture();
         ResetCaptures();
@@ -257,7 +260,7 @@ namespace
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
         EXPECT_TRUE(categoryErrorSent);
         EXPECT_EQ(lastCategoryErrorOriginCmd, services::focSetPidPositionId);
-        EXPECT_EQ(lastCategoryErrorReason, services::FocMotorCategoryError::modeMismatch);
+        EXPECT_EQ(lastCategoryErrorReason, services::FocMotorCategoryError::applicationError);
     }
 
     TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_AcksNotImplemented)

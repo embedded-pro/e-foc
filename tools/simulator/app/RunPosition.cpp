@@ -36,13 +36,26 @@ namespace simulator
         foc::FocPositionController controller{ model, model, foc::Ampere{ defaults::maxCurrentAmps }, baseFrequency,
             lowPriorityInterrupt, hal::Hertz{ defaults::lowPriorityFrequencyHz } };
 
-        controller.SetSpeedTunings(vdc, controllers::PidTunings<float>{ defaults::speedKp, defaults::speedKi, defaults::speedKd });
-        controller.SetPositionTunings(controllers::PidTunings<float>{ defaults::positionKp, defaults::positionKi, defaults::positionKd });
-        controller.SetCurrentTunings(vdc,
-            foc::IdAndIqTunings{
-                { defaults::currentKp, defaults::currentKi, defaults::currentKd },
-                { defaults::currentKp, defaults::currentKi, defaults::currentKd } });
-        controller.SetPolePairs(motorParams.p);
+        auto motorModel = foc::MotorModelParameters{};
+        motorModel.resistance = motorParams.R;
+        motorModel.inductance = foc::MilliHenry{ motorParams.Ld.Value() * 1000.0f };
+        motorModel.fluxLinkage = motorParams.psi_f;
+        motorModel.busVoltage = vdc;
+        motorModel.samplingFrequency = baseFrequency;
+        motorModel.polePairs = motorParams.p;
+        controller.Configure(motorModel);
+
+        auto mechanics = foc::MechanicalModelParameters{};
+        mechanics.inertia = foc::NewtonMeterSecondSquared{ motorParams.J.Value() };
+        mechanics.viscousFriction = motorParams.B;
+        mechanics.torqueConstant = foc::NewtonMeter{ 1.5f * motorParams.p * motorParams.psi_f.Value() };
+        mechanics.maxCurrent = foc::Ampere{ defaults::maxCurrentAmps };
+        mechanics.samplingFrequency = hal::Hertz{ defaults::lowPriorityFrequencyHz };
+        controller.ConfigureMechanics(mechanics);
+
+        controller.SetCurrentTunings(foc::CurrentLoopTunings{});
+        controller.SetSpeedTunings(foc::SpeedLoopTunings{});
+        controller.SetPositionTunings(foc::PositionLoopTunings{});
         controller.SetPoint(foc::Radians{ 0.0f });
 
         const ParametersPanel::PidParameters pidParameters{

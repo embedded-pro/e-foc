@@ -63,8 +63,8 @@ namespace application
         hal::PerformanceTracker& performanceTimer;
         foc::Volts Vdc;
         hal::Hertz systemClock;
-        controllers::PidTunings<float> speedPidTunings;
-        controllers::PidTunings<float> dqPidTunings;
+        float speedLoopBandwidth{ foc::SpeedLoopTunings{}.bandwidth };
+        float currentLoopBandwidth{ foc::CurrentLoopTunings{}.bandwidth };
         std::optional<std::size_t> polePairs = 0;
         foc::SpeedCascade foc;
         hal::Eeprom& eeprom;

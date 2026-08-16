@@ -28,28 +28,22 @@ namespace state_machine
         onDone();
     }
 
-    void FocMotorCanBridge::OnSetPidCurrent(const services::FocPidGains& gains, const infra::Function<void()>& onDone)
+    // Raw PID gains are no longer part of the FOC contract; tuning is bandwidth-based.
+    // can-lite has no bandwidth message yet, so these legacy frames are rejected rather than
+    // reinterpreted, which would apply a gain value as a bandwidth on a live motor.
+    void FocMotorCanBridge::OnSetPidCurrent(const services::FocPidGains&, const infra::Function<void()>&)
     {
-        if (controlMode.TrySetCurrentPidGains(gains))
-            onDone();
-        else
-            server.SendCategoryError(services::focSetPidCurrentId, services::FocMotorCategoryError::modeMismatch);
+        server.SendCategoryError(services::focSetPidCurrentId, services::FocMotorCategoryError::applicationError);
     }
 
-    void FocMotorCanBridge::OnSetPidSpeed(const services::FocPidGains& gains, const infra::Function<void()>& onDone)
+    void FocMotorCanBridge::OnSetPidSpeed(const services::FocPidGains&, const infra::Function<void()>&)
     {
-        if (controlMode.TrySetSpeedPidGains(gains))
-            onDone();
-        else
-            server.SendCategoryError(services::focSetPidSpeedId, services::FocMotorCategoryError::modeMismatch);
+        server.SendCategoryError(services::focSetPidSpeedId, services::FocMotorCategoryError::applicationError);
     }
 
-    void FocMotorCanBridge::OnSetPidPosition(const services::FocPidGains& gains, const infra::Function<void()>& onDone)
+    void FocMotorCanBridge::OnSetPidPosition(const services::FocPidGains&, const infra::Function<void()>&)
     {
-        if (controlMode.TrySetPositionPidGains(gains))
-            onDone();
-        else
-            server.SendCategoryError(services::focSetPidPositionId, services::FocMotorCategoryError::modeMismatch);
+        server.SendCategoryError(services::focSetPidPositionId, services::FocMotorCategoryError::applicationError);
     }
 
     void FocMotorCanBridge::OnIdentifyElectrical(const infra::Function<void(services::FocElectricalParams)>&)

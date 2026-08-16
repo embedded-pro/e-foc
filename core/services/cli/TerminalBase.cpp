@@ -6,12 +6,12 @@
 
 namespace services
 {
-    TerminalFocBaseInteractor::TerminalFocBaseInteractor(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::FocBase& foc)
+    TerminalFocBaseInteractor::TerminalFocBaseInteractor(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::CurrentLoopTunable& currentLoop)
         : terminal(terminal)
         , vdc(vdc)
-        , foc(foc)
+        , currentLoop(currentLoop)
     {
-        terminal.AddCommand({ { "set_dq_pid", "sdqpid", "Set D and Q PID parameters. set_dq_pid <kp> <ki> <kd> <kp> <ki> <kd>. Ex: sdqpid 1.0 0.765 -0.56 0.5 -0.35 0.75" },
+        terminal.AddCommand({ { "set_current_bandwidth", "scbw", "Set current loop bandwidth in rad/s. set_current_bandwidth <bandwidth>. Ex: scbw 6283.2" },
             [this](const auto& params)
             {
                 this->terminal.ProcessResult(SetFocPid(params));
@@ -27,37 +27,16 @@ namespace services
     {
         infra::Tokenizer tokenizer(input, ' ');
 
-        if (tokenizer.Size() != 6)
+        if (tokenizer.Size() != 1)
             return { services::TerminalWithStorage::Status::error, "invalid number of arguments" };
 
-        auto dkp = ParseInput(tokenizer.Token(0));
-        if (!dkp.has_value())
+        auto bandwidth = ParseInput(tokenizer.Token(0));
+        if (!bandwidth.has_value())
             return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
 
-        auto dki = ParseInput(tokenizer.Token(1));
-        if (!dki.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
-
-        auto dkd = ParseInput(tokenizer.Token(2));
-        if (!dkd.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
-
-        auto qkp = ParseInput(tokenizer.Token(3));
-        if (!qkp.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
-
-        auto qki = ParseInput(tokenizer.Token(4));
-        if (!qki.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
-
-        auto qkd = ParseInput(tokenizer.Token(5));
-        if (!qkd.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
-
-        auto dPid = controllers::PidTunings<float>{ (*dkp), (*dki), (*dkd) };
-        auto qPid = controllers::PidTunings<float>{ (*qkp), (*qki), (*qkd) };
-
-        foc.SetCurrentTunings(vdc, foc::IdAndIqTunings{ dPid, qPid });
+        auto tunings = foc::CurrentLoopTunings{};
+        tunings.bandwidth = *bandwidth;
+        currentLoop.SetCurrentTunings(tunings);
         return TerminalFocBaseInteractor::StatusWithMessage();
     }
 }

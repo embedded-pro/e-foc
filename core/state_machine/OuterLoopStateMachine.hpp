@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/foc/cascade/WithAutomaticSpeedPidGains.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
@@ -37,14 +36,15 @@ namespace application
 
         void RunMechanicalIdentStep();
 
-        virtual foc::FocSpeedTunable& SpeedTunable() = 0;
+        virtual foc::SpeedLoopTunable& SpeedTunable() = 0;
         virtual foc::FocOnlineEstimableBase& OnlineEstimable() = 0;
         virtual services::MechanicalParametersIdentification& MechIdentImpl() = 0;
-        virtual foc::WithAutomaticSpeedPidGains& GetSpeedAutoTuner() = 0;
         virtual services::RealTimeFrictionAndInertiaEstimator& GetOnlineMechEstimator() = 0;
         virtual services::RealTimeResistanceAndInductanceEstimator& GetOnlineElecEstimator() = 0;
 
     private:
+        void ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth);
+
         static constexpr float velocityBandwidthRadPerSec = 50.0f;
 
         foc::NewtonMeter mechTorqueConstant;

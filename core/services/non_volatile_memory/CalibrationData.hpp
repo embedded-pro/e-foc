@@ -20,14 +20,12 @@ namespace services
         float frictionCoulomb = 0.0f;
         float frictionViscous = 0.0f;
         int32_t encoderZeroOffset = 0;
-        float kpCurrent = 0.0f;
-        float kiCurrent = 0.0f;
-        float kpVelocity = 0.0f;
-        float kiVelocity = 0.0f;
+        float currentLoopBandwidth = 0.0f;
+        float speedLoopBandwidth = 0.0f;
         uint8_t encoderDirection = 0;
         uint8_t polePairs = 0;
         std::array<uint8_t, 2> reserved = {};
     };
 
-    static_assert(sizeof(CalibrationData) == 60, "CalibrationData layout must be free of implicit padding");
+    static_assert(sizeof(CalibrationData) == 52, "CalibrationData layout must be free of implicit padding");
 }

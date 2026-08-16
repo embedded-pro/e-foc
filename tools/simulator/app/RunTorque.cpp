@@ -29,11 +29,15 @@ namespace simulator
         model.SetLoad(foc::NewtonMeter{ defaults::loadTorqueNm });
 
         foc::FocTorqueController controller{ model, model };
-        controller.SetCurrentTunings(vdc,
-            foc::IdAndIqTunings{
-                { defaults::currentKp, defaults::currentKi, defaults::currentKd },
-                { defaults::currentKp, defaults::currentKi, defaults::currentKd } });
-        controller.SetPolePairs(JK42BLS01_X038ED::parameters.p);
+        auto motorModel = foc::MotorModelParameters{};
+        motorModel.resistance = JK42BLS01_X038ED::parameters.R;
+        motorModel.inductance = foc::MilliHenry{ JK42BLS01_X038ED::parameters.Ld.Value() * 1000.0f };
+        motorModel.fluxLinkage = JK42BLS01_X038ED::parameters.psi_f;
+        motorModel.busVoltage = vdc;
+        motorModel.samplingFrequency = baseFrequency;
+        motorModel.polePairs = JK42BLS01_X038ED::parameters.p;
+        controller.Configure(motorModel);
+        controller.SetCurrentTunings(foc::CurrentLoopTunings{});
         controller.SetPoint(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
         const ParametersPanel::PidParameters pidParameters{

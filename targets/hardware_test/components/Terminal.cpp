@@ -114,7 +114,7 @@ namespace application
                 this->terminal.ProcessResult(ConfigureAdc(param));
             } });
 
-        terminal.AddCommand({ { "pid", "c", "Configure speed and DQ PIDs [spd_kp spd_ki spd_kd dq_kp dq_ki dq_kd]. Ex: pid 1 0 0 1 0 0" },
+        terminal.AddCommand({ { "pid", "c", "Configure loop bandwidths in rad/s [speed current]. Ex: pid 188.5 6283.2" },
             [this](const infra::BoundedConstString& param)
             {
                 this->terminal.ProcessResult(ConfigurePid(param));
@@ -249,38 +249,27 @@ namespace application
     {
         infra::Tokenizer tokenizer(param, ' ');
 
-        if (tokenizer.Size() != 6)
+        if (tokenizer.Size() != 2)
             return { error, "invalid number of arguments" };
 
-        auto dKp = ParseInput<float>(tokenizer.Token(0), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
-        if (!dKp.has_value())
-            return { error, "invalid value for Speed Kp" };
+        auto speedBandwidth = ParseInput<float>(tokenizer.Token(0), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
+        if (!speedBandwidth.has_value())
+            return { error, "invalid value for speed loop bandwidth" };
 
-        auto dKi = ParseInput<float>(tokenizer.Token(1), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
-        if (!dKi.has_value())
-            return { error, "invalid value for Speed Ki" };
+        auto currentBandwidth = ParseInput<float>(tokenizer.Token(1), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
+        if (!currentBandwidth.has_value())
+            return { error, "invalid value for current loop bandwidth" };
 
-        auto dKd = ParseInput<float>(tokenizer.Token(2), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
-        if (!dKd.has_value())
-            return { error, "invalid value for Speed Kd" };
+        speedLoopBandwidth = *speedBandwidth;
+        currentLoopBandwidth = *currentBandwidth;
 
-        auto qKp = ParseInput<float>(tokenizer.Token(3), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
-        if (!qKp.has_value())
-            return { error, "invalid value for DQ-axis Kp" };
+        auto speedTunings = foc::SpeedLoopTunings{};
+        speedTunings.bandwidth = speedLoopBandwidth;
+        foc.SetSpeedTunings(speedTunings);
 
-        auto qKi = ParseInput<float>(tokenizer.Token(4), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
-        if (!qKi.has_value())
-            return { error, "invalid value for DQ-axis Ki" };
-
-        auto qKd = ParseInput<float>(tokenizer.Token(5), std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
-        if (!qKd.has_value())
-            return { error, "invalid value for DQ-axis Kd" };
-
-        speedPidTunings = controllers::PidTunings<float>{ *dKp, *dKi, *dKd };
-        dqPidTunings = controllers::PidTunings<float>{ *qKp, *qKi, *qKd };
-
-        foc.SetSpeedTunings(Vdc, speedPidTunings);
-        foc.SetCurrentTunings(Vdc, { dqPidTunings, dqPidTunings });
+        auto currentTunings = foc::CurrentLoopTunings{};
+        currentTunings.bandwidth = currentLoopBandwidth;
+        foc.SetCurrentTunings(currentTunings);
 
         return { success };
     }
@@ -336,8 +325,8 @@ namespace application
         tracer.Trace() << "      Phase B Current:  " << input.b.Value() << " mA";
         tracer.Trace() << "      Phase C Current:  " << input.c.Value() << " mA";
         tracer.Trace() << "    PID Tunings:";
-        tracer.Trace() << "      Speed PID:         [P: " << speedPidTunings.kp << ", I: " << speedPidTunings.ki << ", D: " << speedPidTunings.kd << "]";
-        tracer.Trace() << "      DQ-axis PID:       [P: " << dqPidTunings.kp << ", I: " << dqPidTunings.ki << ", D: " << dqPidTunings.kd << "]";
+        tracer.Trace() << "    Speed loop bandwidth:   " << speedLoopBandwidth << " rad/s";
+        tracer.Trace() << "    Current loop bandwidth: " << currentLoopBandwidth << " rad/s";
         tracer.Trace() << "    PWM Outputs:";
         tracer.Trace() << "      Phase A PWM:      " << result.a.Value() << " %";
         tracer.Trace() << "      Phase B PWM:      " << result.b.Value() << " %";
@@ -401,7 +390,11 @@ namespace application
             return { error, "invalid value for poles. It should be an integer between 2 and 16." };
 
         polePairs = static_cast<std::size_t>(*poles / 2);
-        foc.SetPolePairs(polePairs.value());
+
+        auto parameters = foc::MotorModelParameters{};
+        parameters.busVoltage = Vdc;
+        parameters.polePairs = polePairs.value();
+        foc.Configure(parameters);
 
         return { success };
     }

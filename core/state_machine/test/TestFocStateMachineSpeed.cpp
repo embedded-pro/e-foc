@@ -76,8 +76,7 @@ namespace
             data.rPhase = 0.5f;
             data.lD = 1.0f;
             data.lQ = 1.0f;
-            data.kpVelocity = 0.25f;
-            data.kiVelocity = 0.5f;
+            data.speedLoopBandwidth = 50.0f;
 
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
@@ -224,8 +223,7 @@ namespace
             data.rPhase = 0.5f;
             data.lD = 1.0f;
             data.lQ = 1.0f;
-            data.kpVelocity = 0.25f;
-            data.kiVelocity = 0.5f;
+            data.speedLoopBandwidth = 50.0f;
             data.inertia = 0.01f;
             data.frictionViscous = 0.005f;
 
@@ -251,8 +249,7 @@ namespace
             data.rPhase = 0.0f;
             data.lD = 1.0f;
             data.lQ = 1.0f;
-            data.kpVelocity = 0.25f;
-            data.kiVelocity = 0.5f;
+            data.speedLoopBandwidth = 50.0f;
 
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
@@ -337,8 +334,7 @@ TEST_F(FocStateMachineSpeedCliTest, calibration_populates_inertia_and_velocity_g
     const auto& data = std::get<state_machine::Ready>(sm.CurrentState()).loadedData;
     EXPECT_NEAR(data.inertia, 0.005f, 1e-5f);
     EXPECT_NEAR(data.frictionViscous, 0.01f, 1e-5f);
-    EXPECT_GT(data.kpVelocity, 0.0f);
-    EXPECT_GT(data.kiVelocity, 0.0f);
+    EXPECT_GT(data.speedLoopBandwidth, 0.0f);
 }
 
 TEST_F(FocStateMachineSpeedCliTest, calibrate_from_ready_re_runs_and_reaches_ready)
@@ -1067,8 +1063,7 @@ namespace
             data.rPhase = 0.5f;
             data.lD = 1.0f;
             data.lQ = 1.0f;
-            data.kpVelocity = 0.25f;
-            data.kiVelocity = 0.5f;
+            data.speedLoopBandwidth = 50.0f;
 
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
