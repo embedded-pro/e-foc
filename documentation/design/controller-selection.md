@@ -235,7 +235,8 @@ This is why `SetPositionTunings` returns `SelectResult` where the current and sp
 `IntegralStateFeedbackLqi` is not used for the LQI position law. Its constructor calls
 `really_assert(converged)` with no non-aborting alternative, which on a live motor turns a single
 CLI command into a firmware abort. The augmented three-state design is built on
-`Lqr<float, 3, 1>::TryCreate` instead. See numerical-toolbox issue #291.
+`Lqr<float, 3, 1>::TryCreate` instead. Tracked as a pending upstream fix in
+`documentation/architecture/system.md` (numerical-toolbox issue #291).
 
 ---
 

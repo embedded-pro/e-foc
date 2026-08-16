@@ -7,7 +7,8 @@ namespace foc
 {
     // State feedback on the position-integral augmented state, which rejects the constant load
     // torque that leaves plain LQR with a standing error. Built on Lqr::TryCreate rather than
-    // IntegralStateFeedbackLqi, which has no non-aborting construction path.
+    // IntegralStateFeedbackLqi, whose constructor aborts on a non-convergent solve; see the
+    // pending upstream fixes in documentation/architecture/system.md.
     class LqiPositionController
     {
     public:
