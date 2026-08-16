@@ -69,7 +69,7 @@ OPTIMIZE_FOR_SPEED PhasePwmDutyCycles SpeedCascade::Calculate(
 }
 ```
 
-Target: FOC loop completes in <400 cycles at 120 MHz for 20 kHz control rate. Use `arm-none-eabi-objdump -d -C` to verify generated assembly if needed.
+Target: the 20 kHz inner loop completes in <=4500 cycles at 120 MHz; the 1 kHz outer loop in <=20000. Use `arm-none-eabi-objdump -d -C` to verify generated assembly if needed.
 
 ### FOC Theory — CORRECTNESS RULES
 

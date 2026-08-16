@@ -60,7 +60,7 @@ The `EepromStub` (512-byte in-memory array, all `0xFF` at construction, synchron
 
 ### FOC Integration Fixture
 
-Central test fixture (`FocIntegrationFixture`) shared across all scenarios via the Cucumber context. Member construction order is declaration order; the key constraint is that the `FocStateMachineImpl` must be constructed after the direct-method expectations are registered on `PlatformFactoryMock`.
+Central test fixture (`FocIntegrationFixture`) shared across all scenarios via the Cucumber context. Member construction order is declaration order; the key constraint is that the state machine must be constructed after the direct-method expectations are registered on `PlatformFactoryMock`.
 
 Lifecycle of each scenario:
 
@@ -69,7 +69,7 @@ sequenceDiagram
     participant Context
     participant Fixture as FocIntegrationFixture
     participant PFM as PlatformFactoryMock
-    participant SM as FocStateMachineImpl
+    participant SM as FocStateMachineCommon
     participant NVM as NonVolatileMemoryImpl
 
     Context->>Fixture: Emplace (constructor)
@@ -86,7 +86,7 @@ sequenceDiagram
     Note over Fixture: State machine in Idle
 ```
 
-The `FocStateMachineImpl` is always constructed with `AutoTransitionPolicy` so that test steps can call `CmdCalibrate()`, `CmdEnable()` and `CmdDisable()` directly without going through the terminal CLI.
+The state machine is always constructed with `TransitionPolicy::Auto` so that test steps can call `CmdCalibrate()`, `CmdEnable()` and `CmdDisable()` directly without going through the terminal CLI.
 
 ### State Machine Bridge
 

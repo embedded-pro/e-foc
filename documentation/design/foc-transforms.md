@@ -52,13 +52,16 @@ The Clarke transform is a geometric projection that reduces a balanced three-pha
 
 **Forward transform** (currents 3-phase → αβ):
 
-The α component is identical to phase-A current.  
-The β component combines phase-A and phase-B with a 1/√3 scaling factor:
+The amplitude-invariant Clarke transform uses all three measured phases, so it stays correct when
+the currents are not perfectly balanced:
 
 ```
-Iα = Ia
-Iβ = (Ia + 2·Ib) / √3
+Iα = (2/3)·(Ia - (Ib + Ic)/2)
+Iβ = (Ib - Ic) / √3
 ```
+
+When the system *is* balanced (`Ia + Ib + Ic = 0`) this reduces to the familiar two-sensor form
+`Iα = Ia`, `Iβ = (Ia + 2·Ib)/√3`. The implementation uses the three-phase form unconditionally.
 
 The third phase current Ic is not measured directly; it is derived from the balanced-system constraint `Ia + Ib + Ic = 0`. This two-sensor topology reduces hardware cost at the cost of assuming ideal phase balance.
 

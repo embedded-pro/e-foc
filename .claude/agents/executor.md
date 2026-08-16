@@ -73,7 +73,7 @@ OPTIMIZE_FOR_SPEED PhasePwmDutyCycles SpeedCascade::Calculate(
 }
 ```
 
-Target: FOC loop completes in <400 cycles at 120 MHz for 20 kHz control rate.
+Target: the 20 kHz inner loop completes in <=4500 cycles at 120 MHz; the 1 kHz outer loop in <=20000.
 
 ### FOC Theory — Correctness Rules
 

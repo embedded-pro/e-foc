@@ -35,7 +35,7 @@ $$
 i[k+1] = A_d^i \cdot i[k] + B_d^i \cdot v'[k]
 $$
 
-with $A_d^i \approx 1 - R_s T_s^i / L_s$ and $B_d^i \approx T_s^i / L_s$.
+with $A_d^i = e^{-R_s T_s^i / L_s}$ and $B_d^i = (1 - A_d^i)/R_s$.
 
 | Algorithm                        | Key Advantage                                                 |
 |----------------------------------|---------------------------------------------------------------|
@@ -71,16 +71,22 @@ $$
 i[k+1] = A_d^i \cdot i[k] + B_d^i \cdot v'[k]
 $$
 
-with the discrete matrices:
+with the discrete matrices obtained by exact zero-order-hold discretisation of the RL plant:
 
 $$
-A_d^i \approx 1 - \frac{R_s\,T_s^i}{L_s}, \qquad B_d^i \approx \frac{T_s^i}{L_s}
+A_d^i = e^{-R_s T_s^i / L_s}, \qquad B_d^i = \frac{1 - A_d^i}{R_s}
 $$
+
+which reduce to the familiar first-order approximations $A_d^i \approx 1 - R_s T_s^i / L_s$ and
+$B_d^i \approx T_s^i / L_s$ when $R_s T_s^i \ll L_s$. The exact form is the one implemented, because
+it stays accurate for the high $R_s T_s / L_s$ ratios that small-inductance motors produce.
 
 A1 derives the feedforward law that recovers this decoupled plant from the coupled PMSM voltage
-equations and then applies a standard PI. A2 (Deadbeat) inverts this plant model directly. A3
-(Sliding-mode) treats the residual coupling and noise as a bounded disturbance bounded by the
-switching gain $K_{sw}$.
+equations and then applies a standard PI. A2 (Deadbeat) inverts this plant model directly and
+therefore applies the **same A1 feedforward** to its inversion result — an exact plant inversion is
+only exact once the coupling it does not model has been cancelled. A3 (Sliding-mode) deliberately
+omits the feedforward and treats the residual coupling and noise as a bounded disturbance covered by
+the switching gain $K_{sw}$; that robustness is the reason to select it before RLS has converged.
 
 ---
 
@@ -188,6 +194,10 @@ The one-step law is unaffected — it places the closed-loop pole at the origin 
 **Model accuracy requirement**: A 10% $L_s$ error leaves a 10% residual error after one step.
 Deadbeat is the natural progression after Decoupled PID has validated RLS convergence.
 
+**Decoupling**: the inversion above solves the decoupled plant, so the A1 feedforward terms are
+added to $v'$ before the modulation-circle limit. Without them $\omega_e L_s i_q$ enters as an
+unmodelled disturbance and the one-step settling property is lost at speed.
+
 **Normalisation**: $v'[k]$ (physical volts) normalised identically to the PI output:
 $v'_{norm}[k] = v'[k] \cdot \sqrt{3}/V_{dc}$.
 
@@ -203,13 +213,15 @@ early in operation before RLS has converged and during thermal transients that s
 drives the current error onto a stable sliding surface regardless of parameter mismatch, within a
 defined gain margin.
 
-**Sliding surface**: For each axis independently:
+**Sliding surface**: For each axis independently, defined on the tracking error
+$e = i - i^*$:
 
 $$
-s_d = i_d^* - i_d, \qquad s_q = i_q^* - i_q
+s_d = i_d - i_d^*, \qquad s_q = i_q - i_q^*
 $$
 
-The surface $s = 0$ is the desired zero-error manifold.
+The surface $s = 0$ is the desired zero-error manifold. This is the sign convention the toolbox
+`SlidingModeControl` uses, and it is the one implemented.
 
 **Discrete equivalent control**: The voltage that would maintain $s[k+1] = 0$:
 
@@ -220,11 +232,13 @@ $$
 **Switching control**: Drives the state onto the surface:
 
 $$
-u_{sw}[k] = -\frac{K_{sw}}{B_d^i} \cdot \mathrm{sat}\!\left(\frac{s[k]}{\phi}\right)
+u_{sw}[k] = -\frac{K_{sw}}{B_d^i} \cdot \mathrm{sat}\!\left(\frac{e[k]}{\phi}\right)
 $$
 
 where $\mathrm{sat}(x) = \mathrm{clamp}(x,-1,1)$. The boundary layer $\phi > 0$ replaces the
-discontinuous sign function with saturation to prevent chattering.
+discontinuous sign function with saturation to prevent chattering. Both terms carry a leading minus
+sign because the error is measured as $i - i^*$: a current below its reference gives $e < 0$ and
+must command a *positive* voltage.
 
 **Total control law**:
 
@@ -261,7 +275,7 @@ boundary-layer saturation. Plant matrices $A_d^i, B_d^i$ are constructed from RL
 
 ### Cycle Budget
 
-The 20 kHz current loop budget is approximately 400 cycles at 120 MHz for the full `Calculate()`
+The 20 kHz inner-loop budget is 4 500 cycles at 120 MHz for the full `Calculate()`
 path (Clarke + Park + controller + inv-Park + SVM).
 
 - A1 feedforward additions: ~8–12 MAC cycles — fits comfortably.

@@ -12,7 +12,7 @@ date: 2026-04-07
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.1.0                        |
+| Version   | 0.2.0                        |
 | Component | service-nvm                  |
 | Date      | 2026-04-07                   |
 
@@ -51,8 +51,8 @@ The service manages two independent EEPROM regions. Each region holds exactly on
 
 | Region        | Magic        | Data structure    | Data size |
 |---------------|--------------|-------------------|-----------|
-| Calibration   | `0xCAFEF00D` | `CalibrationData` | 60 bytes  |
-| Configuration | `0xDEADBEEF` | `ConfigData`      | 40 bytes  |
+| Calibration   | `0xCAFEF00D` | `CalibrationData` | 52 bytes  |
+| Configuration | `0xDEADBEEF` | `ConfigData`      | 20 bytes  |
 
 The two regions use different `NvmRegion` instances (injected at construction) and can be read, written, and erased independently. An operation on the calibration region has no effect on the configuration region and vice versa.
 
@@ -168,7 +168,7 @@ stateDiagram-v2
 
 ### Calibration and Configuration Data Fields
 
-**CalibrationData** (60 bytes total):
+**CalibrationData** (52 bytes total):
 
 | Field                | Physical unit | Description                                         |
 |----------------------|---------------|-----------------------------------------------------|
@@ -185,23 +185,24 @@ stateDiagram-v2
 | encoderDirection     | —             | Polarity correction (+1 or −1)                      |
 | polePairs            | —             | Number of motor pole pairs                          |
 
-**ConfigData** (40 bytes total):
+**ConfigData** (20 bytes total):
 
 | Field                 | Physical unit | Description                                  |
 |-----------------------|---------------|----------------------------------------------|
-| maxCurrent            | A             | Peak current limit                           |
-| maxVelocity           | rad/s         | Peak speed limit                             |
-| maxTorque             | N·m           | Peak torque limit                            |
 | canNodeId             | —             | CAN bus node identifier                      |
 | canBaudrate           | bit/s         | CAN bus baud rate                            |
 | telemetryRateHz       | Hz            | Rate at which telemetry frames are sent      |
-| overTempThreshold     | °C            | Over-temperature trip threshold              |
-| underVoltageThreshold | V             | DC bus under-voltage trip threshold          |
-| overVoltageThreshold  | V             | DC bus over-voltage trip threshold           |
+| encoderResolution     | —             | Encoder counts per mechanical revolution      |
 | defaultControlMode    | —             | Control mode selected on power-up            |
 | currentAlgorithm      | —             | Current-loop algorithm selected on power-up  |
 | speedAlgorithm        | —             | Speed-loop algorithm selected on power-up    |
 | positionAlgorithm     | —             | Position-loop algorithm selected on power-up |
+
+The four selection fields are stored as raw byte identifiers. A record can pass the integrity check
+and still hold a byte outside the valid range for its selection, so each value is range-checked
+against its algorithm set before it is applied on power-up. A value outside the range, or a selection
+the current motor parameters do not support, leaves the loop on its built-in default and the stored
+byte is corrected to match what is actually running.
 
 ---
 

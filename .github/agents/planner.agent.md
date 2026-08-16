@@ -42,7 +42,7 @@ Before planning, thoroughly investigate:
   - `FocBase` — pole pairs, enable/disable, current tunings, `Calculate()`
   - `FocTorque`, `FocSpeed`, `FocPosition` — set-point types
   - `Driver` — hardware adapter abstractions
-- **Timing constraints**: Assess whether each step stays within the FOC loop budget (<400 cycles at 120 MHz for a 20 kHz control rate)
+- **Timing constraints**: Assess whether each step stays within the FOC loop budget (<=4500 cycles at 120 MHz for the 20 kHz inner loop, 20000 for the 1 kHz outer loop)
 - **Hardware adapters**: Check `core/platform_abstraction/PlatformFactory.hpp` for peripheral creation and injection patterns
 - **Numerical tools**: Identify if `infra/numerical-toolbox/` algorithms (PID, filters, transforms) can be reused or need extension
 - **Test infrastructure**: Find existing test files in the `test/` folder of each library under `core/foc/` and simulation models in `tools/simulator/`
@@ -144,7 +144,7 @@ Scope note: The memory and realtime constraints below apply to embedded/runtime 
 - [ ] `Calculate()` hot path is free of virtual dispatch (use concrete types or templates)
 - [ ] No blocking calls (no `sleep`, no busy-wait) in ISR/FOC context
 - [ ] Trigonometric functions use pre-computed or lookup-table approximations where needed
-- [ ] Target cycle budget documented: <400 cycles at 120 MHz for 20 kHz control rate
+- [ ] Target cycle budget documented: <=4500 cycles at 120 MHz for the 20 kHz inner loop
 - [ ] `#pragma GCC optimize("O3", "fast-math")` applied to implementation files
 - [ ] `OPTIMIZE_FOR_SPEED` applied to `Calculate()`, `Compute()`, and other hot-path methods
 

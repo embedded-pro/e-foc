@@ -246,7 +246,7 @@ If called from any state other than `Enabled`, the call is silently ignored.
 
 ### Control Mode Selection (`ControlModeStateMachine`)
 
-`ControlModeStateMachine` is a higher-level coordinator that owns one `FocStateMachineImpl` per supported control mode (Torque, Speed, Position). At any given time exactly one mode's state machine is the **active** instance; the others are idle. This section documents three behavioral invariants introduced to make runtime mode switching safe and predictable.
+`ControlModeStateMachine` is a higher-level coordinator that owns one `FocStateMachineCommon` subclass per supported control mode (`TorqueStateMachine`, `SpeedStateMachine`, `PositionStateMachine`), held in a `std::variant`. At any given time exactly one mode's state machine is the **active** instance; the others are idle. This section documents three behavioral invariants introduced to make runtime mode switching safe and predictable.
 
 #### C1 — CAN Wire-Scale Convention
 

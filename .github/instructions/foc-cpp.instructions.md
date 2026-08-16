@@ -29,7 +29,7 @@ The `Calculate()` method runs at 20 kHz in interrupt context. Every cycle matter
 
 - No virtual dispatch in `Calculate()` hot path
 - No blocking calls in any ISR-reachable code
-- Target: <400 cycles at 120 MHz for the full FOC loop
+- Target: <=4500 cycles at 120 MHz for the 20 kHz inner loop (75% of the 6000-cycle period); the 1 kHz outer loop budget is 20000 cycles
 - Use `FastTrigonometry` (from `core/foc/math/FastTrigonometry.hpp`) or lookup tables — not raw `sin`/`cos` in hot paths
 
 Every implementation file with hot-path code MUST include:
@@ -44,13 +44,13 @@ Apply `OPTIMIZE_FOR_SPEED` (from `numerical/math/CompilerOptimizations.hpp`) on 
 
 ## FOC Theory — Correctness
 
-- **Clarke**: `Iα = Ia`, `Iβ = (Ia + 2·Ib) / √3`
+- **Clarke** (amplitude-invariant, all three phases): `Iα = (2/3)·(Ia - (Ib+Ic)/2)`, `Iβ = (Ib - Ic)/√3`
 - **Park**: `Id = Iα·cos(θ) + Iβ·sin(θ)`, `Iq = -Iα·sin(θ) + Iβ·cos(θ)`
 - **Electrical angle**: `θe = θm · pole_pairs`
 - **Anti-windup**: All PID integrators must have clamping or back-calculation
 - Reuse `Clarke`, `Park`, `ClarkePark` and `SpaceVectorModulation` from `core/foc/transforms/` — do not duplicate
 
-Use unit-typed aliases throughout: `Ampere`, `Radians`, `Volts`, `Rpm`, `PhasePwmDutyCycles`, `PhaseCurrents`.
+Use unit-typed aliases throughout: `Ampere`, `Radians`, `Volts`, `RevPerMinute`, `PhasePwmDutyCycles`, `PhaseCurrents`.
 
 ## Naming
 

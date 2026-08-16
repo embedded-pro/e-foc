@@ -45,7 +45,7 @@ You triage incoming development requests and route them to the right specialist 
   - `tools/simulator/` — host simulation models for validation
   - `numerical-toolbox/` — PID, filters, fixed-point math used by FOC
 - What is the control mode? Torque / speed / position loop
-- What is the timing budget? (FOC loop target: <400 cycles at 120 MHz for 20 kHz rate)
+- What is the timing budget? (inner loop: <=4500 cycles at 120 MHz for 20 kHz; outer loop: <=20000 for 1 kHz)
 - What hardware target? (EK-TM4C1294XL, STM32, or host simulation)
 - Are existing tests or simulation models affected?
 - Does this require documentation updates in `documentation/`?

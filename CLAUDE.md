@@ -89,7 +89,7 @@ Apply `OPTIMIZE_FOR_SPEED` (from `numerical/math/CompilerOptimizations.hpp`) to 
 
 ## 4. FOC Theory — Correctness
 
-- **Clarke**: `Iα = (2/3)·(Ia - (Ib+Ic)/2)`, `Iβ = (Ib - Ic)/√3` (power-invariant, all 3 phases used)
+- **Clarke**: `Iα = (2/3)·(Ia - (Ib+Ic)/2)`, `Iβ = (Ib - Ic)/√3` (amplitude-invariant, all 3 phases used)
 - **Park**: `Id = Iα·cos(θ) + Iβ·sin(θ)`, `Iq = -Iα·sin(θ) + Iβ·cos(θ)`
 - **Electrical angle**: `θe = θm · pole_pairs`
 - **Anti-windup**: All PID integrators must have clamping or back-calculation

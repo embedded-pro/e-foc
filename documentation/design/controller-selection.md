@@ -295,8 +295,11 @@ verbatim, so an operator always learns why a selection was refused.
 
 ### Part G — CAN Interface
 
-Algorithm selection is exposed as a CAN frame in the existing `FocMotorCanBridge` message set.
-Two frame types are added:
+Algorithm selection is **not** exposed over CAN. The `can-lite` `foc_motor` category has no frame
+for it, and the bridge deliberately does not reinterpret an existing frame to carry an algorithm
+identifier. Selection and query are CLI-only for now; see REQ-CTRL-001 and REQ-CTRL-013.
+
+When the protocol gains the frames, the intended shape is:
 
 | Frame                       | Direction     | Payload                                                           |
 |-----------------------------|---------------|-------------------------------------------------------------------|
@@ -304,9 +307,8 @@ Two frame types are added:
 | `GetControllerAlgorithm`    | Host → Device | Loop identifier (1 byte)                                          |
 | `ControllerAlgorithmStatus` | Device → Host | Loop (1 byte) + Active algorithm (1 byte) + SelectResult (1 byte) |
 
-The device responds to `SetControllerAlgorithm` with a `ControllerAlgorithmStatus` frame containing
-the resulting `SelectResult`. The `Busy` result follows the same `CanAckStatus` mapping as the
-existing `SetControlMode` command.
+with the `Busy` result following the same `CanAckStatus` mapping as the existing `SelectControlMode`
+command.
 
 ---
 
