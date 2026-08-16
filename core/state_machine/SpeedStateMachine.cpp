@@ -45,11 +45,6 @@ namespace application
         return focController;
     }
 
-    foc::FocOnlineEstimableBase& SpeedStateMachine::OnlineEstimable()
-    {
-        return focController;
-    }
-
     foc::CurrentLoopTunable& SpeedStateMachine::CurrentTunable()
     {
         return focController;

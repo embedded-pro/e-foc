@@ -53,9 +53,13 @@ namespace state_machine
     private:
         void Activate(ControlMode mode);
         void ApplyPersistedAlgorithms();
+        void PersistConfig();
         foc::CurrentLoopSelectable* CurrentSelectable();
         foc::SpeedLoopSelectable* SpeedSelectable();
         foc::PositionLoopSelectable* PositionSelectable();
+        const foc::CurrentLoopSelectable* CurrentSelectable() const;
+        const foc::SpeedLoopSelectable* SpeedSelectable() const;
+        const foc::PositionLoopSelectable* PositionSelectable() const;
         void RegisterCliCommands();
         void TraceSelectResult(foc::SelectResult result) const;
         void OnSaveConfigDone(services::NvmStatus status);

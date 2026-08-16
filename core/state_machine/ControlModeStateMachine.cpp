@@ -50,6 +50,8 @@ namespace
     {
         switch (algorithm)
         {
+            case foc::CurrentAlgorithm::pid:
+                return "pid";
             case foc::CurrentAlgorithm::decoupledPid:
                 return "decoupled";
             case foc::CurrentAlgorithm::deadbeat:
@@ -57,7 +59,7 @@ namespace
             case foc::CurrentAlgorithm::slidingMode:
                 return "sliding";
             default:
-                return "pid";
+                return "unknown";
         }
     }
 
@@ -65,6 +67,8 @@ namespace
     {
         switch (algorithm)
         {
+            case foc::SpeedAlgorithm::pid:
+                return "pid";
             case foc::SpeedAlgorithm::lqi:
                 return "lqi";
             case foc::SpeedAlgorithm::adrc:
@@ -72,7 +76,7 @@ namespace
             case foc::SpeedAlgorithm::twoDof:
                 return "twodof";
             default:
-                return "pid";
+                return "unknown";
         }
     }
 
@@ -80,6 +84,8 @@ namespace
     {
         switch (algorithm)
         {
+            case foc::PositionAlgorithm::pid:
+                return "pid";
             case foc::PositionAlgorithm::cascadeP:
                 return "cascadep";
             case foc::PositionAlgorithm::lqr:
@@ -89,8 +95,31 @@ namespace
             case foc::PositionAlgorithm::twoDof:
                 return "twodof";
             default:
-                return "pid";
+                return "unknown";
         }
+    }
+
+    // A CRC-valid record can still hold a byte outside the enum domain, so every persisted
+    // selection is range-checked before it reaches a static_cast.
+    std::optional<foc::CurrentAlgorithm> CurrentAlgorithmFromRaw(uint8_t raw)
+    {
+        if (raw > static_cast<uint8_t>(foc::CurrentAlgorithm::slidingMode))
+            return std::nullopt;
+        return static_cast<foc::CurrentAlgorithm>(raw);
+    }
+
+    std::optional<foc::SpeedAlgorithm> SpeedAlgorithmFromRaw(uint8_t raw)
+    {
+        if (raw > static_cast<uint8_t>(foc::SpeedAlgorithm::twoDof))
+            return std::nullopt;
+        return static_cast<foc::SpeedAlgorithm>(raw);
+    }
+
+    std::optional<foc::PositionAlgorithm> PositionAlgorithmFromRaw(uint8_t raw)
+    {
+        if (raw > static_cast<uint8_t>(foc::PositionAlgorithm::twoDof))
+            return std::nullopt;
+        return static_cast<foc::PositionAlgorithm>(raw);
     }
 }
 
@@ -118,7 +147,11 @@ namespace state_machine
 
     void ControlModeStateMachine::Select(ControlMode mode, const infra::Function<void(SelectResult)>& onDone)
     {
-        really_assert(pendingSelectCallback == nullptr);
+        if (pendingSelectCallback != nullptr)
+        {
+            onDone(SelectResult::busy);
+            return;
+        }
 
         if (!IsStopped(ActiveStateMachine().CurrentState()))
         {
@@ -320,16 +353,52 @@ namespace state_machine
         return nullptr;
     }
 
+    const foc::CurrentLoopSelectable* ControlModeStateMachine::CurrentSelectable() const
+    {
+        return const_cast<ControlModeStateMachine*>(this)->CurrentSelectable();
+    }
+
+    const foc::SpeedLoopSelectable* ControlModeStateMachine::SpeedSelectable() const
+    {
+        return const_cast<ControlModeStateMachine*>(this)->SpeedSelectable();
+    }
+
+    const foc::PositionLoopSelectable* ControlModeStateMachine::PositionSelectable() const
+    {
+        return const_cast<ControlModeStateMachine*>(this)->PositionSelectable();
+    }
+
     void ControlModeStateMachine::ApplyPersistedAlgorithms()
     {
         if (auto* selectable = CurrentSelectable())
-            selectable->SelectCurrentAlgorithm(static_cast<foc::CurrentAlgorithm>(configData.currentAlgorithm));
+        {
+            const auto algorithm = CurrentAlgorithmFromRaw(configData.currentAlgorithm);
+            if (!algorithm.has_value() || selectable->SelectCurrentAlgorithm(*algorithm) != foc::SelectResult::ok)
+                configData.currentAlgorithm = static_cast<uint8_t>(selectable->ActiveCurrentAlgorithm());
+        }
 
         if (auto* selectable = SpeedSelectable())
-            selectable->SelectSpeedAlgorithm(static_cast<foc::SpeedAlgorithm>(configData.speedAlgorithm));
+        {
+            const auto algorithm = SpeedAlgorithmFromRaw(configData.speedAlgorithm);
+            if (!algorithm.has_value() || selectable->SelectSpeedAlgorithm(*algorithm) != foc::SelectResult::ok)
+                configData.speedAlgorithm = static_cast<uint8_t>(selectable->ActiveSpeedAlgorithm());
+        }
 
         if (auto* selectable = PositionSelectable())
-            selectable->SelectPositionAlgorithm(static_cast<foc::PositionAlgorithm>(configData.positionAlgorithm));
+        {
+            const auto algorithm = PositionAlgorithmFromRaw(configData.positionAlgorithm);
+            if (!algorithm.has_value() || selectable->SelectPositionAlgorithm(*algorithm) != foc::SelectResult::ok)
+                configData.positionAlgorithm = static_cast<uint8_t>(selectable->ActivePositionAlgorithm());
+        }
+    }
+
+    void ControlModeStateMachine::PersistConfig()
+    {
+        nvm.SaveConfig(configData, [this](services::NvmStatus status)
+            {
+                if (status != services::NvmStatus::Ok)
+                    terminalAndTracer.tracer.Trace() << "config persist failed";
+            });
     }
 
     foc::SelectResult ControlModeStateMachine::SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm)
@@ -343,7 +412,7 @@ namespace state_machine
             return result;
 
         configData.currentAlgorithm = static_cast<uint8_t>(algorithm);
-        nvm.SaveConfig(configData, [](services::NvmStatus) {});
+        PersistConfig();
         return result;
     }
 
@@ -358,7 +427,7 @@ namespace state_machine
             return result;
 
         configData.speedAlgorithm = static_cast<uint8_t>(algorithm);
-        nvm.SaveConfig(configData, [](services::NvmStatus) {});
+        PersistConfig();
         return result;
     }
 
@@ -373,23 +442,32 @@ namespace state_machine
             return result;
 
         configData.positionAlgorithm = static_cast<uint8_t>(algorithm);
-        nvm.SaveConfig(configData, [](services::NvmStatus) {});
+        PersistConfig();
         return result;
     }
 
     foc::CurrentAlgorithm ControlModeStateMachine::ActiveCurrentAlgorithm() const
     {
-        return static_cast<foc::CurrentAlgorithm>(configData.currentAlgorithm);
+        if (const auto* selectable = CurrentSelectable())
+            return selectable->ActiveCurrentAlgorithm();
+
+        return CurrentAlgorithmFromRaw(configData.currentAlgorithm).value_or(foc::CurrentAlgorithm::pid);
     }
 
     foc::SpeedAlgorithm ControlModeStateMachine::ActiveSpeedAlgorithm() const
     {
-        return static_cast<foc::SpeedAlgorithm>(configData.speedAlgorithm);
+        if (const auto* selectable = SpeedSelectable())
+            return selectable->ActiveSpeedAlgorithm();
+
+        return SpeedAlgorithmFromRaw(configData.speedAlgorithm).value_or(foc::SpeedAlgorithm::pid);
     }
 
     foc::PositionAlgorithm ControlModeStateMachine::ActivePositionAlgorithm() const
     {
-        return static_cast<foc::PositionAlgorithm>(configData.positionAlgorithm);
+        if (const auto* selectable = PositionSelectable())
+            return selectable->ActivePositionAlgorithm();
+
+        return PositionAlgorithmFromRaw(configData.positionAlgorithm).value_or(foc::PositionAlgorithm::pid);
     }
 
     void ControlModeStateMachine::RegisterCliCommands()

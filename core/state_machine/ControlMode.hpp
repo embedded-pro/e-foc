@@ -2,6 +2,7 @@
 
 #include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
+#include "core/state_machine/FocStateMachine.hpp"
 #include <cstdint>
 
 namespace state_machine
@@ -87,6 +88,22 @@ namespace state_machine
             case SelectResult::busy:
             default:
                 return services::FocMotorCategoryError::busy;
+        }
+    }
+
+    inline services::FocMotorCategoryError ToCategoryError(CommandResult result)
+    {
+        switch (result)
+        {
+            case CommandResult::calibrationFailed:
+                return services::FocMotorCategoryError::calibrationFailed;
+            case CommandResult::nvmFailed:
+                return services::FocMotorCategoryError::persistenceFailed;
+            case CommandResult::abortedByFault:
+                return services::FocMotorCategoryError::abortedByFault;
+            case CommandResult::rejected:
+            default:
+                return services::FocMotorCategoryError::modeMismatch;
         }
     }
 }

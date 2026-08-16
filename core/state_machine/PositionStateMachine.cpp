@@ -46,11 +46,6 @@ namespace application
         return focController;
     }
 
-    foc::FocOnlineEstimableBase& PositionStateMachine::OnlineEstimable()
-    {
-        return focController;
-    }
-
     foc::CurrentLoopTunable& PositionStateMachine::CurrentTunable()
     {
         return focController;

@@ -27,7 +27,6 @@ namespace application
         foc::FocBase& GetFoc() override;
         foc::Controllable& GetFocControl() override;
         foc::SpeedLoopTunable& SpeedTunable() override;
-        foc::FocOnlineEstimableBase& OnlineEstimable() override;
         services::MechanicalParametersIdentification& MechIdentImpl() override;
         void RunPostAlignmentStep() override;
         foc::CurrentLoopTunable& CurrentTunable() override;

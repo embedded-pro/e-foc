@@ -1,13 +1,10 @@
 #pragma once
 
-#include <array>
 #include <cstdint>
 
 namespace services
 {
     // All 4-byte fields precede the byte-sized fields to avoid implicit compiler padding.
-    // 'reserved' is explicit padding to keep sizeof(ConfigData) a multiple of 4 and
-    // ensure the full struct is a deterministic, padding-free storage schema.
     struct ConfigData
     {
         uint32_t canNodeId = 1;

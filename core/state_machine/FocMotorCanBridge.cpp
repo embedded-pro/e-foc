@@ -1,5 +1,4 @@
 #include "core/state_machine/FocMotorCanBridge.hpp"
-#include "infra/util/ReallyAssert.hpp"
 
 namespace state_machine
 {
@@ -48,8 +47,13 @@ namespace state_machine
 
     void FocMotorCanBridge::OnIdentifyElectrical(const infra::Function<void(services::FocElectricalParams)>&)
     {
-        controlMode.ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
-        server.SendCommandAck(services::focIdentifyElectricalId, services::CanAckStatus::success);
+        controlMode.ActiveStateMachine().CmdCalibrate([this](state_machine::CommandResult result)
+            {
+                if (result == state_machine::CommandResult::ok)
+                    server.SendCommandAck(services::focIdentifyElectricalId, services::CanAckStatus::success);
+                else
+                    server.SendCategoryError(services::focIdentifyElectricalId, ToCategoryError(result));
+            });
     }
 
     void FocMotorCanBridge::OnIdentifyMechanical(const infra::Function<void(services::FocMechanicalParams)>&)
@@ -69,7 +73,12 @@ namespace state_machine
 
     void FocMotorCanBridge::OnSelectControlMode(services::FocMotorMode requestedMode, const infra::Function<void(services::FocMotorMode)>& onActivated)
     {
-        really_assert(pendingSelectCallback == nullptr);
+        if (pendingSelectCallback != nullptr)
+        {
+            server.SendCategoryError(services::focSelectControlModeId, services::FocMotorCategoryError::busy);
+            return;
+        }
+
         pendingSelectCallback = onActivated;
         controlMode.Select(FromCanMode(requestedMode), [this](SelectResult result)
             {

@@ -37,7 +37,6 @@ namespace application
         void RunMechanicalIdentStep();
 
         virtual foc::SpeedLoopTunable& SpeedTunable() = 0;
-        virtual foc::FocOnlineEstimableBase& OnlineEstimable() = 0;
         virtual services::MechanicalParametersIdentification& MechIdentImpl() = 0;
         virtual services::RealTimeFrictionAndInertiaEstimator& GetOnlineMechEstimator() = 0;
         virtual services::RealTimeResistanceAndInductanceEstimator& GetOnlineElecEstimator() = 0;
