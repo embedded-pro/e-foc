@@ -79,6 +79,6 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 - Key techniques: avoid virtual dispatch in hot paths, use `#pragma GCC optimize("O3", "fast-math")` for critical files, prefer static inline functions over virtual methods.
 - Debug builds use `-Og` to maintain debuggability while enabling basic optimizations.
 - Use `arm-none-eabi-objdump -d -C` to analyze generated assembly and verify optimizations.
-- Target cycle budgets: FOC loop should complete in <400 cycles at 120 MHz for 20 kHz control rate.
+- Target cycle budgets: the 20 kHz ISR path must stay within 4500 cycles at 120 MHz (75% of the 6000-cycle control period). CI measures the inner and outer loops separately via `targets/sync_foc_sensored/main/cycle-analysis.json` (20 kHz) and `cycle-analysis-outer.json` (1 kHz).
 
 If any section appears incomplete or you want deeper coverage (build-on-target, hardware flashing steps, or CI specifics), tell me which area to expand.

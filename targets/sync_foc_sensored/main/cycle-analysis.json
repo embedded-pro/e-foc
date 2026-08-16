@@ -1,8 +1,6 @@
 {
-    "path_name": "ADC ISR \u2192 FOC Position (worst case: inner + outer loop + all estimators) \u2192 PWM Output",
+    "path_name": "ADC ISR -> FOC inner loop (Clarke/Park/current loop/SVM) -> PWM output",
     "loop_rates_khz": [
-        1,
-        10,
         20
     ],
     "path_stages": [
@@ -29,7 +27,6 @@
         },
         {
             "label": "FOC Inner Loop (Calculate)",
-            "entry": "PositionCascade::Calculate",
             "patterns": [
                 "PositionCascade::Calculate",
                 "CascadeWithSpeedLoop::CalculateInnerLoop",
@@ -54,53 +51,6 @@
                 "std::clamp",
                 "std::max<float>",
                 "std::min<float>"
-            ]
-        },
-        {
-            "label": "FOC Outer Loop (LowPriorityHandler)",
-            "patterns": [
-                "PositionCascade::LowPriorityHandler",
-                "SpeedCascade::LowPriorityHandler",
-                "CascadeWithSpeedLoop::RunSpeedLoop",
-                "CascadeWithSpeedLoop::MeasureMechanicalSpeed",
-                "CascadeWithSpeedLoop::SetSpeedReference",
-                "CascadeWithSpeedLoop::SetDirectCurrentReference",
-                "CascadeWithSpeedLoop::CurrentMechanicalAngle",
-                "CascadeWithSpeedLoop::PolePairs",
-                "PidSpeedController::Compute",
-                "LqiSpeedController::Compute",
-                "AdrcSpeedController::Compute",
-                "TwoDofSpeedController::Compute",
-                "PidPositionController::Compute",
-                "CascadePPositionController::Compute",
-                "LqrPositionController::Compute",
-                "LqiPositionController::Compute",
-                "TwoDofPositionController::Compute",
-                "PidIncrementalSynchronous.*::Process",
-                "PidIncrementalSynchronous.*::SetPoint",
-                "OuterSamplePeriod",
-                "WrappedPositionError",
-                "LimitToCurrentEnvelope"
-            ]
-        },
-        {
-            "label": "Online Mechanical Estimator (RLS)",
-            "required": false,
-            "patterns": [
-                "CascadeWithSpeedLoop::UpdateOnlineMechanicalEstimator",
-                "RealTimeFrictionAndInertiaEstimator::Update",
-                "RecursiveLeastSquares.*::Update",
-                "ClarkePark::Forward"
-            ]
-        },
-        {
-            "label": "Online Electrical Estimator (RLS)",
-            "required": false,
-            "patterns": [
-                "CascadeWithSpeedLoop::UpdateOnlineElectricalEstimator",
-                "RealTimeResistanceAndInductanceEstimator::Update",
-                "RealTimeResistanceAndInductanceEstimator::ComputeEstimate",
-                "RecursiveLeastSquares.*::Update"
             ]
         },
         {

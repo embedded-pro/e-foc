@@ -67,7 +67,7 @@ The `Calculate()` method runs at 20 kHz in interrupt context.
 
 - No virtual dispatch in `Calculate()` hot path
 - No blocking calls in ISR-reachable code
-- Target: **<400 cycles at 120 MHz** for the full FOC loop
+- Budget: the 20 kHz ISR path must stay within **4500 cycles at 120 MHz**, 75% of the 6000-cycle control period, as required by `documentation/architecture/system.md`. It currently measures 1074–1353 cycles (~23%), of which the FOC calculation itself is 739–860.
 - Use `FastTrigonometry` (from `core/foc/math/FastTrigonometry.hpp`) or lookup tables — not raw `sin`/`cos` in hot paths
 
 Every implementation file with hot-path code must include:

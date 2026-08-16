@@ -191,10 +191,16 @@ jobs:
           analyses-json: |
             [
               {
-                "label": "Worst case (position)",
+                "label": "Inner loop (20 kHz ISR)",
                 "elf_path": "build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf",
                 "config_path": "targets/sync_foc_sensored/main/cycle-analysis.json",
-                "output_dir": "cycle-analysis"
+                "output_dir": "cycle-analysis/inner"
+              },
+              {
+                "label": "Outer loop (1 kHz, worst case position)",
+                "elf_path": "build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf",
+                "config_path": "targets/sync_foc_sensored/main/cycle-analysis-outer.json",
+                "output_dir": "cycle-analysis/outer"
               }
             ]
           target: ${{ matrix.target }}
@@ -202,7 +208,6 @@ jobs:
           clock-mhz: "120"
           cortex: "m4"
           output-dir: cycle-analysis
-          # A fork pull request only ever gets a read-only token, so posting would 403 and fail the job
           post-comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
           artifact-name: cycle-analysis
       - name: Cycle analysis summary
