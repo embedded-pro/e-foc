@@ -2,6 +2,7 @@
 
 #include "core/foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
+#include <cstddef>
 
 namespace foc
 {
@@ -12,6 +13,7 @@ namespace foc
         Weber fluxLinkage{ 0.0f };
         Volts busVoltage{ 0.0f };
         hal::Hertz samplingFrequency{ 0 };
+        std::size_t polePairs{ 0 };
     };
 
     struct MechanicalModelParameters

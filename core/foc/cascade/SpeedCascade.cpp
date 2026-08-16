@@ -17,29 +17,31 @@ namespace foc
             });
     }
 
-    void SpeedCascade::SetPolePairs(std::size_t pole)
+    void SpeedCascade::Configure(const MotorModelParameters& parameters)
     {
-        SetPolePairsImpl(pole);
+        ConfigureImpl(parameters);
+    }
+
+    void SpeedCascade::ConfigureMechanics(const MechanicalModelParameters& parameters)
+    {
+        ConfigureMechanicsImpl(parameters);
     }
 
     OPTIMIZE_FOR_SPEED
     void SpeedCascade::SetPoint(RadiansPerSecond point)
     {
         lastSpeedSetPoint = point;
-        SpeedPid().SetPoint(point.Value());
-        DPid().SetPoint(0.0f);
+        SetSpeedReference(point);
     }
 
-    OPTIMIZE_FOR_SPEED
-    void SpeedCascade::SetCurrentTunings(Volts Vdc, const IdAndIqTunings& torqueTunings)
+    void SpeedCascade::SetCurrentTunings(const CurrentLoopTunings& tunings)
     {
-        SetCurrentTuningsImpl(Vdc, torqueTunings);
+        SetCurrentTuningsImpl(tunings);
     }
 
-    OPTIMIZE_FOR_SPEED
-    void SpeedCascade::SetSpeedTunings(Volts Vdc, const SpeedTunings& speedTuning)
+    void SpeedCascade::SetSpeedTunings(const SpeedLoopTunings& tunings)
     {
-        SetSpeedTuningsImpl(speedTuning);
+        SetSpeedTuningsImpl(tunings);
     }
 
     void SpeedCascade::SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator)
@@ -68,9 +70,8 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     void SpeedCascade::LowPriorityHandler()
     {
-        auto mechanicalSpeed = detail::PositionWithWrapAround(CurrentMechanicalAngle() - PreviousSpeedPosition()) / SpeedDt();
-        PreviousSpeedPosition() = CurrentMechanicalAngle();
-        LastSpeedPidOutput() = SpeedPid().Process(mechanicalSpeed);
+        auto mechanicalSpeed = MeasureMechanicalSpeed();
+        RunSpeedLoop(mechanicalSpeed);
 
         UpdateOnlineMechanicalEstimator(mechanicalSpeed);
         UpdateOnlineElectricalEstimator(mechanicalSpeed * PolePairs());

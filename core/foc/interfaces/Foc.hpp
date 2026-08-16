@@ -1,38 +1,49 @@
 #pragma once
 
+#include "core/foc/interfaces/LoopTunings.hpp"
+#include "core/foc/interfaces/MotorModel.hpp"
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
-#include "numerical/controllers/interfaces/PidController.hpp"
 
 namespace foc
 {
     using IdAndIqPoint = std::pair<Ampere, Ampere>;
-    using IdAndIqTunings = std::pair<controllers::PidTunings<float>, controllers::PidTunings<float>>;
-    using SpeedTunings = controllers::PidTunings<float>;
-    using PositionTunings = controllers::PidTunings<float>;
 
     class FocBase
     {
     public:
-        virtual void SetPolePairs(std::size_t polePairs) = 0;
+        virtual void Configure(const MotorModelParameters& parameters) = 0;
         virtual void Enable() = 0;
         virtual void Disable() = 0;
-        virtual void SetCurrentTunings(Volts Vdc, const IdAndIqTunings& tunings) = 0;
         virtual PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) = 0;
+    };
+
+    class CurrentLoopTunable
+    {
+    public:
+        virtual void SetCurrentTunings(const CurrentLoopTunings& tunings) = 0;
+    };
+
+    class SpeedLoopTunable
+    {
+    public:
+        virtual void ConfigureMechanics(const MechanicalModelParameters& parameters) = 0;
+        virtual void SetSpeedTunings(const SpeedLoopTunings& tunings) = 0;
+    };
+
+    class PositionLoopTunable
+    {
+    public:
+        virtual void SetPositionTunings(const PositionLoopTunings& tunings) = 0;
     };
 
     class FocTorque
         : public FocBase
+        , public CurrentLoopTunable
     {
     public:
         virtual void SetPoint(IdAndIqPoint setPoint) = 0;
-    };
-
-    class FocSpeedTunable
-    {
-    public:
-        virtual void SetSpeedTunings(Volts Vdc, const SpeedTunings& speedTuning) = 0;
     };
 
     class FocOnlineEstimableBase
@@ -44,7 +55,8 @@ namespace foc
 
     class FocSpeed
         : public FocBase
-        , public FocSpeedTunable
+        , public CurrentLoopTunable
+        , public SpeedLoopTunable
         , public FocOnlineEstimableBase
     {
     public:
@@ -54,11 +66,12 @@ namespace foc
 
     class FocPosition
         : public FocBase
-        , public FocSpeedTunable
+        , public CurrentLoopTunable
+        , public SpeedLoopTunable
+        , public PositionLoopTunable
         , public FocOnlineEstimableBase
     {
     public:
         virtual void SetPoint(Radians setPoint) = 0;
-        virtual void SetPositionTunings(const PositionTunings& positionTuning) = 0;
     };
 }

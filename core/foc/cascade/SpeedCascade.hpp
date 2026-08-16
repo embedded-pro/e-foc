@@ -11,16 +11,20 @@ namespace foc
     public:
         explicit SpeedCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency = hal::Hertz{ 1000 });
 
-        void SetPolePairs(std::size_t polePairs) override;
+        void Configure(const MotorModelParameters& parameters) override;
+        void ConfigureMechanics(const MechanicalModelParameters& parameters) override;
         void SetPoint(RadiansPerSecond point) override;
-        void SetCurrentTunings(Volts Vdc, const IdAndIqTunings& torqueTunings) override;
-        void SetSpeedTunings(Volts Vdc, const SpeedTunings& speedTuning) override;
+        void SetCurrentTunings(const CurrentLoopTunings& tunings) override;
+        void SetSpeedTunings(const SpeedLoopTunings& tunings) override;
         void SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator) override;
         void SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator) override;
         void Enable() override;
         void Disable() override;
         hal::Hertz OuterLoopFrequency() const override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
+
+        using CascadeWithSpeedLoop::CurrentLoop;
+        using CascadeWithSpeedLoop::SpeedLoop;
 
     private:
         void LowPriorityHandler();

@@ -1,11 +1,23 @@
-#include "numerical/math/Tolerance.hpp"
 #include "core/foc/cascade/TorqueCascade.hpp"
+#include "numerical/math/Tolerance.hpp"
 #include <gmock/gmock.h>
 #include <numbers>
 
 namespace
 {
     constexpr float tolerance = 1.0f;
+
+    foc::MotorModelParameters MotorParameters(std::size_t polePairs)
+    {
+        auto parameters = foc::MotorModelParameters{};
+        parameters.resistance = foc::Ohm{ 1.0f };
+        parameters.inductance = foc::MilliHenry{ 1.0f };
+        parameters.fluxLinkage = foc::Weber{ 0.01f };
+        parameters.busVoltage = foc::Volts{ 24.0f };
+        parameters.samplingFrequency = hal::Hertz{ 20000 };
+        parameters.polePairs = polePairs;
+        return parameters;
+    }
 
     class TestTorqueCascade
         : public ::testing::Test
@@ -14,7 +26,7 @@ namespace
         void SetUp() override
         {
             focTorque.emplace();
-            focTorque->SetPolePairs(polePairs);
+            focTorque->Configure(MotorParameters(polePairs));
             focTorque->Enable();
         }
 
@@ -31,7 +43,7 @@ namespace
 TEST_F(TestTorqueCascade, zero_setpoint_and_zero_currents_gives_50_percent_duty_cycles)
 {
     focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
-    focTorque->SetCurrentTunings(foc::Volts{ 24.0f }, { { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } });
+    focTorque->SetCurrentTunings(foc::CurrentLoopTunings{});
 
     foc::Radians position{ 0.0f };
     auto result = focTorque->Calculate(ZeroCurrents(), position);
@@ -44,7 +56,7 @@ TEST_F(TestTorqueCascade, zero_setpoint_and_zero_currents_gives_50_percent_duty_
 TEST_F(TestTorqueCascade, duty_cycles_are_bounded_0_to_100)
 {
     focTorque->SetPoint({ foc::Ampere{ 10.0f }, foc::Ampere{ 10.0f } });
-    focTorque->SetCurrentTunings(foc::Volts{ 24.0f }, { { 10.0f, 0.0f, 0.0f }, { 10.0f, 0.0f, 0.0f } });
+    focTorque->SetCurrentTunings(foc::CurrentLoopTunings{});
 
     foc::Radians position{ 0.5f };
     auto result = focTorque->Calculate(ZeroCurrents(), position);
@@ -59,9 +71,9 @@ TEST_F(TestTorqueCascade, duty_cycles_are_bounded_0_to_100)
 
 TEST_F(TestTorqueCascade, set_pole_pairs)
 {
-    focTorque->SetPolePairs(4);
+    focTorque->Configure(MotorParameters(4));
     focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
-    focTorque->SetCurrentTunings(foc::Volts{ 24.0f }, { { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } });
+    focTorque->SetCurrentTunings(foc::CurrentLoopTunings{});
 
     foc::Radians position{ 0.0f };
     auto result = focTorque->Calculate(ZeroCurrents(), position);
@@ -73,7 +85,7 @@ TEST_F(TestTorqueCascade, set_pole_pairs)
 TEST_F(TestTorqueCascade, enable_disable_cycle)
 {
     focTorque->SetPoint({ foc::Ampere{ 1.0f }, foc::Ampere{ 0.0f } });
-    focTorque->SetCurrentTunings(foc::Volts{ 24.0f }, { { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } });
+    focTorque->SetCurrentTunings(foc::CurrentLoopTunings{});
 
     focTorque->Disable();
     focTorque->Enable();
@@ -88,7 +100,7 @@ TEST_F(TestTorqueCascade, enable_disable_cycle)
 TEST_F(TestTorqueCascade, different_positions_produce_different_outputs)
 {
     focTorque->SetPoint({ foc::Ampere{ 1.0f }, foc::Ampere{ 0.0f } });
-    focTorque->SetCurrentTunings(foc::Volts{ 24.0f }, { { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } });
+    focTorque->SetCurrentTunings(foc::CurrentLoopTunings{});
 
     foc::Radians position1{ 0.0f };
     auto result1 = focTorque->Calculate(ZeroCurrents(), position1);
@@ -106,7 +118,7 @@ TEST_F(TestTorqueCascade, different_positions_produce_different_outputs)
 TEST_F(TestTorqueCascade, non_zero_current_setpoint_produces_non_centered_output)
 {
     focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 5.0f } });
-    focTorque->SetCurrentTunings(foc::Volts{ 24.0f }, { { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } });
+    focTorque->SetCurrentTunings(foc::CurrentLoopTunings{});
 
     foc::Radians position{ 0.0f };
     auto result = focTorque->Calculate(ZeroCurrents(), position);

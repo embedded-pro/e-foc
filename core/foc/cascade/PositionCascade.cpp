@@ -16,29 +16,35 @@ namespace foc
             });
     }
 
-    void PositionCascade::SetPolePairs(std::size_t pole)
+    void PositionCascade::Configure(const MotorModelParameters& parameters)
     {
-        SetPolePairsImpl(pole);
+        ConfigureImpl(parameters);
+    }
+
+    void PositionCascade::ConfigureMechanics(const MechanicalModelParameters& parameters)
+    {
+        ConfigureMechanicsImpl(parameters);
     }
 
     OPTIMIZE_FOR_SPEED
     void PositionCascade::SetPoint(Radians point)
     {
         lastPositionSetPoint = point;
-        positionPid.SetPoint(point.Value());
-        DPid().SetPoint(0.0f);
     }
 
-    OPTIMIZE_FOR_SPEED
-    void PositionCascade::SetCurrentTunings(Volts Vdc, const IdAndIqTunings& torqueTunings)
+    void PositionCascade::SetCurrentTunings(const CurrentLoopTunings& tunings)
     {
-        SetCurrentTuningsImpl(Vdc, torqueTunings);
+        SetCurrentTuningsImpl(tunings);
     }
 
-    OPTIMIZE_FOR_SPEED
-    void PositionCascade::SetSpeedTunings(Volts Vdc, const SpeedTunings& speedTuning)
+    void PositionCascade::SetSpeedTunings(const SpeedLoopTunings& tunings)
     {
-        SetSpeedTuningsImpl(speedTuning);
+        SetSpeedTuningsImpl(tunings);
+    }
+
+    void PositionCascade::SetPositionTunings(const PositionLoopTunings& tunings)
+    {
+        positionGain = tunings.bandwidth;
     }
 
     void PositionCascade::SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator)
@@ -52,19 +58,8 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    void PositionCascade::SetPositionTunings(const PositionTunings& positionTuning)
-    {
-        const float kp = positionTuning.kp;
-        const float ki = positionTuning.ki;
-        const float kd = positionTuning.kd;
-
-        positionPid.SetTunings({ kp, ki * SpeedDt(), kd / SpeedDt() });
-    }
-
-    OPTIMIZE_FOR_SPEED
     void PositionCascade::Enable()
     {
-        positionPid.Reset();
         EnableSpeedLoop();
         SetPoint(lastPositionSetPoint);
     }
@@ -78,12 +73,12 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     void PositionCascade::LowPriorityHandler()
     {
-        auto mechanicalSpeed = detail::PositionWithWrapAround(CurrentMechanicalAngle() - PreviousSpeedPosition()) / SpeedDt();
-        PreviousSpeedPosition() = CurrentMechanicalAngle();
+        auto mechanicalSpeed = MeasureMechanicalSpeed();
 
-        auto speedReference = positionPid.Process(CurrentMechanicalAngle());
-        SpeedPid().SetPoint(speedReference);
-        LastSpeedPidOutput() = SpeedPid().Process(mechanicalSpeed);
+        auto positionError = detail::PositionWithWrapAround(lastPositionSetPoint.Value() - CurrentMechanicalAngle());
+        SetSpeedReference(RadiansPerSecond{ positionError * positionGain });
+
+        RunSpeedLoop(mechanicalSpeed);
 
         UpdateOnlineMechanicalEstimator(mechanicalSpeed);
         UpdateOnlineElectricalEstimator(mechanicalSpeed * PolePairs());

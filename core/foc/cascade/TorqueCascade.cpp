@@ -1,24 +1,17 @@
 #include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
-#include <numbers>
 
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC optimize("O3", "fast-math")
 #endif
-
-namespace
-{
-    constexpr float invSqrt3 = 0.577350269189625f;
-}
 
 namespace foc
 {
     OPTIMIZE_FOR_SPEED
     void TorqueCascade::Enable()
     {
-        dPid.Reset();
-        qPid.Reset();
+        currentLoop.Reset();
         SetPoint(lastSetPoint);
     }
 
@@ -27,33 +20,26 @@ namespace foc
     {
     }
 
-    void TorqueCascade::SetPolePairs(std::size_t polePairs)
+    void TorqueCascade::Configure(const MotorModelParameters& parameters)
     {
-        this->polePairs = static_cast<float>(polePairs);
+        polePairs = static_cast<float>(parameters.polePairs);
+        currentLoop.Configure(parameters);
     }
 
     OPTIMIZE_FOR_SPEED
     void TorqueCascade::SetPoint(IdAndIqPoint setPoint)
     {
         lastSetPoint = setPoint;
-        dPid.SetPoint(setPoint.first.Value());
-        qPid.SetPoint(setPoint.second.Value());
     }
 
-    OPTIMIZE_FOR_SPEED
-    void TorqueCascade::SetCurrentTunings(Volts Vdc, const IdAndIqTunings& tunings)
+    void TorqueCascade::SetCurrentTunings(const CurrentLoopTunings& tunings)
     {
-        auto scale = 1.0f / (invSqrt3 * Vdc.Value());
+        currentLoop.SetTunings(tunings);
+    }
 
-        const float d_kp = tunings.first.kp;
-        const float d_ki = tunings.first.ki;
-        const float d_kd = tunings.first.kd;
-        const float q_kp = tunings.second.kp;
-        const float q_ki = tunings.second.ki;
-        const float q_kd = tunings.second.kd;
-
-        dPid.SetTunings({ d_kp * scale, d_ki * scale, d_kd * scale });
-        qPid.SetTunings({ q_kp * scale, q_ki * scale, q_kd * scale });
+    CurrentControllerSelector& TorqueCascade::CurrentLoop()
+    {
+        return currentLoop;
     }
 
     OPTIMIZE_FOR_SPEED
@@ -70,7 +56,8 @@ namespace foc
         auto sinTheta = FastTrigonometry::Sine(electricalAngle);
 
         auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
-        auto output = spaceVectorModulator.Generate(park.Inverse(RotatingFrame{ dPid.Process(idAndIq.d), qPid.Process(idAndIq.q) }, cosTheta, sinTheta));
+        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ lastSetPoint.first.Value(), lastSetPoint.second.Value() }, 0.0f });
+        auto output = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
 
         return PhasePwmDutyCycles{ hal::Percent(static_cast<uint8_t>(output.a * 100.0f + 0.5f)),
             hal::Percent(static_cast<uint8_t>(output.b * 100.0f + 0.5f)),

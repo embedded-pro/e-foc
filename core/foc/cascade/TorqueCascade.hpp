@@ -1,10 +1,10 @@
 #pragma once
 
+#include "core/foc/current_loop/CurrentControllerSelector.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
-#include "numerical/controllers/implementations/PidIncremental.hpp"
 
 namespace foc
 {
@@ -12,20 +12,21 @@ namespace foc
         : public FocTorque
     {
     public:
-        void SetPolePairs(std::size_t polePairs) override;
+        void Configure(const MotorModelParameters& parameters) override;
         void SetPoint(IdAndIqPoint setPoint) override;
-        void SetCurrentTunings(Volts Vdc, const IdAndIqTunings& tunings) override;
+        void SetCurrentTunings(const CurrentLoopTunings& tunings) override;
         void Enable() override;
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
 
+        CurrentControllerSelector& CurrentLoop();
+
     private:
         [[no_unique_address]] Park park;
         [[no_unique_address]] Clarke clarke;
-        controllers::PidIncrementalSynchronous<float> dPid{ { 0.0f, 0.0f, 0.0f }, { -1.0f, 1.0f } };
-        controllers::PidIncrementalSynchronous<float> qPid{ { 0.0f, 0.0f, 0.0f }, { -1.0f, 1.0f } };
+        CurrentControllerSelector currentLoop;
         [[no_unique_address]] SpaceVectorModulation spaceVectorModulator;
-        float polePairs = 0.0f;
+        float polePairs{ 0.0f };
         IdAndIqPoint lastSetPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
     };
 }

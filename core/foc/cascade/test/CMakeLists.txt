@@ -15,6 +15,4 @@ target_sources(e_foc.foc.cascade_test PRIVATE
     TestPositionCascade.cpp
     TestSpeedCascade.cpp
     TestTorqueCascade.cpp
-    TestWithAutomaticCurrentPidGains.cpp
-    TestWithAutomaticSpeedPidGains.cpp
 )

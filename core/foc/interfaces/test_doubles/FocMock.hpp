@@ -9,31 +9,33 @@ namespace foc
         : public FocTorque
     {
     public:
-        MOCK_METHOD(void, SetPolePairs, (std::size_t polePairs), (override));
+        MOCK_METHOD(void, Configure, (const MotorModelParameters& parameters), (override));
         MOCK_METHOD(void, Enable, (), (override));
         MOCK_METHOD(void, Disable, (), (override));
         MOCK_METHOD(void, SetPoint, (IdAndIqPoint), (override));
-        MOCK_METHOD(void, SetCurrentTunings, (Volts Vdc, const IdAndIqTunings& tunings), (override));
+        MOCK_METHOD(void, SetCurrentTunings, (const CurrentLoopTunings& tunings), (override));
         MOCK_METHOD(PhasePwmDutyCycles, Calculate, (const PhaseCurrents& currentPhases, Radians& position), (override));
     };
 
-    class FocSpeedTunableMock
-        : public FocSpeedTunable
+    class SpeedLoopTunableMock
+        : public SpeedLoopTunable
     {
     public:
-        MOCK_METHOD(void, SetSpeedTunings, (Volts Vdc, const SpeedTunings& speedTuning), (override));
+        MOCK_METHOD(void, ConfigureMechanics, (const MechanicalModelParameters& parameters), (override));
+        MOCK_METHOD(void, SetSpeedTunings, (const SpeedLoopTunings& tunings), (override));
     };
 
     class FocSpeedMock
         : public FocSpeed
     {
     public:
-        MOCK_METHOD(void, SetPolePairs, (std::size_t polePairs), (override));
+        MOCK_METHOD(void, Configure, (const MotorModelParameters& parameters), (override));
+        MOCK_METHOD(void, ConfigureMechanics, (const MechanicalModelParameters& parameters), (override));
         MOCK_METHOD(void, Enable, (), (override));
         MOCK_METHOD(void, Disable, (), (override));
         MOCK_METHOD(void, SetPoint, (RadiansPerSecond), (override));
-        MOCK_METHOD(void, SetCurrentTunings, (Volts Vdc, const IdAndIqTunings& torqueTunings), (override));
-        MOCK_METHOD(void, SetSpeedTunings, (Volts Vdc, const SpeedTunings& speedTuning), (override));
+        MOCK_METHOD(void, SetCurrentTunings, (const CurrentLoopTunings& tunings), (override));
+        MOCK_METHOD(void, SetSpeedTunings, (const SpeedLoopTunings& tunings), (override));
         MOCK_METHOD(void, SetOnlineMechanicalEstimator, (OnlineMechanicalEstimator & estimator), (override));
         MOCK_METHOD(void, SetOnlineElectricalEstimator, (OnlineElectricalEstimator & estimator), (override));
         MOCK_METHOD(hal::Hertz, OuterLoopFrequency, (), (const, override));
@@ -44,13 +46,14 @@ namespace foc
         : public FocPosition
     {
     public:
-        MOCK_METHOD(void, SetPolePairs, (std::size_t polePairs), (override));
+        MOCK_METHOD(void, Configure, (const MotorModelParameters& parameters), (override));
+        MOCK_METHOD(void, ConfigureMechanics, (const MechanicalModelParameters& parameters), (override));
         MOCK_METHOD(void, Enable, (), (override));
         MOCK_METHOD(void, Disable, (), (override));
         MOCK_METHOD(void, SetPoint, (Radians), (override));
-        MOCK_METHOD(void, SetCurrentTunings, (Volts Vdc, const IdAndIqTunings& torqueTunings), (override));
-        MOCK_METHOD(void, SetSpeedTunings, (Volts Vdc, const SpeedTunings& speedTuning), (override));
-        MOCK_METHOD(void, SetPositionTunings, (const PositionTunings& positionTuning), (override));
+        MOCK_METHOD(void, SetCurrentTunings, (const CurrentLoopTunings& tunings), (override));
+        MOCK_METHOD(void, SetSpeedTunings, (const SpeedLoopTunings& tunings), (override));
+        MOCK_METHOD(void, SetPositionTunings, (const PositionLoopTunings& tunings), (override));
         MOCK_METHOD(void, SetOnlineMechanicalEstimator, (OnlineMechanicalEstimator & estimator), (override));
         MOCK_METHOD(void, SetOnlineElectricalEstimator, (OnlineElectricalEstimator & estimator), (override));
         MOCK_METHOD(PhasePwmDutyCycles, Calculate, (const PhaseCurrents& currentPhases, Radians& position), (override));

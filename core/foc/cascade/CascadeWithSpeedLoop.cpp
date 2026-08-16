@@ -8,9 +8,9 @@ namespace foc
 {
     OPTIMIZE_FOR_SPEED
     CascadeWithSpeedLoop::CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)
-        : speedPid{ { 0.0f, 0.0f, 0.0f }, { -maxCurrent.Value(), maxCurrent.Value() } }
-        , lowPriorityInterrupt(lowPriorityInterrupt)
-        , dt{ 1.0f / static_cast<float>(baseFrequency.Value()) }
+        : lowPriorityInterrupt(lowPriorityInterrupt)
+        , maxCurrent{ maxCurrent }
+        , outerLoopFrequency{ lowPriorityFrequency }
         , speedDt{ 1.0f / static_cast<float>(lowPriorityFrequency.Value()) }
         , prescaler{ baseFrequency.Value() / lowPriorityFrequency.Value() }
     {
@@ -20,52 +20,41 @@ namespace foc
         really_assert(baseFrequency.Value() % lowPriorityFrequency.Value() == 0);
     }
 
-    OPTIMIZE_FOR_SPEED
-    void CascadeWithSpeedLoop::SetPolePairsImpl(std::size_t pole)
+    void CascadeWithSpeedLoop::ConfigureImpl(const MotorModelParameters& parameters)
     {
-        polePairs = static_cast<float>(pole);
+        polePairs = static_cast<float>(parameters.polePairs);
+        vdcInvScale = detail::invSqrt3 * parameters.busVoltage.Value();
+        currentLoop.Configure(parameters);
     }
 
-    OPTIMIZE_FOR_SPEED
-    void CascadeWithSpeedLoop::SetCurrentTuningsImpl(Volts Vdc, const IdAndIqTunings& torqueTunings)
+    void CascadeWithSpeedLoop::ConfigureMechanicsImpl(const MechanicalModelParameters& parameters)
     {
-        auto scale = 1.0f / (detail::invSqrt3 * Vdc.Value());
-        auto scale_dt = scale * dt;
-        auto scale_inv_dt = scale / dt;
-
-        const float d_kp = torqueTunings.first.kp;
-        const float d_ki = torqueTunings.first.ki;
-        const float d_kd = torqueTunings.first.kd;
-        const float q_kp = torqueTunings.second.kp;
-        const float q_ki = torqueTunings.second.ki;
-        const float q_kd = torqueTunings.second.kd;
-
-        dPid.SetTunings({ d_kp * scale, d_ki * scale_dt, d_kd * scale_inv_dt });
-        qPid.SetTunings({ q_kp * scale, q_ki * scale_dt, q_kd * scale_inv_dt });
-
-        vdcInvScale = detail::invSqrt3 * Vdc.Value();
+        auto withLimits = parameters;
+        withLimits.maxCurrent = maxCurrent;
+        withLimits.samplingFrequency = outerLoopFrequency;
+        speedLoop.Configure(withLimits);
     }
 
-    OPTIMIZE_FOR_SPEED
-    void CascadeWithSpeedLoop::SetSpeedTuningsImpl(const SpeedTunings& speedTuning)
+    void CascadeWithSpeedLoop::SetCurrentTuningsImpl(const CurrentLoopTunings& tunings)
     {
-        const float kp = speedTuning.kp;
-        const float ki = speedTuning.ki;
-        const float kd = speedTuning.kd;
+        currentLoop.SetTunings(tunings);
+    }
 
-        speedPid.SetTunings({ kp, ki * speedDt, kd / speedDt });
+    void CascadeWithSpeedLoop::SetSpeedTuningsImpl(const SpeedLoopTunings& tunings)
+    {
+        speedLoop.SetTunings(tunings);
     }
 
     OPTIMIZE_FOR_SPEED
     void CascadeWithSpeedLoop::EnableSpeedLoop()
     {
-        speedPid.Reset();
-        dPid.Reset();
-        qPid.Reset();
+        currentLoop.Reset();
+        speedLoop.Reset();
 
         currentMechanicalAngle = 0.0f;
         previousSpeedPosition = 0.0f;
-        lastSpeedPidOutput = 0.0f;
+        lastSpeedLoopOutput = 0.0f;
+        lastElectricalSpeed = 0.0f;
         triggerCounter = 0;
     }
 
@@ -88,20 +77,17 @@ namespace foc
         auto cosTheta = FastTrigonometry::Cosine(electricalAngle);
         auto sinTheta = FastTrigonometry::Sine(electricalAngle);
 
-        qPid.SetPoint(lastSpeedPidOutput);
-
         auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
-        float normalizedVd = dPid.Process(idAndIq.d);
-        float normalizedVq = qPid.Process(idAndIq.q);
+        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ 0.0f, lastSpeedLoopOutput }, lastElectricalSpeed });
 
-        auto output = spaceVectorModulator.Generate(park.Inverse(RotatingFrame{ normalizedVd, normalizedVq }, cosTheta, sinTheta));
+        auto output = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
 
         ++triggerCounter;
         if (triggerCounter >= prescaler)
         {
             triggerCounter = 0;
             const uint8_t writeSlot = 1u - readyIndex;
-            snapshots[writeSlot] = EstimatorSnapshot{ currentPhases, electricalAngle, idAndIq.d, idAndIq.q, normalizedVd };
+            snapshots[writeSlot] = EstimatorSnapshot{ currentPhases, electricalAngle, idAndIq.d, idAndIq.q, voltage.d };
             readyIndex = writeSlot;
             lowPriorityInterrupt.Trigger();
         }
@@ -111,29 +97,39 @@ namespace foc
             hal::Percent(static_cast<uint8_t>(output.c * 100.0f + 0.5f)) };
     }
 
-    controllers::PidIncrementalSynchronous<float>& CascadeWithSpeedLoop::SpeedPid()
+    void CascadeWithSpeedLoop::SetSpeedReference(RadiansPerSecond reference)
     {
-        return speedPid;
+        speedReference = reference;
     }
 
-    controllers::PidIncrementalSynchronous<float>& CascadeWithSpeedLoop::DPid()
+    OPTIMIZE_FOR_SPEED
+    float CascadeWithSpeedLoop::MeasureMechanicalSpeed()
     {
-        return dPid;
+        auto mechanicalSpeed = detail::PositionWithWrapAround(currentMechanicalAngle - previousSpeedPosition) / speedDt;
+        previousSpeedPosition = currentMechanicalAngle;
+        return mechanicalSpeed;
+    }
+
+    OPTIMIZE_FOR_SPEED
+    void CascadeWithSpeedLoop::RunSpeedLoop(float mechanicalSpeed)
+    {
+        lastSpeedLoopOutput = speedLoop.Compute(SpeedControlContext{ RadiansPerSecond{ mechanicalSpeed }, speedReference }).Value();
+        lastElectricalSpeed = mechanicalSpeed * polePairs;
+    }
+
+    CurrentControllerSelector& CascadeWithSpeedLoop::CurrentLoop()
+    {
+        return currentLoop;
+    }
+
+    SpeedControllerSelector& CascadeWithSpeedLoop::SpeedLoop()
+    {
+        return speedLoop;
     }
 
     float CascadeWithSpeedLoop::CurrentMechanicalAngle() const
     {
         return currentMechanicalAngle;
-    }
-
-    float& CascadeWithSpeedLoop::PreviousSpeedPosition()
-    {
-        return previousSpeedPosition;
-    }
-
-    float& CascadeWithSpeedLoop::LastSpeedPidOutput()
-    {
-        return lastSpeedPidOutput;
     }
 
     float CascadeWithSpeedLoop::SpeedDt() const

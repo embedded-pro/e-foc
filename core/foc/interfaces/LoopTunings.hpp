@@ -18,4 +18,9 @@ namespace foc
         float observerBandwidthRatio{ 5.0f };
         float referenceTimeConstant{ 0.0053051f };
     };
+
+    struct PositionLoopTunings
+    {
+        float bandwidth{ 18.8495559f };
+    };
 }

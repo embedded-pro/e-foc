@@ -6,10 +6,11 @@ target_include_directories(e_foc.foc.cascade PUBLIC
 )
 
 target_link_libraries(e_foc.foc.cascade PUBLIC
+    e_foc.foc.current_loop
     e_foc.foc.interfaces
     e_foc.foc.math
+    e_foc.foc.speed_loop
     e_foc.foc.transforms
-    numerical.controllers.implementations
 )
 
 target_sources(e_foc.foc.cascade PRIVATE
@@ -21,10 +22,6 @@ target_sources(e_foc.foc.cascade PRIVATE
     TorqueCascade.hpp
     CascadeWithSpeedLoop.cpp
     CascadeWithSpeedLoop.hpp
-    WithAutomaticCurrentPidGains.cpp
-    WithAutomaticCurrentPidGains.hpp
-    WithAutomaticSpeedPidGains.cpp
-    WithAutomaticSpeedPidGains.hpp
 )
 
 add_subdirectory(test)

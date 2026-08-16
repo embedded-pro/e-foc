@@ -13,6 +13,29 @@ namespace
     const hal::Hertz lowPriorityFrequency{ 2000 };
     constexpr float tolerance = 1.0f;
 
+    foc::MotorModelParameters MotorParameters(std::size_t polePairs)
+    {
+        auto parameters = foc::MotorModelParameters{};
+        parameters.resistance = foc::Ohm{ 1.0f };
+        parameters.inductance = foc::MilliHenry{ 1.0f };
+        parameters.fluxLinkage = foc::Weber{ 0.01f };
+        parameters.busVoltage = foc::Volts{ 24.0f };
+        parameters.samplingFrequency = baseFrequency;
+        parameters.polePairs = polePairs;
+        return parameters;
+    }
+
+    foc::MechanicalModelParameters MechanicalParameters()
+    {
+        auto parameters = foc::MechanicalModelParameters{};
+        parameters.inertia = foc::NewtonMeterSecondSquared{ 0.001f };
+        parameters.viscousFriction = foc::NewtonMeterSecondPerRadian{ 0.0001f };
+        parameters.torqueConstant = foc::NewtonMeter{ 0.1f };
+        parameters.maxCurrent = foc::Ampere{ 10.0f };
+        parameters.samplingFrequency = lowPriorityFrequency;
+        return parameters;
+    }
+
     class TestPositionCascade
         : public ::testing::Test
     {
@@ -22,10 +45,11 @@ namespace
             EXPECT_CALL(lowPriorityInterruptMock, Register(_)).WillOnce(Invoke(&lowPriorityInterruptMock, &foc::LowPriorityInterruptMock::StoreHandler));
 
             focPosition.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterruptMock, lowPriorityFrequency);
-            focPosition->SetPolePairs(polePairs);
-            focPosition->SetCurrentTunings(foc::Volts{ 24.0f }, { { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } });
-            focPosition->SetSpeedTunings(foc::Volts{ 24.0f }, { 1.0f, 0.0f, 0.0f });
-            focPosition->SetPositionTunings({ 1.0f, 0.0f, 0.0f });
+            focPosition->Configure(MotorParameters(polePairs));
+            focPosition->ConfigureMechanics(MechanicalParameters());
+            focPosition->SetCurrentTunings(foc::CurrentLoopTunings{});
+            focPosition->SetSpeedTunings(foc::SpeedLoopTunings{});
+            focPosition->SetPositionTunings(foc::PositionLoopTunings{});
         }
 
         foc::LowPriorityInterruptMock lowPriorityInterruptMock;
@@ -71,7 +95,7 @@ TEST_F(TestPositionCascade, duty_cycles_are_bounded_0_to_100)
 
 TEST_F(TestPositionCascade, set_pole_pairs)
 {
-    focPosition->SetPolePairs(4);
+    focPosition->Configure(MotorParameters(4));
     focPosition->SetPoint(foc::Radians{ 0.0f });
 
     foc::Radians position{ 0.0f };
@@ -132,7 +156,7 @@ TEST_F(TestPositionCascade, position_pid_drives_speed_reference)
 
 TEST_F(TestPositionCascade, set_speed_tunings)
 {
-    focPosition->SetSpeedTunings(foc::Volts{ 24.0f }, { 2.0f, 0.1f, 0.0f });
+    focPosition->SetSpeedTunings(foc::SpeedLoopTunings{});
     focPosition->SetPoint(foc::Radians{ 0.5f });
 
     foc::Radians position{ 0.0f };
@@ -144,7 +168,7 @@ TEST_F(TestPositionCascade, set_speed_tunings)
 
 TEST_F(TestPositionCascade, set_position_tunings)
 {
-    focPosition->SetPositionTunings({ 5.0f, 0.5f, 0.0f });
+    focPosition->SetPositionTunings(foc::PositionLoopTunings{});
     focPosition->SetPoint(foc::Radians{ 1.0f });
 
     foc::Radians position{ 0.0f };
