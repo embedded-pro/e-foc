@@ -1,5 +1,7 @@
 #include "core/foc/cascade/TorqueCascade.hpp"
+#include "core/foc/math/AngleWrap.hpp"
 #include "numerical/math/Tolerance.hpp"
+#include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
 
@@ -160,4 +162,64 @@ TEST_F(TestTorqueCascade, selected_algorithm_drives_the_output)
     EXPECT_LE(result.a.Value(), 100);
     bool anyNon50 = (result.a.Value() != 50) || (result.b.Value() != 50) || (result.c.Value() != 50);
     EXPECT_TRUE(anyNon50);
+}
+
+TEST_F(TestTorqueCascade, a_stationary_rotor_produces_no_back_emf_feedforward)
+{
+    focTorque->Disable();
+    ASSERT_EQ(focTorque->SelectCurrentAlgorithm(foc::CurrentAlgorithm::decoupledPid), foc::SelectResult::ok);
+    focTorque->Enable();
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    foc::Radians position{ 0.0f };
+    for (int sample = 0; sample != 100; ++sample)
+        focTorque->Calculate(ZeroCurrents(), position);
+
+    auto result = focTorque->Calculate(ZeroCurrents(), position);
+
+    EXPECT_NEAR(result.a.Value(), 50, tolerance);
+    EXPECT_NEAR(result.b.Value(), 50, tolerance);
+    EXPECT_NEAR(result.c.Value(), 50, tolerance);
+}
+
+TEST_F(TestTorqueCascade, a_spinning_rotor_drives_the_back_emf_feedforward)
+{
+    focTorque->Disable();
+    ASSERT_EQ(focTorque->SelectCurrentAlgorithm(foc::CurrentAlgorithm::decoupledPid), foc::SelectResult::ok);
+    focTorque->Enable();
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    // Torque mode has no outer loop, so the cascade must derive speed from the angle it is handed
+    constexpr float mechanicalStepPerSample = 0.01f;
+    float angle = 0.0f;
+    foc::PhasePwmDutyCycles result{ hal::Percent{ 0 }, hal::Percent{ 0 }, hal::Percent{ 0 } };
+
+    for (int sample = 0; sample != 200; ++sample)
+    {
+        foc::Radians position{ angle };
+        result = focTorque->Calculate(ZeroCurrents(), position);
+        angle = foc::detail::PositionWithWrapAround(angle + mechanicalStepPerSample);
+    }
+
+    const bool anyOffCentre = std::abs(result.a.Value() - 50) > tolerance ||
+                              std::abs(result.b.Value() - 50) > tolerance ||
+                              std::abs(result.c.Value() - 50) > tolerance;
+
+    EXPECT_TRUE(anyOffCentre);
+}
+
+TEST_F(TestTorqueCascade, the_speed_estimate_does_not_spike_on_the_first_sample_after_enable)
+{
+    focTorque->Disable();
+    ASSERT_EQ(focTorque->SelectCurrentAlgorithm(foc::CurrentAlgorithm::decoupledPid), foc::SelectResult::ok);
+    focTorque->Enable();
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    // A rotor parked far from zero must not read as a huge step on the first sample
+    foc::Radians position{ 3.0f };
+    auto result = focTorque->Calculate(ZeroCurrents(), position);
+
+    EXPECT_NEAR(result.a.Value(), 50, tolerance);
+    EXPECT_NEAR(result.b.Value(), 50, tolerance);
+    EXPECT_NEAR(result.c.Value(), 50, tolerance);
 }
