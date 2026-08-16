@@ -14,30 +14,23 @@ namespace foc
         OPTIMIZE_FOR_SPEED
         TwoPhase Forward(const ThreePhase& input) const
         {
-            const float a = input.a;
-            const float b = input.b;
-            const float c = input.c;
-
-            const float bc_sum = b + c;
-            return TwoPhase{ twoThirds * (a - oneHalf * bc_sum), invSqrt3 * (b - c) };
+            const float bcSum = input.b + input.c;
+            return TwoPhase{ twoThirds * (input.a - oneHalf * bcSum), invSqrt3 * (input.b - input.c) };
         }
 
         OPTIMIZE_FOR_SPEED
         ThreePhase Inverse(const TwoPhase& input) const
         {
-            const float alpha = input.alpha;
-            const float beta = input.beta;
-
-            const float alpha_half = oneHalf * alpha;
-            const float beta_sqrt3_half = sqrt3Div2 * beta;
-            return ThreePhase{ alpha, -alpha_half + beta_sqrt3_half, -alpha_half - beta_sqrt3_half };
+            const float alphaHalf = oneHalf * input.alpha;
+            const float betaSqrt3Half = sqrt3Div2 * input.beta;
+            return ThreePhase{ input.alpha, -alphaHalf + betaSqrt3Half, -alphaHalf - betaSqrt3Half };
         }
 
     private:
         constexpr static float oneHalf = 0.5f;
-        constexpr static float twoThirds = 0.666666667f;
+        constexpr static float twoThirds = 2.0f / 3.0f;
         constexpr static float invSqrt3 = std::numbers::inv_sqrt3_v<float>;
-        constexpr static float sqrt3Div2 = 0.8660254037f;
+        constexpr static float sqrt3Div2 = std::numbers::sqrt3_v<float> * 0.5f;
     };
 
     class Park
@@ -46,33 +39,13 @@ namespace foc
         OPTIMIZE_FOR_SPEED
         RotatingFrame Forward(const TwoPhase& input, const float& cosTheta, const float& sinTheta) const
         {
-            const float alpha = input.alpha;
-            const float beta = input.beta;
-            const float cos_t = cosTheta;
-            const float sin_t = sinTheta;
-
-            const float alpha_cos = alpha * cos_t;
-            const float beta_sin = beta * sin_t;
-            const float alpha_sin = alpha * sin_t;
-            const float beta_cos = beta * cos_t;
-
-            return RotatingFrame{ alpha_cos + beta_sin, -alpha_sin + beta_cos };
+            return RotatingFrame{ input.alpha * cosTheta + input.beta * sinTheta, -input.alpha * sinTheta + input.beta * cosTheta };
         }
 
         OPTIMIZE_FOR_SPEED
         TwoPhase Inverse(const RotatingFrame& input, const float& cosTheta, const float& sinTheta) const
         {
-            const float d = input.d;
-            const float q = input.q;
-            const float cos_t = cosTheta;
-            const float sin_t = sinTheta;
-
-            const float d_cos = d * cos_t;
-            const float q_sin = q * sin_t;
-            const float d_sin = d * sin_t;
-            const float q_cos = q * cos_t;
-
-            return TwoPhase{ d_cos - q_sin, d_sin + q_cos };
+            return TwoPhase{ input.d * cosTheta - input.q * sinTheta, input.d * sinTheta + input.q * cosTheta };
         }
     };
 

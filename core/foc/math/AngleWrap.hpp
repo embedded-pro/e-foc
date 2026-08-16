@@ -10,7 +10,7 @@
 
 namespace foc::detail
 {
-    constexpr float invSqrt3 = 0.577350269189625f;
+    constexpr float invSqrt3 = std::numbers::inv_sqrt3_v<float>;
 
     OPTIMIZE_FOR_SPEED
     inline float PositionWithWrapAround(float position)

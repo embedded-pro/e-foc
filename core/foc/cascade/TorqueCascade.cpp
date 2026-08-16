@@ -15,7 +15,6 @@ namespace foc
         constexpr float speedFilterTimeConstant = 0.001f;
     }
 
-    OPTIMIZE_FOR_SPEED
     void TorqueCascade::Enable()
     {
         currentLoop.Reset();
@@ -25,7 +24,6 @@ namespace foc
         SetPoint(lastSetPoint);
     }
 
-    OPTIMIZE_FOR_SPEED
     void TorqueCascade::Disable()
     {
         enabled = false;
@@ -59,7 +57,6 @@ namespace foc
         speedFilterAlpha = 1.0f - math::Exp(-1.0f / (speedFilterTimeConstant * samplingFrequency));
     }
 
-    OPTIMIZE_FOR_SPEED
     void TorqueCascade::SetPoint(IdAndIqPoint setPoint)
     {
         lastSetPoint = setPoint;

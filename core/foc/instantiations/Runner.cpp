@@ -1,4 +1,9 @@
 #include "core/foc/instantiations/Runner.hpp"
+#include "numerical/math/CompilerOptimizations.hpp"
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC optimize("O3", "fast-math")
+#endif
 
 namespace foc
 {
@@ -9,9 +14,7 @@ namespace foc
     {
         inverter.PhaseCurrentsReady(inverter.BaseFrequency(), [this](auto currentPhases)
             {
-                auto position = this->encoder.Read();
-                auto dutyCycles = this->foc.Calculate(currentPhases, position);
-                this->inverter.ThreePhasePwmOutput(dutyCycles);
+                OnPhaseCurrents(currentPhases);
             });
     }
 
@@ -30,5 +33,12 @@ namespace foc
     {
         inverter.Stop();
         foc.Disable();
+    }
+
+    OPTIMIZE_FOR_SPEED
+    void Runner::OnPhaseCurrents(const PhaseCurrents& currentPhases)
+    {
+        auto position = encoder.Read();
+        inverter.ThreePhasePwmOutput(foc.Calculate(currentPhases, position));
     }
 }

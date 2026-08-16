@@ -3,7 +3,6 @@
 #include "core/foc/interfaces/Algorithms.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <concepts>
-#include <cstdint>
 #include <type_traits>
 #include <variant>
 

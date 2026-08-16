@@ -3,6 +3,7 @@
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <algorithm>
+#include <numbers>
 
 namespace foc
 {
@@ -21,19 +22,16 @@ namespace foc
         OPTIMIZE_FOR_SPEED
         Output Generate(const TwoPhase& voltagePhase) const
         {
-            const float alpha = voltagePhase.alpha;
-            const float beta = voltagePhase.beta;
+            const float alphaHalf = voltagePhase.alpha * half;
+            const float betaSqrt3 = voltagePhase.beta * sqrt3Div2;
 
-            const float alpha_half = alpha * half;
-            const float beta_sqrt3 = beta * sqrt3Div2;
+            const auto vA = voltagePhase.alpha;
+            const auto vB = -alphaHalf + betaSqrt3;
+            const auto vC = -alphaHalf - betaSqrt3;
 
-            auto vA = alpha;
-            auto vB = -alpha_half + beta_sqrt3;
-            auto vC = -alpha_half - beta_sqrt3;
-
-            auto vMax = std::max({ vA, vB, vC });
-            auto vMin = std::min({ vA, vB, vC });
-            auto vCommon = (vMax + vMin) * -half;
+            const auto vMax = std::max({ vA, vB, vC });
+            const auto vMin = std::min({ vA, vB, vC });
+            const auto vCommon = (vMax + vMin) * -half;
 
             return Output{ Clip(vA + vCommon), Clip(vB + vCommon), Clip(vC + vCommon) };
         }
@@ -45,10 +43,10 @@ namespace foc
             return std::clamp(dutyCycle * invSqrt3 + half, zero, one);
         }
 
-        static constexpr float zero{ float(0.0f) };
-        static constexpr float one{ float(1.0f) };
-        static constexpr float half{ float(0.5f) };
-        static constexpr float invSqrt3{ float(0.577350269189625f) };
-        static constexpr float sqrt3Div2{ float(0.866025403784438f) };
+        static constexpr float zero{ 0.0f };
+        static constexpr float one{ 1.0f };
+        static constexpr float half{ 0.5f };
+        static constexpr float invSqrt3{ std::numbers::inv_sqrt3_v<float> };
+        static constexpr float sqrt3Div2{ std::numbers::sqrt3_v<float> * 0.5f };
     };
 }

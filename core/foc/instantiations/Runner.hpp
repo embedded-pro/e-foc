@@ -20,6 +20,8 @@ namespace foc
         void Disable();
 
     private:
+        void OnPhaseCurrents(const PhaseCurrents& currentPhases);
+
         drivers::ThreePhaseInverter& inverter;
         drivers::Encoder& encoder;
         FocBase& foc;
