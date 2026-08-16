@@ -1,10 +1,10 @@
 #pragma once
 
-#include "core/foc/selection/ControllerSelector.hpp"
 #include "core/foc/current_loop/DeadbeatCurrentController.hpp"
 #include "core/foc/current_loop/DecoupledPidCurrentController.hpp"
 #include "core/foc/current_loop/PidCurrentController.hpp"
 #include "core/foc/current_loop/SlidingModeCurrentController.hpp"
+#include "core/foc/selection/ControllerSelector.hpp"
 
 namespace foc
 {

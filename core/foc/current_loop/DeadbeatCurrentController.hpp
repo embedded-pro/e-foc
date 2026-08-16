@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/foc/current_loop/CurrentController.hpp"
+#include "core/foc/current_loop/CurrentPlantModel.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc
@@ -14,7 +15,11 @@ namespace foc
         void SetTunings(const CurrentLoopTunings& tunings);
         void Reset();
 
-        OPTIMIZE_FOR_SPEED foc::RotatingFrame Compute(const CurrentControlContext& context) const;
+        OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context) const
+        {
+            return LimitToModulationCircle({ referenceGain * context.reference.d - feedbackGain * context.measured.d,
+                referenceGain * context.reference.q - feedbackGain * context.measured.q });
+        }
 
     private:
         void ApplyGains();

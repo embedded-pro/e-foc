@@ -25,15 +25,6 @@ namespace foc
         qPid.Reset();
     }
 
-    OPTIMIZE_FOR_SPEED
-    foc::RotatingFrame PidCurrentController::Compute(const CurrentControlContext& context)
-    {
-        dPid.SetPoint(context.reference.d);
-        qPid.SetPoint(context.reference.q);
-
-        return LimitToModulationCircle({ dPid.Process(context.measured.d), qPid.Process(context.measured.q) });
-    }
-
     void PidCurrentController::ApplyGains()
     {
         if (!AreElectricalParametersValid(parameters))

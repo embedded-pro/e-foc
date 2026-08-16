@@ -13,7 +13,16 @@ namespace foc
         void SetTunings(const CurrentLoopTunings& tunings);
         void Reset();
 
-        OPTIMIZE_FOR_SPEED foc::RotatingFrame Compute(const CurrentControlContext& context);
+        OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context)
+        {
+            const auto feedback = pid.Compute(context);
+            const auto electricalSpeed = context.electricalSpeed;
+
+            const auto dFeedforward = -electricalSpeed * couplingScale * context.measured.q;
+            const auto qFeedforward = electricalSpeed * (couplingScale * context.measured.d + backEmfScale);
+
+            return LimitToModulationCircle({ feedback.d + dFeedforward, feedback.q + qFeedforward });
+        }
 
     private:
         PidCurrentController pid;

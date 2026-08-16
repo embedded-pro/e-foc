@@ -39,13 +39,6 @@ namespace foc
         // Deadbeat control is a memoryless plant inversion; there is no state to clear
     }
 
-    OPTIMIZE_FOR_SPEED
-    foc::RotatingFrame DeadbeatCurrentController::Compute(const CurrentControlContext& context) const
-    {
-        return LimitToModulationCircle({ referenceGain * context.reference.d - feedbackGain * context.measured.d,
-            referenceGain * context.reference.q - feedbackGain * context.measured.q });
-    }
-
     void DeadbeatCurrentController::ApplyGains()
     {
         referenceGain = 0.0f;

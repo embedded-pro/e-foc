@@ -25,22 +25,6 @@ namespace foc
         // The equivalent and switching terms are algebraic; there is no state to clear
     }
 
-    OPTIMIZE_FOR_SPEED
-    foc::RotatingFrame SlidingModeCurrentController::Compute(const CurrentControlContext& context)
-    {
-        return LimitToModulationCircle({ ComputeAxis(context.measured.d, context.reference.d),
-            ComputeAxis(context.measured.q, context.reference.q) });
-    }
-
-    OPTIMIZE_FOR_SPEED
-    float SlidingModeCurrentController::ComputeAxis(float measured, float reference)
-    {
-        const auto control = slidingMode.ComputeControl(ScalarSlidingMode::StateVector{ measured },
-            ScalarSlidingMode::StateVector{ reference });
-
-        return control.at(0, 0) * normalizationScale;
-    }
-
     // Zero state and switching gain make the control law output zero until Configure supplies a plant
     SlidingModeCurrentController::ScalarSlidingMode SlidingModeCurrentController::Inert()
     {

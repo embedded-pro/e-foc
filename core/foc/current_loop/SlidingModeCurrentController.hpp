@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/foc/current_loop/CurrentController.hpp"
+#include "core/foc/current_loop/CurrentPlantModel.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "numerical/robust_control/SlidingModeControl.hpp"
 
@@ -15,14 +16,25 @@ namespace foc
         void SetTunings(const CurrentLoopTunings& tunings);
         void Reset();
 
-        OPTIMIZE_FOR_SPEED foc::RotatingFrame Compute(const CurrentControlContext& context);
+        OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context)
+        {
+            return LimitToModulationCircle({ ComputeAxis(context.measured.d, context.reference.d),
+                ComputeAxis(context.measured.q, context.reference.q) });
+        }
 
     private:
         using ScalarSlidingMode = robust_control::SlidingModeControl<float, 1, 1>;
 
         static ScalarSlidingMode Inert();
         void Construct();
-        OPTIMIZE_FOR_SPEED float ComputeAxis(float measured, float reference);
+
+        OPTIMIZE_FOR_SPEED float ComputeAxis(float measured, float reference)
+        {
+            const auto control = slidingMode.ComputeControl(ScalarSlidingMode::StateVector{ measured },
+                ScalarSlidingMode::StateVector{ reference });
+
+            return control.at(0, 0) * normalizationScale;
+        }
 
         MotorModelParameters parameters{};
         float switchingGain{ CurrentLoopTunings{}.switchingGain };
