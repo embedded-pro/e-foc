@@ -196,3 +196,36 @@ TEST_F(TestSpeedCascade, second_prescaler_cycle_triggers_again)
         focSpeed->Calculate(ZeroCurrents(), position);
     }
 }
+
+TEST_F(TestSpeedCascade, the_cascade_supplies_the_current_envelope_and_rate_the_caller_cannot_know)
+{
+    // Callers outside the cascade have no view of maxCurrent or the outer loop rate, so they pass
+    // zeros; the cascade must substitute its own before the speed loop validates the model.
+    auto withoutLimits = MechanicalParameters();
+    withoutLimits.maxCurrent = foc::Ampere{ 0.0f };
+    withoutLimits.samplingFrequency = hal::Hertz{ 0 };
+
+    focSpeed->ConfigureMechanics(withoutLimits);
+
+    EXPECT_EQ(focSpeed->SelectSpeedAlgorithm(foc::SpeedAlgorithm::lqi), foc::SelectResult::ok);
+    EXPECT_EQ(focSpeed->ActiveSpeedAlgorithm(), foc::SpeedAlgorithm::lqi);
+}
+
+TEST_F(TestSpeedCascade, a_speed_loop_configured_without_limits_still_drives_the_output)
+{
+    auto withoutLimits = MechanicalParameters();
+    withoutLimits.maxCurrent = foc::Ampere{ 0.0f };
+    withoutLimits.samplingFrequency = hal::Hertz{ 0 };
+
+    focSpeed->ConfigureMechanics(withoutLimits);
+    focSpeed->SetSpeedTunings(foc::SpeedLoopTunings{});
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 100.0f });
+
+    foc::Radians position{ 0.0f };
+    lowPriorityInterruptMock.TriggerHandler();
+    auto result = focSpeed->Calculate(ZeroCurrents(), position);
+
+    EXPECT_GE(result.a.Value(), 0);
+    EXPECT_LE(result.a.Value(), 100);
+}

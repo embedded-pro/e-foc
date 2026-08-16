@@ -6,9 +6,8 @@
 
 namespace services
 {
-    TerminalFocBaseInteractor::TerminalFocBaseInteractor(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::CurrentLoopTunable& currentLoop)
+    TerminalFocBaseInteractor::TerminalFocBaseInteractor(services::TerminalWithStorage& terminal, foc::CurrentLoopTunable& currentLoop)
         : terminal(terminal)
-        , vdc(vdc)
         , currentLoop(currentLoop)
     {
         terminal.AddCommand({ { "set_current_bandwidth", "scbw", "Set current loop bandwidth in rad/s. set_current_bandwidth <bandwidth>. Ex: scbw 6283.2" },

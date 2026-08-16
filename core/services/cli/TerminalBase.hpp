@@ -13,14 +13,13 @@ namespace services
     protected:
         using StatusWithMessage = services::TerminalWithStorage::StatusWithMessage;
 
-        TerminalFocBaseInteractor(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::CurrentLoopTunable& currentLoop);
+        TerminalFocBaseInteractor(services::TerminalWithStorage& terminal, foc::CurrentLoopTunable& currentLoop);
 
     private:
         StatusWithMessage SetFocPid(const infra::BoundedConstString& param);
 
     private:
         services::TerminalWithStorage& terminal;
-        foc::Volts vdc;
         foc::CurrentLoopTunable& currentLoop;
     };
 }

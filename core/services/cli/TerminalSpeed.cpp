@@ -3,9 +3,8 @@
 
 namespace services
 {
-    TerminalFocSpeedInteractor::TerminalFocSpeedInteractor(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::FocSpeed& foc)
-        : TerminalFocBaseInteractor(terminal, vdc, foc)
-        , vdc(vdc)
+    TerminalFocSpeedInteractor::TerminalFocSpeedInteractor(services::TerminalWithStorage& terminal, foc::FocSpeed& foc)
+        : TerminalFocBaseInteractor(terminal, foc)
         , foc(foc)
     {
         terminal.AddCommand({ { "set_speed_bandwidth", "ssbw", "Set speed loop bandwidth in rad/s. set_speed_bandwidth <bandwidth>. Ex: ssbw 188.5" },

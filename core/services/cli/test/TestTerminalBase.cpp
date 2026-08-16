@@ -15,8 +15,8 @@ namespace
     struct TerminalBaseImpl
         : services::TerminalFocBaseInteractor
     {
-        TerminalBaseImpl(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::CurrentLoopTunable& controller)
-            : services::TerminalFocBaseInteractor(terminal, vdc, controller)
+        TerminalBaseImpl(services::TerminalWithStorage& terminal, foc::CurrentLoopTunable& controller)
+            : services::TerminalFocBaseInteractor(terminal, controller)
         {}
     };
 
@@ -36,7 +36,7 @@ namespace
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
         services::TerminalWithStorage::WithMaxSize<10> terminal{ terminalWithCommands, tracer };
-        TerminalBaseImpl terminalInteractor{ terminal, foc::Volts{ 12.0f }, controllerBaseMock };
+        TerminalBaseImpl terminalInteractor{ terminal, controllerBaseMock };
 
         void InvokeCommand(std::string command, const std::function<void()>& onCommandReceived)
         {

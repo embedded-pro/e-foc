@@ -28,7 +28,7 @@ namespace
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
         services::TerminalWithStorage::WithMaxSize<10> terminal{ terminalWithCommands, tracer };
-        services::TerminalFocTorqueInteractor terminalInteractor{ terminal, foc::Volts{ 12.0f }, focMock };
+        services::TerminalFocTorqueInteractor terminalInteractor{ terminal, focMock };
 
         void InvokeCommand(std::string command, const std::function<void()>& onCommandReceived)
         {

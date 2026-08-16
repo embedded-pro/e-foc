@@ -1,8 +1,8 @@
 #pragma once
 
-#include "services/util/TerminalWithStorage.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/services/cli/TerminalBase.hpp"
+#include "services/util/TerminalWithStorage.hpp"
 
 namespace services
 {
@@ -10,7 +10,7 @@ namespace services
         : public TerminalFocBaseInteractor
     {
     public:
-        TerminalFocTorqueInteractor(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::FocTorque& torque);
+        TerminalFocTorqueInteractor(services::TerminalWithStorage& terminal, foc::FocTorque& torque);
 
     private:
         StatusWithMessage SetTorque(const infra::BoundedConstString& param);

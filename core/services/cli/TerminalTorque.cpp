@@ -1,15 +1,15 @@
 #include "core/services/cli/TerminalTorque.hpp"
-#include "infra/util/Function.hpp"
-#include "infra/util/Tokenizer.hpp"
-#include "services/util/TerminalWithStorage.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/services/cli/TerminalHelper.hpp"
+#include "infra/util/Function.hpp"
+#include "infra/util/Tokenizer.hpp"
+#include "services/util/TerminalWithStorage.hpp"
 
 namespace services
 {
-    TerminalFocTorqueInteractor::TerminalFocTorqueInteractor(services::TerminalWithStorage& terminal, foc::Volts vdc, foc::FocTorque& foc)
-        : TerminalFocBaseInteractor(terminal, vdc, foc)
+    TerminalFocTorqueInteractor::TerminalFocTorqueInteractor(services::TerminalWithStorage& terminal, foc::FocTorque& foc)
+        : TerminalFocBaseInteractor(terminal, foc)
         , foc(foc)
     {
         terminal.AddCommand({ { "set_torque", "st", "Set torque. set_torque <torque>. Ex: st 20.0" },
