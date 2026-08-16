@@ -1,70 +1,68 @@
 {
-    "path_name": "ADC ISR -> FOC inner loop (Clarke/Park/current loop/SVM) -> PWM output",
-    "loop_rates_khz": [
-        20
-    ],
-    "path_stages": [
-        {
-            "label": "ISR Entry (exception overhead)",
-            "type": "exception_entry"
-        },
-        {
-            "label": "ADC ISR + Callback Dispatch",
-            "patterns": [
-                "Adc0Sequence.*Handler",
-                "InterruptTable::Invoke",
-                "ImmediateInterruptHandler::Invoke"
-            ]
-        },
-        {
-            "label": "Encoder Read",
-            "patterns": [
-                "PlatformAdapter::Read",
-                "QuadratureEncoderDecorator.*::Read",
-                "QuadratureEncoder::Position",
-                "QuadratureEncoder::Resolution"
-            ]
-        },
-        {
-            "label": "FOC Inner Loop (Calculate)",
-            "patterns": [
-                "PositionCascade::Calculate",
-                "CascadeWithSpeedLoop::CalculateInnerLoop",
-                "Clarke::Forward",
-                "Park::Forward",
-                "Park::Inverse",
-                "SpaceVectorModulation::Generate",
-                "SpaceVectorModulation::Clip",
-                "FastTrigonometry::Sine",
-                "FastTrigonometry::Cosine",
-                "PidCurrentController::Compute",
-                "DecoupledPidCurrentController::Compute",
-                "DeadbeatCurrentController::Compute",
-                "SlidingModeCurrentController::Compute",
-                "LimitToModulationCircle",
-                "PidIncrementalBase.*::Process",
-                "PidIncrementalBase.*::Clamp",
-                "PidIncrementalSynchronous.*::Process",
-                "PidIncrementalSynchronous.*::SetPoint",
-                "PositionWithWrapAround",
-                "std::array<float.*>::operator\\[\\]",
-                "std::clamp",
-                "std::max<float>",
-                "std::min<float>"
-            ]
-        },
-        {
-            "label": "PWM Output",
-            "patterns": [
-                "PlatformAdapter::ThreePhasePwmOutput",
-                "SynchronousPwm::Start.*Percent.*Percent.*Percent",
-                "SynchronousPwm::SetComparator",
-                "SynchronousPwm::Sync"
-            ]
-        },
-        {
-            "label": "ISR Exit (exception return)",
-            "type": "exception_exit"
-        }
-    ]
+  "path_name": "ADC ISR -> FOC inner loop (Clarke/Park/current loop/SVM) -> PWM output",
+  "loop_rates_khz": [20],
+  "path_stages": [
+    {
+      "label": "ISR Entry (exception overhead)",
+      "type": "exception_entry"
+    },
+    {
+      "label": "ADC ISR + Callback Dispatch",
+      "patterns": [
+        "Adc0Sequence.*Handler",
+        "InterruptTable::Invoke",
+        "ImmediateInterruptHandler::Invoke"
+      ]
+    },
+    {
+      "label": "Encoder Read",
+      "patterns": [
+        "PlatformAdapter::Read",
+        "QuadratureEncoderDecorator.*::Read",
+        "QuadratureEncoder::Position",
+        "QuadratureEncoder::Resolution"
+      ]
+    },
+    {
+      "label": "FOC Inner Loop (Calculate)",
+      "patterns": [
+        "PositionCascade::Calculate",
+        "CascadeWithSpeedLoop::CalculateInnerLoop",
+        "Clarke::Forward",
+        "Park::Forward",
+        "Park::Inverse",
+        "SpaceVectorModulation::Generate",
+        "SpaceVectorModulation::Clip",
+        "FastTrigonometry::Sine",
+        "FastTrigonometry::Cosine",
+        "PidCurrentController::Compute",
+        "DecoupledPidCurrentController::Compute",
+        "DeadbeatCurrentController::Compute",
+        "SlidingModeCurrentController::Compute",
+        "LimitToModulationCircle",
+        "PidIncrementalBase.*::Process",
+        "PidIncrementalBase.*::Clamp",
+        "PidIncrementalSynchronous.*::Process",
+        "PidIncrementalSynchronous.*::SetPoint",
+        "PositionWithWrapAround",
+        "std::array<float.*>::operator\\[\\]",
+        "std::clamp",
+        "std::max<float>",
+        "std::min<float>"
+      ]
+    },
+    {
+      "label": "PWM Output",
+      "patterns": [
+        "PlatformAdapter::ThreePhasePwmOutput",
+        "SynchronousPwm::Start.*Percent.*Percent.*Percent",
+        "SynchronousPwm::SetComparator",
+        "SynchronousPwm::Sync"
+      ]
+    },
+    {
+      "label": "ISR Exit (exception return)",
+      "type": "exception_exit"
+    }
+  ]
 }

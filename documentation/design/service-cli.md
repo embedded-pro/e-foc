@@ -81,13 +81,13 @@ Only one interactor is active at a time; the application constructs exactly the 
 
 #### `TerminalFocBaseInteractor` — Shared Commands
 
-| Command      | Arguments            | Action                                                         |
-|--------------|----------------------|----------------------------------------------------------------|
-| `set_current_bandwidth` | bandwidth (float, rad/s) | Sets the current-loop bandwidth via `CurrentLoopTunable::SetCurrentTunings()` |
-| `select_current_algorithm` | pid \| decoupled \| deadbeat \| sliding | Selects the current-loop algorithm; rejected while the motor is enabled or before the motor model is identified |
-| `select_speed_algorithm` | pid \| lqi \| adrc \| twodof | Selects the speed-loop algorithm; only available in speed and position modes |
+| Command                     | Arguments                               | Action                                                                                                                                                                           |
+|-----------------------------|-----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `set_current_bandwidth`     | bandwidth (float, rad/s)                | Sets the current-loop bandwidth via `CurrentLoopTunable::SetCurrentTunings()`                                                                                                    |
+| `select_current_algorithm`  | pid \| decoupled \| deadbeat \| sliding | Selects the current-loop algorithm; rejected while the motor is enabled or before the motor model is identified                                                                  |
+| `select_speed_algorithm`    | pid \| lqi \| adrc \| twodof            | Selects the speed-loop algorithm; only available in speed and position modes                                                                                                     |
 | `select_position_algorithm` | pid \| cascadep \| lqr \| lqi \| twodof | Selects the position-loop algorithm; only available in position mode. LQR and LQI are refused when their Riccati design does not converge, leaving the previous algorithm active |
-| `active_algorithms` | — | Prints the active current, speed and position loop algorithms |
+| `active_algorithms`         | —                                       | Prints the active current, speed and position loop algorithms                                                                                                                    |
 
 This command is available in all control modes.
 
@@ -99,17 +99,17 @@ This command is available in all control modes.
 
 #### `TerminalFocSpeedInteractor` — Speed Mode
 
-| Command         | Arguments          | Action                                                      |
-|-----------------|--------------------|-------------------------------------------------------------|
-| `set-speed`     | ω (rad/s)          | Sets the speed setpoint via `FocSpeed::SetPoint()`          |
+| Command               | Arguments                | Action                                                                  |
+|-----------------------|--------------------------|-------------------------------------------------------------------------|
+| `set-speed`           | ω (rad/s)                | Sets the speed setpoint via `FocSpeed::SetPoint()`                      |
 | `set_speed_bandwidth` | bandwidth (float, rad/s) | Sets the speed-loop bandwidth via `SpeedLoopTunable::SetSpeedTunings()` |
 
 #### `TerminalFocPositionInteractor` — Position Mode
 
-| Command            | Arguments          | Action                                                               |
-|--------------------|--------------------|----------------------------------------------------------------------|
-| `set-position`     | θ (rad)            | Sets the position setpoint via `FocPosition::SetPoint()`             |
-| `set_speed_bandwidth`    | bandwidth (float, rad/s) | Sets the speed-loop bandwidth within the position cascade      |
+| Command                  | Arguments                | Action                                                                                                                                                                                         |
+|--------------------------|--------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `set-position`           | θ (rad)                  | Sets the position setpoint via `FocPosition::SetPoint()`                                                                                                                                       |
+| `set_speed_bandwidth`    | bandwidth (float, rad/s) | Sets the speed-loop bandwidth within the position cascade                                                                                                                                      |
 | `set_position_bandwidth` | bandwidth (float, rad/s) | Sets the position-loop bandwidth via `PositionLoopTunable::SetPositionTunings()`. Refused while the motor is enabled, and refused if the active law cannot be redesigned for the new bandwidth |
 
 ### `TerminalWithBanner` — Decorator
@@ -204,10 +204,10 @@ Registered command handlers are stored in a fixed-size look-up structure in the 
 
 ### Provided
 
-| Interface                                    | Purpose                                                                                                                                                                    | Contract                                                                              |
-|----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
+| Interface                                    | Purpose                                                                                                                                                                               | Contract                                                                              |
+|----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
 | `TerminalFocBaseInteractor` (and subclasses) | Registers the `set_current_bandwidth` command on `TerminalWithStorage`; exposes a `Terminal()` accessor for the `FocStateMachine` to register lifecycle commands on the same terminal | Constructed once per application; exactly one interactor subclass is active at a time |
-| `TerminalWithBanner`                         | Decorates `TerminalWithStorage` to print a welcome banner on first connection                                                                                              | Transparent to the underlying terminal after the banner has been printed              |
+| `TerminalWithBanner`                         | Decorates `TerminalWithStorage` to print a welcome banner on first connection                                                                                                         | Transparent to the underlying terminal after the banner has been printed              |
 
 ### Required
 

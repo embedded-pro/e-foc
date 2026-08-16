@@ -111,13 +111,13 @@ sequenceDiagram
 
 **Steps and data produced:**
 
-| Step                                           | Service             | Data stored                                              |
-|------------------------------------------------|---------------------|----------------------------------------------------------|
-| 1. Pole pairs                                  | Electrical Ident    | `polePairs`                                              |
-| 2. Resistance and inductance                   | Electrical Ident    | `rPhase`, `lD`, `lQ`                                     |
-| 3. Alignment                                   | Motor Alignment     | `encoderZeroOffset`                                      |
+| Step                                           | Service             | Data stored                                        |
+|------------------------------------------------|---------------------|----------------------------------------------------|
+| 1. Pole pairs                                  | Electrical Ident    | `polePairs`                                        |
+| 2. Resistance and inductance                   | Electrical Ident    | `rPhase`, `lD`, `lQ`                               |
+| 3. Alignment                                   | Motor Alignment     | `encoderZeroOffset`                                |
 | 4. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth` |
-| 5. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                       |
+| 5. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                 |
 
 After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, encoder zero offset applied, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`.
 
@@ -315,50 +315,50 @@ sequenceDiagram
 
 ### Provided
 
-| Interface               | Purpose                                                          | Contract                                                                                                                         |
-|-------------------------|------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
-| `FocStateMachineBase`   | Abstract lifecycle controller — state query and command dispatch | Constructed once per application; all command methods are safe to call from any state (invalid transitions are silently ignored) |
-| `CurrentState()`        | Returns the current `State` variant for inspection               | Returns a const reference; valid for the lifetime of the state machine                                                           |
-| `LastFaultCode()`       | Returns the most recent fault code                               | Value is only meaningful when in `Fault` state or just after clearing a fault                                                    |
-| `CmdCalibrate()`        | Requests start of calibration                                    | Only effective from `Idle` or `Ready`; ignored from all other states                                                             |
-| `CmdEnable()`           | Requests enabling the FOC controller                             | Only effective from `Ready`; ignored from all other states                                                                       |
-| `CmdDisable()`          | Requests disabling the FOC controller                            | Only effective from `Enabled`; ignored from all other states                                                                     |
-| `CmdClearFault()`       | Clears the fault and returns to `Idle`                           | Only effective from `Fault`; ignored from all other states                                                                       |
-| `CmdClearCalibration()` | Invalidates NVM calibration and returns to `Idle`                | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`. |
-| `ApplyOnlineEstimates()`| Retunes speed and current PID gains from online estimators       | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only.                                |
+| Interface                | Purpose                                                          | Contract                                                                                                                                             |
+|--------------------------|------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `FocStateMachineBase`    | Abstract lifecycle controller — state query and command dispatch | Constructed once per application; all command methods are safe to call from any state (invalid transitions are silently ignored)                     |
+| `CurrentState()`         | Returns the current `State` variant for inspection               | Returns a const reference; valid for the lifetime of the state machine                                                                               |
+| `LastFaultCode()`        | Returns the most recent fault code                               | Value is only meaningful when in `Fault` state or just after clearing a fault                                                                        |
+| `CmdCalibrate()`         | Requests start of calibration                                    | Only effective from `Idle` or `Ready`; ignored from all other states                                                                                 |
+| `CmdEnable()`            | Requests enabling the FOC controller                             | Only effective from `Ready`; ignored from all other states                                                                                           |
+| `CmdDisable()`           | Requests disabling the FOC controller                            | Only effective from `Enabled`; ignored from all other states                                                                                         |
+| `CmdClearFault()`        | Clears the fault and returns to `Idle`                           | Only effective from `Fault`; ignored from all other states                                                                                           |
+| `CmdClearCalibration()`  | Invalidates NVM calibration and returns to `Idle`                | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`.                    |
+| `ApplyOnlineEstimates()` | Retunes speed and current PID gains from online estimators       | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only. |
 
 ### Required
 
-| Interface                            | Purpose                                                                  | Contract                                                                       |
-|--------------------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------|
-| `NonVolatileMemory`                  | Persists and retrieves calibration data across power cycles              | Must remain valid for the lifetime of the state machine                        |
-| `ElectricalParametersIdentification` | Estimates pole pairs, phase resistance, and dq inductances               | Operations are asynchronous; callback fires on the same event loop             |
-| `MotorAlignment`                     | Forces rotor to a known angle and returns the encoder zero offset        | Operation is asynchronous; result is optional (nullopt = failure)              |
-| `MechanicalParametersIdentification` | Estimates rotor inertia and viscous friction (speed/position modes only) | Operation is asynchronous; result is optional (nullopt = failure)              |
-| `FaultNotifier`                      | Delivers hardware fault notifications to the state machine               | `Register()` must be called during construction; callback may fire at any time |
-| `ThreePhaseInverter`                 | Used by the FOC controller to issue PWM and read phase currents          | Stopped immediately on any fault from `Enabled` or `Calibrating` state         |
-| `Encoder`                            | Rotor position sensor; zero offset applied after alignment               | `Set()` called during `ApplyCalibrationData` to configure the zero point       |
-| `TerminalWithStorage`                | Serial command interface for CLI-mode transition policy                  | Commands registered in constructor; terminal must outlive the state machine    |
-| `Tracer`                             | Debug trace output for lifecycle events                                  | All state transitions and calibration steps are traced                         |
-| `RealTimeFrictionAndInertiaEstimator`   | Online RLS estimator for rotor inertia and viscous friction (speed/position only) | Seeded from calibration data; torque constant set on `EnterEnabled`; updates run while FOC outer loop is active |
-| `RealTimeResistanceAndInductanceEstimator` | Online RLS estimator for phase resistance and d-axis inductance (speed/position only) | Assumes non-salient motor (Ld ≈ Lq); seeded using `lD` from calibration        |
+| Interface                                  | Purpose                                                                               | Contract                                                                                                        |
+|--------------------------------------------|---------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| `NonVolatileMemory`                        | Persists and retrieves calibration data across power cycles                           | Must remain valid for the lifetime of the state machine                                                         |
+| `ElectricalParametersIdentification`       | Estimates pole pairs, phase resistance, and dq inductances                            | Operations are asynchronous; callback fires on the same event loop                                              |
+| `MotorAlignment`                           | Forces rotor to a known angle and returns the encoder zero offset                     | Operation is asynchronous; result is optional (nullopt = failure)                                               |
+| `MechanicalParametersIdentification`       | Estimates rotor inertia and viscous friction (speed/position modes only)              | Operation is asynchronous; result is optional (nullopt = failure)                                               |
+| `FaultNotifier`                            | Delivers hardware fault notifications to the state machine                            | `Register()` must be called during construction; callback may fire at any time                                  |
+| `ThreePhaseInverter`                       | Used by the FOC controller to issue PWM and read phase currents                       | Stopped immediately on any fault from `Enabled` or `Calibrating` state                                          |
+| `Encoder`                                  | Rotor position sensor; zero offset applied after alignment                            | `Set()` called during `ApplyCalibrationData` to configure the zero point                                        |
+| `TerminalWithStorage`                      | Serial command interface for CLI-mode transition policy                               | Commands registered in constructor; terminal must outlive the state machine                                     |
+| `Tracer`                                   | Debug trace output for lifecycle events                                               | All state transitions and calibration steps are traced                                                          |
+| `RealTimeFrictionAndInertiaEstimator`      | Online RLS estimator for rotor inertia and viscous friction (speed/position only)     | Seeded from calibration data; torque constant set on `EnterEnabled`; updates run while FOC outer loop is active |
+| `RealTimeResistanceAndInductanceEstimator` | Online RLS estimator for phase resistance and d-axis inductance (speed/position only) | Assumes non-salient motor (Ld ≈ Lq); seeded using `lD` from calibration                                         |
 
 ---
 
 ## Data Model
 
-| Entity            | Field                     | Type / Unit                    | Range    | Notes                                                                                                                   |
-|-------------------|---------------------------|--------------------------------|----------|-------------------------------------------------------------------------------------------------------------------------|
-| `CalibrationData` | `polePairs`               | count (uint8)                  | 1–255    | Number of electrical pole pairs                                                                                         |
-| `CalibrationData` | `rPhase`                  | Ohm (float)                    | > 0      | Phase resistance identified by electrical ident                                                                         |
-| `CalibrationData` | `lD` / `lQ`               | mH (float)                     | > 0      | D/Q inductances (set equal; anisotropy not estimated)                                                                   |
-| `CalibrationData` | `encoderZeroOffset`       | int32 (bit-cast float Radians) | any      | Quantised electrical angle at encoder zero; applied via `Encoder::Set()`                                                |
-| `CalibrationData` | `inertia`                 | N·m·s² (float)                 | ≥ 0      | Rotor inertia; populated only for speed/position modes                                                                  |
-| `CalibrationData` | `frictionViscous`         | N·m·s/rad (float)              | ≥ 0      | Viscous friction coefficient; populated only for speed/position modes                                                   |
-| `CalibrationData` | `frictionCoulomb`         | N·m (float)                    | ≥ 0      | Coulomb friction; currently 0 (not identified)                                                                          |
-| `CalibrationData` | `speedLoopBandwidth`      | rad/s (float)                  | ≥ 0      | Speed loop closed-loop bandwidth; populated only for speed/position modes                                              |
-| `CalibrationData` | `currentLoopBandwidth`    | rad/s (float)                  | ≥ 0      | Current loop closed-loop bandwidth; defaults to 2π·fs/nyquistFactor when zero                                         |
-| `FaultCode`       | —                         | enum (uint8)                   | 7 values | `overcurrent`, `overvoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed` |
+| Entity            | Field                  | Type / Unit                    | Range    | Notes                                                                                                                   |
+|-------------------|------------------------|--------------------------------|----------|-------------------------------------------------------------------------------------------------------------------------|
+| `CalibrationData` | `polePairs`            | count (uint8)                  | 1–255    | Number of electrical pole pairs                                                                                         |
+| `CalibrationData` | `rPhase`               | Ohm (float)                    | > 0      | Phase resistance identified by electrical ident                                                                         |
+| `CalibrationData` | `lD` / `lQ`            | mH (float)                     | > 0      | D/Q inductances (set equal; anisotropy not estimated)                                                                   |
+| `CalibrationData` | `encoderZeroOffset`    | int32 (bit-cast float Radians) | any      | Quantised electrical angle at encoder zero; applied via `Encoder::Set()`                                                |
+| `CalibrationData` | `inertia`              | N·m·s² (float)                 | ≥ 0      | Rotor inertia; populated only for speed/position modes                                                                  |
+| `CalibrationData` | `frictionViscous`      | N·m·s/rad (float)              | ≥ 0      | Viscous friction coefficient; populated only for speed/position modes                                                   |
+| `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0      | Coulomb friction; currently 0 (not identified)                                                                          |
+| `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0      | Speed loop closed-loop bandwidth; populated only for speed/position modes                                               |
+| `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0      | Current loop closed-loop bandwidth; defaults to 2π·fs/nyquistFactor when zero                                           |
+| `FaultCode`       | —                      | enum (uint8)                   | 7 values | `overcurrent`, `overvoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed` |
 
 ---
 

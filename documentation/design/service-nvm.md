@@ -170,38 +170,38 @@ stateDiagram-v2
 
 **CalibrationData** (60 bytes total):
 
-| Field                  | Physical unit | Description                                         |
-|------------------------|---------------|-----------------------------------------------------|
-| rPhase                 | Ω             | Measured phase resistance                           |
-| lD                     | H             | Measured d-axis inductance                          |
-| lQ                     | H             | Measured q-axis inductance                          |
-| currentOffsetA/B/C     | A             | ADC current sensor zero offsets per phase           |
-| inertia                | kg·m²         | Estimated rotor inertia                             |
-| frictionCoulomb        | N·m           | Coulomb (constant) friction                         |
-| frictionViscous        | N·m·s/rad     | Viscous friction coefficient                        |
-| encoderZeroOffset      | rad           | Encoder calibration offset (from alignment service) |
-| currentLoopBandwidth   | rad/s         | Current loop closed-loop bandwidth                       |
-| speedLoopBandwidth     | rad/s         | Speed loop closed-loop bandwidth                         |
-| encoderDirection       | —             | Polarity correction (+1 or −1)                      |
-| polePairs              | —             | Number of motor pole pairs                          |
+| Field                | Physical unit | Description                                         |
+|----------------------|---------------|-----------------------------------------------------|
+| rPhase               | Ω             | Measured phase resistance                           |
+| lD                   | H             | Measured d-axis inductance                          |
+| lQ                   | H             | Measured q-axis inductance                          |
+| currentOffsetA/B/C   | A             | ADC current sensor zero offsets per phase           |
+| inertia              | kg·m²         | Estimated rotor inertia                             |
+| frictionCoulomb      | N·m           | Coulomb (constant) friction                         |
+| frictionViscous      | N·m·s/rad     | Viscous friction coefficient                        |
+| encoderZeroOffset    | rad           | Encoder calibration offset (from alignment service) |
+| currentLoopBandwidth | rad/s         | Current loop closed-loop bandwidth                  |
+| speedLoopBandwidth   | rad/s         | Speed loop closed-loop bandwidth                    |
+| encoderDirection     | —             | Polarity correction (+1 or −1)                      |
+| polePairs            | —             | Number of motor pole pairs                          |
 
 **ConfigData** (40 bytes total):
 
-| Field                 | Physical unit | Description                             |
-|-----------------------|---------------|-----------------------------------------|
-| maxCurrent            | A             | Peak current limit                      |
-| maxVelocity           | rad/s         | Peak speed limit                        |
-| maxTorque             | N·m           | Peak torque limit                       |
-| canNodeId             | —             | CAN bus node identifier                 |
-| canBaudrate           | bit/s         | CAN bus baud rate                       |
-| telemetryRateHz       | Hz            | Rate at which telemetry frames are sent |
-| overTempThreshold     | °C            | Over-temperature trip threshold         |
-| underVoltageThreshold | V             | DC bus under-voltage trip threshold     |
-| overVoltageThreshold  | V             | DC bus over-voltage trip threshold      |
-| defaultControlMode    | —             | Control mode selected on power-up       |
-| currentAlgorithm      | —             | Current-loop algorithm selected on power-up |
-| speedAlgorithm        | —             | Speed-loop algorithm selected on power-up   |
-| positionAlgorithm     | —             | Position-loop algorithm selected on power-up|
+| Field                 | Physical unit | Description                                  |
+|-----------------------|---------------|----------------------------------------------|
+| maxCurrent            | A             | Peak current limit                           |
+| maxVelocity           | rad/s         | Peak speed limit                             |
+| maxTorque             | N·m           | Peak torque limit                            |
+| canNodeId             | —             | CAN bus node identifier                      |
+| canBaudrate           | bit/s         | CAN bus baud rate                            |
+| telemetryRateHz       | Hz            | Rate at which telemetry frames are sent      |
+| overTempThreshold     | °C            | Over-temperature trip threshold              |
+| underVoltageThreshold | V             | DC bus under-voltage trip threshold          |
+| overVoltageThreshold  | V             | DC bus over-voltage trip threshold           |
+| defaultControlMode    | —             | Control mode selected on power-up            |
+| currentAlgorithm      | —             | Current-loop algorithm selected on power-up  |
+| speedAlgorithm        | —             | Speed-loop algorithm selected on power-up    |
+| positionAlgorithm     | —             | Position-loop algorithm selected on power-up |
 
 ---
 

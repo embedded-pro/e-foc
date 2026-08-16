@@ -108,13 +108,13 @@ The simulator implements the same PAL contracts as real hardware. Control logic 
 
 The heart of the system. Decomposed into sub-layers following a strict separation of vocabulary, generic numerics, transform algorithms, orchestration, and wiring. Dependencies flow in one direction only — from wiring down towards vocabulary; no lower layer may depend on a higher one:
 
-| Sub-component   | Responsibility                                                                                                                                       |
-|-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Sub-component   | Responsibility                                                                                                                                                                                               |
+|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Interfaces      | Define the FOC vocabulary (units, phase and frame signal types) and the abstract contracts for control modes (Torque, Speed, Position) and driver peripherals (inverter, encoder, interrupt). No algorithms. |
-| Math            | Generic numerical helpers that are not specific to field-oriented control — fast trigonometry by lookup table, angle wrap-around. Header-only, dependency-free.                                                |
-| Transforms      | The field-oriented control mathematics proper: the Clarke and Park transforms in both directions, and Space Vector Modulation.                                                                                 |
-| Implementations | Orchestration of the control cascade — the per-mode control loops, the gain-design helpers, and the execution runner that drives the loop from interrupt context.                                              |
-| Instantiations  | Wiring that combines a control-mode implementation with the execution runner to produce a ready-to-use FOC controller.                                                                                         |
+| Math            | Generic numerical helpers that are not specific to field-oriented control — fast trigonometry by lookup table, angle wrap-around. Header-only, dependency-free.                                              |
+| Transforms      | The field-oriented control mathematics proper: the Clarke and Park transforms in both directions, and Space Vector Modulation.                                                                               |
+| Implementations | Orchestration of the control cascade — the per-mode control loops, the gain-design helpers, and the execution runner that drives the loop from interrupt context.                                            |
+| Instantiations  | Wiring that combines a control-mode implementation with the execution runner to produce a ready-to-use FOC controller.                                                                                       |
 
 Because Interfaces, Math, and Transforms carry no dependency on the control cascade, the identification, alignment, and simulation components consume them directly without pulling in the control loops.
 
@@ -211,10 +211,10 @@ Because submodules are never patched locally, an upstream defect has to be carri
 workaround until the fix lands. Two such defects shaped the position loop and are now resolved on
 `numerical-toolbox` `main`, which is what the submodule tracks:
 
-| Upstream                                                                                            | Why it mattered                                                                                                                                            |
-|-----------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| PR **#288** / **#289** — scale-invariant DARE convergence tolerance                                  | Without it the position LQR and LQI designs do not converge at all. The submodule must stay at or past this commit.                                          |
-| Issue **#291** — `IntegralStateFeedbackLqi` had no non-aborting construction path                    | Its constructor called `really_assert(converged)`, so a non-convergent solve aborted the firmware. `TryCreate` now exists and every state feedback design here uses it. |
+| Upstream                                                                          | Why it mattered                                                                                                                                                         |
+|-----------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| PR **#288** / **#289** — scale-invariant DARE convergence tolerance               | Without it the position LQR and LQI designs do not converge at all. The submodule must stay at or past this commit.                                                     |
+| Issue **#291** — `IntegralStateFeedbackLqi` had no non-aborting construction path | Its constructor called `really_assert(converged)`, so a non-convergent solve aborted the firmware. `TryCreate` now exists and every state feedback design here uses it. |
 
 Should a comparable defect appear again, record it in this table with the workaround and the
 condition for retiring it, so a workaround does not quietly become permanent.
@@ -223,10 +223,10 @@ condition for retiring it, so a workaround does not quietly become permanent.
 
 Vendor-provided hardware abstraction libraries consumed as Git submodules. They supply the low-level peripheral register access and interrupt management that the PAL concrete implementations use.
 
-| Directory | Vendor / Board                      |
-|-----------|-------------------------------------|
-| `infra/hal/ti`  | Texas Instruments Tiva (Cortex-M4F) |
-| `infra/hal/st`  | STMicroelectronics STM32            |
+| Directory      | Vendor / Board                      |
+|----------------|-------------------------------------|
+| `infra/hal/ti` | Texas Instruments Tiva (Cortex-M4F) |
+| `infra/hal/st` | STMicroelectronics STM32            |
 
 These are never used directly by the FOC core or services — only by the PAL concrete implementations.
 
@@ -248,7 +248,7 @@ These are never used directly by the FOC core or services — only by the PAL co
 | Interface              | Direction | Purpose                                                                                                    | Invariants                                                                                                          |
 |------------------------|-----------|------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
 | `ThreePhaseInverter`   | required  | Triggers ADC phase-current sampling and applies PWM duty cycles to the three-phase bridge                  | `PhaseCurrentsReady()` installs the callback invoked by the ADC interrupt. Must be called before `Start()`.         |
-| `Encoder`              | required  | Reads rotor mechanical angle and supports zero-offset calibration                                          | Read must be non-blocking and complete in <= a few cycles.                                                           |
+| `Encoder`              | required  | Reads rotor mechanical angle and supports zero-offset calibration                                          | Read must be non-blocking and complete in <= a few cycles.                                                          |
 | `LowPriorityInterrupt` | required  | Schedules periodic execution of the speed and position outer loops at a lower rate than the FOC inner loop | `Register()` installs the callback. `Trigger()` is called from the FOC inner loop at the configured prescale ratio. |
 | `NonVolatileMemory`    | required  | Persists and retrieves calibration and configuration data                                                  | All operations are asynchronous and invoke a callback on completion.                                                |
 
@@ -346,11 +346,11 @@ These patterns eliminate polling, decouple producers from consumers, and allow t
 
 ## Open Questions & Decisions
 
-| # | Question / Decision                                    | Status   | Options Considered                                                                                        | Rationale                                                                                                                                                                                                                                               |
-|---|--------------------------------------------------------|----------|-----------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1 | Rename `source/hardware/` and extract platform targets | resolved | Keep current name vs rename to PAL vs full extraction | Renamed to `core/platform_abstraction/` (interface + adapters only). Platform implementations (TI, ST, Host) and application targets moved to top-level `targets/`. Host-only tools moved to top-level `tools/`. Core tier is now purely libraries. `source/` directory renamed to `core/`. |
-| 2 | Multi-motor support                                    | open     | Single instantiation per motor vs shared PAL with multiple FOC controllers                                | Current architecture supports one motor per binary. A shared PAL with multiple `FocController` instances is architecturally feasible but not yet required.                                                                                              |
-| 3 | Field-weakening                                        | open     | Extend `FocTorque` interface with flux-weakening setpoint vs separate `FocTorqueFieldWeakening` interface | Required for operation above base speed. Separate interface preferred (ISP) but not yet scoped.                                                                                                                                                         |
+| # | Question / Decision                                    | Status   | Options Considered                                                                                        | Rationale                                                                                                                                                                                                                                                                                   |
+|---|--------------------------------------------------------|----------|-----------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | Rename `source/hardware/` and extract platform targets | resolved | Keep current name vs rename to PAL vs full extraction                                                     | Renamed to `core/platform_abstraction/` (interface + adapters only). Platform implementations (TI, ST, Host) and application targets moved to top-level `targets/`. Host-only tools moved to top-level `tools/`. Core tier is now purely libraries. `source/` directory renamed to `core/`. |
+| 2 | Multi-motor support                                    | open     | Single instantiation per motor vs shared PAL with multiple FOC controllers                                | Current architecture supports one motor per binary. A shared PAL with multiple `FocController` instances is architecturally feasible but not yet required.                                                                                                                                  |
+| 3 | Field-weakening                                        | open     | Extend `FocTorque` interface with flux-weakening setpoint vs separate `FocTorqueFieldWeakening` interface | Required for operation above base speed. Separate interface preferred (ISP) but not yet scoped.                                                                                                                                                                                             |
 
 ---
 
@@ -412,14 +412,14 @@ graph TD
 
 ### Integration Boundaries
 
-| Boundary                                 | Real Component                                             | Test Double                                                                  |
-|------------------------------------------|------------------------------------------------------------|------------------------------------------------------------------------------|
-| Platform peripherals (PWM, encoder, current sense) | `PlatformFactoryMock` (single GMock) | Inverter and encoder hot-path methods mocked directly on the factory; default `EXPECT_CALL`s in the fixture constructor |
-| EEPROM storage                           | In-memory 512-byte array                                   | Replaces embedded EEPROM driver                                              |
-| Calibration services                     | Electrical identification mock, alignment mock             | `StrictMock<>` wrapping service interfaces                                   |
-| Fault notification                       | Fault notifier mock                                        | `StrictMock<>` wrapping fault notifier                                       |
-| CAN transport                            | Category server `HandleMessage` invoked directly           | Bypasses CAN wire encoding                                                   |
-| Terminal / tracer                        | Stream writer stub                                         | No-op for terminal output                                                    |
+| Boundary                                           | Real Component                                   | Test Double                                                                                                             |
+|----------------------------------------------------|--------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| Platform peripherals (PWM, encoder, current sense) | `PlatformFactoryMock` (single GMock)             | Inverter and encoder hot-path methods mocked directly on the factory; default `EXPECT_CALL`s in the fixture constructor |
+| EEPROM storage                                     | In-memory 512-byte array                         | Replaces embedded EEPROM driver                                                                                         |
+| Calibration services                               | Electrical identification mock, alignment mock   | `StrictMock<>` wrapping service interfaces                                                                              |
+| Fault notification                                 | Fault notifier mock                              | `StrictMock<>` wrapping fault notifier                                                                                  |
+| CAN transport                                      | Category server `HandleMessage` invoked directly | Bypasses CAN wire encoding                                                                                              |
+| Terminal / tracer                                  | Stream writer stub                               | No-op for terminal output                                                                                               |
 
 ### Requirements Traceability
 

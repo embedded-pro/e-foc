@@ -80,13 +80,13 @@ is listed under; there is no sharing of algorithm identifiers across loops.
 
 **Position loop** — executes at 1 kHz in the low-priority handler:
 
-| Algorithm | Output            | Description                                                 |
-|-----------|-------------------|-------------------------------------------------------------|
-| PID       | Speed reference   | Incremental PI on the wrapped position error                |
-| Cascade P | Speed reference   | Industry-standard P position → speed loop; single gain      |
-| LQR       | Current reference | DARE-computed state feedback on (θ, ω)                      |
-| LQI       | Current reference | LQR with position integral augmentation                     |
-| Two-DOF   | Speed reference   | Reference pre-filter + PI; tracking and stiffness tune apart|
+| Algorithm | Output            | Description                                                  |
+|-----------|-------------------|--------------------------------------------------------------|
+| PID       | Speed reference   | Incremental PI on the wrapped position error                 |
+| Cascade P | Speed reference   | Industry-standard P position → speed loop; single gain       |
+| LQR       | Current reference | DARE-computed state feedback on (θ, ω)                       |
+| LQI       | Current reference | LQR with position integral augmentation                      |
+| Two-DOF   | Speed reference   | Reference pre-filter + PI; tracking and stiffness tune apart |
 
 Iterative learning control is deliberately absent. It is an augmentation layered on top of a
 feedback law for repetitive trajectories, not a peer algorithm, so it does not belong in this

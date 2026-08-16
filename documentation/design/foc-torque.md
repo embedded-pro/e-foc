@@ -117,14 +117,14 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 
 ### Provided
 
-| Interface         | Purpose                                                              | Contract                                                                                        |
-|-------------------|----------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
-| Configure         | Supplies the motor model: resistance, inductance, flux linkage, bus voltage, sampling frequency and pole pairs. | Must be called before the first `Calculate()`. Must not be changed while Enabled.               |
-| Enable            | Arms both PID controllers and resets their integrator state.         | Safe to call repeatedly. PIDs start from a clean state each time. Last setpoints are preserved. |
-| Disable           | Disarms both PID controllers and forces zero duty cycle output.      | Safe to call from any context. `Calculate()` returns zero while disabled.                       |
-| SetCurrentTunings | Provides the current loop closed-loop bandwidth.                     | Gains are derived from the motor model and normalised internally. Takes effect on the next `Calculate()` call. |
-| SetPoint          | Sets the (Id, Iq) current setpoint in Ampere.                        | New setpoint is used on the next `Calculate()` invocation. Can be called while Enabled.         |
-| Calculate         | Executes the full 11-step FOC torque loop for one control cycle.     | Must be called at 20 kHz from ISR context. Returns `PhasePwmDutyCycles`. Must not block.        |
+| Interface         | Purpose                                                                                                         | Contract                                                                                                       |
+|-------------------|-----------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+| Configure         | Supplies the motor model: resistance, inductance, flux linkage, bus voltage, sampling frequency and pole pairs. | Must be called before the first `Calculate()`. Must not be changed while Enabled.                              |
+| Enable            | Arms both PID controllers and resets their integrator state.                                                    | Safe to call repeatedly. PIDs start from a clean state each time. Last setpoints are preserved.                |
+| Disable           | Disarms both PID controllers and forces zero duty cycle output.                                                 | Safe to call from any context. `Calculate()` returns zero while disabled.                                      |
+| SetCurrentTunings | Provides the current loop closed-loop bandwidth.                                                                | Gains are derived from the motor model and normalised internally. Takes effect on the next `Calculate()` call. |
+| SetPoint          | Sets the (Id, Iq) current setpoint in Ampere.                                                                   | New setpoint is used on the next `Calculate()` invocation. Can be called while Enabled.                        |
+| Calculate         | Executes the full 11-step FOC torque loop for one control cycle.                                                | Must be called at 20 kHz from ISR context. Returns `PhasePwmDutyCycles`. Must not block.                       |
 
 ### Required
 
@@ -151,16 +151,16 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 
 ## Constraints & Limitations
 
-| Constraint                      | Value / Description                                                                                       |
-|---------------------------------|-----------------------------------------------------------------------------------------------------------|
-| Control loop rate               | 20 kHz — must be called once per PWM switching period from the FOC interrupt.                             |
-| Cycle budget                    | <= 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz) for the full `Calculate()` execution. |
-| No virtual dispatch in hot path | `Calculate()` must not incur virtual function call overhead.                                              |
-| Output duty cycle format        | Normalised floating-point [0.0, 1.0]; conversion to PWM timer counts is the Runner's responsibility.      |
-| Electrical angle wrapping       | Handled by the LUT normalisation within FastTrigonometry — no explicit modulo operation required in loop. |
+| Constraint                      | Value / Description                                                                                                   |
+|---------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| Control loop rate               | 20 kHz — must be called once per PWM switching period from the FOC interrupt.                                         |
+| Cycle budget                    | <= 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz) for the full `Calculate()` execution.       |
+| No virtual dispatch in hot path | `Calculate()` must not incur virtual function call overhead.                                                          |
+| Output duty cycle format        | Normalised floating-point [0.0, 1.0]; conversion to PWM timer counts is the Runner's responsibility.                  |
+| Electrical angle wrapping       | Handled by the LUT normalisation within FastTrigonometry — no explicit modulo operation required in loop.             |
 | Gain derivation dependency      | Gain derivation requires the motor model — including the DC bus voltage — to be supplied through `Configure()` first. |
-| No flux weakening               | Id_setpoint ≠ 0 is structurally accepted but operational flux-weakening strategy is not yet defined.      |
-| PID state at Enable             | Integrators are always zeroed on Enable, regardless of previous state.                                    |
+| No flux weakening               | Id_setpoint ≠ 0 is structurally accepted but operational flux-weakening strategy is not yet defined.                  |
+| PID state at Enable             | Integrators are always zeroed on Enable, regardless of previous state.                                                |
 
 ---
 

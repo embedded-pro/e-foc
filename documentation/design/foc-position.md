@@ -127,17 +127,17 @@ This ordering guarantees that the Iq setpoint used by the inner loop is always t
 
 ### Provided
 
-| Interface          | Purpose                                                                  | Contract                                                                          |
-|--------------------|--------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
-| Configure          | Supplies the motor model, including the pole-pair count.                 | Must be called before the first `Calculate()`. Must not be changed while Enabled. |
-| Enable             | Resets the position law and arms the loops beneath it.                    | Safe to call repeatedly. Position setpoint is preserved.                          |
-| Disable            | Disarms all PIDs and forces zero duty cycle output.                      | Safe to call from any context.                                                    |
-| SetCurrentTunings  | Sets the current loop closed-loop bandwidth.                             | Gains are derived from the motor model and normalised internally.                 |
-| SetSpeedTunings    | Sets the speed loop closed-loop bandwidth.                               | Speed loop output clamped to ± maxCurrent.                                        |
-| SetPositionTunings | Sets the position loop bandwidth and cost weights.                       | Returns `SelectResult`. Refused with `busy` while enabled; refused with `invalidParameters` if the active law cannot be redesigned for the new tunings, leaving the last accepted set live. |
-| SelectPositionAlgorithm | Selects the position algorithm.                                     | Refused with `busy` while enabled, and with `invalidParameters` when the design does not converge; the previously active algorithm stays live. |
-| SetPoint           | Sets the target position in mechanical radians.                          | Written atomically; used on the next outer-loop cycle.                            |
-| Calculate          | Executes the inner 20 kHz FOC torque loop for one cycle.                 | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.            |
+| Interface               | Purpose                                                  | Contract                                                                                                                                                                                    |
+|-------------------------|----------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Configure               | Supplies the motor model, including the pole-pair count. | Must be called before the first `Calculate()`. Must not be changed while Enabled.                                                                                                           |
+| Enable                  | Resets the position law and arms the loops beneath it.   | Safe to call repeatedly. Position setpoint is preserved.                                                                                                                                    |
+| Disable                 | Disarms all PIDs and forces zero duty cycle output.      | Safe to call from any context.                                                                                                                                                              |
+| SetCurrentTunings       | Sets the current loop closed-loop bandwidth.             | Gains are derived from the motor model and normalised internally.                                                                                                                           |
+| SetSpeedTunings         | Sets the speed loop closed-loop bandwidth.               | Speed loop output clamped to ± maxCurrent.                                                                                                                                                  |
+| SetPositionTunings      | Sets the position loop bandwidth and cost weights.       | Returns `SelectResult`. Refused with `busy` while enabled; refused with `invalidParameters` if the active law cannot be redesigned for the new tunings, leaving the last accepted set live. |
+| SelectPositionAlgorithm | Selects the position algorithm.                          | Refused with `busy` while enabled, and with `invalidParameters` when the design does not converge; the previously active algorithm stays live.                                              |
+| SetPoint                | Sets the target position in mechanical radians.          | Written atomically; used on the next outer-loop cycle.                                                                                                                                      |
+| Calculate               | Executes the inner 20 kHz FOC torque loop for one cycle. | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                                                                                                      |
 
 ### Required
 
@@ -209,15 +209,15 @@ graph LR
 
 ## Constraints & Limitations
 
-| Constraint                         | Value / Description                                                                                                                   |
-|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| Inner loop rate                    | 20 kHz — called from the FOC ISR once per PWM period.                                                                                 |
-| Outer loop rate                    | 1 kHz (same for both position and speed stages). Must be an integer divisor of 20 kHz.                                                |
-| Speed-reference clamp              | One loop bandwidth of speed per π radians of error, which bounds the approach speed at any position error.                            |
-| No multi-turn tracking             | Position setpoint is in single-turn radians. Multi-turn logic must be handled externally.                                             |
-| Position wrap-around correction    | The position error is folded into [−π, π], so a setpoint across the encoder seam moves the short way round.                           |
-| LPI callback order                 | The position law must always execute before the speed PID within the same LPI callback. Reversing the order yields stale setpoints.   |
-| No flux weakening                  | Id = 0 is invariant. High-speed flux-weakening operation is out of scope.                                                             |
-| Cycle budget (inner loop)          | `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz).                                                                               |
-| Controller state at Enable         | Every integrator and observer is zeroed on Enable; the position setpoint is preserved.                                                |
-| Setpoint atomicity                 | Speed and Iq setpoints written by outer loops must be read atomically by downstream loops on 32-bit ARM.                              |
+| Constraint                      | Value / Description                                                                                                                 |
+|---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| Inner loop rate                 | 20 kHz — called from the FOC ISR once per PWM period.                                                                               |
+| Outer loop rate                 | 1 kHz (same for both position and speed stages). Must be an integer divisor of 20 kHz.                                              |
+| Speed-reference clamp           | One loop bandwidth of speed per π radians of error, which bounds the approach speed at any position error.                          |
+| No multi-turn tracking          | Position setpoint is in single-turn radians. Multi-turn logic must be handled externally.                                           |
+| Position wrap-around correction | The position error is folded into [−π, π], so a setpoint across the encoder seam moves the short way round.                         |
+| LPI callback order              | The position law must always execute before the speed PID within the same LPI callback. Reversing the order yields stale setpoints. |
+| No flux weakening               | Id = 0 is invariant. High-speed flux-weakening operation is out of scope.                                                           |
+| Cycle budget (inner loop)       | `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz).                           |
+| Controller state at Enable      | Every integrator and observer is zeroed on Enable; the position setpoint is preserved.                                              |
+| Setpoint atomicity              | Speed and Iq setpoints written by outer loops must be read atomically by downstream loops on 32-bit ARM.                            |

@@ -1,63 +1,61 @@
 {
-    "path_name": "Low-priority interrupt -> position loop -> speed loop -> online estimators",
-    "loop_rates_khz": [
-        1
-    ],
-    "path_stages": [
-        {
-            "label": "LPI Entry (exception overhead)",
-            "type": "exception_entry"
-        },
-        {
-            "label": "FOC Outer Loop (LowPriorityHandler)",
-            "patterns": [
-                "PositionCascade::LowPriorityHandler",
-                "SpeedCascade::LowPriorityHandler",
-                "CascadeWithSpeedLoop::RunSpeedLoop",
-                "CascadeWithSpeedLoop::MeasureMechanicalSpeed",
-                "CascadeWithSpeedLoop::SetSpeedReference",
-                "CascadeWithSpeedLoop::SetDirectCurrentReference",
-                "CascadeWithSpeedLoop::CurrentMechanicalAngle",
-                "CascadeWithSpeedLoop::PolePairs",
-                "PidSpeedController::Compute",
-                "LqiSpeedController::Compute",
-                "AdrcSpeedController::Compute",
-                "TwoDofSpeedController::Compute",
-                "PidPositionController::Compute",
-                "CascadePPositionController::Compute",
-                "LqrPositionController::Compute",
-                "LqiPositionController::Compute",
-                "TwoDofPositionController::Compute",
-                "PidIncrementalSynchronous.*::Process",
-                "PidIncrementalSynchronous.*::SetPoint",
-                "OuterSamplePeriod",
-                "WrappedPositionError",
-                "LimitToCurrentEnvelope"
-            ]
-        },
-        {
-            "label": "Online Mechanical Estimator (RLS)",
-            "required": false,
-            "patterns": [
-                "CascadeWithSpeedLoop::UpdateOnlineMechanicalEstimator",
-                "RealTimeFrictionAndInertiaEstimator::Update",
-                "ClarkePark::Forward",
-                "RecursiveLeastSquares<float, 3u>::Update"
-            ]
-        },
-        {
-            "label": "Online Electrical Estimator (RLS)",
-            "required": false,
-            "patterns": [
-                "CascadeWithSpeedLoop::UpdateOnlineElectricalEstimator",
-                "RealTimeResistanceAndInductanceEstimator::Update",
-                "RealTimeResistanceAndInductanceEstimator::ComputeEstimate",
-                "RecursiveLeastSquares<float, 2u>::Update"
-            ]
-        },
-        {
-            "label": "LPI Exit (exception return)",
-            "type": "exception_exit"
-        }
-    ]
+  "path_name": "Low-priority interrupt -> position loop -> speed loop -> online estimators",
+  "loop_rates_khz": [1],
+  "path_stages": [
+    {
+      "label": "LPI Entry (exception overhead)",
+      "type": "exception_entry"
+    },
+    {
+      "label": "FOC Outer Loop (LowPriorityHandler)",
+      "patterns": [
+        "PositionCascade::LowPriorityHandler",
+        "SpeedCascade::LowPriorityHandler",
+        "CascadeWithSpeedLoop::RunSpeedLoop",
+        "CascadeWithSpeedLoop::MeasureMechanicalSpeed",
+        "CascadeWithSpeedLoop::SetSpeedReference",
+        "CascadeWithSpeedLoop::SetDirectCurrentReference",
+        "CascadeWithSpeedLoop::CurrentMechanicalAngle",
+        "CascadeWithSpeedLoop::PolePairs",
+        "PidSpeedController::Compute",
+        "LqiSpeedController::Compute",
+        "AdrcSpeedController::Compute",
+        "TwoDofSpeedController::Compute",
+        "PidPositionController::Compute",
+        "CascadePPositionController::Compute",
+        "LqrPositionController::Compute",
+        "LqiPositionController::Compute",
+        "TwoDofPositionController::Compute",
+        "PidIncrementalSynchronous.*::Process",
+        "PidIncrementalSynchronous.*::SetPoint",
+        "OuterSamplePeriod",
+        "WrappedPositionError",
+        "LimitToCurrentEnvelope"
+      ]
+    },
+    {
+      "label": "Online Mechanical Estimator (RLS)",
+      "required": false,
+      "patterns": [
+        "CascadeWithSpeedLoop::UpdateOnlineMechanicalEstimator",
+        "RealTimeFrictionAndInertiaEstimator::Update",
+        "ClarkePark::Forward",
+        "RecursiveLeastSquares<float, 3u>::Update"
+      ]
+    },
+    {
+      "label": "Online Electrical Estimator (RLS)",
+      "required": false,
+      "patterns": [
+        "CascadeWithSpeedLoop::UpdateOnlineElectricalEstimator",
+        "RealTimeResistanceAndInductanceEstimator::Update",
+        "RealTimeResistanceAndInductanceEstimator::ComputeEstimate",
+        "RecursiveLeastSquares<float, 2u>::Update"
+      ]
+    },
+    {
+      "label": "LPI Exit (exception return)",
+      "type": "exception_exit"
+    }
+  ]
 }

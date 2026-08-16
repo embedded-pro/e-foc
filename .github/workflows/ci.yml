@@ -187,7 +187,7 @@ jobs:
         if: matrix.target == 'EK-TM4C1294XL'
         uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
         with:
-          comment-marker: '<!-- cycle-analysis-inner-comment -->'
+          comment-marker: "<!-- cycle-analysis-inner-comment -->"
           config-path: targets/sync_foc_sensored/main/cycle-analysis.json
           elf-path: build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf
           target: ${{ matrix.target }}
@@ -205,7 +205,7 @@ jobs:
         if: matrix.target == 'EK-TM4C1294XL'
         uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
         with:
-          comment-marker: '<!-- cycle-analysis-outer-comment -->'
+          comment-marker: "<!-- cycle-analysis-outer-comment -->"
           config-path: targets/sync_foc_sensored/main/cycle-analysis-outer.json
           elf-path: build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf
           target: ${{ matrix.target }}
