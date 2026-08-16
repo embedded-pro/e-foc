@@ -12,7 +12,8 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
   - `core/foc/cascade/` — Cascade orchestration and gain design; no hardware dependency.
   - `core/foc/instantiations/` — Execution wiring (`Runner`, `LowPriorityInterruptImpl`, `FocController`).
   - `core/platform_abstraction/interfaces/` — Hardware ports in namespace `drivers` (`ThreePhaseInverter`, `Encoder`, `HallSensor`).
-  - `core/services/` — Application-level services (coordination, scheduling, helpers), plus the runtime-selectable `current_controllers/` and `speed_controllers/` algorithm sets in the `services` namespace.
+  - `core/foc/selection/`, `core/foc/current_loop/`, `core/foc/speed_loop/` — Runtime-selectable control algorithm sets in the `foc` namespace.
+  - `core/services/` — Application-level services only (alignment, CLI, system identification, NVM).
   - `core/platform_abstraction/` — Abstract `PlatformFactory` interface and shared adapters.
   - `core/state_machine/` — `FocStateMachineImpl`: formal motor lifecycle state machine (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`). Supports `CliTransitionPolicy` (terminal commands) and `AutoTransitionPolicy` (lambda observers). Uses `std::variant` for states.
   - `targets/` — Application entry points (`hardware_test`, `sync_foc_sensored`) and platform implementations under `targets/platform_implementations/` (Host, ti, st).

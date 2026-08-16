@@ -15,7 +15,7 @@ This file is a concise, task-oriented guide for Claude and AI agents to be immed
 - `core/foc/instantiations/` — Execution wiring: `Runner`, `LowPriorityInterruptImpl`, `FocController`. The only foc layer that touches hardware ports.
 - `core/foc/instantiations/` — Concrete wiring of FOC components for specific targets.
 - `core/services/` — Application-level services (alignment, CLI, system identification, NVM).
-- `core/services/current_controllers/`, `core/services/speed_controllers/` — Runtime-selectable control algorithms (`services` namespace), dispatched through a `std::variant` selector.
+- `core/foc/selection/`, `core/foc/current_loop/`, `core/foc/speed_loop/` — Runtime-selectable control algorithms in the `foc` namespace, dispatched through a `std::variant` selector.
 - `core/platform_abstraction/` — Abstract `PlatformFactory` interface and shared adapters.
 - `core/state_machine/` — `FocStateMachineBase` (abstract interface in `FocStateMachine.hpp`) and `FocStateMachineCommon` (concrete in `FocStateMachineCommon.hpp`, `application` namespace): formal motor lifecycle state machine (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`). Uses `std::variant` for states and `state_machine::TransitionPolicy` enum (`::Cli` / `::Auto`) for transition mode.
 - `targets/` — Application entry points (`hardware_test`, `sync_foc_sensored`) and platform implementations under `targets/platform_implementations/` (host, ti, st, motor_boards).
