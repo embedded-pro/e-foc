@@ -2,9 +2,9 @@
 title: "Current Loop Controllers"
 type: theory
 status: draft
-version: 0.1.0
+version: 0.5.0
 component: "current-loop-controllers"
-date: 2026-08-10
+date: 2026-08-14
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-08-10
 | Title     | Current Loop Controllers |
 | Type      | theory                   |
 | Status    | draft                    |
-| Version   | 0.1.0                    |
+| Version   | 0.5.0                    |
 | Component | current-loop-controllers |
-| Date      | 2026-08-10               |
+| Date      | 2026-08-14               |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -55,7 +55,7 @@ position loops.
 | $A_d^i, B_d^i$       | Discrete current plant matrices        | —          |
 | $v_d^{PI}, v_q^{PI}$ | PI controller outputs (decoupled axes) | normalised |
 | $\phi$               | Sliding-mode boundary layer width      | A          |
-| $K_{sw}$             | Sliding-mode switching gain            | normalised |
+| $K_{sw}$             | Sliding-mode switching gain            | A          |
 
 See `documentation/theory/foc-plant-models.md` for all base symbols.
 
@@ -160,15 +160,30 @@ The result is clamped to $[-1,\,1]$ (normalised). When the step demand exceeds a
 settling takes more than one sample but remains optimal for the available headroom.
 
 **Two-step variant** (noise robustness): The one-step law amplifies measurement noise by
-$1/B_d^i = L_s/T_s^i$, which is large for small inductances. The two-step law distributes the
-correction over two samples:
+$1/B_d^i = L_s/T_s^i$, which is large for small inductances. The two-step law solves for the
+**minimum-norm input sequence** over a two-sample horizon and applies its first element, with the
+reference gain corrected so that the closed loop retains unity DC gain:
 
 $$
-v'[k] = \frac{i^* - (A_d^i)^2\, i[k]}{B_d^i\,(1 + A_d^i)}
+v'[k] = \frac{\left((A_d^i)^2 - A_d^i + 1\right) i^* - (A_d^i)^3\, i[k]}{B_d^i\left((A_d^i)^2 + 1\right)}
 $$
 
-This halves the noise amplification at the cost of one extra sample of settling time. Preferred
-when $L_s < 0.3$ mH.
+This reduces the state gain — and hence noise amplification — by roughly half.
+
+**Receding-horizon behaviour**: because only the first element of the sequence is applied and the
+solution is recomputed every sample, the two-step law does *not* settle in exactly two samples. The
+closed-loop pole is $A_d^i/\left((A_d^i)^2+1\right)$, giving a geometric rather than deadbeat
+response. Tracking is nonetheless exact in steady state: the reference gain is obtained by solving
+
+$$
+B_d^i\, g_{ref} = 1 - A_d^i + B_d^i\, g_{state}
+$$
+
+which forces unity DC gain. Taking the raw minimum-norm reference gain instead leaves a static error
+of $A_d^i/\left((A_d^i)^2 - A_d^i + 1\right)$ — around 1% at $A_d^i = 0.90$ and 20% at $0.61$ —
+which is worst in the small-$L_s$ regime the variant targets.
+
+The one-step law is unaffected — it places the closed-loop pole at the origin and tracks exactly.
 
 **Model accuracy requirement**: A 10% $L_s$ error leaves a 10% residual error after one step.
 Deadbeat is the natural progression after Decoupled PID has validated RLS convergence.
@@ -218,8 +233,10 @@ u[k] = u_{eq}[k] + u_{sw}[k]
 $$
 
 **Parameter choices**:
-- $K_{sw}$: must exceed the worst-case disturbance. Starting point:
-  $K_{sw} = 0.3 \cdot V_{dc} / (B_d^i \cdot \sqrt{3})$.
+- $K_{sw}$: must exceed the worst-case disturbance. Because $u_{sw}$ is obtained by dividing by
+  $B_d^i$, the gain carries the same unit as the sliding surface (A). Sizing it so the switching
+  term commands at most 30% of the maximum phase voltage $V_{dc}/\sqrt{3}$ gives the starting point:
+  $K_{sw} = 0.3 \cdot B_d^i \cdot V_{dc} / \sqrt{3}$.
 - $\phi$: boundary layer width (A). Typical: $0.1$–$0.5$ A. Smaller gives tighter tracking but
   more high-frequency actuation.
 
@@ -253,6 +270,37 @@ path (Clarke + Park + controller + inv-Park + SVM).
 
 ---
 
+## Output Voltage Limit
+
+Every controller in this document emits a normalised dq voltage pair that is handed to inverse Park
+and then to SVM. The modulator stays linear only inside the circle inscribed in the voltage hexagon
+(`documentation/theory/foc.md` Section 8):
+
+$$
+\sqrt{(v_d')^2 + (v_q')^2} \leq 1
+\qquad \Longleftrightarrow \qquad
+\sqrt{v_d^2 + v_q^2} \leq \frac{V_{dc}}{\sqrt{3}}
+$$
+
+This is a **circular** constraint on the vector, not an independent bound per axis. Clamping $v_d'$
+and $v_q'$ separately to $[-1, 1]$ admits vectors of magnitude up to $\sqrt{2}$; at that corner the
+duty cycles saturate over roughly three-quarters of the electrical period, distorting both the
+magnitude and the angle of the applied voltage.
+
+When the demand exceeds the circle, both components are scaled by $1/\lVert v' \rVert$. This
+preserves the voltage **angle** and therefore the direction of the resulting current vector,
+sacrificing only magnitude. The alternative — d-axis priority, granting the q-axis the residual
+$\sqrt{1 - (v_d')^2}$ — preserves flux at the expense of the angle and is the preferred scheme once
+field weakening is introduced.
+
+**Interaction with integral action**: scaling the output below what the PI computed leaves the
+integrator holding an unrealisable value. The incremental PI form bounds this inherently — its
+accumulated output is itself clamped to $[-1, 1]$ per axis — so the windup is limited to the
+difference between the box and the circle, and unwinds as soon as the demand returns inside the
+circle. Controllers without integral action (Deadbeat, Sliding-mode) are unaffected.
+
+---
+
 ## Limitations & Assumptions
 
 **All current controllers**:
@@ -260,6 +308,9 @@ path (Clarke + Park + controller + inv-Park + SVM).
 - Assume balanced three-phase operation ($i_a + i_b + i_c = 0$).
 - Require the current loop bandwidth $\omega_{bw}^{current} \geq 10 \times \omega_{bw}^{speed}$
   (cascade separation principle).
+- Output the normalised voltage vector subject to the SVM linear-region constraint
+  $\sqrt{(v_d')^2 + (v_q')^2} \leq 1$ — see *Output Voltage Limit* above. A per-axis clamp is **not**
+  equivalent and permits up to $\sqrt{2}$, driving the modulator deep into over-modulation.
 
 **A1 — Decoupled PID**:
 - Feedforward accuracy proportional to $L_s$ accuracy: 20% $L_s$ error leaves 20% residual coupling.
@@ -269,7 +320,9 @@ path (Clarke + Park + controller + inv-Park + SVM).
 **A2 — Deadbeat**:
 - Most sensitive to $L_s$ error of all current controllers. Do not activate until electrical RLS has
   converged (typically after the first few seconds of operation under load).
-- Two-step variant strongly preferred for $L_s < 0.3$ mH to avoid noise amplification.
+- The two-step variant halves noise amplification and still tracks exactly, but gives up deadbeat
+  settling for a geometric response with pole $A_d^i/\left((A_d^i)^2+1\right)$. Prefer it for noisy
+  current measurement or small $L_s$; prefer one-step for maximum servo stiffness.
 
 **A3 — Sliding-mode**:
 - Boundary layer $\phi$ introduces a steady-state band proportional to $\phi / K_{sw}$. Set $\phi$

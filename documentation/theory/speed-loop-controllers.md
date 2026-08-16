@@ -132,6 +132,16 @@ explicit performance cost.
 **Gain computation** runs once at configuration time off the hot path using the `DARE` solver from
 the numerical toolbox. The 1 kHz handler executes only the dot product.
 
+**Numerical conditioning**: the DARE is solved with the control input expressed per-unit of
+$I_{q,max}$ and with the integral state accumulating the raw error sum rather than $e \cdot T_s^o$.
+Both substitutions leave $\mathbf{K}$ unchanged — only the ratio $Q/R$ and the state scaling matter —
+but they keep the entries of $P$ of order unity, which the single-precision fixed-point iteration
+needs in order to reach its absolute convergence threshold.
+
+**Anti-windup**: the integral state is frozen (conditional integration) on any sample where the
+unsaturated command falls outside $\pm I_{q,max}$, and resumes as soon as the command re-enters the
+envelope.
+
 ---
 
 ## S2 — Active Disturbance Rejection Speed Control (ADRC)
@@ -182,8 +192,9 @@ $$
 **Performance**: Under a step load torque, the ADRC suppresses the speed dip in approximately
 $1/\omega_o$ seconds — typically an order of magnitude faster than integral action alone.
 
-**Relation to toolbox**: `ActiveDisturbanceRejectionControl<float,2>` implements this ESO and
-control law. `Compute(ω_ref, ω_meas)` is called once per 1 kHz handler cycle.
+**Relation to toolbox**: `ActiveDisturbanceRejectionControl<float,1>` implements this ESO and
+control law — the template parameter is the plant order, and the extended state carrying $\hat{f}$ is
+added on top of it. `Compute(ω_ref, ω_meas)` is called once per 1 kHz handler cycle.
 
 <!-- tikz:diagrams/speed-loop-adrc.tex -->
 ```mermaid
@@ -232,7 +243,9 @@ $$
 
 $\tau_{ff}$ shapes tracking speed; PI gains shape disturbance rejection. Neither constrains the other.
 
-**Relation to toolbox**: `Feedforward2Dof` implements this structure directly.
+**Relation to toolbox**: an `ExponentialMovingAverage` realises $F(z)$ and an incremental PI provides
+$C_{fb}(z)$, with $\alpha = 1 - e^{-T_s^o/\tau_{ff}}$ mapping the pre-filter time constant onto the
+filter.
 
 **Tuning**:
 - PI gains ($K_p$, $K_i$): design for disturbance rejection bandwidth $\omega_{bw}$ as in standard PI.
@@ -277,6 +290,12 @@ Negligible relative to Enable/Disable latency.
 - ESO estimates $\hat{f}$ with a lag proportional to $1/\omega_o$. Disturbances faster than $\omega_o$
   are not fully cancelled.
 - High $\omega_o$ amplifies speed measurement noise. Use a velocity smoother upstream if needed.
+- The ESO is discretized with forward Euler, whose poles leave the unit circle for
+  $\omega_o T_s^o > 0.83$. The toolbox enforces the conservative precondition
+  $\omega_o T_s^o < 0.5/n$; the configured observer bandwidth is clamped to $\omega_o \leq 0.4 / T_s^o$
+  to stay inside it, which caps the usable $\omega_o/\omega_c$ ratio at 1 kHz.
+- The clipped $i_q^*$ is fed back into the ESO each cycle, so a sustained current clip does not
+  bias $\hat{f}$.
 
 **S3 — Two-DOF**:
 - $\tau_{ff}$ must be smaller than the closed-loop mechanical time constant to avoid pre-filter lag

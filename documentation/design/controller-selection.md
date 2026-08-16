@@ -2,9 +2,9 @@
 title: "Runtime Controller Selection"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: "controller-selection"
-date: 2026-08-10
+date: 2026-08-14
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-08-10
 | Title     | Runtime Controller Selection |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.1.0                        |
+| Version   | 0.2.0                        |
 | Component | controller-selection         |
-| Date      | 2026-08-10                   |
+| Date      | 2026-08-14                   |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -489,8 +489,8 @@ repeat the selection after every power cycle. The motor state machine will trans
 
 | Entity               | Field             | Type / Unit       | Range                                         | Notes                                                              |
 |----------------------|-------------------|-------------------|-----------------------------------------------|--------------------------------------------------------------------|
-| CurrentAlgorithm     | enum              | uint8             | pid, decoupledPid, slidingMode                | Selectable current-loop strategy                                   |
-| SpeedAlgorithm       | enum              | uint8             | pid, lqi, adrc                                | Selectable speed-loop strategy                                     |
+| CurrentAlgorithm     | enum              | uint8             | pid, decoupledPid, deadbeat, slidingMode      | Selectable current-loop strategy                                   |
+| SpeedAlgorithm       | enum              | uint8             | pid, lqi, adrc, twoDof                        | Selectable speed-loop strategy                                     |
 | PositionAlgorithm    | enum              | uint8             | pid, lqr, lqi                                 | Selectable position-loop strategy                                  |
 | SelectResult         | enum              | uint8             | ok, busy, invalidAlgorithm, invalidParameters | Return code from SelectAlgorithm                                   |
 | MotorModelParameters | Rs                | Ohm (float)       | > 0                                           | From electrical RLS                                                |
@@ -498,6 +498,7 @@ repeat the selection after every power cycle. The motor state machine will trans
 | MotorModelParameters | psiF              | Weber (float)     | > 0                                           | From alignment calibration                                         |
 | MotorModelParameters | polePairs         | uint8             | ≥ 1                                           | Motor constant                                                     |
 | MotorModelParameters | Vdc               | Volt (float)      | > 0                                           | Measured dynamically                                               |
+| MotorModelParameters | currentLoopRate   | Hertz (uint32)    | > 0                                           | $1/T_s^i$; required to discretize the plant for Deadbeat and SMC   |
 | MotorModelParameters | J                 | kg·m² (float)     | > 0                                           | From mechanical RLS                                                |
 | MotorModelParameters | Bf                | N·m·s/rad (float) | ≥ 0                                           | From mechanical RLS                                                |
 | MotorModelParameters | Kt                | N·m/A (float)     | > 0                                           | Derived from psiF and polePairs                                    |
