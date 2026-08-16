@@ -1,5 +1,5 @@
 {
-    "path_name": "ADC ISR → FOC Position (worst case: inner + outer loop + all estimators) → PWM Output",
+    "path_name": "ADC ISR \u2192 FOC Position (worst case: inner + outer loop + all estimators) \u2192 PWM Output",
     "loop_rates_khz": [
         1,
         10,
@@ -29,10 +29,10 @@
         },
         {
             "label": "FOC Inner Loop (Calculate)",
-            "entry": "FocPositionImpl::Calculate",
+            "entry": "PositionCascade::Calculate",
             "patterns": [
-                "FocPositionImpl::Calculate",
-                "FocWithSpeedLoop::CalculateInnerLoop",
+                "PositionCascade::Calculate",
+                "CascadeWithSpeedLoop::CalculateInnerLoop",
                 "Clarke::Forward",
                 "Park::Forward",
                 "Park::Inverse",
@@ -40,6 +40,11 @@
                 "SpaceVectorModulation::Clip",
                 "FastTrigonometry::Sine",
                 "FastTrigonometry::Cosine",
+                "PidCurrentController::Compute",
+                "DecoupledPidCurrentController::Compute",
+                "DeadbeatCurrentController::Compute",
+                "SlidingModeCurrentController::Compute",
+                "LimitToModulationCircle",
                 "PidIncrementalBase.*::Process",
                 "PidIncrementalBase.*::Clamp",
                 "PidIncrementalSynchronous.*::Process",
@@ -54,8 +59,14 @@
         {
             "label": "FOC Outer Loop (LowPriorityHandler)",
             "patterns": [
-                "FocPositionImpl::LowPriorityHandler",
-                "FocWithSpeedLoop::LowPriorityHandler",
+                "PositionCascade::LowPriorityHandler",
+                "SpeedCascade::LowPriorityHandler",
+                "CascadeWithSpeedLoop::RunSpeedLoop",
+                "CascadeWithSpeedLoop::MeasureMechanicalSpeed",
+                "PidSpeedController::Compute",
+                "LqiSpeedController::Compute",
+                "AdrcSpeedController::Compute",
+                "TwoDofSpeedController::Compute",
                 "PidIncrementalSynchronous.*::Process",
                 "PidIncrementalSynchronous.*::SetPoint",
                 "PositionWithWrapAround"
@@ -65,7 +76,7 @@
             "label": "Online Mechanical Estimator (RLS)",
             "required": false,
             "patterns": [
-                "FocWithSpeedLoop::UpdateOnlineMechanicalEstimator",
+                "CascadeWithSpeedLoop::UpdateOnlineMechanicalEstimator",
                 "RealTimeFrictionAndInertiaEstimator::Update",
                 "RecursiveLeastSquares.*::Update",
                 "ClarkePark::Forward"
@@ -75,7 +86,7 @@
             "label": "Online Electrical Estimator (RLS)",
             "required": false,
             "patterns": [
-                "FocWithSpeedLoop::UpdateOnlineElectricalEstimator",
+                "CascadeWithSpeedLoop::UpdateOnlineElectricalEstimator",
                 "RealTimeResistanceAndInductanceEstimator::Update",
                 "RealTimeResistanceAndInductanceEstimator::ComputeEstimate",
                 "RecursiveLeastSquares.*::Update"
