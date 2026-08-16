@@ -195,7 +195,6 @@ jobs:
           clock-mhz: "120"
           cortex: "m4"
           output-dir: cycle-analysis/inner
-          # 75% of the 6000-cycle control period, the constraint in architecture/system.md
           fail-over-max-cycles: "4500"
           post-comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
           artifact-name: cycle-analysis-inner
@@ -214,8 +213,6 @@ jobs:
           clock-mhz: "120"
           cortex: "m4"
           output-dir: cycle-analysis/outer
-          # The 1 kHz period leaves far more room than this; it is a tripwire against a blow-up,
-          # not a specification, and it still keeps 20 inner loops plus this outer loop inside 75%.
           fail-over-max-cycles: "20000"
           post-comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
           artifact-name: cycle-analysis-outer
