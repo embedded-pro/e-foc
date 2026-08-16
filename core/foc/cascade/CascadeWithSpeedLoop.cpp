@@ -114,9 +114,7 @@ namespace foc
         if (triggerCounter >= prescaler)
         {
             triggerCounter = 0;
-            const uint8_t writeSlot = 1u - readyIndex;
-            snapshots[writeSlot] = EstimatorSnapshot{ currentPhases, electricalAngle, idAndIq.d, idAndIq.q, voltage.d };
-            readyIndex = writeSlot;
+            estimators.Publish(EstimatorSnapshot{ currentPhases, electricalAngle, idAndIq.d, idAndIq.q, voltage.d });
             lowPriorityInterrupt.Trigger();
         }
 
@@ -168,21 +166,21 @@ namespace foc
 
     void CascadeWithSpeedLoop::SetOnlineMechanicalEstimatorImpl(OnlineMechanicalEstimator& estimator)
     {
-        onlineMechEstimator = &estimator;
+        estimators.mechanical = &estimator;
     }
 
     void CascadeWithSpeedLoop::SetOnlineElectricalEstimatorImpl(OnlineElectricalEstimator& estimator)
     {
-        onlineElecEstimator = &estimator;
+        estimators.electrical = &estimator;
     }
 
     void CascadeWithSpeedLoop::UpdateOnlineMechanicalEstimator(float mechanicalSpeed)
     {
-        if (onlineMechEstimator == nullptr)
+        if (estimators.mechanical == nullptr)
             return;
 
-        const auto& snapshot = snapshots[readyIndex];
-        onlineMechEstimator->Update(
+        const auto& snapshot = estimators.Ready();
+        estimators.mechanical->Update(
             snapshot.phaseCurrents,
             RadiansPerSecond{ mechanicalSpeed },
             Radians{ snapshot.electricalAngle });
@@ -190,12 +188,12 @@ namespace foc
 
     void CascadeWithSpeedLoop::UpdateOnlineElectricalEstimator(float electricalSpeed)
     {
-        if (onlineElecEstimator == nullptr)
+        if (estimators.electrical == nullptr)
             return;
 
-        const auto& snapshot = snapshots[readyIndex];
+        const auto& snapshot = estimators.Ready();
         const float physicalVd = snapshot.normalizedVd * vdcInvScale;
-        onlineElecEstimator->Update(
+        estimators.electrical->Update(
             Volts{ physicalVd },
             Ampere{ snapshot.measuredId },
             Ampere{ snapshot.measuredIq },

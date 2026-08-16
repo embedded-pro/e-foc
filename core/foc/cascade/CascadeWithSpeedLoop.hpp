@@ -24,6 +24,31 @@ namespace foc
         float normalizedVd{ 0.0f };
     };
 
+    // Double-buffered hand-off from the 20 kHz ISR to the low-priority handler: Publish writes the
+    // slot the reader is not on and only then moves the index, so a snapshot can never be read torn.
+    class EstimatorChannel
+    {
+    public:
+        ALWAYS_INLINE_HOT void Publish(const EstimatorSnapshot& snapshot)
+        {
+            const uint8_t writeSlot = 1u - ready;
+            slots[writeSlot] = snapshot;
+            ready = writeSlot;
+        }
+
+        ALWAYS_INLINE_HOT const EstimatorSnapshot& Ready() const
+        {
+            return slots[ready];
+        }
+
+        OnlineMechanicalEstimator* mechanical{ nullptr };
+        OnlineElectricalEstimator* electrical{ nullptr };
+
+    private:
+        std::array<EstimatorSnapshot, 2> slots{};
+        volatile uint8_t ready{ 0 };
+    };
+
     class CascadeWithSpeedLoop
     {
     protected:
@@ -77,13 +102,6 @@ namespace foc
         float vdcInvScale{ 1.0f };
         bool enabled{ false };
 
-        OnlineMechanicalEstimator* onlineMechEstimator{ nullptr };
-        OnlineElectricalEstimator* onlineElecEstimator{ nullptr };
-        // Double-buffer: ISR writes to snapshots[1 - readyIndex], then publishes
-        // by setting readyIndex. The handler reads snapshots[readyIndex]. Since
-        // the ISR always writes to the slot the handler is NOT reading, no torn
-        // reads are possible regardless of when preemption occurs.
-        std::array<EstimatorSnapshot, 2> snapshots{};
-        volatile uint8_t readyIndex{ 0 };
+        EstimatorChannel estimators;
     };
 }

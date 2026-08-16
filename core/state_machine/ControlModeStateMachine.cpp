@@ -7,54 +7,62 @@ namespace
 {
     std::optional<foc::CurrentAlgorithm> ParseCurrentAlgorithm(const infra::BoundedConstString& name)
     {
+        using enum foc::CurrentAlgorithm;
+
         if (name == "pid")
-            return foc::CurrentAlgorithm::pid;
+            return pid;
         if (name == "decoupled")
-            return foc::CurrentAlgorithm::decoupledPid;
+            return decoupledPid;
         if (name == "deadbeat")
-            return foc::CurrentAlgorithm::deadbeat;
+            return deadbeat;
         if (name == "sliding")
-            return foc::CurrentAlgorithm::slidingMode;
+            return slidingMode;
         return std::nullopt;
     }
 
     std::optional<foc::SpeedAlgorithm> ParseSpeedAlgorithm(const infra::BoundedConstString& name)
     {
+        using enum foc::SpeedAlgorithm;
+
         if (name == "pid")
-            return foc::SpeedAlgorithm::pid;
+            return pid;
         if (name == "lqi")
-            return foc::SpeedAlgorithm::lqi;
+            return lqi;
         if (name == "adrc")
-            return foc::SpeedAlgorithm::adrc;
+            return adrc;
         if (name == "twodof")
-            return foc::SpeedAlgorithm::twoDof;
+            return twoDof;
         return std::nullopt;
     }
 
     std::optional<foc::PositionAlgorithm> ParsePositionAlgorithm(const infra::BoundedConstString& name)
     {
+        using enum foc::PositionAlgorithm;
+
         if (name == "pid")
-            return foc::PositionAlgorithm::pid;
+            return pid;
         if (name == "cascadep")
-            return foc::PositionAlgorithm::cascadeP;
+            return cascadeP;
         if (name == "lqr")
-            return foc::PositionAlgorithm::lqr;
+            return lqr;
         if (name == "lqi")
-            return foc::PositionAlgorithm::lqi;
+            return lqi;
         if (name == "twodof")
-            return foc::PositionAlgorithm::twoDof;
+            return twoDof;
         return std::nullopt;
     }
 
     const char* CurrentAlgorithmName(foc::CurrentAlgorithm algorithm)
     {
+        using enum foc::CurrentAlgorithm;
+
         switch (algorithm)
         {
-            case foc::CurrentAlgorithm::decoupledPid:
+            case decoupledPid:
                 return "decoupled";
-            case foc::CurrentAlgorithm::deadbeat:
+            case deadbeat:
                 return "deadbeat";
-            case foc::CurrentAlgorithm::slidingMode:
+            case slidingMode:
                 return "sliding";
             default:
                 return "pid";
@@ -63,13 +71,15 @@ namespace
 
     const char* SpeedAlgorithmName(foc::SpeedAlgorithm algorithm)
     {
+        using enum foc::SpeedAlgorithm;
+
         switch (algorithm)
         {
-            case foc::SpeedAlgorithm::lqi:
+            case lqi:
                 return "lqi";
-            case foc::SpeedAlgorithm::adrc:
+            case adrc:
                 return "adrc";
-            case foc::SpeedAlgorithm::twoDof:
+            case twoDof:
                 return "twodof";
             default:
                 return "pid";
@@ -78,15 +88,17 @@ namespace
 
     const char* PositionAlgorithmName(foc::PositionAlgorithm algorithm)
     {
+        using enum foc::PositionAlgorithm;
+
         switch (algorithm)
         {
-            case foc::PositionAlgorithm::cascadeP:
+            case cascadeP:
                 return "cascadep";
-            case foc::PositionAlgorithm::lqr:
+            case lqr:
                 return "lqr";
-            case foc::PositionAlgorithm::lqi:
+            case lqi:
                 return "lqi";
-            case foc::PositionAlgorithm::twoDof:
+            case twoDof:
                 return "twodof";
             default:
                 return "pid";
@@ -459,20 +471,22 @@ namespace state_machine
             } });
     }
 
-    void ControlModeStateMachine::TraceSelectResult(foc::SelectResult result)
+    void ControlModeStateMachine::TraceSelectResult(foc::SelectResult result) const
     {
+        using enum foc::SelectResult;
+
         switch (result)
         {
-            case foc::SelectResult::ok:
+            case ok:
                 terminalAndTracer.tracer.Trace() << "Algorithm selected";
                 break;
-            case foc::SelectResult::busy:
+            case busy:
                 terminalAndTracer.tracer.Trace() << "Rejected: motor is enabled";
                 break;
-            case foc::SelectResult::invalidParameters:
+            case invalidParameters:
                 terminalAndTracer.tracer.Trace() << "Rejected: motor model not identified";
                 break;
-            case foc::SelectResult::invalidAlgorithm:
+            case invalidAlgorithm:
                 terminalAndTracer.tracer.Trace() << "Rejected: algorithm not available in this control mode";
                 break;
         }

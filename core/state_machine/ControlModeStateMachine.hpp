@@ -57,7 +57,7 @@ namespace state_machine
         foc::SpeedLoopSelectable* SpeedSelectable();
         foc::PositionLoopSelectable* PositionSelectable();
         void RegisterCliCommands();
-        void TraceSelectResult(foc::SelectResult result);
+        void TraceSelectResult(foc::SelectResult result) const;
         void OnSaveConfigDone(services::NvmStatus status);
 
         const application::TerminalAndTracer terminalAndTracer;
