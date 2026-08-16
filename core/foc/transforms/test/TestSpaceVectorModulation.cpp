@@ -13,6 +13,13 @@ namespace
         return { d, q };
     }
 
+    constexpr float sectorWidth = std::numbers::pi_v<float> / 3.0f;
+
+    foc::TwoPhase VectorAt(float magnitude, float angle)
+    {
+        return { magnitude * std::cos(angle), magnitude * std::sin(angle) };
+    }
+
     class TestSpaceVectorModulation
         : public ::testing::Test
     {
@@ -108,60 +115,78 @@ TEST_F(TestSpaceVectorModulation, zero_voltage_centering)
     EXPECT_NEAR(pwm.c, 0.5f, tolerance);
 }
 
-TEST_F(TestSpaceVectorModulation, sector_continuity)
+// A 60 degree boundary hands the reference over to the next pair of active vectors. The commanded
+// voltage does not jump there, so no phase duty may either: each is sampled either side of it.
+TEST_F(TestSpaceVectorModulation, duty_cycles_are_continuous_across_every_sector_boundary)
 {
-    auto dq = CreateTwoPhaseFrame(0.5f, 0.0f);
+    constexpr float magnitude = 0.9f;
+    constexpr float deltaAngle = 1e-3f;
+    constexpr float maxStep = 5e-3f;
 
-    auto pwm1 = spaceVectorModulation->Generate(dq);
-    auto pwm2 = spaceVectorModulation->Generate(dq);
+    for (int boundary = 0; boundary != 6; ++boundary)
+    {
+        SCOPED_TRACE(boundary);
+        const float angle = static_cast<float>(boundary) * sectorWidth;
 
-    float max_change = 0.2f;
-    EXPECT_NEAR(pwm1.a, pwm2.a, max_change);
-    EXPECT_NEAR(pwm1.b, pwm2.b, max_change);
-    EXPECT_NEAR(pwm1.c, pwm2.c, max_change);
+        auto below = spaceVectorModulation->Generate(VectorAt(magnitude, angle - deltaAngle));
+        auto above = spaceVectorModulation->Generate(VectorAt(magnitude, angle + deltaAngle));
+
+        EXPECT_NEAR(below.a, above.a, maxStep);
+        EXPECT_NEAR(below.b, above.b, maxStep);
+        EXPECT_NEAR(below.c, above.c, maxStep);
+    }
 }
 
 // The alpha axis aligns with active vector V1, so 0, 60, ... 300 degrees are the hexagon vertex
-// directions. Driven to the vertex reach |V| = 2/sqrt(3) the modulator must collapse onto a pure
-// inverter switching state: every duty is exactly 0 or 1, with at least one of each.
+// directions. Driven to the vertex reach |V| = 2/sqrt(3) the modulator must collapse onto exactly
+// the switching state of that vertex: V1 = 100, V2 = 110, V3 = 010, V4 = 011, V5 = 001, V6 = 101.
 TEST_F(TestSpaceVectorModulation, active_vector_directions_collapse_onto_a_pure_switching_state)
 {
-    const float tolerance = 1e-5f;
+    constexpr float tolerance = 1e-5f;
     const float vertexReach = 2.0f / std::numbers::sqrt3_v<float>;
+    constexpr std::array<std::array<float, 3>, 6> switchingStates{ {
+        { 1.0f, 0.0f, 0.0f },
+        { 1.0f, 1.0f, 0.0f },
+        { 0.0f, 1.0f, 0.0f },
+        { 0.0f, 1.0f, 1.0f },
+        { 0.0f, 0.0f, 1.0f },
+        { 1.0f, 0.0f, 1.0f },
+    } };
 
-    for (int vertex = 0; vertex < 6; ++vertex)
+    for (int vertex = 0; vertex != 6; ++vertex)
     {
-        const float angle = static_cast<float>(vertex) * std::numbers::pi_v<float> / 3.0f;
-        auto pwm = spaceVectorModulation->Generate(
-            CreateTwoPhaseFrame(vertexReach * std::cos(angle), vertexReach * std::sin(angle)));
+        SCOPED_TRACE(vertex);
+        auto pwm = spaceVectorModulation->Generate(VectorAt(vertexReach, static_cast<float>(vertex) * sectorWidth));
 
-        std::array<float, 3> duties{ pwm.a, pwm.b, pwm.c };
-        std::sort(duties.begin(), duties.end());
-
-        EXPECT_NEAR(duties[0], 0.0f, tolerance) << "vertex " << vertex;
-        EXPECT_NEAR(duties[2], 1.0f, tolerance) << "vertex " << vertex;
-        EXPECT_TRUE(std::abs(duties[1]) < tolerance || std::abs(duties[1] - 1.0f) < tolerance)
-            << "vertex " << vertex << " middle duty " << duties[1];
+        EXPECT_NEAR(pwm.a, switchingStates[vertex][0], tolerance);
+        EXPECT_NEAR(pwm.b, switchingStates[vertex][1], tolerance);
+        EXPECT_NEAR(pwm.c, switchingStates[vertex][2], tolerance);
     }
 }
 
 // Halfway between two active vectors the inscribed circle touches the hexagon edge, so |V| = 1 is
-// exactly the linear-modulation limit: one phase at 1, one at 0, and the third centred at 0.5.
+// exactly the linear-modulation limit: the two phases spanning the sector sit at 1 and 0 while the
+// phase orthogonal to the reference stays centred at 0.5.
 TEST_F(TestSpaceVectorModulation, sector_centres_reach_the_limit_at_unit_magnitude)
 {
-    const float tolerance = 1e-5f;
+    constexpr float tolerance = 1e-5f;
+    constexpr std::array<std::array<float, 3>, 6> centreDuties{ {
+        { 1.0f, 0.5f, 0.0f },
+        { 0.5f, 1.0f, 0.0f },
+        { 0.0f, 1.0f, 0.5f },
+        { 0.0f, 0.5f, 1.0f },
+        { 0.5f, 0.0f, 1.0f },
+        { 1.0f, 0.0f, 0.5f },
+    } };
 
-    for (int sector = 0; sector < 6; ++sector)
+    for (int sector = 0; sector != 6; ++sector)
     {
-        const float angle = (static_cast<float>(sector) + 0.5f) * std::numbers::pi_v<float> / 3.0f;
-        auto pwm = spaceVectorModulation->Generate(CreateTwoPhaseFrame(std::cos(angle), std::sin(angle)));
+        SCOPED_TRACE(sector);
+        auto pwm = spaceVectorModulation->Generate(VectorAt(1.0f, (static_cast<float>(sector) + 0.5f) * sectorWidth));
 
-        std::array<float, 3> duties{ pwm.a, pwm.b, pwm.c };
-        std::sort(duties.begin(), duties.end());
-
-        EXPECT_NEAR(duties[0], 0.0f, tolerance) << "sector " << sector;
-        EXPECT_NEAR(duties[1], 0.5f, tolerance) << "sector " << sector;
-        EXPECT_NEAR(duties[2], 1.0f, tolerance) << "sector " << sector;
+        EXPECT_NEAR(pwm.a, centreDuties[sector][0], tolerance);
+        EXPECT_NEAR(pwm.b, centreDuties[sector][1], tolerance);
+        EXPECT_NEAR(pwm.c, centreDuties[sector][2], tolerance);
     }
 }
 

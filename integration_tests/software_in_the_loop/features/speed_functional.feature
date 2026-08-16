@@ -6,13 +6,13 @@ Feature: Speed Controller Functional API
   Scenario: Speed controller accepts a velocity setpoint in radians per second
     Given the speed controller is initialised with default parameters
     When a velocity setpoint of 100 radians per second is commanded
-    Then the setpoint is accepted without error
+    Then the commanded duty cycles follow the velocity setpoint
 
   @REQ-SPD-003
-  Scenario: Speed controller accepts a current loop bandwidth
+  Scenario: Speed controller applies the configured current loop bandwidth
     Given the speed controller is initialised with default parameters
-    When d-axis gains kp=1.0 ki=0.1 kd=0 and q-axis gains kp=2.0 ki=0.2 kd=0 are configured
-    Then the current loop bandwidth is stored
+    When a current loop bandwidth an order of magnitude below the default is configured
+    Then the commanded duty cycles differ from those of the default bandwidth
 
   @REQ-SPD-004
   Scenario: Speed controller accepts an outer velocity loop bandwidth and reports its frequency

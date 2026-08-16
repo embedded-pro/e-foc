@@ -6,7 +6,7 @@ Feature: Position Controller Functional API
   Scenario: Position controller accepts a target position in mechanical radians
     Given the position controller is initialised with default parameters
     When a position setpoint of 3.14 radians is commanded
-    Then the position setpoint is accepted without error
+    Then the commanded duty cycles follow the position setpoint
 
   @REQ-POS-003
   Scenario: Position controller accepts an independent bandwidth for each cascade stage
@@ -14,11 +14,11 @@ Feature: Position Controller Functional API
     When the position current loop bandwidth is configured
     And the cascade speed loop bandwidth is configured
     And the position loop bandwidth is configured
-    Then all three loop bandwidths are stored independently
+    Then each configured bandwidth acts on its own loop
 
   @REQ-POS-004
-  Scenario: Position controller accepts a position loop bandwidth
+  Scenario: Position controller applies the configured position loop bandwidth
     Given the position controller is initialised with default parameters
     When the position loop bandwidth is configured
-    Then the position loop bandwidth is accepted without error
+    Then the commanded duty cycles differ from those of the detuned position loop
 

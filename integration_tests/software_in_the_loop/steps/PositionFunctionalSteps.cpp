@@ -2,33 +2,134 @@
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
-#include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "cucumber_cpp/Steps.hpp"
-#include "infra/util/Function.hpp"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <optional>
 
 using namespace testing;
 
 namespace
 {
-    // Lightweight fixture: just the PositionCascade with a mock LowPriorityInterrupt.
-    // SetPoint / SetCurrentTunings / SetSpeedTunings / SetPositionTunings do not
-    // invoke Calculate() so no ThreePhaseInverter or Encoder mocks are required.
+    const hal::Hertz baseFrequency{ 20000 };
+    const hal::Hertz outerLoopFrequency{ 1000 };
+
+    // The shipped current-loop bandwidth rails the modulator for every reference an outer loop can
+    // ask for, which would hide the differences these scenarios look for.
+    constexpr float nominalCurrentBandwidth{ 6.283185f };
+    const float nominalSpeedBandwidth{ foc::SpeedLoopTunings{}.bandwidth };
+    const float nominalPositionBandwidth{ foc::PositionLoopTunings{}.bandwidth };
+    constexpr float detuneFactor{ 10.0f };
+    constexpr float positionStep{ 0.005f };
+
+    foc::MotorModelParameters MotorParameters()
+    {
+        auto parameters = foc::MotorModelParameters{};
+        parameters.resistance = foc::Ohm{ 1.0f };
+        parameters.inductance = foc::MilliHenry{ 1.0f };
+        parameters.fluxLinkage = foc::Weber{ 0.01f };
+        parameters.busVoltage = foc::Volts{ 24.0f };
+        parameters.samplingFrequency = baseFrequency;
+        parameters.polePairs = 7;
+        return parameters;
+    }
+
+    foc::MechanicalModelParameters MechanicalParameters()
+    {
+        auto parameters = foc::MechanicalModelParameters{};
+        parameters.inertia = foc::NewtonMeterSecondSquared{ 0.001f };
+        parameters.viscousFriction = foc::NewtonMeterSecondPerRadian{ 0.0001f };
+        parameters.torqueConstant = foc::NewtonMeter{ 0.1f };
+        parameters.maxCurrent = foc::Ampere{ 10.0f };
+        parameters.samplingFrequency = outerLoopFrequency;
+        return parameters;
+    }
+
+    foc::CurrentLoopTunings CurrentTunings(float bandwidth)
+    {
+        auto tunings = foc::CurrentLoopTunings{};
+        tunings.bandwidth = bandwidth;
+        return tunings;
+    }
+
+    foc::SpeedLoopTunings SpeedTunings(float bandwidth)
+    {
+        auto tunings = foc::SpeedLoopTunings{};
+        tunings.bandwidth = bandwidth;
+        return tunings;
+    }
+
+    foc::PositionLoopTunings PositionTunings(float bandwidth)
+    {
+        auto tunings = foc::PositionLoopTunings{};
+        tunings.bandwidth = bandwidth;
+        return tunings;
+    }
+
+    foc::PhaseCurrents ZeroCurrents()
+    {
+        return { foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
+    }
+
+    bool DutiesDiffer(const foc::PhasePwmDutyCycles& left, const foc::PhasePwmDutyCycles& right)
+    {
+        return left.a.Value() != right.a.Value() ||
+               left.b.Value() != right.b.Value() ||
+               left.c.Value() != right.c.Value();
+    }
+
+    void ExpectSameDuty(const foc::PhasePwmDutyCycles& duty, const foc::PhasePwmDutyCycles& expected)
+    {
+        EXPECT_EQ(duty.a.Value(), expected.a.Value());
+        EXPECT_EQ(duty.b.Value(), expected.b.Value());
+        EXPECT_EQ(duty.c.Value(), expected.c.Value());
+    }
+
+    struct PositionCascadeUnderTest
+    {
+        PositionCascadeUnderTest(float currentBandwidth, float speedBandwidth, float positionBandwidth)
+        {
+            EXPECT_CALL(lowPriorityInterrupt, Register(_)).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
+
+            cascade.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, outerLoopFrequency);
+            cascade->Configure(MotorParameters());
+            cascade->ConfigureMechanics(MechanicalParameters());
+            cascade->SetCurrentTunings(CurrentTunings(currentBandwidth));
+            cascade->SetSpeedTunings(SpeedTunings(speedBandwidth));
+            EXPECT_EQ(cascade->SetPositionTunings(PositionTunings(positionBandwidth)), foc::SelectResult::ok);
+        }
+
+        StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterrupt;
+        std::optional<foc::PositionCascade> cascade;
+    };
+
+    // Enable re-applies the standing setpoint, so a setpoint commanded in a WHEN step survives;
+    // the cascade is left disabled because retuning is rejected while it runs.
+    foc::PhasePwmDutyCycles DutyAfterOuterCycle(PositionCascadeUnderTest& positionCascade)
+    {
+        positionCascade.cascade->Enable();
+
+        foc::Radians position{ 0.0f };
+        positionCascade.cascade->Calculate(ZeroCurrents(), position);
+        positionCascade.lowPriorityInterrupt.TriggerHandler();
+
+        foc::Radians secondSample{ 0.0f };
+        auto duty = positionCascade.cascade->Calculate(ZeroCurrents(), secondSample);
+
+        positionCascade.cascade->Disable();
+        return duty;
+    }
+
+    foc::PhasePwmDutyCycles DutyAtPositionError(PositionCascadeUnderTest& positionCascade, float error)
+    {
+        positionCascade.cascade->SetPoint(foc::Radians{ error });
+        return DutyAfterOuterCycle(positionCascade);
+    }
+
     struct PositionFunctionalContext
     {
-        StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
-
-        // infra::Execute runs the lambda during member-init order, BEFORE focPosition is
-        // constructed. This ensures EXPECT_CALL is set up before PositionCascade's
-        // constructor calls lowPriorityInterrupt.Register().
-        infra::Execute setupExpectations{ [this]()
-            {
-                using namespace testing;
-                EXPECT_CALL(lowPriorityInterruptMock, Register(_)).Times(AnyNumber());
-            } };
-
-        foc::PositionCascade focPosition{ foc::Ampere{ 10.0f }, hal::Hertz{ 20000 }, lowPriorityInterruptMock };
+        // The position loop starts detuned so the scenario that configures it changes something
+        PositionCascadeUnderTest underTest{ nominalCurrentBandwidth, nominalSpeedBandwidth, nominalPositionBandwidth / detuneFactor };
     };
 }
 
@@ -40,65 +141,62 @@ GIVEN(R"(the position controller is initialised with default parameters)")
 WHEN(R"(a position setpoint of 3.14 radians is commanded)")
 {
     auto& ctx = context.Get<PositionFunctionalContext>();
-    ctx.focPosition.SetPoint(foc::Radians{ 3.14f });
+    ctx.underTest.cascade->SetPoint(foc::Radians{ 3.14f });
 }
 
-THEN(R"(the position setpoint is accepted without error)")
+THEN(R"(the commanded duty cycles follow the position setpoint)")
 {
-    // Verifying that no assertion or exception was raised in the WHEN step.
-    SUCCEED();
+    auto& ctx = context.Get<PositionFunctionalContext>();
+    auto commanded = DutyAfterOuterCycle(ctx.underTest);
+
+    PositionCascadeUnderTest atTarget{ nominalCurrentBandwidth, nominalSpeedBandwidth, nominalPositionBandwidth / detuneFactor };
+    auto held = DutyAtPositionError(atTarget, 0.0f);
+
+    EXPECT_TRUE(DutiesDiffer(commanded, held))
+        << "a commanded position must drive the modulator away from the on-target command";
 }
 
 WHEN(R"(the position current loop bandwidth is configured)")
 {
     auto& ctx = context.Get<PositionFunctionalContext>();
-    auto tunings = foc::CurrentLoopTunings{};
-    tunings.bandwidth = 6283.2f;
-    ctx.focPosition.SetCurrentTunings(tunings);
+    ctx.underTest.cascade->SetCurrentTunings(CurrentTunings(nominalCurrentBandwidth));
 }
 
 WHEN(R"(the cascade speed loop bandwidth is configured)")
 {
     auto& ctx = context.Get<PositionFunctionalContext>();
-    auto gains = foc::SpeedLoopTunings{};
-    gains.bandwidth = 188.5f;
-    ctx.focPosition.SetSpeedTunings(gains);
+    ctx.underTest.cascade->SetSpeedTunings(SpeedTunings(nominalSpeedBandwidth));
 }
 
 WHEN(R"(the position loop bandwidth is configured)")
 {
     auto& ctx = context.Get<PositionFunctionalContext>();
-    auto gains = foc::PositionLoopTunings{};
-    gains.bandwidth = 18.8f;
-    ctx.focPosition.SetPositionTunings(gains);
+    EXPECT_EQ(ctx.underTest.cascade->SetPositionTunings(PositionTunings(nominalPositionBandwidth)), foc::SelectResult::ok);
 }
 
-THEN(R"(all three loop bandwidths are stored independently)")
+THEN(R"(each configured bandwidth acts on its own loop)")
 {
-    // REQ-POS-003: verify independence by applying a second distinct set of gains for
-    // each loop after the first and confirming no assertion or exception is raised.
-    // A re-configure that mixes up d/q kp values exercises that both PID instances are
-    // writable without conflict.
     auto& ctx = context.Get<PositionFunctionalContext>();
-    auto current = foc::CurrentLoopTunings{};
-    current.bandwidth = 5000.0f;
-    ctx.focPosition.SetCurrentTunings(current);
+    auto configured = DutyAtPositionError(ctx.underTest, positionStep);
 
-    auto speed = foc::SpeedLoopTunings{};
-    speed.bandwidth = 150.0f;
-    ctx.focPosition.SetSpeedTunings(speed);
+    PositionCascadeUnderTest sameTunings{ nominalCurrentBandwidth, nominalSpeedBandwidth, nominalPositionBandwidth };
+    PositionCascadeUnderTest currentDetuned{ nominalCurrentBandwidth / detuneFactor, nominalSpeedBandwidth, nominalPositionBandwidth };
+    PositionCascadeUnderTest speedDetuned{ nominalCurrentBandwidth, nominalSpeedBandwidth / detuneFactor, nominalPositionBandwidth };
+    PositionCascadeUnderTest positionDetuned{ nominalCurrentBandwidth, nominalSpeedBandwidth, nominalPositionBandwidth / detuneFactor };
 
-    auto position = foc::PositionLoopTunings{};
-    position.bandwidth = 15.0f;
-    ctx.focPosition.SetPositionTunings(position);
+    ExpectSameDuty(configured, DutyAtPositionError(sameTunings, positionStep));
+    EXPECT_TRUE(DutiesDiffer(configured, DutyAtPositionError(currentDetuned, positionStep)));
+    EXPECT_TRUE(DutiesDiffer(configured, DutyAtPositionError(speedDetuned, positionStep)));
+    EXPECT_TRUE(DutiesDiffer(configured, DutyAtPositionError(positionDetuned, positionStep)));
 }
 
-THEN(R"(the position loop bandwidth is accepted without error)")
+THEN(R"(the commanded duty cycles differ from those of the detuned position loop)")
 {
-    // REQ-POS-004: re-apply different position PID gains and verify the second call is
-    // accepted (anti-windup limits are internal; the interface must not reject valid gains).
     auto& ctx = context.Get<PositionFunctionalContext>();
-    auto retuned = foc::PositionLoopTunings{};
-    retuned.bandwidth = 20.0f;
-    ctx.focPosition.SetPositionTunings(retuned);
+    auto configured = DutyAtPositionError(ctx.underTest, positionStep);
+
+    PositionCascadeUnderTest detuned{ nominalCurrentBandwidth, nominalSpeedBandwidth, nominalPositionBandwidth / detuneFactor };
+
+    EXPECT_TRUE(DutiesDiffer(configured, DutyAtPositionError(detuned, positionStep)))
+        << "the position loop must act on the configured bandwidth for the same position error";
 }

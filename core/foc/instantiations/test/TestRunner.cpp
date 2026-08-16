@@ -7,9 +7,12 @@
 namespace
 {
     using testing::_;
-    using testing::Invoke;
     using testing::Return;
-    using testing::StrictMock;
+
+    MATCHER_P(DutiesEqual, expected, "")
+    {
+        return arg.a.Value() == expected.a.Value() && arg.b.Value() == expected.b.Value() && arg.c.Value() == expected.c.Value();
+    }
 
     class TestRunner
         : public testing::Test
@@ -26,8 +29,6 @@ namespace
                     {
                         inverterMock.StorePhaseCurrentsCallback(onDone);
                     });
-            EXPECT_CALL(inverterMock, Stop()).Times(testing::AnyNumber());
-            EXPECT_CALL(focMock, Disable()).Times(testing::AnyNumber());
         }
 
         testing::StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
@@ -41,6 +42,10 @@ TEST_F(TestRunner, ConstructionRegistersPhaseCurrentsCallback)
     EXPECT_CALL(inverterMock, PhaseCurrentsReady(hal::Hertz{ 20000 }, _));
 
     foc::Runner runner{ inverterMock, encoderMock, focMock };
+
+    testing::InSequence seq;
+    EXPECT_CALL(inverterMock, Stop());
+    EXPECT_CALL(focMock, Disable());
 }
 
 TEST_F(TestRunner, EnableStartsFocThenInverter)
@@ -50,6 +55,8 @@ TEST_F(TestRunner, EnableStartsFocThenInverter)
     testing::InSequence seq;
     EXPECT_CALL(focMock, Enable());
     EXPECT_CALL(inverterMock, Start());
+    EXPECT_CALL(inverterMock, Stop());
+    EXPECT_CALL(focMock, Disable());
 
     runner.Enable();
 }
@@ -85,7 +92,9 @@ TEST_F(TestRunner, PhaseCurrentsCallbackReadsEncoderCalculatesFocAndOutputsPwm)
         testing::InSequence seq;
         EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.5f }));
         EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(expectedDuties));
-        EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
+        EXPECT_CALL(inverterMock, ThreePhasePwmOutput(DutiesEqual(expectedDuties)));
+        EXPECT_CALL(inverterMock, Stop());
+        EXPECT_CALL(focMock, Disable());
     }
 
     inverterMock.TriggerPhaseCurrentsCallback(testCurrents);
