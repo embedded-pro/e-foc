@@ -1,4 +1,4 @@
-#include "core/foc/implementations/LowPriorityInterruptImpl.hpp"
+#include "core/foc/instantiations/LowPriorityInterruptImpl.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
 #include <gtest/gtest.h>
 

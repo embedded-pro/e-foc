@@ -349,7 +349,7 @@ namespace application
         return tracer;
     }
 
-    foc::ThreePhaseInverter& FocStateMachineCommon::GetInverter()
+    drivers::ThreePhaseInverter& FocStateMachineCommon::GetInverter()
     {
         return inverter;
     }

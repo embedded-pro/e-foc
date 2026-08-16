@@ -1,7 +1,8 @@
-#include "core/foc/implementations/FocPositionImpl.hpp"
-#include "core/foc/implementations/FocSpeedImpl.hpp"
-#include "core/foc/implementations/FocTorqueImpl.hpp"
-#include "core/foc/interfaces/test_doubles/DriversMock.hpp"
+#include "core/foc/cascade/PositionCascade.hpp"
+#include "core/foc/cascade/SpeedCascade.hpp"
+#include "core/foc/cascade/TorqueCascade.hpp"
+#include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
+#include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/mechanical_system_ident/test_doubles/MechanicalParametersIdentificationMock.hpp"
@@ -45,8 +46,8 @@ namespace
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
         services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
-        StrictMock<foc::FieldOrientedControllerInterfaceMock> inverterMock;
-        StrictMock<foc::EncoderMock> encoderMock;
+        StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
+        StrictMock<drivers::EncoderMock> encoderMock;
         StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
@@ -224,9 +225,7 @@ namespace
         GivenNvmAlwaysInvalid();
 
         EXPECT_CALL(nvmMock, SaveConfig(_, _))
-            .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)>)
-                {
-                }));
+            .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)>) {}));
 
         ConstructSubject();
 

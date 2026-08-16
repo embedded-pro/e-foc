@@ -1,7 +1,8 @@
-#include "core/foc/implementations/FocSpeedImpl.hpp"
-#include "core/foc/interfaces/test_doubles/DriversMock.hpp"
+#include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
+#include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "cucumber_cpp/Steps.hpp"
 #include "infra/util/Function.hpp"
 #include <gmock/gmock.h>
@@ -11,7 +12,7 @@ using namespace testing;
 
 namespace
 {
-    // Lightweight fixture: just the FocSpeedImpl with a mock LowPriorityInterrupt.
+    // Lightweight fixture: just the SpeedCascade with a mock LowPriorityInterrupt.
     // SetPoint / SetCurrentTunings / SetSpeedTunings / OuterLoopFrequency do not
     // invoke Calculate() so no ThreePhaseInverter or Encoder mocks are required.
     struct SpeedFunctionalContext
@@ -19,7 +20,7 @@ namespace
         StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
 
         // infra::Execute runs the lambda during member-init order, BEFORE focSpeed is
-        // constructed. This ensures EXPECT_CALL is set up before FocSpeedImpl's
+        // constructed. This ensures EXPECT_CALL is set up before SpeedCascade's
         // constructor calls lowPriorityInterrupt.Register().
         infra::Execute setupExpectations{ [this]()
             {
@@ -27,7 +28,7 @@ namespace
                 EXPECT_CALL(lowPriorityInterruptMock, Register(_)).Times(AnyNumber());
             } };
 
-        foc::FocSpeedImpl focSpeed{ foc::Ampere{ 10.0f }, hal::Hertz{ 20000 }, lowPriorityInterruptMock };
+        foc::SpeedCascade focSpeed{ foc::Ampere{ 10.0f }, hal::Hertz{ 20000 }, lowPriorityInterruptMock };
     };
 }
 

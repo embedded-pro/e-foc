@@ -1,14 +1,14 @@
 #pragma once
 
-#include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/Foc.hpp"
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "numerical/controllers/implementations/PidIncremental.hpp"
 
 namespace foc
 {
-    class FocTorqueImpl
+    class TorqueCascade
         : public FocTorque
     {
     public:

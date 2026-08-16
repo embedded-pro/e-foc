@@ -21,7 +21,7 @@ target_include_directories(e_foc.integration_tests.support PUBLIC
 
 target_link_libraries(e_foc.integration_tests.support PUBLIC
     e_foc.state_machine
-    e_foc.foc.implementations
+    e_foc.foc.cascade
     e_foc.platform_abstraction
     e_foc.platform_abstraction_mock
     e_foc.state_machine_mock

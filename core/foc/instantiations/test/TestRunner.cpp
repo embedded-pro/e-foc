@@ -1,5 +1,5 @@
-#include "core/foc/implementations/Runner.hpp"
-#include "core/foc/interfaces/test_doubles/DriversMock.hpp"
+#include "core/foc/instantiations/Runner.hpp"
+#include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/foc/interfaces/test_doubles/FocMock.hpp"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -30,8 +30,8 @@ namespace
             EXPECT_CALL(focMock, Disable()).Times(testing::AnyNumber());
         }
 
-        testing::StrictMock<foc::FieldOrientedControllerInterfaceMock> inverterMock;
-        testing::StrictMock<foc::EncoderMock> encoderMock;
+        testing::StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
+        testing::StrictMock<drivers::EncoderMock> encoderMock;
         testing::StrictMock<foc::FocTorqueMock> focMock;
     };
 

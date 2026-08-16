@@ -1,12 +1,12 @@
 #pragma once
 
+#include "core/foc/interfaces/Foc.hpp"
+#include "core/foc/transforms/TransformsClarkePark.hpp"
+#include "core/platform_abstraction/interfaces/Drivers.hpp"
+#include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/AutoResetFunction.hpp"
 #include "numerical/estimators/online/RecursiveLeastSquares.hpp"
-#include "core/foc/interfaces/Driver.hpp"
-#include "core/foc/interfaces/Foc.hpp"
-#include "core/foc/transforms/TransformsClarkePark.hpp"
-#include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 
 namespace services
 {
@@ -14,7 +14,7 @@ namespace services
         : public MechanicalParametersIdentification
     {
     public:
-        MechanicalParametersIdentificationImpl(foc::FocSpeed& controller, foc::ThreePhaseInverter& driver, foc::Encoder& encoder);
+        MechanicalParametersIdentificationImpl(foc::FocSpeed& controller, drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder);
 
         void EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone) override;
 
@@ -22,8 +22,8 @@ namespace services
         void OnSamplingUpdate(foc::PhaseCurrents currentPhases, const foc::NewtonMeter& torqueConstant);
 
         foc::FocSpeed& controller;
-        foc::ThreePhaseInverter& driver;
-        foc::Encoder& encoder;
+        drivers::ThreePhaseInverter& driver;
+        drivers::Encoder& encoder;
 
         float samplingPeriod;
         Config currentConfig;

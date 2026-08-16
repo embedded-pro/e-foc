@@ -1,5 +1,5 @@
 #include "core/platform_abstraction/test_doubles/CanBusAdapterMock.hpp"
-#include "foc/interfaces/Driver.hpp"
+#include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "hal/interfaces/test_doubles/EepromMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"

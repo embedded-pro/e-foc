@@ -1,5 +1,4 @@
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
-#include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include <cmath>
 #include <numbers>
@@ -78,7 +77,7 @@ namespace
 
 namespace services
 {
-    ElectricalParametersIdentificationImpl::ElectricalParametersIdentificationImpl(foc::ThreePhaseInverter& driver, foc::Encoder& encoder, foc::Volts vdc)
+    ElectricalParametersIdentificationImpl::ElectricalParametersIdentificationImpl(drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder, foc::Volts vdc)
         : driver(driver)
         , encoder(encoder)
         , vdc(vdc)

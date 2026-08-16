@@ -1,5 +1,4 @@
 #include "tools/simulator/model/Model.hpp"
-#include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"

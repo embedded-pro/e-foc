@@ -1,4 +1,4 @@
-#include "core/foc/implementations/FocWithSpeedLoop.hpp"
+#include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
 
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC optimize("O3", "fast-math")
@@ -7,7 +7,7 @@
 namespace foc
 {
     OPTIMIZE_FOR_SPEED
-    FocWithSpeedLoop::FocWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)
+    CascadeWithSpeedLoop::CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)
         : speedPid{ { 0.0f, 0.0f, 0.0f }, { -maxCurrent.Value(), maxCurrent.Value() } }
         , lowPriorityInterrupt(lowPriorityInterrupt)
         , dt{ 1.0f / static_cast<float>(baseFrequency.Value()) }
@@ -21,13 +21,13 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocWithSpeedLoop::SetPolePairsImpl(std::size_t pole)
+    void CascadeWithSpeedLoop::SetPolePairsImpl(std::size_t pole)
     {
         polePairs = static_cast<float>(pole);
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocWithSpeedLoop::SetCurrentTuningsImpl(Volts Vdc, const IdAndIqTunings& torqueTunings)
+    void CascadeWithSpeedLoop::SetCurrentTuningsImpl(Volts Vdc, const IdAndIqTunings& torqueTunings)
     {
         auto scale = 1.0f / (detail::invSqrt3 * Vdc.Value());
         auto scale_dt = scale * dt;
@@ -47,7 +47,7 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocWithSpeedLoop::SetSpeedTuningsImpl(const SpeedTunings& speedTuning)
+    void CascadeWithSpeedLoop::SetSpeedTuningsImpl(const SpeedTunings& speedTuning)
     {
         const float kp = speedTuning.kp;
         const float ki = speedTuning.ki;
@@ -57,7 +57,7 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocWithSpeedLoop::EnableSpeedLoop()
+    void CascadeWithSpeedLoop::EnableSpeedLoop()
     {
         speedPid.Reset();
         dPid.Reset();
@@ -70,12 +70,12 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocWithSpeedLoop::DisableSpeedLoop()
+    void CascadeWithSpeedLoop::DisableSpeedLoop()
     {
     }
 
     OPTIMIZE_FOR_SPEED
-    PhasePwmDutyCycles FocWithSpeedLoop::CalculateInnerLoop(const PhaseCurrents& currentPhases, const Radians& position)
+    PhasePwmDutyCycles CascadeWithSpeedLoop::CalculateInnerLoop(const PhaseCurrents& currentPhases, const Radians& position)
     {
         const float ia = currentPhases.a.Value();
         const float ib = currentPhases.b.Value();
@@ -111,57 +111,57 @@ namespace foc
             hal::Percent(static_cast<uint8_t>(output.c * 100.0f + 0.5f)) };
     }
 
-    controllers::PidIncrementalSynchronous<float>& FocWithSpeedLoop::SpeedPid()
+    controllers::PidIncrementalSynchronous<float>& CascadeWithSpeedLoop::SpeedPid()
     {
         return speedPid;
     }
 
-    controllers::PidIncrementalSynchronous<float>& FocWithSpeedLoop::DPid()
+    controllers::PidIncrementalSynchronous<float>& CascadeWithSpeedLoop::DPid()
     {
         return dPid;
     }
 
-    float FocWithSpeedLoop::CurrentMechanicalAngle() const
+    float CascadeWithSpeedLoop::CurrentMechanicalAngle() const
     {
         return currentMechanicalAngle;
     }
 
-    float& FocWithSpeedLoop::PreviousSpeedPosition()
+    float& CascadeWithSpeedLoop::PreviousSpeedPosition()
     {
         return previousSpeedPosition;
     }
 
-    float& FocWithSpeedLoop::LastSpeedPidOutput()
+    float& CascadeWithSpeedLoop::LastSpeedPidOutput()
     {
         return lastSpeedPidOutput;
     }
 
-    float FocWithSpeedLoop::SpeedDt() const
+    float CascadeWithSpeedLoop::SpeedDt() const
     {
         return speedDt;
     }
 
-    float FocWithSpeedLoop::PolePairs() const
+    float CascadeWithSpeedLoop::PolePairs() const
     {
         return polePairs;
     }
 
-    LowPriorityInterrupt& FocWithSpeedLoop::GetLowPriorityInterrupt()
+    LowPriorityInterrupt& CascadeWithSpeedLoop::GetLowPriorityInterrupt()
     {
         return lowPriorityInterrupt;
     }
 
-    void FocWithSpeedLoop::SetOnlineMechanicalEstimatorImpl(OnlineMechanicalEstimator& estimator)
+    void CascadeWithSpeedLoop::SetOnlineMechanicalEstimatorImpl(OnlineMechanicalEstimator& estimator)
     {
         onlineMechEstimator = &estimator;
     }
 
-    void FocWithSpeedLoop::SetOnlineElectricalEstimatorImpl(OnlineElectricalEstimator& estimator)
+    void CascadeWithSpeedLoop::SetOnlineElectricalEstimatorImpl(OnlineElectricalEstimator& estimator)
     {
         onlineElecEstimator = &estimator;
     }
 
-    void FocWithSpeedLoop::UpdateOnlineMechanicalEstimator(float mechanicalSpeed)
+    void CascadeWithSpeedLoop::UpdateOnlineMechanicalEstimator(float mechanicalSpeed)
     {
         if (onlineMechEstimator == nullptr)
             return;
@@ -173,7 +173,7 @@ namespace foc
             Radians{ snapshot.electricalAngle });
     }
 
-    void FocWithSpeedLoop::UpdateOnlineElectricalEstimator(float electricalSpeed)
+    void CascadeWithSpeedLoop::UpdateOnlineElectricalEstimator(float electricalSpeed)
     {
         if (onlineElecEstimator == nullptr)
             return;

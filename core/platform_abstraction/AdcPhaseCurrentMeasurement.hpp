@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/foc/interfaces/Driver.hpp"
+#include "core/foc/interfaces/Units.hpp"
 #include "hal/interfaces/AdcMultiChannel.hpp"
 #include <concepts>
 #include <utility>

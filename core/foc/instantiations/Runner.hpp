@@ -1,14 +1,14 @@
 #pragma once
 
-#include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/Foc.hpp"
+#include "core/platform_abstraction/interfaces/Drivers.hpp"
 
 namespace foc
 {
     class Runner
     {
     public:
-        Runner(ThreePhaseInverter& inverter, Encoder& encoder, FocBase& foc);
+        Runner(drivers::ThreePhaseInverter& inverter, drivers::Encoder& encoder, FocBase& foc);
         ~Runner();
 
         Runner(const Runner&) = delete;
@@ -20,8 +20,8 @@ namespace foc
         void Disable();
 
     private:
-        ThreePhaseInverter& inverter;
-        Encoder& encoder;
+        drivers::ThreePhaseInverter& inverter;
+        drivers::Encoder& encoder;
         FocBase& foc;
     };
 }

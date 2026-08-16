@@ -1,4 +1,4 @@
-#include "core/foc/implementations/WithAutomaticCurrentPidGains.hpp"
+#include "core/foc/cascade/WithAutomaticCurrentPidGains.hpp"
 
 namespace
 {

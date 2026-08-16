@@ -1,8 +1,9 @@
 #pragma once
 
-#include "core/foc/interfaces/Driver.hpp"
+#include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/OnlineEstimators.hpp"
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
@@ -22,10 +23,10 @@ namespace foc
         float normalizedVd{ 0.0f };
     };
 
-    class FocWithSpeedLoop
+    class CascadeWithSpeedLoop
     {
     protected:
-        explicit FocWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency);
+        explicit CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency);
 
         void SetPolePairsImpl(std::size_t pole);
         void SetCurrentTuningsImpl(Volts Vdc, const IdAndIqTunings& torqueTunings);

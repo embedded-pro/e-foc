@@ -2,7 +2,7 @@
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
-#include "foc/implementations/LowPriorityInterruptImpl.hpp"
+#include "core/foc/instantiations/LowPriorityInterruptImpl.hpp"
 #include "foc/instantiations/FocController.hpp"
 #include "foc/interfaces/Units.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"

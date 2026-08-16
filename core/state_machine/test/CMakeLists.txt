@@ -5,7 +5,7 @@ emil_add_test(e_foc.state_machine_test)
 target_link_libraries(e_foc.state_machine_test PUBLIC
     gmock_main
     e_foc.state_machine
-    e_foc.foc.implementations
+    e_foc.foc.cascade
     hal.interfaces_test_doubles
     infra.timer_test_helper
     infra.event_test_helper

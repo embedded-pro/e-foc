@@ -1,5 +1,5 @@
 #include "TestFocStateMachineHelper.hpp"
-#include "core/foc/implementations/FocPositionImpl.hpp"
+#include "core/foc/cascade/PositionCascade.hpp"
 
 namespace
 {
@@ -30,8 +30,8 @@ namespace
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
         services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
-        StrictMock<foc::FieldOrientedControllerInterfaceMock> inverterMock;
-        StrictMock<foc::EncoderMock> encoderMock;
+        StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
+        StrictMock<drivers::EncoderMock> encoderMock;
         StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
@@ -659,8 +659,8 @@ namespace
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
         services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
-        StrictMock<foc::FieldOrientedControllerInterfaceMock> inverterMock;
-        StrictMock<foc::EncoderMock> encoderMock;
+        StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
+        StrictMock<drivers::EncoderMock> encoderMock;
         StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;

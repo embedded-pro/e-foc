@@ -1,4 +1,4 @@
-#include "core/foc/interfaces/test_doubles/DriversMock.hpp"
+#include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include <gmock/gmock.h>
 
@@ -17,8 +17,8 @@ namespace
         : public ::testing::Test
     {
     public:
-        StrictMock<foc::FieldOrientedControllerInterfaceMock> driverMock;
-        StrictMock<foc::EncoderMock> encoderMock;
+        StrictMock<drivers::ThreePhaseInverterMock> driverMock;
+        StrictMock<drivers::EncoderMock> encoderMock;
         services::MotorAlignmentImpl alignment{ driverMock, encoderMock };
     };
 }

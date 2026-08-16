@@ -1,5 +1,5 @@
 #include "targets/hardware_test/components/Terminal.hpp"
-#include "foc/interfaces/Driver.hpp"
+#include "core/foc/interfaces/Signals.hpp"
 #include "hal/interfaces/Pwm.hpp"
 #include "infra/stream/StringInputStream.hpp"
 #include "infra/stream/StringOutputStream.hpp"

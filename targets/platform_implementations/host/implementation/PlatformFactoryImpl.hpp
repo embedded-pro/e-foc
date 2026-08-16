@@ -59,14 +59,14 @@ namespace application
         void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>&) override
         {}
 
-        // Implementation of foc::ThreePhaseInverter
+        // Implementation of drivers::ThreePhaseInverter
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
         void Stop() override;
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
 
-        // Implementation of foc::Encoder
+        // Implementation of drivers::Encoder
         foc::Radians Read() override;
         void Set(foc::Radians value) override;
         void SetZero() override;

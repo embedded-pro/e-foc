@@ -1,4 +1,4 @@
-#include "core/foc/implementations/FocPositionImpl.hpp"
+#include "core/foc/cascade/PositionCascade.hpp"
 
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC optimize("O3", "fast-math")
@@ -7,8 +7,8 @@
 namespace foc
 {
     OPTIMIZE_FOR_SPEED
-    FocPositionImpl::FocPositionImpl(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)
-        : FocWithSpeedLoop(maxCurrent, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency)
+    PositionCascade::PositionCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)
+        : CascadeWithSpeedLoop(maxCurrent, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency)
     {
         GetLowPriorityInterrupt().Register([this]()
             {
@@ -16,13 +16,13 @@ namespace foc
             });
     }
 
-    void FocPositionImpl::SetPolePairs(std::size_t pole)
+    void PositionCascade::SetPolePairs(std::size_t pole)
     {
         SetPolePairsImpl(pole);
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocPositionImpl::SetPoint(Radians point)
+    void PositionCascade::SetPoint(Radians point)
     {
         lastPositionSetPoint = point;
         positionPid.SetPoint(point.Value());
@@ -30,29 +30,29 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocPositionImpl::SetCurrentTunings(Volts Vdc, const IdAndIqTunings& torqueTunings)
+    void PositionCascade::SetCurrentTunings(Volts Vdc, const IdAndIqTunings& torqueTunings)
     {
         SetCurrentTuningsImpl(Vdc, torqueTunings);
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocPositionImpl::SetSpeedTunings(Volts Vdc, const SpeedTunings& speedTuning)
+    void PositionCascade::SetSpeedTunings(Volts Vdc, const SpeedTunings& speedTuning)
     {
         SetSpeedTuningsImpl(speedTuning);
     }
 
-    void FocPositionImpl::SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator)
+    void PositionCascade::SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator)
     {
         SetOnlineMechanicalEstimatorImpl(estimator);
     }
 
-    void FocPositionImpl::SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator)
+    void PositionCascade::SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator)
     {
         SetOnlineElectricalEstimatorImpl(estimator);
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocPositionImpl::SetPositionTunings(const PositionTunings& positionTuning)
+    void PositionCascade::SetPositionTunings(const PositionTunings& positionTuning)
     {
         const float kp = positionTuning.kp;
         const float ki = positionTuning.ki;
@@ -62,7 +62,7 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocPositionImpl::Enable()
+    void PositionCascade::Enable()
     {
         positionPid.Reset();
         EnableSpeedLoop();
@@ -70,13 +70,13 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocPositionImpl::Disable()
+    void PositionCascade::Disable()
     {
         DisableSpeedLoop();
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocPositionImpl::LowPriorityHandler()
+    void PositionCascade::LowPriorityHandler()
     {
         auto mechanicalSpeed = detail::PositionWithWrapAround(CurrentMechanicalAngle() - PreviousSpeedPosition()) / SpeedDt();
         PreviousSpeedPosition() = CurrentMechanicalAngle();
@@ -90,7 +90,7 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    PhasePwmDutyCycles FocPositionImpl::Calculate(const PhaseCurrents& currentPhases, Radians& position)
+    PhasePwmDutyCycles PositionCascade::Calculate(const PhaseCurrents& currentPhases, Radians& position)
     {
         return CalculateInnerLoop(currentPhases, position);
     }

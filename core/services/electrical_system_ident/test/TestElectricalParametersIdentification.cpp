@@ -1,4 +1,4 @@
-#include "core/foc/interfaces/test_doubles/DriversMock.hpp"
+#include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include <cmath>
@@ -39,8 +39,8 @@ namespace
         const std::size_t numberOfSamples = 127;
         std::size_t encoderStepIndex = 0;
 
-        StrictMock<foc::FieldOrientedControllerInterfaceMock> driverMock;
-        StrictMock<foc::EncoderMock> encoderMock;
+        StrictMock<drivers::ThreePhaseInverterMock> driverMock;
+        StrictMock<drivers::EncoderMock> encoderMock;
         foc::Volts vdc{ 24.0f };
         services::ElectricalParametersIdentificationImpl identification{ driverMock, encoderMock, vdc };
     };

@@ -4,7 +4,7 @@
 #include "can-lite/core/CanCategory.hpp"
 #include "can-lite/core/CanFrameTransport.hpp"
 #include "can-lite/core/test/CanMock.hpp"
-#include "core/foc/implementations/FocTorqueImpl.hpp"
+#include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"

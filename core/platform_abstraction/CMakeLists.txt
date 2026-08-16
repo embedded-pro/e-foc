@@ -1,6 +1,8 @@
 add_library(e_foc.platform_abstraction)
 emil_build_for(e_foc.platform_abstraction)
 
+add_subdirectory(interfaces)
+
 target_include_directories(e_foc.platform_abstraction PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../..>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
@@ -14,6 +16,7 @@ target_link_libraries(e_foc.platform_abstraction PUBLIC
     infra.event
     infra.stream
     e_foc.foc.interfaces
+    e_foc.platform_abstraction.interfaces
 )
 
 target_sources(e_foc.platform_abstraction PRIVATE

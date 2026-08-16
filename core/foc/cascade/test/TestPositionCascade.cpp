@@ -1,6 +1,6 @@
+#include "core/foc/cascade/PositionCascade.hpp"
+#include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "numerical/math/Tolerance.hpp"
-#include "core/foc/implementations/FocPositionImpl.hpp"
-#include "core/foc/interfaces/test_doubles/DriversMock.hpp"
 #include <gmock/gmock.h>
 #include <numbers>
 
@@ -13,7 +13,7 @@ namespace
     const hal::Hertz lowPriorityFrequency{ 2000 };
     constexpr float tolerance = 1.0f;
 
-    class TestFocPositionImpl
+    class TestPositionCascade
         : public ::testing::Test
     {
     public:
@@ -29,7 +29,7 @@ namespace
         }
 
         foc::LowPriorityInterruptMock lowPriorityInterruptMock;
-        std::optional<foc::FocPositionImpl> focPosition;
+        std::optional<foc::PositionCascade> focPosition;
         std::size_t polePairs = 7;
     };
 
@@ -39,7 +39,7 @@ namespace
     }
 }
 
-TEST_F(TestFocPositionImpl, zero_position_setpoint_produces_bounded_duty_cycles)
+TEST_F(TestPositionCascade, zero_position_setpoint_produces_bounded_duty_cycles)
 {
     focPosition->SetPoint(foc::Radians{ 0.0f });
 
@@ -54,7 +54,7 @@ TEST_F(TestFocPositionImpl, zero_position_setpoint_produces_bounded_duty_cycles)
     EXPECT_LE(result.c.Value(), 100);
 }
 
-TEST_F(TestFocPositionImpl, duty_cycles_are_bounded_0_to_100)
+TEST_F(TestPositionCascade, duty_cycles_are_bounded_0_to_100)
 {
     focPosition->SetPoint(foc::Radians{ 1.0f });
 
@@ -69,7 +69,7 @@ TEST_F(TestFocPositionImpl, duty_cycles_are_bounded_0_to_100)
     EXPECT_LE(result.c.Value(), 100);
 }
 
-TEST_F(TestFocPositionImpl, set_pole_pairs)
+TEST_F(TestPositionCascade, set_pole_pairs)
 {
     focPosition->SetPolePairs(4);
     focPosition->SetPoint(foc::Radians{ 0.0f });
@@ -81,7 +81,7 @@ TEST_F(TestFocPositionImpl, set_pole_pairs)
     EXPECT_LE(result.a.Value(), 100);
 }
 
-TEST_F(TestFocPositionImpl, enable_disable_cycle)
+TEST_F(TestPositionCascade, enable_disable_cycle)
 {
     focPosition->SetPoint(foc::Radians{ 0.5f });
 
@@ -95,7 +95,7 @@ TEST_F(TestFocPositionImpl, enable_disable_cycle)
     EXPECT_LE(result.a.Value(), 100);
 }
 
-TEST_F(TestFocPositionImpl, different_positions_produce_different_outputs)
+TEST_F(TestPositionCascade, different_positions_produce_different_outputs)
 {
     focPosition->SetPoint(foc::Radians{ 1.0f });
 
@@ -114,7 +114,7 @@ TEST_F(TestFocPositionImpl, different_positions_produce_different_outputs)
     EXPECT_TRUE(anyDifferent);
 }
 
-TEST_F(TestFocPositionImpl, position_pid_drives_speed_reference)
+TEST_F(TestPositionCascade, position_pid_drives_speed_reference)
 {
     focPosition->SetPoint(foc::Radians{ 1.0f });
 
@@ -130,7 +130,7 @@ TEST_F(TestFocPositionImpl, position_pid_drives_speed_reference)
     EXPECT_LE(result.a.Value(), 100);
 }
 
-TEST_F(TestFocPositionImpl, set_speed_tunings)
+TEST_F(TestPositionCascade, set_speed_tunings)
 {
     focPosition->SetSpeedTunings(foc::Volts{ 24.0f }, { 2.0f, 0.1f, 0.0f });
     focPosition->SetPoint(foc::Radians{ 0.5f });
@@ -142,7 +142,7 @@ TEST_F(TestFocPositionImpl, set_speed_tunings)
     EXPECT_LE(result.a.Value(), 100);
 }
 
-TEST_F(TestFocPositionImpl, set_position_tunings)
+TEST_F(TestPositionCascade, set_position_tunings)
 {
     focPosition->SetPositionTunings({ 5.0f, 0.5f, 0.0f });
     focPosition->SetPoint(foc::Radians{ 1.0f });
@@ -154,7 +154,7 @@ TEST_F(TestFocPositionImpl, set_position_tunings)
     EXPECT_LE(result.a.Value(), 100);
 }
 
-TEST_F(TestFocPositionImpl, at_target_position_output_is_near_center)
+TEST_F(TestPositionCascade, at_target_position_output_is_near_center)
 {
     focPosition->SetPoint(foc::Radians{ 0.0f });
 
@@ -166,7 +166,7 @@ TEST_F(TestFocPositionImpl, at_target_position_output_is_near_center)
     EXPECT_NEAR(result.c.Value(), 50, tolerance);
 }
 
-TEST_F(TestFocPositionImpl, prescaler_triggers_low_priority_interrupt)
+TEST_F(TestPositionCascade, prescaler_triggers_low_priority_interrupt)
 {
     focPosition->SetPoint(foc::Radians{ 0.5f });
     const uint32_t expectedPrescaler = baseFrequencyValue / lowPriorityFrequency.Value();

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/foc/implementations/WithAutomaticCurrentPidGains.hpp"
-#include "core/foc/implementations/WithAutomaticSpeedPidGains.hpp"
+#include "core/foc/cascade/WithAutomaticCurrentPidGains.hpp"
+#include "core/foc/cascade/WithAutomaticSpeedPidGains.hpp"
 #include "core/foc/instantiations/FocController.hpp"
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"

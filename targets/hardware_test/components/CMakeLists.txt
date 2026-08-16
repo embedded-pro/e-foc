@@ -10,7 +10,7 @@ target_link_libraries(e_foc.hardware_test.components PUBLIC
     e_foc.platform_abstraction
     services.util
     services.tracer
-    e_foc.foc.implementations
+    e_foc.foc.cascade
 )
 
 target_sources(e_foc.hardware_test.components PRIVATE

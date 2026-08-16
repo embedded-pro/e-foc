@@ -1,4 +1,4 @@
-#include "core/foc/implementations/WithAutomaticSpeedPidGains.hpp"
+#include "core/foc/cascade/WithAutomaticSpeedPidGains.hpp"
 
 namespace foc
 {

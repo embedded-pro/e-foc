@@ -1,4 +1,4 @@
-#include "core/foc/implementations/FocTorqueImpl.hpp"
+#include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <numbers>
@@ -15,7 +15,7 @@ namespace
 namespace foc
 {
     OPTIMIZE_FOR_SPEED
-    void FocTorqueImpl::Enable()
+    void TorqueCascade::Enable()
     {
         dPid.Reset();
         qPid.Reset();
@@ -23,17 +23,17 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocTorqueImpl::Disable()
+    void TorqueCascade::Disable()
     {
     }
 
-    void FocTorqueImpl::SetPolePairs(std::size_t polePairs)
+    void TorqueCascade::SetPolePairs(std::size_t polePairs)
     {
         this->polePairs = static_cast<float>(polePairs);
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocTorqueImpl::SetPoint(IdAndIqPoint setPoint)
+    void TorqueCascade::SetPoint(IdAndIqPoint setPoint)
     {
         lastSetPoint = setPoint;
         dPid.SetPoint(setPoint.first.Value());
@@ -41,7 +41,7 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    void FocTorqueImpl::SetCurrentTunings(Volts Vdc, const IdAndIqTunings& tunings)
+    void TorqueCascade::SetCurrentTunings(Volts Vdc, const IdAndIqTunings& tunings)
     {
         auto scale = 1.0f / (invSqrt3 * Vdc.Value());
 
@@ -57,7 +57,7 @@ namespace foc
     }
 
     OPTIMIZE_FOR_SPEED
-    PhasePwmDutyCycles FocTorqueImpl::Calculate(const PhaseCurrents& currentPhases, Radians& position)
+    PhasePwmDutyCycles TorqueCascade::Calculate(const PhaseCurrents& currentPhases, Radians& position)
     {
         const float ia = currentPhases.a.Value();
         const float ib = currentPhases.b.Value();

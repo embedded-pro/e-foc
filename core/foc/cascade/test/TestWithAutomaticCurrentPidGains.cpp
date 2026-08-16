@@ -1,4 +1,4 @@
-#include "core/foc/implementations/WithAutomaticCurrentPidGains.hpp"
+#include "core/foc/cascade/WithAutomaticCurrentPidGains.hpp"
 #include "core/foc/interfaces/test_doubles/FocMock.hpp"
 #include "gmock/gmock.h"
 #include <numbers>

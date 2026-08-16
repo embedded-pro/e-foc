@@ -1,5 +1,5 @@
 #include "numerical/math/Tolerance.hpp"
-#include "core/foc/implementations/FocTorqueImpl.hpp"
+#include "core/foc/cascade/TorqueCascade.hpp"
 #include <gmock/gmock.h>
 #include <numbers>
 
@@ -7,7 +7,7 @@ namespace
 {
     constexpr float tolerance = 1.0f;
 
-    class TestFocTorqueImpl
+    class TestTorqueCascade
         : public ::testing::Test
     {
     public:
@@ -18,7 +18,7 @@ namespace
             focTorque->Enable();
         }
 
-        std::optional<foc::FocTorqueImpl> focTorque;
+        std::optional<foc::TorqueCascade> focTorque;
         std::size_t polePairs = 7;
     };
 
@@ -28,7 +28,7 @@ namespace
     }
 }
 
-TEST_F(TestFocTorqueImpl, zero_setpoint_and_zero_currents_gives_50_percent_duty_cycles)
+TEST_F(TestTorqueCascade, zero_setpoint_and_zero_currents_gives_50_percent_duty_cycles)
 {
     focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
     focTorque->SetCurrentTunings(foc::Volts{ 24.0f }, { { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } });
@@ -41,7 +41,7 @@ TEST_F(TestFocTorqueImpl, zero_setpoint_and_zero_currents_gives_50_percent_duty_
     EXPECT_NEAR(result.c.Value(), 50, tolerance);
 }
 
-TEST_F(TestFocTorqueImpl, duty_cycles_are_bounded_0_to_100)
+TEST_F(TestTorqueCascade, duty_cycles_are_bounded_0_to_100)
 {
     focTorque->SetPoint({ foc::Ampere{ 10.0f }, foc::Ampere{ 10.0f } });
     focTorque->SetCurrentTunings(foc::Volts{ 24.0f }, { { 10.0f, 0.0f, 0.0f }, { 10.0f, 0.0f, 0.0f } });
@@ -57,7 +57,7 @@ TEST_F(TestFocTorqueImpl, duty_cycles_are_bounded_0_to_100)
     EXPECT_LE(result.c.Value(), 100);
 }
 
-TEST_F(TestFocTorqueImpl, set_pole_pairs)
+TEST_F(TestTorqueCascade, set_pole_pairs)
 {
     focTorque->SetPolePairs(4);
     focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
@@ -70,7 +70,7 @@ TEST_F(TestFocTorqueImpl, set_pole_pairs)
     EXPECT_LE(result.a.Value(), 100);
 }
 
-TEST_F(TestFocTorqueImpl, enable_disable_cycle)
+TEST_F(TestTorqueCascade, enable_disable_cycle)
 {
     focTorque->SetPoint({ foc::Ampere{ 1.0f }, foc::Ampere{ 0.0f } });
     focTorque->SetCurrentTunings(foc::Volts{ 24.0f }, { { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } });
@@ -85,7 +85,7 @@ TEST_F(TestFocTorqueImpl, enable_disable_cycle)
     EXPECT_LE(result.a.Value(), 100);
 }
 
-TEST_F(TestFocTorqueImpl, different_positions_produce_different_outputs)
+TEST_F(TestTorqueCascade, different_positions_produce_different_outputs)
 {
     focTorque->SetPoint({ foc::Ampere{ 1.0f }, foc::Ampere{ 0.0f } });
     focTorque->SetCurrentTunings(foc::Volts{ 24.0f }, { { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } });
@@ -103,7 +103,7 @@ TEST_F(TestFocTorqueImpl, different_positions_produce_different_outputs)
     EXPECT_TRUE(anyDifferent);
 }
 
-TEST_F(TestFocTorqueImpl, non_zero_current_setpoint_produces_non_centered_output)
+TEST_F(TestTorqueCascade, non_zero_current_setpoint_produces_non_centered_output)
 {
     focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 5.0f } });
     focTorque->SetCurrentTunings(foc::Volts{ 24.0f }, { { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } });

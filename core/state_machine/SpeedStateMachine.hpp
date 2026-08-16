@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/foc/implementations/FocSpeedImpl.hpp"
-#include "core/foc/implementations/WithAutomaticCurrentPidGains.hpp"
-#include "core/foc/implementations/WithAutomaticSpeedPidGains.hpp"
+#include "core/foc/cascade/SpeedCascade.hpp"
+#include "core/foc/cascade/WithAutomaticCurrentPidGains.hpp"
+#include "core/foc/cascade/WithAutomaticSpeedPidGains.hpp"
 #include "core/foc/instantiations/FocController.hpp"
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
@@ -43,8 +43,8 @@ namespace application
             const CalibrationServices& calibServices,
             std::optional<services::MechanicalParametersIdentificationImpl>& ownMechIdent,
             foc::FocSpeedController& focController,
-            foc::ThreePhaseInverter& inverter,
-            foc::Encoder& encoder);
+            drivers::ThreePhaseInverter& inverter,
+            drivers::Encoder& encoder);
 
         foc::FocSpeedController focController;
         foc::WithAutomaticCurrentPidGains pidAutoTuner;

@@ -12,7 +12,7 @@ namespace
 
 namespace services
 {
-    MechanicalParametersIdentificationImpl::MechanicalParametersIdentificationImpl(foc::FocSpeed& controller, foc::ThreePhaseInverter& driver, foc::Encoder& encoder)
+    MechanicalParametersIdentificationImpl::MechanicalParametersIdentificationImpl(foc::FocSpeed& controller, drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder)
         : controller(controller)
         , driver(driver)
         , encoder(encoder)

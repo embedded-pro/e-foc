@@ -1,11 +1,12 @@
 #pragma once
 
-#include "core/foc/implementations/FocPositionImpl.hpp"
-#include "core/foc/implementations/FocSpeedImpl.hpp"
-#include "core/foc/implementations/FocTorqueImpl.hpp"
-#include "core/foc/implementations/Runner.hpp"
-#include "core/foc/interfaces/Driver.hpp"
+#include "core/foc/cascade/PositionCascade.hpp"
+#include "core/foc/cascade/SpeedCascade.hpp"
+#include "core/foc/cascade/TorqueCascade.hpp"
+#include "core/foc/instantiations/Runner.hpp"
+#include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
+#include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include <utility>
 
 namespace foc
@@ -17,7 +18,7 @@ namespace foc
     {
     public:
         template<typename... Args>
-        FocController(ThreePhaseInverter& inverter, Encoder& encoder, Args&&... args)
+        FocController(drivers::ThreePhaseInverter& inverter, drivers::Encoder& encoder, Args&&... args)
             : FocImpl(std::forward<Args>(args)...)
             , runner(inverter, encoder, *this)
         {}
@@ -36,7 +37,7 @@ namespace foc
         Runner runner;
     };
 
-    using FocTorqueController = FocController<FocTorqueImpl>;
-    using FocSpeedController = FocController<FocSpeedImpl>;
-    using FocPositionController = FocController<FocPositionImpl>;
+    using FocTorqueController = FocController<TorqueCascade>;
+    using FocSpeedController = FocController<SpeedCascade>;
+    using FocPositionController = FocController<PositionCascade>;
 }

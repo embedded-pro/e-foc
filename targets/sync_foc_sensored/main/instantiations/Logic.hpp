@@ -2,9 +2,9 @@
 
 #include "can-lite/categories/foc_motor/FocMotorCategoryServer.hpp"
 #include "can-lite/core/CanFrameTransport.hpp"
-#include "core/foc/implementations/FocPositionImpl.hpp"
-#include "core/foc/implementations/FocSpeedImpl.hpp"
-#include "core/foc/implementations/FocTorqueImpl.hpp"
+#include "core/foc/cascade/PositionCascade.hpp"
+#include "core/foc/cascade/SpeedCascade.hpp"
+#include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/cli/TerminalWithBanner.hpp"

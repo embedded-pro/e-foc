@@ -9,6 +9,6 @@ target_link_libraries(e_foc.foc_mock INTERFACE
 )
 
 target_sources(e_foc.foc_mock PRIVATE
-    DriversMock.hpp
+    ExecutionMock.hpp
     FocMock.hpp
 )

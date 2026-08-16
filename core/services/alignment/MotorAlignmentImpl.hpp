@@ -1,9 +1,9 @@
 #pragma once
 
-#include "infra/util/AutoResetFunction.hpp"
-#include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
+#include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/alignment/MotorAlignment.hpp"
+#include "infra/util/AutoResetFunction.hpp"
 
 namespace services
 {
@@ -11,7 +11,7 @@ namespace services
         : public MotorAlignment
     {
     public:
-        MotorAlignmentImpl(foc::ThreePhaseInverter& driver, foc::Encoder& encoder);
+        MotorAlignmentImpl(drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder);
 
         void ForceAlignment(std::size_t polePairs, const AlignmentConfig& config, const infra::Function<void(std::optional<foc::Radians>)>& onDone) override;
 
@@ -24,8 +24,8 @@ namespace services
         constexpr static uint8_t neutralDuty = 50;
         constexpr static float alignmentAngle = 0.0f;
 
-        foc::ThreePhaseInverter& driver;
-        foc::Encoder& encoder;
+        drivers::ThreePhaseInverter& driver;
+        drivers::Encoder& encoder;
         [[no_unique_address]] foc::ClarkePark transforms;
         AlignmentConfig alignmentConfig;
         std::size_t polePairs = 1;

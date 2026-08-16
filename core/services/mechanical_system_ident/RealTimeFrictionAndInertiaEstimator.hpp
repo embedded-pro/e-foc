@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/OnlineEstimators.hpp"
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/services/mechanical_system_ident/FrictionAndInertiaEstimator.hpp"

@@ -81,8 +81,8 @@ namespace application
         const CalibrationServices& calibServices,
         std::optional<services::MechanicalParametersIdentificationImpl>& ownMechIdent,
         foc::FocSpeedController& focController,
-        foc::ThreePhaseInverter& inverter,
-        foc::Encoder& encoder)
+        drivers::ThreePhaseInverter& inverter,
+        drivers::Encoder& encoder)
     {
         if (calibServices.mechIdentOverride.has_value())
             return calibServices.mechIdentOverride->get();

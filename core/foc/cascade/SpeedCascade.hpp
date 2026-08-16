@@ -1,33 +1,32 @@
 #pragma once
 
-#include "core/foc/implementations/FocWithSpeedLoop.hpp"
-#include "numerical/controllers/implementations/PidIncremental.hpp"
+#include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
 
 namespace foc
 {
-    class FocPositionImpl
-        : public FocPosition
-        , protected FocWithSpeedLoop
+    class SpeedCascade
+        : public FocSpeed
+        , protected CascadeWithSpeedLoop
     {
     public:
-        explicit FocPositionImpl(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency = hal::Hertz{ 1000 });
+        explicit SpeedCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency = hal::Hertz{ 1000 });
 
         void SetPolePairs(std::size_t polePairs) override;
-        void SetPoint(Radians point) override;
+        void SetPoint(RadiansPerSecond point) override;
         void SetCurrentTunings(Volts Vdc, const IdAndIqTunings& torqueTunings) override;
         void SetSpeedTunings(Volts Vdc, const SpeedTunings& speedTuning) override;
-        void SetPositionTunings(const PositionTunings& positionTuning) override;
         void SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator) override;
         void SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator) override;
         void Enable() override;
         void Disable() override;
+        hal::Hertz OuterLoopFrequency() const override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
 
     private:
         void LowPriorityHandler();
 
     private:
-        controllers::PidIncrementalSynchronous<float> positionPid{ { 0.0f, 0.0f, 0.0f }, { -1000.0f, 1000.0f } };
-        Radians lastPositionSetPoint{ 0.0f };
+        RadiansPerSecond lastSpeedSetPoint{ 0.0f };
+        hal::Hertz outerLoopFrequency;
     };
 }

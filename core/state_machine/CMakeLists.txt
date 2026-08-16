@@ -9,7 +9,7 @@ target_include_directories(e_foc.state_machine PUBLIC
 
 target_link_libraries(e_foc.state_machine PUBLIC
     can_lite.categories.foc_motor
-    e_foc.foc.implementations
+    e_foc.foc.cascade
     e_foc.foc.instantiations
     e_foc.services.alignment
     e_foc.services.cli

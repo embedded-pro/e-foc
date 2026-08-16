@@ -1,8 +1,9 @@
 #pragma once
 
-#include "core/foc/implementations/WithAutomaticCurrentPidGains.hpp"
-#include "core/foc/interfaces/Driver.hpp"
+#include "core/foc/cascade/WithAutomaticCurrentPidGains.hpp"
+#include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
+#include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/alignment/MotorAlignment.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
@@ -26,8 +27,8 @@ namespace application
 
     struct MotorHardware
     {
-        foc::ThreePhaseInverter& inverter;
-        foc::Encoder& encoder;
+        drivers::ThreePhaseInverter& inverter;
+        drivers::Encoder& encoder;
         foc::Volts vdc;
     };
 
@@ -89,7 +90,7 @@ namespace application
         bool IsCalibrating(state_machine::CalibrationStep expected) const;
 
         services::Tracer& GetTracer();
-        foc::ThreePhaseInverter& GetInverter();
+        drivers::ThreePhaseInverter& GetInverter();
         foc::Volts GetVdc() const;
         state_machine::State& GetCurrentState();
         const state_machine::State& GetCurrentState() const;
@@ -99,8 +100,8 @@ namespace application
     private:
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
-        foc::ThreePhaseInverter& inverter;
-        foc::Encoder& encoder;
+        drivers::ThreePhaseInverter& inverter;
+        drivers::Encoder& encoder;
         foc::Volts vdc;
         services::NonVolatileMemory& nvm;
         services::ElectricalParametersIdentification& electricalIdent;

@@ -1,6 +1,6 @@
+#include "core/foc/cascade/SpeedCascade.hpp"
+#include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "numerical/math/Tolerance.hpp"
-#include "core/foc/implementations/FocSpeedImpl.hpp"
-#include "core/foc/interfaces/test_doubles/DriversMock.hpp"
 #include <gmock/gmock.h>
 #include <numbers>
 
@@ -13,7 +13,7 @@ namespace
     const hal::Hertz lowPriorityFrequency{ 2000 };
     constexpr float tolerance = 1.0f;
 
-    class TestFocSpeedImpl
+    class TestSpeedCascade
         : public ::testing::Test
     {
     public:
@@ -28,7 +28,7 @@ namespace
         }
 
         foc::LowPriorityInterruptMock lowPriorityInterruptMock;
-        std::optional<foc::FocSpeedImpl> focSpeed;
+        std::optional<foc::SpeedCascade> focSpeed;
         std::size_t polePairs = 7;
     };
 
@@ -38,7 +38,7 @@ namespace
     }
 }
 
-TEST_F(TestFocSpeedImpl, zero_speed_setpoint_produces_bounded_duty_cycles)
+TEST_F(TestSpeedCascade, zero_speed_setpoint_produces_bounded_duty_cycles)
 {
     focSpeed->SetPoint(foc::RadiansPerSecond{ 0.0f });
 
@@ -53,7 +53,7 @@ TEST_F(TestFocSpeedImpl, zero_speed_setpoint_produces_bounded_duty_cycles)
     EXPECT_LE(result.c.Value(), 100);
 }
 
-TEST_F(TestFocSpeedImpl, duty_cycles_are_bounded_0_to_100)
+TEST_F(TestSpeedCascade, duty_cycles_are_bounded_0_to_100)
 {
     focSpeed->SetPoint(foc::RadiansPerSecond{ 100.0f });
 
@@ -68,7 +68,7 @@ TEST_F(TestFocSpeedImpl, duty_cycles_are_bounded_0_to_100)
     EXPECT_LE(result.c.Value(), 100);
 }
 
-TEST_F(TestFocSpeedImpl, set_pole_pairs)
+TEST_F(TestSpeedCascade, set_pole_pairs)
 {
     focSpeed->SetPolePairs(4);
     focSpeed->SetPoint(foc::RadiansPerSecond{ 0.0f });
@@ -80,7 +80,7 @@ TEST_F(TestFocSpeedImpl, set_pole_pairs)
     EXPECT_LE(result.a.Value(), 100);
 }
 
-TEST_F(TestFocSpeedImpl, enable_disable_cycle)
+TEST_F(TestSpeedCascade, enable_disable_cycle)
 {
     focSpeed->SetPoint(foc::RadiansPerSecond{ 10.0f });
 
@@ -94,7 +94,7 @@ TEST_F(TestFocSpeedImpl, enable_disable_cycle)
     EXPECT_LE(result.a.Value(), 100);
 }
 
-TEST_F(TestFocSpeedImpl, different_positions_produce_different_outputs)
+TEST_F(TestSpeedCascade, different_positions_produce_different_outputs)
 {
     focSpeed->SetPoint(foc::RadiansPerSecond{ 10.0f });
 
@@ -113,7 +113,7 @@ TEST_F(TestFocSpeedImpl, different_positions_produce_different_outputs)
     EXPECT_TRUE(anyDifferent);
 }
 
-TEST_F(TestFocSpeedImpl, consecutive_calls_update_speed_estimation)
+TEST_F(TestSpeedCascade, consecutive_calls_update_speed_estimation)
 {
     focSpeed->SetPoint(foc::RadiansPerSecond{ 10.0f });
 
@@ -129,7 +129,7 @@ TEST_F(TestFocSpeedImpl, consecutive_calls_update_speed_estimation)
     EXPECT_LE(result2.a.Value(), 100);
 }
 
-TEST_F(TestFocSpeedImpl, set_speed_tunings)
+TEST_F(TestSpeedCascade, set_speed_tunings)
 {
     focSpeed->SetSpeedTunings(foc::Volts{ 24.0f }, { 2.0f, 0.1f, 0.0f });
     focSpeed->SetPoint(foc::RadiansPerSecond{ 5.0f });
@@ -141,7 +141,7 @@ TEST_F(TestFocSpeedImpl, set_speed_tunings)
     EXPECT_LE(result.a.Value(), 100);
 }
 
-TEST_F(TestFocSpeedImpl, prescaler_triggers_low_priority_at_correct_rate)
+TEST_F(TestSpeedCascade, prescaler_triggers_low_priority_at_correct_rate)
 {
     // baseFrequency = 20000, lowPriorityFrequency = 2000 → prescaler = 10
     // LowPriorityInterrupt::Trigger() must be called exactly once every 10 iterations.
@@ -158,7 +158,7 @@ TEST_F(TestFocSpeedImpl, prescaler_triggers_low_priority_at_correct_rate)
     }
 }
 
-TEST_F(TestFocSpeedImpl, second_prescaler_cycle_triggers_again)
+TEST_F(TestSpeedCascade, second_prescaler_cycle_triggers_again)
 {
     focSpeed->SetPoint(foc::RadiansPerSecond{ 0.0f });
 

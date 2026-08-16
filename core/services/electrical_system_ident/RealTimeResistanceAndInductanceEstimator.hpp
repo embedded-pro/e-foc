@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "numerical/estimators/online/RecursiveLeastSquares.hpp"

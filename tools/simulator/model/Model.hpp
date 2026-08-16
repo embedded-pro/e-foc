@@ -3,8 +3,8 @@
 #ifndef Q_MOC_RUN
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #endif
-#include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "infra/util/Function.hpp"
 #include "infra/util/Observer.hpp"
 #include <cstddef>
@@ -28,8 +28,8 @@ namespace simulator
     };
 
     class ThreePhaseMotorModel
-        : public foc::ThreePhaseInverter
-        , public foc::Encoder
+        : public drivers::ThreePhaseInverter
+        , public drivers::Encoder
         , public infra::Subject<ThreePhaseMotorModelObserver>
     {
     public:
@@ -90,7 +90,7 @@ namespace simulator
         // drive the model synchronously must NOT enable self-driving (use StepForTest).
         void EnableSelfDriving();
 
-        // Implementation of foc::ThreePhaseInverter
+        // Implementation of drivers::ThreePhaseInverter
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
         void Start() override;
@@ -98,7 +98,7 @@ namespace simulator
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
 
-        // Implementation of foc::Encoder
+        // Implementation of drivers::Encoder
         foc::Radians Read() override;
         void Set(foc::Radians value) override;
         void SetZero() override;

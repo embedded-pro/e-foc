@@ -1,8 +1,8 @@
-#include "core/foc/implementations/Runner.hpp"
+#include "core/foc/instantiations/Runner.hpp"
 
 namespace foc
 {
-    Runner::Runner(ThreePhaseInverter& inverter, Encoder& encoder, FocBase& foc)
+    Runner::Runner(drivers::ThreePhaseInverter& inverter, drivers::Encoder& encoder, FocBase& foc)
         : inverter{ inverter }
         , encoder{ encoder }
         , foc{ foc }

@@ -56,7 +56,7 @@ namespace application
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
 
-        // Implementation of foc::ThreePhaseInverter
+        // Implementation of drivers::ThreePhaseInverter
         OPTIMIZE_FOR_SPEED void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         OPTIMIZE_FOR_SPEED void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
         void Start() override;
@@ -64,7 +64,7 @@ namespace application
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
 
-        // Implementation of foc::Encoder
+        // Implementation of drivers::Encoder
         OPTIMIZE_FOR_SPEED foc::Radians Read() override;
         void Set(foc::Radians value) override;
         void SetZero() override;
