@@ -32,7 +32,7 @@ namespace services
 
         foc::Ampere current(*t);
 
-        foc.SetPoint(foc::IdAndIqPoint{ current, 0.0f });
+        foc.SetPoint(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, current });
         return TerminalFocTorqueInteractor::StatusWithMessage();
     }
 }
