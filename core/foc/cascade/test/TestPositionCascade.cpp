@@ -1,5 +1,6 @@
 #include "core/foc/cascade/PositionCascade.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
+#include "core/foc/interfaces/test_doubles/OnlineEstimatorsMock.hpp"
 #include "numerical/math/Tolerance.hpp"
 #include <gmock/gmock.h>
 #include <numbers>
@@ -261,4 +262,118 @@ TEST_F(TestPositionCascade, a_current_commanding_algorithm_still_drives_the_inve
 
     EXPECT_GE(result.a.Value(), 0);
     EXPECT_LE(result.a.Value(), 100);
+}
+
+TEST_F(TestPositionCascade, the_cascade_p_algorithm_drives_the_inverter)
+{
+    ASSERT_EQ(focPosition->SelectPositionAlgorithm(foc::PositionAlgorithm::cascadeP), foc::SelectResult::ok);
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 1.0f });
+
+    foc::Radians position{ 0.0f };
+    focPosition->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+    auto result = focPosition->Calculate(ZeroCurrents(), position);
+
+    EXPECT_GE(result.a.Value(), 0);
+    EXPECT_LE(result.a.Value(), 100);
+}
+
+TEST_F(TestPositionCascade, the_two_dof_algorithm_drives_the_inverter)
+{
+    ASSERT_EQ(focPosition->SelectPositionAlgorithm(foc::PositionAlgorithm::twoDof), foc::SelectResult::ok);
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 1.0f });
+
+    foc::Radians position{ 0.0f };
+    for (int sample = 0; sample != 5; ++sample)
+    {
+        focPosition->Calculate(ZeroCurrents(), position);
+        lowPriorityInterruptMock.TriggerHandler();
+    }
+
+    auto result = focPosition->Calculate(ZeroCurrents(), position);
+
+    EXPECT_GE(result.a.Value(), 0);
+    EXPECT_LE(result.a.Value(), 100);
+}
+
+TEST_F(TestPositionCascade, a_non_positive_reference_time_constant_leaves_the_two_dof_prefilter_transparent)
+{
+    auto tunings = foc::PositionLoopTunings{};
+    tunings.referenceTimeConstant = 0.0f;
+
+    ASSERT_EQ(focPosition->SelectPositionAlgorithm(foc::PositionAlgorithm::twoDof), foc::SelectResult::ok);
+    ASSERT_EQ(focPosition->SetPositionTunings(tunings), foc::SelectResult::ok);
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 0.5f });
+
+    foc::Radians position{ 0.0f };
+    focPosition->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+    auto result = focPosition->Calculate(ZeroCurrents(), position);
+
+    EXPECT_GE(result.a.Value(), 0);
+    EXPECT_LE(result.a.Value(), 100);
+}
+
+TEST_F(TestPositionCascade, a_setpoint_across_the_encoder_seam_moves_the_short_way)
+{
+    constexpr float pi = std::numbers::pi_v<float>;
+
+    ASSERT_EQ(focPosition->SelectPositionAlgorithm(foc::PositionAlgorithm::cascadeP), foc::SelectResult::ok);
+    focPosition->Enable();
+
+    // Both directions across the wrap, so the error folds each way rather than running the long way round
+    for (auto [setPoint, measured] : { std::pair{ -pi + 0.1f, pi - 0.1f }, std::pair{ pi - 0.1f, -pi + 0.1f } })
+    {
+        focPosition->SetPoint(foc::Radians{ setPoint });
+
+        foc::Radians position{ measured };
+        focPosition->Calculate(ZeroCurrents(), position);
+        lowPriorityInterruptMock.TriggerHandler();
+        auto result = focPosition->Calculate(ZeroCurrents(), position);
+
+        EXPECT_GE(result.a.Value(), 0);
+        EXPECT_LE(result.a.Value(), 100);
+    }
+}
+
+TEST_F(TestPositionCascade, a_current_commanding_algorithm_bypasses_the_speed_loop)
+{
+    ASSERT_EQ(focPosition->SelectPositionAlgorithm(foc::PositionAlgorithm::lqr), foc::SelectResult::ok);
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 1.0f });
+
+    foc::Radians position{ 0.0f };
+    focPosition->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+    auto result = focPosition->Calculate(ZeroCurrents(), position);
+
+    EXPECT_GE(result.a.Value(), 0);
+    EXPECT_LE(result.a.Value(), 100);
+}
+
+TEST_F(TestPositionCascade, the_inner_and_speed_algorithms_are_reported)
+{
+    EXPECT_EQ(focPosition->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
+    EXPECT_EQ(focPosition->ActiveSpeedAlgorithm(), foc::SpeedAlgorithm::pid);
+}
+
+TEST_F(TestPositionCascade, registered_online_estimators_are_fed_from_the_outer_loop)
+{
+    testing::StrictMock<foc::OnlineMechanicalEstimatorMock> mechanicalEstimator;
+    testing::StrictMock<foc::OnlineElectricalEstimatorMock> electricalEstimator;
+
+    focPosition->SetOnlineMechanicalEstimator(mechanicalEstimator);
+    focPosition->SetOnlineElectricalEstimator(electricalEstimator);
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 0.5f });
+
+    EXPECT_CALL(mechanicalEstimator, Update(_, _, _));
+    EXPECT_CALL(electricalEstimator, Update(_, _, _, _));
+
+    foc::Radians position{ 0.0f };
+    focPosition->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
 }

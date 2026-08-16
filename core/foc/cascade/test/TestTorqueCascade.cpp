@@ -223,3 +223,18 @@ TEST_F(TestTorqueCascade, the_speed_estimate_does_not_spike_on_the_first_sample_
     EXPECT_NEAR(result.b.Value(), 50, tolerance);
     EXPECT_NEAR(result.c.Value(), 50, tolerance);
 }
+
+TEST_F(TestTorqueCascade, the_sliding_mode_algorithm_drives_the_inverter)
+{
+    focTorque->Disable();
+    ASSERT_EQ(focTorque->SelectCurrentAlgorithm(foc::CurrentAlgorithm::slidingMode), foc::SelectResult::ok);
+    focTorque->Enable();
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 2.0f } });
+
+    foc::Radians position{ 0.0f };
+    auto result = focTorque->Calculate(ZeroCurrents(), position);
+
+    EXPECT_GE(result.a.Value(), 0);
+    EXPECT_LE(result.a.Value(), 100);
+    EXPECT_TRUE(result.a.Value() != 50 || result.b.Value() != 50 || result.c.Value() != 50);
+}

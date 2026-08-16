@@ -30,9 +30,6 @@ namespace foc
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
 
-        using CascadeWithSpeedLoop::CurrentLoop;
-        using CascadeWithSpeedLoop::SpeedLoop;
-
     private:
         void LowPriorityHandler();
 

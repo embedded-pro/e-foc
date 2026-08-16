@@ -151,24 +151,9 @@ namespace foc
         lastSpeedLoopOutput = current;
     }
 
-    CurrentControllerSelector& CascadeWithSpeedLoop::CurrentLoop()
-    {
-        return currentLoop;
-    }
-
-    SpeedControllerSelector& CascadeWithSpeedLoop::SpeedLoop()
-    {
-        return speedLoop;
-    }
-
     float CascadeWithSpeedLoop::CurrentMechanicalAngle() const
     {
         return currentMechanicalAngle;
-    }
-
-    float CascadeWithSpeedLoop::SpeedDt() const
-    {
-        return speedDt;
     }
 
     float CascadeWithSpeedLoop::PolePairs() const

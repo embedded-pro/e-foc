@@ -92,6 +92,16 @@ namespace
                     }));
         }
 
+        void GivenNvmSaveConfigAlwaysSucceeds()
+        {
+            EXPECT_CALL(nvmMock, SaveConfig(_, _))
+                .Times(AnyNumber())
+                .WillRepeatedly(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
+                    {
+                        onDone(services::NvmStatus::Ok);
+                    }));
+        }
+
         void GivenNvmSaveConfigFails()
         {
             EXPECT_CALL(nvmMock, SaveConfig(_, _))
@@ -242,6 +252,30 @@ namespace
         : public ControlModeStateMachineTest
     {
     public:
+        void GivenNvmAlwaysValid()
+        {
+            services::CalibrationData data{};
+            data.polePairs = 7;
+            data.rPhase = 0.5f;
+            data.lD = 1.0f;
+            data.lQ = 1.0f;
+            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
+                .Times(AnyNumber())
+                .WillRepeatedly(Invoke([](infra::Function<void(bool)> onDone)
+                    {
+                        onDone(true);
+                    }));
+            EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+                .Times(AnyNumber())
+                .WillRepeatedly(Invoke([data](services::CalibrationData& out,
+                                           infra::Function<void(services::NvmStatus)> onDone)
+                    {
+                        out = data;
+                        onDone(services::NvmStatus::Ok);
+                    }));
+            EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+        }
+
         void GivenNvmValid()
         {
             services::CalibrationData data{};
@@ -856,5 +890,142 @@ namespace
         subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
         EXPECT_EQ(subject->SelectSpeedAlgorithm(foc::SpeedAlgorithm::lqi), foc::SelectResult::invalidParameters);
+    }
+
+    // ---- CLI: algorithm selection parses every accepted name and rejects the rest ----
+
+    TEST_F(ControlModeStateMachineExtTest, Cli_SelectCurrentAlgorithm_AcceptsEveryName)
+    {
+        GivenNvmValid();
+        GivenNvmSaveConfigAlwaysSucceeds();
+        ConstructSubject();
+
+        for (const auto* name : { "sca pid", "sca decoupled", "sca deadbeat", "sca sliding" })
+            InvokeCliCommand(name);
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, Cli_SelectCurrentAlgorithm_RejectsUnknownName)
+    {
+        GivenNvmAlwaysInvalid();
+        ConstructSubject();
+
+        InvokeCliCommand("sca nonsense");
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, Cli_SelectSpeedAlgorithm_AcceptsEveryName)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigAlwaysSucceeds();
+        ConstructSubject();
+        subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+        for (const auto* name : { "ssa pid", "ssa lqi", "ssa adrc", "ssa twodof" })
+            InvokeCliCommand(name);
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, Cli_SelectSpeedAlgorithm_RejectsUnknownName)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigAlwaysSucceeds();
+        ConstructSubject();
+        subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+        InvokeCliCommand("ssa nonsense");
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, Cli_SelectPositionAlgorithm_AcceptsEveryName)
+    {
+        GivenNvmAlwaysValid();
+        GivenNvmSaveConfigAlwaysSucceeds();
+        ConstructSubject();
+        subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+        for (const auto* name : { "spa pid", "spa cascadep", "spa lqr", "spa lqi", "spa twodof" })
+            InvokeCliCommand(name);
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, Cli_SelectPositionAlgorithm_RejectsUnknownName)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigAlwaysSucceeds();
+        ConstructSubject();
+        subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+        InvokeCliCommand("spa nonsense");
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, Cli_SelectPositionAlgorithm_RejectedOutsidePositionMode)
+    {
+        GivenNvmAlwaysInvalid();
+        ConstructSubject();
+
+        EXPECT_EQ(subject->SelectPositionAlgorithm(foc::PositionAlgorithm::lqr), foc::SelectResult::invalidAlgorithm);
+    }
+
+    // ---- CLI: active_algorithms names every enumerator ----
+
+    TEST_F(ControlModeStateMachineExtTest, Cli_ActiveAlgorithms_NamesEveryCurrentAlgorithm)
+    {
+        GivenNvmValid();
+        GivenNvmSaveConfigAlwaysSucceeds();
+        ConstructSubject();
+
+        for (const auto* name : { "sca pid", "sca decoupled", "sca deadbeat", "sca sliding" })
+        {
+            InvokeCliCommand(name);
+            InvokeCliCommand("aa");
+        }
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, Cli_ActiveAlgorithms_NamesEverySpeedAlgorithm)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigAlwaysSucceeds();
+        ConstructSubject();
+        subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+        for (const auto* name : { "ssa pid", "ssa lqi", "ssa adrc", "ssa twodof" })
+        {
+            InvokeCliCommand(name);
+            InvokeCliCommand("aa");
+        }
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, Cli_ActiveAlgorithms_NamesEveryPositionAlgorithm)
+    {
+        GivenNvmAlwaysValid();
+        GivenNvmSaveConfigAlwaysSucceeds();
+        ConstructSubject();
+        subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+        for (const auto* name : { "spa pid", "spa cascadep", "spa lqr", "spa lqi", "spa twodof" })
+        {
+            InvokeCliCommand(name);
+            InvokeCliCommand("aa");
+        }
+    }
+
+    // ---- Bandwidth commands reach each loop ----
+
+    TEST_F(ControlModeStateMachineExtTest, TrySetBandwidths_AreAcceptedInPositionMode)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigAlwaysSucceeds();
+        ConstructSubject();
+        subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+        EXPECT_TRUE(subject->TrySetCurrentBandwidth(6283.2f));
+        EXPECT_TRUE(subject->TrySetSpeedBandwidth(188.5f));
+        EXPECT_TRUE(subject->TrySetPositionBandwidth(18.8f));
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, TrySetSpeedAndPositionBandwidth_AreRejectedInTorqueMode)
+    {
+        GivenNvmAlwaysInvalid();
+        ConstructSubject();
+
+        EXPECT_TRUE(subject->TrySetCurrentBandwidth(6283.2f));
+        EXPECT_FALSE(subject->TrySetSpeedBandwidth(188.5f));
+        EXPECT_FALSE(subject->TrySetPositionBandwidth(18.8f));
     }
 }

@@ -47,10 +47,7 @@ namespace foc
         void SetDirectCurrentReference(float current);
         float MeasureMechanicalSpeed();
 
-        CurrentControllerSelector& CurrentLoop();
-        SpeedControllerSelector& SpeedLoop();
         float CurrentMechanicalAngle() const;
-        float SpeedDt() const;
         float PolePairs() const;
         LowPriorityInterrupt& GetLowPriorityInterrupt();
 
