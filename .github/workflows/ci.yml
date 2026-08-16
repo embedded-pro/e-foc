@@ -202,7 +202,8 @@ jobs:
           clock-mhz: "120"
           cortex: "m4"
           output-dir: cycle-analysis
-          post-comment: "true"
+          # A fork pull request only ever gets a read-only token, so posting would 403 and fail the job
+          post-comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
           artifact-name: cycle-analysis
       - name: Cycle analysis summary
         if: matrix.target == 'EK-TM4C1294XL'
@@ -226,7 +227,7 @@ jobs:
           build-config: ${{ matrix.configuration }}
           cortex: "m4"
           output-dir: memory-analysis
-          post-comment: "true"
+          post-comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
           artifact-name: memory-analysis
       - name: Memory analysis summary
         if: matrix.target == 'EK-TM4C1294XL'
