@@ -56,4 +56,4 @@ You triage incoming development requests and route them to the right specialist 
 - FOC theory: [`documentation/theory/foc.md`](../../documentation/theory/foc.md)
 - Performance optimization: [`documentation/performance-optimization/README.md`](../../documentation/performance-optimization/README.md)
 - Hardware factory: [`core/platform_abstraction/PlatformFactory.hpp`](../../core/platform_abstraction/PlatformFactory.hpp)
-- Numerical toolbox guidelines: [`numerical-toolbox/.github/copilot-instructions.md`](../../numerical-toolbox/.github/copilot-instructions.md)
+- Numerical toolbox guidelines: [`infra/numerical-toolbox/.github/copilot-instructions.md`](../../infra/numerical-toolbox/.github/copilot-instructions.md)
