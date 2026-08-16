@@ -59,11 +59,13 @@ namespace foc
         MOCK_METHOD(void, SetPoint, (Radians), (override));
         MOCK_METHOD(void, SetCurrentTunings, (const CurrentLoopTunings& tunings), (override));
         MOCK_METHOD(void, SetSpeedTunings, (const SpeedLoopTunings& tunings), (override));
-        MOCK_METHOD(void, SetPositionTunings, (const PositionLoopTunings& tunings), (override));
+        MOCK_METHOD(SelectResult, SetPositionTunings, (const PositionLoopTunings& tunings), (override));
         MOCK_METHOD(SelectResult, SelectCurrentAlgorithm, (CurrentAlgorithm algorithm), (override));
         MOCK_METHOD(CurrentAlgorithm, ActiveCurrentAlgorithm, (), (const, override));
         MOCK_METHOD(SelectResult, SelectSpeedAlgorithm, (SpeedAlgorithm algorithm), (override));
         MOCK_METHOD(SpeedAlgorithm, ActiveSpeedAlgorithm, (), (const, override));
+        MOCK_METHOD(SelectResult, SelectPositionAlgorithm, (PositionAlgorithm algorithm), (override));
+        MOCK_METHOD(PositionAlgorithm, ActivePositionAlgorithm, (), (const, override));
         MOCK_METHOD(void, SetOnlineMechanicalEstimator, (OnlineMechanicalEstimator & estimator), (override));
         MOCK_METHOD(void, SetOnlineElectricalEstimator, (OnlineElectricalEstimator & estimator), (override));
         MOCK_METHOD(PhasePwmDutyCycles, Calculate, (const PhaseCurrents& currentPhases, Radians& position), (override));

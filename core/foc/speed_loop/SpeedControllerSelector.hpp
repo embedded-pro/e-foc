@@ -16,7 +16,7 @@ namespace foc
         using Context = SpeedControlContext;
         using Output = foc::Ampere;
 
-        static bool IsSelectable(Algorithm algorithm, const Parameters& parameters);
+        static bool IsSelectable(Algorithm algorithm, const Parameters& parameters, const Tunings& tunings);
     };
 
     class SpeedControllerSelector

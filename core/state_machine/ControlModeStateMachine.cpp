@@ -31,6 +31,21 @@ namespace
         return std::nullopt;
     }
 
+    std::optional<foc::PositionAlgorithm> ParsePositionAlgorithm(const infra::BoundedConstString& name)
+    {
+        if (name == "pid")
+            return foc::PositionAlgorithm::pid;
+        if (name == "cascadep")
+            return foc::PositionAlgorithm::cascadeP;
+        if (name == "lqr")
+            return foc::PositionAlgorithm::lqr;
+        if (name == "lqi")
+            return foc::PositionAlgorithm::lqi;
+        if (name == "twodof")
+            return foc::PositionAlgorithm::twoDof;
+        return std::nullopt;
+    }
+
     const char* CurrentAlgorithmName(foc::CurrentAlgorithm algorithm)
     {
         switch (algorithm)
@@ -55,6 +70,23 @@ namespace
             case foc::SpeedAlgorithm::adrc:
                 return "adrc";
             case foc::SpeedAlgorithm::twoDof:
+                return "twodof";
+            default:
+                return "pid";
+        }
+    }
+
+    const char* PositionAlgorithmName(foc::PositionAlgorithm algorithm)
+    {
+        switch (algorithm)
+        {
+            case foc::PositionAlgorithm::cascadeP:
+                return "cascadep";
+            case foc::PositionAlgorithm::lqr:
+                return "lqr";
+            case foc::PositionAlgorithm::lqi:
+                return "lqi";
+            case foc::PositionAlgorithm::twoDof:
                 return "twodof";
             default:
                 return "pid";
@@ -221,8 +253,9 @@ namespace state_machine
 
         auto tunings = foc::PositionLoopTunings{};
         tunings.bandwidth = bandwidth;
-        sm->GetController().SetPositionTunings(tunings);
-        return true;
+
+        // The position law is redesigned on retuning, so a rejected design must not look accepted
+        return sm->GetController().SetPositionTunings(tunings) == foc::SelectResult::ok;
     }
 
     void ControlModeStateMachine::Activate(ControlMode mode)
@@ -280,6 +313,13 @@ namespace state_machine
         return nullptr;
     }
 
+    foc::PositionLoopSelectable* ControlModeStateMachine::PositionSelectable()
+    {
+        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
+            return &sm->GetController();
+        return nullptr;
+    }
+
     void ControlModeStateMachine::ApplyPersistedAlgorithms()
     {
         if (auto* selectable = CurrentSelectable())
@@ -287,6 +327,9 @@ namespace state_machine
 
         if (auto* selectable = SpeedSelectable())
             selectable->SelectSpeedAlgorithm(static_cast<foc::SpeedAlgorithm>(configData.speedAlgorithm));
+
+        if (auto* selectable = PositionSelectable())
+            selectable->SelectPositionAlgorithm(static_cast<foc::PositionAlgorithm>(configData.positionAlgorithm));
     }
 
     foc::SelectResult ControlModeStateMachine::SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm)
@@ -319,6 +362,21 @@ namespace state_machine
         return result;
     }
 
+    foc::SelectResult ControlModeStateMachine::SelectPositionAlgorithm(foc::PositionAlgorithm algorithm)
+    {
+        auto* selectable = PositionSelectable();
+        if (selectable == nullptr)
+            return foc::SelectResult::invalidAlgorithm;
+
+        auto result = selectable->SelectPositionAlgorithm(algorithm);
+        if (result != foc::SelectResult::ok)
+            return result;
+
+        configData.positionAlgorithm = static_cast<uint8_t>(algorithm);
+        nvm.SaveConfig(configData, [](services::NvmStatus) {});
+        return result;
+    }
+
     foc::CurrentAlgorithm ControlModeStateMachine::ActiveCurrentAlgorithm() const
     {
         return static_cast<foc::CurrentAlgorithm>(configData.currentAlgorithm);
@@ -327,6 +385,11 @@ namespace state_machine
     foc::SpeedAlgorithm ControlModeStateMachine::ActiveSpeedAlgorithm() const
     {
         return static_cast<foc::SpeedAlgorithm>(configData.speedAlgorithm);
+    }
+
+    foc::PositionAlgorithm ControlModeStateMachine::ActivePositionAlgorithm() const
+    {
+        return static_cast<foc::PositionAlgorithm>(configData.positionAlgorithm);
     }
 
     void ControlModeStateMachine::RegisterCliCommands()
@@ -377,11 +440,22 @@ namespace state_machine
                     TraceSelectResult(SelectSpeedAlgorithm(*algorithm));
             } });
 
+        terminal.AddCommand({ { "select_position_algorithm", "spa", "Select position loop algorithm [pid|cascadep|lqr|lqi|twodof]. Ex: spa lqi" },
+            [this](const infra::BoundedConstString& param)
+            {
+                const auto algorithm = ParsePositionAlgorithm(param);
+                if (!algorithm)
+                    terminalAndTracer.tracer.Trace() << "Unknown algorithm. Expected pid, cascadep, lqr, lqi or twodof";
+                else
+                    TraceSelectResult(SelectPositionAlgorithm(*algorithm));
+            } });
+
         terminal.AddCommand({ { "active_algorithms", "aa", "Print the active loop algorithms" },
             [this](const infra::BoundedConstString&)
             {
                 terminalAndTracer.tracer.Trace() << "Current loop: " << CurrentAlgorithmName(ActiveCurrentAlgorithm());
                 terminalAndTracer.tracer.Trace() << "Speed loop: " << SpeedAlgorithmName(ActiveSpeedAlgorithm());
+                terminalAndTracer.tracer.Trace() << "Position loop: " << PositionAlgorithmName(ActivePositionAlgorithm());
             } });
     }
 

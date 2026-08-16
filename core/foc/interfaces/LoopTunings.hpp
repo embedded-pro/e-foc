@@ -22,5 +22,9 @@ namespace foc
     struct PositionLoopTunings
     {
         float bandwidth{ 18.8495559f };
+        float positionErrorWeight{ 1.0f };
+        float speedErrorWeight{ 0.1f };
+        float integralWeight{ 0.05f };
+        float referenceTimeConstant{ 0.053051f };
     };
 }

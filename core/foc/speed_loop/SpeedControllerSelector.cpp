@@ -8,7 +8,7 @@
 namespace foc
 {
     // Every speed algorithm derives its gains from the same mechanical set, so the rule is uniform
-    bool SpeedControllerTraits::IsSelectable(SpeedAlgorithm, const MechanicalModelParameters& parameters)
+    bool SpeedControllerTraits::IsSelectable(SpeedAlgorithm, const MechanicalModelParameters& parameters, const SpeedLoopTunings&)
     {
         return AreMechanicalParametersValid(parameters);
     }

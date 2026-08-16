@@ -43,6 +43,8 @@ namespace foc
 
         void SetSpeedReference(RadiansPerSecond reference);
         void RunSpeedLoop(float mechanicalSpeed);
+        // Lets an outer law drive the current loop itself, bypassing the speed loop entirely
+        void SetDirectCurrentReference(float current);
         float MeasureMechanicalSpeed();
 
         CurrentControllerSelector& CurrentLoop();

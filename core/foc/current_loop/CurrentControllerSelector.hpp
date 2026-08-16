@@ -16,7 +16,7 @@ namespace foc
         using Context = CurrentControlContext;
         using Output = foc::RotatingFrame;
 
-        static bool IsSelectable(Algorithm algorithm, const Parameters& parameters);
+        static bool IsSelectable(Algorithm algorithm, const Parameters& parameters, const Tunings& tunings);
     };
 
     class CurrentControllerSelector

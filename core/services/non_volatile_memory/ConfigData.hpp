@@ -17,7 +17,7 @@ namespace services
         uint8_t defaultControlMode = 0;
         uint8_t currentAlgorithm = 0;
         uint8_t speedAlgorithm = 0;
-        std::array<uint8_t, 1> reserved = {};
+        uint8_t positionAlgorithm = 0;
     };
 
     static_assert(sizeof(ConfigData) == 20, "ConfigData layout must be free of implicit padding");

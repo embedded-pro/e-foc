@@ -203,3 +203,62 @@ TEST_F(TestPositionCascade, prescaler_triggers_low_priority_interrupt)
         focPosition->Calculate(ZeroCurrents(), position);
     }
 }
+
+TEST_F(TestPositionCascade, pid_is_the_default_position_algorithm)
+{
+    EXPECT_EQ(focPosition->ActivePositionAlgorithm(), foc::PositionAlgorithm::pid);
+}
+
+TEST_F(TestPositionCascade, every_position_algorithm_is_selectable_once_the_mechanics_are_known)
+{
+    for (auto algorithm : { foc::PositionAlgorithm::cascadeP,
+             foc::PositionAlgorithm::lqr,
+             foc::PositionAlgorithm::lqi,
+             foc::PositionAlgorithm::twoDof,
+             foc::PositionAlgorithm::pid })
+    {
+        EXPECT_EQ(focPosition->SelectPositionAlgorithm(algorithm), foc::SelectResult::ok);
+        EXPECT_EQ(focPosition->ActivePositionAlgorithm(), algorithm);
+    }
+}
+
+TEST_F(TestPositionCascade, selecting_a_position_algorithm_is_refused_while_enabled)
+{
+    focPosition->Enable();
+
+    EXPECT_EQ(focPosition->SelectPositionAlgorithm(foc::PositionAlgorithm::lqr), foc::SelectResult::busy);
+    EXPECT_EQ(focPosition->ActivePositionAlgorithm(), foc::PositionAlgorithm::pid);
+}
+
+TEST_F(TestPositionCascade, retuning_the_position_loop_is_refused_while_enabled)
+{
+    focPosition->Enable();
+
+    EXPECT_EQ(focPosition->SetPositionTunings(foc::PositionLoopTunings{}), foc::SelectResult::busy);
+}
+
+TEST_F(TestPositionCascade, retuning_is_accepted_again_once_disabled)
+{
+    focPosition->Enable();
+    focPosition->Disable();
+
+    EXPECT_EQ(focPosition->SetPositionTunings(foc::PositionLoopTunings{}), foc::SelectResult::ok);
+}
+
+TEST_F(TestPositionCascade, an_unknown_position_algorithm_is_rejected)
+{
+    EXPECT_EQ(focPosition->SelectPositionAlgorithm(static_cast<foc::PositionAlgorithm>(200)), foc::SelectResult::invalidAlgorithm);
+}
+
+TEST_F(TestPositionCascade, a_current_commanding_algorithm_still_drives_the_inverter)
+{
+    ASSERT_EQ(focPosition->SelectPositionAlgorithm(foc::PositionAlgorithm::lqr), foc::SelectResult::ok);
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 1.0f });
+
+    foc::Radians position{ 0.0f };
+    auto result = focPosition->Calculate(ZeroCurrents(), position);
+
+    EXPECT_GE(result.a.Value(), 0);
+    EXPECT_LE(result.a.Value(), 100);
+}

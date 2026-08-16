@@ -57,8 +57,17 @@ namespace services
 
         auto tunings = foc::PositionLoopTunings{};
         tunings.bandwidth = *bandwidth;
-        foc.SetPositionTunings(tunings);
-        return StatusWithMessage();
+
+        // Retuning redesigns the position law, which can be refused; never report that as applied
+        switch (foc.SetPositionTunings(tunings))
+        {
+            case foc::SelectResult::busy:
+                return { services::TerminalWithStorage::Status::error, "rejected: motor is enabled." };
+            case foc::SelectResult::ok:
+                return StatusWithMessage();
+            default:
+                return { services::TerminalWithStorage::Status::error, "rejected: no controller for this bandwidth." };
+        }
     }
 
     TerminalFocPositionInteractor::StatusWithMessage TerminalFocPositionInteractor::SetPosition(const infra::BoundedConstString& input)

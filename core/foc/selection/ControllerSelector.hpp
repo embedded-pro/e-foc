@@ -27,7 +27,7 @@ namespace foc
         template<AlgorithmOf<Algorithm> T>
         SelectResult Select()
         {
-            if (!Traits::IsSelectable(T::algorithm, parameters))
+            if (!Traits::IsSelectable(T::algorithm, parameters, tunings))
                 return SelectResult::invalidParameters;
 
             active.template emplace<T>();
@@ -53,6 +53,17 @@ namespace foc
         {
             tunings = controllerTunings;
             ApplyConfiguration();
+        }
+
+        // Rejects tunings the active algorithm cannot be designed for, leaving the last accepted set live
+        SelectResult TrySetTunings(const Tunings& controllerTunings)
+        {
+            if (!Traits::IsSelectable(activeAlgorithm, parameters, controllerTunings))
+                return SelectResult::invalidParameters;
+
+            SetTunings(controllerTunings);
+
+            return SelectResult::ok;
         }
 
         void Reset()

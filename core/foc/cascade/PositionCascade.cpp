@@ -24,6 +24,7 @@ namespace foc
     void PositionCascade::ConfigureMechanics(const MechanicalModelParameters& parameters)
     {
         ConfigureMechanicsImpl(parameters);
+        positionLoop.Configure(parameters);
     }
 
     OPTIMIZE_FOR_SPEED
@@ -42,9 +43,13 @@ namespace foc
         SetSpeedTuningsImpl(tunings);
     }
 
-    void PositionCascade::SetPositionTunings(const PositionLoopTunings& tunings)
+    SelectResult PositionCascade::SetPositionTunings(const PositionLoopTunings& tunings)
     {
-        positionGain = tunings.bandwidth;
+        // Retuning redesigns the active law, which cannot be done underneath a running motor
+        if (enabled)
+            return SelectResult::busy;
+
+        return positionLoop.TrySetTunings(tunings);
     }
 
     SelectResult PositionCascade::SelectCurrentAlgorithm(CurrentAlgorithm algorithm)
@@ -67,6 +72,19 @@ namespace foc
         return ActiveSpeedAlgorithmImpl();
     }
 
+    SelectResult PositionCascade::SelectPositionAlgorithm(PositionAlgorithm algorithm)
+    {
+        if (enabled)
+            return SelectResult::busy;
+
+        return positionLoop.Select(algorithm);
+    }
+
+    PositionAlgorithm PositionCascade::ActivePositionAlgorithm() const
+    {
+        return positionLoop.Active();
+    }
+
     void PositionCascade::SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator)
     {
         SetOnlineMechanicalEstimatorImpl(estimator);
@@ -80,13 +98,16 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     void PositionCascade::Enable()
     {
+        positionLoop.Reset();
         EnableSpeedLoop();
         SetPoint(lastPositionSetPoint);
+        enabled = true;
     }
 
     OPTIMIZE_FOR_SPEED
     void PositionCascade::Disable()
     {
+        enabled = false;
         DisableSpeedLoop();
     }
 
@@ -95,10 +116,16 @@ namespace foc
     {
         auto mechanicalSpeed = MeasureMechanicalSpeed();
 
-        auto positionError = detail::PositionWithWrapAround(lastPositionSetPoint.Value() - CurrentMechanicalAngle());
-        SetSpeedReference(RadiansPerSecond{ positionError * positionGain });
+        auto command = positionLoop.Compute(PositionControlContext{ Radians{ CurrentMechanicalAngle() }, lastPositionSetPoint, RadiansPerSecond{ mechanicalSpeed } });
 
-        RunSpeedLoop(mechanicalSpeed);
+        // A law that sizes the current itself owns the mechanical response, so the speed loop steps aside
+        if (command.kind == PositionOutputKind::speedReference)
+        {
+            SetSpeedReference(RadiansPerSecond{ command.value });
+            RunSpeedLoop(mechanicalSpeed);
+        }
+        else
+            SetDirectCurrentReference(command.value);
 
         UpdateOnlineMechanicalEstimator(mechanicalSpeed);
         UpdateOnlineElectricalEstimator(mechanicalSpeed * PolePairs());

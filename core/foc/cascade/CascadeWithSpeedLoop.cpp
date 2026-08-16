@@ -145,6 +145,12 @@ namespace foc
         lastElectricalSpeed = mechanicalSpeed * polePairs;
     }
 
+    OPTIMIZE_FOR_SPEED
+    void CascadeWithSpeedLoop::SetDirectCurrentReference(float current)
+    {
+        lastSpeedLoopOutput = current;
+    }
+
     CurrentControllerSelector& CascadeWithSpeedLoop::CurrentLoop()
     {
         return currentLoop;

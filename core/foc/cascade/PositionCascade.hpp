@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
+#include "core/foc/position_loop/PositionControllerSelector.hpp"
 
 namespace foc
 {
@@ -16,11 +17,13 @@ namespace foc
         void SetPoint(Radians point) override;
         void SetCurrentTunings(const CurrentLoopTunings& tunings) override;
         void SetSpeedTunings(const SpeedLoopTunings& tunings) override;
-        void SetPositionTunings(const PositionLoopTunings& tunings) override;
+        SelectResult SetPositionTunings(const PositionLoopTunings& tunings) override;
         SelectResult SelectCurrentAlgorithm(CurrentAlgorithm algorithm) override;
         CurrentAlgorithm ActiveCurrentAlgorithm() const override;
         SelectResult SelectSpeedAlgorithm(SpeedAlgorithm algorithm) override;
         SpeedAlgorithm ActiveSpeedAlgorithm() const override;
+        SelectResult SelectPositionAlgorithm(PositionAlgorithm algorithm) override;
+        PositionAlgorithm ActivePositionAlgorithm() const override;
         void SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator) override;
         void SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator) override;
         void Enable() override;
@@ -33,8 +36,8 @@ namespace foc
     private:
         void LowPriorityHandler();
 
-        // Proportional position loop: the speed reference is the position error times the loop bandwidth.
-        float positionGain{ PositionLoopTunings{}.bandwidth };
+        PositionControllerSelector positionLoop;
         Radians lastPositionSetPoint{ 0.0f };
+        bool enabled{ false };
     };
 }

@@ -7,7 +7,7 @@
 
 namespace foc
 {
-    bool CurrentControllerTraits::IsSelectable(CurrentAlgorithm algorithm, const MotorModelParameters& parameters)
+    bool CurrentControllerTraits::IsSelectable(CurrentAlgorithm algorithm, const MotorModelParameters& parameters, const CurrentLoopTunings&)
     {
         if (!AreElectricalParametersValid(parameters))
             return false;

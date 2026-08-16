@@ -45,14 +45,17 @@ namespace state_machine
 
         foc::SelectResult SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm);
         foc::SelectResult SelectSpeedAlgorithm(foc::SpeedAlgorithm algorithm);
+        foc::SelectResult SelectPositionAlgorithm(foc::PositionAlgorithm algorithm);
         foc::CurrentAlgorithm ActiveCurrentAlgorithm() const;
         foc::SpeedAlgorithm ActiveSpeedAlgorithm() const;
+        foc::PositionAlgorithm ActivePositionAlgorithm() const;
 
     private:
         void Activate(ControlMode mode);
         void ApplyPersistedAlgorithms();
         foc::CurrentLoopSelectable* CurrentSelectable();
         foc::SpeedLoopSelectable* SpeedSelectable();
+        foc::PositionLoopSelectable* PositionSelectable();
         void RegisterCliCommands();
         void TraceSelectResult(foc::SelectResult result);
         void OnSaveConfigDone(services::NvmStatus status);

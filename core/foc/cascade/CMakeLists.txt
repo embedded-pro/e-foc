@@ -10,6 +10,7 @@ target_link_libraries(e_foc.foc.cascade PUBLIC
     e_foc.foc.interfaces
     e_foc.foc.math
     e_foc.foc.speed_loop
+    e_foc.foc.position_loop
     e_foc.foc.transforms
 )
 

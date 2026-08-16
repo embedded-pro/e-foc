@@ -48,10 +48,19 @@ namespace foc
         virtual void SetSpeedTunings(const SpeedLoopTunings& tunings) = 0;
     };
 
+    // Reports rejection because the state feedback laws cannot always be redesigned for a
+    // new set of tunings, and implementations refuse retuning outright while the motor is enabled.
     class PositionLoopTunable
     {
     public:
-        virtual void SetPositionTunings(const PositionLoopTunings& tunings) = 0;
+        virtual SelectResult SetPositionTunings(const PositionLoopTunings& tunings) = 0;
+    };
+
+    class PositionLoopSelectable
+    {
+    public:
+        virtual SelectResult SelectPositionAlgorithm(PositionAlgorithm algorithm) = 0;
+        virtual PositionAlgorithm ActivePositionAlgorithm() const = 0;
     };
 
     class FocTorque
@@ -90,6 +99,7 @@ namespace foc
         , public SpeedLoopTunable
         , public SpeedLoopSelectable
         , public PositionLoopTunable
+        , public PositionLoopSelectable
         , public FocOnlineEstimableBase
     {
     public:
