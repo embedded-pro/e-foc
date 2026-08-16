@@ -15,7 +15,7 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        hal::SerialCommunicationMock communication;
+        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
@@ -987,7 +987,7 @@ TEST_F(FocStateMachineSpeedCliTest, cli_ae_command_applies_estimates_when_enable
 }
 
 // ==========================================================================
-// Speed-mode with AutoTransitionPolicy
+// Speed-mode with TransitionPolicy::Auto
 // ==========================================================================
 
 namespace
@@ -1002,7 +1002,7 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        hal::SerialCommunicationMock communication;
+        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());

@@ -24,9 +24,19 @@ TEST_F(TestSpeedControllerSelector, pid_is_active_by_default)
     EXPECT_EQ(selector.Active(), foc::SpeedAlgorithm::pid);
 }
 
-TEST_F(TestSpeedControllerSelector, selection_without_parameters_is_rejected)
+TEST_F(TestSpeedControllerSelector, model_based_selection_without_parameters_is_rejected)
 {
     EXPECT_EQ(selector.Select(foc::SpeedAlgorithm::adrc), foc::SelectResult::invalidParameters);
+    EXPECT_EQ(selector.Select(foc::SpeedAlgorithm::lqi), foc::SelectResult::invalidParameters);
+    EXPECT_EQ(selector.Active(), foc::SpeedAlgorithm::pid);
+}
+
+TEST_F(TestSpeedControllerSelector, model_free_selection_without_parameters_is_accepted)
+{
+    EXPECT_EQ(selector.Select(foc::SpeedAlgorithm::twoDof), foc::SelectResult::ok);
+    EXPECT_EQ(selector.Active(), foc::SpeedAlgorithm::twoDof);
+
+    EXPECT_EQ(selector.Select(foc::SpeedAlgorithm::pid), foc::SelectResult::ok);
     EXPECT_EQ(selector.Active(), foc::SpeedAlgorithm::pid);
 }
 

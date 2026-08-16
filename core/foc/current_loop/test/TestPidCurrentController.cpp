@@ -1,6 +1,7 @@
 #include "core/foc/current_loop/PidCurrentController.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
+#include <numbers>
 
 namespace
 {
@@ -77,4 +78,62 @@ TEST_F(TestPidCurrentController, invalid_parameters_leave_gains_untouched)
 
     EXPECT_NEAR(output.d, 0.0f, tolerance);
     EXPECT_NEAR(output.q, 0.0f, tolerance);
+}
+
+// Pole-zero cancellation design: kp = Ls * bandwidth, ki = Rs * bandwidth, both normalised by
+// sqrt(3)/Vdc. The first incremental step after reset emits (kp + ki) * error.
+TEST_F(TestPidCurrentController, gains_follow_the_pole_zero_cancellation_design)
+{
+    const auto parameters = ValidParameters();
+    const float bandwidth = 500.0f;
+    const float error = 0.01f;
+
+    controller.Configure(parameters);
+    controller.SetTunings({ bandwidth, 1.0f, 0.2f, false });
+
+    const float scale = std::numbers::sqrt3_v<float> / parameters.busVoltage.Value();
+    const float kp = parameters.inductance.Value() * 0.001f * bandwidth * scale;
+    const float ki = parameters.resistance.Value() * bandwidth * scale;
+
+    auto output = controller.Compute({ { 0.0f, 0.0f }, { error, error }, 0.0f });
+
+    EXPECT_NEAR(output.d, (kp + ki) * error, tolerance);
+    EXPECT_NEAR(output.q, (kp + ki) * error, tolerance);
+}
+
+TEST_F(TestPidCurrentController, proportional_gain_tracks_inductance_and_integral_gain_tracks_resistance)
+{
+    auto parameters = ValidParameters();
+    parameters.inductance = foc::MilliHenry{ parameters.inductance.Value() * 2.0f };
+    parameters.resistance = foc::Ohm{ parameters.resistance.Value() * 3.0f };
+
+    const float bandwidth = 500.0f;
+    const float error = 0.005f;
+
+    controller.Configure(parameters);
+    controller.SetTunings({ bandwidth, 1.0f, 0.2f, false });
+
+    const float scale = std::numbers::sqrt3_v<float> / parameters.busVoltage.Value();
+    const float kp = parameters.inductance.Value() * 0.001f * bandwidth * scale;
+    const float ki = parameters.resistance.Value() * bandwidth * scale;
+
+    auto output = controller.Compute({ { 0.0f, 0.0f }, { error, 0.0f }, 0.0f });
+
+    EXPECT_NEAR(output.d, (kp + ki) * error, tolerance);
+}
+
+// Anti-windup: the incremental form clamps its own accumulator, so a long saturating excursion must
+// not leave stored integral that delays the return once the error reverses.
+TEST_F(TestPidCurrentController, sustained_saturation_does_not_wind_up_the_integrator)
+{
+    controller.Configure(ValidParameters());
+
+    for (int i = 0; i < 200; ++i)
+        controller.Compute({ { 0.0f, 0.0f }, { 50.0f, 0.0f }, 0.0f });
+
+    const auto saturated = controller.Compute({ { 0.0f, 0.0f }, { 50.0f, 0.0f }, 0.0f });
+    EXPECT_NEAR(saturated.d, 1.0f, tolerance);
+
+    const auto reversed = controller.Compute({ { 0.0f, 0.0f }, { -50.0f, 0.0f }, 0.0f });
+    EXPECT_NEAR(reversed.d, -1.0f, tolerance);
 }

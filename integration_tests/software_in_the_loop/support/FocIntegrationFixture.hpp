@@ -68,7 +68,7 @@ namespace integration
         testing::StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterMock };
         services::TracerToStream tracer{ tracerStream };
-        hal::SerialCommunicationMock serialCommunication;
+        testing::StrictMock<hal::SerialCommunicationMock> serialCommunication;
         infra::Execute setupInfraExpectations{ [this]()
             {
                 using namespace testing;

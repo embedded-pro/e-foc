@@ -219,8 +219,8 @@ TEST_F(TestTransforms, park_harmonic_angle)
     auto input = CreateTwoPhase(0.2f, 0.3f);
     float tolerance = math::Tolerance<float>();
 
-    auto result1 = park->Forward(input, base_sin, base_cos);
-    auto result2 = park->Forward(input, harmonic_sin, harmonic_cos);
+    auto result1 = park->Forward(input, base_cos, base_sin);
+    auto result2 = park->Forward(input, harmonic_cos, harmonic_sin);
 
     EXPECT_NEAR(result1.d, result2.d, tolerance);
     EXPECT_NEAR(result1.q, result2.q, tolerance);

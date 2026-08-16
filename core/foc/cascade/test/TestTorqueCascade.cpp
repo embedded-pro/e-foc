@@ -71,17 +71,35 @@ TEST_F(TestTorqueCascade, duty_cycles_are_bounded_0_to_100)
     EXPECT_LE(result.c.Value(), 100);
 }
 
-TEST_F(TestTorqueCascade, set_pole_pairs)
+// theta_e = theta_m * pole_pairs: p pole pairs at a mechanical angle must land on the same
+// electrical angle - and therefore the same duty cycles - as 1 pole pair at p times that angle.
+TEST_F(TestTorqueCascade, electrical_angle_scales_with_pole_pairs)
 {
-    focTorque->Configure(MotorParameters(4));
-    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
-    focTorque->SetCurrentTunings(foc::CurrentLoopTunings{});
+    const foc::PhaseCurrents currents{ foc::Ampere{ 0.4f }, foc::Ampere{ -0.1f }, foc::Ampere{ -0.3f } };
+    const float mechanicalAngle = 0.3f;
 
-    foc::Radians position{ 0.0f };
-    auto result = focTorque->Calculate(ZeroCurrents(), position);
+    for (std::size_t poles : { std::size_t{ 1 }, std::size_t{ 2 }, std::size_t{ 4 }, std::size_t{ 7 } })
+    {
+        foc::TorqueCascade scaled;
+        scaled.Configure(MotorParameters(poles));
+        scaled.SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } });
+        scaled.Enable();
 
-    EXPECT_GE(result.a.Value(), 0);
-    EXPECT_LE(result.a.Value(), 100);
+        foc::TorqueCascade reference;
+        reference.Configure(MotorParameters(1));
+        reference.SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } });
+        reference.Enable();
+
+        foc::Radians scaledPosition{ mechanicalAngle };
+        foc::Radians referencePosition{ mechanicalAngle * static_cast<float>(poles) };
+
+        auto scaledResult = scaled.Calculate(currents, scaledPosition);
+        auto referenceResult = reference.Calculate(currents, referencePosition);
+
+        EXPECT_EQ(scaledResult.a.Value(), referenceResult.a.Value()) << "pole pairs " << poles;
+        EXPECT_EQ(scaledResult.b.Value(), referenceResult.b.Value()) << "pole pairs " << poles;
+        EXPECT_EQ(scaledResult.c.Value(), referenceResult.c.Value()) << "pole pairs " << poles;
+    }
 }
 
 TEST_F(TestTorqueCascade, enable_disable_cycle)

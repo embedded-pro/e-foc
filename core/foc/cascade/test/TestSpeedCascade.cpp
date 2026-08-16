@@ -51,7 +51,7 @@ namespace
             focSpeed->SetSpeedTunings(foc::SpeedLoopTunings{});
         }
 
-        foc::LowPriorityInterruptMock lowPriorityInterruptMock;
+        testing::StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         std::optional<foc::SpeedCascade> focSpeed;
         std::size_t polePairs = 7;
     };

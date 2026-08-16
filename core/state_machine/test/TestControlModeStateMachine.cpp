@@ -17,12 +17,12 @@
 #include "services/util/Terminal.hpp"
 #include <gtest/gtest.h>
 
+using namespace testing;
+
+using TestedControlMode = state_machine::ControlModeStateMachine;
+
 namespace
 {
-    using namespace testing;
-
-    using TestedControlMode = state_machine::ControlModeStateMachine;
-
     class ControlModeStateMachineTest
         : public ::testing::Test
         , public infra::EventDispatcherWithWeakPtrFixture
@@ -31,7 +31,7 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        hal::SerialCommunicationMock communication;
+        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
@@ -115,6 +115,11 @@ namespace
         {
             services::ConfigData config{};
             config.defaultControlMode = defaultMode;
+            ConstructSubjectWithConfig(config);
+        }
+
+        void ConstructSubjectWithConfig(const services::ConfigData& config)
+        {
             subject.emplace(
                 application::TerminalAndTracer{ terminal, tracer },
                 application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
@@ -128,126 +133,133 @@ namespace
                     lowPriorityInterruptMock });
         }
     };
+}
 
-    // ---- Active() initial state ----
+// ---- Active() initial state ----
 
-    TEST_F(ControlModeStateMachineTest, Active_Returns_Torque_After_Default_Construction)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject(/*defaultMode=*/0);
+TEST_F(ControlModeStateMachineTest, Active_Returns_Torque_After_Default_Construction)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject(/*defaultMode=*/0);
 
-        EXPECT_EQ(subject->Active(), state_machine::ControlMode::torque);
-    }
+    EXPECT_EQ(subject->Active(), state_machine::ControlMode::torque);
+}
 
-    TEST_F(ControlModeStateMachineTest, Active_Returns_Speed_When_Constructed_With_Speed_Default)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject(/*defaultMode=*/static_cast<uint8_t>(state_machine::ControlMode::speed));
+TEST_F(ControlModeStateMachineTest, Active_Returns_Speed_When_Constructed_With_Speed_Default)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject(/*defaultMode=*/static_cast<uint8_t>(state_machine::ControlMode::speed));
 
-        EXPECT_EQ(subject->Active(), state_machine::ControlMode::speed);
-    }
+    EXPECT_EQ(subject->Active(), state_machine::ControlMode::speed);
+}
 
-    // ---- TrySet* returns false when wrong mode active ----
+// ---- TrySet* returns false when wrong mode active ----
 
-    TEST_F(ControlModeStateMachineTest, TrySetSpeed_Returns_False_When_Torque_Active)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
+TEST_F(ControlModeStateMachineTest, TrySetSpeed_Returns_False_When_Torque_Active)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
 
-        EXPECT_FALSE(subject->TrySetSpeed(foc::RadiansPerSecond{ 10.0f }));
-    }
+    EXPECT_FALSE(subject->TrySetSpeed(foc::RadiansPerSecond{ 10.0f }));
+}
 
-    TEST_F(ControlModeStateMachineTest, TrySetPosition_Returns_False_When_Torque_Active)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
+TEST_F(ControlModeStateMachineTest, TrySetPosition_Returns_False_When_Torque_Active)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
 
-        EXPECT_FALSE(subject->TrySetPosition(foc::Radians{ 1.0f }));
-    }
+    EXPECT_FALSE(subject->TrySetPosition(foc::Radians{ 1.0f }));
+}
 
-    TEST_F(ControlModeStateMachineTest, TrySetTorque_Returns_False_When_Speed_Active)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        ConstructSubject();
+TEST_F(ControlModeStateMachineTest, TrySetTorque_Returns_False_When_Speed_Active)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
 
-        subject->Select(state_machine::ControlMode::speed, [](auto) {});
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-        EXPECT_FALSE(subject->TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } }));
-    }
+    EXPECT_FALSE(subject->TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } }));
+}
 
-    // ---- Select() NVM success ----
+// ---- Select() NVM success ----
 
-    TEST_F(ControlModeStateMachineTest, Select_Switches_Active_To_Speed_On_Nvm_Ok)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        ConstructSubject();
+TEST_F(ControlModeStateMachineTest, Select_Switches_Active_To_Speed_On_Nvm_Ok)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
 
-        state_machine::SelectResult result{ state_machine::SelectResult::nvmFailed };
-        subject->Select(state_machine::ControlMode::speed, [&result](state_machine::SelectResult r)
-            {
-                result = r;
-            });
+    state_machine::SelectResult result{ state_machine::SelectResult::nvmFailed };
+    subject->Select(state_machine::ControlMode::speed, [&result](state_machine::SelectResult r)
+        {
+            result = r;
+        });
 
-        EXPECT_EQ(result, state_machine::SelectResult::ok);
-        EXPECT_EQ(subject->Active(), state_machine::ControlMode::speed);
-    }
+    EXPECT_EQ(result, state_machine::SelectResult::ok);
+    EXPECT_EQ(subject->Active(), state_machine::ControlMode::speed);
+}
 
-    TEST_F(ControlModeStateMachineTest, Select_Switches_Active_To_Position_On_Nvm_Ok)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        ConstructSubject();
+TEST_F(ControlModeStateMachineTest, Select_Switches_Active_To_Position_On_Nvm_Ok)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
 
-        state_machine::SelectResult result{ state_machine::SelectResult::nvmFailed };
-        subject->Select(state_machine::ControlMode::position, [&result](state_machine::SelectResult r)
-            {
-                result = r;
-            });
+    state_machine::SelectResult result{ state_machine::SelectResult::nvmFailed };
+    subject->Select(state_machine::ControlMode::position, [&result](state_machine::SelectResult r)
+        {
+            result = r;
+        });
 
-        EXPECT_EQ(result, state_machine::SelectResult::ok);
-        EXPECT_EQ(subject->Active(), state_machine::ControlMode::position);
-    }
+    EXPECT_EQ(result, state_machine::SelectResult::ok);
+    EXPECT_EQ(subject->Active(), state_machine::ControlMode::position);
+}
 
-    // ---- C3: NVM failure rollback ----
+// ---- C3: NVM failure rollback ----
 
-    TEST_F(ControlModeStateMachineTest, Select_RollsBack_Mode_On_Nvm_Failure)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigFails();
-        ConstructSubject();
+TEST_F(ControlModeStateMachineTest, Select_RollsBack_Mode_On_Nvm_Failure)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigFails();
+    ConstructSubject();
 
-        state_machine::SelectResult result{ state_machine::SelectResult::ok };
-        subject->Select(state_machine::ControlMode::speed, [&result](state_machine::SelectResult r)
-            {
-                result = r;
-            });
+    state_machine::SelectResult result{ state_machine::SelectResult::ok };
+    subject->Select(state_machine::ControlMode::speed, [&result](state_machine::SelectResult r)
+        {
+            result = r;
+        });
 
-        EXPECT_EQ(result, state_machine::SelectResult::nvmFailed);
-        EXPECT_EQ(subject->Active(), state_machine::ControlMode::torque);
-    }
+    EXPECT_EQ(result, state_machine::SelectResult::nvmFailed);
+    EXPECT_EQ(subject->Active(), state_machine::ControlMode::torque);
+}
 
-    // ---- C2: In-flight select guard ----
+// ---- C2: In-flight select guard ----
 
-    TEST_F(ControlModeStateMachineTest, Select_While_Previous_Select_Pending_Aborts)
-    {
-        GivenNvmAlwaysInvalid();
+TEST_F(ControlModeStateMachineTest, Select_While_Previous_Select_Pending_Reports_Busy)
+{
+    GivenNvmAlwaysInvalid();
 
-        EXPECT_CALL(nvmMock, SaveConfig(_, _))
-            .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)>) {}));
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)>) {}));
 
-        ConstructSubject();
+    ConstructSubject();
 
-        subject->Select(state_machine::ControlMode::speed, [](state_machine::SelectResult) {});
+    subject->Select(state_machine::ControlMode::speed, [](state_machine::SelectResult) {});
 
-        EXPECT_DEATH(
-            subject->Select(state_machine::ControlMode::speed, [](state_machine::SelectResult) {}),
-            ".*");
-    }
+    state_machine::SelectResult result{ state_machine::SelectResult::ok };
+    subject->Select(state_machine::ControlMode::position, [&result](state_machine::SelectResult r)
+        {
+            result = r;
+        });
 
-    // ---- Additional helpers ----
+    EXPECT_EQ(result, state_machine::SelectResult::busy);
+}
 
+// ---- Additional helpers ----
+
+namespace
+{
     class ControlModeStateMachineExtTest
         : public ControlModeStateMachineTest
     {
@@ -306,233 +318,236 @@ namespace
             ExecuteAllActions();
         }
     };
+}
 
-    // ---- Active() — position branch ----
+// ---- Active() — position branch ----
 
-    TEST_F(ControlModeStateMachineExtTest, Active_Returns_Position_When_Constructed_With_Position_Default)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject(/*defaultMode=*/static_cast<uint8_t>(state_machine::ControlMode::position));
+TEST_F(ControlModeStateMachineExtTest, Active_Returns_Position_When_Constructed_With_Position_Default)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject(/*defaultMode=*/static_cast<uint8_t>(state_machine::ControlMode::position));
 
-        EXPECT_EQ(subject->Active(), state_machine::ControlMode::position);
-    }
+    EXPECT_EQ(subject->Active(), state_machine::ControlMode::position);
+}
 
-    // ---- TrySet* returns true when correct mode active ----
+// ---- TrySet* returns true when correct mode active ----
 
-    TEST_F(ControlModeStateMachineExtTest, TrySetTorque_Returns_True_When_Torque_Mode_Active)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
+TEST_F(ControlModeStateMachineExtTest, TrySetTorque_Returns_True_When_Torque_Mode_Active)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
 
-        EXPECT_TRUE(subject->TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } }));
-    }
+    EXPECT_TRUE(subject->TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } }));
+}
 
-    TEST_F(ControlModeStateMachineExtTest, TrySetSpeed_Returns_True_When_Speed_Mode_Active)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        ConstructSubject();
+TEST_F(ControlModeStateMachineExtTest, TrySetSpeed_Returns_True_When_Speed_Mode_Active)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
 
-        subject->Select(state_machine::ControlMode::speed, [](auto) {});
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-        EXPECT_TRUE(subject->TrySetSpeed(foc::RadiansPerSecond{ 10.0f }));
-    }
+    EXPECT_TRUE(subject->TrySetSpeed(foc::RadiansPerSecond{ 10.0f }));
+}
 
-    TEST_F(ControlModeStateMachineExtTest, TrySetPosition_Returns_True_When_Position_Mode_Active)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        ConstructSubject();
+TEST_F(ControlModeStateMachineExtTest, TrySetPosition_Returns_True_When_Position_Mode_Active)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
 
-        subject->Select(state_machine::ControlMode::position, [](auto) {});
+    subject->Select(state_machine::ControlMode::position, [](auto) {});
 
-        EXPECT_TRUE(subject->TrySetPosition(foc::Radians{ 1.0f }));
-    }
+    EXPECT_TRUE(subject->TrySetPosition(foc::Radians{ 1.0f }));
+}
 
-    // ---- TrySetTorque returns false when position active ----
+// ---- TrySetTorque returns false when position active ----
 
-    TEST_F(ControlModeStateMachineExtTest, TrySetTorque_Returns_False_When_Position_Active)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        ConstructSubject();
+TEST_F(ControlModeStateMachineExtTest, TrySetTorque_Returns_False_When_Position_Active)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
 
-        subject->Select(state_machine::ControlMode::position, [](auto) {});
+    subject->Select(state_machine::ControlMode::position, [](auto) {});
 
-        EXPECT_FALSE(subject->TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } }));
-    }
+    EXPECT_FALSE(subject->TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } }));
+}
 
-    // ---- ActiveStateMachine() in each mode ----
+// ---- ActiveStateMachine() in each mode ----
 
-    TEST_F(ControlModeStateMachineExtTest, ActiveStateMachine_Is_Accessible_In_Speed_Mode)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        ConstructSubject();
+TEST_F(ControlModeStateMachineExtTest, ActiveStateMachine_Is_Accessible_In_Speed_Mode)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
 
-        subject->Select(state_machine::ControlMode::speed, [](auto) {});
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-        // CmdDisable is a no-op in Idle — just verifies no crash and correct SM is returned
-        subject->ActiveStateMachine().CmdDisable();
-    }
+    // CmdDisable is a no-op in Idle — just verifies no crash and correct SM is returned
+    subject->ActiveStateMachine().CmdDisable();
+}
 
-    TEST_F(ControlModeStateMachineExtTest, ActiveStateMachine_Is_Accessible_In_Position_Mode)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        ConstructSubject();
+TEST_F(ControlModeStateMachineExtTest, ActiveStateMachine_Is_Accessible_In_Position_Mode)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
 
-        subject->Select(state_machine::ControlMode::position, [](auto) {});
+    subject->Select(state_machine::ControlMode::position, [](auto) {});
 
-        subject->ActiveStateMachine().CmdDisable();
-    }
+    subject->ActiveStateMachine().CmdDisable();
+}
 
-    // ---- Select() returns busy when motor is enabled ----
+// ---- Select() returns busy when motor is enabled ----
 
-    TEST_F(ControlModeStateMachineExtTest, Select_Returns_Busy_When_Motor_Is_Enabled)
-    {
-        GivenNvmValid();
-        ConstructSubject();
+TEST_F(ControlModeStateMachineExtTest, Select_Returns_Busy_When_Motor_Is_Enabled)
+{
+    GivenNvmValid();
+    ConstructSubject();
 
-        EXPECT_CALL(inverterMock, Start()).Times(1);
-        subject->ActiveStateMachine().CmdEnable();
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    subject->ActiveStateMachine().CmdEnable();
 
-        state_machine::SelectResult result{ state_machine::SelectResult::ok };
-        subject->Select(state_machine::ControlMode::speed, [&result](state_machine::SelectResult r)
+    state_machine::SelectResult result{ state_machine::SelectResult::ok };
+    subject->Select(state_machine::ControlMode::speed, [&result](state_machine::SelectResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::SelectResult::busy);
+}
+
+// ---- CLI commands: no-ops in Idle ----
+
+TEST_F(ControlModeStateMachineExtTest, Cli_Enable_Is_NoOp_In_Idle)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    InvokeCliCommand("en");
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
+        subject->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(ControlModeStateMachineExtTest, Cli_Disable_Is_NoOp_In_Idle)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    InvokeCliCommand("dis");
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
+        subject->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(ControlModeStateMachineExtTest, Cli_ClearFault_Is_NoOp_In_Idle)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    InvokeCliCommand("cf");
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
+        subject->ActiveStateMachine().CurrentState()));
+}
+
+// ---- CLI: calibrate starts calibration sequence ----
+
+TEST_F(ControlModeStateMachineExtTest, Cli_Calibrate_In_Idle_Starts_Calibration)
+{
+    GivenNvmAlwaysInvalid();
+    infra::Function<void(std::optional<std::size_t>)> capturedCb;
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([&capturedCb](const auto&,
+                             const infra::Function<void(std::optional<std::size_t>)>& cb)
             {
-                result = r;
-            });
+                capturedCb = cb;
+            }));
+    ConstructSubject();
 
-        EXPECT_EQ(result, state_machine::SelectResult::busy);
-    }
+    InvokeCliCommand("cal");
 
-    // ---- CLI commands: no-ops in Idle ----
+    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(
+        subject->ActiveStateMachine().CurrentState()));
+}
 
-    TEST_F(ControlModeStateMachineExtTest, Cli_Enable_Is_NoOp_In_Idle)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
+// ---- CLI: clear_cal from Idle invalidates NVM ----
 
-        InvokeCliCommand("en");
+TEST_F(ControlModeStateMachineExtTest, Cli_ClearCal_In_Idle_Calls_InvalidateCalibration)
+{
+    GivenNvmAlwaysInvalid();
+    EXPECT_CALL(nvmMock, InvalidateCalibration(_))
+        .WillOnce(Invoke([](infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            }));
+    ConstructSubject();
 
-        EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
-            subject->ActiveStateMachine().CurrentState()));
-    }
+    InvokeCliCommand("cc");
 
-    TEST_F(ControlModeStateMachineExtTest, Cli_Disable_Is_NoOp_In_Idle)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
+        subject->ActiveStateMachine().CurrentState()));
+}
 
-        InvokeCliCommand("dis");
+// ---- CLI: apply_estimates ----
 
-        EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
-            subject->ActiveStateMachine().CurrentState()));
-    }
+TEST_F(ControlModeStateMachineExtTest, Cli_ApplyEstimates_Is_NoOp_In_Torque_Mode)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
 
-    TEST_F(ControlModeStateMachineExtTest, Cli_ClearFault_Is_NoOp_In_Idle)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
+    // No mock expectations — guard prevents ApplyOnlineEstimates() from being called
+    InvokeCliCommand("ae");
+}
 
-        InvokeCliCommand("cf");
+TEST_F(ControlModeStateMachineExtTest, Cli_ApplyEstimates_In_Speed_Mode_Does_Not_Crash)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-        EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
-            subject->ActiveStateMachine().CurrentState()));
-    }
+    // ApplyOnlineEstimates() returns early when SM is not Enabled — no mock expectations
+    InvokeCliCommand("ae");
+}
 
-    // ---- CLI: calibrate starts calibration sequence ----
+// ---- CLI: active_mode prints each mode ----
 
-    TEST_F(ControlModeStateMachineExtTest, Cli_Calibrate_In_Idle_Starts_Calibration)
-    {
-        GivenNvmAlwaysInvalid();
-        infra::Function<void(std::optional<std::size_t>)> capturedCb;
-        EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
-            .WillOnce(Invoke([&capturedCb](const auto&,
-                                 const infra::Function<void(std::optional<std::size_t>)>& cb)
-                {
-                    capturedCb = cb;
-                }));
-        ConstructSubject();
+TEST_F(ControlModeStateMachineExtTest, Cli_ActiveMode_Prints_Torque)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
 
-        InvokeCliCommand("cal");
+    InvokeCliCommand("am");
+}
 
-        EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(
-            subject->ActiveStateMachine().CurrentState()));
-    }
+TEST_F(ControlModeStateMachineExtTest, Cli_ActiveMode_Prints_Speed)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-    // ---- CLI: clear_cal from Idle invalidates NVM ----
+    InvokeCliCommand("am");
+}
 
-    TEST_F(ControlModeStateMachineExtTest, Cli_ClearCal_In_Idle_Calls_InvalidateCalibration)
-    {
-        GivenNvmAlwaysInvalid();
-        EXPECT_CALL(nvmMock, InvalidateCalibration(_))
-            .WillOnce(Invoke([](infra::Function<void(services::NvmStatus)> onDone)
-                {
-                    onDone(services::NvmStatus::Ok);
-                }));
-        ConstructSubject();
+TEST_F(ControlModeStateMachineExtTest, Cli_ActiveMode_Prints_Position)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::position, [](auto) {});
 
-        InvokeCliCommand("cc");
+    InvokeCliCommand("am");
+}
 
-        EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
-            subject->ActiveStateMachine().CurrentState()));
-    }
+// ---- Full lifecycle tests covering all 3 NoOp state machine types ----
 
-    // ---- CLI: apply_estimates ----
-
-    TEST_F(ControlModeStateMachineExtTest, Cli_ApplyEstimates_Is_NoOp_In_Torque_Mode)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
-
-        // No mock expectations — guard prevents ApplyOnlineEstimates() from being called
-        InvokeCliCommand("ae");
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, Cli_ApplyEstimates_In_Speed_Mode_Does_Not_Crash)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-        // ApplyOnlineEstimates() returns early when SM is not Enabled — no mock expectations
-        InvokeCliCommand("ae");
-    }
-
-    // ---- CLI: active_mode prints each mode ----
-
-    TEST_F(ControlModeStateMachineExtTest, Cli_ActiveMode_Prints_Torque)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
-
-        InvokeCliCommand("am");
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, Cli_ActiveMode_Prints_Speed)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-        InvokeCliCommand("am");
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, Cli_ActiveMode_Prints_Position)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::position, [](auto) {});
-
-        InvokeCliCommand("am");
-    }
-
-    // ---- Full lifecycle tests covering all 3 NoOp FocStateMachineImpl types ----
-
+namespace
+{
     class ControlModeStateMachineLifecycleTest
         : public ControlModeStateMachineExtTest
     {
@@ -597,435 +612,459 @@ namespace
             capturedNvmSaveCb(services::NvmStatus::Ok);
         }
     };
+}
 
-    // ---- Torque mode full lifecycle ----
+// ---- Torque mode full lifecycle ----
 
-    TEST_F(ControlModeStateMachineLifecycleTest, Full_Calibration_Completes_To_Ready_In_Torque_Mode)
+TEST_F(ControlModeStateMachineLifecycleTest, Full_Calibration_Completes_To_Ready_In_Torque_Mode)
+{
+    GivenNvmAlwaysInvalid();
+    SetUpTorqueCalibrationCaptures();
+    ConstructSubject();
+
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_Torque();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
+        subject->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(ControlModeStateMachineLifecycleTest, CmdEnable_And_Disable_From_Ready_In_Torque_Mode)
+{
+    GivenNvmAlwaysInvalid();
+    SetUpTorqueCalibrationCaptures();
+    ConstructSubject();
+
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_Torque();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    subject->ActiveStateMachine().CmdEnable();
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(
+        subject->ActiveStateMachine().CurrentState()));
+
+    subject->ActiveStateMachine().CmdDisable();
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
+        subject->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(ControlModeStateMachineLifecycleTest, Fault_And_ClearFault_In_Torque_Mode)
+{
+    GivenNvmAlwaysInvalid();
+    SetUpTorqueCalibrationCaptures();
+    ConstructSubject();
+
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_Torque();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    subject->ActiveStateMachine().CmdEnable();
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(
+        subject->ActiveStateMachine().CurrentState()));
+    EXPECT_EQ(subject->ActiveStateMachine().LastFaultCode(), state_machine::FaultCode::hardwareFault);
+
+    subject->ActiveStateMachine().CmdClearFault();
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
+        subject->ActiveStateMachine().CurrentState()));
+}
+
+// ---- Speed mode full lifecycle ----
+
+TEST_F(ControlModeStateMachineLifecycleTest, Full_Calibration_Completes_To_Ready_In_Speed_Mode)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    SetUpMechIdentCalibrationCaptures();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_WithMechIdent();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
+        subject->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(ControlModeStateMachineLifecycleTest, CmdEnable_And_Disable_From_Ready_In_Speed_Mode)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    SetUpMechIdentCalibrationCaptures();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_WithMechIdent();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    subject->ActiveStateMachine().CmdEnable();
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(
+        subject->ActiveStateMachine().CurrentState()));
+
+    subject->ActiveStateMachine().CmdDisable();
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
+        subject->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(ControlModeStateMachineLifecycleTest, Fault_And_ClearFault_In_Speed_Mode)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    SetUpMechIdentCalibrationCaptures();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_WithMechIdent();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    subject->ActiveStateMachine().CmdEnable();
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(
+        subject->ActiveStateMachine().CurrentState()));
+    EXPECT_EQ(subject->ActiveStateMachine().LastFaultCode(), state_machine::FaultCode::hardwareFault);
+
+    subject->ActiveStateMachine().CmdClearFault();
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
+        subject->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(ControlModeStateMachineLifecycleTest, ApplyOnlineEstimates_When_Enabled_In_Speed_Mode)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    SetUpMechIdentCalibrationCaptures();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_WithMechIdent();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    subject->ActiveStateMachine().CmdEnable();
+
+    subject->ActiveStateMachine().ApplyOnlineEstimates();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(
+        subject->ActiveStateMachine().CurrentState()));
+}
+
+// ---- Position mode full lifecycle ----
+
+TEST_F(ControlModeStateMachineLifecycleTest, Full_Calibration_Completes_To_Ready_In_Position_Mode)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    SetUpMechIdentCalibrationCaptures();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_WithMechIdent();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
+        subject->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(ControlModeStateMachineLifecycleTest, CmdEnable_And_Disable_From_Ready_In_Position_Mode)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    SetUpMechIdentCalibrationCaptures();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_WithMechIdent();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    subject->ActiveStateMachine().CmdEnable();
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(
+        subject->ActiveStateMachine().CurrentState()));
+
+    subject->ActiveStateMachine().CmdDisable();
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
+        subject->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(ControlModeStateMachineLifecycleTest, Fault_And_ClearFault_In_Position_Mode)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    SetUpMechIdentCalibrationCaptures();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_WithMechIdent();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    subject->ActiveStateMachine().CmdEnable();
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(
+        subject->ActiveStateMachine().CurrentState()));
+    EXPECT_EQ(subject->ActiveStateMachine().LastFaultCode(), state_machine::FaultCode::hardwareFault);
+
+    subject->ActiveStateMachine().CmdClearFault();
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
+        subject->ActiveStateMachine().CurrentState()));
+}
+
+// ---- TrySet*PidGains: accepted by matching mode(s) ----
+
+TEST_F(ControlModeStateMachineExtTest, TrySetCurrentBandwidth_AcceptedInTorqueMode)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    EXPECT_TRUE(subject->TrySetCurrentBandwidth(8377.6f));
+}
+
+TEST_F(ControlModeStateMachineExtTest, TrySetSpeedBandwidth_RejectedInTorqueMode)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    EXPECT_FALSE(subject->TrySetSpeedBandwidth(50.0f));
+}
+
+TEST_F(ControlModeStateMachineExtTest, TrySetSpeedBandwidth_AcceptedInSpeedMode)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
+
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+    EXPECT_TRUE(subject->TrySetSpeedBandwidth(50.0f));
+}
+
+TEST_F(ControlModeStateMachineExtTest, TrySetPositionBandwidth_AcceptedOnlyInPositionMode)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
+
+    EXPECT_FALSE(subject->TrySetPositionBandwidth(18.8f));
+
+    subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+    EXPECT_TRUE(subject->TrySetPositionBandwidth(18.8f));
+}
+
+TEST_F(ControlModeStateMachineExtTest, SelectCurrentAlgorithm_DefaultsToPid)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
+}
+
+TEST_F(ControlModeStateMachineExtTest, SelectCurrentAlgorithm_RejectedWithoutMotorModel)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    EXPECT_EQ(subject->SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::invalidParameters);
+    EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
+}
+
+TEST_F(ControlModeStateMachineExtTest, SelectCurrentAlgorithm_PersistsToNvmOnceCalibrated)
+{
+    GivenNvmValid();
+    ConstructSubject();
+
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([](const services::ConfigData& config, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_EQ(config.currentAlgorithm, static_cast<uint8_t>(foc::CurrentAlgorithm::deadbeat));
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    EXPECT_EQ(subject->SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
+    EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::deadbeat);
+}
+
+TEST_F(ControlModeStateMachineExtTest, PersistedAlgorithmOutsideEnumRangeFallsBackToDefault)
+{
+    GivenNvmValid();
+
+    services::ConfigData config{};
+    config.currentAlgorithm = 200;
+    config.speedAlgorithm = 200;
+    config.positionAlgorithm = 200;
+    ConstructSubjectWithConfig(config);
+
+    EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
+}
+
+TEST_F(ControlModeStateMachineExtTest, ActiveAlgorithmReportsTheRunningLoopNotThePersistedByte)
+{
+    GivenNvmAlwaysInvalid();
+
+    services::ConfigData config{};
+    config.currentAlgorithm = static_cast<uint8_t>(foc::CurrentAlgorithm::deadbeat);
+    ConstructSubjectWithConfig(config);
+
+    EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
+}
+
+TEST_F(ControlModeStateMachineExtTest, SelectSpeedAlgorithm_RejectedInTorqueMode)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    EXPECT_EQ(subject->SelectSpeedAlgorithm(foc::SpeedAlgorithm::lqi), foc::SelectResult::invalidAlgorithm);
+}
+
+TEST_F(ControlModeStateMachineExtTest, SelectSpeedAlgorithm_RejectedWithoutMechanicalModel)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
+
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+    EXPECT_EQ(subject->SelectSpeedAlgorithm(foc::SpeedAlgorithm::lqi), foc::SelectResult::invalidParameters);
+}
+
+// ---- CLI: algorithm selection parses every accepted name and rejects the rest ----
+
+TEST_F(ControlModeStateMachineExtTest, Cli_SelectCurrentAlgorithm_AcceptsEveryName)
+{
+    GivenNvmValid();
+    GivenNvmSaveConfigAlwaysSucceeds();
+    ConstructSubject();
+
+    for (const auto* name : { "sca pid", "sca decoupled", "sca deadbeat", "sca sliding" })
+        InvokeCliCommand(name);
+}
+
+TEST_F(ControlModeStateMachineExtTest, Cli_SelectCurrentAlgorithm_RejectsUnknownName)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    InvokeCliCommand("sca nonsense");
+}
+
+TEST_F(ControlModeStateMachineExtTest, Cli_SelectSpeedAlgorithm_AcceptsEveryName)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigAlwaysSucceeds();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+    for (const auto* name : { "ssa pid", "ssa lqi", "ssa adrc", "ssa twodof" })
+        InvokeCliCommand(name);
+}
+
+TEST_F(ControlModeStateMachineExtTest, Cli_SelectSpeedAlgorithm_RejectsUnknownName)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigAlwaysSucceeds();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+    InvokeCliCommand("ssa nonsense");
+}
+
+TEST_F(ControlModeStateMachineExtTest, Cli_SelectPositionAlgorithm_AcceptsEveryName)
+{
+    GivenNvmAlwaysValid();
+    GivenNvmSaveConfigAlwaysSucceeds();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+    for (const auto* name : { "spa pid", "spa cascadep", "spa lqr", "spa lqi", "spa twodof" })
+        InvokeCliCommand(name);
+}
+
+TEST_F(ControlModeStateMachineExtTest, Cli_SelectPositionAlgorithm_RejectsUnknownName)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigAlwaysSucceeds();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+    InvokeCliCommand("spa nonsense");
+}
+
+TEST_F(ControlModeStateMachineExtTest, Cli_SelectPositionAlgorithm_RejectedOutsidePositionMode)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    EXPECT_EQ(subject->SelectPositionAlgorithm(foc::PositionAlgorithm::lqr), foc::SelectResult::invalidAlgorithm);
+}
+
+// ---- CLI: active_algorithms names every enumerator ----
+
+TEST_F(ControlModeStateMachineExtTest, Cli_ActiveAlgorithms_NamesEveryCurrentAlgorithm)
+{
+    GivenNvmValid();
+    GivenNvmSaveConfigAlwaysSucceeds();
+    ConstructSubject();
+
+    for (const auto* name : { "sca pid", "sca decoupled", "sca deadbeat", "sca sliding" })
     {
-        GivenNvmAlwaysInvalid();
-        SetUpTorqueCalibrationCaptures();
-        ConstructSubject();
-
-        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
-        CompleteCalibration_Torque();
-
-        EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
-            subject->ActiveStateMachine().CurrentState()));
+        InvokeCliCommand(name);
+        InvokeCliCommand("aa");
     }
+}
 
-    TEST_F(ControlModeStateMachineLifecycleTest, CmdEnable_And_Disable_From_Ready_In_Torque_Mode)
+TEST_F(ControlModeStateMachineExtTest, Cli_ActiveAlgorithms_NamesEverySpeedAlgorithm)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigAlwaysSucceeds();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+    for (const auto* name : { "ssa pid", "ssa lqi", "ssa adrc", "ssa twodof" })
     {
-        GivenNvmAlwaysInvalid();
-        SetUpTorqueCalibrationCaptures();
-        ConstructSubject();
-
-        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
-        CompleteCalibration_Torque();
-
-        EXPECT_CALL(inverterMock, Start()).Times(1);
-        subject->ActiveStateMachine().CmdEnable();
-        EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(
-            subject->ActiveStateMachine().CurrentState()));
-
-        subject->ActiveStateMachine().CmdDisable();
-        EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
-            subject->ActiveStateMachine().CurrentState()));
+        InvokeCliCommand(name);
+        InvokeCliCommand("aa");
     }
+}
 
-    TEST_F(ControlModeStateMachineLifecycleTest, Fault_And_ClearFault_In_Torque_Mode)
+TEST_F(ControlModeStateMachineExtTest, Cli_ActiveAlgorithms_NamesEveryPositionAlgorithm)
+{
+    GivenNvmAlwaysValid();
+    GivenNvmSaveConfigAlwaysSucceeds();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+    for (const auto* name : { "spa pid", "spa cascadep", "spa lqr", "spa lqi", "spa twodof" })
     {
-        GivenNvmAlwaysInvalid();
-        SetUpTorqueCalibrationCaptures();
-        ConstructSubject();
-
-        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
-        CompleteCalibration_Torque();
-
-        EXPECT_CALL(inverterMock, Start()).Times(1);
-        subject->ActiveStateMachine().CmdEnable();
-
-        faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
-        EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(
-            subject->ActiveStateMachine().CurrentState()));
-        EXPECT_EQ(subject->ActiveStateMachine().LastFaultCode(), state_machine::FaultCode::hardwareFault);
-
-        subject->ActiveStateMachine().CmdClearFault();
-        EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
-            subject->ActiveStateMachine().CurrentState()));
+        InvokeCliCommand(name);
+        InvokeCliCommand("aa");
     }
-
-    // ---- Speed mode full lifecycle ----
-
-    TEST_F(ControlModeStateMachineLifecycleTest, Full_Calibration_Completes_To_Ready_In_Speed_Mode)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        SetUpMechIdentCalibrationCaptures();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
-        CompleteCalibration_WithMechIdent();
-
-        EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
-            subject->ActiveStateMachine().CurrentState()));
-    }
-
-    TEST_F(ControlModeStateMachineLifecycleTest, CmdEnable_And_Disable_From_Ready_In_Speed_Mode)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        SetUpMechIdentCalibrationCaptures();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
-        CompleteCalibration_WithMechIdent();
-
-        EXPECT_CALL(inverterMock, Start()).Times(1);
-        subject->ActiveStateMachine().CmdEnable();
-        EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(
-            subject->ActiveStateMachine().CurrentState()));
-
-        subject->ActiveStateMachine().CmdDisable();
-        EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
-            subject->ActiveStateMachine().CurrentState()));
-    }
-
-    TEST_F(ControlModeStateMachineLifecycleTest, Fault_And_ClearFault_In_Speed_Mode)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        SetUpMechIdentCalibrationCaptures();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
-        CompleteCalibration_WithMechIdent();
-
-        EXPECT_CALL(inverterMock, Start()).Times(1);
-        subject->ActiveStateMachine().CmdEnable();
-
-        faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
-        EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(
-            subject->ActiveStateMachine().CurrentState()));
-        EXPECT_EQ(subject->ActiveStateMachine().LastFaultCode(), state_machine::FaultCode::hardwareFault);
-
-        subject->ActiveStateMachine().CmdClearFault();
-        EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
-            subject->ActiveStateMachine().CurrentState()));
-    }
-
-    TEST_F(ControlModeStateMachineLifecycleTest, ApplyOnlineEstimates_When_Enabled_In_Speed_Mode)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        SetUpMechIdentCalibrationCaptures();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
-        CompleteCalibration_WithMechIdent();
-
-        EXPECT_CALL(inverterMock, Start()).Times(1);
-        subject->ActiveStateMachine().CmdEnable();
-
-        subject->ActiveStateMachine().ApplyOnlineEstimates();
-
-        EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(
-            subject->ActiveStateMachine().CurrentState()));
-    }
-
-    // ---- Position mode full lifecycle ----
-
-    TEST_F(ControlModeStateMachineLifecycleTest, Full_Calibration_Completes_To_Ready_In_Position_Mode)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        SetUpMechIdentCalibrationCaptures();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::position, [](auto) {});
-
-        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
-        CompleteCalibration_WithMechIdent();
-
-        EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
-            subject->ActiveStateMachine().CurrentState()));
-    }
-
-    TEST_F(ControlModeStateMachineLifecycleTest, CmdEnable_And_Disable_From_Ready_In_Position_Mode)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        SetUpMechIdentCalibrationCaptures();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::position, [](auto) {});
-
-        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
-        CompleteCalibration_WithMechIdent();
-
-        EXPECT_CALL(inverterMock, Start()).Times(1);
-        subject->ActiveStateMachine().CmdEnable();
-        EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(
-            subject->ActiveStateMachine().CurrentState()));
-
-        subject->ActiveStateMachine().CmdDisable();
-        EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
-            subject->ActiveStateMachine().CurrentState()));
-    }
-
-    TEST_F(ControlModeStateMachineLifecycleTest, Fault_And_ClearFault_In_Position_Mode)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        SetUpMechIdentCalibrationCaptures();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::position, [](auto) {});
-
-        subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
-        CompleteCalibration_WithMechIdent();
-
-        EXPECT_CALL(inverterMock, Start()).Times(1);
-        subject->ActiveStateMachine().CmdEnable();
-
-        faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
-        EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(
-            subject->ActiveStateMachine().CurrentState()));
-        EXPECT_EQ(subject->ActiveStateMachine().LastFaultCode(), state_machine::FaultCode::hardwareFault);
-
-        subject->ActiveStateMachine().CmdClearFault();
-        EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
-            subject->ActiveStateMachine().CurrentState()));
-    }
-
-    // ---- TrySet*PidGains: accepted by matching mode(s) ----
-
-    TEST_F(ControlModeStateMachineExtTest, TrySetCurrentBandwidth_AcceptedInTorqueMode)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
-
-        EXPECT_TRUE(subject->TrySetCurrentBandwidth(8377.6f));
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, TrySetSpeedBandwidth_RejectedInTorqueMode)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
-
-        EXPECT_FALSE(subject->TrySetSpeedBandwidth(50.0f));
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, TrySetSpeedBandwidth_AcceptedInSpeedMode)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        ConstructSubject();
-
-        subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-        EXPECT_TRUE(subject->TrySetSpeedBandwidth(50.0f));
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, TrySetPositionBandwidth_AcceptedOnlyInPositionMode)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        ConstructSubject();
-
-        EXPECT_FALSE(subject->TrySetPositionBandwidth(18.8f));
-
-        subject->Select(state_machine::ControlMode::position, [](auto) {});
-
-        EXPECT_TRUE(subject->TrySetPositionBandwidth(18.8f));
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, SelectCurrentAlgorithm_DefaultsToPid)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
-
-        EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, SelectCurrentAlgorithm_RejectedWithoutMotorModel)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
-
-        EXPECT_EQ(subject->SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::invalidParameters);
-        EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, SelectCurrentAlgorithm_PersistsToNvmOnceCalibrated)
-    {
-        GivenNvmValid();
-        ConstructSubject();
-
-        EXPECT_CALL(nvmMock, SaveConfig(_, _))
-            .WillOnce(Invoke([](const services::ConfigData& config, infra::Function<void(services::NvmStatus)> onDone)
-                {
-                    EXPECT_EQ(config.currentAlgorithm, static_cast<uint8_t>(foc::CurrentAlgorithm::deadbeat));
-                    onDone(services::NvmStatus::Ok);
-                }));
-
-        EXPECT_EQ(subject->SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
-        EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::deadbeat);
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, SelectSpeedAlgorithm_RejectedInTorqueMode)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
-
-        EXPECT_EQ(subject->SelectSpeedAlgorithm(foc::SpeedAlgorithm::lqi), foc::SelectResult::invalidAlgorithm);
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, SelectSpeedAlgorithm_RejectedWithoutMechanicalModel)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigSucceeds();
-        ConstructSubject();
-
-        subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-        EXPECT_EQ(subject->SelectSpeedAlgorithm(foc::SpeedAlgorithm::lqi), foc::SelectResult::invalidParameters);
-    }
-
-    // ---- CLI: algorithm selection parses every accepted name and rejects the rest ----
-
-    TEST_F(ControlModeStateMachineExtTest, Cli_SelectCurrentAlgorithm_AcceptsEveryName)
-    {
-        GivenNvmValid();
-        GivenNvmSaveConfigAlwaysSucceeds();
-        ConstructSubject();
-
-        for (const auto* name : { "sca pid", "sca decoupled", "sca deadbeat", "sca sliding" })
-            InvokeCliCommand(name);
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, Cli_SelectCurrentAlgorithm_RejectsUnknownName)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
-
-        InvokeCliCommand("sca nonsense");
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, Cli_SelectSpeedAlgorithm_AcceptsEveryName)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigAlwaysSucceeds();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-        for (const auto* name : { "ssa pid", "ssa lqi", "ssa adrc", "ssa twodof" })
-            InvokeCliCommand(name);
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, Cli_SelectSpeedAlgorithm_RejectsUnknownName)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigAlwaysSucceeds();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-        InvokeCliCommand("ssa nonsense");
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, Cli_SelectPositionAlgorithm_AcceptsEveryName)
-    {
-        GivenNvmAlwaysValid();
-        GivenNvmSaveConfigAlwaysSucceeds();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::position, [](auto) {});
-
-        for (const auto* name : { "spa pid", "spa cascadep", "spa lqr", "spa lqi", "spa twodof" })
-            InvokeCliCommand(name);
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, Cli_SelectPositionAlgorithm_RejectsUnknownName)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigAlwaysSucceeds();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::position, [](auto) {});
-
-        InvokeCliCommand("spa nonsense");
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, Cli_SelectPositionAlgorithm_RejectedOutsidePositionMode)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
-
-        EXPECT_EQ(subject->SelectPositionAlgorithm(foc::PositionAlgorithm::lqr), foc::SelectResult::invalidAlgorithm);
-    }
-
-    // ---- CLI: active_algorithms names every enumerator ----
-
-    TEST_F(ControlModeStateMachineExtTest, Cli_ActiveAlgorithms_NamesEveryCurrentAlgorithm)
-    {
-        GivenNvmValid();
-        GivenNvmSaveConfigAlwaysSucceeds();
-        ConstructSubject();
-
-        for (const auto* name : { "sca pid", "sca decoupled", "sca deadbeat", "sca sliding" })
-        {
-            InvokeCliCommand(name);
-            InvokeCliCommand("aa");
-        }
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, Cli_ActiveAlgorithms_NamesEverySpeedAlgorithm)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigAlwaysSucceeds();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::speed, [](auto) {});
-
-        for (const auto* name : { "ssa pid", "ssa lqi", "ssa adrc", "ssa twodof" })
-        {
-            InvokeCliCommand(name);
-            InvokeCliCommand("aa");
-        }
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, Cli_ActiveAlgorithms_NamesEveryPositionAlgorithm)
-    {
-        GivenNvmAlwaysValid();
-        GivenNvmSaveConfigAlwaysSucceeds();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::position, [](auto) {});
-
-        for (const auto* name : { "spa pid", "spa cascadep", "spa lqr", "spa lqi", "spa twodof" })
-        {
-            InvokeCliCommand(name);
-            InvokeCliCommand("aa");
-        }
-    }
-
-    // ---- Bandwidth commands reach each loop ----
-
-    TEST_F(ControlModeStateMachineExtTest, TrySetBandwidths_AreAcceptedInPositionMode)
-    {
-        GivenNvmAlwaysInvalid();
-        GivenNvmSaveConfigAlwaysSucceeds();
-        ConstructSubject();
-        subject->Select(state_machine::ControlMode::position, [](auto) {});
-
-        EXPECT_TRUE(subject->TrySetCurrentBandwidth(6283.2f));
-        EXPECT_TRUE(subject->TrySetSpeedBandwidth(188.5f));
-        EXPECT_TRUE(subject->TrySetPositionBandwidth(18.8f));
-    }
-
-    TEST_F(ControlModeStateMachineExtTest, TrySetSpeedAndPositionBandwidth_AreRejectedInTorqueMode)
-    {
-        GivenNvmAlwaysInvalid();
-        ConstructSubject();
-
-        EXPECT_TRUE(subject->TrySetCurrentBandwidth(6283.2f));
-        EXPECT_FALSE(subject->TrySetSpeedBandwidth(188.5f));
-        EXPECT_FALSE(subject->TrySetPositionBandwidth(18.8f));
-    }
+}
+
+// ---- Bandwidth commands reach each loop ----
+
+TEST_F(ControlModeStateMachineExtTest, TrySetBandwidths_AreAcceptedInPositionMode)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigAlwaysSucceeds();
+    ConstructSubject();
+    subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+    EXPECT_TRUE(subject->TrySetCurrentBandwidth(6283.2f));
+    EXPECT_TRUE(subject->TrySetSpeedBandwidth(188.5f));
+    EXPECT_TRUE(subject->TrySetPositionBandwidth(18.8f));
+}
+
+TEST_F(ControlModeStateMachineExtTest, TrySetSpeedAndPositionBandwidth_AreRejectedInTorqueMode)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    EXPECT_TRUE(subject->TrySetCurrentBandwidth(6283.2f));
+    EXPECT_FALSE(subject->TrySetSpeedBandwidth(188.5f));
+    EXPECT_FALSE(subject->TrySetPositionBandwidth(18.8f));
 }

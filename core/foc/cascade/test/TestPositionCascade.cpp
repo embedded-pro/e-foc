@@ -53,7 +53,7 @@ namespace
             focPosition->SetPositionTunings(foc::PositionLoopTunings{});
         }
 
-        foc::LowPriorityInterruptMock lowPriorityInterruptMock;
+        testing::StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         std::optional<foc::PositionCascade> focPosition;
         std::size_t polePairs = 7;
     };

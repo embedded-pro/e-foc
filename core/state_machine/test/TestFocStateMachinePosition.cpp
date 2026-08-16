@@ -15,7 +15,7 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        hal::SerialCommunicationMock communication;
+        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
@@ -627,7 +627,7 @@ TEST_F(FocStateMachinePositionCliTest, cli_cc_command_clears_calibration)
 }
 
 // ==========================================================================
-// Position-mode with AutoTransitionPolicy
+// Position-mode with TransitionPolicy::Auto
 // ==========================================================================
 
 namespace
@@ -642,7 +642,7 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        hal::SerialCommunicationMock communication;
+        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());

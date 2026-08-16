@@ -15,7 +15,7 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        hal::SerialCommunicationMock communication;
+        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
@@ -802,7 +802,7 @@ TEST_F(FocStateMachineTorqueCliTest, clear_cal_nvm_failure_enters_fault)
 }
 
 // ==========================================================================
-// Torque-mode with AutoTransitionPolicy
+// Torque-mode with TransitionPolicy::Auto
 // ==========================================================================
 
 namespace
@@ -817,7 +817,7 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        hal::SerialCommunicationMock communication;
+        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
