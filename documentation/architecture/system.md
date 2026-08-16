@@ -110,11 +110,13 @@ The heart of the system. Decomposed into sub-layers following a strict separatio
 
 | Sub-component   | Responsibility                                                                                                                                                                                               |
 |-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Interfaces      | Define the FOC vocabulary (units, phase and frame signal types) and the abstract contracts for control modes (Torque, Speed, Position) and driver peripherals (inverter, encoder, interrupt). No algorithms. |
+| Interfaces      | Define the FOC vocabulary (units, phase and frame signal types) and the abstract contracts for control modes (Torque, Speed, Position) and execution (low-priority interrupt, controllable). No algorithms. Hardware ports live in the platform abstraction layer, not here. |
 | Math            | Generic numerical helpers that are not specific to field-oriented control — fast trigonometry by lookup table, angle wrap-around. Header-only, dependency-free.                                              |
 | Transforms      | The field-oriented control mathematics proper: the Clarke and Park transforms in both directions, and Space Vector Modulation.                                                                               |
-| Implementations | Orchestration of the control cascade — the per-mode control loops, the gain-design helpers, and the execution runner that drives the loop from interrupt context.                                            |
-| Instantiations  | Wiring that combines a control-mode implementation with the execution runner to produce a ready-to-use FOC controller.                                                                                       |
+| Loop algorithms | Interchangeable control laws for each loop, under `current_loop/`, `speed_loop/` and `position_loop/`, together with their plant models and gain design.                                                     |
+| Selection       | The `ControllerSelector` template that stores the active algorithm of a loop in a fixed-size `std::variant` and dispatches to it without allocation.                                                         |
+| Cascade         | Orchestration of the control cascade — the per-mode control loops that combine the current, speed and position algorithms.                                                                                  |
+| Instantiations  | Wiring that combines a control-mode cascade with the execution runner to produce a ready-to-use FOC controller.                                                                                              |
 
 Because Interfaces, Math, and Transforms carry no dependency on the control cascade, the identification, alignment, and simulation components consume them directly without pulling in the control loops.
 
