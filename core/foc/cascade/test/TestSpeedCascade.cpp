@@ -1,8 +1,6 @@
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
-#include "numerical/math/Tolerance.hpp"
 #include <gmock/gmock.h>
-#include <numbers>
 
 namespace
 {
@@ -12,6 +10,15 @@ namespace
     const hal::Hertz baseFrequency{ baseFrequencyValue };
     const hal::Hertz lowPriorityFrequency{ 2000 };
     constexpr float tolerance = 1.0f;
+
+    // The shipped current-loop bandwidth drives the modulator onto its rails for every current
+    // reference a speed loop can ask for, which would hide the differences these tests look for.
+    foc::CurrentLoopTunings UnsaturatedCurrentTunings()
+    {
+        auto tunings = foc::CurrentLoopTunings{};
+        tunings.bandwidth = 6.283185f;
+        return tunings;
+    }
 
     foc::MotorModelParameters MotorParameters(std::size_t polePairs)
     {
@@ -53,12 +60,75 @@ namespace
 
         testing::StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         std::optional<foc::SpeedCascade> focSpeed;
-        std::size_t polePairs = 7;
+        const std::size_t polePairs{ 7 };
     };
 
     foc::PhaseCurrents ZeroCurrents()
     {
         return { foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
+    }
+
+    void ExpectValidDuty(const foc::PhasePwmDutyCycles& duty)
+    {
+        EXPECT_LE(duty.a.Value(), 100);
+        EXPECT_LE(duty.b.Value(), 100);
+        EXPECT_LE(duty.c.Value(), 100);
+    }
+
+    void ExpectCentredDuty(const foc::PhasePwmDutyCycles& duty)
+    {
+        EXPECT_NEAR(duty.a.Value(), 50, tolerance);
+        EXPECT_NEAR(duty.b.Value(), 50, tolerance);
+        EXPECT_NEAR(duty.c.Value(), 50, tolerance);
+    }
+
+    void ExpectSameDuty(const foc::PhasePwmDutyCycles& duty, const foc::PhasePwmDutyCycles& expected)
+    {
+        EXPECT_EQ(duty.a.Value(), expected.a.Value());
+        EXPECT_EQ(duty.b.Value(), expected.b.Value());
+        EXPECT_EQ(duty.c.Value(), expected.c.Value());
+    }
+
+    bool DutiesDiffer(const foc::PhasePwmDutyCycles& left, const foc::PhasePwmDutyCycles& right)
+    {
+        return left.a.Value() != right.a.Value() ||
+               left.b.Value() != right.b.Value() ||
+               left.c.Value() != right.c.Value();
+    }
+
+    void ExpectOffCentreDuty(const foc::PhasePwmDutyCycles& duty)
+    {
+        EXPECT_TRUE(DutiesDiffer(duty, foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } }));
+    }
+
+    struct SpeedCascadeUnderTest
+    {
+        SpeedCascadeUnderTest(std::size_t polePairs, const foc::SpeedLoopTunings& speedTunings)
+        {
+            EXPECT_CALL(lowPriorityInterrupt, Register(_)).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
+
+            cascade.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency);
+            cascade->Configure(MotorParameters(polePairs));
+            cascade->ConfigureMechanics(MechanicalParameters());
+            cascade->SetCurrentTunings(UnsaturatedCurrentTunings());
+            cascade->SetSpeedTunings(speedTunings);
+        }
+
+        testing::StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterrupt;
+        std::optional<foc::SpeedCascade> cascade;
+    };
+
+    foc::PhasePwmDutyCycles FirstDutyAfterSpeedStep(SpeedCascadeUnderTest& speedCascade, float setPoint)
+    {
+        speedCascade.cascade->Enable();
+        speedCascade.cascade->SetPoint(foc::RadiansPerSecond{ setPoint });
+
+        foc::Radians position{ 0.0f };
+        speedCascade.cascade->Calculate(ZeroCurrents(), position);
+        speedCascade.lowPriorityInterrupt.TriggerHandler();
+
+        foc::Radians secondSample{ 0.0f };
+        return speedCascade.cascade->Calculate(ZeroCurrents(), secondSample);
     }
 }
 
@@ -69,12 +139,7 @@ TEST_F(TestSpeedCascade, zero_speed_setpoint_produces_bounded_duty_cycles)
     foc::Radians position{ 0.0f };
     auto result = focSpeed->Calculate(ZeroCurrents(), position);
 
-    EXPECT_GE(result.a.Value(), 0);
-    EXPECT_LE(result.a.Value(), 100);
-    EXPECT_GE(result.b.Value(), 0);
-    EXPECT_LE(result.b.Value(), 100);
-    EXPECT_GE(result.c.Value(), 0);
-    EXPECT_LE(result.c.Value(), 100);
+    ExpectValidDuty(result);
 }
 
 TEST_F(TestSpeedCascade, duty_cycles_are_bounded_0_to_100)
@@ -84,38 +149,70 @@ TEST_F(TestSpeedCascade, duty_cycles_are_bounded_0_to_100)
     foc::Radians position{ 0.5f };
     auto result = focSpeed->Calculate(ZeroCurrents(), position);
 
-    EXPECT_GE(result.a.Value(), 0);
-    EXPECT_LE(result.a.Value(), 100);
-    EXPECT_GE(result.b.Value(), 0);
-    EXPECT_LE(result.b.Value(), 100);
-    EXPECT_GE(result.c.Value(), 0);
-    EXPECT_LE(result.c.Value(), 100);
+    ExpectValidDuty(result);
 }
 
+// theta_e = theta_m * pole_pairs: p pole pairs at a mechanical angle must land on the same
+// electrical angle - and therefore the same duty cycles - as 1 pole pair at p times that angle.
 TEST_F(TestSpeedCascade, set_pole_pairs)
 {
-    focSpeed->Configure(MotorParameters(4));
-    focSpeed->SetPoint(foc::RadiansPerSecond{ 0.0f });
+    constexpr float mechanicalAngle{ 0.3f };
 
-    foc::Radians position{ 0.0f };
-    auto result = focSpeed->Calculate(ZeroCurrents(), position);
+    for (std::size_t poles : { std::size_t{ 2 }, std::size_t{ 4 }, std::size_t{ 7 } })
+    {
+        SCOPED_TRACE(poles);
 
-    EXPECT_GE(result.a.Value(), 0);
-    EXPECT_LE(result.a.Value(), 100);
+        SpeedCascadeUnderTest scaled{ poles, foc::SpeedLoopTunings{} };
+        SpeedCascadeUnderTest reference{ 1, foc::SpeedLoopTunings{} };
+
+        scaled.cascade->Enable();
+        reference.cascade->Enable();
+        scaled.cascade->SetPoint(foc::RadiansPerSecond{ 0.2f });
+        reference.cascade->SetPoint(foc::RadiansPerSecond{ 0.2f });
+
+        // Both start at zero, so the outer loop measures the same standstill and commands the same current
+        foc::Radians scaledStart{ 0.0f };
+        foc::Radians referenceStart{ 0.0f };
+        scaled.cascade->Calculate(ZeroCurrents(), scaledStart);
+        reference.cascade->Calculate(ZeroCurrents(), referenceStart);
+        scaled.lowPriorityInterrupt.TriggerHandler();
+        reference.lowPriorityInterrupt.TriggerHandler();
+
+        foc::Radians scaledPosition{ mechanicalAngle };
+        foc::Radians referencePosition{ mechanicalAngle * static_cast<float>(poles) };
+
+        ExpectSameDuty(scaled.cascade->Calculate(ZeroCurrents(), scaledPosition), reference.cascade->Calculate(ZeroCurrents(), referencePosition));
+    }
 }
 
 TEST_F(TestSpeedCascade, enable_disable_cycle)
 {
-    focSpeed->SetPoint(foc::RadiansPerSecond{ 10.0f });
+    focSpeed->SetCurrentTunings(UnsaturatedCurrentTunings());
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 0.2f });
+
+    foc::Radians position{ 0.1f };
+    focSpeed->Calculate(ZeroCurrents(), position);
+    for (int cycle = 0; cycle != 20; ++cycle)
+        lowPriorityInterruptMock.TriggerHandler();
+
+    foc::Radians woundPosition{ 0.1f };
+    auto wound = focSpeed->Calculate(ZeroCurrents(), woundPosition);
 
     focSpeed->Disable();
     focSpeed->Enable();
 
-    foc::Radians position{ 0.0f };
-    auto result = focSpeed->Calculate(ZeroCurrents(), position);
+    SpeedCascadeUnderTest fresh{ polePairs, foc::SpeedLoopTunings{} };
+    fresh.cascade->Enable();
+    fresh.cascade->SetPoint(foc::RadiansPerSecond{ 0.2f });
 
-    EXPECT_GE(result.a.Value(), 0);
-    EXPECT_LE(result.a.Value(), 100);
+    foc::Radians restarted{ 0.1f };
+    foc::Radians freshPosition{ 0.1f };
+    auto afterEnable = focSpeed->Calculate(ZeroCurrents(), restarted);
+    auto firstOfFresh = fresh.cascade->Calculate(ZeroCurrents(), freshPosition);
+
+    EXPECT_TRUE(DutiesDiffer(wound, afterEnable));
+    ExpectSameDuty(afterEnable, firstOfFresh);
 }
 
 TEST_F(TestSpeedCascade, different_positions_produce_different_outputs)
@@ -139,30 +236,57 @@ TEST_F(TestSpeedCascade, different_positions_produce_different_outputs)
 
 TEST_F(TestSpeedCascade, consecutive_calls_update_speed_estimation)
 {
-    focSpeed->SetPoint(foc::RadiansPerSecond{ 10.0f });
+    // 50 urad of rotation is 0.35 mrad electrically for the seven pole pairs under test, far below
+    // the one percent the duty cycles resolve, so only the measured speed separates the two runs.
+    constexpr float step{ 0.00005f };
 
-    foc::Radians position1{ 0.0f };
-    auto result1 = focSpeed->Calculate(ZeroCurrents(), position1);
+    focSpeed->SetCurrentTunings(UnsaturatedCurrentTunings());
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 0.0f });
 
+    foc::Radians start{ 0.0f };
+    focSpeed->Calculate(ZeroCurrents(), start);
     lowPriorityInterruptMock.TriggerHandler();
 
-    foc::Radians position2{ 0.01f };
-    auto result2 = focSpeed->Calculate(ZeroCurrents(), position2);
+    foc::Radians advanced{ step };
+    focSpeed->Calculate(ZeroCurrents(), advanced);
+    lowPriorityInterruptMock.TriggerHandler();
 
-    EXPECT_GE(result2.a.Value(), 0);
-    EXPECT_LE(result2.a.Value(), 100);
+    foc::Radians moved{ step };
+    auto movingRotor = focSpeed->Calculate(ZeroCurrents(), moved);
+
+    SpeedCascadeUnderTest stationary{ polePairs, foc::SpeedLoopTunings{} };
+    stationary.cascade->Enable();
+    stationary.cascade->SetPoint(foc::RadiansPerSecond{ 0.0f });
+
+    for (int cycle = 0; cycle != 2; ++cycle)
+    {
+        foc::Radians held{ 0.0f };
+        stationary.cascade->Calculate(ZeroCurrents(), held);
+        stationary.lowPriorityInterrupt.TriggerHandler();
+    }
+
+    foc::Radians held{ 0.0f };
+    auto stationaryRotor = stationary.cascade->Calculate(ZeroCurrents(), held);
+
+    ExpectCentredDuty(stationaryRotor);
+    EXPECT_TRUE(DutiesDiffer(movingRotor, stationaryRotor));
 }
 
 TEST_F(TestSpeedCascade, set_speed_tunings)
 {
-    focSpeed->SetSpeedTunings(foc::SpeedLoopTunings{});
-    focSpeed->SetPoint(foc::RadiansPerSecond{ 5.0f });
+    auto slowTunings = foc::SpeedLoopTunings{};
+    slowTunings.bandwidth = foc::SpeedLoopTunings{}.bandwidth / 10.0f;
 
-    foc::Radians position{ 0.0f };
-    auto result = focSpeed->Calculate(ZeroCurrents(), position);
+    SpeedCascadeUnderTest slowLoop{ polePairs, slowTunings };
+    SpeedCascadeUnderTest fastLoop{ polePairs, foc::SpeedLoopTunings{} };
+    SpeedCascadeUnderTest atSetPoint{ polePairs, foc::SpeedLoopTunings{} };
 
-    EXPECT_GE(result.a.Value(), 0);
-    EXPECT_LE(result.a.Value(), 100);
+    auto slowResult = FirstDutyAfterSpeedStep(slowLoop, 0.2f);
+    auto fastResult = FirstDutyAfterSpeedStep(fastLoop, 0.2f);
+
+    EXPECT_TRUE(DutiesDiffer(slowResult, fastResult));
+    ExpectCentredDuty(FirstDutyAfterSpeedStep(atSetPoint, 0.0f));
 }
 
 TEST_F(TestSpeedCascade, prescaler_triggers_low_priority_at_correct_rate)
@@ -171,7 +295,7 @@ TEST_F(TestSpeedCascade, prescaler_triggers_low_priority_at_correct_rate)
     // LowPriorityInterrupt::Trigger() must be called exactly once every 10 iterations.
     focSpeed->SetPoint(foc::RadiansPerSecond{ 0.0f });
 
-    const uint32_t prescaler = baseFrequencyValue / 2000;
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
 
     EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(1);
 
@@ -186,7 +310,7 @@ TEST_F(TestSpeedCascade, second_prescaler_cycle_triggers_again)
 {
     focSpeed->SetPoint(foc::RadiansPerSecond{ 0.0f });
 
-    const uint32_t prescaler = baseFrequencyValue / 2000;
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
 
     EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(2);
 
@@ -226,6 +350,6 @@ TEST_F(TestSpeedCascade, a_speed_loop_configured_without_limits_still_drives_the
     lowPriorityInterruptMock.TriggerHandler();
     auto result = focSpeed->Calculate(ZeroCurrents(), position);
 
-    EXPECT_GE(result.a.Value(), 0);
-    EXPECT_LE(result.a.Value(), 100);
+    ExpectValidDuty(result);
+    ExpectOffCentreDuty(result);
 }

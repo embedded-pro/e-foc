@@ -1,9 +1,7 @@
 #include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/foc/math/AngleWrap.hpp"
-#include "numerical/math/Tolerance.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
-#include <numbers>
 
 namespace
 {
@@ -33,12 +31,33 @@ namespace
         }
 
         std::optional<foc::TorqueCascade> focTorque;
-        std::size_t polePairs = 7;
+        const std::size_t polePairs{ 7 };
     };
 
     foc::PhaseCurrents ZeroCurrents()
     {
         return { foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
+    }
+
+    void ExpectValidDuty(const foc::PhasePwmDutyCycles& duty)
+    {
+        EXPECT_LE(duty.a.Value(), 100);
+        EXPECT_LE(duty.b.Value(), 100);
+        EXPECT_LE(duty.c.Value(), 100);
+    }
+
+    void ExpectCentredDuty(const foc::PhasePwmDutyCycles& duty)
+    {
+        EXPECT_NEAR(duty.a.Value(), 50, tolerance);
+        EXPECT_NEAR(duty.b.Value(), 50, tolerance);
+        EXPECT_NEAR(duty.c.Value(), 50, tolerance);
+    }
+
+    bool IsOffCentre(const foc::PhasePwmDutyCycles& duty)
+    {
+        return std::abs(duty.a.Value() - 50) > tolerance ||
+               std::abs(duty.b.Value() - 50) > tolerance ||
+               std::abs(duty.c.Value() - 50) > tolerance;
     }
 }
 
@@ -63,12 +82,7 @@ TEST_F(TestTorqueCascade, duty_cycles_are_bounded_0_to_100)
     foc::Radians position{ 0.5f };
     auto result = focTorque->Calculate(ZeroCurrents(), position);
 
-    EXPECT_GE(result.a.Value(), 0);
-    EXPECT_LE(result.a.Value(), 100);
-    EXPECT_GE(result.b.Value(), 0);
-    EXPECT_LE(result.b.Value(), 100);
-    EXPECT_GE(result.c.Value(), 0);
-    EXPECT_LE(result.c.Value(), 100);
+    ExpectValidDuty(result);
 }
 
 // theta_e = theta_m * pole_pairs: p pole pairs at a mechanical angle must land on the same
@@ -104,17 +118,27 @@ TEST_F(TestTorqueCascade, electrical_angle_scales_with_pole_pairs)
 
 TEST_F(TestTorqueCascade, enable_disable_cycle)
 {
-    focTorque->SetPoint({ foc::Ampere{ 1.0f }, foc::Ampere{ 0.0f } });
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } });
     focTorque->SetCurrentTunings(foc::CurrentLoopTunings{});
 
+    foc::PhasePwmDutyCycles wound{ hal::Percent{ 0 }, hal::Percent{ 0 }, hal::Percent{ 0 } };
+    for (int sample = 0; sample != 50; ++sample)
+    {
+        foc::Radians position{ 0.2f };
+        wound = focTorque->Calculate(ZeroCurrents(), position);
+    }
+
+    ASSERT_TRUE(IsOffCentre(wound));
+
     focTorque->Disable();
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
     focTorque->Enable();
 
-    foc::Radians position{ 0.0f };
+    foc::Radians position{ 0.2f };
     auto result = focTorque->Calculate(ZeroCurrents(), position);
 
-    EXPECT_GE(result.a.Value(), 0);
-    EXPECT_LE(result.a.Value(), 100);
+    // An integrator carried across the cycle would hold the output where the wound-up loop left it
+    ExpectCentredDuty(result);
 }
 
 TEST_F(TestTorqueCascade, different_positions_produce_different_outputs)
@@ -176,8 +200,7 @@ TEST_F(TestTorqueCascade, selected_algorithm_drives_the_output)
     foc::Radians position{ 0.0f };
     auto result = focTorque->Calculate(ZeroCurrents(), position);
 
-    EXPECT_GE(result.a.Value(), 0);
-    EXPECT_LE(result.a.Value(), 100);
+    ExpectValidDuty(result);
     bool anyNon50 = (result.a.Value() != 50) || (result.b.Value() != 50) || (result.c.Value() != 50);
     EXPECT_TRUE(anyNon50);
 }
@@ -219,9 +242,7 @@ TEST_F(TestTorqueCascade, a_spinning_rotor_drives_the_back_emf_feedforward)
         angle = foc::detail::PositionWithWrapAround(angle + mechanicalStepPerSample);
     }
 
-    const bool anyOffCentre = std::abs(result.a.Value() - 50) > tolerance ||
-                              std::abs(result.b.Value() - 50) > tolerance ||
-                              std::abs(result.c.Value() - 50) > tolerance;
+    const bool anyOffCentre = IsOffCentre(result);
 
     EXPECT_TRUE(anyOffCentre);
 }
@@ -252,7 +273,6 @@ TEST_F(TestTorqueCascade, the_sliding_mode_algorithm_drives_the_inverter)
     foc::Radians position{ 0.0f };
     auto result = focTorque->Calculate(ZeroCurrents(), position);
 
-    EXPECT_GE(result.a.Value(), 0);
-    EXPECT_LE(result.a.Value(), 100);
+    ExpectValidDuty(result);
     EXPECT_TRUE(result.a.Value() != 50 || result.b.Value() != 50 || result.c.Value() != 50);
 }
