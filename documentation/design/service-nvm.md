@@ -201,6 +201,7 @@ stateDiagram-v2
 | defaultControlMode    | —             | Control mode selected on power-up       |
 | currentAlgorithm      | —             | Current-loop algorithm selected on power-up |
 | speedAlgorithm        | —             | Speed-loop algorithm selected on power-up   |
+| positionAlgorithm     | —             | Position-loop algorithm selected on power-up|
 
 ---
 

@@ -69,6 +69,7 @@ classDiagram
         +set-position(θ)
         +set-speed-bandwidth(bandwidth)
         +set-position-bandwidth(bandwidth)
+        +select-position-algorithm(alg)
     }
 
     TerminalFocBaseInteractor <|-- TerminalFocTorqueInteractor
@@ -85,7 +86,8 @@ Only one interactor is active at a time; the application constructs exactly the 
 | `set_current_bandwidth` | bandwidth (float, rad/s) | Sets the current-loop bandwidth via `CurrentLoopTunable::SetCurrentTunings()` |
 | `select_current_algorithm` | pid \| decoupled \| deadbeat \| sliding | Selects the current-loop algorithm; rejected while the motor is enabled or before the motor model is identified |
 | `select_speed_algorithm` | pid \| lqi \| adrc \| twodof | Selects the speed-loop algorithm; only available in speed and position modes |
-| `active_algorithms` | — | Prints the active current and speed loop algorithms |
+| `select_position_algorithm` | pid \| cascadep \| lqr \| lqi \| twodof | Selects the position-loop algorithm; only available in position mode. LQR and LQI are refused when their Riccati design does not converge, leaving the previous algorithm active |
+| `active_algorithms` | — | Prints the active current, speed and position loop algorithms |
 
 This command is available in all control modes.
 
@@ -108,7 +110,7 @@ This command is available in all control modes.
 |--------------------|--------------------|----------------------------------------------------------------------|
 | `set-position`     | θ (rad)            | Sets the position setpoint via `FocPosition::SetPoint()`             |
 | `set_speed_bandwidth`    | bandwidth (float, rad/s) | Sets the speed-loop bandwidth within the position cascade      |
-| `set_position_bandwidth` | bandwidth (float, rad/s) | Sets the position-loop bandwidth via `PositionLoopTunable::SetPositionTunings()` |
+| `set_position_bandwidth` | bandwidth (float, rad/s) | Sets the position-loop bandwidth via `PositionLoopTunable::SetPositionTunings()`. Refused while the motor is enabled, and refused if the active law cannot be redesigned for the new bandwidth |
 
 ### `TerminalWithBanner` — Decorator
 

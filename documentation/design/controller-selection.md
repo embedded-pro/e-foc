@@ -80,14 +80,23 @@ is listed under; there is no sharing of algorithm identifiers across loops.
 
 **Position loop** — executes at 1 kHz in the low-priority handler:
 
-| Algorithm | Description                                                       |
-|-----------|-------------------------------------------------------------------|
-| PID       | Incremental PD/PID baseline                                       |
-| Cascade P | Industry-standard P position → speed loop; single Kv parameter    |
-| LQR       | DARE-computed state-feedback (θ, ω)                               |
-| LQI       | LQR with position integral augmentation                           |
-| Two-DOF   | Reference pre-filter + feedback; decoupled tracking and stiffness |
-| ILC       | Iterative learning control for repetitive servo tasks             |
+| Algorithm | Output            | Description                                                 |
+|-----------|-------------------|-------------------------------------------------------------|
+| PID       | Speed reference   | Incremental PI on the wrapped position error                |
+| Cascade P | Speed reference   | Industry-standard P position → speed loop; single gain      |
+| LQR       | Current reference | DARE-computed state feedback on (θ, ω)                      |
+| LQI       | Current reference | LQR with position integral augmentation                     |
+| Two-DOF   | Speed reference   | Reference pre-filter + PI; tracking and stiffness tune apart|
+
+Iterative learning control is deliberately absent. It is an augmentation layered on top of a
+feedback law for repetitive trajectories, not a peer algorithm, so it does not belong in this
+enumeration.
+
+Each position algorithm declares whether it produces a speed reference or a current reference.
+A speed reference runs through the existing speed and current loops unchanged. A current
+reference bypasses the speed loop and feeds the current loop directly, because the state
+feedback laws already regulate speed as part of their own state vector; running them on top of
+a speed loop would stack two regulators on the same state.
 
 **Friction compensation** is not an algorithm in any of the three enumerations. It is an independent
 on/off augmentation that adds a nonlinear feedforward correction to the $i_q^*$ output of the speed
@@ -184,6 +193,52 @@ or the previous controller was in.
 
 ---
 
+### Part D2 — Design Feasibility for the Position State Feedback Laws
+
+The position plant is a near double integrator, which makes its discrete Riccati solve far more
+fragile than the first-order speed plant. Solved on the raw state $(\theta, \omega)$ at a 1 kHz
+outer rate it does not converge at all in single precision. Three conditioning measures make it
+tractable:
+
+1. **Time-scaled state.** The design runs on $(\theta,\ \omega T_s)$ rather than
+   $(\theta,\ \omega)$, so the state matrix becomes
+   $A = \begin{bmatrix} 1 & 1 \\ 0 & 1 - \tfrac{B_f}{J} T_s \end{bmatrix}$
+   with every entry near unity.
+2. **Normalised input.** The input matrix is fixed at $B = [0\ \ 1]^T$ by folding the actuator
+   authority $\tfrac{K_t}{J} T_s^2 I_{max}$ into a scalar applied to the resulting command. The
+   Riccati recursion therefore never sees the motor's torque scale.
+3. **Bandwidth-derived effort weight.** $R = 1 / (\omega_{bw} T_s)^2$, with $\omega_{bw} T_s$
+   clamped to $[10^{-3},\ 0.5]$. This makes settling time scale as $2 / \omega_{bw}$ seconds
+   with roughly 4 % overshoot across four decades of bandwidth, so `bandwidth` remains the single
+   aggressiveness knob it is for every other loop.
+
+The state weights are shape knobs only. `positionErrorWeight` anchors the cost at one and the
+remaining weights enter as ratios against it, clamped to $[10^{-3},\ 10^3]$. Anchoring matters
+for more than conditioning: if the position entry of $Q$ can reach zero the cost stops penalising
+the integrator state and the recursion has no stabilising solution to find.
+
+These measures shrink but do not eliminate non-convergence. `Lqr::TryCreate` is therefore used
+throughout in preference to the aborting constructor, and feasibility is part of the selection
+rule rather than an afterthought:
+
+- `PositionControllerTraits::IsSelectable` runs the actual Riccati solve for LQR and LQI. A
+  selection whose design does not converge returns `invalidParameters` and **leaves the
+  previously active algorithm running**, so the motor never ends up holding a silently dead loop.
+- `SetPositionTunings` is refused outright while the motor is enabled, returning `busy`. A live
+  motor is not a safe place to redesign the law that is holding it.
+- When disabled, `SetPositionTunings` revalidates the new tunings against the active algorithm
+  and rejects them if the design fails, keeping the last accepted gains live.
+
+This is why `SetPositionTunings` returns `SelectResult` where the current and speed loops return
+`void`: those loops derive their gains algebraically and cannot fail.
+
+`IntegralStateFeedbackLqi` is not used for the LQI position law. Its constructor calls
+`really_assert(converged)` with no non-aborting alternative, which on a live motor turns a single
+CLI command into a firmware abort. The augmented three-state design is built on
+`Lqr<float, 3, 1>::TryCreate` instead. See numerical-toolbox issue #291.
+
+---
+
 ### Part E — Motor Model Parameter Flow
 
 When an algorithm is selected, it is immediately configured using the most recent snapshot of the
@@ -216,21 +271,22 @@ flowchart LR
 
 ### Part F — CLI Interface
 
-The CLI terminal service exposes algorithm selection through a `ctrl` command group, consistent with
-the existing `TerminalTorque`, `TerminalSpeed`, and `TerminalPosition` command handlers.
+`ControlModeStateMachine` registers the selection commands on the terminal.
 
-| Command                     | Effect                                                       |
-|-----------------------------|--------------------------------------------------------------|
-| `ctrl current <algorithm>`  | Selects the current-loop algorithm. Returns `ok` or `busy`.  |
-| `ctrl speed <algorithm>`    | Selects the speed-loop algorithm. Returns `ok` or `busy`.    |
-| `ctrl position <algorithm>` | Selects the position-loop algorithm. Returns `ok` or `busy`. |
-| `ctrl status`               | Prints the active algorithm for each loop.                   |
+| Command                           | Alias | Effect                                    |
+|-----------------------------------|-------|-------------------------------------------|
+| `select_current_algorithm <alg>`  | `sca` | Selects the current-loop algorithm        |
+| `select_speed_algorithm <alg>`    | `ssa` | Selects the speed-loop algorithm          |
+| `select_position_algorithm <alg>` | `spa` | Selects the position-loop algorithm       |
+| `active_algorithms`               | `aa`  | Prints the active algorithm for each loop |
 
-Valid `<algorithm>` tokens are the lower-case algorithm names (e.g., `pid`, `decoupled_pid`,
-`sliding_mode`, `lqi`, `adrc`, `lqr`). Unknown tokens produce a usage error without altering state.
+Valid `<alg>` tokens are the lower-case algorithm names: `pid`, `decoupled`, `deadbeat` and
+`sliding` for the current loop; `pid`, `lqi`, `adrc` and `twodof` for the speed loop; and `pid`,
+`cascadep`, `lqr`, `lqi` and `twodof` for the position loop. Unknown tokens produce a usage
+error without altering state.
 
-The CLI handler enforces the same motor-enabled guard described in Part D. The `busy` response is
-returned without side effects if the motor is enabled.
+The commands enforce the motor-enabled guard described in Part D and report the `SelectResult`
+verbatim, so an operator always learns why a selection was refused.
 
 ---
 
