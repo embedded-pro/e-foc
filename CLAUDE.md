@@ -8,10 +8,13 @@ This file is a concise, task-oriented guide for Claude and AI agents to be immed
 
 **Major components**:
 - `core/` — FOC implementations, platform abstraction interfaces, and services (libraries only).
-- `core/foc/interfaces/` — Abstract FOC interfaces (`FocBase`, `FocTorque`, `FocSpeed`, `FocPosition`).
-- `core/foc/implementations/` — Clarke/Park transforms, SVM, current/speed/position control loops.
+- `core/foc/interfaces/` — FOC vocabulary and contracts: `Units.hpp`, `Signals.hpp` (`PhaseCurrents`, `PhasePwmDutyCycles`, `ThreePhase`, `TwoPhase`, `RotatingFrame`), `Foc.hpp` (`FocBase`, `FocTorque`, `FocSpeed`, `FocPosition`), `Driver.hpp`, `OnlineEstimators.hpp`. No algorithms.
+- `core/foc/math/` — Header-only generic numerics: `FastTrigonometry.hpp` (sine LUT), `AngleWrap.hpp`. Not FOC-specific; candidate for upstreaming to `numerical-toolbox`.
+- `core/foc/transforms/` — The FOC math proper: Clarke/Park transforms and Space Vector Modulation.
+- `core/foc/implementations/` — Cascade orchestration (`FocTorqueImpl`, `FocSpeedImpl`, `FocPositionImpl`, `FocWithSpeedLoop`), execution wiring (`Runner`, `LowPriorityInterruptImpl`), and gain design (`WithAutomatic*PidGains`).
 - `core/foc/instantiations/` — Concrete wiring of FOC components for specific targets.
 - `core/services/` — Application-level services (alignment, CLI, system identification, NVM).
+- `core/services/current_controllers/`, `core/services/speed_controllers/` — Runtime-selectable control algorithms (`services` namespace), dispatched through a `std::variant` selector.
 - `core/platform_abstraction/` — Abstract `PlatformFactory` interface and shared adapters.
 - `core/state_machine/` — `FocStateMachineBase` (abstract interface in `FocStateMachine.hpp`) and `FocStateMachineCommon` (concrete in `FocStateMachineCommon.hpp`, `application` namespace): formal motor lifecycle state machine (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`). Uses `std::variant` for states and `state_machine::TransitionPolicy` enum (`::Cli` / `::Auto`) for transition mode.
 - `targets/` — Application entry points (`hardware_test`, `sync_foc_sensored`) and platform implementations under `targets/platform_implementations/` (host, ti, st, motor_boards).
@@ -64,7 +67,7 @@ The `Calculate()` method runs at 20 kHz in interrupt context.
 - No virtual dispatch in `Calculate()` hot path
 - No blocking calls in ISR-reachable code
 - Target: **<400 cycles at 120 MHz** for the full FOC loop
-- Use `TrigonometricFunctions` (from `TrigonometricImpl.hpp`) or lookup tables — not raw `sin`/`cos` in hot paths
+- Use `FastTrigonometry` (from `core/foc/math/FastTrigonometry.hpp`) or lookup tables — not raw `sin`/`cos` in hot paths
 
 Every implementation file with hot-path code must include:
 
@@ -90,7 +93,7 @@ Apply `OPTIMIZE_FOR_SPEED` (from `numerical/math/CompilerOptimizations.hpp`) to 
 - **Electrical angle**: `θe = θm · pole_pairs`
 - **Anti-windup**: All PID integrators must have clamping or back-calculation
 - **Decoupling**: Add ω·Ld·Iq feedforward to Vd, subtract ω·Lq·Id from Vq where appropriate
-- Reuse `TransformsClarkePark` and `SpaceVectorModulation` from `core/foc/implementations/` — do not duplicate
+- Reuse `Clarke`, `Park`, `ClarkePark` and `SpaceVectorModulation` from `core/foc/transforms/` — do not duplicate
 - Use unit-typed aliases: `Ampere`, `Radians`, `Volts`, `RevPerMinute`, `PhasePwmDutyCycles`, `PhaseCurrents`
 
 ## 5. Naming Conventions
@@ -120,7 +123,7 @@ namespace foc
 
 ## 7. Patterns & Code Locations
 
-- **New FOC algorithm**: implement in `core/foc/implementations/`, keep public interfaces in `core/foc/interfaces/`
+- **New FOC algorithm**: implement in `core/foc/implementations/`, keep public interfaces in `core/foc/interfaces/`, put pure transforms in `core/foc/transforms/` and generic numerics in `core/foc/math/`
 - **State machine**: see `core/state_machine/FocStateMachine.hpp` (base) and `core/state_machine/FocStateMachineCommon.hpp` (implementation)
 - **Platform abstraction**: see `core/platform_abstraction/PlatformFactory.hpp`
 - **Numerical algorithms**: follow patterns in `infra/numerical-toolbox/`
@@ -128,7 +131,7 @@ namespace foc
 
 ## 8. Testing
 
-- Unit tests: `core/foc/implementations/test/Test{ComponentName}.cpp`
+- Unit tests live in the `test/` folder of the library under test, e.g. `core/foc/transforms/test/Test{ComponentName}.cpp`
 - Hardware stubs: `targets/platform_implementations/host/`
 - Host simulation: `tools/simulator/`
 - Use `TEST_F` for fixture tests; `TYPED_TEST` for multi-type tests; plain `TEST()` acceptable for simple stateless cases

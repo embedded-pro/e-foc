@@ -68,7 +68,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 - [ ] `Calculate()` hot path contains no virtual dispatch
 - [ ] No blocking calls (`sleep`, busy-wait) in ISR / FOC context
 - [ ] No heap allocation anywhere reachable from `Calculate()`
-- [ ] Trigonometric calls use approved implementation (`TrigonometricFunctions` from `TrigonometricImpl.hpp`, or lookup tables) — not raw `sin`/`cos` unless `fast-math` is confirmed active
+- [ ] Trigonometric calls use approved implementation (`FastTrigonometry` from `core/foc/math/FastTrigonometry.hpp`, or lookup tables) — not raw `sin`/`cos` unless `fast-math` is confirmed active
 - [ ] `#pragma GCC optimize("O3", "fast-math")` present in implementation files with hot-path code (guarded by `#if defined(__GNUC__) || defined(__clang__)`)
 - [ ] `OPTIMIZE_FOR_SPEED` macro applied to `Calculate()`, `Compute()`, and other hot-path methods
 - [ ] `#include "numerical/math/CompilerOptimizations.hpp"` present when `OPTIMIZE_FOR_SPEED` is used
@@ -150,7 +150,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 
 - [ ] All mocks use `testing::StrictMock<>` — `NiceMock` and `NaggyMock` are **FORBIDDEN**
 - [ ] Prefer `TEST_F` or `TYPED_TEST`; plain `TEST()` is acceptable for simple stateless cases matching existing patterns
-- [ ] Test files exist at `core/foc/implementations/test/Test{ComponentName}.cpp`
+- [ ] Test files exist in the `test/` folder of the library under test, e.g. `core/foc/transforms/test/Test{ComponentName}.cpp`
 - [ ] Fixture class inside anonymous `namespace {}`
 - [ ] Test macros outside anonymous namespace
 - [ ] Transforms verified against known mathematical reference values

@@ -51,7 +51,7 @@ The `Calculate()` method runs in the FOC interrupt at 20 kHz. Every cycle counts
 - Virtual dispatch — use concrete types or templates
 - Heap allocation — already forbidden
 - Blocking calls, `sleep`, busy-wait
-- Unguarded trigonometric functions — prefer lookup tables or `TrigonometricFunctions` (from `TrigonometricImpl.hpp`)
+- Unguarded trigonometric functions — prefer lookup tables or `FastTrigonometry` (from `core/foc/math/FastTrigonometry.hpp`)
 
 **REQUIRED for hot-path methods:**
 
@@ -88,7 +88,7 @@ When implementing FOC transforms or control loops:
 - **Decoupling**: Add ω·Ld·Iq feedforward to Vd, subtract ω·Lq·Id from Vq where appropriate
 - **Unit types**: Use the type aliases: `Ampere`, `Radians`, `Volts`, `RevPerMinute`, `PhasePwmDutyCycles`, `PhaseCurrents`
 
-Reuse `TransformsClarkePark` and `SpaceVectorModulation` from `core/foc/implementations/` when possible. Do not reimplement existing transforms.
+Reuse `Clarke`, `Park`, `ClarkePark` and `SpaceVectorModulation` from `core/foc/transforms/` when possible. Do not reimplement existing transforms.
 
 ### Naming Conventions
 
@@ -145,12 +145,12 @@ namespace foc
 
 ### Testing
 
-Test files live in `core/foc/implementations/test/Test{ComponentName}.cpp`.
+Test files live in the `test/` folder of the library under test, e.g. `core/foc/transforms/test/Test{ComponentName}.cpp`.
 
 Use `TEST_F` for fixture tests with shared setup:
 
 ```cpp
-#include "core/foc/implementations/TransformsClarkePark.hpp"
+#include "core/foc/transforms/TransformsClarkePark.hpp"
 #include <gtest/gtest.h>
 
 namespace
@@ -189,7 +189,7 @@ Follow the TDD Red-Green-Refactor cycle. **Ask clarifying questions before writi
 2. **Read the plan or task** carefully. Understand the FOC theory context.
 3. **Search for existing patterns** in `core/foc/` — follow them exactly
 4. **Reuse `infra/numerical-toolbox/` algorithms** (PID, filters) rather than reimplementing
-5. **Red** — Write failing tests first in `core/foc/implementations/test/Test{ComponentName}.cpp` for every behavior.
+5. **Red** — Write failing tests first in the `test/` folder of the library under test for every behavior.
 6. **Green** — Implement the minimum production code needed to make all tests pass, one file at a time.
 7. **Add `#pragma GCC optimize` and `OPTIMIZE_FOR_SPEED`** to all hot-path code
 8. **Refactor** — Clean up while keeping all tests green.

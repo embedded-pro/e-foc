@@ -6,7 +6,11 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 - Purpose: Field-Oriented Control (FOC) for BLDC/PMSM with strict realtime and memory constraints.
 - Major components:
   - `core/` — FOC implementations, platform abstraction interfaces, and services (libraries only).
-  - `core/services/` — Application-level services (coordination, scheduling, helpers).
+  - `core/foc/interfaces/` — FOC vocabulary and contracts only (`Units.hpp`, `Signals.hpp`, `Foc.hpp`, `Driver.hpp`, `OnlineEstimators.hpp`). No algorithms.
+  - `core/foc/math/` — Header-only generic numerics (`FastTrigonometry.hpp`, `AngleWrap.hpp`); not FOC-specific.
+  - `core/foc/transforms/` — Clarke/Park transforms and Space Vector Modulation.
+  - `core/foc/implementations/` — Cascade orchestration, execution wiring (`Runner`), and gain design.
+  - `core/services/` — Application-level services (coordination, scheduling, helpers), plus the runtime-selectable `current_controllers/` and `speed_controllers/` algorithm sets in the `services` namespace.
   - `core/platform_abstraction/` — Abstract `PlatformFactory` interface and shared adapters.
   - `core/state_machine/` — `FocStateMachineImpl`: formal motor lifecycle state machine (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`). Supports `CliTransitionPolicy` (terminal commands) and `AutoTransitionPolicy` (lambda observers). Uses `std::variant` for states.
   - `targets/` — Application entry points (`hardware_test`, `sync_foc_sensored`) and platform implementations under `targets/platform_implementations/` (Host, ti, st).
@@ -39,7 +43,7 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 
 4) Patterns & code locations (concrete examples)
 - Add a new FOC algorithm:
-  - Implement code in `core/foc/implementations/` and keep public interfaces in `core/foc/interfaces/`.
+  - Implement code in `core/foc/implementations/` and keep public interfaces in `core/foc/interfaces/`. Pure transforms belong in `core/foc/transforms/`, generic numerics in `core/foc/math/`.
   - Motor-specific application code lives under `targets/sync_foc_sensored/` and `targets/hardware_test/`.
 - State machine: see `core/state_machine/FocStateMachineImpl.hpp` for the `FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>` template. Use `state_machine::CliTransitionPolicy` (default) or `state_machine::AutoTransitionPolicy`. `LogicWithOuterLoop.hpp` shows how to wire it to hardware.
 - Platform abstraction & factory: see `core/platform_abstraction/PlatformFactory.hpp` for how peripherals and adapters are created and injected.

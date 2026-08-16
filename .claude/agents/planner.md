@@ -46,7 +46,7 @@ Before planning, thoroughly investigate:
 - **Timing constraints**: Assess whether each step stays within the FOC loop budget (<400 cycles at 120 MHz for a 20 kHz control rate)
 - **Hardware adapters**: Check `core/platform_abstraction/PlatformFactory.hpp` for peripheral creation and injection patterns
 - **Numerical tools**: Identify if `infra/numerical-toolbox/` algorithms (PID, filters, transforms) can be reused or need extension
-- **Test infrastructure**: Find existing test files in `core/foc/implementations/test/` and simulation models in `tools/simulator/`
+- **Test infrastructure**: Find existing test files in the `test/` folder of each library under `core/foc/` and simulation models in `tools/simulator/`
 - **Documentation**: Consult `documentation/` for domain guidance — `documentation/theory/foc.md`, `documentation/theory/alignment.md`, `documentation/performance-optimization/README.md`. Check for existing architecture/design documents under `documentation/` for the affected component. **Any behavioral change must be reflected in these documents.**
 
 ### 2. Plan Structure
@@ -87,7 +87,7 @@ Tests are designed **before** implementation (TDD Red-Green-Refactor):
 - **Green**: Implementation follows only to make the failing tests pass
 - **Refactor**: Clean up after all tests are green
 
-- Unit test files: `core/foc/implementations/test/Test{ComponentName}.cpp`
+- Unit test files: `test/Test{ComponentName}.cpp` inside the library under test
 - Host simulation models for validation: `tools/simulator/`
 - Host hardware stubs: `targets/platform_implementations/host/`
 - Key test cases: correctness of transforms, PID output under known conditions, SVM duty cycles, edge cases

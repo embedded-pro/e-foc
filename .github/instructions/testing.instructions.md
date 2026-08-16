@@ -32,7 +32,7 @@ Tests act as executable specifications. Write tests **before** implementation, n
 ## Fixture Test Pattern (single type — most FOC tests)
 
 ```cpp
-#include "core/foc/implementations/TransformsClarkePark.hpp"
+#include "core/foc/transforms/TransformsClarkePark.hpp"
 #include <gtest/gtest.h>
 
 namespace

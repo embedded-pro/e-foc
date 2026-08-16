@@ -106,13 +106,17 @@ The simulator implements the same PAL contracts as real hardware. Control logic 
 
 ### 1. FOC Core
 
-The heart of the system. Decomposed into three sub-layers following a strict separation of contract, algorithm, and wiring:
+The heart of the system. Decomposed into sub-layers following a strict separation of vocabulary, generic numerics, transform algorithms, orchestration, and wiring. Dependencies flow in one direction only — from wiring down towards vocabulary; no lower layer may depend on a higher one:
 
 | Sub-component   | Responsibility                                                                                                                                       |
 |-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Interfaces      | Define abstract contracts for control modes (Torque, Speed, Position) and driver peripherals (inverter, encoder, interrupt). No algorithms, no data. |
-| Implementations | Concrete algorithm implementations for Clarke/Park transforms, Space Vector Modulation, trigonometric helpers, PID wrappers, and control loops.      |
-| Instantiations  | Wiring that combines a control-mode implementation with the execution runner to produce a ready-to-use FOC controller.                               |
+| Interfaces      | Define the FOC vocabulary (units, phase and frame signal types) and the abstract contracts for control modes (Torque, Speed, Position) and driver peripherals (inverter, encoder, interrupt). No algorithms. |
+| Math            | Generic numerical helpers that are not specific to field-oriented control — fast trigonometry by lookup table, angle wrap-around. Header-only, dependency-free.                                                |
+| Transforms      | The field-oriented control mathematics proper: the Clarke and Park transforms in both directions, and Space Vector Modulation.                                                                                 |
+| Implementations | Orchestration of the control cascade — the per-mode control loops, the gain-design helpers, and the execution runner that drives the loop from interrupt context.                                              |
+| Instantiations  | Wiring that combines a control-mode implementation with the execution runner to produce a ready-to-use FOC controller.                                                                                         |
+
+Because Interfaces, Math, and Transforms carry no dependency on the control cascade, the identification, alignment, and simulation components consume them directly without pulling in the control loops.
 
 The three control modes are available in the same binary and are selected at runtime through `ControlModeStateMachine`. Only one mode is active at a time; switching is only permitted from `Idle` or `Ready` state and persists the new choice to NVM via `defaultControlMode`:
 
