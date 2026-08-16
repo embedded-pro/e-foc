@@ -106,7 +106,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 
 ### 6. Naming Conventions (WARNING)
 
-- [ ] Classes: `PascalCase` (e.g., `FocSpeedImpl`, `TransformsClarkePark`)
+- [ ] Classes: `PascalCase` (e.g., `SpeedCascade`, `ClarkePark`)
 - [ ] Methods: `PascalCase` (e.g., `Calculate()`, `SetPoint()`, `Enable()`)
 - [ ] Member variables: `camelCase` (e.g., `polePairs`, `currentTunings`)
 - [ ] Namespaces: lowercase (`foc`, `hardware`)

@@ -165,7 +165,7 @@ Scope note: The memory and realtime constraints below apply to embedded/runtime 
 - [ ] DRY: no duplicated transform or PID logic — reuse from `infra/numerical-toolbox/`
 
 ### Naming — PascalCase
-- [ ] Classes: `PascalCase` (e.g., `FocSpeedImpl`, `TransformsClarkePark`)
+- [ ] Classes: `PascalCase` (e.g., `SpeedCascade`, `ClarkePark`)
 - [ ] Methods: `PascalCase` (e.g., `Calculate()`, `SetPoint()`)
 - [ ] Member variables: `camelCase` (e.g., `polePairs`, `currentTunings`)
 - [ ] Namespaces: lowercase (e.g., `foc`, `hardware`)

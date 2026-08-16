@@ -7,7 +7,7 @@ applyTo: "**/test/**"
 
 ## File Structure
 
-- Unit test files: `core/foc/implementations/test/Test{ComponentName}.cpp`
+- Unit test files: `test/Test{ComponentName}.cpp` inside the library under test
 - Hardware stubs for unit tests: `targets/platform_implementations/Host/`
 - Host simulation models for integration: `tools/simulator/`
 - CMake: tests added via `add_subdirectory(test)` in `CMakeLists.txt`

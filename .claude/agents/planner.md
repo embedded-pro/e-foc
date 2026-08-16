@@ -157,7 +157,7 @@ Before finalizing, verify the plan against these constraints:
 - [ ] DRY: no duplicated transform or PID logic — reuse from `infra/numerical-toolbox/`
 
 ### Naming — PascalCase
-- [ ] Classes: `PascalCase` (e.g., `FocSpeedImpl`)
+- [ ] Classes: `PascalCase` (e.g., `SpeedCascade`)
 - [ ] Methods: `PascalCase` (e.g., `Calculate()`, `SetPoint()`)
 - [ ] Member variables: `camelCase` (e.g., `polePairs`, `currentTunings`)
 - [ ] Namespaces: lowercase (e.g., `foc`, `hardware`)

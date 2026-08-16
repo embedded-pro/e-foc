@@ -54,7 +54,7 @@ Use unit-typed aliases throughout: `Ampere`, `Radians`, `Volts`, `Rpm`, `PhasePw
 
 ## Naming
 
-- Classes/Methods: `PascalCase` (e.g., `FocSpeedImpl`, `Calculate()`)
+- Classes/Methods: `PascalCase` (e.g., `SpeedCascade`, `Calculate()`)
 - Member variables: `camelCase` (e.g., `polePairs`, `currentTunings`)
 - Namespaces: lowercase (`foc`, `hardware`)
 

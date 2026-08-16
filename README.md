@@ -69,10 +69,13 @@ cmake --build --preset EK-TM4C1294XL-Debug
 e-foc/
 ├── core/                            # FOC library code (no application entry points)
 │   ├── foc/                         # Field-Oriented Control
-│   │   ├── interfaces/              # Abstract FOC interfaces (Foc.hpp, Driver.hpp, Units.hpp)
-│   │   ├── implementations/         # Clarke/Park, SVM, torque/speed/position loops, Runner
-│   │   └── instantiations/          # Concrete wiring of FOC components
+│   │   ├── interfaces/              # FOC vocabulary and contracts (Foc.hpp, Signals.hpp, Execution.hpp, Units.hpp)
+│   │   ├── math/                    # Generic numerics (FastTrigonometry.hpp, AngleWrap.hpp)
+│   │   ├── transforms/              # Clarke/Park transforms and Space Vector Modulation
+│   │   ├── cascade/                 # Torque/speed/position cascade orchestration and gain design
+│   │   └── instantiations/          # Execution wiring (Runner, FocController)
 │   ├── platform_abstraction/        # Platform abstraction interfaces and shared adapters
+│   │   ├── interfaces/              # Hardware ports in namespace drivers (ThreePhaseInverter, Encoder, HallSensor)
 │   │   ├── PlatformFactory.hpp      # Abstract factory for peripherals
 │   │   ├── AdcPhaseCurrentMeasurement.hpp
 │   │   ├── CanBusAdapter.hpp
@@ -80,9 +83,12 @@ e-foc/
 │   ├── services/                    # Application-level services
 │   │   ├── alignment/               # Motor alignment and offset detection
 │   │   ├── cli/                     # Command-line interface service
+│   │   ├── controller_selection/    # Heap-free runtime controller selection
+│   │   ├── current_controllers/     # PID/decoupled-PID/deadbeat/sliding-mode current loops
 │   │   ├── electrical_system_ident/ # Resistance/inductance estimation
 │   │   ├── mechanical_system_ident/ # Friction and inertia estimation
-│   │   └── non_volatile_memory/     # NVM persistence service
+│   │   ├── non_volatile_memory/     # NVM persistence service
+│   │   └── speed_controllers/       # PID/LQI/ADRC/two-DOF speed loops
 │   └── state_machine/               # FOC motor lifecycle state machine (Idle/Calibrating/Ready/Enabled/Fault)
 ├── integration_tests/               # BDD integration tests (Cucumber/Gherkin)
 │   ├── features/                    # Gherkin .feature files

@@ -8,10 +8,11 @@ This file is a concise, task-oriented guide for Claude and AI agents to be immed
 
 **Major components**:
 - `core/` — FOC implementations, platform abstraction interfaces, and services (libraries only).
-- `core/foc/interfaces/` — FOC vocabulary and contracts: `Units.hpp`, `Signals.hpp` (`PhaseCurrents`, `PhasePwmDutyCycles`, `ThreePhase`, `TwoPhase`, `RotatingFrame`), `Foc.hpp` (`FocBase`, `FocTorque`, `FocSpeed`, `FocPosition`), `Driver.hpp`, `OnlineEstimators.hpp`. No algorithms.
+- `core/foc/interfaces/` — FOC vocabulary and contracts: `Units.hpp`, `Signals.hpp` (`PhaseCurrents`, `PhasePwmDutyCycles`, `ThreePhase`, `TwoPhase`, `RotatingFrame`), `Foc.hpp` (`FocBase`, `FocTorque`, `FocSpeed`, `FocPosition`), `Execution.hpp` (`LowPriorityInterrupt`, `Controllable`), `OnlineEstimators.hpp`. No algorithms.
 - `core/foc/math/` — Header-only generic numerics: `FastTrigonometry.hpp` (sine LUT), `AngleWrap.hpp`. Not FOC-specific; candidate for upstreaming to `numerical-toolbox`.
 - `core/foc/transforms/` — The FOC math proper: Clarke/Park transforms and Space Vector Modulation.
-- `core/foc/implementations/` — Cascade orchestration (`FocTorqueImpl`, `FocSpeedImpl`, `FocPositionImpl`, `FocWithSpeedLoop`), execution wiring (`Runner`, `LowPriorityInterruptImpl`), and gain design (`WithAutomatic*PidGains`).
+- `core/foc/cascade/` — Cascade orchestration (`TorqueCascade`, `SpeedCascade`, `PositionCascade`, `CascadeWithSpeedLoop`) and gain design (`WithAutomatic*PidGains`). Depends on no hardware.
+- `core/foc/instantiations/` — Execution wiring: `Runner`, `LowPriorityInterruptImpl`, `FocController`. The only foc layer that touches hardware ports.
 - `core/foc/instantiations/` — Concrete wiring of FOC components for specific targets.
 - `core/services/` — Application-level services (alignment, CLI, system identification, NVM).
 - `core/services/current_controllers/`, `core/services/speed_controllers/` — Runtime-selectable control algorithms (`services` namespace), dispatched through a `std::variant` selector.
@@ -98,7 +99,7 @@ Apply `OPTIMIZE_FOR_SPEED` (from `numerical/math/CompilerOptimizations.hpp`) to 
 
 ## 5. Naming Conventions
 
-- **Classes/Methods**: `PascalCase` (`FocSpeedImpl`, `Calculate()`, `SetPoint()`)
+- **Classes/Methods**: `PascalCase` (`SpeedCascade`, `Calculate()`, `SetPoint()`)
 - **Member variables**: `camelCase` (`polePairs`, `currentTunings`)
 - **Namespaces**: lowercase (`foc`, `hardware`)
 
@@ -107,7 +108,7 @@ Apply `OPTIMIZE_FOR_SPEED` (from `numerical/math/CompilerOptimizations.hpp`) to 
 ```cpp
 namespace foc
 {
-    class FocSpeedImpl
+    class SpeedCascade
         : public FocSpeed
     {
     public:
@@ -123,7 +124,7 @@ namespace foc
 
 ## 7. Patterns & Code Locations
 
-- **New FOC algorithm**: implement in `core/foc/implementations/`, keep public interfaces in `core/foc/interfaces/`, put pure transforms in `core/foc/transforms/` and generic numerics in `core/foc/math/`
+- **New FOC algorithm**: implement in `core/foc/cascade/`, keep public interfaces in `core/foc/interfaces/`, put pure transforms in `core/foc/transforms/` and generic numerics in `core/foc/math/`
 - **State machine**: see `core/state_machine/FocStateMachine.hpp` (base) and `core/state_machine/FocStateMachineCommon.hpp` (implementation)
 - **Platform abstraction**: see `core/platform_abstraction/PlatformFactory.hpp`
 - **Numerical algorithms**: follow patterns in `infra/numerical-toolbox/`

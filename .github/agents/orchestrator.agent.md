@@ -37,7 +37,7 @@ You triage incoming development requests and route them to the right specialist 
   - `core/foc/interfaces/` — abstract FOC interfaces (`FocTorque`, `FocSpeed`, `FocPosition`, `FocBase`)
   - `core/foc/transforms/` — Clarke/Park transforms and SVM
   - `core/foc/math/` — generic numerics (sine LUT, angle wrap)
-  - `core/foc/implementations/` — current/speed/position cascade orchestration
+  - `core/foc/cascade/` — current/speed/position cascade orchestration
   - `core/foc/instantiations/` — concrete wiring of FOC components for specific targets
   - `core/platform_abstraction/` — platform abstraction adapters (`PlatformFactory` interface, ADC, encoder, CAN adapters)
   - `targets/` — platform implementations (Host, TI, ST) and application entry points

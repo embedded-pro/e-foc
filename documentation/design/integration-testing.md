@@ -40,7 +40,7 @@ The test suite uses the **amp-cucumber-cpp-runner v4.0.0** framework. Scenarios 
 - Injecting CAN commands directly into the category server to verify state machine transitions independently of CAN transport encoding
 
 **Is NOT responsible for:**
-- Testing FOC control algorithm correctness — covered by unit tests in `core/foc/implementations/test/`
+- Testing FOC control algorithm correctness — covered by unit tests in `core/foc/cascade/test/`
 - Testing CAN framing or transport encoding — covered by `can-lite` unit and integration tests
 - Running on an embedded target — host-only suite
 

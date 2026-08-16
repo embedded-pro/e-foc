@@ -66,7 +66,7 @@ The `Calculate()` method runs in the FOC interrupt at 20 kHz. Every cycle counts
 ```cpp
 #include "numerical/math/CompilerOptimizations.hpp"
 
-OPTIMIZE_FOR_SPEED PhasePwmDutyCycles FocSpeedImpl::Calculate(
+OPTIMIZE_FOR_SPEED PhasePwmDutyCycles SpeedCascade::Calculate(
     const PhaseCurrents& currentPhases, Radians& position)
 {
     // hot-path implementation
@@ -92,7 +92,7 @@ Reuse `Clarke`, `Park`, `ClarkePark` and `SpaceVectorModulation` from `core/foc/
 
 ### Naming Conventions
 
-- **Classes**: `PascalCase` — `FocSpeedImpl`, `TransformsClarkePark`, `SpaceVectorModulation`
+- **Classes**: `PascalCase` — `SpeedCascade`, `ClarkePark`, `SpaceVectorModulation`
 - **Methods**: `PascalCase` — `Calculate()`, `SetPoint()`, `Enable()`
 - **Member variables**: `camelCase` — `polePairs`, `currentTunings`, `positionPid`
 - **Namespaces**: lowercase — `foc`, `hardware`
@@ -111,7 +111,7 @@ Reuse `Clarke`, `Park`, `ClarkePark` and `SpaceVectorModulation` from `core/foc/
 ```cpp
 namespace foc
 {
-    class FocSpeedImpl
+    class SpeedCascade
         : public FocSpeed
     {
     public:
