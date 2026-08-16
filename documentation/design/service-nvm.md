@@ -199,6 +199,8 @@ stateDiagram-v2
 | underVoltageThreshold | V             | DC bus under-voltage trip threshold     |
 | overVoltageThreshold  | V             | DC bus over-voltage trip threshold      |
 | defaultControlMode    | —             | Control mode selected on power-up       |
+| currentAlgorithm      | —             | Current-loop algorithm selected on power-up |
+| speedAlgorithm        | —             | Speed-loop algorithm selected on power-up   |
 
 ---
 
