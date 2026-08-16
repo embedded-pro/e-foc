@@ -45,16 +45,14 @@ namespace services
 
     TerminalFocPositionInteractor::StatusWithMessage TerminalFocPositionInteractor::SetPositionPid(const infra::BoundedConstString& input)
     {
-        using enum services::TerminalWithStorage::Status;
-
         infra::Tokenizer tokenizer(input, ' ');
 
         if (tokenizer.Size() != 1)
-            return { error, "invalid number of arguments." };
+            return { services::TerminalWithStorage::Status::error, "invalid number of arguments." };
 
         auto bandwidth = ParseInput(tokenizer.Token(0));
         if (!bandwidth.has_value())
-            return { error, "invalid value. It should be a float." };
+            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
 
         auto tunings = foc::PositionLoopTunings{};
         tunings.bandwidth = *bandwidth;
@@ -63,11 +61,11 @@ namespace services
         switch (foc.SetPositionTunings(tunings))
         {
             case foc::SelectResult::busy:
-                return { error, "rejected: motor is enabled." };
+                return { services::TerminalWithStorage::Status::error, "rejected: motor is enabled." };
             case foc::SelectResult::ok:
                 return StatusWithMessage();
             default:
-                return { error, "rejected: no controller for this bandwidth." };
+                return { services::TerminalWithStorage::Status::error, "rejected: no controller for this bandwidth." };
         }
     }
 
