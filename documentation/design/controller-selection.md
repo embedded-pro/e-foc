@@ -232,11 +232,13 @@ rule rather than an afterthought:
 This is why `SetPositionTunings` returns `SelectResult` where the current and speed loops return
 `void`: those loops derive their gains algebraically and cannot fail.
 
-`IntegralStateFeedbackLqi` is not used for the LQI position law. Its constructor calls
-`really_assert(converged)` with no non-aborting alternative, which on a live motor turns a single
-CLI command into a firmware abort. The augmented three-state design is built on
-`Lqr<float, 3, 1>::TryCreate` instead. Tracked as a pending upstream fix in
-`documentation/architecture/system.md` (numerical-toolbox issue #291).
+`IntegralStateFeedbackLqi` is not used for the LQI position law even though it now offers a
+`TryCreate` factory. It augments the plant with `C · (−Ts)`, which reintroduces the sample period
+into the integral row and undoes the time scaling above; at a 1 kHz outer rate that row is three
+orders of magnitude smaller than the rest of the matrix and the solve stops converging. The
+augmentation is therefore written out explicitly in the scaled coordinates, where the integral
+state simply accumulates the position deviation per sample, and solved with
+`Lqr<float, 3, 1>::TryCreate`.
 
 ---
 

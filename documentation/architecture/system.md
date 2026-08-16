@@ -205,16 +205,19 @@ External repositories consumed as Git submodules. This project does not modify t
 | `infra/numerical-toolbox`         | Numerical algorithms for control: incremental PID controllers with anti-windup, digital filters (FIR, IIR, Kalman), recursive least-squares estimators, and compiler-optimisation helpers (`OPTIMIZE_FOR_SPEED`).                                                     |
 | `infra/can-lite`                  | Lightweight CAN 2.0B protocol stack: client-server model, category-based message dispatch, ISO-TP segmentation. Zero heap allocation.                                                                                                                                 |
 
-#### Pending upstream fixes
+#### Upstream dependencies of the position state feedback laws
 
-Because submodules are never patched locally, an upstream defect is carried here as a workaround
-until the fix lands. Each entry below records what the workaround is and what should be undone
-once the upstream change is released, so the workarounds do not quietly become permanent.
+Because submodules are never patched locally, an upstream defect has to be carried here as a
+workaround until the fix lands. Two such defects shaped the position loop and are now resolved on
+`numerical-toolbox` `main`, which is what the submodule tracks:
 
-| Upstream                    | Status                                              | Effect here                                                                                                                                                                                                        | Retire when                                                                                                                    |
-|-----------------------------|-----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
-| numerical-toolbox PR **#288** — scale-invariant DARE convergence tolerance | Merged on the PR branch, **not yet on `main`**       | `infra/numerical-toolbox` is pinned to `fix/dare-scale-dependent-tolerance-288` (`11d6df4`, one commit past `v3.1.0`) rather than a release tag. Without it the position LQR and LQI designs do not converge at all. | #288 lands on `main`. Re-pin the submodule to the release tag that contains it. **Until then this branch is not mergeable.**    |
-| numerical-toolbox issue **#291** — `IntegralStateFeedbackLqi` has no non-aborting construction path | Open                                                | Its constructor calls `really_assert(converged)`, so a non-convergent Riccati solve aborts the firmware. On a live motor that turns one CLI selection into a hard fault. `LqiPositionController` therefore builds the augmented three-state design on `Lqr<float, 3, 1>::TryCreate` instead of using `IntegralStateFeedbackLqi`. | #291 ships a `TryCreate`-style factory. `LqiPositionController` may then be rewritten against `IntegralStateFeedbackLqi`.       |
+| Upstream                                                                                            | Why it mattered                                                                                                                                            |
+|-----------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| PR **#288** / **#289** — scale-invariant DARE convergence tolerance                                  | Without it the position LQR and LQI designs do not converge at all. The submodule must stay at or past this commit.                                          |
+| Issue **#291** — `IntegralStateFeedbackLqi` had no non-aborting construction path                    | Its constructor called `really_assert(converged)`, so a non-convergent solve aborted the firmware. `TryCreate` now exists and every state feedback design here uses it. |
+
+Should a comparable defect appear again, record it in this table with the workaround and the
+condition for retiring it, so a workaround does not quietly become permanent.
 
 ### 7. Vendor HAL
 
