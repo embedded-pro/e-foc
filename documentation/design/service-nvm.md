@@ -180,8 +180,8 @@ stateDiagram-v2
 | frictionCoulomb        | N·m           | Coulomb (constant) friction                         |
 | frictionViscous        | N·m·s/rad     | Viscous friction coefficient                        |
 | encoderZeroOffset      | rad           | Encoder calibration offset (from alignment service) |
-| kpCurrent, kiCurrent   | —             | Normalised current PID gains                        |
-| kpVelocity, kiVelocity | —             | Normalised velocity PID gains                       |
+| currentLoopBandwidth   | rad/s         | Current loop closed-loop bandwidth                       |
+| speedLoopBandwidth     | rad/s         | Speed loop closed-loop bandwidth                         |
 | encoderDirection       | —             | Polarity correction (+1 or −1)                      |
 | polePairs              | —             | Number of motor pole pairs                          |
 

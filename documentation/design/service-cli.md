@@ -63,12 +63,12 @@ classDiagram
     }
     class TerminalFocSpeedInteractor {
         +set-speed(ω)
-        +set-speed-pid(kp, ki, kd)
+        +set-speed-bandwidth(bandwidth)
     }
     class TerminalFocPositionInteractor {
         +set-position(θ)
-        +set-speed-pid(kp, ki, kd)
-        +set-position-pid(kp, ki, kd)
+        +set-speed-bandwidth(bandwidth)
+        +set-position-bandwidth(bandwidth)
     }
 
     TerminalFocBaseInteractor <|-- TerminalFocTorqueInteractor
@@ -82,7 +82,7 @@ Only one interactor is active at a time; the application constructs exactly the 
 
 | Command      | Arguments            | Action                                                         |
 |--------------|----------------------|----------------------------------------------------------------|
-| `set_dq_pid` | kp, ki, kd×2 (float) | Sets current-loop PID gains via `FocBase::SetCurrentTunings()` |
+| `set_current_bandwidth` | bandwidth (float, rad/s) | Sets the current-loop bandwidth via `CurrentLoopTunable::SetCurrentTunings()` |
 
 This command is available in all control modes.
 
@@ -97,15 +97,15 @@ This command is available in all control modes.
 | Command         | Arguments          | Action                                                      |
 |-----------------|--------------------|-------------------------------------------------------------|
 | `set-speed`     | ω (rad/s)          | Sets the speed setpoint via `FocSpeed::SetPoint()`          |
-| `set-speed-pid` | kp, ki, kd (float) | Sets speed-loop PID gains via `FocSpeed::SetSpeedTunings()` |
+| `set_speed_bandwidth` | bandwidth (float, rad/s) | Sets the speed-loop bandwidth via `SpeedLoopTunable::SetSpeedTunings()` |
 
 #### `TerminalFocPositionInteractor` — Position Mode
 
 | Command            | Arguments          | Action                                                               |
 |--------------------|--------------------|----------------------------------------------------------------------|
 | `set-position`     | θ (rad)            | Sets the position setpoint via `FocPosition::SetPoint()`             |
-| `set-speed-pid`    | kp, ki, kd (float) | Sets speed-loop PID gains within the position cascade                |
-| `set-position-pid` | kp, ki, kd (float) | Sets position-loop PID gains via `FocPosition::SetPositionTunings()` |
+| `set_speed_bandwidth`    | bandwidth (float, rad/s) | Sets the speed-loop bandwidth within the position cascade      |
+| `set_position_bandwidth` | bandwidth (float, rad/s) | Sets the position-loop bandwidth via `PositionLoopTunable::SetPositionTunings()` |
 
 ### `TerminalWithBanner` — Decorator
 
@@ -201,7 +201,7 @@ Registered command handlers are stored in a fixed-size look-up structure in the 
 
 | Interface                                    | Purpose                                                                                                                                                                    | Contract                                                                              |
 |----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
-| `TerminalFocBaseInteractor` (and subclasses) | Registers the `set_dq_pid` command on `TerminalWithStorage`; exposes a `Terminal()` accessor for the `FocStateMachine` to register lifecycle commands on the same terminal | Constructed once per application; exactly one interactor subclass is active at a time |
+| `TerminalFocBaseInteractor` (and subclasses) | Registers the `set_current_bandwidth` command on `TerminalWithStorage`; exposes a `Terminal()` accessor for the `FocStateMachine` to register lifecycle commands on the same terminal | Constructed once per application; exactly one interactor subclass is active at a time |
 | `TerminalWithBanner`                         | Decorates `TerminalWithStorage` to print a welcome banner on first connection                                                                                              | Transparent to the underlying terminal after the banner has been printed              |
 
 ### Required
@@ -209,7 +209,7 @@ Registered command handlers are stored in a fixed-size look-up structure in the 
 | Interface                                | Purpose                                                                                                | Contract                                                                             |
 |------------------------------------------|--------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
 | `TerminalWithStorage`                    | Receives and dispatches parsed command tokens; writes string responses to the serial output            | Must be connected to the physical serial driver before any interactor is constructed |
-| `FocBase`                                | Provides `Enable()`, `Disable()`, and `SetCurrentTunings()` shared by all control modes                | Must remain valid for the lifetime of the interactor                                 |
+| `CurrentLoopTunable`                     | Provides `SetCurrentTunings()`, shared by all control modes                                            | Must remain valid for the lifetime of the interactor                                 |
 | `FocTorque` / `FocSpeed` / `FocPosition` | Provides mode-specific setpoint and tuning methods                                                     | The concrete interface must match the constructed interactor subclass                |
 | DC bus voltage (`Volts`)                 | Supplied to the interactor for normalising PID gain inputs before forwarding them to the FOC component | Must reflect the actual DC bus voltage at the time tunings are applied               |
 

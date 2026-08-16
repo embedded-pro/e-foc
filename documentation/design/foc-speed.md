@@ -118,11 +118,11 @@ stateDiagram-v2
 
 | Interface          | Purpose                                                              | Contract                                                                                   |
 |--------------------|----------------------------------------------------------------------|--------------------------------------------------------------------------------------------|
-| SetPolePairs       | Configures the pole-pair count for the electrical angle calculation. | Must be called before the first `Calculate()`. Must not be changed while Enabled.          |
+| Configure          | Supplies the motor model, including the pole-pair count used for the electrical angle. | Must be called before the first `Calculate()`. Must not be changed while Enabled.          |
 | Enable             | Arms all three PIDs and resets their integrator state.               | Safe to call repeatedly. Speed setpoint is preserved.                                      |
 | Disable            | Disarms all PIDs and forces zero duty cycle output.                  | Safe to call from any context.                                                             |
-| SetCurrentTunings  | Sets P, I, D gains for the d-axis and q-axis current PIDs.           | Gains normalised by 1/(√3·Vdc) internally. Takes effect on the next `Calculate()`.         |
-| SetSpeedTunings    | Sets P, I, D gains for the outer speed PID.                          | Output of speed PID is clamped to ± maxCurrent. Takes effect on the next outer-loop cycle. |
+| SetCurrentTunings  | Sets the current loop closed-loop bandwidth.                         | Gains are derived from the motor model and normalised internally. Takes effect on the next `Calculate()`. |
+| SetSpeedTunings    | Sets the speed loop closed-loop bandwidth.                           | Gains are derived from the mechanical model supplied through `ConfigureMechanics()`. Output is clamped to ± maxCurrent. |
 | SetPoint           | Sets the speed setpoint in radians per second.                       | Written atomically; used on the next outer-loop cycle.                                     |
 | Calculate          | Executes the inner 20 kHz FOC torque loop for one cycle.             | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                     |
 | OuterLoopFrequency | Returns the configured outer-loop frequency in Hz.                   | Pure query; no side effects. Can be called before Enable.                                  |

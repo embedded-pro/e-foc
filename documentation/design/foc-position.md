@@ -128,12 +128,12 @@ This ordering guarantees that the speed setpoint used by the speed PID in any gi
 
 | Interface          | Purpose                                                                  | Contract                                                                          |
 |--------------------|--------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
-| SetPolePairs       | Configures the pole-pair count for electrical angle calculation.         | Must be called before the first `Calculate()`. Must not be changed while Enabled. |
+| Configure          | Supplies the motor model, including the pole-pair count.                 | Must be called before the first `Calculate()`. Must not be changed while Enabled. |
 | Enable             | Arms all four PIDs and resets their integrator state.                    | Safe to call repeatedly. Position setpoint is preserved.                          |
 | Disable            | Disarms all PIDs and forces zero duty cycle output.                      | Safe to call from any context.                                                    |
-| SetCurrentTunings  | Sets P, I, D gains for d-axis and q-axis current PIDs.                   | Gains normalised by 1/(√3·Vdc) internally.                                        |
-| SetSpeedTunings    | Sets P, I, D gains for the speed PID, including the current clamp limit. | Speed PID output clamped to ± maxCurrent.                                         |
-| SetPositionTunings | Sets P, I, D gains for the position PID.                                 | Position PID output clamped to ± 1000 rad/s.                                      |
+| SetCurrentTunings  | Sets the current loop closed-loop bandwidth.                             | Gains are derived from the motor model and normalised internally.                 |
+| SetSpeedTunings    | Sets the speed loop closed-loop bandwidth.                               | Speed loop output clamped to ± maxCurrent.                                        |
+| SetPositionTunings | Sets the position loop bandwidth.                                        | The position loop is proportional: the speed reference is the position error times the bandwidth. |
 | SetPoint           | Sets the target position in mechanical radians.                          | Written atomically; used on the next outer-loop cycle.                            |
 | Calculate          | Executes the inner 20 kHz FOC torque loop for one cycle.                 | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.            |
 

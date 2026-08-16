@@ -116,7 +116,7 @@ sequenceDiagram
 | 1. Pole pairs                                  | Electrical Ident    | `polePairs`                                              |
 | 2. Resistance and inductance                   | Electrical Ident    | `rPhase`, `lD`, `lQ`                                     |
 | 3. Alignment                                   | Motor Alignment     | `encoderZeroOffset`                                      |
-| 4. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `kpVelocity`, `kiVelocity` |
+| 4. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth` |
 | 5. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                       |
 
 After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, encoder zero offset applied, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`.
@@ -356,9 +356,8 @@ sequenceDiagram
 | `CalibrationData` | `inertia`                 | N·m·s² (float)                 | ≥ 0      | Rotor inertia; populated only for speed/position modes                                                                  |
 | `CalibrationData` | `frictionViscous`         | N·m·s/rad (float)              | ≥ 0      | Viscous friction coefficient; populated only for speed/position modes                                                   |
 | `CalibrationData` | `frictionCoulomb`         | N·m (float)                    | ≥ 0      | Coulomb friction; currently 0 (not identified)                                                                          |
-| `CalibrationData` | `kpVelocity`              | (float)                        | ≥ 0      | Velocity PID proportional gain; computed as J × ω_bw                                                                    |
-| `CalibrationData` | `kiVelocity`              | (float)                        | ≥ 0      | Velocity PID integral gain; computed as B × ω_bw                                                                        |
-| `CalibrationData` | `kpCurrent` / `kiCurrent` | (float)                        | any      | Current PID gains; computed from R/L/bandwidth by auto-tuner, not stored by the state machine                           |
+| `CalibrationData` | `speedLoopBandwidth`      | rad/s (float)                  | ≥ 0      | Speed loop closed-loop bandwidth; populated only for speed/position modes                                              |
+| `CalibrationData` | `currentLoopBandwidth`    | rad/s (float)                  | ≥ 0      | Current loop closed-loop bandwidth; defaults to 2π·fs/nyquistFactor when zero                                         |
 | `FaultCode`       | —                         | enum (uint8)                   | 7 values | `overcurrent`, `overvoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed` |
 
 ---

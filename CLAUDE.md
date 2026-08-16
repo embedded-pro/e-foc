@@ -11,7 +11,7 @@ This file is a concise, task-oriented guide for Claude and AI agents to be immed
 - `core/foc/interfaces/` — FOC vocabulary and contracts: `Units.hpp`, `Signals.hpp` (`PhaseCurrents`, `PhasePwmDutyCycles`, `ThreePhase`, `TwoPhase`, `RotatingFrame`), `Foc.hpp` (`FocBase`, `FocTorque`, `FocSpeed`, `FocPosition`), `Execution.hpp` (`LowPriorityInterrupt`, `Controllable`), `OnlineEstimators.hpp`. No algorithms.
 - `core/foc/math/` — Header-only generic numerics: `FastTrigonometry.hpp` (sine LUT), `AngleWrap.hpp`. Not FOC-specific; candidate for upstreaming to `numerical-toolbox`.
 - `core/foc/transforms/` — The FOC math proper: Clarke/Park transforms and Space Vector Modulation.
-- `core/foc/cascade/` — Cascade orchestration (`TorqueCascade`, `SpeedCascade`, `PositionCascade`, `CascadeWithSpeedLoop`) and gain design (`WithAutomatic*PidGains`). Depends on no hardware.
+- `core/foc/cascade/` — Cascade orchestration (`TorqueCascade`, `SpeedCascade`, `PositionCascade`, `CascadeWithSpeedLoop`). Dispatches to the current and speed loop selectors; depends on no hardware.
 - `core/foc/instantiations/` — Execution wiring: `Runner`, `LowPriorityInterruptImpl`, `FocController`. The only foc layer that touches hardware ports.
 - `core/foc/instantiations/` — Concrete wiring of FOC components for specific targets.
 - `core/services/` — Application-level services (alignment, CLI, system identification, NVM).
