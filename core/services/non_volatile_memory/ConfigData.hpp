@@ -15,7 +15,9 @@ namespace services
         uint32_t telemetryRateHz = 100;
         uint32_t encoderResolution = 4000;
         uint8_t defaultControlMode = 0;
-        std::array<uint8_t, 3> reserved = {};
+        uint8_t currentAlgorithm = 0;
+        uint8_t speedAlgorithm = 0;
+        std::array<uint8_t, 1> reserved = {};
     };
 
     static_assert(sizeof(ConfigData) == 20, "ConfigData layout must be free of implicit padding");

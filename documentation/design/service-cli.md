@@ -83,6 +83,9 @@ Only one interactor is active at a time; the application constructs exactly the 
 | Command      | Arguments            | Action                                                         |
 |--------------|----------------------|----------------------------------------------------------------|
 | `set_current_bandwidth` | bandwidth (float, rad/s) | Sets the current-loop bandwidth via `CurrentLoopTunable::SetCurrentTunings()` |
+| `select_current_algorithm` | pid \| decoupled \| deadbeat \| sliding | Selects the current-loop algorithm; rejected while the motor is enabled or before the motor model is identified |
+| `select_speed_algorithm` | pid \| lqi \| adrc \| twodof | Selects the speed-loop algorithm; only available in speed and position modes |
+| `active_algorithms` | — | Prints the active current and speed loop algorithms |
 
 This command is available in all control modes.
 

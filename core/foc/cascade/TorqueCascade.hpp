@@ -15,6 +15,8 @@ namespace foc
         void Configure(const MotorModelParameters& parameters) override;
         void SetPoint(IdAndIqPoint setPoint) override;
         void SetCurrentTunings(const CurrentLoopTunings& tunings) override;
+        SelectResult SelectCurrentAlgorithm(CurrentAlgorithm algorithm) override;
+        CurrentAlgorithm ActiveCurrentAlgorithm() const override;
         void Enable() override;
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
@@ -27,6 +29,7 @@ namespace foc
         CurrentControllerSelector currentLoop;
         [[no_unique_address]] SpaceVectorModulation spaceVectorModulator;
         float polePairs{ 0.0f };
+        bool enabled{ false };
         IdAndIqPoint lastSetPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
     };
 }

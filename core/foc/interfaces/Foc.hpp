@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/interfaces/Algorithms.hpp"
 #include "core/foc/interfaces/LoopTunings.hpp"
 #include "core/foc/interfaces/MotorModel.hpp"
 #include "core/foc/interfaces/OnlineEstimators.hpp"
@@ -25,6 +26,21 @@ namespace foc
         virtual void SetCurrentTunings(const CurrentLoopTunings& tunings) = 0;
     };
 
+    // Selection is a configuration-time operation; implementations reject it while enabled.
+    class CurrentLoopSelectable
+    {
+    public:
+        virtual SelectResult SelectCurrentAlgorithm(CurrentAlgorithm algorithm) = 0;
+        virtual CurrentAlgorithm ActiveCurrentAlgorithm() const = 0;
+    };
+
+    class SpeedLoopSelectable
+    {
+    public:
+        virtual SelectResult SelectSpeedAlgorithm(SpeedAlgorithm algorithm) = 0;
+        virtual SpeedAlgorithm ActiveSpeedAlgorithm() const = 0;
+    };
+
     class SpeedLoopTunable
     {
     public:
@@ -41,6 +57,7 @@ namespace foc
     class FocTorque
         : public FocBase
         , public CurrentLoopTunable
+        , public CurrentLoopSelectable
     {
     public:
         virtual void SetPoint(IdAndIqPoint setPoint) = 0;
@@ -56,7 +73,9 @@ namespace foc
     class FocSpeed
         : public FocBase
         , public CurrentLoopTunable
+        , public CurrentLoopSelectable
         , public SpeedLoopTunable
+        , public SpeedLoopSelectable
         , public FocOnlineEstimableBase
     {
     public:
@@ -67,7 +86,9 @@ namespace foc
     class FocPosition
         : public FocBase
         , public CurrentLoopTunable
+        , public CurrentLoopSelectable
         , public SpeedLoopTunable
+        , public SpeedLoopSelectable
         , public PositionLoopTunable
         , public FocOnlineEstimableBase
     {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/interfaces/Algorithms.hpp"
 #include "core/foc/interfaces/LoopTunings.hpp"
 #include "core/foc/interfaces/MotorModel.hpp"
 #include "core/foc/interfaces/Signals.hpp"
@@ -9,14 +10,6 @@
 
 namespace foc
 {
-    enum class CurrentAlgorithm : uint8_t
-    {
-        pid = 0,
-        decoupledPid = 1,
-        deadbeat = 2,
-        slidingMode = 3
-    };
-
     struct CurrentControlContext
     {
         RotatingFrame measured{ 0.0f, 0.0f };

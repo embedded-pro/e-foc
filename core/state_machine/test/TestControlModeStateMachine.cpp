@@ -805,4 +805,56 @@ namespace
 
         EXPECT_TRUE(subject->TrySetPositionBandwidth(18.8f));
     }
+
+    TEST_F(ControlModeStateMachineExtTest, SelectCurrentAlgorithm_DefaultsToPid)
+    {
+        GivenNvmAlwaysInvalid();
+        ConstructSubject();
+
+        EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, SelectCurrentAlgorithm_RejectedWithoutMotorModel)
+    {
+        GivenNvmAlwaysInvalid();
+        ConstructSubject();
+
+        EXPECT_EQ(subject->SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::invalidParameters);
+        EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, SelectCurrentAlgorithm_PersistsToNvmOnceCalibrated)
+    {
+        GivenNvmValid();
+        ConstructSubject();
+
+        EXPECT_CALL(nvmMock, SaveConfig(_, _))
+            .WillOnce(Invoke([](const services::ConfigData& config, infra::Function<void(services::NvmStatus)> onDone)
+                {
+                    EXPECT_EQ(config.currentAlgorithm, static_cast<uint8_t>(foc::CurrentAlgorithm::deadbeat));
+                    onDone(services::NvmStatus::Ok);
+                }));
+
+        EXPECT_EQ(subject->SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
+        EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::deadbeat);
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, SelectSpeedAlgorithm_RejectedInTorqueMode)
+    {
+        GivenNvmAlwaysInvalid();
+        ConstructSubject();
+
+        EXPECT_EQ(subject->SelectSpeedAlgorithm(foc::SpeedAlgorithm::lqi), foc::SelectResult::invalidAlgorithm);
+    }
+
+    TEST_F(ControlModeStateMachineExtTest, SelectSpeedAlgorithm_RejectedWithoutMechanicalModel)
+    {
+        GivenNvmAlwaysInvalid();
+        GivenNvmSaveConfigSucceeds();
+        ConstructSubject();
+
+        subject->Select(state_machine::ControlMode::speed, [](auto) {});
+
+        EXPECT_EQ(subject->SelectSpeedAlgorithm(foc::SpeedAlgorithm::lqi), foc::SelectResult::invalidParameters);
+    }
 }

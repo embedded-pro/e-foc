@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/interfaces/Algorithms.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <concepts>
 #include <cstdint>
@@ -8,14 +9,6 @@
 
 namespace foc
 {
-    enum class SelectResult : uint8_t
-    {
-        ok = 0,
-        busy = 1,
-        invalidAlgorithm = 2,
-        invalidParameters = 3
-    };
-
     template<typename T, typename Algorithm>
     concept AlgorithmOf = std::same_as<std::remove_const_t<decltype(T::algorithm)>, Algorithm>;
 

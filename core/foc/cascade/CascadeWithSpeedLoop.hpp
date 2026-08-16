@@ -33,6 +33,10 @@ namespace foc
         void ConfigureMechanicsImpl(const MechanicalModelParameters& parameters);
         void SetCurrentTuningsImpl(const CurrentLoopTunings& tunings);
         void SetSpeedTuningsImpl(const SpeedLoopTunings& tunings);
+        SelectResult SelectCurrentAlgorithmImpl(CurrentAlgorithm algorithm);
+        SelectResult SelectSpeedAlgorithmImpl(SpeedAlgorithm algorithm);
+        CurrentAlgorithm ActiveCurrentAlgorithmImpl() const;
+        SpeedAlgorithm ActiveSpeedAlgorithmImpl() const;
         void EnableSpeedLoop();
         void DisableSpeedLoop();
         PhasePwmDutyCycles CalculateInnerLoop(const PhaseCurrents& currentPhases, const Radians& position);
@@ -72,6 +76,7 @@ namespace foc
         uint32_t triggerCounter{ 0 };
         float polePairs{ 0.0f };
         float vdcInvScale{ 1.0f };
+        bool enabled{ false };
 
         OnlineMechanicalEstimator* onlineMechEstimator{ nullptr };
         OnlineElectricalEstimator* onlineElecEstimator{ nullptr };

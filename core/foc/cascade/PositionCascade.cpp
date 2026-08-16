@@ -47,6 +47,26 @@ namespace foc
         positionGain = tunings.bandwidth;
     }
 
+    SelectResult PositionCascade::SelectCurrentAlgorithm(CurrentAlgorithm algorithm)
+    {
+        return SelectCurrentAlgorithmImpl(algorithm);
+    }
+
+    CurrentAlgorithm PositionCascade::ActiveCurrentAlgorithm() const
+    {
+        return ActiveCurrentAlgorithmImpl();
+    }
+
+    SelectResult PositionCascade::SelectSpeedAlgorithm(SpeedAlgorithm algorithm)
+    {
+        return SelectSpeedAlgorithmImpl(algorithm);
+    }
+
+    SpeedAlgorithm PositionCascade::ActiveSpeedAlgorithm() const
+    {
+        return ActiveSpeedAlgorithmImpl();
+    }
+
     void PositionCascade::SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator)
     {
         SetOnlineMechanicalEstimatorImpl(estimator);

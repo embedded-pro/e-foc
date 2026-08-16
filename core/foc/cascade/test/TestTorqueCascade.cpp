@@ -126,3 +126,38 @@ TEST_F(TestTorqueCascade, non_zero_current_setpoint_produces_non_centered_output
     bool anyNon50 = (result.a.Value() != 50) || (result.b.Value() != 50) || (result.c.Value() != 50);
     EXPECT_TRUE(anyNon50);
 }
+
+TEST_F(TestTorqueCascade, pid_is_the_default_current_algorithm)
+{
+    EXPECT_EQ(focTorque->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
+}
+
+TEST_F(TestTorqueCascade, algorithm_selection_is_rejected_while_enabled)
+{
+    EXPECT_EQ(focTorque->SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::busy);
+    EXPECT_EQ(focTorque->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
+}
+
+TEST_F(TestTorqueCascade, algorithm_selection_is_accepted_while_disabled)
+{
+    focTorque->Disable();
+
+    EXPECT_EQ(focTorque->SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
+    EXPECT_EQ(focTorque->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::deadbeat);
+}
+
+TEST_F(TestTorqueCascade, selected_algorithm_drives_the_output)
+{
+    focTorque->Disable();
+    ASSERT_EQ(focTorque->SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
+    focTorque->Enable();
+    focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 5.0f } });
+
+    foc::Radians position{ 0.0f };
+    auto result = focTorque->Calculate(ZeroCurrents(), position);
+
+    EXPECT_GE(result.a.Value(), 0);
+    EXPECT_LE(result.a.Value(), 100);
+    bool anyNon50 = (result.a.Value() != 50) || (result.b.Value() != 50) || (result.c.Value() != 50);
+    EXPECT_TRUE(anyNon50);
+}

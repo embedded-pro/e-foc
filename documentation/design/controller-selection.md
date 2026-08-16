@@ -1,7 +1,7 @@
 ---
 title: "Runtime Controller Selection"
 type: design
-status: draft
+status: accepted
 version: 0.2.0
 component: "controller-selection"
 date: 2026-08-14
@@ -11,7 +11,7 @@ date: 2026-08-14
 |-----------|------------------------------|
 | Title     | Runtime Controller Selection |
 | Type      | design                       |
-| Status    | draft                        |
+| Status    | accepted                     |
 | Version   | 0.2.0                        |
 | Component | controller-selection         |
 | Date      | 2026-08-14                   |

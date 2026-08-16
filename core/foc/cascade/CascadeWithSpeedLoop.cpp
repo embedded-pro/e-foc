@@ -56,11 +56,39 @@ namespace foc
         lastSpeedLoopOutput = 0.0f;
         lastElectricalSpeed = 0.0f;
         triggerCounter = 0;
+        enabled = true;
     }
 
     OPTIMIZE_FOR_SPEED
     void CascadeWithSpeedLoop::DisableSpeedLoop()
     {
+        enabled = false;
+    }
+
+    SelectResult CascadeWithSpeedLoop::SelectCurrentAlgorithmImpl(CurrentAlgorithm algorithm)
+    {
+        if (enabled)
+            return SelectResult::busy;
+
+        return currentLoop.Select(algorithm);
+    }
+
+    SelectResult CascadeWithSpeedLoop::SelectSpeedAlgorithmImpl(SpeedAlgorithm algorithm)
+    {
+        if (enabled)
+            return SelectResult::busy;
+
+        return speedLoop.Select(algorithm);
+    }
+
+    CurrentAlgorithm CascadeWithSpeedLoop::ActiveCurrentAlgorithmImpl() const
+    {
+        return currentLoop.Active();
+    }
+
+    SpeedAlgorithm CascadeWithSpeedLoop::ActiveSpeedAlgorithmImpl() const
+    {
+        return speedLoop.Active();
     }
 
     OPTIMIZE_FOR_SPEED

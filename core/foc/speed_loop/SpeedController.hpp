@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/interfaces/Algorithms.hpp"
 #include "core/foc/interfaces/LoopTunings.hpp"
 #include "core/foc/interfaces/MotorModel.hpp"
 #include "core/foc/interfaces/Units.hpp"
@@ -8,14 +9,6 @@
 
 namespace foc
 {
-    enum class SpeedAlgorithm : uint8_t
-    {
-        pid = 0,
-        lqi = 1,
-        adrc = 2,
-        twoDof = 3
-    };
-
     struct SpeedControlContext
     {
         RadiansPerSecond measured{ 0.0f };

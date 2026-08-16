@@ -14,6 +14,8 @@ namespace foc
         MOCK_METHOD(void, Disable, (), (override));
         MOCK_METHOD(void, SetPoint, (IdAndIqPoint), (override));
         MOCK_METHOD(void, SetCurrentTunings, (const CurrentLoopTunings& tunings), (override));
+        MOCK_METHOD(SelectResult, SelectCurrentAlgorithm, (CurrentAlgorithm algorithm), (override));
+        MOCK_METHOD(CurrentAlgorithm, ActiveCurrentAlgorithm, (), (const, override));
         MOCK_METHOD(PhasePwmDutyCycles, Calculate, (const PhaseCurrents& currentPhases, Radians& position), (override));
     };
 
@@ -36,6 +38,10 @@ namespace foc
         MOCK_METHOD(void, SetPoint, (RadiansPerSecond), (override));
         MOCK_METHOD(void, SetCurrentTunings, (const CurrentLoopTunings& tunings), (override));
         MOCK_METHOD(void, SetSpeedTunings, (const SpeedLoopTunings& tunings), (override));
+        MOCK_METHOD(SelectResult, SelectCurrentAlgorithm, (CurrentAlgorithm algorithm), (override));
+        MOCK_METHOD(CurrentAlgorithm, ActiveCurrentAlgorithm, (), (const, override));
+        MOCK_METHOD(SelectResult, SelectSpeedAlgorithm, (SpeedAlgorithm algorithm), (override));
+        MOCK_METHOD(SpeedAlgorithm, ActiveSpeedAlgorithm, (), (const, override));
         MOCK_METHOD(void, SetOnlineMechanicalEstimator, (OnlineMechanicalEstimator & estimator), (override));
         MOCK_METHOD(void, SetOnlineElectricalEstimator, (OnlineElectricalEstimator & estimator), (override));
         MOCK_METHOD(hal::Hertz, OuterLoopFrequency, (), (const, override));
@@ -54,6 +60,10 @@ namespace foc
         MOCK_METHOD(void, SetCurrentTunings, (const CurrentLoopTunings& tunings), (override));
         MOCK_METHOD(void, SetSpeedTunings, (const SpeedLoopTunings& tunings), (override));
         MOCK_METHOD(void, SetPositionTunings, (const PositionLoopTunings& tunings), (override));
+        MOCK_METHOD(SelectResult, SelectCurrentAlgorithm, (CurrentAlgorithm algorithm), (override));
+        MOCK_METHOD(CurrentAlgorithm, ActiveCurrentAlgorithm, (), (const, override));
+        MOCK_METHOD(SelectResult, SelectSpeedAlgorithm, (SpeedAlgorithm algorithm), (override));
+        MOCK_METHOD(SpeedAlgorithm, ActiveSpeedAlgorithm, (), (const, override));
         MOCK_METHOD(void, SetOnlineMechanicalEstimator, (OnlineMechanicalEstimator & estimator), (override));
         MOCK_METHOD(void, SetOnlineElectricalEstimator, (OnlineElectricalEstimator & estimator), (override));
         MOCK_METHOD(PhasePwmDutyCycles, Calculate, (const PhaseCurrents& currentPhases, Radians& position), (override));

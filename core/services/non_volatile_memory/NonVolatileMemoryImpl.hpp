@@ -13,7 +13,7 @@ namespace services
     static constexpr uint32_t CalibrationMagic = 0xCAFEF00D;
     static constexpr uint32_t ConfigMagic = 0xDEADBEEF;
     static constexpr uint8_t CalibrationLayoutVersion = 2;
-    static constexpr uint8_t ConfigLayoutVersion = 2;
+    static constexpr uint8_t ConfigLayoutVersion = 3;
 
     class NonVolatileMemoryImpl
         : public NonVolatileMemory

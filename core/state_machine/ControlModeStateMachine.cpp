@@ -1,6 +1,66 @@
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "numerical/controllers/interfaces/PidController.hpp"
+#include <optional>
+
+namespace
+{
+    std::optional<foc::CurrentAlgorithm> ParseCurrentAlgorithm(const infra::BoundedConstString& name)
+    {
+        if (name == "pid")
+            return foc::CurrentAlgorithm::pid;
+        if (name == "decoupled")
+            return foc::CurrentAlgorithm::decoupledPid;
+        if (name == "deadbeat")
+            return foc::CurrentAlgorithm::deadbeat;
+        if (name == "sliding")
+            return foc::CurrentAlgorithm::slidingMode;
+        return std::nullopt;
+    }
+
+    std::optional<foc::SpeedAlgorithm> ParseSpeedAlgorithm(const infra::BoundedConstString& name)
+    {
+        if (name == "pid")
+            return foc::SpeedAlgorithm::pid;
+        if (name == "lqi")
+            return foc::SpeedAlgorithm::lqi;
+        if (name == "adrc")
+            return foc::SpeedAlgorithm::adrc;
+        if (name == "twodof")
+            return foc::SpeedAlgorithm::twoDof;
+        return std::nullopt;
+    }
+
+    const char* CurrentAlgorithmName(foc::CurrentAlgorithm algorithm)
+    {
+        switch (algorithm)
+        {
+            case foc::CurrentAlgorithm::decoupledPid:
+                return "decoupled";
+            case foc::CurrentAlgorithm::deadbeat:
+                return "deadbeat";
+            case foc::CurrentAlgorithm::slidingMode:
+                return "sliding";
+            default:
+                return "pid";
+        }
+    }
+
+    const char* SpeedAlgorithmName(foc::SpeedAlgorithm algorithm)
+    {
+        switch (algorithm)
+        {
+            case foc::SpeedAlgorithm::lqi:
+                return "lqi";
+            case foc::SpeedAlgorithm::adrc:
+                return "adrc";
+            case foc::SpeedAlgorithm::twoDof:
+                return "twodof";
+            default:
+                return "pid";
+        }
+    }
+}
 
 namespace state_machine
 {
@@ -196,6 +256,77 @@ namespace state_machine
                 calibServices,
                 faultNotifier,
                 TransitionPolicy::Auto);
+
+        ApplyPersistedAlgorithms();
+    }
+
+    foc::CurrentLoopSelectable* ControlModeStateMachine::CurrentSelectable()
+    {
+        if (auto* sm = std::get_if<application::TorqueStateMachine>(&activeSm))
+            return &sm->GetController();
+        if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
+            return &sm->GetController();
+        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
+            return &sm->GetController();
+        return nullptr;
+    }
+
+    foc::SpeedLoopSelectable* ControlModeStateMachine::SpeedSelectable()
+    {
+        if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
+            return &sm->GetController();
+        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
+            return &sm->GetController();
+        return nullptr;
+    }
+
+    void ControlModeStateMachine::ApplyPersistedAlgorithms()
+    {
+        if (auto* selectable = CurrentSelectable())
+            selectable->SelectCurrentAlgorithm(static_cast<foc::CurrentAlgorithm>(configData.currentAlgorithm));
+
+        if (auto* selectable = SpeedSelectable())
+            selectable->SelectSpeedAlgorithm(static_cast<foc::SpeedAlgorithm>(configData.speedAlgorithm));
+    }
+
+    foc::SelectResult ControlModeStateMachine::SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm)
+    {
+        auto* selectable = CurrentSelectable();
+        if (selectable == nullptr)
+            return foc::SelectResult::invalidAlgorithm;
+
+        auto result = selectable->SelectCurrentAlgorithm(algorithm);
+        if (result != foc::SelectResult::ok)
+            return result;
+
+        configData.currentAlgorithm = static_cast<uint8_t>(algorithm);
+        nvm.SaveConfig(configData, [](services::NvmStatus) {});
+        return result;
+    }
+
+    foc::SelectResult ControlModeStateMachine::SelectSpeedAlgorithm(foc::SpeedAlgorithm algorithm)
+    {
+        auto* selectable = SpeedSelectable();
+        if (selectable == nullptr)
+            return foc::SelectResult::invalidAlgorithm;
+
+        auto result = selectable->SelectSpeedAlgorithm(algorithm);
+        if (result != foc::SelectResult::ok)
+            return result;
+
+        configData.speedAlgorithm = static_cast<uint8_t>(algorithm);
+        nvm.SaveConfig(configData, [](services::NvmStatus) {});
+        return result;
+    }
+
+    foc::CurrentAlgorithm ControlModeStateMachine::ActiveCurrentAlgorithm() const
+    {
+        return static_cast<foc::CurrentAlgorithm>(configData.currentAlgorithm);
+    }
+
+    foc::SpeedAlgorithm ControlModeStateMachine::ActiveSpeedAlgorithm() const
+    {
+        return static_cast<foc::SpeedAlgorithm>(configData.speedAlgorithm);
     }
 
     void ControlModeStateMachine::RegisterCliCommands()
@@ -225,5 +356,51 @@ namespace state_machine
                 else
                     terminalAndTracer.tracer.Trace() << "Active mode: torque";
             } });
+
+        terminal.AddCommand({ { "select_current_algorithm", "sca", "Select current loop algorithm [pid|decoupled|deadbeat|sliding]. Ex: sca deadbeat" },
+            [this](const infra::BoundedConstString& param)
+            {
+                const auto algorithm = ParseCurrentAlgorithm(param);
+                if (!algorithm)
+                    terminalAndTracer.tracer.Trace() << "Unknown algorithm. Expected pid, decoupled, deadbeat or sliding";
+                else
+                    TraceSelectResult(SelectCurrentAlgorithm(*algorithm));
+            } });
+
+        terminal.AddCommand({ { "select_speed_algorithm", "ssa", "Select speed loop algorithm [pid|lqi|adrc|twodof]. Ex: ssa lqi" },
+            [this](const infra::BoundedConstString& param)
+            {
+                const auto algorithm = ParseSpeedAlgorithm(param);
+                if (!algorithm)
+                    terminalAndTracer.tracer.Trace() << "Unknown algorithm. Expected pid, lqi, adrc or twodof";
+                else
+                    TraceSelectResult(SelectSpeedAlgorithm(*algorithm));
+            } });
+
+        terminal.AddCommand({ { "active_algorithms", "aa", "Print the active loop algorithms" },
+            [this](const infra::BoundedConstString&)
+            {
+                terminalAndTracer.tracer.Trace() << "Current loop: " << CurrentAlgorithmName(ActiveCurrentAlgorithm());
+                terminalAndTracer.tracer.Trace() << "Speed loop: " << SpeedAlgorithmName(ActiveSpeedAlgorithm());
+            } });
+    }
+
+    void ControlModeStateMachine::TraceSelectResult(foc::SelectResult result)
+    {
+        switch (result)
+        {
+            case foc::SelectResult::ok:
+                terminalAndTracer.tracer.Trace() << "Algorithm selected";
+                break;
+            case foc::SelectResult::busy:
+                terminalAndTracer.tracer.Trace() << "Rejected: motor is enabled";
+                break;
+            case foc::SelectResult::invalidParameters:
+                terminalAndTracer.tracer.Trace() << "Rejected: motor model not identified";
+                break;
+            case foc::SelectResult::invalidAlgorithm:
+                terminalAndTracer.tracer.Trace() << "Rejected: algorithm not available in this control mode";
+                break;
+        }
     }
 }

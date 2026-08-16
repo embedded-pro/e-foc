@@ -16,6 +16,10 @@ namespace foc
         void SetPoint(RadiansPerSecond point) override;
         void SetCurrentTunings(const CurrentLoopTunings& tunings) override;
         void SetSpeedTunings(const SpeedLoopTunings& tunings) override;
+        SelectResult SelectCurrentAlgorithm(CurrentAlgorithm algorithm) override;
+        CurrentAlgorithm ActiveCurrentAlgorithm() const override;
+        SelectResult SelectSpeedAlgorithm(SpeedAlgorithm algorithm) override;
+        SpeedAlgorithm ActiveSpeedAlgorithm() const override;
         void SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator) override;
         void SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator) override;
         void Enable() override;

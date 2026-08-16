@@ -43,9 +43,18 @@ namespace state_machine
         bool TrySetSpeedBandwidth(float bandwidth);
         bool TrySetPositionBandwidth(float bandwidth);
 
+        foc::SelectResult SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm);
+        foc::SelectResult SelectSpeedAlgorithm(foc::SpeedAlgorithm algorithm);
+        foc::CurrentAlgorithm ActiveCurrentAlgorithm() const;
+        foc::SpeedAlgorithm ActiveSpeedAlgorithm() const;
+
     private:
         void Activate(ControlMode mode);
+        void ApplyPersistedAlgorithms();
+        foc::CurrentLoopSelectable* CurrentSelectable();
+        foc::SpeedLoopSelectable* SpeedSelectable();
         void RegisterCliCommands();
+        void TraceSelectResult(foc::SelectResult result);
         void OnSaveConfigDone(services::NvmStatus status);
 
         const application::TerminalAndTracer terminalAndTracer;

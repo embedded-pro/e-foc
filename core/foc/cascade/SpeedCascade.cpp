@@ -44,6 +44,26 @@ namespace foc
         SetSpeedTuningsImpl(tunings);
     }
 
+    SelectResult SpeedCascade::SelectCurrentAlgorithm(CurrentAlgorithm algorithm)
+    {
+        return SelectCurrentAlgorithmImpl(algorithm);
+    }
+
+    CurrentAlgorithm SpeedCascade::ActiveCurrentAlgorithm() const
+    {
+        return ActiveCurrentAlgorithmImpl();
+    }
+
+    SelectResult SpeedCascade::SelectSpeedAlgorithm(SpeedAlgorithm algorithm)
+    {
+        return SelectSpeedAlgorithmImpl(algorithm);
+    }
+
+    SpeedAlgorithm SpeedCascade::ActiveSpeedAlgorithm() const
+    {
+        return ActiveSpeedAlgorithmImpl();
+    }
+
     void SpeedCascade::SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator)
     {
         SetOnlineMechanicalEstimatorImpl(estimator);

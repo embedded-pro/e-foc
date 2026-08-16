@@ -12,12 +12,27 @@ namespace foc
     void TorqueCascade::Enable()
     {
         currentLoop.Reset();
+        enabled = true;
         SetPoint(lastSetPoint);
     }
 
     OPTIMIZE_FOR_SPEED
     void TorqueCascade::Disable()
     {
+        enabled = false;
+    }
+
+    SelectResult TorqueCascade::SelectCurrentAlgorithm(CurrentAlgorithm algorithm)
+    {
+        if (enabled)
+            return SelectResult::busy;
+
+        return currentLoop.Select(algorithm);
+    }
+
+    CurrentAlgorithm TorqueCascade::ActiveCurrentAlgorithm() const
+    {
+        return currentLoop.Active();
     }
 
     void TorqueCascade::Configure(const MotorModelParameters& parameters)

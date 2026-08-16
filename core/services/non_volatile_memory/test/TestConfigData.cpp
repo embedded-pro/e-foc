@@ -43,3 +43,10 @@ TEST_F(TestConfigData, config_data_sizeof_is_20)
 {
     EXPECT_EQ(sizeof(services::ConfigData), std::size_t{ 20 });
 }
+
+TEST_F(TestConfigData, make_default_config_data_selects_pid_for_both_loops)
+{
+    const auto cfg = services::MakeDefaultConfigData();
+    EXPECT_EQ(cfg.currentAlgorithm, uint8_t{ 0 });
+    EXPECT_EQ(cfg.speedAlgorithm, uint8_t{ 0 });
+}
