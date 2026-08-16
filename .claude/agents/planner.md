@@ -42,7 +42,7 @@ Before planning, thoroughly investigate:
 - **Interface contracts**: Identify abstract interfaces in `core/foc/interfaces/` that must be implemented or extended:
   - `FocBase` — pole pairs, enable/disable, current tunings, `Calculate()`
   - `FocTorque`, `FocSpeed`, `FocPosition` — set-point types
-  - `Driver` — hardware adapter abstractions
+  - `drivers::ThreePhaseInverter`, `drivers::Encoder`, `drivers::HallSensor` — hardware ports in `core/platform_abstraction/interfaces/Drivers.hpp`
 - **Timing constraints**: Assess whether each step stays within the FOC loop budget (<=4500 cycles at 120 MHz for the 20 kHz inner loop, 20000 for the 1 kHz outer loop)
 - **Hardware adapters**: Check `core/platform_abstraction/PlatformFactory.hpp` for peripheral creation and injection patterns
 - **Numerical tools**: Identify if `infra/numerical-toolbox/` algorithms (PID, filters, transforms) can be reused or need extension
@@ -142,7 +142,7 @@ Before finalizing, verify the plan against these constraints:
 - [ ] `OPTIMIZE_FOR_SPEED` applied to `Calculate()`, `Compute()`, and other hot-path methods
 
 ### FOC Theory — Correctness
-- [ ] Clarke transform: `Iα = (2/3)·(Ia - (Ib+Ic)/2)`, `Iβ = (Ib - Ic)/√3` (power-invariant, all 3 phases)
+- [ ] Clarke transform: `Iα = (2/3)·(Ia - (Ib+Ic)/2)`, `Iβ = (Ib - Ic)/√3` (amplitude-invariant, all 3 phases)
 - [ ] Park transform: `Id = Iα·cos(θ) + Iβ·sin(θ)`, `Iq = -Iα·sin(θ) + Iβ·cos(θ)`
 - [ ] Inverse Park/Clarke applied correctly for voltage reconstruction
 - [ ] SVM sector detection and duty cycle computation are correct

@@ -75,7 +75,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 
 ### 3. FOC Theory Correctness (CRITICAL)
 
-- [ ] **Clarke transform**: `Iα = (2/3)·(Ia - (Ib+Ic)/2)`, `Iβ = (Ib - Ic)/√3` — power-invariant, all 3 phases used
+- [ ] **Clarke transform**: `Iα = (2/3)·(Ia - (Ib+Ic)/2)`, `Iβ = (Ib - Ic)/√3` — amplitude-invariant, all 3 phases used
 - [ ] **Park transform**: `Id = Iα·cos(θ) + Iβ·sin(θ)`, `Iq = -Iα·sin(θ) + Iβ·cos(θ)` — correct sign convention
 - [ ] **Inverse Park/Clarke**: Applied correctly for voltage reconstruction
 - [ ] **SVM**: Sector detection (0–5), duty cycle formulas, and null vector distribution are correct
@@ -90,7 +90,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 - [ ] New FOC implementations satisfy all pure virtual methods of `FocBase`
 - [ ] Correct base interface used for control mode: `FocTorque`, `FocSpeed`, or `FocPosition`
 - [ ] Hardware dependencies injected via constructor — no global state, no direct peripheral access
-- [ ] `Driver` interface used for hardware abstraction — not concrete hardware types
+- [ ] Hardware ports from `core/platform_abstraction/interfaces/Drivers.hpp` (`drivers::ThreePhaseInverter`, `drivers::Encoder`) used for hardware abstraction — not concrete hardware types
 
 ### 5. Embedded Optimization (WARNING)
 

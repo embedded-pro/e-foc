@@ -41,7 +41,7 @@ Before planning, thoroughly investigate:
 - **Interface contracts**: Identify abstract interfaces in `core/foc/interfaces/` that must be implemented or extended:
   - `FocBase` — pole pairs, enable/disable, current tunings, `Calculate()`
   - `FocTorque`, `FocSpeed`, `FocPosition` — set-point types
-  - `Driver` — hardware adapter abstractions
+  - `drivers::ThreePhaseInverter`, `drivers::Encoder`, `drivers::HallSensor` — hardware ports in `core/platform_abstraction/interfaces/Drivers.hpp`
 - **Timing constraints**: Assess whether each step stays within the FOC loop budget (<=4500 cycles at 120 MHz for the 20 kHz inner loop, 20000 for the 1 kHz outer loop)
 - **Hardware adapters**: Check `core/platform_abstraction/PlatformFactory.hpp` for peripheral creation and injection patterns
 - **Numerical tools**: Identify if `infra/numerical-toolbox/` algorithms (PID, filters, transforms) can be reused or need extension
@@ -108,7 +108,7 @@ Tests are designed **before** implementation (TDD Red-Green-Refactor):
 #### Build Integration
 - `CMakeLists.txt` changes needed in affected layers
 - Host build: `cmake --preset host && cmake --build --preset host-Debug`
-- Test run: `ctest --preset host-Debug`
+- Test run: `ctest --preset host`
 - Embedded build (if applicable): `cmake --preset EK-TM4C1294XL && cmake --build --preset EK-TM4C1294XL-Debug`
 
 #### Verification Checklist
@@ -169,7 +169,7 @@ Scope note: The memory and realtime constraints below apply to embedded/runtime 
 - [ ] Methods: `PascalCase` (e.g., `Calculate()`, `SetPoint()`)
 - [ ] Member variables: `camelCase` (e.g., `polePairs`, `currentTunings`)
 - [ ] Namespaces: lowercase (e.g., `foc`, `hardware`)
-- [ ] Units explicit in type aliases (e.g., `Ampere`, `Radians`, `Volts`, `Rpm`)
+- [ ] Units explicit in type aliases (e.g., `Ampere`, `Radians`, `Volts`, `RevPerMinute`)
 
 ### Testing
 - [ ] Unit tests for every new transform, algorithm, or mode

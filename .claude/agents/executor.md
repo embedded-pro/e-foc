@@ -79,7 +79,7 @@ Target: the 20 kHz inner loop completes in <=4500 cycles at 120 MHz; the 1 kHz o
 
 When implementing FOC transforms or control loops:
 
-- **Clarke transform** (3-phase → α-β): `Iα = (2/3)·(Ia - (Ib+Ic)/2)`, `Iβ = (Ib - Ic)/√3` (power-invariant; all 3 phases used)
+- **Clarke transform** (3-phase → α-β): `Iα = (2/3)·(Ia - (Ib+Ic)/2)`, `Iβ = (Ib - Ic)/√3` (amplitude-invariant; all 3 phases used)
 - **Park transform** (α-β → d-q): `Id = Iα·cos(θ) + Iβ·sin(θ)`, `Iq = -Iα·sin(θ) + Iβ·cos(θ)`
 - **Inverse Park** (d-q → α-β): Reverse transformation using same rotor angle
 - **SVM**: Correct sector detection (0–5), duty cycle computation, and null vector distribution

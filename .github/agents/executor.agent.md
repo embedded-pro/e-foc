@@ -75,14 +75,14 @@ Target: the 20 kHz inner loop completes in <=4500 cycles at 120 MHz; the 1 kHz o
 
 When implementing FOC transforms or control loops:
 
-- **Clarke transform** (3-phase → α-β): `Iα = Ia`, `Iβ = (Ia + 2·Ib) / √3`
+- **Clarke transform** (3-phase → α-β): `Iα = (2/3)·(Ia - (Ib+Ic)/2)`, `Iβ = (Ib - Ic)/√3` (amplitude-invariant; all 3 phases used)
 - **Park transform** (α-β → d-q): `Id = Iα·cos(θ) + Iβ·sin(θ)`, `Iq = -Iα·sin(θ) + Iβ·cos(θ)`
 - **Inverse Park** (d-q → α-β): Reverse transformation using same rotor angle
 - **SVM**: Correct sector detection (0–5), duty cycle computation, and null vector distribution
 - **Electrical angle**: Always multiply mechanical angle by pole pairs — `θe = θm · P`
 - **Anti-windup**: Implement clamping or back-calculation on all PID integrators
 - **Decoupling**: Add ω·Ld·Iq feedforward to Vd, subtract ω·Lq·Id from Vq where appropriate
-- **Unit types**: Use the type aliases: `Ampere`, `Radians`, `Volts`, `Rpm`, `PhasePwmDutyCycles`, `PhaseCurrents`
+- **Unit types**: Use the type aliases: `Ampere`, `Radians`, `Volts`, `RevPerMinute`, `PhasePwmDutyCycles`, `PhaseCurrents`
 
 Reuse `Clarke`, `Park`, `ClarkePark` and `SpaceVectorModulation` from `core/foc/transforms/` when possible. Do not reimplement existing transforms.
 
@@ -111,7 +111,7 @@ namespace foc
         : public FocSpeed
     {
     public:
-        void SetPoint(Rpm setPoint) override;
+        void SetPoint(RevPerMinute setPoint) override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
 
     private:
@@ -201,7 +201,7 @@ Follow the TDD Red-Green-Refactor cycle. **Ask clarifying questions before writi
 8. **Refactor** — Clean up the implementation (naming, single responsibility, DRY, extract helpers) while keeping all tests green.
 9. **Update `CMakeLists.txt`** if new files were added
 10. **Update documentation** in `documentation/` for every algorithm or procedure added or changed
-11. **Build and test** (host): `cmake --build --preset host-Debug` and `ctest --preset host-Debug`
+11. **Build and test** (host): `cmake --build --preset host-Debug` and `ctest --preset host`
 12. **Hand off to reviewer** using the handoff button
 
 ## What NOT to Do
