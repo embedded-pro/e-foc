@@ -1,8 +1,8 @@
 #pragma once
 
-#include "infra/util/Function.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
+#include "infra/util/Function.hpp"
 
 namespace services
 {
@@ -12,7 +12,9 @@ namespace services
         InvalidData,
         VersionMismatch,
         WriteFailed,
-        HardwareFault
+        HardwareFault,
+        // Another operation is already in flight; the device serialises all access.
+        Busy
     };
 
     class NonVolatileMemory

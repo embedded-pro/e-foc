@@ -235,6 +235,41 @@ TEST_F(ControlModeStateMachineTest, Select_RollsBack_Mode_On_Nvm_Failure)
     EXPECT_EQ(subject->Active(), state_machine::ControlMode::torque);
 }
 
+TEST_F(ControlModeStateMachineTest, Select_Remains_Usable_After_Nvm_Reports_Busy)
+{
+    GivenNvmAlwaysInvalid();
+
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Busy);
+            }))
+        .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    ConstructSubject();
+
+    state_machine::SelectResult busyResult{ state_machine::SelectResult::ok };
+    subject->Select(state_machine::ControlMode::speed, [&busyResult](state_machine::SelectResult r)
+        {
+            busyResult = r;
+        });
+
+    EXPECT_EQ(busyResult, state_machine::SelectResult::busy);
+    EXPECT_EQ(subject->Active(), state_machine::ControlMode::torque);
+
+    state_machine::SelectResult retryResult{ state_machine::SelectResult::nvmFailed };
+    subject->Select(state_machine::ControlMode::speed, [&retryResult](state_machine::SelectResult r)
+        {
+            retryResult = r;
+        });
+
+    EXPECT_EQ(retryResult, state_machine::SelectResult::ok);
+    EXPECT_EQ(subject->Active(), state_machine::ControlMode::speed);
+}
+
 // ---- C2: In-flight select guard ----
 
 TEST_F(ControlModeStateMachineTest, Select_While_Previous_Select_Pending_Reports_Busy)

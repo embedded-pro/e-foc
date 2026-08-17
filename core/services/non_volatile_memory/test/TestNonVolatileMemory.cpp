@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstring>
 #include <gmock/gmock.h>
+#include <optional>
 #include <vector>
 
 namespace
@@ -158,6 +159,70 @@ namespace
             }
             FAIL() << "Async callback was not invoked within " << maxIterations << " iterations";
         }
+    };
+
+    // ---------------------------------------------------------------------------
+    // Single-writer fixture — both records share one device, so an operation issued
+    // while another is in flight must be rejected without ever reaching a region.
+    // ---------------------------------------------------------------------------
+    class NvmRegionMock
+        : public services::NvmRegion
+    {
+    public:
+        MOCK_METHOD(void, Write, (infra::ConstByteRange data, infra::Function<void()> onDone), (override));
+        MOCK_METHOD(void, Read, (infra::ByteRange data, infra::Function<void()> onDone), (override));
+        MOCK_METHOD(void, Erase, (infra::Function<void()> onDone), (override));
+        MOCK_METHOD(std::size_t, Size, (), (const, override));
+    };
+
+    class NonVolatileMemorySingleWriterTest
+        : public ::testing::Test
+    {
+    protected:
+        void StartConfigWrite()
+        {
+            EXPECT_CALL(configRegion, Erase(_)).WillOnce(SaveArg<0>(&pendingRegionCallback));
+            nvm.SaveConfig(services::ConfigData{}, [this](services::NvmStatus status)
+                {
+                    configStatus = status;
+                });
+        }
+
+        void StartCalibrationWrite()
+        {
+            EXPECT_CALL(calibrationRegion, Erase(_)).WillOnce(SaveArg<0>(&pendingRegionCallback));
+            nvm.SaveCalibration(services::CalibrationData{}, [this](services::NvmStatus status)
+                {
+                    calibrationStatus = status;
+                });
+        }
+
+        void InvokePendingRegionCallback()
+        {
+            ASSERT_TRUE(pendingRegionCallback != nullptr);
+            auto callback = pendingRegionCallback;
+            pendingRegionCallback = nullptr;
+            callback();
+        }
+
+        // Walks the erase -> write -> read-back sequence to completion.
+        void FinishWrite(testing::StrictMock<NvmRegionMock>& region)
+        {
+            EXPECT_CALL(region, Write(_, _)).WillOnce(SaveArg<1>(&pendingRegionCallback));
+            InvokePendingRegionCallback();
+            EXPECT_CALL(region, Read(_, _)).WillOnce(SaveArg<1>(&pendingRegionCallback));
+            InvokePendingRegionCallback();
+            InvokePendingRegionCallback();
+        }
+
+        testing::StrictMock<NvmRegionMock> calibrationRegion;
+        testing::StrictMock<NvmRegionMock> configRegion;
+        services::NonVolatileMemoryImpl nvm{ calibrationRegion, configRegion };
+
+        infra::Function<void()> pendingRegionCallback;
+        std::optional<services::NvmStatus> configStatus;
+        std::optional<services::NvmStatus> calibrationStatus;
+        std::optional<bool> calibrationValid;
     };
 }
 
@@ -582,8 +647,8 @@ TEST_F(NonVolatileMemoryTest, save_config_write_verify_failure_returns_write_fai
 
 TEST_F(NonVolatileMemoryTest, concurrent_save_calibration_second_call_is_rejected)
 {
-    // Start a save that won't complete (no ExecuteAllActions) then call again —
-    // the second call must return silently without interfering with the first.
+    // Start a save that won't complete (no ExecuteAllActions) then call again — the
+    // second call must be answered with Busy without interfering with the first.
     bool firstDone = false;
 
     nvm.SaveCalibration(MakeTestCalibration(), [&](auto)
@@ -591,17 +656,18 @@ TEST_F(NonVolatileMemoryTest, concurrent_save_calibration_second_call_is_rejecte
             firstDone = true;
         });
 
-    // Second call while first is pending: should be silently ignored.
-    bool secondDone = false;
-    nvm.SaveCalibration(MakeTestCalibration(), [&](auto)
+    std::optional<services::NvmStatus> secondStatus;
+    nvm.SaveCalibration(MakeTestCalibration(), [&](services::NvmStatus s)
         {
-            secondDone = true;
+            secondStatus = s;
         });
+
+    ASSERT_TRUE(secondStatus.has_value());
+    EXPECT_EQ(*secondStatus, services::NvmStatus::Busy);
 
     RunUntilDone(firstDone);
 
     EXPECT_TRUE(firstDone);
-    EXPECT_FALSE(secondDone);
 }
 
 TEST_F(NonVolatileMemoryTest, concurrent_load_config_second_call_is_rejected)
@@ -623,14 +689,109 @@ TEST_F(NonVolatileMemoryTest, concurrent_load_config_second_call_is_rejected)
             firstDone = true;
         });
 
-    bool secondDone = false;
-    nvm.LoadConfig(out2, [&](auto)
+    std::optional<services::NvmStatus> secondStatus;
+    nvm.LoadConfig(out2, [&](services::NvmStatus s)
         {
-            secondDone = true;
+            secondStatus = s;
         });
+
+    ASSERT_TRUE(secondStatus.has_value());
+    EXPECT_EQ(*secondStatus, services::NvmStatus::Busy);
 
     RunUntilDone(firstDone);
 
     EXPECT_TRUE(firstDone);
-    EXPECT_FALSE(secondDone);
+}
+
+TEST_F(NonVolatileMemorySingleWriterTest, save_calibration_during_config_write_reports_busy_without_touching_the_region)
+{
+    StartConfigWrite();
+
+    nvm.SaveCalibration(services::CalibrationData{}, [this](services::NvmStatus status)
+        {
+            calibrationStatus = status;
+        });
+
+    ASSERT_TRUE(calibrationStatus.has_value());
+    EXPECT_EQ(*calibrationStatus, services::NvmStatus::Busy);
+}
+
+TEST_F(NonVolatileMemorySingleWriterTest, invalidate_calibration_during_config_write_reports_busy_without_touching_the_region)
+{
+    StartConfigWrite();
+
+    nvm.InvalidateCalibration([this](services::NvmStatus status)
+        {
+            calibrationStatus = status;
+        });
+
+    ASSERT_TRUE(calibrationStatus.has_value());
+    EXPECT_EQ(*calibrationStatus, services::NvmStatus::Busy);
+}
+
+TEST_F(NonVolatileMemorySingleWriterTest, is_calibration_valid_during_config_write_reports_false_without_touching_the_region)
+{
+    StartConfigWrite();
+
+    nvm.IsCalibrationValid([this](bool valid)
+        {
+            calibrationValid = valid;
+        });
+
+    ASSERT_TRUE(calibrationValid.has_value());
+    EXPECT_FALSE(*calibrationValid);
+}
+
+TEST_F(NonVolatileMemorySingleWriterTest, save_config_during_calibration_write_reports_busy_without_touching_the_region)
+{
+    StartCalibrationWrite();
+
+    nvm.SaveConfig(services::ConfigData{}, [this](services::NvmStatus status)
+        {
+            configStatus = status;
+        });
+
+    ASSERT_TRUE(configStatus.has_value());
+    EXPECT_EQ(*configStatus, services::NvmStatus::Busy);
+}
+
+TEST_F(NonVolatileMemorySingleWriterTest, format_during_config_write_reports_busy_without_touching_the_region)
+{
+    StartConfigWrite();
+
+    std::optional<services::NvmStatus> formatStatus;
+    nvm.Format([&formatStatus](services::NvmStatus status)
+        {
+            formatStatus = status;
+        });
+
+    ASSERT_TRUE(formatStatus.has_value());
+    EXPECT_EQ(*formatStatus, services::NvmStatus::Busy);
+}
+
+TEST_F(NonVolatileMemorySingleWriterTest, calibration_request_is_accepted_after_the_config_write_completes)
+{
+    StartConfigWrite();
+
+    nvm.InvalidateCalibration([this](services::NvmStatus status)
+        {
+            calibrationStatus = status;
+        });
+    ASSERT_EQ(*calibrationStatus, services::NvmStatus::Busy);
+    calibrationStatus.reset();
+
+    FinishWrite(configRegion);
+    ASSERT_TRUE(configStatus.has_value());
+
+    EXPECT_CALL(calibrationRegion, Erase(_)).WillOnce(SaveArg<0>(&pendingRegionCallback));
+    nvm.InvalidateCalibration([this](services::NvmStatus status)
+        {
+            calibrationStatus = status;
+        });
+    EXPECT_FALSE(calibrationStatus.has_value());
+
+    InvokePendingRegionCallback();
+
+    ASSERT_TRUE(calibrationStatus.has_value());
+    EXPECT_EQ(*calibrationStatus, services::NvmStatus::Ok);
 }

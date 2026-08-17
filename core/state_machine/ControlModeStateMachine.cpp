@@ -174,7 +174,7 @@ namespace state_machine
         if (status != services::NvmStatus::Ok)
         {
             configData.defaultControlMode = previousDefaultControlMode;
-            pendingSelectCallback(SelectResult::nvmFailed);
+            pendingSelectCallback(status == services::NvmStatus::Busy ? SelectResult::busy : SelectResult::nvmFailed);
         }
         else
         {

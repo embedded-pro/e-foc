@@ -52,6 +52,11 @@ namespace services
 
         void OnCalibrationSectorFormattedDuringFormat();
 
+        void CompleteCalibration(NvmStatus status);
+        void CompleteConfig(NvmStatus status);
+        void CompleteFormat(NvmStatus status);
+        void CompleteIsCalibrationValid(bool valid);
+
         static uint32_t ComputeCrc(infra::ConstByteRange bytes);
 
         NvmRegion& calibrationRegion;
@@ -69,5 +74,8 @@ namespace services
 
         CalibrationData* pendingCalibrationOutput = nullptr;
         ConfigData* pendingConfigOutput = nullptr;
+
+        // Both regions share one device, so admission is device-wide, not per record.
+        bool busy{ false };
     };
 }

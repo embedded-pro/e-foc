@@ -106,6 +106,13 @@ namespace application
                 if (!HasPendingCommand() || !state_machine::IsStopped(currentState))
                     return;
 
+                // A busy device means nothing was written; reject without faulting.
+                if (status == services::NvmStatus::Busy)
+                {
+                    CompletePendingCommand(state_machine::CommandResult::rejected);
+                    return;
+                }
+
                 if (status != services::NvmStatus::Ok)
                 {
                     CompletePendingCommand(state_machine::CommandResult::nvmFailed);

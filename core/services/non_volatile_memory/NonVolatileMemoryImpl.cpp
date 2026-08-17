@@ -50,11 +50,42 @@ namespace services
         return crc.Result();
     }
 
+    void NonVolatileMemoryImpl::CompleteCalibration(NvmStatus status)
+    {
+        busy = false;
+        onCalibrationDone(status);
+    }
+
+    void NonVolatileMemoryImpl::CompleteConfig(NvmStatus status)
+    {
+        busy = false;
+        onConfigDone(status);
+    }
+
+    void NonVolatileMemoryImpl::CompleteFormat(NvmStatus status)
+    {
+        busy = false;
+        onFormatDone(status);
+    }
+
+    void NonVolatileMemoryImpl::CompleteIsCalibrationValid(bool valid)
+    {
+        busy = false;
+        onIsCalibrationValidDone(valid);
+    }
+
     void NonVolatileMemoryImpl::SaveCalibration(const CalibrationData& data,
         infra::Function<void(NvmStatus)> onDone)
     {
-        if (onCalibrationDone)
+        // One device backs both regions, and its driver asserts exclusivity, so admission is
+        // device-wide rather than per record. A refused request still completes its callback.
+        if (busy)
+        {
+            onDone(NvmStatus::Busy);
             return;
+        }
+
+        busy = true;
 
         CalibrationStorageRecord record{};
         record.magic = CalibrationMagic;
@@ -93,16 +124,21 @@ namespace services
     void NonVolatileMemoryImpl::OnCalibrationReadBack()
     {
         if (calibrationBuffer == calibrationReadBackBuffer)
-            onCalibrationDone(NvmStatus::Ok);
+            CompleteCalibration(NvmStatus::Ok);
         else
-            onCalibrationDone(NvmStatus::WriteFailed);
+            CompleteCalibration(NvmStatus::WriteFailed);
     }
 
     void NonVolatileMemoryImpl::LoadCalibration(CalibrationData& data,
         infra::Function<void(NvmStatus)> onDone)
     {
-        if (onCalibrationDone)
+        if (busy)
+        {
+            onDone(NvmStatus::Busy);
             return;
+        }
+
+        busy = true;
 
         pendingCalibrationOutput = &data;
         onCalibrationDone = onDone;
@@ -122,43 +158,53 @@ namespace services
 
         if (record.magic != CalibrationMagic)
         {
-            onCalibrationDone(NvmStatus::InvalidData);
+            CompleteCalibration(NvmStatus::InvalidData);
             return;
         }
 
         if (record.version != CalibrationLayoutVersion)
         {
-            onCalibrationDone(NvmStatus::VersionMismatch);
+            CompleteCalibration(NvmStatus::VersionMismatch);
             return;
         }
 
         const uint32_t computed = ComputeCrc(infra::MakeConstByteRange(record.data));
         if (computed != record.crc32)
         {
-            onCalibrationDone(NvmStatus::InvalidData);
+            CompleteCalibration(NvmStatus::InvalidData);
             return;
         }
 
         *pendingCalibrationOutput = record.data;
-        onCalibrationDone(NvmStatus::Ok);
+        CompleteCalibration(NvmStatus::Ok);
     }
 
     void NonVolatileMemoryImpl::InvalidateCalibration(infra::Function<void(NvmStatus)> onDone)
     {
-        if (onCalibrationDone)
+        if (busy)
+        {
+            onDone(NvmStatus::Busy);
             return;
+        }
+
+        busy = true;
 
         onCalibrationDone = onDone;
         calibrationRegion.Erase([this]
             {
-                onCalibrationDone(NvmStatus::Ok);
+                CompleteCalibration(NvmStatus::Ok);
             });
     }
 
     void NonVolatileMemoryImpl::IsCalibrationValid(infra::Function<void(bool)> onDone)
     {
-        if (onIsCalibrationValidDone)
+        if (busy)
+        {
+            onDone(false);
             return;
+        }
+
+        busy = true;
 
         onIsCalibrationValidDone = onDone;
 
@@ -177,19 +223,24 @@ namespace services
 
         if (record.magic != CalibrationMagic || record.version != CalibrationLayoutVersion)
         {
-            onIsCalibrationValidDone(false);
+            CompleteIsCalibrationValid(false);
             return;
         }
 
         const uint32_t computed = ComputeCrc(infra::MakeConstByteRange(record.data));
-        onIsCalibrationValidDone(computed == record.crc32);
+        CompleteIsCalibrationValid(computed == record.crc32);
     }
 
     void NonVolatileMemoryImpl::SaveConfig(const ConfigData& data,
         infra::Function<void(NvmStatus)> onDone)
     {
-        if (onConfigDone)
+        if (busy)
+        {
+            onDone(NvmStatus::Busy);
             return;
+        }
+
+        busy = true;
 
         ConfigStorageRecord record{};
         record.magic = ConfigMagic;
@@ -228,16 +279,21 @@ namespace services
     void NonVolatileMemoryImpl::OnConfigReadBack()
     {
         if (configBuffer == configReadBackBuffer)
-            onConfigDone(NvmStatus::Ok);
+            CompleteConfig(NvmStatus::Ok);
         else
-            onConfigDone(NvmStatus::WriteFailed);
+            CompleteConfig(NvmStatus::WriteFailed);
     }
 
     void NonVolatileMemoryImpl::LoadConfig(ConfigData& data,
         infra::Function<void(NvmStatus)> onDone)
     {
-        if (onConfigDone)
+        if (busy)
+        {
+            onDone(NvmStatus::Busy);
             return;
+        }
+
+        busy = true;
 
         pendingConfigOutput = &data;
         onConfigDone = onDone;
@@ -258,7 +314,7 @@ namespace services
         if (record.magic != ConfigMagic || record.version != ConfigLayoutVersion)
         {
             *pendingConfigOutput = MakeDefaultConfigData();
-            onConfigDone(NvmStatus::Ok);
+            CompleteConfig(NvmStatus::Ok);
             return;
         }
 
@@ -266,12 +322,12 @@ namespace services
         if (computed != record.crc32)
         {
             *pendingConfigOutput = MakeDefaultConfigData();
-            onConfigDone(NvmStatus::Ok);
+            CompleteConfig(NvmStatus::Ok);
             return;
         }
 
         *pendingConfigOutput = record.data;
-        onConfigDone(NvmStatus::Ok);
+        CompleteConfig(NvmStatus::Ok);
     }
 
     void NonVolatileMemoryImpl::ResetConfigToDefaults(infra::Function<void(NvmStatus)> onDone)
@@ -281,8 +337,13 @@ namespace services
 
     void NonVolatileMemoryImpl::Format(infra::Function<void(NvmStatus)> onDone)
     {
-        if (onFormatDone)
+        if (busy)
+        {
+            onDone(NvmStatus::Busy);
             return;
+        }
+
+        busy = true;
 
         onFormatDone = onDone;
         calibrationRegion.Erase([this]
@@ -295,7 +356,7 @@ namespace services
     {
         configRegion.Erase([this]
             {
-                onFormatDone(NvmStatus::Ok);
+                CompleteFormat(NvmStatus::Ok);
             });
     }
 }
