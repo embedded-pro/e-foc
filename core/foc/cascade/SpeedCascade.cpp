@@ -102,6 +102,21 @@ namespace foc
         return outerLoopFrequency;
     }
 
+    void SpeedCascade::EnableSpeedCommand()
+    {
+        Enable();
+    }
+
+    void SpeedCascade::CommandSpeed(RadiansPerSecond speed)
+    {
+        SetPoint(speed);
+    }
+
+    hal::Hertz SpeedCascade::SpeedCommandFrequency() const
+    {
+        return outerLoopFrequency;
+    }
+
     OPTIMIZE_FOR_SPEED
     PhasePwmDutyCycles SpeedCascade::Calculate(const PhaseCurrents& currentPhases, Radians& position)
     {

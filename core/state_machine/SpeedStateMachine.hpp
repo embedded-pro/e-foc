@@ -35,13 +35,6 @@ namespace application
         services::RealTimeResistanceAndInductanceEstimator& GetOnlineElecEstimator() override;
 
     private:
-        static services::MechanicalParametersIdentification& ResolveMechIdent(
-            const CalibrationServices& calibServices,
-            std::optional<services::MechanicalParametersIdentificationImpl>& ownMechIdent,
-            foc::FocSpeedController& focController,
-            drivers::ThreePhaseInverter& inverter,
-            drivers::Encoder& encoder);
-
         foc::FocSpeedController focController;
         services::RealTimeFrictionAndInertiaEstimator onlineMechEstimator;
         services::RealTimeResistanceAndInductanceEstimator onlineElecEstimator;

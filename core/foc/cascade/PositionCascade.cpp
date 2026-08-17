@@ -9,6 +9,7 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     PositionCascade::PositionCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)
         : CascadeWithSpeedLoop(maxCurrent, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency)
+        , outerLoopFrequency(lowPriorityFrequency)
     {
         GetLowPriorityInterrupt().Register([this]()
             {
@@ -97,6 +98,7 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     void PositionCascade::Enable()
     {
+        speedCommandActive = false;
         positionLoop.Reset();
         EnableSpeedLoop();
         SetPoint(lastPositionSetPoint);
@@ -107,13 +109,42 @@ namespace foc
     void PositionCascade::Disable()
     {
         enabled = false;
+        speedCommandActive = false;
         DisableSpeedLoop();
+    }
+
+    void PositionCascade::EnableSpeedCommand()
+    {
+        speedCommand = RadiansPerSecond{ 0.0f };
+        speedCommandActive = true;
+        EnableSpeedLoop();
+        enabled = true;
+    }
+
+    void PositionCascade::CommandSpeed(RadiansPerSecond speed)
+    {
+        speedCommand = speed;
+    }
+
+    hal::Hertz PositionCascade::SpeedCommandFrequency() const
+    {
+        return outerLoopFrequency;
     }
 
     OPTIMIZE_FOR_SPEED
     void PositionCascade::LowPriorityHandler()
     {
         auto mechanicalSpeed = MeasureMechanicalSpeed();
+
+        // Identification drives the speed loop itself; the position law must not fight it
+        if (speedCommandActive)
+        {
+            SetSpeedReference(speedCommand);
+            RunSpeedLoop(mechanicalSpeed);
+            UpdateOnlineMechanicalEstimator(mechanicalSpeed);
+            UpdateOnlineElectricalEstimator(mechanicalSpeed * PolePairs());
+            return;
+        }
 
         auto command = positionLoop.Compute(PositionControlContext{ Radians{ CurrentMechanicalAngle() }, lastPositionSetPoint, RadiansPerSecond{ mechanicalSpeed } });
 

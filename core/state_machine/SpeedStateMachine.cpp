@@ -64,18 +64,4 @@ namespace application
     {
         return resolvedMechIdent.get();
     }
-
-    services::MechanicalParametersIdentification& SpeedStateMachine::ResolveMechIdent(
-        const CalibrationServices& calibServices,
-        std::optional<services::MechanicalParametersIdentificationImpl>& ownMechIdent,
-        foc::FocSpeedController& focController,
-        drivers::ThreePhaseInverter& inverter,
-        drivers::Encoder& encoder)
-    {
-        if (calibServices.mechIdentOverride.has_value())
-            return calibServices.mechIdentOverride->get();
-
-        ownMechIdent.emplace(static_cast<foc::FocSpeed&>(focController), inverter, encoder);
-        return *ownMechIdent;
-    }
 }

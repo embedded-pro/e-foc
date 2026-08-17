@@ -86,6 +86,20 @@ namespace application
         RunMechanicalIdentStep();
     }
 
+    services::MechanicalParametersIdentification& OuterLoopStateMachine::ResolveMechIdent(
+        const CalibrationServices& calibServices,
+        std::optional<services::MechanicalParametersIdentificationImpl>& ownMechIdent,
+        foc::SpeedCommandable& speedCommandable,
+        drivers::ThreePhaseInverter& inverter,
+        drivers::Encoder& encoder)
+    {
+        if (calibServices.mechIdentOverride.has_value())
+            return calibServices.mechIdentOverride->get();
+
+        ownMechIdent.emplace(speedCommandable, inverter, encoder);
+        return *ownMechIdent;
+    }
+
     void OuterLoopStateMachine::RunMechanicalIdentStep()
     {
         GetTracer().Trace() << "[SM] Estimating mechanical parameters";

@@ -1,5 +1,4 @@
 #include "core/state_machine/PositionStateMachine.hpp"
-#include <cassert>
 
 namespace application
 {
@@ -17,7 +16,7 @@ namespace application
         , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt, outerLoopArgs.outerLoopFrequency)
         , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
         , onlineElecEstimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
-        , mechIdentPtr(calibServices.mechIdentOverride)
+        , resolvedMechIdent(ResolveMechIdent(calibServices, ownMechIdent, focController, hardware.inverter, hardware.encoder))
     {
         focController.SetOnlineMechanicalEstimator(onlineMechEstimator);
         focController.SetOnlineElectricalEstimator(onlineElecEstimator);
@@ -63,15 +62,6 @@ namespace application
 
     services::MechanicalParametersIdentification& PositionStateMachine::MechIdentImpl()
     {
-        assert(mechIdentPtr.has_value());
-        return mechIdentPtr->get();
-    }
-
-    void PositionStateMachine::RunPostAlignmentStep()
-    {
-        if (!mechIdentPtr.has_value())
-            EnterFault(state_machine::FaultCode::calibrationFailed);
-        else
-            RunMechanicalIdentStep();
+        return resolvedMechIdent.get();
     }
 }

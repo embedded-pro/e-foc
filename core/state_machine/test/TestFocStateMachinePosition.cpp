@@ -314,49 +314,27 @@ TEST_F(FocStateMachinePositionCliTest, calibrate_from_enabled_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachinePositionCliTest, no_mech_ident_override_enters_fault)
+// Position mode builds its own mechanical identification when the caller supplies no override,
+// as speed mode already did; without it the production target could never commission position mode.
+TEST_F(FocStateMachinePositionCliTest, no_mech_ident_override_uses_its_own_identification)
 {
-    EXPECT_CALL(faultNotifierMock, Register(_))
-        .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)
-            {
-                faultNotifierMock.StoreHandler(handler);
-            }));
+    GivenFaultNotifierRegistered();
     GivenNvmInvalid();
+    ExpectPositionCalibrationSequence();
 
     PositionStateMachine sm{
         application::TerminalAndTracer{ terminal, tracer },
         application::MotorHardware{ inverterMock, encoderMock, vdc },
         nvmMock,
-        application::CalibrationServices{ electricalIdentMock, alignmentMock },
+        application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
         faultNotifierMock,
         state_machine::TransitionPolicy::Cli,
         application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
     };
 
-    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
-        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
-            {
-                cb(std::size_t{ 4 });
-            }));
-    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
-        .WillOnce(Invoke([](const auto&,
-                             const infra::Function<void(std::optional<foc::Ohm>,
-                                 std::optional<foc::MilliHenry>)>& cb)
-            {
-                cb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
-            }));
-    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
-        .WillOnce(Invoke([](std::size_t, const auto&,
-                             const infra::Function<void(std::optional<foc::Radians>)>& cb)
-            {
-                cb(foc::Radians{ 0.0f });
-            }));
-
     sm.CmdCalibrate([](state_machine::CommandResult) {});
 
-    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
-    EXPECT_EQ(std::get<state_machine::Fault>(sm.CurrentState()).code,
-        state_machine::FaultCode::calibrationFailed);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
 // --- Calibration failures ---
@@ -1716,49 +1694,27 @@ TEST_F(FocStateMachinePositionCliTest, clear_cal_invalidate_failure_callback_aft
 // Auto policy: async callback safety parity
 // ==========================================================================
 
-TEST_F(FocStateMachinePositionAutoTest, no_mech_ident_override_enters_fault)
+// Position mode builds its own mechanical identification when the caller supplies no override,
+// as speed mode already did; without it the production target could never commission position mode.
+TEST_F(FocStateMachinePositionAutoTest, no_mech_ident_override_uses_its_own_identification)
 {
-    EXPECT_CALL(faultNotifierMock, Register(_))
-        .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)
-            {
-                faultNotifierMock.StoreHandler(handler);
-            }));
+    GivenFaultNotifierRegistered();
     GivenNvmInvalid();
+    ExpectPositionCalibrationSequence();
 
     PositionAutoStateMachine sm{
         application::TerminalAndTracer{ terminal, tracer },
         application::MotorHardware{ inverterMock, encoderMock, vdc },
         nvmMock,
-        application::CalibrationServices{ electricalIdentMock, alignmentMock },
+        application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
         faultNotifierMock,
         state_machine::TransitionPolicy::Auto,
         application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
     };
 
-    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
-        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
-            {
-                cb(std::size_t{ 4 });
-            }));
-    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
-        .WillOnce(Invoke([](const auto&,
-                             const infra::Function<void(std::optional<foc::Ohm>,
-                                 std::optional<foc::MilliHenry>)>& cb)
-            {
-                cb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
-            }));
-    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
-        .WillOnce(Invoke([](std::size_t, const auto&,
-                             const infra::Function<void(std::optional<foc::Radians>)>& cb)
-            {
-                cb(foc::Radians{ 0.0f });
-            }));
-
     sm.CmdCalibrate([](state_machine::CommandResult) {});
 
-    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
-    EXPECT_EQ(std::get<state_machine::Fault>(sm.CurrentState()).code,
-        state_machine::FaultCode::calibrationFailed);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachinePositionAutoTest, late_pole_pairs_callback_after_fault_is_ignored)

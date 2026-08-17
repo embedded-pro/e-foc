@@ -48,6 +48,15 @@ namespace foc
         MOCK_METHOD(PhasePwmDutyCycles, Calculate, (const PhaseCurrents& currentPhases, Radians& position), (override));
     };
 
+    class SpeedCommandableMock
+        : public SpeedCommandable
+    {
+    public:
+        MOCK_METHOD(void, EnableSpeedCommand, (), (override));
+        MOCK_METHOD(void, CommandSpeed, (RadiansPerSecond speed), (override));
+        MOCK_METHOD(hal::Hertz, SpeedCommandFrequency, (), (const, override));
+    };
+
     class FocPositionMock
         : public FocPosition
     {

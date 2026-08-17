@@ -14,14 +14,14 @@ namespace services
         : public MechanicalParametersIdentification
     {
     public:
-        MechanicalParametersIdentificationImpl(foc::FocSpeed& controller, drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder);
+        MechanicalParametersIdentificationImpl(foc::SpeedCommandable& controller, drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder);
 
         void EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone) override;
 
     private:
         void OnSamplingUpdate(foc::PhaseCurrents currentPhases, const foc::NewtonMeter& torqueConstant);
 
-        foc::FocSpeed& controller;
+        foc::SpeedCommandable& controller;
         drivers::ThreePhaseInverter& driver;
         drivers::Encoder& encoder;
 

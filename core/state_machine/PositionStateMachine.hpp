@@ -28,7 +28,6 @@ namespace application
         foc::Controllable& GetFocControl() override;
         foc::SpeedLoopTunable& SpeedTunable() override;
         services::MechanicalParametersIdentification& MechIdentImpl() override;
-        void RunPostAlignmentStep() override;
         foc::CurrentLoopTunable& CurrentTunable() override;
         services::RealTimeFrictionAndInertiaEstimator& GetOnlineMechEstimator() override;
         services::RealTimeResistanceAndInductanceEstimator& GetOnlineElecEstimator() override;
@@ -37,6 +36,7 @@ namespace application
         foc::FocPositionController focController;
         services::RealTimeFrictionAndInertiaEstimator onlineMechEstimator;
         services::RealTimeResistanceAndInductanceEstimator onlineElecEstimator;
-        std::optional<std::reference_wrapper<services::MechanicalParametersIdentification>> mechIdentPtr;
+        std::optional<services::MechanicalParametersIdentificationImpl> ownMechIdent;
+        std::reference_wrapper<services::MechanicalParametersIdentification> resolvedMechIdent;
     };
 }

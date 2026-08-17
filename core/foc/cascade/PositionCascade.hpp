@@ -7,6 +7,7 @@ namespace foc
 {
     class PositionCascade
         : public FocPosition
+        , public SpeedCommandable
         , protected CascadeWithSpeedLoop
     {
     public:
@@ -30,11 +31,18 @@ namespace foc
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
 
+        void EnableSpeedCommand() override;
+        void CommandSpeed(RadiansPerSecond speed) override;
+        hal::Hertz SpeedCommandFrequency() const override;
+
     private:
         void LowPriorityHandler();
 
         PositionControllerSelector positionLoop;
+        hal::Hertz outerLoopFrequency;
         Radians lastPositionSetPoint{ 0.0f };
+        RadiansPerSecond speedCommand{ 0.0f };
+        bool speedCommandActive{ false };
         bool enabled{ false };
     };
 }

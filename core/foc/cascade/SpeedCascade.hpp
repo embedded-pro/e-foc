@@ -6,6 +6,7 @@ namespace foc
 {
     class SpeedCascade
         : public FocSpeed
+        , public SpeedCommandable
         , protected CascadeWithSpeedLoop
     {
     public:
@@ -26,6 +27,10 @@ namespace foc
         void Disable() override;
         hal::Hertz OuterLoopFrequency() const override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
+
+        void EnableSpeedCommand() override;
+        void CommandSpeed(RadiansPerSecond speed) override;
+        hal::Hertz SpeedCommandFrequency() const override;
 
     private:
         void LowPriorityHandler();
