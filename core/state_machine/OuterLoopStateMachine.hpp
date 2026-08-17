@@ -23,6 +23,7 @@ namespace application
     {
     public:
         void ApplyOnlineEstimates() override;
+        void TraceOnlineEstimates();
 
     protected:
         OuterLoopStateMachine(const TerminalAndTracer& terminalAndTracer,

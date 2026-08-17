@@ -47,9 +47,14 @@ namespace application
         terminal.AddCommand({ { "estimate_status", "es", "Print current online estimates" },
             [this](const infra::BoundedConstString&)
             {
-                GetTracer().Trace() << "[EST] Mech: J=" << GetOnlineMechEstimator().CurrentInertia().Value() << " B=" << GetOnlineMechEstimator().CurrentFriction().Value();
-                GetTracer().Trace() << "[EST] Elec: R=" << GetOnlineElecEstimator().CurrentResistance().Value() << " L=" << GetOnlineElecEstimator().CurrentInductance().Value();
+                TraceOnlineEstimates();
             } });
+    }
+
+    void OuterLoopStateMachine::TraceOnlineEstimates()
+    {
+        GetTracer().Trace() << "[EST] Mech: J=" << GetOnlineMechEstimator().CurrentInertia().Value() << " B=" << GetOnlineMechEstimator().CurrentFriction().Value();
+        GetTracer().Trace() << "[EST] Elec: R=" << GetOnlineElecEstimator().CurrentResistance().Value() << " L=" << GetOnlineElecEstimator().CurrentInductance().Value();
     }
 
     void OuterLoopStateMachine::ApplyOnlineEstimates()

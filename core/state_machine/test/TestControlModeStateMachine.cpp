@@ -428,6 +428,25 @@ namespace
             communication.dataReceived(infra::MakeStringByteRange(cmd));
             ExecuteAllActions();
         }
+
+        std::string capturedOutput;
+
+        void CaptureTerminalOutput()
+        {
+            EXPECT_CALL(streamWriterMock, Insert(_, _))
+                .Times(AnyNumber())
+                .WillRepeatedly(Invoke([this](infra::ConstByteRange range, infra::StreamErrorPolicy&)
+                    {
+                        capturedOutput.append(reinterpret_cast<const char*>(range.begin()), range.size());
+                    }));
+        }
+
+        std::string OutputOf(const char* command)
+        {
+            capturedOutput.clear();
+            InvokeCliCommand(command);
+            return capturedOutput;
+        }
     };
 }
 
@@ -1260,4 +1279,207 @@ TEST_F(ControlModeStateMachineLifecycleTest, PersistedSpeedAlgorithmIsAppliedOnc
     CompleteCalibration_WithMechIdent();
 
     EXPECT_EQ(subject->ActiveSpeedAlgorithm(), foc::SpeedAlgorithm::lqi);
+}
+
+// ---- CLI: setpoint and bandwidth commands registered on the coordinator ----
+
+namespace
+{
+    class ControlModeStateMachineCliTest
+        : public ControlModeStateMachineLifecycleTest
+    {
+    public:
+        void GivenTorqueModeReady()
+        {
+            GivenNvmAlwaysInvalid();
+            SetUpTorqueCalibrationCaptures();
+            ConstructSubject(static_cast<uint8_t>(state_machine::ControlMode::torque));
+            subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+            CompleteCalibration_Torque();
+            CaptureTerminalOutput();
+        }
+
+        void GivenOuterLoopModeReady(state_machine::ControlMode mode)
+        {
+            GivenNvmAlwaysInvalid();
+            GivenNvmSaveConfigAlwaysSucceeds();
+            SetUpMechIdentCalibrationCaptures();
+            ConstructSubject(static_cast<uint8_t>(mode));
+            subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+            CompleteCalibration_WithMechIdent();
+            CaptureTerminalOutput();
+        }
+
+        void GivenTorqueModeIdle()
+        {
+            GivenNvmAlwaysInvalid();
+            ConstructSubject(static_cast<uint8_t>(state_machine::ControlMode::torque));
+            CaptureTerminalOutput();
+        }
+    };
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetTorque_Is_Accepted_In_Torque_Mode_When_Ready)
+{
+    GivenTorqueModeReady();
+
+    const auto output = OutputOf("st 2.5");
+
+    EXPECT_THAT(output, Not(HasSubstr("Unrecognized command.")));
+    EXPECT_THAT(output, Not(HasSubstr("ERROR")));
+    EXPECT_THAT(output, HasSubstr("> "));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetSpeed_Is_Accepted_In_Speed_Mode_When_Enabled)
+{
+    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    subject->ActiveStateMachine().CmdEnable();
+
+    const auto output = OutputOf("ss 20.0");
+
+    EXPECT_THAT(output, Not(HasSubstr("Unrecognized command.")));
+    EXPECT_THAT(output, Not(HasSubstr("ERROR")));
+    EXPECT_THAT(output, HasSubstr("> "));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetPosition_Is_Accepted_In_Position_Mode_When_Ready)
+{
+    GivenOuterLoopModeReady(state_machine::ControlMode::position);
+
+    const auto output = OutputOf("sp 3.14");
+
+    EXPECT_THAT(output, Not(HasSubstr("Unrecognized command.")));
+    EXPECT_THAT(output, Not(HasSubstr("ERROR")));
+    EXPECT_THAT(output, HasSubstr("> "));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetSpeed_Is_Rejected_With_Mode_Message_In_Torque_Mode)
+{
+    GivenTorqueModeReady();
+
+    const auto output = OutputOf("ss 20.0");
+
+    EXPECT_THAT(output, HasSubstr("ERROR"));
+    EXPECT_THAT(output, HasSubstr("rejected: command does not apply to the active control mode."));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetPosition_Is_Rejected_With_Mode_Message_In_Speed_Mode)
+{
+    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
+
+    const auto output = OutputOf("sp 1.0");
+
+    EXPECT_THAT(output, HasSubstr("ERROR"));
+    EXPECT_THAT(output, HasSubstr("rejected: command does not apply to the active control mode."));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetTorque_Is_Rejected_When_Lifecycle_State_Is_Idle)
+{
+    GivenTorqueModeIdle();
+
+    const auto output = OutputOf("st 2.5");
+
+    EXPECT_THAT(output, HasSubstr("ERROR"));
+    EXPECT_THAT(output, HasSubstr("rejected: setpoints are only accepted in Ready or Enabled."));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetTorque_Rejects_Wrong_Argument_Count)
+{
+    GivenTorqueModeReady();
+
+    EXPECT_THAT(OutputOf("st 1.0 2.0"), HasSubstr("invalid number of arguments."));
+    EXPECT_THAT(OutputOf("st"), HasSubstr("invalid number of arguments."));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetTorque_Rejects_NonNumeric_Argument)
+{
+    GivenTorqueModeReady();
+
+    EXPECT_THAT(OutputOf("st abc"), HasSubstr("invalid value. It should be a float."));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetSpeed_Rejects_NonNumeric_Argument_Before_Mode_Check)
+{
+    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
+
+    EXPECT_THAT(OutputOf("ss abc"), HasSubstr("invalid value. It should be a float."));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Is_Accepted_In_Torque_Mode)
+{
+    GivenTorqueModeReady();
+
+    const auto output = OutputOf("scbw 6283.2");
+
+    EXPECT_THAT(output, Not(HasSubstr("Unrecognized command.")));
+    EXPECT_THAT(output, Not(HasSubstr("ERROR")));
+    EXPECT_THAT(output, HasSubstr("> "));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Rejects_Wrong_Argument_Count)
+{
+    GivenTorqueModeReady();
+
+    EXPECT_THAT(OutputOf("scbw 100.0 200.0"), HasSubstr("invalid number of arguments."));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetSpeedBandwidth_Is_Rejected_In_Torque_Mode)
+{
+    GivenTorqueModeReady();
+
+    const auto output = OutputOf("ssbw 188.5");
+
+    EXPECT_THAT(output, HasSubstr("ERROR"));
+    EXPECT_THAT(output, HasSubstr("rejected: command does not apply to the active control mode."));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetSpeedBandwidth_Is_Accepted_In_Speed_Mode)
+{
+    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
+
+    const auto output = OutputOf("ssbw 188.5");
+
+    EXPECT_THAT(output, Not(HasSubstr("Unrecognized command.")));
+    EXPECT_THAT(output, Not(HasSubstr("ERROR")));
+    EXPECT_THAT(output, HasSubstr("> "));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetPositionBandwidth_Is_Rejected_In_Speed_Mode)
+{
+    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
+
+    const auto output = OutputOf("spbw 18.8");
+
+    EXPECT_THAT(output, HasSubstr("ERROR"));
+    EXPECT_THAT(output, HasSubstr("rejected: command does not apply to the active control mode."));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetPositionBandwidth_Reaches_The_Position_Cascade)
+{
+    GivenOuterLoopModeReady(state_machine::ControlMode::position);
+
+    const auto output = OutputOf("spbw 18.8");
+
+    EXPECT_THAT(output, Not(HasSubstr("Unrecognized command.")));
+    EXPECT_THAT(output, Not(HasSubstr("ERROR")));
+    EXPECT_THAT(output, HasSubstr("> "));
+}
+
+TEST_F(ControlModeStateMachineCliTest, EstimateStatus_Prints_The_Active_Mode_Estimates)
+{
+    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
+
+    const auto output = OutputOf("es");
+
+    EXPECT_THAT(output, HasSubstr("[EST] Mech: J="));
+    EXPECT_THAT(output, HasSubstr("[EST] Elec: R="));
+}
+
+TEST_F(ControlModeStateMachineCliTest, EstimateStatus_Reports_That_Torque_Mode_Has_No_Estimators)
+{
+    GivenTorqueModeReady();
+
+    EXPECT_THAT(OutputOf("es"), HasSubstr("online estimates are not available in torque mode"));
 }

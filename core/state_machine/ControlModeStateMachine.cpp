@@ -1,10 +1,34 @@
 #include "core/state_machine/ControlModeStateMachine.hpp"
+#include "core/services/cli/TerminalHelper.hpp"
 #include "infra/util/ReallyAssert.hpp"
+#include "infra/util/Tokenizer.hpp"
 #include "numerical/controllers/interfaces/PidController.hpp"
 #include <optional>
 
 namespace
 {
+    using CliStatus = services::TerminalWithStorage::Status;
+    using CliStatusWithMessage = services::TerminalWithStorage::StatusWithMessage;
+
+    constexpr auto wrongModeMessage = "rejected: command does not apply to the active control mode.";
+    constexpr auto wrongStateMessage = "rejected: setpoints are only accepted in Ready or Enabled.";
+
+    // Returns the rejection to report, or nothing when the single float argument was accepted.
+    std::optional<CliStatusWithMessage> ParseSingleFloat(const infra::BoundedConstString& input, float& value)
+    {
+        infra::Tokenizer tokenizer(input, ' ');
+
+        if (tokenizer.Size() != 1)
+            return CliStatusWithMessage{ CliStatus::error, "invalid number of arguments." };
+
+        const auto parsed = services::ParseInput(tokenizer.Token(0));
+        if (!parsed.has_value())
+            return CliStatusWithMessage{ CliStatus::error, "invalid value. It should be a float." };
+
+        value = *parsed;
+        return std::nullopt;
+    }
+
     std::optional<foc::CurrentAlgorithm> ParseCurrentAlgorithm(const infra::BoundedConstString& name)
     {
         if (name == "pid")
@@ -556,6 +580,160 @@ namespace state_machine
                 terminalAndTracer.tracer.Trace() << "Speed loop: " << SpeedAlgorithmName(ActiveSpeedAlgorithm());
                 terminalAndTracer.tracer.Trace() << "Position loop: " << PositionAlgorithmName(ActivePositionAlgorithm());
             } });
+
+        terminal.AddCommand({ { "estimate_status", "es", "Print current online estimates" },
+            [this](const infra::BoundedConstString&)
+            {
+                if (auto* outerLoop = ActiveOuterLoop())
+                    outerLoop->TraceOnlineEstimates();
+                else
+                    terminalAndTracer.tracer.Trace() << "Rejected: online estimates are not available in torque mode";
+            } });
+
+        RegisterSetpointCliCommands(terminal);
+        RegisterBandwidthCliCommands(terminal);
+    }
+
+    void ControlModeStateMachine::RegisterSetpointCliCommands(services::TerminalWithStorage& terminal)
+    {
+        terminal.AddCommand({ { "set_torque", "st", "Set q-axis current in A, torque mode only. set_torque <iq>. Ex: st 2.5" },
+            [this, &terminal](const infra::BoundedConstString& params)
+            {
+                terminal.ProcessResult(SetTorqueSetpoint(params));
+            } });
+
+        terminal.AddCommand({ { "set_speed", "ss", "Set speed in rad/s, speed mode only. set_speed <speed>. Ex: ss 20.0" },
+            [this, &terminal](const infra::BoundedConstString& params)
+            {
+                terminal.ProcessResult(SetSpeedSetpoint(params));
+            } });
+
+        terminal.AddCommand({ { "set_position", "sp", "Set mechanical position in rad, position mode only. set_position <position>. Ex: sp 3.14" },
+            [this, &terminal](const infra::BoundedConstString& params)
+            {
+                terminal.ProcessResult(SetPositionSetpoint(params));
+            } });
+    }
+
+    void ControlModeStateMachine::RegisterBandwidthCliCommands(services::TerminalWithStorage& terminal)
+    {
+        terminal.AddCommand({ { "set_current_bandwidth", "scbw", "Set current loop bandwidth in rad/s. set_current_bandwidth <bandwidth>. Ex: scbw 6283.2" },
+            [this, &terminal](const infra::BoundedConstString& params)
+            {
+                terminal.ProcessResult(SetCurrentBandwidth(params));
+            } });
+
+        terminal.AddCommand({ { "set_speed_bandwidth", "ssbw", "Set speed loop bandwidth in rad/s. set_speed_bandwidth <bandwidth>. Ex: ssbw 188.5" },
+            [this, &terminal](const infra::BoundedConstString& params)
+            {
+                terminal.ProcessResult(SetSpeedBandwidth(params));
+            } });
+
+        terminal.AddCommand({ { "set_position_bandwidth", "spbw", "Set position loop bandwidth in rad/s. set_position_bandwidth <bandwidth>. Ex: spbw 18.8" },
+            [this, &terminal](const infra::BoundedConstString& params)
+            {
+                terminal.ProcessResult(SetPositionBandwidth(params));
+            } });
+    }
+
+    std::optional<ControlModeStateMachine::CliResult> ControlModeStateMachine::RejectSetpoint(ControlMode requiredMode) const
+    {
+        if (Active() != requiredMode)
+            return CliResult{ CliStatus::error, wrongModeMessage };
+
+        const auto& state = ActiveStateMachine().CurrentState();
+        if (!std::holds_alternative<Ready>(state) && !std::holds_alternative<Enabled>(state))
+            return CliResult{ CliStatus::error, wrongStateMessage };
+
+        return std::nullopt;
+    }
+
+    ControlModeStateMachine::CliResult ControlModeStateMachine::SetTorqueSetpoint(const infra::BoundedConstString& input)
+    {
+        float value{ 0.0f };
+        if (auto error = ParseSingleFloat(input, value); error.has_value())
+            return *error;
+
+        if (auto rejection = RejectSetpoint(ControlMode::torque); rejection.has_value())
+            return *rejection;
+
+        TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ value } });
+        return CliResult{};
+    }
+
+    ControlModeStateMachine::CliResult ControlModeStateMachine::SetSpeedSetpoint(const infra::BoundedConstString& input)
+    {
+        float value{ 0.0f };
+        if (auto error = ParseSingleFloat(input, value); error.has_value())
+            return *error;
+
+        if (auto rejection = RejectSetpoint(ControlMode::speed); rejection.has_value())
+            return *rejection;
+
+        TrySetSpeed(foc::RadiansPerSecond{ value });
+        return CliResult{};
+    }
+
+    ControlModeStateMachine::CliResult ControlModeStateMachine::SetPositionSetpoint(const infra::BoundedConstString& input)
+    {
+        float value{ 0.0f };
+        if (auto error = ParseSingleFloat(input, value); error.has_value())
+            return *error;
+
+        if (auto rejection = RejectSetpoint(ControlMode::position); rejection.has_value())
+            return *rejection;
+
+        TrySetPosition(foc::Radians{ value });
+        return CliResult{};
+    }
+
+    ControlModeStateMachine::CliResult ControlModeStateMachine::SetCurrentBandwidth(const infra::BoundedConstString& input)
+    {
+        float value{ 0.0f };
+        if (auto error = ParseSingleFloat(input, value); error.has_value())
+            return *error;
+
+        if (!TrySetCurrentBandwidth(value))
+            return CliResult{ CliStatus::error, wrongModeMessage };
+
+        return CliResult{};
+    }
+
+    ControlModeStateMachine::CliResult ControlModeStateMachine::SetSpeedBandwidth(const infra::BoundedConstString& input)
+    {
+        float value{ 0.0f };
+        if (auto error = ParseSingleFloat(input, value); error.has_value())
+            return *error;
+
+        if (!TrySetSpeedBandwidth(value))
+            return CliResult{ CliStatus::error, wrongModeMessage };
+
+        return CliResult{};
+    }
+
+    ControlModeStateMachine::CliResult ControlModeStateMachine::SetPositionBandwidth(const infra::BoundedConstString& input)
+    {
+        float value{ 0.0f };
+        if (auto error = ParseSingleFloat(input, value); error.has_value())
+            return *error;
+
+        if (Active() != ControlMode::position)
+            return CliResult{ CliStatus::error, wrongModeMessage };
+
+        // Retuning redesigns the position law, which can be refused; never report that as applied
+        if (!TrySetPositionBandwidth(value))
+            return CliResult{ CliStatus::error, "rejected: no controller for this bandwidth." };
+
+        return CliResult{};
+    }
+
+    application::OuterLoopStateMachine* ControlModeStateMachine::ActiveOuterLoop()
+    {
+        if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
+            return sm;
+        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
+            return sm;
+        return nullptr;
     }
 
     void ControlModeStateMachine::TraceSelectResult(foc::SelectResult result) const

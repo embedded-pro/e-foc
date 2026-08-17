@@ -45,72 +45,76 @@ date: 2026-04-07
 
 ## Component Details
 
-### Three-Layer Interactor Hierarchy
+### Command Registration
 
-The CLI is structured as a three-level inheritance hierarchy of interactors. Each level adds commands specific to a control mode while inheriting the common commands of the level above.
+Every command is registered by the control-mode coordinator, which owns the only lifetime-safe
+reference to the active control mode. There is no per-mode interactor object in production: the
+active mode lives inside a `std::variant` that is replaced on a mode switch, so an object holding a
+reference to it could outlive its target. The coordinator instead dispatches each command to
+whichever mode is active and rejects the command when it does not apply.
 
 ```mermaid
 classDiagram
-    class TerminalFocBaseInteractor {
-        +start()
-        +stop()
-        +set-pid(kp, ki, kd)
-        #FocBase reference
-        #TerminalWithStorage reference
+    class ControlModeStateMachine {
+        +RegisterCliCommands()
+        -TrySetTorque(iq)
+        -TrySetSpeed(omega)
+        -TrySetPosition(theta)
+        -ActiveStateMachine()
     }
-    class TerminalFocTorqueInteractor {
-        +set-torque(Id, Iq)
+    class TerminalWithStorage {
+        +AddCommand(descriptor, handler)
     }
-    class TerminalFocSpeedInteractor {
-        +set-speed(ω)
-        +set-speed-bandwidth(bandwidth)
-    }
-    class TerminalFocPositionInteractor {
-        +set-position(θ)
-        +set-speed-bandwidth(bandwidth)
-        +set-position-bandwidth(bandwidth)
-        +select-position-algorithm(alg)
-    }
-
-    TerminalFocBaseInteractor <|-- TerminalFocTorqueInteractor
-    TerminalFocBaseInteractor <|-- TerminalFocSpeedInteractor
-    TerminalFocBaseInteractor <|-- TerminalFocPositionInteractor
+    ControlModeStateMachine --> TerminalWithStorage : registers
 ```
 
-Only one interactor is active at a time; the application constructs exactly the interactor matching the desired control mode and connects it to the `FocStateMachine`.
+#### Lifecycle Commands
 
-#### `TerminalFocBaseInteractor` — Shared Commands
+| Command             | Alias | Arguments | Action                                                              |
+|---------------------|-------|-----------|---------------------------------------------------------------------|
+| `calibrate`         | `cal` | —         | Runs the calibration sequence                                       |
+| `enable`            | `en`  | —         | Enables the motor; rejected outside `Ready`                         |
+| `disable`           | `dis` | —         | Disables the motor                                                  |
+| `clear_fault`       | `cf`  | —         | Clears a latched fault                                              |
+| `clear_calibration` | `cc`  | —         | Invalidates stored calibration                                      |
+| `active_mode`       | `am`  | —         | Prints the active control mode                                      |
+| `apply_estimates`   | `ae`  | —         | Applies the online estimates to the loop gains                      |
+| `estimate_status`   | `es`  | —         | Prints the current online estimates                                 |
 
-| Command                     | Arguments                               | Action                                                                                                                                                                           |
-|-----------------------------|-----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `set_current_bandwidth`     | bandwidth (float, rad/s)                | Sets the current-loop bandwidth via `CurrentLoopTunable::SetCurrentTunings()`                                                                                                    |
-| `select_current_algorithm`  | pid \| decoupled \| deadbeat \| sliding | Selects the current-loop algorithm; rejected while the motor is enabled or before the motor model is identified                                                                  |
-| `select_speed_algorithm`    | pid \| lqi \| adrc \| twodof            | Selects the speed-loop algorithm; only available in speed and position modes                                                                                                     |
-| `select_position_algorithm` | pid \| cascadep \| lqr \| lqi \| twodof | Selects the position-loop algorithm; only available in position mode. LQR and LQI are refused when their Riccati design does not converge, leaving the previous algorithm active |
-| `active_algorithms`         | —                                       | Prints the active current, speed and position loop algorithms                                                                                                                    |
+#### Algorithm Selection
 
-This command is available in all control modes.
+| Command                     | Alias | Arguments                               | Action                                                                                                       |
+|-----------------------------|-------|-----------------------------------------|--------------------------------------------------------------------------------------------------------------|
+| `select_current_algorithm`  | `sca` | pid \| decoupled \| deadbeat \| sliding | Selects the current-loop law; rejected while enabled or before the motor model is identified                 |
+| `select_speed_algorithm`    | `ssa` | pid \| lqi \| adrc \| twodof            | Selects the speed-loop law; speed and position modes only                                                    |
+| `select_position_algorithm` | `spa` | pid \| cascadep \| lqr \| lqi \| twodof | Selects the position-loop law; position mode only. LQR and LQI are refused when their Riccati design fails   |
+| `active_algorithms`         | `aa`  | —                                       | Prints the active current, speed and position laws                                                           |
 
-#### `TerminalFocTorqueInteractor` — Torque Mode
+#### Setpoints
 
-| Command      | Arguments      | Action                                                                   |
-|--------------|----------------|--------------------------------------------------------------------------|
-| `set-torque` | Id (A), Iq (A) | Sets the d-axis and q-axis current setpoints via `FocTorque::SetPoint()` |
+Each setpoint command applies to exactly one control mode and is rejected with a mode-mismatch
+message in the others, and rejected when the lifecycle state does not accept setpoints.
 
-#### `TerminalFocSpeedInteractor` — Speed Mode
+| Command        | Alias | Arguments      | Mode     |
+|----------------|-------|----------------|----------|
+| `set_torque`   | `st`  | Iq (A)         | Torque   |
+| `set_speed`    | `ss`  | omega (rad/s)  | Speed    |
+| `set_position` | `sp`  | theta (rad)    | Position |
 
-| Command               | Arguments                | Action                                                                  |
-|-----------------------|--------------------------|-------------------------------------------------------------------------|
-| `set-speed`           | ω (rad/s)                | Sets the speed setpoint via `FocSpeed::SetPoint()`                      |
-| `set_speed_bandwidth` | bandwidth (float, rad/s) | Sets the speed-loop bandwidth via `SpeedLoopTunable::SetSpeedTunings()` |
+The torque command takes the q-axis current only. The d-axis reference is held at zero by the
+control law, so exposing it would let an operator command a flux reference the cascade immediately
+overwrites.
 
-#### `TerminalFocPositionInteractor` — Position Mode
+#### Bandwidths
 
-| Command                  | Arguments                | Action                                                                                                                                                                                         |
-|--------------------------|--------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `set-position`           | θ (rad)                  | Sets the position setpoint via `FocPosition::SetPoint()`                                                                                                                                       |
-| `set_speed_bandwidth`    | bandwidth (float, rad/s) | Sets the speed-loop bandwidth within the position cascade                                                                                                                                      |
-| `set_position_bandwidth` | bandwidth (float, rad/s) | Sets the position-loop bandwidth via `PositionLoopTunable::SetPositionTunings()`. Refused while the motor is enabled, and refused if the active law cannot be redesigned for the new bandwidth |
+| Command                  | Alias  | Arguments             | Availability                       |
+|--------------------------|--------|-----------------------|------------------------------------|
+| `set_current_bandwidth`  | `scbw` | bandwidth (rad/s)     | All modes                          |
+| `set_speed_bandwidth`    | `ssbw` | bandwidth (rad/s)     | Speed and position modes           |
+| `set_position_bandwidth` | `spbw` | bandwidth (rad/s)     | Position mode                      |
+
+Retuning is refused while the motor is enabled, and refused when the active law cannot be redesigned
+for the requested bandwidth.
 
 ### `TerminalWithBanner` — Decorator
 
