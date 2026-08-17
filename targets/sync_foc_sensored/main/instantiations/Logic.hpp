@@ -29,7 +29,7 @@ namespace application
         static constexpr uint32_t calibrationRegionSize = 128;
         static constexpr uint32_t configRegionOffset = calibrationRegionOffset + calibrationRegionSize;
         static constexpr uint32_t configRegionSize = 128;
-        static constexpr uint32_t controlLoopFrequencyHz = 10000;
+        static constexpr uint32_t controlLoopFrequencyHz = 20000;
         static constexpr uint32_t pwmDeadTimeNs = 500;
 
         using ControlMode = state_machine::ControlModeStateMachine;

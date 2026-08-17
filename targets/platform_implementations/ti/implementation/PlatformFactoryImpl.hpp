@@ -234,7 +234,7 @@ namespace application
         PendSvLowPriorityInterrupt pendSvLowPriorityInterrupt;
         ResetCause resetCause{ ResetCause::powerUp };
         infra::BoundedString::WithStorage<1024> faultStatusString;
-        hal::Hertz pwmBaseFrequency{ 10000 };
+        hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         infra::Function<void(BoardProtectionReason)> onFaultCallback;
