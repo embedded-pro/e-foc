@@ -5,8 +5,6 @@ namespace foc
     struct CurrentLoopTunings
     {
         float bandwidth{ 6283.185307f };
-        // Inside the boundary layer the sliding-mode error map is e[k+1] = -(switchingGain/boundaryLayer)*e[k],
-        // so the ratio must stay below one for the discrete loop to contract.
         float switchingGain{ 0.2f };
         float boundaryLayer{ 0.5f };
         bool twoStepDeadbeat{ false };

@@ -80,9 +80,6 @@ TEST_F(TestPidCurrentController, invalid_parameters_leave_gains_untouched)
     EXPECT_NEAR(output.q, 0.0f, tolerance);
 }
 
-// Pole-zero cancellation design: kp = Ls * bandwidth, Ki = Rs * bandwidth, both normalised by
-// sqrt(3)/Vdc. PidIncremental takes the integral gain already multiplied by the sample period, so
-// the first incremental step after reset emits (kp + Ki * Ts) * error.
 TEST_F(TestPidCurrentController, gains_follow_the_pole_zero_cancellation_design)
 {
     const auto parameters = ValidParameters();
@@ -103,7 +100,6 @@ TEST_F(TestPidCurrentController, gains_follow_the_pole_zero_cancellation_design)
     EXPECT_NEAR(output.q, (kp + ki) * error, tolerance);
 }
 
-// The integral gain is per-sample, so halving the sampling frequency must double it.
 TEST_F(TestPidCurrentController, integral_gain_scales_with_the_sample_period)
 {
     const float bandwidth = 500.0f;

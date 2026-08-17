@@ -22,7 +22,6 @@ namespace foc
 
     void Runner::Enable()
     {
-        // Calibration services take over the single-slot current callback, so it must be reclaimed here.
         RegisterPhaseCurrents();
         foc.Enable();
         enabled = true;
@@ -47,8 +46,6 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     void Runner::OnPhaseCurrents(const PhaseCurrents& currentPhases)
     {
-        // A conversion already in flight when Stop() ran must not write duty cycles: on TI that
-        // re-enables the generator and outputs, which would re-energise the bridge after a fault.
         if (!enabled)
             return;
 

@@ -62,7 +62,7 @@ namespace application
             onBoardProtection = onProtection;
         }
 
-        void RaiseBoardProtection(PlatformFactory::BoardProtectionReason reason)
+        void RaiseBoardProtection(PlatformFactory::BoardProtectionReason reason) const
         {
             if (onBoardProtection != nullptr)
                 onBoardProtection(reason);

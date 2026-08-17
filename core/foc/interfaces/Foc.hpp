@@ -79,8 +79,6 @@ namespace foc
         virtual void SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator) = 0;
     };
 
-    // Identification services only need to spin the motor at a commanded speed, which the position
-    // cascade can supply from its speed loop just as well as the speed cascade does.
     class SpeedCommandable
     {
     public:

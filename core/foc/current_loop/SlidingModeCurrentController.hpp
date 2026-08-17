@@ -14,7 +14,7 @@ namespace foc
 
         void Configure(const MotorModelParameters& motorParameters);
         void SetTunings(const CurrentLoopTunings& tunings);
-        void Reset();
+        void Reset() const;
 
         OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context)
         {
@@ -28,8 +28,6 @@ namespace foc
         static ScalarSlidingMode Inert();
         void Construct();
 
-        // The error-only law holds the error where it is; the equilibrium voltage (1 - ad) / bd * i*
-        // is what keeps a non-zero reference standing, see documentation/theory/current-loop-controllers.md A3
         OPTIMIZE_FOR_SPEED float ComputeAxis(float measured, float reference)
         {
             const auto control = slidingMode.ComputeControl(ScalarSlidingMode::StateVector{ measured },

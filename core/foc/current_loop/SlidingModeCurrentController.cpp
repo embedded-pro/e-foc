@@ -20,7 +20,7 @@ namespace foc
         Construct();
     }
 
-    void SlidingModeCurrentController::Reset()
+    void SlidingModeCurrentController::Reset() const
     {
         // The equivalent and switching terms are algebraic; there is no state to clear
     }

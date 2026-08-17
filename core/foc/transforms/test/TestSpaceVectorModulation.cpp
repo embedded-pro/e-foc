@@ -115,8 +115,6 @@ TEST_F(TestSpaceVectorModulation, zero_voltage_centering)
     EXPECT_NEAR(pwm.c, 0.5f, tolerance);
 }
 
-// A 60 degree boundary hands the reference over to the next pair of active vectors. The commanded
-// voltage does not jump there, so no phase duty may either: each is sampled either side of it.
 TEST_F(TestSpaceVectorModulation, duty_cycles_are_continuous_across_every_sector_boundary)
 {
     constexpr float magnitude = 0.9f;
@@ -138,8 +136,6 @@ TEST_F(TestSpaceVectorModulation, duty_cycles_are_continuous_across_every_sector
 }
 
 // The alpha axis aligns with active vector V1, so 0, 60, ... 300 degrees are the hexagon vertex
-// directions. Driven to the vertex reach |V| = 2/sqrt(3) the modulator must collapse onto exactly
-// the switching state of that vertex: V1 = 100, V2 = 110, V3 = 010, V4 = 011, V5 = 001, V6 = 101.
 TEST_F(TestSpaceVectorModulation, active_vector_directions_collapse_onto_a_pure_switching_state)
 {
     constexpr float tolerance = 1e-5f;
@@ -165,8 +161,6 @@ TEST_F(TestSpaceVectorModulation, active_vector_directions_collapse_onto_a_pure_
 }
 
 // Halfway between two active vectors the inscribed circle touches the hexagon edge, so |V| = 1 is
-// exactly the linear-modulation limit: the two phases spanning the sector sit at 1 and 0 while the
-// phase orthogonal to the reference stays centred at 0.5.
 TEST_F(TestSpaceVectorModulation, sector_centres_reach_the_limit_at_unit_magnitude)
 {
     constexpr float tolerance = 1e-5f;

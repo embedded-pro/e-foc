@@ -26,7 +26,6 @@ namespace foc
         drivers::ThreePhaseInverter& inverter;
         drivers::Encoder& encoder;
         FocBase& foc;
-        // Written from command context, read from the control interrupt.
         volatile bool enabled{ false };
     };
 }

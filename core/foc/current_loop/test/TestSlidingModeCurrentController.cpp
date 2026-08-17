@@ -135,8 +135,6 @@ TEST_F(TestSlidingModeCurrentController, non_positive_boundary_layer_disables_th
     EXPECT_NEAR(output.q, 0.0f, tolerance);
 }
 
-// The shipped defaults must satisfy the discrete contraction condition Ksw < phi, otherwise the
-// error map inside the boundary layer diverges regardless of the equivalent-control term.
 TEST_F(TestSlidingModeCurrentController, default_tunings_settle_on_a_non_zero_reference)
 {
     controller.Configure(ValidParameters());
@@ -149,7 +147,6 @@ TEST_F(TestSlidingModeCurrentController, closed_loop_settles_on_a_non_zero_refer
 {
     controller.Configure(ValidParameters());
 
-    // A switching gain below the boundary layer makes the discrete error map contracting
     controller.SetTunings({ 6283.185307f, 0.2f, 0.5f, false });
 
     EXPECT_NEAR(SettledCurrent(1.0f), 1.0f, tolerance);

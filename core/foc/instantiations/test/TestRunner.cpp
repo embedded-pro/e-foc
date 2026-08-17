@@ -77,8 +77,6 @@ TEST_F(TestRunner, DisableStopsInverterThenFoc)
 
 TEST_F(TestRunner, PhaseCurrentsCallbackReadsEncoderCalculatesFocAndOutputsPwm)
 {
-    // Registration happens in the constructor and again in Enable(), which reclaims the single
-    // callback slot from any calibration service that took it over.
     EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _))
         .Times(2)
         .WillRepeatedly([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
@@ -133,8 +131,6 @@ TEST_F(TestRunner, MultipleEnableDisableCyclesWork)
     // destructor calls Disable() again
 }
 
-// A conversion already in flight when Stop() ran must not write duty cycles: on TI that call
-// re-enables the generator and outputs, which would re-energise the bridge after a fault.
 TEST_F(TestRunner, ALateCallbackAfterDisableDoesNotDriveThePwm)
 {
     EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _))

@@ -94,11 +94,9 @@ namespace foc
         ALWAYS_INLINE static float Sine(float angle) noexcept
         {
             const auto scaledAngle = angle * detail::lutScale;
-            // Integer floor without std::floor or std::fmod, either of which may call into libm
             const auto i = static_cast<int32_t>(scaledAngle);
             const auto floored = i - (scaledAngle < static_cast<float>(i) ? 1 : 0);
             const auto fraction = scaledAngle - static_cast<float>(floored);
-            // Reinterpreted as uint32_t so a negative index wraps onto the power-of-two LUT: -1 becomes 511
             const auto index = static_cast<std::size_t>(static_cast<uint32_t>(floored)) & detail::lutMask;
             const auto nextIndex = (index + 1) & detail::lutMask;
 

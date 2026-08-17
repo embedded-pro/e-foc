@@ -35,7 +35,7 @@ namespace foc
         ApplyGains();
     }
 
-    void DeadbeatCurrentController::Reset()
+    void DeadbeatCurrentController::Reset() const
     {
         // Deadbeat control is a memoryless plant inversion; there is no state to clear
     }

@@ -13,7 +13,7 @@ namespace foc
 
         void Configure(const MotorModelParameters& motorParameters);
         void SetTunings(const CurrentLoopTunings& tunings);
-        void Reset();
+        void Reset() const;
 
         OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context) const
         {

@@ -41,8 +41,6 @@ namespace foc
 
         const auto control = lqi.ComputeControl(state, reference, measured).at(0, 0);
 
-        // Same-sample conditional integration: the toolbox integrates before it returns, so a
-        // saturated command replays the mirrored error, which undoes the step just taken
         if (math::Abs(control) > 1.0f)
         {
             const SpeedLqi::OutputVector mirrored{ 2.0f * context.measured.Value() - context.reference.Value() };
