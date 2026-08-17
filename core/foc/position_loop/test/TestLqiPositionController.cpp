@@ -63,7 +63,6 @@ namespace
             return controller.Compute({ foc::Radians{ measured }, foc::Radians{ reference }, foc::RadiansPerSecond{ speed } }).value;
         }
 
-        // Rigid body integrated with the same rectangular rule the discretisation assumes
         float SettledPosition(float reference, float loadTorque)
         {
             float position = 0.0f;

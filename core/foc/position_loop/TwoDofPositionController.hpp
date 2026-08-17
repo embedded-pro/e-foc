@@ -26,8 +26,6 @@ namespace foc
     private:
         void ApplyReferenceFilter();
 
-        // An angle is not a linear quantity: the state advances along the wrapped error, so a setpoint
-        // on the far side of the seam is approached the short way round instead of all the way back
         OPTIMIZE_FOR_SPEED Radians ShapedReference(const PositionControlContext& context)
         {
             if (!filterActive)

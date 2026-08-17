@@ -2,7 +2,7 @@
 
 namespace foc
 {
-    void CascadePPositionController::Configure(const MechanicalModelParameters&)
+    void CascadePPositionController::Configure(const MechanicalModelParameters&) const
     {
     }
 
@@ -11,7 +11,7 @@ namespace foc
         gain = tunings.bandwidth;
     }
 
-    void CascadePPositionController::Reset()
+    void CascadePPositionController::Reset() const
     {
     }
 }

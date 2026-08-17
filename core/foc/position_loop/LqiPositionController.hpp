@@ -1,7 +1,6 @@
 #pragma once
 
-#include "core/foc/position_loop/PositionPlantModel.hpp"
-#include "numerical/controllers/implementations/Lqr.hpp"
+#include "core/foc/position_loop/StateFeedbackPositionController.hpp"
 
 namespace foc
 {
@@ -10,31 +9,21 @@ namespace foc
     // IntegralStateFeedbackLqi so the integral row stays in the time-scaled coordinates the
     // Riccati solve needs; see documentation/design/controller-selection.md.
     class LqiPositionController
+        : public StateFeedbackPositionController<LqiPositionController, 3>
     {
     public:
         static constexpr PositionAlgorithm algorithm{ PositionAlgorithm::lqi };
 
-        using Design = controllers::Lqr<float, 3, 1>;
+        static std::optional<Design> Solve(const MechanicalModelParameters& parameters, const PositionLoopTunings& tunings);
+        static Design Inert();
 
-        static bool IsDesignFeasible(const MechanicalModelParameters& parameters, const PositionLoopTunings& tunings);
-
-        void Configure(const MechanicalModelParameters& motorParameters);
-        void SetTunings(const PositionLoopTunings& tunings);
         void Reset();
+        void OnDesignChanged();
 
         OPTIMIZE_FOR_SPEED PositionOutput Compute(const PositionControlContext& context);
 
     private:
-        static std::optional<Design> Solve(const MechanicalModelParameters& parameters, const PositionLoopTunings& tunings);
-        static Design Inert();
-        void Construct();
-
-        MechanicalModelParameters parameters{};
-        PositionLoopTunings tunings{};
-        float currentPerNormalizedInput{ 0.0f };
-        float samplePeriod{ 0.0f };
         float accumulatedDeviation{ 0.0f };
-        Design design{ Inert() };
     };
 
     static_assert(PositionController<LqiPositionController>);

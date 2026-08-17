@@ -24,7 +24,6 @@ namespace
         return tunings;
     }
 
-    // Half a turn of error commands one bandwidth of speed, so kp is the reciprocal of half a turn
     float ProportionalGain()
     {
         return 1.0f / pi;

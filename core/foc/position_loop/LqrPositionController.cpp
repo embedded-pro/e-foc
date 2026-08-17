@@ -33,24 +33,7 @@ namespace foc
         return Design::TryCreate(a, b, q, r);
     }
 
-    bool LqrPositionController::IsDesignFeasible(const MechanicalModelParameters& parameters, const PositionLoopTunings& tunings)
-    {
-        return Solve(parameters, tunings).has_value();
-    }
-
-    void LqrPositionController::Configure(const MechanicalModelParameters& motorParameters)
-    {
-        parameters = motorParameters;
-        Construct();
-    }
-
-    void LqrPositionController::SetTunings(const PositionLoopTunings& controllerTunings)
-    {
-        tunings = controllerTunings;
-        Construct();
-    }
-
-    void LqrPositionController::Reset()
+    void LqrPositionController::Reset() const
     {
     }
 
@@ -65,14 +48,4 @@ namespace foc
             LimitToCurrentEnvelope(command.at(0, 0) * currentPerNormalizedInput, parameters.maxCurrent).Value() };
     }
 
-    void LqrPositionController::Construct()
-    {
-        auto solved = Solve(parameters, tunings);
-
-        // A rejected design leaves the loop inert without a hot-path branch: zero gains and a zero
-        // input scale drive the command to zero, and a zero sample period keeps the state finite.
-        design = solved ? *solved : Inert();
-        currentPerNormalizedInput = solved ? PositionPlantModel::FromParameters(parameters).currentPerNormalizedInput : 0.0f;
-        samplePeriod = solved ? OuterSamplePeriod(parameters.samplingFrequency) : 0.0f;
-    }
 }

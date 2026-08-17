@@ -21,7 +21,6 @@ namespace
             foc::NewtonMeter{ torqueConstant }, foc::Ampere{ maxCurrent }, hal::Hertz{ samplingFrequency } };
     }
 
-    // The normalised input absorbs (Kt / J) * Ts^2, so one unit of it costs J / (Kt * Ts^2) Amperes
     float CurrentPerNormalizedInput()
     {
         return inertia / (torqueConstant * samplePeriod * samplePeriod);
@@ -59,7 +58,6 @@ namespace
             return controller.Compute({ foc::Radians{ measured }, foc::Radians{ reference }, foc::RadiansPerSecond{ speed } }).value;
         }
 
-        // Rigid body integrated with the same rectangular rule the discretisation assumes
         float SettledPosition(float reference)
         {
             float position = 0.0f;

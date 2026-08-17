@@ -40,7 +40,6 @@ TEST_F(TestPositionPlantModel, a_frictionless_load_leaves_the_scaled_speed_undam
     EXPECT_NEAR(foc::PositionPlantModel::FromParameters(parameters).speedDecay, 1.0f, tolerance);
 }
 
-// The normalised input absorbs (Kt / J) * Ts^2 * Imax, so its inverse in Amperes is J / (Kt * Ts^2)
 TEST_F(TestPositionPlantModel, the_normalised_input_converts_back_to_amperes_through_the_rigid_body)
 {
     const auto model = foc::PositionPlantModel::FromParameters(ValidParameters());

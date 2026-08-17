@@ -67,7 +67,6 @@ TEST_F(TestTwoDofPositionController, the_shaped_reference_never_leaves_the_seam_
     const float shortestPath = 2.0f * std::numbers::pi_v<float> - 2.0f * nearSeam;
     const float speedEnvelope = foc::PositionLoopTunings{}.bandwidth * std::numbers::pi_v<float>;
 
-    // Travelling the long way round would command more than a hundred times this speed reference
     EXPECT_LT(FirstCommand(nearSeam, -nearSeam), shortestPath / std::numbers::pi_v<float> * speedEnvelope);
 }
 

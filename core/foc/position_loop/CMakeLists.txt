@@ -25,6 +25,7 @@ target_sources(e_foc.foc.position_loop PRIVATE
     PidPositionController.hpp
     PositionController.hpp
     PositionControllerSelector.cpp
+    StateFeedbackPositionController.hpp
     PositionControllerSelector.hpp
     PositionPlantModel.cpp
     PositionPlantModel.hpp
