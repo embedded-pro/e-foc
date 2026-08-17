@@ -13,6 +13,10 @@ namespace foc
 
     float OuterSamplePeriod(hal::Hertz samplingFrequency)
     {
+        // An unconfigured loop has no sample period; returning infinity here produced NaN downstream.
+        if (samplingFrequency.Value() == 0)
+            return 0.0f;
+
         return 1.0f / static_cast<float>(samplingFrequency.Value());
     }
 
