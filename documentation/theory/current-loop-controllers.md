@@ -286,14 +286,14 @@ boundary-layer saturation on the error alone; the equilibrium term $R_s i^*$ is 
 
 ## Numerical Properties
 
-| Property                  | PID (baseline)  | Dec-PID (A1)        | Deadbeat (A2)          | SMC (A3)            |
+| Property                  | PID (baseline)  |    Dec-PID (A1)     |     Deadbeat (A2)      |      SMC (A3)       |
 |---------------------------|:---------------:|:-------------------:|:----------------------:|:-------------------:|
-| ISR cost (ops)            | ~6 MACs         | ~10 MACs            | ~4 MACs                | ~12 MACs            |
-| Settling time             | ~1/ωbw          | ~1/ωbw              | 1–2 samples            | ~1/ωbw              |
+| ISR cost (ops)            |     ~6 MACs     |      ~10 MACs       |        ~4 MACs         |      ~12 MACs       |
+| Settling time             |     ~1/ωbw      |       ~1/ωbw        |      1–2 samples       |       ~1/ωbw        |
 | Robustness to Rs/Ls error | High (integral) | Low (FF model-dep.) | Low (exact model req.) | High (gain-bounded) |
-| Requires ψf               | No              | Yes                 | No                     | No                  |
-| Requires RLS convergence  | No              | Partial             | Yes (tight)            | Partial             |
-| Tuning knobs              | 3               | 1 (ωbw)             | 0 (variant choice)     | 2 (Ksw, φ)          |
+| Requires ψf               |       No        |         Yes         |           No           |         No          |
+| Requires RLS convergence  |       No        |       Partial       |      Yes (tight)       |       Partial       |
+| Tuning knobs              |        3        |       1 (ωbw)       |   0 (variant choice)   |     2 (Ksw, φ)      |
 
 ### Cycle Budget
 

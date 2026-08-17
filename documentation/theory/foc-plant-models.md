@@ -205,13 +205,13 @@ graph LR
 
 ## Numerical Properties
 
-| Property             | Current plant                     | Speed plant                     | Position plant            |
+| Property             |           Current plant           |           Speed plant           |      Position plant       |
 |----------------------|:---------------------------------:|:-------------------------------:|:-------------------------:|
-| States               | 1 per axis (Id, Iq)               | 1 (ωm)                          | 2 (θm, ωm)                |
-| Inputs               | 1 per axis (v'd, v'q)             | 1 (Iq*)                         | 1 (Iq*)                   |
-| Time constant        | $L_s/R_s$ (typ. 0.4 ms)           | $J/B_f$ (typ. 0.1–2 s)          | Integrating               |
+| States               |        1 per axis (Id, Iq)        |             1 (ωm)              |        2 (θm, ωm)         |
+| Inputs               |       1 per axis (v'd, v'q)       |             1 (Iq*)             |          1 (Iq*)          |
+| Time constant        |      $L_s/R_s$ (typ. 0.4 ms)      |     $J/B_f$ (typ. 0.1–2 s)      |        Integrating        |
 | Discretization error | $< 1\%$ for $R_s T_s / L_s < 0.1$ | $< 1\%$ for $B_f T_s / J < 0.1$ | Row approx valid at 1 kHz |
-| Parameter source     | Electrical RLS                    | Mechanical RLS                  | Mechanical RLS            |
+| Parameter source     |          Electrical RLS           |         Mechanical RLS          |      Mechanical RLS       |
 
 ---
 
