@@ -16,7 +16,7 @@ namespace
     foc::CurrentLoopTunings UnsaturatedCurrentTunings()
     {
         auto tunings = foc::CurrentLoopTunings{};
-        tunings.bandwidth = 6.283185f;
+        tunings.bandwidth = 628.3185f;
         return tunings;
     }
 

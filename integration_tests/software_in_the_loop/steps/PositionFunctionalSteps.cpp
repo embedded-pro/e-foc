@@ -16,11 +16,14 @@ namespace
 
     // The shipped current-loop bandwidth rails the modulator for every reference an outer loop can
     // ask for, which would hide the differences these scenarios look for.
-    constexpr float nominalCurrentBandwidth{ 6.283185f };
+    constexpr float nominalCurrentBandwidth{ 628.3185f };
     const float nominalSpeedBandwidth{ foc::SpeedLoopTunings{}.bandwidth };
     const float nominalPositionBandwidth{ foc::PositionLoopTunings{}.bandwidth };
-    constexpr float detuneFactor{ 10.0f };
-    constexpr float positionStep{ 0.005f };
+    constexpr float detuneFactor{ 100.0f };
+
+    // Small enough to keep the modulator off its rails, large enough to move it by more than the
+    // one percent quantisation of hal::Percent
+    constexpr float positionStep{ 0.05f };
 
     foc::MotorModelParameters MotorParameters()
     {

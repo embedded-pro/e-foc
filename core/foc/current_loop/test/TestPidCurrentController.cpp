@@ -80,8 +80,9 @@ TEST_F(TestPidCurrentController, invalid_parameters_leave_gains_untouched)
     EXPECT_NEAR(output.q, 0.0f, tolerance);
 }
 
-// Pole-zero cancellation design: kp = Ls * bandwidth, ki = Rs * bandwidth, both normalised by
-// sqrt(3)/Vdc. The first incremental step after reset emits (kp + ki) * error.
+// Pole-zero cancellation design: kp = Ls * bandwidth, Ki = Rs * bandwidth, both normalised by
+// sqrt(3)/Vdc. PidIncremental takes the integral gain already multiplied by the sample period, so
+// the first incremental step after reset emits (kp + Ki * Ts) * error.
 TEST_F(TestPidCurrentController, gains_follow_the_pole_zero_cancellation_design)
 {
     const auto parameters = ValidParameters();
@@ -92,13 +93,43 @@ TEST_F(TestPidCurrentController, gains_follow_the_pole_zero_cancellation_design)
     controller.SetTunings({ bandwidth, 1.0f, 0.2f, false });
 
     const float scale = std::numbers::sqrt3_v<float> / parameters.busVoltage.Value();
+    const float samplePeriod = 1.0f / static_cast<float>(parameters.samplingFrequency.Value());
     const float kp = parameters.inductance.Value() * 0.001f * bandwidth * scale;
-    const float ki = parameters.resistance.Value() * bandwidth * scale;
+    const float ki = parameters.resistance.Value() * bandwidth * scale * samplePeriod;
 
     auto output = controller.Compute({ { 0.0f, 0.0f }, { error, error }, 0.0f });
 
     EXPECT_NEAR(output.d, (kp + ki) * error, tolerance);
     EXPECT_NEAR(output.q, (kp + ki) * error, tolerance);
+}
+
+// The integral gain is per-sample, so halving the sampling frequency must double it.
+TEST_F(TestPidCurrentController, integral_gain_scales_with_the_sample_period)
+{
+    const float bandwidth = 500.0f;
+    const float error = 0.01f;
+
+    auto fast = ValidParameters();
+    auto slow = ValidParameters();
+    slow.samplingFrequency = hal::Hertz{ fast.samplingFrequency.Value() / 2 };
+
+    foc::PidCurrentController fastController;
+    fastController.Configure(fast);
+    fastController.SetTunings({ bandwidth, 1.0f, 0.2f, false });
+
+    foc::PidCurrentController slowController;
+    slowController.Configure(slow);
+    slowController.SetTunings({ bandwidth, 1.0f, 0.2f, false });
+
+    const float scale = std::numbers::sqrt3_v<float> / fast.busVoltage.Value();
+    const float kp = fast.inductance.Value() * 0.001f * bandwidth * scale;
+    const float kiFast = fast.resistance.Value() * bandwidth * scale / static_cast<float>(fast.samplingFrequency.Value());
+
+    const auto fastOutput = fastController.Compute({ { 0.0f, 0.0f }, { error, error }, 0.0f });
+    const auto slowOutput = slowController.Compute({ { 0.0f, 0.0f }, { error, error }, 0.0f });
+
+    EXPECT_NEAR(fastOutput.d, (kp + kiFast) * error, tolerance);
+    EXPECT_NEAR(slowOutput.d, (kp + 2.0f * kiFast) * error, tolerance);
 }
 
 TEST_F(TestPidCurrentController, proportional_gain_tracks_inductance_and_integral_gain_tracks_resistance)
@@ -115,7 +146,7 @@ TEST_F(TestPidCurrentController, proportional_gain_tracks_inductance_and_integra
 
     const float scale = std::numbers::sqrt3_v<float> / parameters.busVoltage.Value();
     const float kp = parameters.inductance.Value() * 0.001f * bandwidth * scale;
-    const float ki = parameters.resistance.Value() * bandwidth * scale;
+    const float ki = parameters.resistance.Value() * bandwidth * scale / static_cast<float>(parameters.samplingFrequency.Value());
 
     auto output = controller.Compute({ { 0.0f, 0.0f }, { error, 0.0f }, 0.0f });
 

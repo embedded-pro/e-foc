@@ -11,8 +11,8 @@ Feature: Speed Controller Functional API
   @REQ-SPD-003
   Scenario: Speed controller applies the configured current loop bandwidth
     Given the speed controller is initialised with default parameters
-    When a current loop bandwidth an order of magnitude below the default is configured
-    Then the commanded duty cycles differ from those of the default bandwidth
+    When a current loop bandwidth well below the baseline is configured
+    Then the commanded duty cycles differ from those of the baseline bandwidth
 
   @REQ-SPD-004
   Scenario: Speed controller accepts an outer velocity loop bandwidth and reports its frequency

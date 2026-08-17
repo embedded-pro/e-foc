@@ -16,8 +16,12 @@ namespace
 
     // The shipped current-loop bandwidth rails the modulator for every reference the speed loop can
     // ask for, which would hide the differences these scenarios look for.
-    constexpr float nominalCurrentBandwidth{ 6.283185f };
-    constexpr float speedStep{ 0.2f };
+    constexpr float nominalCurrentBandwidth{ 628.3185f };
+    constexpr float detuneFactor{ 100.0f };
+
+    // Small enough to keep the modulator off its rails, large enough to move it by more than the
+    // one percent quantisation of hal::Percent
+    constexpr float speedStep{ 2.0f };
 
     foc::MotorModelParameters MotorParameters()
     {
@@ -121,13 +125,13 @@ THEN(R"(the commanded duty cycles follow the velocity setpoint)")
         << "a commanded velocity must drive the modulator away from the standstill command";
 }
 
-WHEN(R"(a current loop bandwidth an order of magnitude below the default is configured)")
+WHEN(R"(a current loop bandwidth well below the baseline is configured)")
 {
     auto& ctx = context.Get<SpeedFunctionalContext>();
-    ctx.underTest.cascade->SetCurrentTunings(CurrentTunings(nominalCurrentBandwidth / 10.0f));
+    ctx.underTest.cascade->SetCurrentTunings(CurrentTunings(nominalCurrentBandwidth / detuneFactor));
 }
 
-THEN(R"(the commanded duty cycles differ from those of the default bandwidth)")
+THEN(R"(the commanded duty cycles differ from those of the baseline bandwidth)")
 {
     auto& ctx = context.Get<SpeedFunctionalContext>();
     ctx.underTest.cascade->SetPoint(foc::RadiansPerSecond{ speedStep });

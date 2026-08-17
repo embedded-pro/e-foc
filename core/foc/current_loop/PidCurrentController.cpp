@@ -32,7 +32,7 @@ namespace foc
 
         const auto scale = NormalizationScale(parameters.busVoltage);
         const auto kp = InductanceInHenry(parameters.inductance) * bandwidth * scale;
-        const auto ki = parameters.resistance.Value() * bandwidth * scale;
+        const auto ki = parameters.resistance.Value() * bandwidth * scale * SamplePeriod(parameters.samplingFrequency);
 
         dPid.SetTunings({ kp, ki, 0.0f });
         qPid.SetTunings({ kp, ki, 0.0f });

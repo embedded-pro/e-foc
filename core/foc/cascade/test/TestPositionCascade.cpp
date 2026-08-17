@@ -15,12 +15,16 @@ namespace
     const hal::Hertz lowPriorityFrequency{ 2000 };
     constexpr float tolerance = 1.0f;
 
+    // Duty cycles are whole percents, so the stimulus has to move the modulator by more than that
+    // quantisation step while staying well inside the current envelope
+    constexpr float observableError{ 0.05f };
+
     // The shipped current-loop bandwidth drives the modulator onto its rails for every current
     // reference an outer loop can ask for, which would hide the differences these tests look for.
     foc::CurrentLoopTunings UnsaturatedCurrentTunings()
     {
         auto tunings = foc::CurrentLoopTunings{};
-        tunings.bandwidth = 6.283185f;
+        tunings.bandwidth = 628.3185f;
         return tunings;
     }
 
@@ -202,7 +206,7 @@ TEST_F(TestPositionCascade, enable_disable_cycle)
     PositionCascadeUnderTest positionCascade{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
 
     positionCascade.cascade->Enable();
-    positionCascade.cascade->SetPoint(foc::Radians{ 0.002f });
+    positionCascade.cascade->SetPoint(foc::Radians{ observableError });
 
     foc::Radians position{ 0.0f };
     positionCascade.cascade->Calculate(ZeroCurrents(), position);
@@ -217,7 +221,7 @@ TEST_F(TestPositionCascade, enable_disable_cycle)
 
     PositionCascadeUnderTest fresh{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
     fresh.cascade->Enable();
-    fresh.cascade->SetPoint(foc::Radians{ 0.002f });
+    fresh.cascade->SetPoint(foc::Radians{ observableError });
 
     foc::Radians restarted{ 0.0f };
     foc::Radians freshPosition{ 0.0f };
@@ -251,7 +255,7 @@ TEST_F(TestPositionCascade, position_pid_drives_speed_reference)
 {
     // The position PID hands the speed loop a reference of error * bandwidth, so a speed cascade
     // driven straight from that setpoint has to produce the very same duty cycles.
-    constexpr float positionError{ 0.002f };
+    constexpr float positionError{ observableError };
 
     PositionCascadeUnderTest positionCascade{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
 
@@ -397,26 +401,31 @@ TEST_F(TestPositionCascade, the_cascade_p_algorithm_drives_the_inverter)
     // The P law ignores the integral weight the PID designs its gains from, which is what makes
     // the two laws tell apart at the inverter
     auto tunings = foc::PositionLoopTunings{};
-    tunings.integralWeight = 1000.0f;
+    tunings.integralWeight = 100.0f;
 
     PositionCascadeUnderTest proportional{ polePairs, foc::SpeedLoopTunings{}, tunings, foc::PositionAlgorithm::cascadeP };
     PositionCascadeUnderTest defaultAlgorithm{ polePairs, foc::SpeedLoopTunings{}, tunings, foc::PositionAlgorithm::pid };
 
-    auto result = DutyAfterOuterCycles(proportional, 0.002f, 0.0f);
+    auto result = DutyAfterOuterCycles(proportional, observableError, 0.0f);
 
     ExpectOffCentreDuty(result);
-    EXPECT_TRUE(DutiesDiffer(result, DutyAfterOuterCycles(defaultAlgorithm, 0.002f, 0.0f)));
+    EXPECT_TRUE(DutiesDiffer(result, DutyAfterOuterCycles(defaultAlgorithm, observableError, 0.0f)));
 }
 
 TEST_F(TestPositionCascade, the_two_dof_algorithm_drives_the_inverter)
 {
+    // The prefilter admits about one percent of the step per outer sample, so both the step and the
+    // number of cycles have to be larger than elsewhere before the shaped command reaches the inverter
+    constexpr float shapedSetPoint{ 1.0f };
+    constexpr int outerCycles{ 3 };
+
     PositionCascadeUnderTest twoDof{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::twoDof };
     PositionCascadeUnderTest defaultAlgorithm{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
 
-    auto result = DutyAfterOuterCycles(twoDof, 0.3f, 0.0f);
+    auto result = DutyAfterOuterCycles(twoDof, shapedSetPoint, 0.0f, outerCycles);
 
     ExpectOffCentreDuty(result);
-    EXPECT_TRUE(DutiesDiffer(result, DutyAfterOuterCycles(defaultAlgorithm, 0.3f, 0.0f)));
+    EXPECT_TRUE(DutiesDiffer(result, DutyAfterOuterCycles(defaultAlgorithm, shapedSetPoint, 0.0f, outerCycles)));
 }
 
 TEST_F(TestPositionCascade, a_non_positive_reference_time_constant_leaves_the_two_dof_prefilter_transparent)
@@ -428,10 +437,11 @@ TEST_F(TestPositionCascade, a_non_positive_reference_time_constant_leaves_the_tw
     PositionCascadeUnderTest shaped{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::twoDof };
     PositionCascadeUnderTest feedbackOnly{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
 
-    auto withoutPrefilter = DutyAfterOuterCycles(feedbackOnly, 0.002f, 0.0f);
+    auto withoutPrefilter = DutyAfterOuterCycles(feedbackOnly, observableError, 0.0f);
 
-    ExpectSameDuty(DutyAfterOuterCycles(transparent, 0.002f, 0.0f), withoutPrefilter);
-    EXPECT_TRUE(DutiesDiffer(DutyAfterOuterCycles(shaped, 0.002f, 0.0f), withoutPrefilter));
+    ExpectOffCentreDuty(withoutPrefilter);
+    ExpectSameDuty(DutyAfterOuterCycles(transparent, observableError, 0.0f), withoutPrefilter);
+    EXPECT_TRUE(DutiesDiffer(DutyAfterOuterCycles(shaped, observableError, 0.0f), withoutPrefilter));
 }
 
 TEST_F(TestPositionCascade, a_setpoint_across_the_encoder_seam_moves_the_short_way)
@@ -459,15 +469,19 @@ TEST_F(TestPositionCascade, a_setpoint_across_the_encoder_seam_moves_the_short_w
 TEST_F(TestPositionCascade, a_current_commanding_algorithm_bypasses_the_speed_loop)
 {
     auto slowTunings = foc::SpeedLoopTunings{};
-    slowTunings.bandwidth = foc::SpeedLoopTunings{}.bandwidth / 10.0f;
+    slowTunings.bandwidth = foc::SpeedLoopTunings{}.bandwidth / 100.0f;
 
     PositionCascadeUnderTest currentCommanding{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::lqr };
     PositionCascadeUnderTest currentCommandingSlowSpeedLoop{ polePairs, slowTunings, foc::PositionLoopTunings{}, foc::PositionAlgorithm::lqr };
     PositionCascadeUnderTest speedCommanding{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::cascadeP };
     PositionCascadeUnderTest speedCommandingSlowSpeedLoop{ polePairs, slowTunings, foc::PositionLoopTunings{}, foc::PositionAlgorithm::cascadeP };
 
-    ExpectSameDuty(DutyAfterOuterCycles(currentCommandingSlowSpeedLoop, 0.002f, 0.0f), DutyAfterOuterCycles(currentCommanding, 0.002f, 0.0f));
-    EXPECT_TRUE(DutiesDiffer(DutyAfterOuterCycles(speedCommandingSlowSpeedLoop, 0.002f, 0.0f), DutyAfterOuterCycles(speedCommanding, 0.002f, 0.0f)));
+    auto currentCommandingResult = DutyAfterOuterCycles(currentCommanding, observableError, 0.0f);
+
+    ExpectOffCentreDuty(currentCommandingResult);
+    ExpectOffCentreDuty(DutyAfterOuterCycles(speedCommanding, observableError, 0.0f));
+    ExpectSameDuty(DutyAfterOuterCycles(currentCommandingSlowSpeedLoop, observableError, 0.0f), currentCommandingResult);
+    EXPECT_TRUE(DutiesDiffer(DutyAfterOuterCycles(speedCommandingSlowSpeedLoop, observableError, 0.0f), DutyAfterOuterCycles(speedCommanding, observableError, 0.0f)));
 }
 
 TEST_F(TestPositionCascade, the_inner_and_speed_algorithms_are_reported)
