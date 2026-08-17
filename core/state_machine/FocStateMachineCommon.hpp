@@ -113,7 +113,7 @@ namespace application
         services::MotorAlignment& motorAlignment;
 
         state_machine::State currentState{ state_machine::Idle{} };
-        state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::hardwareFault };
+        state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::none };
         services::CalibrationData calibrationData{};
         infra::AutoResetFunction<void(state_machine::CommandResult)> pendingCommandCallback;
     };

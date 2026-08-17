@@ -45,8 +45,16 @@ namespace application
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
 
-        void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>&) override
-        {}
+        void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>& onProtection) override
+        {
+            onBoardProtection = onProtection;
+        }
+
+        void RaiseBoardProtection(PlatformFactory::BoardProtectionReason reason)
+        {
+            if (onBoardProtection != nullptr)
+                onBoardProtection(reason);
+        }
 
         // Implementation of hal::PerformanceTracker (Start also satisfies ThreePhaseInverter::Start — no-op on ST)
         void Start() override;
@@ -229,5 +237,6 @@ namespace application
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
+        infra::Function<void(PlatformFactory::BoardProtectionReason)> onBoardProtection;
     };
 }

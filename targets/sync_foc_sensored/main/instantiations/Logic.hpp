@@ -12,8 +12,8 @@
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
-#include "core/state_machine/FaultNotifier.hpp"
 #include "core/state_machine/FocMotorCanBridge.hpp"
+#include "core/state_machine/PlatformFaultNotifier.hpp"
 #include "services/peripheral/DebugLed.hpp"
 #include <optional>
 
@@ -43,7 +43,7 @@ namespace application
         services::NonVolatileMemoryImpl nvm;
         services::ElectricalParametersIdentificationImpl electricalIdent;
         services::MotorAlignmentImpl motorAlignment;
-        state_machine::NoOpFaultNotifier noOpFaultNotifier;
+        state_machine::PlatformFaultNotifier platformFaultNotifier;
         services::ConfigData configData;
 
         std::optional<services::CanFrameTransport> canTransport;

@@ -57,8 +57,16 @@ namespace application
         void Register(const infra::Function<void()>& handler) override;
         void Unregister() override;
 
-        void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>&) override
-        {}
+        void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>& onProtection) override
+        {
+            onBoardProtection = onProtection;
+        }
+
+        void RaiseBoardProtection(PlatformFactory::BoardProtectionReason reason)
+        {
+            if (onBoardProtection != nullptr)
+                onBoardProtection(reason);
+        }
 
         // Implementation of drivers::ThreePhaseInverter
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
@@ -242,5 +250,6 @@ namespace application
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
+        infra::Function<void(PlatformFactory::BoardProtectionReason)> onBoardProtection;
     };
 }

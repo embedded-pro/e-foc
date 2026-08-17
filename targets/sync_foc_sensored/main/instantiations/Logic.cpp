@@ -12,6 +12,7 @@ namespace application
         , nvm{ calibrationRegion, configRegion }
         , electricalIdent{ hardware, hardware, vdc }
         , motorAlignment{ hardware, hardware }
+        , platformFaultNotifier{ hardware }
     {
         hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shorter);
         nvm.LoadConfig(configData, [this](services::NvmStatus status)
@@ -27,7 +28,7 @@ namespace application
                     MotorHardware{ this->hardware, this->hardware, vdc },
                     nvm,
                     CalibrationServices{ electricalIdent, motorAlignment },
-                    noOpFaultNotifier,
+                    platformFaultNotifier,
                     configData,
                     ControlMode::OuterLoopArgs{
                         this->hardware.MaxCurrentSupported(),

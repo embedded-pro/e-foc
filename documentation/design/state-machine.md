@@ -125,7 +125,17 @@ After saving, calibration data is applied to the FOC controller (current PID gai
 
 Entering `Fault` always stops the inverter when the machine was in `Enabled` or `Calibrating` state. This ensures that any active PWM output (from normal operation or from identification test signals) is immediately cut, regardless of which state caused the fault.
 
-The last fault code is preserved in `LastFaultCode()` and remains readable even after the fault is cleared via `CmdClearFault`.
+The last fault code is preserved in `LastFaultCode()` and remains readable even after the fault is cleared via `CmdClearFault`. Before any fault has occurred it reads `FaultCode::none`, so a client can distinguish "no fault yet" from a real hardware fault.
+
+Hardware protection events reach the state machine through `PlatformFaultNotifier`, the production `FaultNotifier`. It registers a callback with `PlatformFactory::RegisterBoardProtection()` during construction and translates each `BoardProtectionReason` into the matching `FaultCode`:
+
+| `BoardProtectionReason` | `FaultCode`       |
+|-------------------------|-------------------|
+| `overCurrent`           | `overcurrent`     |
+| `overVoltage`           | `overvoltage`     |
+| `overTemperature`       | `overtemperature` |
+
+A protection event raised before the state machine has registered its handler is discarded.
 
 ### Async-Callback State Invariant
 
@@ -319,7 +329,7 @@ sequenceDiagram
 |--------------------------|------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `FocStateMachineBase`    | Abstract lifecycle controller — state query and command dispatch | Constructed once per application; all command methods are safe to call from any state (invalid transitions are silently ignored)                     |
 | `CurrentState()`         | Returns the current `State` variant for inspection               | Returns a const reference; valid for the lifetime of the state machine                                                                               |
-| `LastFaultCode()`        | Returns the most recent fault code                               | Value is only meaningful when in `Fault` state or just after clearing a fault                                                                        |
+| `LastFaultCode()`        | Returns the most recent fault code                               | Returns `FaultCode::none` until the first fault occurs; afterwards it retains the last fault code, also after the fault is cleared                    |
 | `CmdCalibrate()`         | Requests start of calibration                                    | Only effective from `Idle` or `Ready`; ignored from all other states                                                                                 |
 | `CmdEnable()`            | Requests enabling the FOC controller                             | Only effective from `Ready`; ignored from all other states                                                                                           |
 | `CmdDisable()`           | Requests disabling the FOC controller                            | Only effective from `Enabled`; ignored from all other states                                                                                         |
@@ -335,7 +345,7 @@ sequenceDiagram
 | `ElectricalParametersIdentification`       | Estimates pole pairs, phase resistance, and dq inductances                            | Operations are asynchronous; callback fires on the same event loop                                              |
 | `MotorAlignment`                           | Forces rotor to a known angle and returns the encoder zero offset                     | Operation is asynchronous; result is optional (nullopt = failure)                                               |
 | `MechanicalParametersIdentification`       | Estimates rotor inertia and viscous friction (speed/position modes only)              | Operation is asynchronous; result is optional (nullopt = failure)                                               |
-| `FaultNotifier`                            | Delivers hardware fault notifications to the state machine                            | `Register()` must be called during construction; callback may fire at any time                                  |
+| `FaultNotifier`                            | Delivers hardware fault notifications to the state machine                            | `Register()` must be called during construction; callback may fire at any time. Production implementation is `PlatformFaultNotifier`.                |
 | `ThreePhaseInverter`                       | Used by the FOC controller to issue PWM and read phase currents                       | Stopped immediately on any fault from `Enabled` or `Calibrating` state                                          |
 | `Encoder`                                  | Rotor position sensor; zero offset applied after alignment                            | `Set()` called during `ApplyCalibrationData` to configure the zero point                                        |
 | `TerminalWithStorage`                      | Serial command interface for CLI-mode transition policy                               | Commands registered in constructor; terminal must outlive the state machine                                     |
