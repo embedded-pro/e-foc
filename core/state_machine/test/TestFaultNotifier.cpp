@@ -30,6 +30,11 @@ namespace
             return state_machine::FaultCode::hardwareFault;
         }
 
+        bool HasPendingAsyncWork() const override
+        {
+            return false;
+        }
+
         void CmdCalibrate(const infra::Function<void(state_machine::CommandResult)>&) override
         {}
 

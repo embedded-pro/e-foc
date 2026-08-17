@@ -391,6 +391,76 @@ TEST_F(FocStateMachineTorqueCliTest, disable_from_ready_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
+// --- Emergency stop ---
+
+TEST_F(FocStateMachineTorqueCliTest, emergency_stop_from_enabled_with_valid_calibration_returns_to_ready)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(inverterMock, Start()).Times(2);
+    sm.CmdEnable();
+
+    EXPECT_EQ(sm.CmdEmergencyStop(), state_machine::CommandResult::ok);
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_EQ(std::get<state_machine::Ready>(sm.CurrentState()).loadedData.polePairs, 7);
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::ok);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, emergency_stop_during_calibration_without_valid_calibration_returns_to_idle)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>&) {}));
+
+    auto commandResult = state_machine::CommandResult::ok;
+    sm.CmdCalibrate([&commandResult](state_machine::CommandResult result)
+        {
+            commandResult = result;
+        });
+    ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+    EXPECT_EQ(sm.CmdEmergencyStop(), state_machine::CommandResult::ok);
+
+    EXPECT_EQ(commandResult, state_machine::CommandResult::abortedByFault);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, emergency_stop_during_calibration_keeps_previously_valid_calibration)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>&) {}));
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+    ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+    EXPECT_EQ(sm.CmdEmergencyStop(), state_machine::CommandResult::ok);
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_EQ(std::get<state_machine::Ready>(sm.CurrentState()).loadedData.polePairs, 7);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, emergency_stop_from_ready_keeps_ready)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_EQ(sm.CmdEmergencyStop(), state_machine::CommandResult::ok);
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
 // --- Fault handling ---
 
 TEST_F(FocStateMachineTorqueCliTest, fault_from_enabled_stops_pwm_and_enters_fault)

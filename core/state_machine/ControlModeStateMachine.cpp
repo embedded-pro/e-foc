@@ -153,7 +153,7 @@ namespace state_machine
             return;
         }
 
-        if (!IsStopped(ActiveStateMachine().CurrentState()))
+        if (!IsStopped(ActiveStateMachine().CurrentState()) || ActiveStateMachine().HasPendingAsyncWork())
         {
             onDone(SelectResult::busy);
             return;

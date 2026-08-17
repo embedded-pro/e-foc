@@ -292,6 +292,81 @@ TEST_F(ControlModeStateMachineTest, Select_While_Previous_Select_Pending_Reports
     EXPECT_EQ(result, state_machine::SelectResult::busy);
 }
 
+// ---- M2: mode replacement is rejected while the active machine owns async work ----
+
+TEST_F(ControlModeStateMachineTest, Select_While_Active_Machine_Has_Pending_Nvm_Command_Reports_Busy)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    infra::Function<void(services::NvmStatus)> deferredInvalidate;
+    EXPECT_CALL(nvmMock, InvalidateCalibration(_))
+        .WillOnce(Invoke([&deferredInvalidate](infra::Function<void(services::NvmStatus)> onDone)
+            {
+                deferredInvalidate = onDone;
+            }));
+
+    subject->ActiveStateMachine().CmdClearCalibration([](state_machine::CommandResult) {});
+
+    state_machine::SelectResult result{ state_machine::SelectResult::ok };
+    subject->Select(state_machine::ControlMode::speed, [&result](state_machine::SelectResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::SelectResult::busy);
+    EXPECT_EQ(subject->Active(), state_machine::ControlMode::torque);
+
+    deferredInvalidate(services::NvmStatus::Ok);
+
+    GivenNvmSaveConfigSucceeds();
+    state_machine::SelectResult retryResult{ state_machine::SelectResult::nvmFailed };
+    subject->Select(state_machine::ControlMode::speed, [&retryResult](state_machine::SelectResult r)
+        {
+            retryResult = r;
+        });
+
+    EXPECT_EQ(retryResult, state_machine::SelectResult::ok);
+    EXPECT_EQ(subject->Active(), state_machine::ControlMode::speed);
+}
+
+TEST_F(ControlModeStateMachineTest, Select_While_Boot_Nvm_Check_In_Flight_Reports_Busy)
+{
+    infra::Function<void(bool)> deferredValidityCheck;
+    EXPECT_CALL(nvmMock, IsCalibrationValid(_))
+        .WillOnce(Invoke([&deferredValidityCheck](infra::Function<void(bool)> onDone)
+            {
+                deferredValidityCheck = onDone;
+            }))
+        .WillRepeatedly(Invoke([](infra::Function<void(bool)> onDone)
+            {
+                onDone(false);
+            }));
+
+    ConstructSubject();
+
+    state_machine::SelectResult result{ state_machine::SelectResult::ok };
+    subject->Select(state_machine::ControlMode::speed, [&result](state_machine::SelectResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::SelectResult::busy);
+    EXPECT_EQ(subject->Active(), state_machine::ControlMode::torque);
+
+    deferredValidityCheck(false);
+
+    GivenNvmSaveConfigSucceeds();
+    state_machine::SelectResult retryResult{ state_machine::SelectResult::nvmFailed };
+    subject->Select(state_machine::ControlMode::speed, [&retryResult](state_machine::SelectResult r)
+        {
+            retryResult = r;
+        });
+
+    EXPECT_EQ(retryResult, state_machine::SelectResult::ok);
+    EXPECT_EQ(subject->Active(), state_machine::ControlMode::speed);
+}
+
 // ---- Additional helpers ----
 
 namespace

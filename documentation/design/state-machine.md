@@ -53,9 +53,9 @@ The state machine has five named states:
 | State         | Motor condition                                                              | Allowed transitions                                                                                                         |
 |---------------|------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
 | `Idle`        | No calibration data; motor cannot be enabled                                 | → `Calibrating` (CmdCalibrate), → `Ready` (valid NVM on boot), → `Fault` (hardware fault)                                   |
-| `Calibrating` | Calibration sequence in progress; motor is driven by identification services | → `Ready` (sequence complete + NVM saved), → `Fault` (any step fails or hardware fault)                                     |
+| `Calibrating` | Calibration sequence in progress; motor is driven by identification services | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop with previously valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (any step fails or hardware fault) |
 | `Ready`       | Calibration data valid and applied; motor can be enabled at any time         | → `Enabled` (CmdEnable), → `Calibrating` (CmdCalibrate re-runs), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault) |
-| `Enabled`     | FOC controller active; motor under closed-loop control                       | → `Ready` (CmdDisable), → `Fault` (hardware fault)                                                                          |
+| `Enabled`     | FOC controller active; motor under closed-loop control                       | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault) |
 | `Fault`       | Safe state; inverter stopped; fault code recorded                            | → `Idle` (CmdClearFault)                                                                                                    |
 
 ### State Diagram
@@ -69,6 +69,8 @@ stateDiagram-v2
     Idle --> Fault : hardware fault
 
     Calibrating --> Ready : sequence complete\n+ NVM saved
+    Calibrating --> Ready : CmdEmergencyStop\n(calibration still valid)
+    Calibrating --> Idle : CmdEmergencyStop\n(no valid calibration)
     Calibrating --> Fault : any step fails\nor hardware fault
 
     Ready --> Enabled : CmdEnable
@@ -77,10 +79,29 @@ stateDiagram-v2
     Ready --> Fault : hardware fault
 
     Enabled --> Ready : CmdDisable
+    Enabled --> Ready : CmdEmergencyStop\n(calibration still valid)
+    Enabled --> Idle : CmdEmergencyStop\n(no valid calibration)
     Enabled --> Fault : hardware fault
 
     Fault --> Idle : CmdClearFault
 ```
+
+### Emergency Stop
+
+`CmdEmergencyStop` is the unconditional safety command: it is accepted from **every** state and always returns `CommandResult::ok`. Its first action is to stop the FOC controller and therefore the PWM output, before any state evaluation takes place. Any command callback still outstanding (a running calibration or a pending `CmdClearCalibration`) is completed with `CommandResult::abortedByFault`.
+
+The resulting state depends on the state the command was issued from:
+
+| Issued from                | Resulting state | Rationale                                                                            |
+|----------------------------|-----------------|--------------------------------------------------------------------------------------|
+| `Enabled` or `Calibrating` | `Ready`         | Calibration data in memory and NVM is still valid; the motor stays enableable         |
+| `Enabled` or `Calibrating` | `Idle`          | No valid calibration data is held, so the motor must be calibrated before enabling    |
+| `Idle`, `Ready`            | unchanged       | The machine is already stopped; only the inverter stop is (re)issued                  |
+| `Fault`                    | `Fault`         | The fault state is safe and must be cleared explicitly with `CmdClearFault`           |
+
+Calibration data is considered valid when the applied record holds a non-zero pole-pair count and a positive phase resistance. An aborted calibration run never commits its results — the in-progress values live in `Calibrating::pendingData` and are only copied out after the NVM save succeeds — so a previously valid calibration survives an emergency stop during a re-calibration and the machine returns to `Ready`.
+
+Dropping to `Idle` on every emergency stop would force a full recalibration after each safety intervention, which is why the transition is conditional on calibration validity rather than unconditional.
 
 ### Calibration Sequence
 
@@ -280,6 +301,8 @@ Switching control mode involves an asynchronous NVM write to persist the new def
 
 Behavioral rule: if a `Select()` is called while a previous `Select()` callback has not yet fired, the call returns `SelectResult::busy` immediately and takes no other action. The caller is responsible for retrying.
 
+The same guard covers the active mode's own asynchronous work. Applying a selection destroys the active `FocStateMachineCommon` instance, while its outstanding NVM and identification callbacks still capture that instance. `Select()` therefore also returns `SelectResult::busy` when `ActiveStateMachine().HasPendingAsyncWork()` is true — that is, while a command callback is pending, the boot-time NVM check is in flight, or a calibration step is running — in addition to the existing check that the active machine is stopped.
+
 ```mermaid
 sequenceDiagram
     participant Caller
@@ -335,6 +358,8 @@ sequenceDiagram
 | `CmdDisable()`           | Requests disabling the FOC controller                            | Only effective from `Enabled`; ignored from all other states                                                                                         |
 | `CmdClearFault()`        | Clears the fault and returns to `Idle`                           | Only effective from `Fault`; ignored from all other states                                                                                           |
 | `CmdClearCalibration()`  | Invalidates NVM calibration and returns to `Idle`                | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`.                    |
+| `CmdEmergencyStop()`     | Stops PWM immediately and leaves the active states               | Accepted from every state and always returns `ok`. From `Enabled` or `Calibrating` it goes to `Ready` when calibration data is valid, otherwise to `Idle`. `Idle`, `Ready` and `Fault` are left unchanged. Aborts any pending command with `abortedByFault`. |
+| `HasPendingAsyncWork()`  | Reports whether a service callback capturing the machine is outstanding | True while a command callback is pending, the boot-time NVM check is in flight, or a calibration step is running. Used by `ControlModeStateMachine` to refuse destroying the machine. |
 | `ApplyOnlineEstimates()` | Retunes speed and current PID gains from online estimators       | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only. |
 
 ### Required

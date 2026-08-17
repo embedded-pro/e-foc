@@ -45,6 +45,7 @@ namespace application
     public:
         const state_machine::State& CurrentState() const override;
         state_machine::FaultCode LastFaultCode() const override;
+        bool HasPendingAsyncWork() const override;
 
         void CmdCalibrate(const infra::Function<void(state_machine::CommandResult)>& onDone) override;
         state_machine::CommandResult CmdEnable() override;
@@ -82,6 +83,7 @@ namespace application
 
         void CompletePendingCommand(state_machine::CommandResult result);
         bool HasPendingCommand() const;
+        bool HasValidCalibration() const;
 
         void RunPolePairsStep();
         void RunResistanceAndInductanceStep();
@@ -117,6 +119,7 @@ namespace application
         state_machine::State currentState{ state_machine::Idle{} };
         state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::none };
         services::CalibrationData calibrationData{};
+        bool bootCheckInFlight{ false };
         infra::AutoResetFunction<void(state_machine::CommandResult)> pendingCommandCallback;
         infra::Function<void()> readyHandler;
     };

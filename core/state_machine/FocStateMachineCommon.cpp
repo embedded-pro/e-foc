@@ -50,6 +50,11 @@ namespace application
         return lastFaultCode;
     }
 
+    bool FocStateMachineCommon::HasPendingAsyncWork() const
+    {
+        return HasPendingCommand() || bootCheckInFlight || std::holds_alternative<state_machine::Calibrating>(currentState);
+    }
+
     void FocStateMachineCommon::CmdCalibrate(const infra::Function<void(state_machine::CommandResult)>& onDone)
     {
         if (!state_machine::IsStopped(currentState) || HasPendingCommand())
@@ -146,7 +151,14 @@ namespace application
             return state_machine::CommandResult::ok;
 
         if (wasActive)
-            currentState = state_machine::Idle{};
+        {
+            // An aborted calibration never commits into calibrationData, so any previously
+            // applied calibration is still valid and the motor stays enableable.
+            if (HasValidCalibration())
+                EnterReady(calibrationData);
+            else
+                currentState = state_machine::Idle{};
+        }
 
         return state_machine::CommandResult::ok;
     }
@@ -212,6 +224,11 @@ namespace application
     bool FocStateMachineCommon::HasPendingCommand() const
     {
         return pendingCommandCallback != nullptr;
+    }
+
+    bool FocStateMachineCommon::HasValidCalibration() const
+    {
+        return calibrationData.polePairs != 0 && calibrationData.rPhase > 0.0f;
     }
 
     void FocStateMachineCommon::RunPolePairsStep()
@@ -333,29 +350,39 @@ namespace application
 
     void FocStateMachineCommon::CheckNvmOnBoot()
     {
+        bootCheckInFlight = true;
         nvm.IsCalibrationValid([this](bool valid)
             {
                 if (!std::holds_alternative<state_machine::Idle>(currentState))
+                {
+                    bootCheckInFlight = false;
                     return;
+                }
 
                 if (!valid)
+                {
+                    bootCheckInFlight = false;
                     tracer.Trace() << "[SM] NVM invalid, starting in Idle";
-                else
-                    nvm.LoadCalibration(calibrationData, [this](services::NvmStatus status)
-                        {
-                            if (!std::holds_alternative<state_machine::Idle>(currentState))
-                                return;
+                    return;
+                }
 
-                            if (status != services::NvmStatus::Ok)
-                                tracer.Trace() << "[SM] NVM load failed, starting in Idle";
-                            else
-                            {
-                                encoder.Set(foc::Radians{ std::bit_cast<float>(calibrationData.encoderZeroOffset) });
-                                ApplyElectricalCalibration(calibrationData);
-                                ApplyModeSpecificCalibration(calibrationData);
-                                EnterReady(calibrationData);
-                            }
-                        });
+                nvm.LoadCalibration(calibrationData, [this](services::NvmStatus status)
+                    {
+                        bootCheckInFlight = false;
+
+                        if (!std::holds_alternative<state_machine::Idle>(currentState))
+                            return;
+
+                        if (status != services::NvmStatus::Ok)
+                            tracer.Trace() << "[SM] NVM load failed, starting in Idle";
+                        else
+                        {
+                            encoder.Set(foc::Radians{ std::bit_cast<float>(calibrationData.encoderZeroOffset) });
+                            ApplyElectricalCalibration(calibrationData);
+                            ApplyModeSpecificCalibration(calibrationData);
+                            EnterReady(calibrationData);
+                        }
+                    });
             });
     }
 

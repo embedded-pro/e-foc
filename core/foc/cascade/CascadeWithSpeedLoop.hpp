@@ -103,7 +103,9 @@ namespace foc
         uint32_t triggerCounter{ 0 };
         float polePairs{ 0.0f };
         float vdcInvScale{ 1.0f };
-        bool enabled{ false };
+        // Written from command context, read from the control interrupt; it also gates algorithm
+        // replacement, which must never run while the interrupt can visit the selector variant.
+        volatile bool enabled{ false };
 
         EstimatorChannel estimators;
     };

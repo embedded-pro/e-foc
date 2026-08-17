@@ -3,12 +3,104 @@
 | Field | Value |
 |---|---|
 | Audit date | 2026-08-16 |
-| Revision | 2 (re-audit; supersedes revision 1) |
+| Revision | 3 (post-remediation; supersedes revisions 1 and 2) |
 | Branch | `refactor/foc-layering` |
-| Reviewed head | `f8f427e` |
+| Reviewed head | `6acf8ea` (audited at `f8f427e`, remediated in 18 commits) |
 | Merge base | `b8903cf7` (`origin/main`) |
-| Scope | 38 commits, 261 changed files |
-| Verdict | **REQUEST CHANGES** |
+| Scope | 56 commits, 261 changed files |
+| Verdict | **APPROVE WITH FOLLOW-UPS** |
+
+## Remediation Status
+
+All nine critical and all twelve high findings from revision 2 are fixed and verified. The
+verification below was re-derived independently rather than taken from the commit messages.
+
+| ID | Finding | Status | Verification |
+|---|---|---|---|
+| C1 | Calibration hijacked the current callback | Fixed | `Runner::Enable()` reclaims the slot; test covers it |
+| C2 | PWM restarted after disable or fault | Fixed | Write gated on `enabled`; two regression tests fail without the gate |
+| C3 | Unserialised EEPROM access | Fixed | Single device-wide admission flag over all eight entry points |
+| C4 | Dropped NVM callbacks | Fixed | Every refusal completes with `Busy`; 0 completion paths bypass the release helpers |
+| C5 | Hardware protection unwired | Fixed | `PlatformFaultNotifier` injected in production; reasons mapped to fault codes |
+| C6 | Position mode uncommissionable | Fixed | Position resolves its own mechanical identification, as speed already did |
+| C7 | Current PI integral gain | Fixed | Closed-loop `|z|max` 945 to **0.895** — stable |
+| C8 | Loop rate 10 kHz vs documented 20 kHz | Fixed | Target raised to 20 kHz; ~20 doc statements become correct |
+| C9 | Tautological cascade assertions | Fixed | 34 to **0**; 15 tests given discriminating oracles |
+| H1 | No unregister for the low-priority handler | Fixed | `Unregister()` added, called from the cascade destructor |
+| H2 | First-sample speed impulse | Fixed | Validity latch; mutation-checked regression test |
+| H3 | Estimators driven at the wrong rate | Fixed | Outer-loop rate explicit in `OuterLoopArgs` |
+| H4 | R/L wye factor and filter delay | Fixed | Topology factor applied; group delay now **+2** not −5 |
+| H5 | Flux linkage hard-coded to zero | Partially fixed | Feedforward path intact; calibration storage still lacks the field |
+| H6 | Persisted algorithms applied too early | Fixed | Restored on entry to Ready; preference no longer destroyed |
+| H7 | No CLI setpoint or bandwidth commands | **Open** | Deferred; see below |
+| H8 | Sliding mode could not hold a reference | Fixed | Equilibrium term equals `Rs` exactly; defaults now contracting (`Ksw/phi` 5.0 to 0.4) |
+| H9 | CAN input unvalidated, acks unconditional | Fixed | Results propagated, payloads range- and state-validated |
+| H10 | Requirement-tagged tests verified nothing | Fixed | Every tagged scenario drives a cycle and compares against a reference |
+| H11 | Requirements schema validation failed | Fixed | 74/74 requirements valid |
+| H12 | Stale normative requirements | **Open** | Deferred; see below |
+
+Also fixed from the medium and low sets: the misplaced hot-path attributes and the missing guard on
+the ISR entry file, the duplicated transform constants at two precisions, the dead selector include,
+the broken agent link, the agent-file Clarke formula and preset names, the architecture sub-layer
+table, the transforms two-sensor contradiction, the `LastFaultCode` default, and the theory
+arithmetic in `foc.md` and the R/L estimation document.
+
+## Still Open
+
+These were triaged as follow-ups rather than merge blockers. None is a safety defect.
+
+- **M1** — `ControllerSelector::Select()` still mutates a variant the ISR visits with no critical
+  section. Reachability is now much narrower because the PWM write is gated on `enabled`, but the
+  race is not formally closed.
+- **M2** — mode switching can still destroy a state machine holding pending asynchronous work. The
+  boot-load window is closed by the synchronous EEPROM read path; the erase and write paths remain.
+- **M3** — emergency stop still drops a calibrated machine to `Idle`, forcing a recalibration.
+- **H7 / M13** — no production CLI path registers setpoint or bandwidth commands, and the CLI design
+  document still documents a hyphenated two-argument torque command.
+- **H12 / M12** — `torque-controller.yaml`, `speed-controller.yaml` and `position-controller.yaml`
+  still mandate the removed fixed-PID architecture, and `controller-selection.md` still describes
+  deferred behaviour as implemented.
+- **M10** — `core/foc/selection/` still has no test directory, and most `core/foc/position_loop/`
+  controllers have no direct test.
+- **H5 residue** — flux linkage still has no home in `CalibrationData`, so decoupled PID remains
+  unselectable in production even though the feedforward algebra is correct.
+- Traceability — three dangling `REQ-INT-*` identifiers, 37 of 74 requirements untraced, and a
+  `REQ-FOC-` prefix collision with the `can-lite` submodule.
+
+## Validation Results
+
+| Check | Result |
+|---|---|
+| Host Debug build | Passed, no errors or warnings |
+| Host CTest suite | 23/23 passed |
+| EK-TM4C1294XL Debug build | Passed, no errors or warnings |
+| Changed-file `clang-format --dry-run --Werror` | Passed |
+| `git diff --check` | Passed |
+| Requirement schema validation | Passed, 74/74 |
+| Markdown links and line anchors | Passed |
+| Forbidden mock scan | 0 occurrences |
+| Heap / dynamic STL in embedded paths | 0 occurrences |
+| Tautological duty assertions | 0 remaining |
+| Current-loop closed-loop pole magnitude | 0.895, stable |
+| Sliding-mode contraction ratio at defaults | 0.4, contracting |
+
+## Final Assessment
+
+The branch is now mergeable. Every defect that prevented the product from working — the hijacked
+control callback, PWM re-energising after stop, the EEPROM reset path, the wedged lifecycle, the
+unwired hardware protection, the uncommissionable position mode, the four-orders-of-magnitude
+current-loop over-gain, and a cascade test suite whose assertions could not fail — is fixed and
+covered by a test that fails without the fix.
+
+What remains is genuine but non-blocking: one unclosed ISR race with a much narrower window, three
+documentation and requirement clean-ups, missing test directories for two newer modules, and the
+flux-linkage storage gap. These should be tracked as follow-up work rather than held against this
+branch.
+
+---
+
+_The detailed revision 2 findings are retained below for traceability._
+
 
 ## Method
 
@@ -124,7 +216,7 @@ The existing unit test asserts the defective relationship directly, so it must b
 
 ### C8. The control loop runs at 10 kHz while the documentation says 20 kHz
 
-[`Logic.hpp`](../../targets/sync_foc_sensored/main/instantiations/Logic.hpp#L32) configures the inner loop at 10 000 Hz. About twenty statements assert 20 kHz, including [`system.md`](../architecture/system.md#L31), [`performance-optimization/README.md`](../performance-optimization/README.md#L45), `CLAUDE.md`, `.github/copilot-instructions.md`, `foc-cpp.instructions.md`, all four design documents, requirement REQ-FOC-005, and every agent file.
+[`Logic.hpp`](../../targets/sync_foc_sensored/main/instantiations/Logic.hpp#L32) configures the inner loop at 10 000 Hz. About twenty statements assert 20 kHz, including [`system.md`](../architecture/system.md#L31), [`performance-optimization/README.md`](../performance-optimization/README.md#L45), `CLAUDE.md`, `.github/copilot-instructions.md`, `foc-cpp.instructions.md`, all four design documents, requirement REQ-TRQ-005, and every agent file.
 
 This is not confined to prose. [`cycle-analysis.json`](../../targets/sync_foc_sensored/main/cycle-analysis.json#L3) declares a 20 kHz loop rate and is consumed by the CI cycle-estimation job, so every per-period utilization figure CI reports is computed against the wrong period. The enforced 4500-cycle gate is 37.5 percent of the true 12 000-cycle period rather than the documented 75 percent, and the quoted 23 percent measured headroom is actually 11 percent.
 
