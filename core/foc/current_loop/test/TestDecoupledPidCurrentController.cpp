@@ -60,6 +60,24 @@ TEST_F(TestDecoupledPidCurrentController, q_axis_feedforward_adds_coupling_and_b
     EXPECT_NEAR(output.q, NormalizedFeedforward(electricalSpeed * (inductanceInHenry * id + fluxLinkage)), tolerance);
 }
 
+TEST_F(TestDecoupledPidCurrentController, back_emf_term_vanishes_without_flux_linkage)
+{
+    auto parametersWithoutFluxLinkage = ValidParameters();
+    parametersWithoutFluxLinkage.fluxLinkage = foc::Weber{ 0.0f };
+
+    foc::DecoupledPidCurrentController withoutFluxLinkage;
+    withoutFluxLinkage.Configure(parametersWithoutFluxLinkage);
+    controller.Configure(ValidParameters());
+
+    const float electricalSpeed = 300.0f;
+    const foc::CurrentControlContext input{ { 0.0f, 0.0f }, { 0.0f, 0.0f }, electricalSpeed };
+
+    const auto backEmf = controller.Compute(input).q - withoutFluxLinkage.Compute(input).q;
+
+    EXPECT_NEAR(backEmf, NormalizedFeedforward(electricalSpeed * fluxLinkage), tolerance);
+    EXPECT_GT(backEmf, 0.0f);
+}
+
 TEST_F(TestDecoupledPidCurrentController, feedforward_is_absent_without_configuration)
 {
     auto output = controller.Compute({ { 2.0f, 2.0f }, { 2.0f, 2.0f }, 500.0f });

@@ -53,6 +53,17 @@ TEST_F(TestCurrentControllerSelector, decoupled_pid_requires_flux_linkage)
     EXPECT_EQ(selector.Select(foc::CurrentAlgorithm::slidingMode), foc::SelectResult::ok);
 }
 
+TEST_F(TestCurrentControllerSelector, decoupled_pid_becomes_selectable_once_flux_linkage_is_configured)
+{
+    selector.Configure(ParametersWithoutFluxLinkage());
+    EXPECT_EQ(selector.Select(foc::CurrentAlgorithm::decoupledPid), foc::SelectResult::invalidParameters);
+
+    selector.Configure(ValidParameters());
+
+    EXPECT_EQ(selector.Select(foc::CurrentAlgorithm::decoupledPid), foc::SelectResult::ok);
+    EXPECT_EQ(selector.Active(), foc::CurrentAlgorithm::decoupledPid);
+}
+
 TEST_F(TestCurrentControllerSelector, every_algorithm_can_be_selected_with_valid_parameters)
 {
     using enum foc::CurrentAlgorithm;

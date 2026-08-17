@@ -45,6 +45,9 @@ namespace state_machine
         bool TrySetSpeedBandwidth(float bandwidth);
         bool TrySetPositionBandwidth(float bandwidth);
 
+        void SetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(CommandResult)>& onDone);
+        foc::Weber ActiveFluxLinkage() const;
+
         foc::SelectResult SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm);
         foc::SelectResult SelectSpeedAlgorithm(foc::SpeedAlgorithm algorithm);
         foc::SelectResult SelectPositionAlgorithm(foc::PositionAlgorithm algorithm);
@@ -57,6 +60,8 @@ namespace state_machine
 
         void Activate(ControlMode mode);
         void AttachAlgorithmRestore(application::FocStateMachineCommon& stateMachine);
+        application::FocStateMachineCommon& ActiveCommon();
+        const application::FocStateMachineCommon& ActiveCommon() const;
         void ApplyPersistedAlgorithms();
         void PersistConfig();
         foc::CurrentLoopSelectable* CurrentSelectable();
@@ -76,6 +81,7 @@ namespace state_machine
         CliResult SetCurrentBandwidth(const infra::BoundedConstString& input);
         CliResult SetSpeedBandwidth(const infra::BoundedConstString& input);
         CliResult SetPositionBandwidth(const infra::BoundedConstString& input);
+        CliResult SetFluxLinkageFromCli(const infra::BoundedConstString& input);
         void TraceSelectResult(foc::SelectResult result) const;
         void OnSaveConfigDone(services::NvmStatus status);
 

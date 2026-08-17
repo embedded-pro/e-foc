@@ -29,9 +29,7 @@ namespace application
         OuterLoopStateMachine(const TerminalAndTracer& terminalAndTracer,
             const MotorHardware& hardware,
             services::NonVolatileMemory& nvm,
-            services::ElectricalParametersIdentification& electricalIdent,
-            services::MotorAlignment& motorAlignment,
-            foc::NewtonMeter mechTorqueConstant);
+            const CalibrationServices& calibServices);
 
         void ApplyModeSpecificCalibration(const services::CalibrationData& data) override;
         void PrepareForEnabled() override;

@@ -27,7 +27,7 @@ namespace application
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
                     MotorHardware{ this->hardware, this->hardware, vdc },
                     nvm,
-                    CalibrationServices{ electricalIdent, motorAlignment },
+                    CalibrationServices{ .electricalIdent = electricalIdent, .motorAlignment = motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb } },
                     platformFaultNotifier,
                     configData,
                     ControlMode::OuterLoopArgs{

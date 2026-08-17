@@ -7,11 +7,9 @@ namespace application
         const TerminalAndTracer& terminalAndTracer,
         const MotorHardware& hardware,
         services::NonVolatileMemory& nvm,
-        services::ElectricalParametersIdentification& electricalIdent,
-        services::MotorAlignment& motorAlignment,
-        foc::NewtonMeter mechTorqueConstantArg)
-        : FocStateMachineCommon(terminalAndTracer, hardware, nvm, electricalIdent, motorAlignment)
-        , mechTorqueConstant(mechTorqueConstantArg)
+        const CalibrationServices& calibServices)
+        : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices)
+        , mechTorqueConstant(calibServices.mechTorqueConstant)
     {}
 
     void OuterLoopStateMachine::ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth)
@@ -82,7 +80,7 @@ namespace application
         else
         {
             GetTracer().Trace() << "[SM] Applying electrical estimates: R=" << resistance.Value() << " L=" << inductance.Value();
-            ApplyElectricalModel(resistance, inductance, GetCalibration().polePairs, GetCalibration().currentLoopBandwidth);
+            ApplyElectricalModel(resistance, inductance, GetCalibration().polePairs, GetCalibration().currentLoopBandwidth, EffectiveFluxLinkage(GetCalibration()));
         }
     }
 

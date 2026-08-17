@@ -37,6 +37,8 @@ namespace application
         services::MotorAlignment& motorAlignment;
         std::optional<std::reference_wrapper<services::MechanicalParametersIdentification>> mechIdentOverride{ std::nullopt };
         foc::NewtonMeter mechTorqueConstant{ foc::NewtonMeter{ 0.1f } };
+        // No identification procedure measures the rotor flux linkage, so the datasheet value is configured here.
+        foc::Weber fluxLinkage{ foc::Weber{ 0.0f } };
     };
 
     class FocStateMachineCommon
@@ -54,14 +56,16 @@ namespace application
         void CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>& onDone) override;
         state_machine::CommandResult CmdEmergencyStop() override;
 
+        void CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone);
+        foc::Weber ActiveFluxLinkage() const;
+
         void RegisterReadyHandler(const infra::Function<void()>& onReady);
 
     protected:
         FocStateMachineCommon(const TerminalAndTracer& terminalAndTracer,
             const MotorHardware& hardware,
             services::NonVolatileMemory& nvm,
-            services::ElectricalParametersIdentification& electricalIdent,
-            services::MotorAlignment& motorAlignment);
+            const CalibrationServices& calibServices);
 
         void RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier);
         void RegisterCliIfNeeded(state_machine::TransitionPolicy transitionPolicy);
@@ -101,8 +105,9 @@ namespace application
         static constexpr float nyquistFactor = 15.0f;
 
         void ApplyElectricalCalibration(const services::CalibrationData& data);
-        void ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth);
+        void ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage);
         const services::CalibrationData& GetCalibration() const;
+        foc::Weber EffectiveFluxLinkage(const services::CalibrationData& data) const;
         foc::CurrentLoopTunings CurrentTuningsFor(float bandwidth) const;
         float DefaultCurrentLoopBandwidth() const;
 
@@ -115,10 +120,12 @@ namespace application
         services::NonVolatileMemory& nvm;
         services::ElectricalParametersIdentification& electricalIdent;
         services::MotorAlignment& motorAlignment;
+        foc::Weber configuredFluxLinkage;
 
         state_machine::State currentState{ state_machine::Idle{} };
         state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::none };
         services::CalibrationData calibrationData{};
+        float pendingFluxLinkage{ 0.0f };
         bool bootCheckInFlight{ false };
         infra::AutoResetFunction<void(state_machine::CommandResult)> pendingCommandCallback;
         infra::Function<void()> readyHandler;

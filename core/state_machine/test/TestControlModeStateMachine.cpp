@@ -447,7 +447,98 @@ namespace
             InvokeCliCommand(command);
             return capturedOutput;
         }
+
+        void ConstructSubjectWithFluxLinkage(foc::Weber fluxLinkage)
+        {
+            services::ConfigData config{};
+            subject.emplace(
+                application::TerminalAndTracer{ terminal, tracer },
+                application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
+                nvmMock,
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::NewtonMeter{ 0.1f }, fluxLinkage },
+                faultNotifierMock,
+                config,
+                TestedControlMode::OuterLoopArgs{
+                    foc::Ampere{ 10.0f },
+                    hal::Hertz{ 1000 },
+                    lowPriorityInterruptMock });
+        }
     };
+}
+
+// ---- Rotor flux linkage ----
+
+TEST_F(ControlModeStateMachineExtTest, DecoupledPidIsSelectableWithConfiguredFluxLinkage)
+{
+    GivenNvmValid();
+    GivenNvmSaveConfigAlwaysSucceeds();
+    ConstructSubjectWithFluxLinkage(foc::Weber{ 0.007f });
+
+    EXPECT_EQ(subject->SelectCurrentAlgorithm(foc::CurrentAlgorithm::decoupledPid), foc::SelectResult::ok);
+}
+
+TEST_F(ControlModeStateMachineExtTest, DecoupledPidIsRefusedWithoutFluxLinkage)
+{
+    GivenNvmValid();
+    ConstructSubjectWithFluxLinkage(foc::Weber{ 0.0f });
+
+    EXPECT_EQ(subject->SelectCurrentAlgorithm(foc::CurrentAlgorithm::decoupledPid), foc::SelectResult::invalidParameters);
+}
+
+TEST_F(ControlModeStateMachineExtTest, PersistedFluxLinkageOverridesTheConfiguredDefault)
+{
+    services::CalibrationData stored{};
+    stored.polePairs = 7;
+    stored.rPhase = 0.5f;
+    stored.lD = 1.0f;
+    stored.lQ = 1.0f;
+    stored.fluxLinkage = 0.02f;
+
+    EXPECT_CALL(nvmMock, IsCalibrationValid(_))
+        .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
+            {
+                onDone(true);
+            }));
+    EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+        .WillOnce(Invoke([stored](services::CalibrationData& out, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                out = stored;
+                onDone(services::NvmStatus::Ok);
+            }));
+    EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+
+    ConstructSubjectWithFluxLinkage(foc::Weber{ 0.007f });
+
+    EXPECT_FLOAT_EQ(subject->ActiveFluxLinkage().Value(), 0.02f);
+}
+
+TEST_F(ControlModeStateMachineExtTest, Cli_SetFluxLinkage_PersistsTheValueAndMakesDecoupledPidSelectable)
+{
+    GivenNvmValid();
+    GivenNvmSaveConfigAlwaysSucceeds();
+    ConstructSubjectWithFluxLinkage(foc::Weber{ 0.0f });
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_FLOAT_EQ(data.fluxLinkage, 0.009f);
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    InvokeCliCommand("sfl 0.009");
+
+    EXPECT_FLOAT_EQ(subject->ActiveFluxLinkage().Value(), 0.009f);
+    EXPECT_EQ(subject->SelectCurrentAlgorithm(foc::CurrentAlgorithm::decoupledPid), foc::SelectResult::ok);
+}
+
+TEST_F(ControlModeStateMachineExtTest, Cli_SetFluxLinkage_RejectsNonPositiveValue)
+{
+    GivenNvmValid();
+    ConstructSubjectWithFluxLinkage(foc::Weber{ 0.007f });
+
+    InvokeCliCommand("sfl 0");
+
+    EXPECT_FLOAT_EQ(subject->ActiveFluxLinkage().Value(), 0.007f);
 }
 
 // ---- Active() — position branch ----

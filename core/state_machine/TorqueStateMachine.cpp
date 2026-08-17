@@ -9,8 +9,7 @@ namespace application
         const CalibrationServices& calibServices,
         state_machine::FaultNotifier& faultNotifier,
         state_machine::TransitionPolicy transitionPolicy)
-        : FocStateMachineCommon(terminalAndTracer, hardware, nvm,
-              calibServices.electricalIdent, calibServices.motorAlignment)
+        : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices)
         , focController(hardware.inverter, hardware.encoder)
     {
         RegisterFaultHandler(faultNotifier);

@@ -8,16 +8,16 @@ namespace application
         const TerminalAndTracer& terminalAndTracer,
         const MotorHardware& hardware,
         services::NonVolatileMemory& nvm,
-        services::ElectricalParametersIdentification& electricalIdent,
-        services::MotorAlignment& motorAlignment)
+        const CalibrationServices& calibServices)
         : terminal(terminalAndTracer.terminal)
         , tracer(terminalAndTracer.tracer)
         , inverter(hardware.inverter)
         , encoder(hardware.encoder)
         , vdc(hardware.vdc)
         , nvm(nvm)
-        , electricalIdent(electricalIdent)
-        , motorAlignment(motorAlignment)
+        , electricalIdent(calibServices.electricalIdent)
+        , motorAlignment(calibServices.motorAlignment)
+        , configuredFluxLinkage(calibServices.fluxLinkage)
     {}
 
     void FocStateMachineCommon::RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier)
@@ -176,6 +176,10 @@ namespace application
     {
         tracer.Trace() << "[SM] Entering Calibrating";
         currentState = state_machine::Calibrating{};
+
+        // No calibration step measures the flux linkage, so the record keeps the value already in force.
+        std::get<state_machine::Calibrating>(currentState).pendingData.fluxLinkage = EffectiveFluxLinkage(calibrationData).Value();
+
         RunPolePairsStep();
     }
 
@@ -425,20 +429,64 @@ namespace application
 
     void FocStateMachineCommon::ApplyElectricalCalibration(const services::CalibrationData& data)
     {
-        ApplyElectricalModel(foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD }, data.polePairs, data.currentLoopBandwidth);
+        ApplyElectricalModel(foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD }, data.polePairs, data.currentLoopBandwidth, EffectiveFluxLinkage(data));
     }
 
-    void FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth)
+    void FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage)
     {
         GetFoc().Configure(foc::MotorModelParameters{
             resistance,
             inductance,
-            foc::Weber{ 0.0f },
+            fluxLinkage,
             vdc,
             inverter.BaseFrequency(),
             polePairs });
 
         CurrentTunable().SetCurrentTunings(CurrentTuningsFor(bandwidth));
+    }
+
+    foc::Weber FocStateMachineCommon::EffectiveFluxLinkage(const services::CalibrationData& data) const
+    {
+        return data.fluxLinkage > 0.0f ? foc::Weber{ data.fluxLinkage } : configuredFluxLinkage;
+    }
+
+    foc::Weber FocStateMachineCommon::ActiveFluxLinkage() const
+    {
+        return EffectiveFluxLinkage(calibrationData);
+    }
+
+    void FocStateMachineCommon::CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone)
+    {
+        if (fluxLinkage.Value() <= 0.0f || !state_machine::IsStopped(currentState) || HasPendingCommand() || !HasValidCalibration())
+        {
+            tracer.Trace() << "[SM] Flux linkage rejected: needs a positive value and a calibrated motor in Idle or Ready";
+            onDone(state_machine::CommandResult::rejected);
+            return;
+        }
+
+        pendingFluxLinkage = fluxLinkage.Value();
+        pendingCommandCallback = onDone;
+
+        auto updated = calibrationData;
+        updated.fluxLinkage = pendingFluxLinkage;
+
+        nvm.SaveCalibration(updated, [this](services::NvmStatus status)
+            {
+                if (!HasPendingCommand())
+                    return;
+
+                if (status != services::NvmStatus::Ok)
+                {
+                    tracer.Trace() << "[SM] Flux linkage not persisted";
+                    CompletePendingCommand(status == services::NvmStatus::Busy ? state_machine::CommandResult::rejected : state_machine::CommandResult::nvmFailed);
+                    return;
+                }
+
+                calibrationData.fluxLinkage = pendingFluxLinkage;
+                ApplyElectricalCalibration(calibrationData);
+                tracer.Trace() << "[SM] Flux linkage stored";
+                CompletePendingCommand(state_machine::CommandResult::ok);
+            });
     }
 
     const services::CalibrationData& FocStateMachineCommon::GetCalibration() const

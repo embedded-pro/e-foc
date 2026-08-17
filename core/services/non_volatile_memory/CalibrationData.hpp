@@ -13,6 +13,7 @@ namespace services
         float rPhase = 0.0f;
         float lD = 0.0f;
         float lQ = 0.0f;
+        float fluxLinkage = 0.0f;
         float currentOffsetA = 0.0f;
         float currentOffsetB = 0.0f;
         float currentOffsetC = 0.0f;
@@ -27,5 +28,5 @@ namespace services
         std::array<uint8_t, 2> reserved = {};
     };
 
-    static_assert(sizeof(CalibrationData) == 52, "CalibrationData layout must be free of implicit padding");
+    static_assert(sizeof(CalibrationData) == 56, "CalibrationData layout must be free of implicit padding");
 }

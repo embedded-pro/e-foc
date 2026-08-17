@@ -12,7 +12,7 @@ namespace services
     // data of that type, protecting against silent corruption after a firmware update.
     static constexpr uint32_t CalibrationMagic = 0xCAFEF00D;
     static constexpr uint32_t ConfigMagic = 0xDEADBEEF;
-    static constexpr uint8_t CalibrationLayoutVersion = 2;
+    static constexpr uint8_t CalibrationLayoutVersion = 3;
     static constexpr uint8_t ConfigLayoutVersion = 4;
 
     class NonVolatileMemoryImpl

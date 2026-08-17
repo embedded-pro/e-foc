@@ -82,6 +82,7 @@ namespace
         EXPECT_EQ(actual.rPhase, expected.rPhase);
         EXPECT_EQ(actual.lD, expected.lD);
         EXPECT_EQ(actual.lQ, expected.lQ);
+        EXPECT_EQ(actual.fluxLinkage, expected.fluxLinkage);
         EXPECT_EQ(actual.currentOffsetA, expected.currentOffsetA);
         EXPECT_EQ(actual.currentOffsetB, expected.currentOffsetB);
         EXPECT_EQ(actual.currentOffsetC, expected.currentOffsetC);
@@ -123,6 +124,7 @@ namespace
             d.rPhase = 1.5f;
             d.lD = 0.001f;
             d.lQ = 0.0012f;
+            d.fluxLinkage = 0.007f;
             d.currentOffsetA = 0.01f;
             d.currentOffsetB = -0.01f;
             d.currentOffsetC = 0.005f;
@@ -298,6 +300,26 @@ TEST_F(NonVolatileMemoryTest, load_calibration_returns_version_mismatch_on_wrong
 
     RunUntilDone(done);
     EXPECT_EQ(result, services::NvmStatus::VersionMismatch);
+}
+
+TEST_F(NonVolatileMemoryTest, load_calibration_returns_version_mismatch_on_previous_layout)
+{
+    WriteCalibrationRecord(calibrationRegion, services::CalibrationMagic,
+        services::CalibrationLayoutVersion - 1, MakeTestCalibration());
+
+    services::CalibrationData out{};
+    bool done = false;
+    services::NvmStatus result{};
+
+    nvm.LoadCalibration(out, [&](services::NvmStatus s)
+        {
+            result = s;
+            done = true;
+        });
+
+    RunUntilDone(done);
+    EXPECT_EQ(result, services::NvmStatus::VersionMismatch);
+    EXPECT_EQ(out.rPhase, 0.0f);
 }
 
 TEST_F(NonVolatileMemoryTest, load_calibration_returns_invalid_data_on_crc_corruption)

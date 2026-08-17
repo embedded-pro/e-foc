@@ -590,6 +590,12 @@ namespace state_machine
                     terminalAndTracer.tracer.Trace() << "Rejected: online estimates are not available in torque mode";
             } });
 
+        terminal.AddCommand({ { "set_flux_linkage", "sfl", "Set and persist rotor flux linkage in Wb. set_flux_linkage <psi>. Ex: sfl 0.007" },
+            [this, &terminal](const infra::BoundedConstString& params)
+            {
+                terminal.ProcessResult(SetFluxLinkageFromCli(params));
+            } });
+
         RegisterSetpointCliCommands(terminal);
         RegisterBandwidthCliCommands(terminal);
     }
@@ -727,6 +733,17 @@ namespace state_machine
         return CliResult{};
     }
 
+    ControlModeStateMachine::CliResult ControlModeStateMachine::SetFluxLinkageFromCli(const infra::BoundedConstString& input)
+    {
+        float value{ 0.0f };
+        if (auto error = ParseSingleFloat(input, value); error.has_value())
+            return *error;
+
+        // The persist completes asynchronously, so the state machine traces the outcome.
+        SetFluxLinkage(foc::Weber{ value }, [](CommandResult) {});
+        return CliResult{};
+    }
+
     application::OuterLoopStateMachine* ControlModeStateMachine::ActiveOuterLoop()
     {
         if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
@@ -734,6 +751,30 @@ namespace state_machine
         if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
             return sm;
         return nullptr;
+    }
+
+    application::FocStateMachineCommon& ControlModeStateMachine::ActiveCommon()
+    {
+        if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
+            return *sm;
+        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
+            return *sm;
+        return std::get<application::TorqueStateMachine>(activeSm);
+    }
+
+    const application::FocStateMachineCommon& ControlModeStateMachine::ActiveCommon() const
+    {
+        return const_cast<ControlModeStateMachine*>(this)->ActiveCommon();
+    }
+
+    void ControlModeStateMachine::SetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(CommandResult)>& onDone)
+    {
+        ActiveCommon().CmdSetFluxLinkage(fluxLinkage, onDone);
+    }
+
+    foc::Weber ControlModeStateMachine::ActiveFluxLinkage() const
+    {
+        return ActiveCommon().ActiveFluxLinkage();
     }
 
     void ControlModeStateMachine::TraceSelectResult(foc::SelectResult result) const
