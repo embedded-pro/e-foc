@@ -13,6 +13,7 @@ namespace services
         float rPhase = 0.0f;
         float lD = 0.0f;
         float lQ = 0.0f;
+        float fluxLinkage = 0.0f;
         float currentOffsetA = 0.0f;
         float currentOffsetB = 0.0f;
         float currentOffsetC = 0.0f;
@@ -20,14 +21,12 @@ namespace services
         float frictionCoulomb = 0.0f;
         float frictionViscous = 0.0f;
         int32_t encoderZeroOffset = 0;
-        float kpCurrent = 0.0f;
-        float kiCurrent = 0.0f;
-        float kpVelocity = 0.0f;
-        float kiVelocity = 0.0f;
+        float currentLoopBandwidth = 0.0f;
+        float speedLoopBandwidth = 0.0f;
         uint8_t encoderDirection = 0;
         uint8_t polePairs = 0;
         std::array<uint8_t, 2> reserved = {};
     };
 
-    static_assert(sizeof(CalibrationData) == 60, "CalibrationData layout must be free of implicit padding");
+    static_assert(sizeof(CalibrationData) == 56, "CalibrationData layout must be free of implicit padding");
 }

@@ -5,11 +5,12 @@ emil_add_test(e_foc.state_machine_test)
 target_link_libraries(e_foc.state_machine_test PUBLIC
     gmock_main
     e_foc.state_machine
-    e_foc.foc.implementations
+    e_foc.foc.cascade
     hal.interfaces_test_doubles
     infra.timer_test_helper
     infra.event_test_helper
     e_foc.foc_mock
+    e_foc.platform_abstraction_mock
     e_foc.state_machine_mock
     e_foc.services.alignment_mock
     e_foc.services.electrical_system_ident_mock
@@ -27,6 +28,7 @@ target_sources(e_foc.state_machine_test PRIVATE
     TestFocStateMachineTorque.cpp
     TestFocStateMachineSpeed.cpp
     TestFocStateMachinePosition.cpp
+    TestPlatformFaultNotifier.cpp
 )
 
 if (EMIL_ENABLE_COVERAGE)

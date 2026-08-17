@@ -1,7 +1,8 @@
 #pragma once
 
-#include "core/foc/interfaces/Driver.hpp"
+#include "core/foc/interfaces/Execution.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
+#include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "hal/interfaces/Eeprom.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "infra/stream/OutputStream.hpp"
@@ -36,8 +37,8 @@ namespace application
     infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, ResetCause cause);
 
     class PlatformFactory
-        : public foc::ThreePhaseInverter
-        , public foc::Encoder
+        : public drivers::ThreePhaseInverter
+        , public drivers::Encoder
     {
     public:
         enum class SampleAndHold

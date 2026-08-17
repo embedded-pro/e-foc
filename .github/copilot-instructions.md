@@ -6,9 +6,16 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 - Purpose: Field-Oriented Control (FOC) for BLDC/PMSM with strict realtime and memory constraints.
 - Major components:
   - `core/` — FOC implementations, platform abstraction interfaces, and services (libraries only).
-  - `core/services/` — Application-level services (coordination, scheduling, helpers).
+  - `core/foc/interfaces/` — FOC vocabulary and contracts only (`Units.hpp`, `Signals.hpp`, `Foc.hpp`, `Execution.hpp`, `OnlineEstimators.hpp`). No algorithms.
+  - `core/foc/math/` — Header-only generic numerics (`FastTrigonometry.hpp`, `AngleWrap.hpp`); not FOC-specific.
+  - `core/foc/transforms/` — Clarke/Park transforms and Space Vector Modulation.
+  - `core/foc/cascade/` — Cascade orchestration and gain design; no hardware dependency.
+  - `core/foc/instantiations/` — Execution wiring (`Runner`, `LowPriorityInterruptImpl`, `FocController`).
+  - `core/platform_abstraction/interfaces/` — Hardware ports in namespace `drivers` (`ThreePhaseInverter`, `Encoder`, `HallSensor`).
+  - `core/foc/selection/`, `core/foc/current_loop/`, `core/foc/speed_loop/` — Runtime-selectable control algorithm sets in the `foc` namespace.
+  - `core/services/` — Application-level services only (alignment, CLI, system identification, NVM).
   - `core/platform_abstraction/` — Abstract `PlatformFactory` interface and shared adapters.
-  - `core/state_machine/` — `FocStateMachineImpl`: formal motor lifecycle state machine (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`). Supports `CliTransitionPolicy` (terminal commands) and `AutoTransitionPolicy` (lambda observers). Uses `std::variant` for states.
+  - `core/state_machine/` — `FocStateMachineBase` (interface) and `FocStateMachineCommon` (shared implementation): formal motor lifecycle state machine (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`). Transition mode is the `state_machine::TransitionPolicy` enum (`::Cli` for terminal commands, `::Auto` for direct calls). Uses `std::variant` for states.
   - `targets/` — Application entry points (`hardware_test`, `sync_foc_sensored`) and platform implementations under `targets/platform_implementations/` (Host, ti, st).
   - `numerical-toolbox/` — Generic numerical algorithms (PID, filters, fixed-point helpers). Located at `infra/numerical-toolbox/`.
   - `embedded-infra-lib/` — Infrastructure: bounded containers, build helpers, toolchain cmake pieces. Located at `infra/embedded-infra-lib/`.
@@ -36,12 +43,13 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 - Avoid recursion and virtual calls in ISR/hot paths.
 - Favor `constexpr`, `inline`, and `const` correctness for performance.
 - No implementation in headers — only templated classes may have method bodies in `.hpp` files. All other implementation goes in `.cpp` files.
+- Comments must state what the code cannot: a non-obvious *why*, a unit or frame the types do not carry, or a concurrency contract. One short line. No comments that restate the next line, address a reviewer, describe the change, or claim behaviour the code does not implement. No commented-out code, no `TODO`/`FIXME`/`HACK`. Delete or correct any comment your change makes stale.
 
 4) Patterns & code locations (concrete examples)
 - Add a new FOC algorithm:
-  - Implement code in `core/foc/implementations/` and keep public interfaces in `core/foc/interfaces/`.
+  - Implement code in `core/foc/cascade/` and keep public interfaces in `core/foc/interfaces/`. Pure transforms belong in `core/foc/transforms/`, generic numerics in `core/foc/math/`.
   - Motor-specific application code lives under `targets/sync_foc_sensored/` and `targets/hardware_test/`.
-- State machine: see `core/state_machine/FocStateMachineImpl.hpp` for the `FocStateMachineImpl<FocImpl, TerminalImpl, TransitionPolicy>` template. Use `state_machine::CliTransitionPolicy` (default) or `state_machine::AutoTransitionPolicy`. `LogicWithOuterLoop.hpp` shows how to wire it to hardware.
+- State machine: see `core/state_machine/FocStateMachine.hpp` for the `FocStateMachineBase` interface and `core/state_machine/FocStateMachineCommon.hpp` for the shared implementation. Transition mode is the `state_machine::TransitionPolicy` enum (`::Cli` or `::Auto`), declared in `TransitionPolicies.hpp`. `ControlModeStateMachine.cpp` shows how the per-mode machines are wired to hardware.
 - Platform abstraction & factory: see `core/platform_abstraction/PlatformFactory.hpp` for how peripherals and adapters are created and injected.
 - Numerical algorithms: follow patterns in `infra/numerical-toolbox/` — implement float first, then Q15/Q31 variants, and add typed GoogleTest suites.
 
@@ -72,6 +80,6 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 - Key techniques: avoid virtual dispatch in hot paths, use `#pragma GCC optimize("O3", "fast-math")` for critical files, prefer static inline functions over virtual methods.
 - Debug builds use `-Og` to maintain debuggability while enabling basic optimizations.
 - Use `arm-none-eabi-objdump -d -C` to analyze generated assembly and verify optimizations.
-- Target cycle budgets: FOC loop should complete in <400 cycles at 120 MHz for 20 kHz control rate.
+- Target cycle budgets: the 20 kHz ISR path must stay within 4500 cycles at 120 MHz (75% of the 6000-cycle control period). CI measures the inner and outer loops separately via `targets/sync_foc_sensored/main/cycle-analysis.json` (20 kHz) and `cycle-analysis-outer.json` (1 kHz).
 
 If any section appears incomplete or you want deeper coverage (build-on-target, hardware flashing steps, or CI specifics), tell me which area to expand.

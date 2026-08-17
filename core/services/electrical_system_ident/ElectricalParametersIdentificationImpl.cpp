@@ -1,5 +1,4 @@
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
-#include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include <cmath>
 #include <numbers>
@@ -14,7 +13,6 @@ namespace
     constexpr float timeConstantThreshold = 0.632f;
     const hal::Hertz samplingFrequency{ 10000 };
     const auto samplingPeriod = 1.0f / static_cast<float>(samplingFrequency.Value());
-    ;
 
     foc::PhasePwmDutyCycles
     NormalizedDutyCycles(foc::ThreePhase voltages)
@@ -51,16 +49,13 @@ namespace
     {
         auto targetCurrent = timeConstantThreshold * steadyStateCurrent;
 
+        // The buffer is averaged only once full and then pops its front, so filtered index n spans raw
+        // samples n..n+N-1 and represents the raw instant n + (N-1)/2.
+        const auto groupDelay = static_cast<float>(averageFilter - 1) / 2.0f;
+
         for (std::size_t i = 0; i < samples.size(); ++i)
-        {
             if (samples[i] >= targetCurrent)
-            {
-                if (i >= averageFilter)
-                    return static_cast<float>(i - averageFilter);
-                else
-                    return static_cast<float>(i);
-            }
-        }
+                return static_cast<float>(i) + groupDelay;
 
         return std::nullopt;
     }
@@ -78,7 +73,7 @@ namespace
 
 namespace services
 {
-    ElectricalParametersIdentificationImpl::ElectricalParametersIdentificationImpl(foc::ThreePhaseInverter& driver, foc::Encoder& encoder, foc::Volts vdc)
+    ElectricalParametersIdentificationImpl::ElectricalParametersIdentificationImpl(drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder, foc::Volts vdc)
         : driver(driver)
         , encoder(encoder)
         , vdc(vdc)
@@ -129,7 +124,10 @@ namespace services
         else
         {
             auto tau = GetTauFromCurrentSamples(filteredCurrentSample, steadyStateCurrent, averageFilter);
-            auto resistance = CalculateResistance(resistanceAndInductanceConfig.testVoltagePercent.Value() * vdc.Value() / 100.0f, steadyStateCurrent);
+            const auto appliedDuty = static_cast<float>(resistanceAndInductanceConfig.testVoltagePercent.Value() - neutralDuty);
+            const auto terminalFactor = resistanceAndInductanceConfig.windingConfig == WindingConfiguration::Delta ? deltaTerminalFactor : wyeTerminalFactor;
+            auto terminalResistance = CalculateResistance(appliedDuty * vdc.Value() / 100.0f, steadyStateCurrent);
+            auto resistance = terminalResistance.has_value() ? std::optional<foc::Ohm>{ foc::Ohm{ terminalResistance->Value() / terminalFactor } } : std::nullopt;
 
             if (resistance.has_value() && tau.has_value())
                 onResistanceAndInductanceDone(resistance, CalculateInductance(resistance.value(), tau.value_or(0.0f)));

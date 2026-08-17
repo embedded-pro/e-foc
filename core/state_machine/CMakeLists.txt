@@ -9,8 +9,9 @@ target_include_directories(e_foc.state_machine PUBLIC
 
 target_link_libraries(e_foc.state_machine PUBLIC
     can_lite.categories.foc_motor
-    e_foc.foc.implementations
+    e_foc.foc.cascade
     e_foc.foc.instantiations
+    e_foc.platform_abstraction
     e_foc.services.alignment
     e_foc.services.cli
     e_foc.services.electrical_system_ident
@@ -33,10 +34,11 @@ target_sources(e_foc.state_machine PRIVATE
     FocStateMachineCommon.cpp
     OuterLoopStateMachine.hpp
     OuterLoopStateMachine.cpp
+    OuterLoopStateMachineFor.hpp
+    PlatformFaultNotifier.hpp
+    PlatformFaultNotifier.cpp
     PositionStateMachine.hpp
-    PositionStateMachine.cpp
     SpeedStateMachine.hpp
-    SpeedStateMachine.cpp
     TorqueStateMachine.hpp
     TorqueStateMachine.cpp
     TransitionPolicies.hpp

@@ -1,0 +1,42 @@
+#pragma once
+
+#include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
+
+namespace foc
+{
+    class SpeedCascade
+        : public FocSpeed
+        , public SpeedCommandable
+        , protected CascadeWithSpeedLoop
+    {
+    public:
+        explicit SpeedCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency = hal::Hertz{ 1000 });
+
+        void Configure(const MotorModelParameters& parameters) override;
+        void ConfigureMechanics(const MechanicalModelParameters& parameters) override;
+        void SetPoint(RadiansPerSecond point) override;
+        void SetCurrentTunings(const CurrentLoopTunings& tunings) override;
+        void SetSpeedTunings(const SpeedLoopTunings& tunings) override;
+        SelectResult SelectCurrentAlgorithm(CurrentAlgorithm algorithm) override;
+        CurrentAlgorithm ActiveCurrentAlgorithm() const override;
+        SelectResult SelectSpeedAlgorithm(SpeedAlgorithm algorithm) override;
+        SpeedAlgorithm ActiveSpeedAlgorithm() const override;
+        void SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator) override;
+        void SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator) override;
+        void Enable() override;
+        void Disable() override;
+        hal::Hertz OuterLoopFrequency() const override;
+        PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
+
+        void EnableSpeedCommand() override;
+        void CommandSpeed(RadiansPerSecond speed) override;
+        hal::Hertz SpeedCommandFrequency() const override;
+
+    private:
+        void LowPriorityHandler();
+
+    private:
+        RadiansPerSecond lastSpeedSetPoint{ 0.0f };
+        hal::Hertz outerLoopFrequency;
+    };
+}

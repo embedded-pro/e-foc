@@ -40,27 +40,32 @@ The test suite uses the **amp-cucumber-cpp-runner v4.0.0** framework. Scenarios 
 - Injecting CAN commands directly into the category server to verify state machine transitions independently of CAN transport encoding
 
 **Is NOT responsible for:**
-- Testing FOC control algorithm correctness — covered by unit tests in `core/foc/implementations/test/`
+- Testing FOC control algorithm correctness — covered by unit tests in `core/foc/cascade/test/`
 - Testing CAN framing or transport encoding — covered by `can-lite` unit and integration tests
 - Running on an embedded target — host-only suite
 
 ### Platform Factory Mock
 
-`PlatformFactoryMock` mocks every pure virtual of `application::PlatformFactory`, including the inverter hot-path methods it inherits from `foc::ThreePhaseInverter` (`PhaseCurrentsReady`, `ThreePhasePwmOutput`, `Start`, `Stop`, `BaseFrequency`, `MaxCurrentSupported`) and the encoder methods from `foc::Encoder` (`Read`, `Set`, `SetZero`), plus the configuration methods (`ConfigureAdcAndPwm`, `SetEncoderResolution`, `ConfigureCanBus`, `CanBus`). There are no creator proxies, no per-peripheral wrapper mocks, and no `PlatformAdapter`.
+`PlatformFactoryMock` mocks every pure virtual of `application::PlatformFactory`, including the inverter
+hot-path methods it inherits from `foc::ThreePhaseInverter` (`PhaseCurrentsReady`, `ThreePhasePwmOutput`,
+`Start`, `Stop`, `BaseFrequency`, `MaxCurrentSupported`) and the encoder methods from `foc::Encoder` (`Read`,
+`Set`, `SetZero`), plus the configuration methods (`ConfigureAdcAndPwm`, `SetEncoderResolution`,
+`ConfigureCanBus`, `CanBus`). There are no creator proxies, no per-peripheral wrapper mocks, and no
+`PlatformAdapter`.
 
 The fixture registers standing `EXPECT_CALL` defaults in its constructor:
 
-| Method | Default expectation |
-|---|---|
-| `PhaseCurrentsReady`, `ThreePhasePwmOutput`, `Start`, `Stop`, `Set`, `SetZero` | `Times(AnyNumber())` |
-| `BaseFrequency` | `WillRepeatedly(Return(hal::Hertz{ 10000 }))` |
-| `Read` | `WillRepeatedly(Return(foc::Radians{ 0.0f }))` |
+| Method                                                                         | Default expectation                            |
+|--------------------------------------------------------------------------------|------------------------------------------------|
+| `PhaseCurrentsReady`, `ThreePhasePwmOutput`, `Start`, `Stop`, `Set`, `SetZero` | `Times(AnyNumber())`                           |
+| `BaseFrequency`                                                                | `WillRepeatedly(Return(hal::Hertz{ 10000 }))`  |
+| `Read`                                                                         | `WillRepeatedly(Return(foc::Radians{ 0.0f }))` |
 
 The `EepromStub` (512-byte in-memory array, all `0xFF` at construction, synchronous R/W) is a separate non-mock class owned by the fixture. The NVM regions reference the stub directly.
 
 ### FOC Integration Fixture
 
-Central test fixture (`FocIntegrationFixture`) shared across all scenarios via the Cucumber context. Member construction order is declaration order; the key constraint is that the `FocStateMachineImpl` must be constructed after the direct-method expectations are registered on `PlatformFactoryMock`.
+Central test fixture (`FocIntegrationFixture`) shared across all scenarios via the Cucumber context. Member construction order is declaration order; the key constraint is that the state machine must be constructed after the direct-method expectations are registered on `PlatformFactoryMock`.
 
 Lifecycle of each scenario:
 
@@ -69,7 +74,7 @@ sequenceDiagram
     participant Context
     participant Fixture as FocIntegrationFixture
     participant PFM as PlatformFactoryMock
-    participant SM as FocStateMachineImpl
+    participant SM as FocStateMachineCommon
     participant NVM as NonVolatileMemoryImpl
 
     Context->>Fixture: Emplace (constructor)
@@ -86,7 +91,7 @@ sequenceDiagram
     Note over Fixture: State machine in Idle
 ```
 
-The `FocStateMachineImpl` is always constructed with `AutoTransitionPolicy` so that test steps can call `CmdCalibrate()`, `CmdEnable()` and `CmdDisable()` directly without going through the terminal CLI.
+The state machine is always constructed with `TransitionPolicy::Auto` so that test steps can call `CmdCalibrate()`, `CmdEnable()` and `CmdDisable()` directly without going through the terminal CLI.
 
 ### State Machine Bridge
 

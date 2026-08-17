@@ -9,10 +9,8 @@ namespace application
         const CalibrationServices& calibServices,
         state_machine::FaultNotifier& faultNotifier,
         state_machine::TransitionPolicy transitionPolicy)
-        : FocStateMachineCommon(terminalAndTracer, hardware, nvm,
-              calibServices.electricalIdent, calibServices.motorAlignment)
+        : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices)
         , focController(hardware.inverter, hardware.encoder)
-        , pidAutoTuner(focController)
     {
         RegisterFaultHandler(faultNotifier);
         RegisterCliIfNeeded(transitionPolicy);
@@ -20,6 +18,11 @@ namespace application
     }
 
     foc::FocTorque& TorqueStateMachine::GetController()
+    {
+        return focController;
+    }
+
+    const foc::FocTorque& TorqueStateMachine::GetController() const
     {
         return focController;
     }
@@ -34,9 +37,9 @@ namespace application
         return focController;
     }
 
-    foc::WithAutomaticCurrentPidGains& TorqueStateMachine::GetCurrentLoopTuner()
+    foc::CurrentLoopTunable& TorqueStateMachine::CurrentTunable()
     {
-        return pidAutoTuner;
+        return focController;
     }
 
     void TorqueStateMachine::RunPostAlignmentStep()

@@ -2,9 +2,9 @@
 
 #include "can-lite/categories/foc_motor/FocMotorCategoryServer.hpp"
 #include "can-lite/core/CanFrameTransport.hpp"
-#include "core/foc/implementations/FocPositionImpl.hpp"
-#include "core/foc/implementations/FocSpeedImpl.hpp"
-#include "core/foc/implementations/FocTorqueImpl.hpp"
+#include "core/foc/cascade/PositionCascade.hpp"
+#include "core/foc/cascade/SpeedCascade.hpp"
+#include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/cli/TerminalWithBanner.hpp"
@@ -12,8 +12,8 @@
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
-#include "core/state_machine/FaultNotifier.hpp"
 #include "core/state_machine/FocMotorCanBridge.hpp"
+#include "core/state_machine/PlatformFaultNotifier.hpp"
 #include "services/peripheral/DebugLed.hpp"
 #include <optional>
 
@@ -29,8 +29,9 @@ namespace application
         static constexpr uint32_t calibrationRegionSize = 128;
         static constexpr uint32_t configRegionOffset = calibrationRegionOffset + calibrationRegionSize;
         static constexpr uint32_t configRegionSize = 128;
-        static constexpr uint32_t controlLoopFrequencyHz = 10000;
+        static constexpr uint32_t controlLoopFrequencyHz = 20000;
         static constexpr uint32_t pwmDeadTimeNs = 500;
+        static constexpr float motorFluxLinkageWb = 0.007f;
 
         using ControlMode = state_machine::ControlModeStateMachine;
 
@@ -43,7 +44,7 @@ namespace application
         services::NonVolatileMemoryImpl nvm;
         services::ElectricalParametersIdentificationImpl electricalIdent;
         services::MotorAlignmentImpl motorAlignment;
-        state_machine::NoOpFaultNotifier noOpFaultNotifier;
+        state_machine::PlatformFaultNotifier platformFaultNotifier;
         services::ConfigData configData;
 
         std::optional<services::CanFrameTransport> canTransport;

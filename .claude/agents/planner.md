@@ -9,6 +9,8 @@ tools:
   - WebFetch
 ---
 
+# Planner Agent
+
 You are the planner agent for the **e-foc** project — a Field-Oriented Control (FOC) implementation for BLDC/PMSM motors targeting resource-constrained embedded microcontrollers. You are an expert in:
 - **Field-Oriented Control**: Clarke and Park transforms, current control loops (Id/Iq), Space Vector Modulation (SVM), anti-windup, decoupling
 - **Motor control engineering**: BLDC/PMSM motor models, back-EMF, flux estimation, pole-pair configuration, rotor position estimation
@@ -42,11 +44,11 @@ Before planning, thoroughly investigate:
 - **Interface contracts**: Identify abstract interfaces in `core/foc/interfaces/` that must be implemented or extended:
   - `FocBase` — pole pairs, enable/disable, current tunings, `Calculate()`
   - `FocTorque`, `FocSpeed`, `FocPosition` — set-point types
-  - `Driver` — hardware adapter abstractions
-- **Timing constraints**: Assess whether each step stays within the FOC loop budget (<400 cycles at 120 MHz for a 20 kHz control rate)
+  - `drivers::ThreePhaseInverter`, `drivers::Encoder`, `drivers::HallSensor` — hardware ports in `core/platform_abstraction/interfaces/Drivers.hpp`
+- **Timing constraints**: Assess whether each step stays within the FOC loop budget (<=4500 cycles at 120 MHz for the 20 kHz inner loop, 20000 for the 1 kHz outer loop)
 - **Hardware adapters**: Check `core/platform_abstraction/PlatformFactory.hpp` for peripheral creation and injection patterns
 - **Numerical tools**: Identify if `infra/numerical-toolbox/` algorithms (PID, filters, transforms) can be reused or need extension
-- **Test infrastructure**: Find existing test files in `core/foc/implementations/test/` and simulation models in `tools/simulator/`
+- **Test infrastructure**: Find existing test files in the `test/` folder of each library under `core/foc/` and simulation models in `tools/simulator/`
 - **Documentation**: Consult `documentation/` for domain guidance — `documentation/theory/foc.md`, `documentation/theory/alignment.md`, `documentation/performance-optimization/README.md`. Check for existing architecture/design documents under `documentation/` for the affected component. **Any behavioral change must be reflected in these documents.**
 
 ### 2. Plan Structure
@@ -87,7 +89,7 @@ Tests are designed **before** implementation (TDD Red-Green-Refactor):
 - **Green**: Implementation follows only to make the failing tests pass
 - **Refactor**: Clean up after all tests are green
 
-- Unit test files: `core/foc/implementations/test/Test{ComponentName}.cpp`
+- Unit test files: `test/Test{ComponentName}.cpp` inside the library under test
 - Host simulation models for validation: `tools/simulator/`
 - Host hardware stubs: `targets/platform_implementations/host/`
 - Key test cases: correctness of transforms, PID output under known conditions, SVM duty cycles, edge cases
@@ -137,12 +139,12 @@ Before finalizing, verify the plan against these constraints:
 ### Real-Time — FOC Loop Constraints
 - [ ] `Calculate()` hot path is free of virtual dispatch
 - [ ] No blocking calls in ISR/FOC context
-- [ ] Target cycle budget documented: <400 cycles at 120 MHz for 20 kHz control rate
+- [ ] Target cycle budget documented: <=4500 cycles at 120 MHz for the 20 kHz inner loop
 - [ ] `#pragma GCC optimize("O3", "fast-math")` applied to implementation files (guarded by `#if defined(__GNUC__) || defined(__clang__)`)
 - [ ] `OPTIMIZE_FOR_SPEED` applied to `Calculate()`, `Compute()`, and other hot-path methods
 
 ### FOC Theory — Correctness
-- [ ] Clarke transform: `Iα = (2/3)·(Ia - (Ib+Ic)/2)`, `Iβ = (Ib - Ic)/√3` (power-invariant, all 3 phases)
+- [ ] Clarke transform: `Iα = (2/3)·(Ia - (Ib+Ic)/2)`, `Iβ = (Ib - Ic)/√3` (amplitude-invariant, all 3 phases)
 - [ ] Park transform: `Id = Iα·cos(θ) + Iβ·sin(θ)`, `Iq = -Iα·sin(θ) + Iβ·cos(θ)`
 - [ ] Inverse Park/Clarke applied correctly for voltage reconstruction
 - [ ] SVM sector detection and duty cycle computation are correct
@@ -157,7 +159,7 @@ Before finalizing, verify the plan against these constraints:
 - [ ] DRY: no duplicated transform or PID logic — reuse from `infra/numerical-toolbox/`
 
 ### Naming — PascalCase
-- [ ] Classes: `PascalCase` (e.g., `FocSpeedImpl`)
+- [ ] Classes: `PascalCase` (e.g., `SpeedCascade`)
 - [ ] Methods: `PascalCase` (e.g., `Calculate()`, `SetPoint()`)
 - [ ] Member variables: `camelCase` (e.g., `polePairs`, `currentTunings`)
 - [ ] Namespaces: lowercase (e.g., `foc`, `hardware`)

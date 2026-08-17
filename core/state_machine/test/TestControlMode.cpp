@@ -7,8 +7,6 @@ namespace
     using namespace state_machine;
     using namespace services;
 
-    // -------- FromCanMode / ToCanMode roundtrip --------
-
     TEST(TestControlMode, FromCanMode_Torque_ReturnsTorque)
     {
         EXPECT_EQ(FromCanMode(FocMotorMode::torque), ControlMode::torque);
@@ -42,10 +40,16 @@ namespace
     TEST(TestControlMode, FromCanMode_ToCanMode_Roundtrip_AllModes)
     {
         for (auto mode : { FocMotorMode::torque, FocMotorMode::speed, FocMotorMode::position })
-            EXPECT_EQ(ToCanMode(FromCanMode(mode)), mode);
+        {
+            ASSERT_TRUE(FromCanMode(mode).has_value());
+            EXPECT_EQ(ToCanMode(*FromCanMode(mode)), mode);
+        }
     }
 
-    // -------- ToAckStatus --------
+    TEST(TestControlMode, FromCanMode_UnrecognisedByte_ReturnsNullopt)
+    {
+        EXPECT_FALSE(FromCanMode(static_cast<FocMotorMode>(7)).has_value());
+    }
 
     TEST(TestControlMode, ToAckStatus_Ok_ReturnsSuccess)
     {
@@ -68,8 +72,6 @@ namespace
     {
         EXPECT_EQ(ToAckStatus(SelectResult::invalidMode), CanAckStatus::invalidPayload);
     }
-
-    // -------- ControlModeFromRaw --------
 
     TEST(TestControlMode, ControlModeFromRaw_ZeroReturnsTorque)
     {

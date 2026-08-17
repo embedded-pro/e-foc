@@ -1,4 +1,4 @@
-#include "core/foc/implementations/test_doubles/DriversMock.hpp"
+#include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include <cmath>
@@ -39,8 +39,8 @@ namespace
         const std::size_t numberOfSamples = 127;
         std::size_t encoderStepIndex = 0;
 
-        StrictMock<foc::FieldOrientedControllerInterfaceMock> driverMock;
-        StrictMock<foc::EncoderMock> encoderMock;
+        StrictMock<drivers::ThreePhaseInverterMock> driverMock;
+        StrictMock<drivers::EncoderMock> encoderMock;
         foc::Volts vdc{ 24.0f };
         services::ElectricalParametersIdentificationImpl identification{ driverMock, encoderMock, vdc };
     };
@@ -100,9 +100,13 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_resistance_and_inductanc
         services::WindingConfiguration::Wye
     };
 
-    float testVoltage = 0.15f * vdc.Value();
-    float resistance = 1.5f;
-    float inductance = 0.002f;
+    // The stimulus drives phase A against B and C held at the neutral duty, so the simulated circuit is
+    // the terminal one: R + R/2 for a wye motor. The service must report the per-phase values.
+    float testVoltage = 0.14f * vdc.Value();
+    float terminalResistance = 1.5f;
+    float terminalInductance = 0.002f;
+    float resistance = terminalResistance / 1.5f;
+    float inductance = terminalInductance / 1.5f;
 
     std::optional<foc::Ohm> resultResistance;
     std::optional<foc::MilliHenry> resultInductance;
@@ -129,7 +133,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_resistance_and_inductanc
     for (std::size_t i = 0; i < numberOfSamples; ++i)
     {
         float time = static_cast<float>(i) * 0.0001f;
-        float current = SimulateRLModelCurrent(testVoltage, resistance, inductance, time);
+        float current = SimulateRLModelCurrent(testVoltage, terminalResistance, terminalInductance, time);
         driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
             foc::Ampere{ current },
             foc::Ampere{ 0.0f },
@@ -192,9 +196,11 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_resistance_and_inductanc
         services::WindingConfiguration::Wye
     };
 
-    float testVoltage = 0.15f * 24.0f;
-    float resistance = 0.5f;
-    float inductance = 0.001f;
+    float testVoltage = 0.14f * 24.0f;
+    float terminalResistance = 0.5f;
+    float terminalInductance = 0.001f;
+    float resistance = terminalResistance / 1.5f;
+    float inductance = terminalInductance / 1.5f;
 
     std::optional<foc::Ohm> resultResistance;
     std::optional<foc::MilliHenry> resultInductance;
@@ -221,7 +227,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_resistance_and_inductanc
     for (std::size_t i = 0; i < numberOfSamples; ++i)
     {
         float time = static_cast<float>(i) * 0.0001f;
-        float current = SimulateRLModelCurrent(testVoltage, resistance, inductance, time);
+        float current = SimulateRLModelCurrent(testVoltage, terminalResistance, terminalInductance, time);
         driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
             foc::Ampere{ current },
             foc::Ampere{ 0.0f },

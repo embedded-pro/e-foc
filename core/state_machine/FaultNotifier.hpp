@@ -7,6 +7,7 @@ namespace state_machine
 {
     enum class FaultCode : uint8_t
     {
+        none,
         overcurrent,
         overvoltage,
         overtemperature,

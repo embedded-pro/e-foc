@@ -1,8 +1,8 @@
 #pragma once
 
 #ifndef Q_MOC_RUN
-#include "core/foc/implementations/TransformsClarkePark.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
 #include "tools/simulator/model/Model.hpp"
 #endif
@@ -12,9 +12,6 @@
 
 namespace simulator
 {
-    // Thin Qt observer that adapts the simulator's three-phase model samples
-    // to the production RealTimeResistanceAndInductanceEstimator and re-emits
-    // the resulting estimates as Qt signals for the GUI scopes.
     class OnlineElectricalRls
         : public QObject
         , public ThreePhaseMotorModelObserver

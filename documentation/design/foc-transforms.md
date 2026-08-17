@@ -52,22 +52,27 @@ The Clarke transform is a geometric projection that reduces a balanced three-pha
 
 **Forward transform** (currents 3-phase → αβ):
 
-The α component is identical to phase-A current.  
-The β component combines phase-A and phase-B with a 1/√3 scaling factor:
+The amplitude-invariant Clarke transform uses all three measured phases, so it stays correct when
+the currents are not perfectly balanced:
 
-```
-Iα = Ia
-Iβ = (Ia + 2·Ib) / √3
+```text
+Iα = (2/3)·(Ia - (Ib + Ic)/2)
+Iβ = (Ib - Ic) / √3
 ```
 
-The third phase current Ic is not measured directly; it is derived from the balanced-system constraint `Ia + Ib + Ic = 0`. This two-sensor topology reduces hardware cost at the cost of assuming ideal phase balance.
+When the system *is* balanced (`Ia + Ib + Ic = 0`) this reduces to the familiar two-sensor form
+`Iα = Ia`, `Iβ = (Ia + 2·Ib)/√3`. The implementation uses the three-phase form unconditionally.
+
+All three phase currents are measured. `AdcPhaseCurrentMeasurement` converts three ADC samples and
+delivers them as a `PhaseCurrents` triple, so no phase is reconstructed from the balance constraint.
 
 **Inverse transform** (voltages αβ → 3-phase):
 
 Reconstructs the three-phase voltage references from Vα and Vβ, using the same geometric relationships in reverse. The output of the inverse Clarke is fed into the Space Vector Modulator.
 
 **Invariants:**
-- The input system must be balanced (sum of the three phase values is zero).
+- No balance assumption is required on the input; a nonzero common-mode current appears only in the
+  zero-sequence component, which the two-axis output discards.
 - The transform is purely linear and involves no state — every call is independent.
 
 ### Park Transform — Stationary αβ to Rotor-Synchronous dq Frame
@@ -76,7 +81,7 @@ The Park transform rotates the stationary αβ frame to align with the rotor mag
 
 **Forward transform** (αβ → dq):
 
-```
+```text
 Id =  Iα·cos(θe) + Iβ·sin(θe)
 Iq = −Iα·sin(θe) + Iβ·cos(θe)
 ```
@@ -85,7 +90,7 @@ The d-axis (direct) current component is aligned with the rotor flux. For a surf
 
 **Inverse transform** (dq → αβ):
 
-```
+```text
 Vα = Vd·cos(θe) − Vq·sin(θe)
 Vβ = Vd·sin(θe) + Vq·cos(θe)
 ```
@@ -96,7 +101,7 @@ The inverse Park transform is applied after the PID controllers produce voltage 
 
 The electrical angle θe is obtained by multiplying the mechanical rotor angle θm by the motor's pole-pair count P:
 
-```
+```text
 θe = θm · P
 ```
 
@@ -117,31 +122,36 @@ This is the form used by all inner-control-loop implementations in this project.
 
 ### Space Vector Modulation — αβ Voltage Vector to PWM Duty Cycles
 
-Space Vector Modulation (SVM) maps a two-component voltage reference vector in the αβ plane to three symmetrical PWM duty cycles. The αβ plane is divided into six sectors (numbered 0–5), each covering a 60-degree arc of the regular hexagon inscribed in the modulation boundary circle.
+Space Vector Modulation (SVM) maps a two-component voltage reference vector in the αβ plane to three symmetrical PWM duty cycles. The implementation is *sector-free*: it reaches the same duty cycles as classical sector-and-dwell-time SVM by injecting a common-mode offset, which is algebraically equivalent and has no branch on sector index.
 
-**Sector determination:**
+**Inverse Clarke:**
 
-The active sector is determined from the signs and relative magnitudes of Vα and Vβ. Each sector selects a unique pair of active voltage vectors (non-zero switching states) that bracket the reference vector.
+The reference is first expanded to three phase voltages, `vA = Vα`, `vB = -Vα/2 + (√3/2)·Vβ`, `vC = -Vα/2 - (√3/2)·Vβ`.
 
-**Dwell time calculation:**
+**Common-mode (min-max) injection:**
 
-Within the selected sector, the reference vector is decomposed into components along the two active voltage vectors. The two resulting dwell times (T1 and T2) sum to less than the full switching period; the remainder is distributed equally between the two null vectors V0 (all phases low) and V7 (all phases high) to maintain switching symmetry.
+The offset `vCommon = -(max(vA,vB,vC) + min(vA,vB,vC)) / 2` is added to all three phases. Because it is
+identical on every phase it cancels in every line-to-line voltage, so it changes no motor current while
+centring the waveform. This is what recovers the full 2/√3 linear range that classical SVM obtains from
+symmetric null-vector splitting.
 
 **Duty cycle output:**
 
-Phase duty cycles are computed from T1, T2, and the null-vector times. Output values are saturated to the range [0.0, 1.0] and represent the fraction of the switching period during which each phase is in the high state.
+Each offset phase voltage is scaled by 1/√3, biased by 0.5 to centre it in the PWM period, and clamped:
+`d = clamp(v/√3 + 0.5, 0, 1)`. A reference of unit magnitude therefore spans exactly [0, 1].
 
 **Constraints:**
-- Input Vα, Vβ are normalised fractions relative to the DC bus (dimensionless, typically in [−1, +1]).
-- Output duty cycles are in the range [0.0, 1.0]; values outside this range are clamped.
+- Input Vα, Vβ are per-unit relative to `V_dc/√3` (dimensionless, inside the unit circle for linear operation).
+- Output duty cycles are in the range [0.0, 1.0]; values outside this range are clamped, which is how
+  over-modulation is handled.
+- Being branch-free in the sector, the output is continuous across every sector boundary by construction.
 - SVM does not accept angles directly — it operates only on the (Vα, Vβ) pair.
 
 ```mermaid
 graph LR
-    Va["Vα, Vβ (normalised)"] --> Sector["Sector Detection\n(0–5)"]
-    Sector --> Dwell["Dwell Time\nCalculation (T1, T2)"]
-    Dwell --> Null["Null Vector\nDistribution (V0, V7)"]
-    Null --> Duty["Duty Cycles\n[0.0, 1.0]"]
+    Va["Vα, Vβ (per-unit)"] --> Inv["Inverse Clarke\n(vA, vB, vC)"]
+    Inv --> Cm["Common-mode injection\n-(max+min)/2"]
+    Cm --> Duty["Scale, bias, clamp\n[0.0, 1.0]"]
 ```
 
 ### Fast Trigonometry — Lookup-Table Sine and Cosine
@@ -164,17 +174,17 @@ Direct hardware transcendental functions (`sin`, `cos`) introduce variable laten
 
 ### Provided
 
-| Interface                        | Purpose                                       | Contract                                                                                                                    |
-|----------------------------------|-----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
-| Clarke — Forward                 | Converts (Ia, Ib) to (Iα, Iβ)                 | Ic is derived internally; inputs must satisfy the balanced-phase assumption. Output is immediately valid.                   |
-| Clarke — Inverse                 | Converts (Vα, Vβ) to (Va, Vb, Vc)             | Produces all three phase voltages. The sum of outputs is zero.                                                              |
-| Park — Forward                   | Converts (Iα, Iβ, θe) to (Id, Iq)             | Caller supplies pre-computed or LUT-evaluated cos(θe) and sin(θe). Stateless.                                               |
-| Park — Inverse                   | Converts (Vd, Vq, θe) to (Vα, Vβ)             | Uses the same θe as the forward Park in the same control cycle.                                                             |
-| ClarkePark — Forward             | Converts (Ia, Ib, θe) to (Id, Iq) in one call | Computes cos/sin once; result is identical to chaining Clarke then Park separately.                                         |
-| ClarkePark — Inverse             | Converts (Vd, Vq, θe) to (Vα, Vβ) in one call | Computes cos/sin once; result is identical to chaining inverse Park then inverse Clarke separately.                         |
-| SpaceVectorModulation — Generate | Converts (Vα, Vβ) to three duty cycles        | Inputs must be normalised fractions. Outputs are always in [0.0, 1.0]. Sector detection and null-vector split are internal. |
-| FastTrigonometry — Sine          | Returns an approximation of sin(θ)            | θ is normalised to [0, 2π) internally. ROM LUT; no floating-point transcendental at runtime.                                |
-| FastTrigonometry — Cosine        | Returns an approximation of cos(θ)            | Derived from the sine LUT via a quarter-period offset. Same ROM, no additional storage.                                     |
+| Interface                        | Purpose                                       | Contract                                                                                                                                       |
+|----------------------------------|-----------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| Clarke — Forward                 | Converts (Ia, Ib) to (Iα, Iβ)                 | Ic is derived internally; inputs must satisfy the balanced-phase assumption. Output is immediately valid.                                      |
+| Clarke — Inverse                 | Converts (Vα, Vβ) to (Va, Vb, Vc)             | Produces all three phase voltages. The sum of outputs is zero.                                                                                 |
+| Park — Forward                   | Converts (Iα, Iβ, θe) to (Id, Iq)             | Caller supplies pre-computed or LUT-evaluated cos(θe) and sin(θe). Stateless.                                                                  |
+| Park — Inverse                   | Converts (Vd, Vq, θe) to (Vα, Vβ)             | Uses the same θe as the forward Park in the same control cycle.                                                                                |
+| ClarkePark — Forward             | Converts (Ia, Ib, θe) to (Id, Iq) in one call | Computes cos/sin once; result is identical to chaining Clarke then Park separately.                                                            |
+| ClarkePark — Inverse             | Converts (Vd, Vq, θe) to (Vα, Vβ) in one call | Computes cos/sin once; result is identical to chaining inverse Park then inverse Clarke separately.                                            |
+| SpaceVectorModulation — Generate | Converts (Vα, Vβ) to three duty cycles        | Inputs must be per-unit relative to `V_dc/√3`. Outputs are always in [0.0, 1.0]. Common-mode injection is internal; there is no sector branch. |
+| FastTrigonometry — Sine          | Returns an approximation of sin(θ)            | θ is normalised to [0, 2π) internally. ROM LUT; no floating-point transcendental at runtime.                                                   |
+| FastTrigonometry — Cosine        | Returns an approximation of cos(θ)            | Derived from the sine LUT via a quarter-period offset. Same ROM, no additional storage.                                                        |
 
 ### Required
 

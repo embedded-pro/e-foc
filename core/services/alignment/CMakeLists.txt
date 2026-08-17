@@ -9,6 +9,7 @@ target_link_libraries(e_foc.services.alignment PUBLIC
     infra.util
     e_foc.platform_abstraction
     e_foc.foc.interfaces
+    e_foc.foc.transforms
 )
 
 target_sources(e_foc.services.alignment PRIVATE

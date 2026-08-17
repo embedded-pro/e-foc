@@ -7,16 +7,29 @@ namespace application
         const TerminalAndTracer& terminalAndTracer,
         const MotorHardware& hardware,
         services::NonVolatileMemory& nvm,
-        services::ElectricalParametersIdentification& electricalIdent,
-        services::MotorAlignment& motorAlignment,
-        foc::NewtonMeter mechTorqueConstantArg)
-        : FocStateMachineCommon(terminalAndTracer, hardware, nvm, electricalIdent, motorAlignment)
-        , mechTorqueConstant(mechTorqueConstantArg)
+        const CalibrationServices& calibServices)
+        : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices)
+        , mechTorqueConstant(calibServices.mechTorqueConstant)
     {}
+
+    void OuterLoopStateMachine::ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth)
+    {
+        // The cascade owns the current envelope and the outer-loop rate and substitutes them for these placeholders.
+        SpeedTunable().ConfigureMechanics(foc::MechanicalModelParameters{
+            inertia,
+            friction,
+            mechTorqueConstant,
+            foc::Ampere{ 0.0f },
+            hal::Hertz{ 0 } });
+
+        auto tunings = foc::SpeedLoopTunings{};
+        tunings.bandwidth = bandwidth > 0.0f ? bandwidth : velocityBandwidthRadPerSec;
+        SpeedTunable().SetSpeedTunings(tunings);
+    }
 
     void OuterLoopStateMachine::ApplyModeSpecificCalibration(const services::CalibrationData& data)
     {
-        SpeedTunable().SetSpeedTunings(GetVdc(), foc::SpeedTunings{ data.kpVelocity, data.kiVelocity, 0.0f });
+        ApplyMechanics(foc::NewtonMeterSecondSquared{ data.inertia }, foc::NewtonMeterSecondPerRadian{ data.frictionViscous }, data.speedLoopBandwidth);
 
         GetOnlineMechEstimator().SetInitialEstimate(foc::NewtonMeterSecondSquared{ data.inertia }, foc::NewtonMeterSecondPerRadian{ data.frictionViscous });
         GetOnlineElecEstimator().SetInitialEstimate(foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD });
@@ -32,9 +45,14 @@ namespace application
         terminal.AddCommand({ { "estimate_status", "es", "Print current online estimates" },
             [this](const infra::BoundedConstString&)
             {
-                GetTracer().Trace() << "[EST] Mech: J=" << GetOnlineMechEstimator().CurrentInertia().Value() << " B=" << GetOnlineMechEstimator().CurrentFriction().Value();
-                GetTracer().Trace() << "[EST] Elec: R=" << GetOnlineElecEstimator().CurrentResistance().Value() << " L=" << GetOnlineElecEstimator().CurrentInductance().Value();
+                TraceOnlineEstimates();
             } });
+    }
+
+    void OuterLoopStateMachine::TraceOnlineEstimates()
+    {
+        GetTracer().Trace() << "[EST] Mech: J=" << GetOnlineMechEstimator().CurrentInertia().Value() << " B=" << GetOnlineMechEstimator().CurrentFriction().Value();
+        GetTracer().Trace() << "[EST] Elec: R=" << GetOnlineElecEstimator().CurrentResistance().Value() << " L=" << GetOnlineElecEstimator().CurrentInductance().Value();
     }
 
     void OuterLoopStateMachine::ApplyOnlineEstimates()
@@ -51,7 +69,7 @@ namespace application
         else
         {
             GetTracer().Trace() << "[SM] Applying mechanical estimates: J=" << inertia.Value() << " B=" << friction.Value();
-            GetSpeedAutoTuner().SetPidBasedOnInertiaAndFriction(GetVdc(), inertia, friction, velocityBandwidthRadPerSec);
+            ApplyMechanics(inertia, friction, velocityBandwidthRadPerSec);
         }
 
         const auto resistance = GetOnlineElecEstimator().CurrentResistance();
@@ -62,13 +80,27 @@ namespace application
         else
         {
             GetTracer().Trace() << "[SM] Applying electrical estimates: R=" << resistance.Value() << " L=" << inductance.Value();
-            GetCurrentLoopTuner().SetPidBasedOnResistanceAndInductance(GetVdc(), resistance, inductance, GetInverter().BaseFrequency(), nyquistFactor);
+            ApplyElectricalModel(resistance, inductance, GetCalibration().polePairs, GetCalibration().currentLoopBandwidth, EffectiveFluxLinkage(GetCalibration()));
         }
     }
 
     void OuterLoopStateMachine::RunPostAlignmentStep()
     {
         RunMechanicalIdentStep();
+    }
+
+    services::MechanicalParametersIdentification& OuterLoopStateMachine::ResolveMechIdent(
+        const CalibrationServices& calibServices,
+        std::optional<services::MechanicalParametersIdentificationImpl>& ownMechIdent,
+        foc::SpeedCommandable& speedCommandable,
+        drivers::ThreePhaseInverter& inverter,
+        drivers::Encoder& encoder)
+    {
+        if (calibServices.mechIdentOverride.has_value())
+            return calibServices.mechIdentOverride->get();
+
+        ownMechIdent.emplace(speedCommandable, inverter, encoder);
+        return *ownMechIdent;
     }
 
     void OuterLoopStateMachine::RunMechanicalIdentStep()
@@ -95,8 +127,7 @@ namespace application
                     auto& cal = std::get<state_machine::Calibrating>(GetCurrentState());
                     cal.pendingData.inertia = inertia->Value();
                     cal.pendingData.frictionViscous = friction->Value();
-                    cal.pendingData.kpVelocity = inertia->Value() * velocityBandwidthRadPerSec;
-                    cal.pendingData.kiVelocity = friction->Value() * velocityBandwidthRadPerSec;
+                    cal.pendingData.speedLoopBandwidth = velocityBandwidthRadPerSec;
                     OnCalibrationComplete();
                 }
             });

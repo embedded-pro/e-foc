@@ -9,7 +9,8 @@ target_link_libraries(e_foc.services.mechanical_system_ident PUBLIC
     infra.util
     e_foc.platform_abstraction
     e_foc.foc.interfaces
-    e_foc.foc.implementations
+    e_foc.foc.math
+    e_foc.foc.transforms
     numerical.estimators.online
 )
 

@@ -8,7 +8,10 @@ target_include_directories(e_foc.tool.simulator.model PUBLIC
 target_link_libraries(e_foc.tool.simulator.model PUBLIC
     infra.util
     numerical.math
-    e_foc.foc.implementations
+    e_foc.foc.interfaces
+    e_foc.foc.math
+    e_foc.foc.transforms
+    e_foc.platform_abstraction.interfaces
 )
 
 target_sources(e_foc.tool.simulator.model PRIVATE

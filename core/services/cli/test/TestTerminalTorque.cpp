@@ -1,4 +1,4 @@
-#include "core/foc/implementations/test_doubles/FocMock.hpp"
+#include "core/foc/interfaces/test_doubles/FocMock.hpp"
 #include "core/services/cli/TerminalTorque.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
@@ -28,7 +28,7 @@ namespace
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
         services::TerminalWithStorage::WithMaxSize<10> terminal{ terminalWithCommands, tracer };
-        services::TerminalFocTorqueInteractor terminalInteractor{ terminal, foc::Volts{ 12.0f }, focMock };
+        services::TerminalFocTorqueInteractor terminalInteractor{ terminal, focMock };
 
         void InvokeCommand(std::string command, const std::function<void()>& onCommandReceived)
         {
@@ -46,15 +46,15 @@ namespace
     };
 }
 
-TEST_F(TerminalTorqueTest, set_torque)
+TEST_F(TerminalTorqueTest, set_torque_commands_the_q_axis)
 {
     InvokeCommand("set_torque 2.5", [this]()
         {
             EXPECT_CALL(focMock, SetPoint(testing::_))
                 .WillOnce(testing::Invoke([](const foc::IdAndIqPoint& point)
                     {
-                        EXPECT_NEAR(point.first.Value(), 2.5f, 1e-5f);
-                        EXPECT_NEAR(point.second.Value(), 0.0f, 1e-5f);
+                        EXPECT_NEAR(point.first.Value(), 0.0f, 1e-5f);
+                        EXPECT_NEAR(point.second.Value(), 2.5f, 1e-5f);
                     }));
         });
 

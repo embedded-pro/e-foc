@@ -1,13 +1,37 @@
-- id: REQ-FOC-002
-  title: Independent Id and Iq current control
+- id: REQ-TRQ-001
+  title: Runtime-selectable current control law
+  shall: >
+    The torque controller shall dispatch the per-sample current control computation
+    to one of a fixed set of control laws selected at runtime. All laws shall reside
+    simultaneously in fixed-size storage held by a variant, and neither selection nor
+    per-sample dispatch shall perform any dynamic memory allocation.
+
+- id: REQ-TRQ-002
+  title: Independent Id and Iq setpoints
   shall: >
     The torque controller shall accept d-axis current (Id) and q-axis current (Iq)
-    as independent inputs. Both setpoints shall be injectable into the controller
-    and regulated by separate PID controllers with anti-windup.
+    as independent inputs. Both setpoints shall be injectable into the controller and
+    regulated by the active current control law within a single per-sample computation.
 
-- id: REQ-FOC-005
+- id: REQ-TRQ-003
+  title: Bandwidth-based current loop tuning
+  shall: >
+    The current loop shall be tuned through a single closed-loop bandwidth together
+    with the weights specific to the active law, and shall derive its own gains from
+    that bandwidth and the identified motor model. The controller shall not require
+    per-axis proportional, integral, and derivative gains to be supplied externally.
+
+- id: REQ-TRQ-004
+  title: Anti-windup on integrating current laws
+  shall: >
+    Every current control law that accumulates an integral state shall bound that
+    state whenever the commanded voltage saturates, so that the accumulated term
+    cannot grow while the output is limited.
+
+- id: REQ-TRQ-005
   title: ISR execution budget
   shall: >
-    The complete torque control cycle (sensing, transforms, PID, SVM, output)
-    shall not exceed 75 percent of available CPU time per control period
-    (<= 4500 cycles at 120 MHz for a 20 kHz control rate).
+    The complete torque control cycle (sensing, transforms, active current law,
+    space vector modulation, output) shall execute at a 20 kHz control rate and
+    shall not exceed 4500 cycles at 120 MHz, which is 75 percent of the available
+    CPU time per control period.

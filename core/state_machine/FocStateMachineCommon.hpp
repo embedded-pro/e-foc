@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/foc/implementations/WithAutomaticCurrentPidGains.hpp"
-#include "core/foc/interfaces/Driver.hpp"
+#include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
+#include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/alignment/MotorAlignment.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
@@ -26,8 +26,8 @@ namespace application
 
     struct MotorHardware
     {
-        foc::ThreePhaseInverter& inverter;
-        foc::Encoder& encoder;
+        drivers::ThreePhaseInverter& inverter;
+        drivers::Encoder& encoder;
         foc::Volts vdc;
     };
 
@@ -37,6 +37,7 @@ namespace application
         services::MotorAlignment& motorAlignment;
         std::optional<std::reference_wrapper<services::MechanicalParametersIdentification>> mechIdentOverride{ std::nullopt };
         foc::NewtonMeter mechTorqueConstant{ foc::NewtonMeter{ 0.1f } };
+        foc::Weber fluxLinkage{ foc::Weber{ 0.0f } };
     };
 
     class FocStateMachineCommon
@@ -45,20 +46,25 @@ namespace application
     public:
         const state_machine::State& CurrentState() const override;
         state_machine::FaultCode LastFaultCode() const override;
+        bool HasPendingAsyncWork() const override;
 
         void CmdCalibrate(const infra::Function<void(state_machine::CommandResult)>& onDone) override;
-        void CmdEnable() override;
-        void CmdDisable() override;
-        void CmdClearFault() override;
+        state_machine::CommandResult CmdEnable() override;
+        state_machine::CommandResult CmdDisable() override;
+        state_machine::CommandResult CmdClearFault() override;
         void CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>& onDone) override;
-        void CmdEmergencyStop() override;
+        state_machine::CommandResult CmdEmergencyStop() override;
+
+        void CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone);
+        foc::Weber ActiveFluxLinkage() const;
+
+        void RegisterReadyHandler(const infra::Function<void()>& onReady);
 
     protected:
         FocStateMachineCommon(const TerminalAndTracer& terminalAndTracer,
             const MotorHardware& hardware,
             services::NonVolatileMemory& nvm,
-            services::ElectricalParametersIdentification& electricalIdent,
-            services::MotorAlignment& motorAlignment);
+            const CalibrationServices& calibServices);
 
         void RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier);
         void RegisterCliIfNeeded(state_machine::TransitionPolicy transitionPolicy);
@@ -67,7 +73,7 @@ namespace application
         virtual foc::FocBase& GetFoc() = 0;
         virtual foc::Controllable& GetFocControl() = 0;
         virtual void RunPostAlignmentStep() = 0;
-        virtual foc::WithAutomaticCurrentPidGains& GetCurrentLoopTuner() = 0;
+        virtual foc::CurrentLoopTunable& CurrentTunable() = 0;
 
         virtual void ApplyModeSpecificCalibration(const services::CalibrationData& data);
         virtual void PrepareForEnabled();
@@ -80,6 +86,7 @@ namespace application
 
         void CompletePendingCommand(state_machine::CommandResult result);
         bool HasPendingCommand() const;
+        bool HasValidCalibration() const;
 
         void RunPolePairsStep();
         void RunResistanceAndInductanceStep();
@@ -89,27 +96,40 @@ namespace application
         bool IsCalibrating(state_machine::CalibrationStep expected) const;
 
         services::Tracer& GetTracer();
-        foc::ThreePhaseInverter& GetInverter();
+        drivers::ThreePhaseInverter& GetInverter();
         foc::Volts GetVdc() const;
         state_machine::State& GetCurrentState();
         const state_machine::State& GetCurrentState() const;
 
         static constexpr float nyquistFactor = 15.0f;
 
+        void ApplyElectricalCalibration(const services::CalibrationData& data);
+        void ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage);
+        const services::CalibrationData& GetCalibration() const;
+        foc::Weber EffectiveFluxLinkage(const services::CalibrationData& data) const;
+        foc::CurrentLoopTunings CurrentTuningsFor(float bandwidth) const;
+        float DefaultCurrentLoopBandwidth() const;
+
     private:
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
-        foc::ThreePhaseInverter& inverter;
-        foc::Encoder& encoder;
+        drivers::ThreePhaseInverter& inverter;
+        drivers::Encoder& encoder;
         foc::Volts vdc;
         services::NonVolatileMemory& nvm;
         services::ElectricalParametersIdentification& electricalIdent;
         services::MotorAlignment& motorAlignment;
+        foc::Weber configuredFluxLinkage;
 
         state_machine::State currentState{ state_machine::Idle{} };
-        state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::hardwareFault };
+        state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::none };
         services::CalibrationData calibrationData{};
+        float pendingFluxLinkage{ 0.0f };
+        bool bootCheckInFlight{ false };
+        void OnCalibrationInvalidated(services::NvmStatus status);
+
         infra::AutoResetFunction<void(state_machine::CommandResult)> pendingCommandCallback;
+        infra::Function<void()> readyHandler;
     };
 
     template<class GetActiveSm>

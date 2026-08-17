@@ -315,9 +315,11 @@ To avoid calling `sinf/cosf` in the ISR:
 - The electrical angle is mapped to a table index: `k = (uint16_t)(θ_norm * 512) & 0x1FF`.
 - Angular range: angle is normalised to $[0, 1)$ representing $[0, 2\pi)$.
 
-The fixed-step table introduces a bounded angle error of at most $\pi/512 \approx 0.35°$. This is acceptable
-for 20 kHz FOC since the angle changes by at most $\omega_e/(20000) \approx 0.09°$ per step at 3000 rpm
-with $p = 5$.
+The fixed-step table introduces a bounded angle-quantisation error of at most $\pi/512 \approx 0.35°$ when
+truncating to the nearest entry. The implementation interpolates linearly between adjacent entries, which
+bounds the amplitude error at $\Delta^2/8 \approx 1.9 \times 10^{-5}$ instead. At 3000 rpm with $p = 5$ the
+electrical angle advances $\omega_e/20000 = 0.0785\ \text{rad} \approx 4.5°$ per step, roughly 6.4 table
+entries, so it is the interpolation rather than the table density that bounds the error.
 
 ---
 
@@ -366,7 +368,7 @@ graph TD
 
 ### Coordinate System Relationships
 
-```
+```text
                  β
                  ↑
                  |    q (rotates)
@@ -386,17 +388,17 @@ See also: `documentation/theory/images/foc_coordinates.svg` and `documentation/t
 
 ## Numerical Properties
 
-| Property            | Value / Condition                                     |
-|---------------------|-------------------------------------------------------|
-| Control rate        | 20 kHz (50 µs period)                                 |
-| Transform latency   | < 20 CPU cycles (Clarke + Park combined)              |
-| LUT angle error     | <= $\pi/512 \approx 0.35°$                             |
-| SVM duty resolution | 16-bit timer → ≈ 0.0015% per step                     |
-| PI output range     | [−1.0, 1.0] normalised; anti-windup at ±1.0           |
-| Torque linearity    | $\tau_e \propto i_q$ within MTPA region               |
-| Over-modulation     | Clamp-based saturation; duty cycles bounded to [0, 1] |
-| Gain normalisation  | $K_{p,norm} = K_{p,phys} \cdot \sqrt{3}/V_{dc}$       |
-| LUT memory          | 512 × 4 bytes = 2048 bytes flash                      |
+| Property            | Value / Condition                                                                              |
+|---------------------|------------------------------------------------------------------------------------------------|
+| Control rate        | 20 kHz (50 µs period)                                                                          |
+| Transform latency   | < 20 CPU cycles (Clarke + Park combined)                                                       |
+| LUT angle error     | <= $\pi/512 \approx 0.35°$ truncated; $\approx 1.9\times10^{-5}$ interpolated                  |
+| SVM duty resolution | 1% per step — `PhasePwmDutyCycles` carries `hal::Percent` (`uint8_t`)                          |
+| PI output range     | Applied $v_{dq}$ limited to the unit circle $\lVert v \rVert \le 1$; anti-windup on that limit |
+| Torque linearity    | $\tau_e \propto i_q$ within MTPA region                                                        |
+| Over-modulation     | Clamp-based saturation; duty cycles bounded to [0, 1]                                          |
+| Gain normalisation  | $K_{p,norm} = K_{p,phys} \cdot \sqrt{3}/V_{dc}$                                                |
+| LUT memory          | 512 × 4 bytes = 2048 bytes flash                                                               |
 
 ### Sensitivity Analysis
 
@@ -435,13 +437,14 @@ $$\tau_e = \frac{3}{2} \times 4 \times 0.05 \times 5 = 1.5\ \text{N·m}$$
 
 **Step 5 — SVM for $V_\alpha = 8\ \text{V}$, $V_\beta = 5\ \text{V}$** ($V_{dc} = 24\ \text{V}$):
 
-$$v_A = 8,\quad v_B = -4 + 5 \cdot 0.866 = 0.33,\quad v_C = -4 - 4.33 = -8.33$$
-$$v_{common} = -\frac{8 + (-8.33)}{2} = 0.165$$
-$$d_A = \mathrm{clamp}\!\left(\frac{8.165}{\sqrt{3}} + 0.5,\ 0,\ 1\right) = \mathrm{clamp}(5.21, 0, 1) = 1$$
+The modulator takes per-unit voltages, where $1\ \text{pu} = V_{dc}/\sqrt{3} = 13.86\ \text{V}$. Since
+$|V_{ref}| = \sqrt{64+25} \approx 9.43\ \text{V} < 13.86\ \text{V}$, the reference lies inside the linear
+region and no over-modulation clamping occurs.
 
-> Note: $|V_{ref}| = \sqrt{64+25} \approx 9.43\ \text{V} > V_{dc}/\sqrt{3} \approx 13.9\ \text{V}$…
-> actually within range; recalculate normalised: $V_\alpha^{norm} = 8/13.9 = 0.576$,
-> $V_\beta^{norm} = 5/13.9 = 0.360$. Common-mode injection brings duty into [0,1].
+$$v_\alpha^{pu} = 8/13.86 = 0.577,\quad v_\beta^{pu} = 5/13.86 = 0.361$$
+$$v_A = 0.577,\quad v_B = -0.289 + 0.866 \cdot 0.361 = 0.024,\quad v_C = -0.289 - 0.313 = -0.601$$
+$$v_{common} = -\frac{0.577 + (-0.601)}{2} = 0.012$$
+$$d_A = \mathrm{clamp}\!\left(\frac{0.589}{\sqrt{3}} + 0.5,\ 0,\ 1\right) = 0.840,\quad d_B = 0.521,\quad d_C = 0.160$$
 
 ---
 

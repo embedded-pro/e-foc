@@ -2,7 +2,7 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.2.0
+version: 0.3.0
 component: service-nvm
 date: 2026-04-07
 ---
@@ -12,7 +12,7 @@ date: 2026-04-07
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.1.0                        |
+| Version   | 0.3.0                        |
 | Component | service-nvm                  |
 | Date      | 2026-04-07                   |
 
@@ -51,8 +51,8 @@ The service manages two independent EEPROM regions. Each region holds exactly on
 
 | Region        | Magic        | Data structure    | Data size |
 |---------------|--------------|-------------------|-----------|
-| Calibration   | `0xCAFEF00D` | `CalibrationData` | 60 bytes  |
-| Configuration | `0xDEADBEEF` | `ConfigData`      | 40 bytes  |
+| Calibration   | `0xCAFEF00D` | `CalibrationData` | 52 bytes  |
+| Configuration | `0xDEADBEEF` | `ConfigData`      | 20 bytes  |
 
 The two regions use different `NvmRegion` instances (injected at construction) and can be read, written, and erased independently. An operation on the calibration region has no effect on the configuration region and vice versa.
 
@@ -137,23 +137,44 @@ Each region owns two statically allocated byte arrays:
 
 Both buffers are `std::array<uint8_t, recordSize>` members of the service object. They are reused across invocations. No heap is used at any point.
 
-### Concurrency — One Operation Per Region
+### Concurrency — One Operation At A Time, Device-Wide
 
-Each region is governed by a state machine that enforces sequential access. A second write request for the calibration region while a write is already in progress (in the Erasing, Writing, or ReadingBack state) is rejected — the new request's callback is invoked immediately with an error.
+Both logical regions are backed by a single EEPROM device, and that device driver serialises access:
+it accepts exactly one erase, program, or read at a time and treats a second concurrent request as a
+programming error. Admission control is therefore **device-wide, not per region**: while any
+operation is in flight, every entry point — calibration save, load, invalidate, validity check,
+configuration save, load, reset-to-defaults, and format — is refused. No refused request ever reaches
+a region.
 
-The calibration and configuration regions are independent: a simultaneous calibration write and configuration read are permitted.
+A refused request never silently disappears. Its callback is invoked immediately with `Busy`; the
+validity check, whose callback carries a boolean rather than a status, is answered `false`. Callers
+that arm a pending-command callback before issuing a request therefore always see it complete, and
+cannot be wedged by a dropped notification.
 
-### State Machine (Per Region)
+Refusal is decided before any internal state is touched, so a caller that issues a further request
+from inside a synchronously delivered `Busy` callback can only be refused in turn — re-entry cannot
+corrupt an in-flight operation. Admission is released just before the completion callback of the
+in-flight operation runs, so a follow-up request issued from that callback is accepted normally.
+
+Callers are expected to treat `Busy` as "nothing was written": any in-memory state speculatively
+updated in anticipation of a successful write must be rolled back, and the originating command
+rejected cleanly rather than escalated to a fault.
+
+### State Machine (Device-Wide)
 
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
-    Idle --> Erasing : SaveCalibration / SaveConfig
-    Idle --> Reading : LoadCalibration / LoadConfig
+    Idle --> Erasing : SaveCalibration / SaveConfig / InvalidateCalibration / Format
+    Idle --> Reading : LoadCalibration / LoadConfig / IsCalibrationValid
     Erasing --> Writing : sector erase complete
     Writing --> ReadingBack : write complete
     ReadingBack --> Idle : read-back verified (Ok or WriteFailed)
     Reading --> Idle : read complete (Ok, InvalidData, or VersionMismatch)
+    Erasing --> Erasing : any further request refused with Busy
+    Writing --> Writing : any further request refused with Busy
+    ReadingBack --> ReadingBack : any further request refused with Busy
+    Reading --> Reading : any further request refused with Busy
 ```
 
 ### Error Codes
@@ -165,40 +186,45 @@ stateDiagram-v2
 | `VersionMismatch` | Version byte in stored record does not match firmware constant               |
 | `WriteFailed`     | CRC-32 of read-back data does not match what was written                     |
 | `HardwareFault`   | `NvmRegion` reported a hardware-level error (e.g., erase or program failure) |
+| `Busy`            | Another operation is in flight; nothing was read or written                  |
 
 ### Calibration and Configuration Data Fields
 
-**CalibrationData** (60 bytes total):
+**CalibrationData** (52 bytes total):
 
-| Field                  | Physical unit | Description                                         |
-|------------------------|---------------|-----------------------------------------------------|
-| rPhase                 | Ω             | Measured phase resistance                           |
-| lD                     | H             | Measured d-axis inductance                          |
-| lQ                     | H             | Measured q-axis inductance                          |
-| currentOffsetA/B/C     | A             | ADC current sensor zero offsets per phase           |
-| inertia                | kg·m²         | Estimated rotor inertia                             |
-| frictionCoulomb        | N·m           | Coulomb (constant) friction                         |
-| frictionViscous        | N·m·s/rad     | Viscous friction coefficient                        |
-| encoderZeroOffset      | rad           | Encoder calibration offset (from alignment service) |
-| kpCurrent, kiCurrent   | —             | Normalised current PID gains                        |
-| kpVelocity, kiVelocity | —             | Normalised velocity PID gains                       |
-| encoderDirection       | —             | Polarity correction (+1 or −1)                      |
-| polePairs              | —             | Number of motor pole pairs                          |
+| Field                | Physical unit | Description                                         |
+|----------------------|---------------|-----------------------------------------------------|
+| rPhase               | Ω             | Measured phase resistance                           |
+| lD                   | H             | Measured d-axis inductance                          |
+| lQ                   | H             | Measured q-axis inductance                          |
+| currentOffsetA/B/C   | A             | ADC current sensor zero offsets per phase           |
+| inertia              | kg·m²         | Estimated rotor inertia                             |
+| frictionCoulomb      | N·m           | Coulomb (constant) friction                         |
+| frictionViscous      | N·m·s/rad     | Viscous friction coefficient                        |
+| encoderZeroOffset    | rad           | Encoder calibration offset (from alignment service) |
+| currentLoopBandwidth | rad/s         | Current loop closed-loop bandwidth                  |
+| speedLoopBandwidth   | rad/s         | Speed loop closed-loop bandwidth                    |
+| encoderDirection     | —             | Polarity correction (+1 or −1)                      |
+| polePairs            | —             | Number of motor pole pairs                          |
 
-**ConfigData** (40 bytes total):
+**ConfigData** (20 bytes total):
 
-| Field                 | Physical unit | Description                             |
-|-----------------------|---------------|-----------------------------------------|
-| maxCurrent            | A             | Peak current limit                      |
-| maxVelocity           | rad/s         | Peak speed limit                        |
-| maxTorque             | N·m           | Peak torque limit                       |
-| canNodeId             | —             | CAN bus node identifier                 |
-| canBaudrate           | bit/s         | CAN bus baud rate                       |
-| telemetryRateHz       | Hz            | Rate at which telemetry frames are sent |
-| overTempThreshold     | °C            | Over-temperature trip threshold         |
-| underVoltageThreshold | V             | DC bus under-voltage trip threshold     |
-| overVoltageThreshold  | V             | DC bus over-voltage trip threshold      |
-| defaultControlMode    | —             | Control mode selected on power-up       |
+| Field              | Physical unit | Description                                  |
+|--------------------|---------------|----------------------------------------------|
+| canNodeId          | —             | CAN bus node identifier                      |
+| canBaudrate        | bit/s         | CAN bus baud rate                            |
+| telemetryRateHz    | Hz            | Rate at which telemetry frames are sent      |
+| encoderResolution  | —             | Encoder counts per mechanical revolution     |
+| defaultControlMode | —             | Control mode selected on power-up            |
+| currentAlgorithm   | —             | Current-loop algorithm selected on power-up  |
+| speedAlgorithm     | —             | Speed-loop algorithm selected on power-up    |
+| positionAlgorithm  | —             | Position-loop algorithm selected on power-up |
+
+The four selection fields are stored as raw byte identifiers. A record can pass the integrity check
+and still hold a byte outside the valid range for its selection, so each value is range-checked
+against its algorithm set before it is applied on power-up. A value outside the range, or a selection
+the current motor parameters do not support, leaves the loop on its built-in default and the stored
+byte is corrected to match what is actually running.
 
 ---
 
@@ -206,16 +232,16 @@ stateDiagram-v2
 
 ### Provided
 
-| Interface                       | Purpose                                                                       | Contract                                                                |
-|---------------------------------|-------------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| `SaveCalibration(data, onDone)` | Erases calibration sector, writes record, verifies read-back                  | `onDone(NvmStatus)` fires exactly once; rejected if region is busy      |
-| `LoadCalibration(onDone)`       | Reads and integrity-checks the calibration record                             | `onDone(NvmStatus, optional<CalibrationData>)` fires exactly once       |
-| `InvalidateCalibration(onDone)` | Erases the calibration sector without writing a new record                    | Makes `IsCalibrationValid` return false; `onDone(NvmStatus)` fires once |
-| `IsCalibrationValid()`          | Synchronously returns whether a valid calibration record is present           | Based on last known read status; does not perform an EEPROM read        |
-| `SaveConfig(data, onDone)`      | Same write+verify sequence for the configuration region                       | `onDone(NvmStatus)` fires exactly once                                  |
-| `LoadConfig(onDone)`            | Reads and integrity-checks the configuration record                           | `onDone(NvmStatus, optional<ConfigData>)` fires exactly once            |
-| `ResetConfigToDefaults(onDone)` | Writes a record containing factory-default values to the configuration region | Follows the same erase/write/verify sequence as `SaveConfig`            |
-| `Format(onDone)`                | Erases both calibration and configuration regions                             | `onDone(NvmStatus)` fires once, after both regions are erased           |
+| Interface                       | Purpose                                                                       | Contract                                                                 |
+|---------------------------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------|
+| `SaveCalibration(data, onDone)` | Erases calibration sector, writes record, verifies read-back                  | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied |
+| `LoadCalibration(onDone)`       | Reads and integrity-checks the calibration record                             | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied |
+| `InvalidateCalibration(onDone)` | Erases the calibration sector without writing a new record                    | Makes `IsCalibrationValid` return false; `onDone(NvmStatus)` fires once  |
+| `IsCalibrationValid(onDone)`    | Reads and integrity-checks the calibration record, reporting validity only    | `onDone(bool)` fires exactly once; `false` if the device is occupied     |
+| `SaveConfig(data, onDone)`      | Same write+verify sequence for the configuration region                       | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied |
+| `LoadConfig(onDone)`            | Reads and integrity-checks the configuration record                           | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied |
+| `ResetConfigToDefaults(onDone)` | Writes a record containing factory-default values to the configuration region | Follows the same erase/write/verify sequence as `SaveConfig`             |
+| `Format(onDone)`                | Erases both calibration and configuration regions                             | `onDone(NvmStatus)` fires once, after both regions are erased            |
 
 ### Required
 

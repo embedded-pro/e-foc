@@ -1,17 +1,13 @@
 #pragma once
 
-#include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "numerical/estimators/online/RecursiveLeastSquares.hpp"
 
 namespace services
 {
-    // Real-time RLS estimator for phase resistance and d-axis inductance.
-    // Assumes a non-salient motor (Ld ≈ Lq, i.e., surface-mounted PMSM).
-    // For interior PMSMs, a 3-parameter model separating Ld and Lq would be required.
-    // Seeds and reports using Ld. On construction, the RLS is seeded to zero; call
-    // Seed() to warm-start from calibration data before enabling.
+    // Assumes a non-salient motor (Ld ≈ Lq, i.e., surface-mounted PMSM); an interior PMSM
+    // would need a 3-parameter model separating Ld and Lq. Estimates start at zero until Seed().
     class RealTimeResistanceAndInductanceEstimator
         : public foc::OnlineElectricalEstimator
     {

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/foc/implementations/FocSpeedImpl.hpp"
-#include "core/foc/interfaces/Driver.hpp"
+#include "core/foc/cascade/SpeedCascade.hpp"
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "hal/interfaces/Eeprom.hpp"
 #include "hal/interfaces/Pwm.hpp"
@@ -63,10 +63,10 @@ namespace application
         hal::PerformanceTracker& performanceTimer;
         foc::Volts Vdc;
         hal::Hertz systemClock;
-        controllers::PidTunings<float> speedPidTunings;
-        controllers::PidTunings<float> dqPidTunings;
+        float speedLoopBandwidth{ foc::SpeedLoopTunings{}.bandwidth };
+        float currentLoopBandwidth{ foc::CurrentLoopTunings{}.bandwidth };
         std::optional<std::size_t> polePairs = 0;
-        foc::FocSpeedImpl foc;
+        foc::SpeedCascade foc;
         hal::Eeprom& eeprom;
         std::array<uint8_t, 64> eepromBuffer{};
         uint32_t eepromCurrentReadSize{ 0 };

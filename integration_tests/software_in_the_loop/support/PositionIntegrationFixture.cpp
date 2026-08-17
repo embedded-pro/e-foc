@@ -18,6 +18,7 @@ namespace integration
         EXPECT_CALL(platformFactory, Set(_)).Times(AnyNumber());
         EXPECT_CALL(platformFactory, SetZero()).Times(AnyNumber());
         EXPECT_CALL(lowPriorityInterruptMock, Register(_)).Times(AnyNumber());
+        EXPECT_CALL(lowPriorityInterruptMock, Unregister()).Times(AnyNumber());
     }
 
     void PositionIntegrationFixture::ConstructWithInvalidNvm()
@@ -190,8 +191,7 @@ namespace integration
         data.rPhase = 0.5f;
         data.lD = 1.0f;
         data.lQ = 1.0f;
-        data.kpVelocity = 0.25f;
-        data.kiVelocity = 0.5f;
+        data.speedLoopBandwidth = 50.0f;
         return data;
     }
 }

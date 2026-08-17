@@ -2,8 +2,8 @@
   title: Runtime algorithm selection
   shall: >
     The system shall allow selection of the active control algorithm for each FOC
-    loop (current, speed, and position) at runtime via the CLI or CAN interface,
-    without requiring a firmware update or restart.
+    loop (current, speed, and position) at runtime via the CLI, without requiring
+    a firmware update or restart.
 
 - id: REQ-CTRL-002
   title: Algorithm selection permitted only when motor is stopped
@@ -18,12 +18,11 @@
   title: NACK response on rejected algorithm selection
   shall: >
     When an algorithm selection request is rejected because the motor is not stopped,
-    the system shall respond with a negative acknowledgment (NACK) on the interface
-    through which the request was received. A CAN SetControllerAlgorithm frame
-    shall be answered with a ControllerAlgorithmStatus frame carrying the Busy
-    result code. A CLI ctrl command shall print an error indicating the motor must
-    be stopped before changing the algorithm. In both cases the response shall be
-    delivered before any subsequent command is processed on that interface.
+    the system shall respond with a negative acknowledgment on the interface
+    through which the request was received. A CLI select command shall print an
+    error indicating the motor must be stopped before changing the algorithm. The
+    response shall be delivered before any subsequent command is processed on that
+    interface.
 
 - id: REQ-CTRL-004
   title: Heap-free algorithm storage
@@ -83,9 +82,8 @@
     algorithms, each valid only for the position loop: incremental PID, cascade
     proportional position controller (Cascade P) that outputs a speed reference
     to the speed loop, LQR state-feedback with DARE-computed gains, LQI with
-    position integral augmentation, two-degree-of-freedom position control
-    (Two-DOF), and Iterative Learning Control (ILC) for repetitive servo tasks.
-    All shall be selectable at runtime without recompilation.
+    position integral augmentation, and two-degree-of-freedom position control
+    (Two-DOF). All shall be selectable at runtime without recompilation.
 
 - id: REQ-CTRL-011
   title: Controller reset on selection
@@ -101,39 +99,15 @@
     Selection of any speed or position algorithm that requires mechanical parameters
     (LQI, ADRC, LQR for speed; LQR, LQI for position) shall be rejected with an
     InvalidParameters result code if the mechanical RLS identification has not been
-    completed and valid estimates of J and Bf are not available. PID, Two-DOF,
-    Cascade P, and ILC for position do not require mechanical RLS and shall remain
-    selectable before mechanical identification.
+    completed and valid estimates of J and Bf are not available. PID, Two-DOF and
+    Cascade P do not require mechanical RLS and shall remain selectable before
+    mechanical identification.
 
 - id: REQ-CTRL-013
   title: Active algorithm query
   shall: >
     The system shall provide a query interface to read the currently active
     algorithm identifier for each control loop. This query shall be available
-    via both the CLI (ctrl status command) and the CAN interface, and shall
-    reflect the algorithm that is currently dispatched in the ISR.
-
-- id: REQ-CTRL-014
-  title: Iterative Learning Control trial length
-  shall: >
-    When ILC is selected as the active position-loop algorithm, the operator shall
-    specify the trial length N in samples at selection time. The system shall
-    allocate a bounded, statically-sized array of N float values for the learned
-    correction signal at build time. The trial length shall not be changeable at
-    runtime; a new selection with a different N requires stopping the motor and
-    reissuing the select command. The maximum trial length N_max shall be a
-    build-time constant.
-
-- id: REQ-CTRL-015
-  title: Friction compensation augmentation
-  shall: >
-    The system shall provide a friction compensation feedforward augmentation that
-    can be independently enabled or disabled regardless of the active speed or
-    position algorithm. When enabled, a nonlinear Coulomb and Stribeck friction
-    model shall compute an additional Iq feedforward correction added to the speed
-    or position controller output before it enters the current loop. The friction
-    compensation enable state and its parameters shall be persisted to NVM. Enabling
-    friction compensation shall be rejected with a NACK (same condition as
-    REQ-CTRL-003) while the motor is running. Friction compensation shall not be
-    available until the friction identification parameters (Tc, Ts, omega_st) have
-    been stored via a dedicated friction identification step.
+    via the CLI (active_algorithms command) and shall reflect the algorithm that
+    is currently dispatched in the ISR, not the value most recently requested or
+    persisted.

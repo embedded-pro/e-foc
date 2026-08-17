@@ -1,8 +1,8 @@
 #pragma once
 
-#include "numerical/estimators/Estimator.hpp"
-#include "core/foc/interfaces/Driver.hpp"
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "numerical/estimators/Estimator.hpp"
 
 namespace services
 {

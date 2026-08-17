@@ -1,6 +1,7 @@
 #pragma once
 
-#include "core/foc/interfaces/Driver.hpp"
+#include "core/foc/interfaces/Execution.hpp"
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"

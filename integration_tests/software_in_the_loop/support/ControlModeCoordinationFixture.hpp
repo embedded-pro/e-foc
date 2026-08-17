@@ -3,10 +3,11 @@
 #include "can-lite/categories/foc_motor/FocMotorCategoryServer.hpp"
 #include "can-lite/core/CanFrameTransport.hpp"
 #include "can-lite/core/test/CanMock.hpp"
-#include "core/foc/implementations/FocPositionImpl.hpp"
-#include "core/foc/implementations/FocSpeedImpl.hpp"
-#include "core/foc/implementations/FocTorqueImpl.hpp"
-#include "core/foc/implementations/test_doubles/DriversMock.hpp"
+#include "core/foc/cascade/PositionCascade.hpp"
+#include "core/foc/cascade/SpeedCascade.hpp"
+#include "core/foc/cascade/TorqueCascade.hpp"
+#include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
+#include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/mechanical_system_ident/test_doubles/MechanicalParametersIdentificationMock.hpp"
@@ -54,7 +55,6 @@ namespace integration
         // CanCommandAcknowledger
         void SendCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status) override;
 
-        // Helper: dispatch a message through the motor category server and emit ACK like CanProtocolServer would.
         void DispatchToMotor(uint8_t messageType, const hal::Can::Message& data);
 
         static services::CalibrationData MakeDefaultCalibrationData();
@@ -64,7 +64,7 @@ namespace integration
         testing::StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterMock };
         services::TracerToStream tracer{ tracerStream };
-        hal::SerialCommunicationMock serialCommunication;
+        testing::StrictMock<hal::SerialCommunicationMock> serialCommunication;
         infra::Execute setupInfraExpectations{ [this]()
             {
                 using namespace testing;

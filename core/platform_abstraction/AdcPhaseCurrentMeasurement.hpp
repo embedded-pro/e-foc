@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/foc/interfaces/Driver.hpp"
+#include "core/foc/interfaces/Units.hpp"
 #include "hal/interfaces/AdcMultiChannel.hpp"
 #include <concepts>
 #include <utility>
@@ -32,8 +32,6 @@ namespace application
         float offset = 0.0f;
         infra::Function<void(foc::Ampere phaseA, foc::Ampere phaseB, foc::Ampere phaseC)> onMeasurementDone;
     };
-
-    // Implementation
 
     template<typename Impl>
     requires std::derived_from<Impl, hal::AdcMultiChannel>

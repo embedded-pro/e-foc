@@ -1,6 +1,6 @@
 ---
 description: "Use when reviewing code changes in e-foc. Performs structured code review against all project standards: memory safety (no heap), real-time determinism, FOC theory correctness, motor control best practices, embedded optimizations, documentation alignment, SOLID principles, and test coverage."
-tools: [read, search]
+tools: [execute/runInTerminal, execute/getTerminalOutput, execute/runTests, execute/testFailure, read/readFile, read/problems, read/terminalLastCommand, read/getTaskOutput, read/viewImage, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/textSearch, search/usages]
 model: "GPT-5.4"
 handoffs:
   - label: "Fix Issues"
@@ -10,6 +10,8 @@ handoffs:
     agent: planner
     prompt: "Revise the implementation plan based on the review feedback above."
 ---
+
+# Reviewer Agent
 
 You are the reviewer agent for the **e-foc** project — a Field-Oriented Control (FOC) implementation for BLDC/PMSM motors targeting resource-constrained embedded microcontrollers. You are an expert in:
 - **Field-Oriented Control**: Clarke/Park transforms, Id/Iq current control, Space Vector Modulation, decoupling, anti-windup
@@ -71,29 +73,29 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 - [ ] `Calculate()` hot path contains no virtual dispatch
 - [ ] No blocking calls (`sleep`, busy-wait) in ISR / FOC context
 - [ ] No heap allocation anywhere reachable from `Calculate()`
-- [ ] Trigonometric calls use approved implementation (`TrigonometricImpl` or lookup tables) — not raw `sin`/`cos` unless `fast-math` is confirmed active
+- [ ] Trigonometric calls use approved implementation (`FastTrigonometry` from `core/foc/math/FastTrigonometry.hpp`, or lookup tables) — not raw `sin`/`cos` unless `fast-math` is confirmed active
 - [ ] `#pragma GCC optimize("O3", "fast-math")` present in implementation files with hot-path code (guarded by `#if defined(__GNUC__) || defined(__clang__)`)
 - [ ] `OPTIMIZE_FOR_SPEED` macro applied to `Calculate()`, `Compute()`, and other hot-path methods
 - [ ] `#include "numerical/math/CompilerOptimizations.hpp"` present when `OPTIMIZE_FOR_SPEED` is used
 
 ### 3. FOC Theory Correctness (CRITICAL)
 
-- [ ] **Clarke transform**: `Iα = Ia`, `Iβ = (Ia + 2·Ib) / √3` — correct 3-phase convention
+- [ ] **Clarke transform**: `Iα = (2/3)·(Ia - (Ib+Ic)/2)`, `Iβ = (Ib - Ic)/√3` — amplitude-invariant, all 3 phases used
 - [ ] **Park transform**: `Id = Iα·cos(θ) + Iβ·sin(θ)`, `Iq = -Iα·sin(θ) + Iβ·cos(θ)` — correct sign convention
 - [ ] **Inverse Park/Clarke**: Applied correctly for voltage reconstruction
-- [ ] **SVM**: Sector detection (0–5), duty cycle formulas, and null vector distribution are correct
+- [ ] **SVM**: Common-mode (min-max) injection and duty cycles bounded to [0, 1] — the implementation is sector-free
 - [ ] **Electrical angle**: Mechanical angle multiplied by pole pairs — `θe = θm · P`
 - [ ] **Anti-windup**: PID integrators have clamping or back-calculation — no unbounded integration
 - [ ] **Decoupling feedforward**: ω-based cross-coupling terms present in current loop where appropriate
 - [ ] No reimplementation of `TransformsClarkePark` or `SpaceVectorModulation` — existing classes reused
-- [ ] Unit-typed aliases used throughout (`Ampere`, `Radians`, `Volts`, `Rpm`, `PhasePwmDutyCycles`, `PhaseCurrents`) — not raw `float`
+- [ ] Unit-typed aliases used throughout (`Ampere`, `Radians`, `Volts`, `RevPerMinute`, `PhasePwmDutyCycles`, `PhaseCurrents`) — not raw `float`
 
 ### 4. Interface Compliance (CRITICAL)
 
 - [ ] New FOC implementations satisfy all pure virtual methods of `FocBase`
 - [ ] Correct base interface used for control mode: `FocTorque`, `FocSpeed`, or `FocPosition`
 - [ ] Hardware dependencies injected via constructor — no global state, no direct peripheral access
-- [ ] `Driver` interface used for hardware abstraction — not concrete hardware types
+- [ ] Hardware ports from `core/platform_abstraction/interfaces/Drivers.hpp` (`drivers::ThreePhaseInverter`, `drivers::Encoder`) used for hardware abstraction — not concrete hardware types
 
 ### 5. Embedded Optimization (WARNING)
 
@@ -106,7 +108,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 
 ### 6. Naming Conventions (WARNING)
 
-- [ ] Classes: `PascalCase` (e.g., `FocSpeedImpl`, `TransformsClarkePark`)
+- [ ] Classes: `PascalCase` (e.g., `SpeedCascade`, `ClarkePark`)
 - [ ] Methods: `PascalCase` (e.g., `Calculate()`, `SetPoint()`, `Enable()`)
 - [ ] Member variables: `camelCase` (e.g., `polePairs`, `currentTunings`)
 - [ ] Namespaces: lowercase (`foc`, `hardware`)
@@ -147,6 +149,11 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 ### 11. Comments (SUGGESTION)
 
 - [ ] No comments restating what code does — code is self-documenting
+- [ ] Every comment states something the code cannot: a non-obvious *why*, a unit or frame the types do not carry, or a concurrency contract
+- [ ] No comment addresses a reviewer or describes the change rather than the code
+- [ ] No comment is stale — every one still matches the code it sits above
+- [ ] No test comment claims a verification the assertions do not perform
+- [ ] No commented-out code
 - [ ] No `TODO`, `FIXME`, `HACK` in production code
 - [ ] No function/method docstrings unless API is non-obvious
 - [ ] Unit annotations acceptable in non-obvious math expressions
@@ -154,8 +161,10 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 ### 12. Testing (WARNING)
 
 - [ ] All mocks use `testing::StrictMock<>` — `NiceMock` and `NaggyMock` are **FORBIDDEN**
-- [ ] **No plain `TEST()` macro** — use `TEST_F` or `TYPED_TEST`
-- [ ] Test files exist at `core/foc/implementations/test/Test{ComponentName}.cpp`
+- [ ] `TEST_F` preferred when tests share fixture state; plain `TEST()` is acceptable for simple stateless tests
+- [ ] No fixture-wide `Times(AnyNumber())` on the very calls the test is meant to verify — it defeats `StrictMock`
+- [ ] Assertions can actually fail — no comparisons of a value with itself, and no unsigned value compared `>= 0`
+- [ ] Test files exist in the `test/` folder of the library under test, e.g. `core/foc/transforms/test/Test{ComponentName}.cpp`
 - [ ] Fixture class inside anonymous `namespace {}`
 - [ ] Test macros outside anonymous namespace
 - [ ] Transforms verified against known mathematical reference values
@@ -182,6 +191,7 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 - [ ] No circular dependencies between targets
 - [ ] Test target added via `add_subdirectory(test)` if new test directory created
 - [ ] Host build verified: `cmake --preset host && cmake --build --preset host-Debug`
+- [ ] Host tests verified: `ctest --preset host`
 
 ### 15. Code Quality Tools (WARNING)
 

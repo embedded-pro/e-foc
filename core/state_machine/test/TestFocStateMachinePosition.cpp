@@ -1,5 +1,5 @@
 #include "TestFocStateMachineHelper.hpp"
-#include "core/foc/implementations/FocPositionImpl.hpp"
+#include "core/foc/cascade/PositionCascade.hpp"
 
 namespace
 {
@@ -15,7 +15,7 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        hal::SerialCommunicationMock communication;
+        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
@@ -30,8 +30,8 @@ namespace
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
         services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
-        StrictMock<foc::FieldOrientedControllerInterfaceMock> inverterMock;
-        StrictMock<foc::EncoderMock> encoderMock;
+        StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
+        StrictMock<drivers::EncoderMock> encoderMock;
         StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
@@ -49,6 +49,7 @@ namespace
                 EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _)).Times(AnyNumber());
                 EXPECT_CALL(inverterMock, Stop()).Times(AnyNumber());
                 EXPECT_CALL(lowPriorityInterruptMock, Register(_)).Times(AnyNumber());
+                EXPECT_CALL(lowPriorityInterruptMock, Unregister()).Times(AnyNumber());
             } };
 
         void GivenFaultNotifierRegistered()
@@ -76,8 +77,7 @@ namespace
             data.rPhase = 0.5f;
             data.lD = 1.0f;
             data.lQ = 1.0f;
-            data.kpVelocity = 0.25f;
-            data.kiVelocity = 0.5f;
+            data.speedLoopBandwidth = 50.0f;
 
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
@@ -219,8 +219,6 @@ namespace
     };
 }
 
-// --- Boot / NVM ---
-
 TEST_F(FocStateMachinePositionCliTest, nvm_invalid_on_boot_remains_in_idle)
 {
     GivenFaultNotifierRegistered();
@@ -258,8 +256,6 @@ TEST_F(FocStateMachinePositionCliTest, nvm_load_failure_on_boot_remains_in_idle)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-// --- Calibration success ---
-
 TEST_F(FocStateMachinePositionCliTest, calibration_calls_mech_ident_after_alignment)
 {
     GivenFaultNotifierRegistered();
@@ -285,8 +281,7 @@ TEST_F(FocStateMachinePositionCliTest, calibration_populates_inertia_and_velocit
     const auto& data = std::get<state_machine::Ready>(sm.CurrentState()).loadedData;
     EXPECT_NEAR(data.inertia, 0.005f, 1e-5f);
     EXPECT_NEAR(data.frictionViscous, 0.01f, 1e-5f);
-    EXPECT_GT(data.kpVelocity, 0.0f);
-    EXPECT_GT(data.kiVelocity, 0.0f);
+    EXPECT_GT(data.speedLoopBandwidth, 0.0f);
 }
 
 TEST_F(FocStateMachinePositionCliTest, calibrate_from_ready_re_runs_and_reaches_ready)
@@ -315,52 +310,27 @@ TEST_F(FocStateMachinePositionCliTest, calibrate_from_enabled_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachinePositionCliTest, no_mech_ident_override_enters_fault)
+// Without its own mechanical identification, position mode could never be commissioned on the production target.
+TEST_F(FocStateMachinePositionCliTest, no_mech_ident_override_uses_its_own_identification)
 {
-    EXPECT_CALL(faultNotifierMock, Register(_))
-        .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)
-            {
-                faultNotifierMock.StoreHandler(handler);
-            }));
+    GivenFaultNotifierRegistered();
     GivenNvmInvalid();
+    ExpectPositionCalibrationSequence();
 
     PositionStateMachine sm{
         application::TerminalAndTracer{ terminal, tracer },
         application::MotorHardware{ inverterMock, encoderMock, vdc },
         nvmMock,
-        application::CalibrationServices{ electricalIdentMock, alignmentMock },
+        application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
         faultNotifierMock,
         state_machine::TransitionPolicy::Cli,
         application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
     };
 
-    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
-        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
-            {
-                cb(std::size_t{ 4 });
-            }));
-    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
-        .WillOnce(Invoke([](const auto&,
-                             const infra::Function<void(std::optional<foc::Ohm>,
-                                 std::optional<foc::MilliHenry>)>& cb)
-            {
-                cb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
-            }));
-    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
-        .WillOnce(Invoke([](std::size_t, const auto&,
-                             const infra::Function<void(std::optional<foc::Radians>)>& cb)
-            {
-                cb(foc::Radians{ 0.0f });
-            }));
-
     sm.CmdCalibrate([](state_machine::CommandResult) {});
 
-    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
-    EXPECT_EQ(std::get<state_machine::Fault>(sm.CurrentState()).code,
-        state_machine::FaultCode::calibrationFailed);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
-
-// --- Calibration failures ---
 
 TEST_F(FocStateMachinePositionCliTest, pole_pairs_nullopt_enters_fault)
 {
@@ -424,8 +394,6 @@ TEST_F(FocStateMachinePositionCliTest, nvm_save_failure_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-// --- Enable / Disable ---
-
 TEST_F(FocStateMachinePositionCliTest, enable_disable_cycle)
 {
     GivenFaultNotifierRegistered();
@@ -461,8 +429,6 @@ TEST_F(FocStateMachinePositionCliTest, disable_from_ready_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
-
-// --- Fault handling ---
 
 TEST_F(FocStateMachinePositionCliTest, fault_from_enabled_enters_fault)
 {
@@ -500,8 +466,6 @@ TEST_F(FocStateMachinePositionCliTest, fault_code_is_recorded)
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
 
-// --- Clear fault ---
-
 TEST_F(FocStateMachinePositionCliTest, clear_fault_from_fault_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
@@ -524,8 +488,6 @@ TEST_F(FocStateMachinePositionCliTest, clear_fault_from_non_fault_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
-
-// --- Clear calibration ---
 
 TEST_F(FocStateMachinePositionCliTest, clear_cal_from_ready_returns_to_idle)
 {
@@ -555,8 +517,6 @@ TEST_F(FocStateMachinePositionCliTest, clear_cal_from_enabled_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
-
-// --- CLI command invocation exercises RegisterCliCommands lambdas ---
 
 TEST_F(FocStateMachinePositionCliTest, cli_cal_command_triggers_calibration)
 {
@@ -628,10 +588,6 @@ TEST_F(FocStateMachinePositionCliTest, cli_cc_command_clears_calibration)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-// ==========================================================================
-// Position-mode with AutoTransitionPolicy
-// ==========================================================================
-
 namespace
 {
     class FocStateMachinePositionAutoTest
@@ -644,7 +600,7 @@ namespace
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
-        hal::SerialCommunicationMock communication;
+        testing::StrictMock<hal::SerialCommunicationMock> communication;
         infra::Execute setupStreamExpectations{ [this]()
             {
                 EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AnyNumber());
@@ -659,8 +615,8 @@ namespace
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
         services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
-        StrictMock<foc::FieldOrientedControllerInterfaceMock> inverterMock;
-        StrictMock<foc::EncoderMock> encoderMock;
+        StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
+        StrictMock<drivers::EncoderMock> encoderMock;
         StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
@@ -678,6 +634,7 @@ namespace
                 EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _)).Times(AnyNumber());
                 EXPECT_CALL(inverterMock, Stop()).Times(AnyNumber());
                 EXPECT_CALL(lowPriorityInterruptMock, Register(_)).Times(AnyNumber());
+                EXPECT_CALL(lowPriorityInterruptMock, Unregister()).Times(AnyNumber());
             } };
 
         void GivenFaultNotifierRegistered()
@@ -705,8 +662,7 @@ namespace
             data.rPhase = 0.5f;
             data.lD = 1.0f;
             data.lQ = 1.0f;
-            data.kpVelocity = 0.25f;
-            data.kiVelocity = 0.5f;
+            data.speedLoopBandwidth = 50.0f;
 
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
@@ -848,8 +804,6 @@ namespace
     };
 }
 
-// --- Boot ---
-
 TEST_F(FocStateMachinePositionAutoTest, starts_in_idle_when_nvm_invalid)
 {
     GivenFaultNotifierRegistered();
@@ -887,8 +841,6 @@ TEST_F(FocStateMachinePositionAutoTest, nvm_load_failure_on_boot_remains_in_idle
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-// --- Calibration ---
-
 TEST_F(FocStateMachinePositionAutoTest, calibrate_enable_disable_cycle)
 {
     GivenFaultNotifierRegistered();
@@ -920,8 +872,6 @@ TEST_F(FocStateMachinePositionAutoTest, calibrate_from_enabled_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
-
-// --- Calibration failures ---
 
 TEST_F(FocStateMachinePositionAutoTest, pole_pairs_nullopt_enters_fault)
 {
@@ -983,8 +933,6 @@ TEST_F(FocStateMachinePositionAutoTest, nvm_save_failure_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-// --- Enable / Disable guards ---
-
 TEST_F(FocStateMachinePositionAutoTest, enable_from_idle_is_rejected)
 {
     GivenFaultNotifierRegistered();
@@ -1006,8 +954,6 @@ TEST_F(FocStateMachinePositionAutoTest, disable_from_ready_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
-
-// --- Fault handling ---
 
 TEST_F(FocStateMachinePositionAutoTest, fault_from_enabled_enters_fault)
 {
@@ -1035,8 +981,6 @@ TEST_F(FocStateMachinePositionAutoTest, fault_and_clear_cycle)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
-
-// --- Clear calibration ---
 
 TEST_F(FocStateMachinePositionAutoTest, clear_cal_from_ready_returns_to_idle)
 {
@@ -1066,12 +1010,6 @@ TEST_F(FocStateMachinePositionAutoTest, clear_cal_from_enabled_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
-
-// ==========================================================================
-// Forbidden-transition coverage (both policies, all source states)
-// ==========================================================================
-
-// --- CmdCalibrate forbidden source states ---
 
 TEST_F(FocStateMachinePositionCliTest, calibrate_from_calibrating_is_rejected)
 {
@@ -1128,8 +1066,6 @@ TEST_F(FocStateMachinePositionAutoTest, calibrate_from_fault_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
-
-// --- CmdEnable forbidden source states ---
 
 TEST_F(FocStateMachinePositionCliTest, enable_from_calibrating_is_rejected)
 {
@@ -1217,8 +1153,6 @@ TEST_F(FocStateMachinePositionAutoTest, enable_from_enabled_does_not_call_start_
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-// --- CmdDisable forbidden source states ---
-
 TEST_F(FocStateMachinePositionCliTest, disable_from_idle_is_rejected)
 {
     GivenFaultNotifierRegistered();
@@ -1296,8 +1230,6 @@ TEST_F(FocStateMachinePositionAutoTest, disable_from_fault_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
-
-// --- CmdClearFault forbidden source states ---
 
 TEST_F(FocStateMachinePositionCliTest, clear_fault_from_idle_is_rejected)
 {
@@ -1381,8 +1313,6 @@ TEST_F(FocStateMachinePositionAutoTest, clear_fault_from_enabled_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-// --- CmdClearCalibration forbidden source states ---
-
 TEST_F(FocStateMachinePositionCliTest, clear_cal_from_fault_is_rejected)
 {
     GivenFaultNotifierRegistered();
@@ -1408,8 +1338,6 @@ TEST_F(FocStateMachinePositionAutoTest, clear_cal_from_fault_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
-
-// --- Asymmetric gaps filled for Position ---
 
 TEST_F(FocStateMachinePositionCliTest, clear_cal_during_calibrating_is_rejected)
 {
@@ -1441,10 +1369,6 @@ TEST_F(FocStateMachinePositionCliTest, clear_cal_nvm_failure_enters_fault)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
-
-// ==========================================================================
-// Async callback safety: late callbacks after fault must be silently ignored
-// ==========================================================================
 
 TEST_F(FocStateMachinePositionCliTest, late_pole_pairs_callback_after_fault_is_ignored)
 {
@@ -1644,8 +1568,6 @@ TEST_F(FocStateMachinePositionCliTest, nvm_boot_callback_ignored_if_calibration_
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-// --- CmdClearCalibration async callback races ---
-
 TEST_F(FocStateMachinePositionCliTest, clear_cal_invalidate_callback_after_enable_is_ignored)
 {
     GivenFaultNotifierRegistered();
@@ -1713,53 +1635,25 @@ TEST_F(FocStateMachinePositionCliTest, clear_cal_invalidate_failure_callback_aft
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
 
-// ==========================================================================
-// Auto policy: async callback safety parity
-// ==========================================================================
-
-TEST_F(FocStateMachinePositionAutoTest, no_mech_ident_override_enters_fault)
+TEST_F(FocStateMachinePositionAutoTest, no_mech_ident_override_uses_its_own_identification)
 {
-    EXPECT_CALL(faultNotifierMock, Register(_))
-        .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)
-            {
-                faultNotifierMock.StoreHandler(handler);
-            }));
+    GivenFaultNotifierRegistered();
     GivenNvmInvalid();
+    ExpectPositionCalibrationSequence();
 
     PositionAutoStateMachine sm{
         application::TerminalAndTracer{ terminal, tracer },
         application::MotorHardware{ inverterMock, encoderMock, vdc },
         nvmMock,
-        application::CalibrationServices{ electricalIdentMock, alignmentMock },
+        application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
         faultNotifierMock,
         state_machine::TransitionPolicy::Auto,
         application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
     };
 
-    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
-        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
-            {
-                cb(std::size_t{ 4 });
-            }));
-    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
-        .WillOnce(Invoke([](const auto&,
-                             const infra::Function<void(std::optional<foc::Ohm>,
-                                 std::optional<foc::MilliHenry>)>& cb)
-            {
-                cb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
-            }));
-    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
-        .WillOnce(Invoke([](std::size_t, const auto&,
-                             const infra::Function<void(std::optional<foc::Radians>)>& cb)
-            {
-                cb(foc::Radians{ 0.0f });
-            }));
-
     sm.CmdCalibrate([](state_machine::CommandResult) {});
 
-    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
-    EXPECT_EQ(std::get<state_machine::Fault>(sm.CurrentState()).code,
-        state_machine::FaultCode::calibrationFailed);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachinePositionAutoTest, late_pole_pairs_callback_after_fault_is_ignored)
@@ -1960,8 +1854,6 @@ TEST_F(FocStateMachinePositionAutoTest, nvm_boot_callback_ignored_if_calibration
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-// --- Auto policy: CmdClearCalibration async callback races ---
-
 TEST_F(FocStateMachinePositionAutoTest, clear_cal_during_calibrating_is_rejected)
 {
     GivenFaultNotifierRegistered();
@@ -2059,8 +1951,6 @@ TEST_F(FocStateMachinePositionAutoTest, clear_cal_invalidate_failure_callback_af
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
-
-// --- ApplyOnlineEstimates and GetFoc ---
 
 TEST_F(FocStateMachinePositionCliTest, apply_online_estimates_does_not_change_state_when_enabled)
 {

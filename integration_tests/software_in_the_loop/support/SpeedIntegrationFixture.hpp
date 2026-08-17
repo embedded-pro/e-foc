@@ -4,8 +4,9 @@
 #include "can-lite/core/CanCategory.hpp"
 #include "can-lite/core/CanFrameTransport.hpp"
 #include "can-lite/core/test/CanMock.hpp"
-#include "core/foc/implementations/FocSpeedImpl.hpp"
-#include "core/foc/implementations/test_doubles/DriversMock.hpp"
+#include "core/foc/cascade/SpeedCascade.hpp"
+#include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
+#include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/mechanical_system_ident/test_doubles/MechanicalParametersIdentificationMock.hpp"
@@ -64,7 +65,7 @@ namespace integration
         testing::StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterMock };
         services::TracerToStream tracer{ tracerStream };
-        hal::SerialCommunicationMock serialCommunication;
+        testing::StrictMock<hal::SerialCommunicationMock> serialCommunication;
         infra::Execute setupInfraExpectations{ [this]()
             {
                 using namespace testing;

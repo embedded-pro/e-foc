@@ -1,6 +1,6 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
-#include "core/foc/implementations/TrigonometricImpl.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/foc/math/FastTrigonometry.hpp"
 #include <cmath>
 #include <numbers>
 
@@ -12,11 +12,11 @@ namespace
 
 namespace services
 {
-    MechanicalParametersIdentificationImpl::MechanicalParametersIdentificationImpl(foc::FocSpeed& controller, foc::ThreePhaseInverter& driver, foc::Encoder& encoder)
+    MechanicalParametersIdentificationImpl::MechanicalParametersIdentificationImpl(foc::SpeedCommandable& controller, drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder)
         : controller(controller)
         , driver(driver)
         , encoder(encoder)
-        , samplingPeriod(1.0f / static_cast<float>(controller.OuterLoopFrequency().Value()))
+        , samplingPeriod(1.0f / static_cast<float>(controller.SpeedCommandFrequency().Value()))
     {
     }
 
@@ -30,8 +30,8 @@ namespace services
 
         rls.emplace(1000.0f, config.forgettingFactor);
 
-        controller.Enable();
-        controller.SetPoint(config.targetSpeed);
+        controller.EnableSpeedCommand();
+        controller.CommandSpeed(config.targetSpeed);
 
         driver.PhaseCurrentsReady(hal::Hertz{ 10000 }, [this, torqueConstant](auto currents)
             {

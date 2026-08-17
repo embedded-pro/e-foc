@@ -41,7 +41,12 @@ date: 2026-04-13
 
 A naked assembly trampoline runs in HardFault exception context before any C function prologue executes. It determines whether the exception was entered from thread mode (using PSP as the stack pointer) or from handler mode (using MSP), then passes the correct stack frame pointer to the C-level capture routine.
 
-The capture routine writes all eight words of the ARM exception stack frame (R0–R3, R12, LR, PC, xPSR) plus three Cortex-M fault status registers (CFSR, MMFAR, BFAR) into the persistent region. It also scans the stack above the exception frame and records any word whose value falls within the `.text` section as a probable return address — this constitutes the backtrace. A validity sentinel is written last; this is the atomic commit point. If the MCU loses power or watchdog-resets mid-write, an incomplete capture is detected and discarded on the next boot.
+The capture routine writes all eight words of the ARM exception stack frame (R0–R3, R12, LR, PC, xPSR) plus
+three Cortex-M fault status registers (CFSR, MMFAR, BFAR) into the persistent region. It also scans the stack
+above the exception frame and records any word whose value falls within the `.text` section as a probable
+return address — this constitutes the backtrace. A validity sentinel is written last; this is the atomic
+commit point. If the MCU loses power or watchdog-resets mid-write, an incomplete capture is detected and
+discarded on the next boot.
 
 After capture, the handler calls `abort()`, which the platform startup maps to `NVIC_SystemReset()`.
 
@@ -55,7 +60,11 @@ Each platform's `PlatformFactoryImpl` reads the hardware-specific reset status r
 
 ### Boot-time CLI reporting
 
-The CLI banner reads both the reset cause and any pending fault snapshot from `PlatformFactory` during construction. If a valid snapshot exists, it is formatted into a human-readable string and the validity sentinel is cleared immediately after formatting, so the snapshot is consumed at most once. The formatted string is retained for the lifetime of the application for later `fault_status` CLI queries. The banner prints the reset cause unconditionally and surrounds fault data with visible delimiters.
+The CLI banner reads both the reset cause and any pending fault snapshot from `PlatformFactory` during
+construction. If a valid snapshot exists, it is formatted into a human-readable string and the validity
+sentinel is cleared immediately after formatting, so the snapshot is consumed at most once. The formatted
+string is retained for the lifetime of the application for later `fault_status` CLI queries. The banner prints
+the reset cause unconditionally and surrounds fault data with visible delimiters.
 
 ---
 

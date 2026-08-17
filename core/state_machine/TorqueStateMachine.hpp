@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/foc/implementations/WithAutomaticCurrentPidGains.hpp"
 #include "core/foc/instantiations/FocController.hpp"
 #include "core/state_machine/FocStateMachineCommon.hpp"
 
@@ -18,15 +17,15 @@ namespace application
             state_machine::TransitionPolicy transitionPolicy);
 
         foc::FocTorque& GetController();
+        const foc::FocTorque& GetController() const;
 
     protected:
         foc::FocBase& GetFoc() override;
         foc::Controllable& GetFocControl() override;
         void RunPostAlignmentStep() override;
-        foc::WithAutomaticCurrentPidGains& GetCurrentLoopTuner() override;
+        foc::CurrentLoopTunable& CurrentTunable() override;
 
     private:
         foc::FocTorqueController focController;
-        foc::WithAutomaticCurrentPidGains pidAutoTuner;
     };
 }

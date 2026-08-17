@@ -2,7 +2,9 @@
 
 #include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
+#include "core/state_machine/FocStateMachine.hpp"
 #include <cstdint>
+#include <optional>
 
 namespace state_machine
 {
@@ -49,18 +51,19 @@ namespace state_machine
         }
     }
 
-    inline ControlMode FromCanMode(services::FocMotorMode mode)
+    inline std::optional<ControlMode> FromCanMode(services::FocMotorMode mode)
     {
         switch (mode)
         {
+            case services::FocMotorMode::torque:
+                return ControlMode::torque;
             case services::FocMotorMode::speed:
                 return ControlMode::speed;
             case services::FocMotorMode::position:
                 return ControlMode::position;
-            case services::FocMotorMode::torque:
-            default:
-                return ControlMode::torque;
         }
+
+        return std::nullopt;
     }
 
     inline services::CanAckStatus ToAckStatus(SelectResult result)
@@ -87,6 +90,22 @@ namespace state_machine
             case SelectResult::busy:
             default:
                 return services::FocMotorCategoryError::busy;
+        }
+    }
+
+    inline services::FocMotorCategoryError ToCategoryError(CommandResult result)
+    {
+        switch (result)
+        {
+            case CommandResult::calibrationFailed:
+                return services::FocMotorCategoryError::calibrationFailed;
+            case CommandResult::nvmFailed:
+                return services::FocMotorCategoryError::persistenceFailed;
+            case CommandResult::abortedByFault:
+                return services::FocMotorCategoryError::abortedByFault;
+            case CommandResult::rejected:
+            default:
+                return services::FocMotorCategoryError::modeMismatch;
         }
     }
 }

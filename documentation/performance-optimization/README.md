@@ -20,9 +20,10 @@ date: 2026-04-07
 
 Real-time motor control firmware must meet strict cycle-count deadlines at every control-loop iteration.
 On an ARM Cortex-M4F running at 120 MHz with a 20 kHz FOC loop, the complete ISR computation budget is
-6 000 cycles — fewer than 400 of which should be consumed by the FOC core (Clarke, Park, two PI
-controllers, inverse Park, SVM). Violating this budget causes PWM update skips, current ripple, and
-control instability.
+6 000 cycles, of which no more than 4 500 (75%) may be consumed by the inner-loop path (Clarke, Park,
+current controller, inverse Park, SVM). The 1 kHz outer loop has its own 20 000-cycle deadline. Both
+are enforced in CI. Violating either budget causes PWM update skips, current ripple, and control
+instability.
 
 This document describes the compiler and code-level techniques used to keep the FOC path within budget,
 how to measure and verify cycle usage, and the common patterns that silently erode performance.
@@ -349,16 +350,16 @@ GPIO_ClearPin(DEBUG_PIN);
 
 ### Control Loop Cycle Budgets — ARM Cortex-M4 at 120 MHz
 
-| Control Rate | Cycles/Period | FOC Budget (< 7 %) | Notes                          |
-|--------------|---------------|--------------------|--------------------------------|
-| 10 kHz       | 12 000        | 840                | Low-frequency, conservative    |
-| 20 kHz       | 6 000         | **420**            | Target rate for this project   |
-| 40 kHz       | 3 000         | 210                | High performance, tight budget |
-| 100 kHz      | 1 200         | 84                 | Requires fixed-point or DSP    |
+| Control Rate | Cycles/Period | Inner-Loop Budget (75 %) | Notes                          |
+|--------------|---------------|--------------------------|--------------------------------|
+| 10 kHz       | 12 000        | 9 000                    | Low-frequency, conservative    |
+| 20 kHz       | 6 000         | **4 500**                | Target rate for this project   |
+| 40 kHz       | 3 000         | 2 250                    | High performance, tight budget |
+| 100 kHz      | 1 200         | 900                      | Requires fixed-point or DSP    |
 
-**FOC core typical requirements**:
-- Optimised (`-O3`, `fast-math`, LUT sin/cos): **200–400 cycles**
-- Non-optimised (`-O0`, `sinf/cosf` calls): **800–1500 cycles**
+**Measured inner-loop cost** (`EK-TM4C1294XL`, `-O3`, `fast-math`, LUT sin/cos): **1074–1353 cycles**,
+of which the FOC calculation itself is 739–860 — roughly 23 % of the 20 kHz period. A non-optimised
+build (`-O0`, `sinf`/`cosf` calls) costs several times that and does not fit.
 
 ### Key Performance Sensitivities
 

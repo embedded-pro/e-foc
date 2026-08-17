@@ -1,4 +1,4 @@
-#include "core/foc/implementations/test_doubles/FocMock.hpp"
+#include "core/foc/interfaces/test_doubles/FocMock.hpp"
 #include "core/services/cli/TerminalPosition.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
@@ -28,7 +28,7 @@ namespace
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
         services::TerminalWithStorage::WithMaxSize<10> terminal{ terminalWithCommands, tracer };
-        services::TerminalFocPositionInteractor terminalInteractor{ terminal, foc::Volts{ 12.0f }, focMock };
+        services::TerminalFocPositionInteractor terminalInteractor{ terminal, focMock };
 
         void InvokeCommand(std::string command, const std::function<void()>& onCommandReceived)
         {
@@ -58,39 +58,29 @@ namespace
     };
 }
 
-TEST_F(TerminalPositionTest, set_speed_pid)
+TEST_F(TerminalPositionTest, set_speed_bandwidth)
 {
-    InvokeCommand("sspid 0.5 0.1 0.01", [this]()
+    InvokeCommand("ssbw 188.5", [this]()
         {
-            EXPECT_CALL(focMock, SetSpeedTunings(testing::_, testing::_));
+            EXPECT_CALL(focMock, SetSpeedTunings(testing::_));
         });
 
     ExecuteAllActions();
 }
 
-TEST_F(TerminalPositionTest, set_speed_pid_invalid_argument_count)
+TEST_F(TerminalPositionTest, set_speed_bandwidth_invalid_argument_count)
 {
-    InvokeCommand("set_speed_pid 0.5 0.1", [this]()
+    InvokeCommand("set_speed_bandwidth 188.5 1.0", [this]()
         {
-            ExpectError("invalid number of arguments");
+            ExpectError("invalid number of arguments.");
         });
 
     ExecuteAllActions();
 }
 
-TEST_F(TerminalPositionTest, set_speed_pid_invalid_kp)
+TEST_F(TerminalPositionTest, set_speed_bandwidth_invalid_value)
 {
-    InvokeCommand("set_speed_pid abc 0.1 0.01", [this]()
-        {
-            ExpectError("invalid value. It should be a float.");
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalPositionTest, set_speed_pid_invalid_ki)
-{
-    InvokeCommand("set_speed_pid 0.5 abc 0.01", [this]()
+    InvokeCommand("set_speed_bandwidth abc", [this]()
         {
             ExpectError("invalid value. It should be a float.");
         });
@@ -98,19 +88,9 @@ TEST_F(TerminalPositionTest, set_speed_pid_invalid_ki)
     ExecuteAllActions();
 }
 
-TEST_F(TerminalPositionTest, set_speed_pid_invalid_kd)
+TEST_F(TerminalPositionTest, set_position_bandwidth)
 {
-    InvokeCommand("set_speed_pid 0.5 0.1 abc", [this]()
-        {
-            ExpectError("invalid value. It should be a float.");
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalPositionTest, set_position_pid)
-{
-    InvokeCommand("sppid 5.0 0.1 0.0", [this]()
+    InvokeCommand("spbw 18.8", [this]()
         {
             EXPECT_CALL(focMock, SetPositionTunings(testing::_));
         });
@@ -118,39 +98,19 @@ TEST_F(TerminalPositionTest, set_position_pid)
     ExecuteAllActions();
 }
 
-TEST_F(TerminalPositionTest, set_position_pid_invalid_argument_count)
+TEST_F(TerminalPositionTest, set_position_bandwidth_invalid_argument_count)
 {
-    InvokeCommand("set_position_pid 5.0", [this]()
+    InvokeCommand("set_position_bandwidth 18.8 1.0", [this]()
         {
-            ExpectError("invalid number of arguments");
+            ExpectError("invalid number of arguments.");
         });
 
     ExecuteAllActions();
 }
 
-TEST_F(TerminalPositionTest, set_position_pid_invalid_kp)
+TEST_F(TerminalPositionTest, set_position_bandwidth_invalid_value)
 {
-    InvokeCommand("set_position_pid abc 0.1 0.0", [this]()
-        {
-            ExpectError("invalid value. It should be a float.");
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalPositionTest, set_position_pid_invalid_ki)
-{
-    InvokeCommand("set_position_pid 5.0 abc 0.0", [this]()
-        {
-            ExpectError("invalid value. It should be a float.");
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TerminalPositionTest, set_position_pid_invalid_kd)
-{
-    InvokeCommand("set_position_pid 5.0 0.1 abc", [this]()
+    InvokeCommand("set_position_bandwidth abc", [this]()
         {
             ExpectError("invalid value. It should be a float.");
         });

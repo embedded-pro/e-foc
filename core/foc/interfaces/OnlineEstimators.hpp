@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/foc/interfaces/Driver.hpp"
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
 
 namespace foc

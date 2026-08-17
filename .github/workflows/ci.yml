@@ -183,30 +183,42 @@ jobs:
         with:
           configurePreset: ${{ matrix.target }}
           buildPreset: ${{ matrix.target }}-${{ matrix.configuration }}
-      - name: Run cycle analysis
+      - name: Run inner loop cycle analysis
         if: matrix.target == 'EK-TM4C1294XL'
         uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
         with:
-          comment-marker: '<!-- cycle-analysis-comment -->'
-          analyses-json: |
-            [
-              {
-                "label": "Worst case (position)",
-                "elf_path": "build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf",
-                "config_path": "targets/sync_foc_sensored/main/cycle-analysis.json",
-                "output_dir": "cycle-analysis"
-              }
-            ]
+          comment-marker: "<!-- cycle-analysis-inner-comment -->"
+          config-path: targets/sync_foc_sensored/main/cycle-analysis.json
+          elf-path: build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf
           target: ${{ matrix.target }}
           build-config: ${{ matrix.configuration }}
           clock-mhz: "120"
           cortex: "m4"
-          output-dir: cycle-analysis
-          post-comment: "true"
-          artifact-name: cycle-analysis
-      - name: Cycle analysis summary
+          output-dir: cycle-analysis/inner
+          fail-over-max-cycles: "4500"
+          post-comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          artifact-name: cycle-analysis-inner
+      - name: Inner loop cycle analysis summary
         if: matrix.target == 'EK-TM4C1294XL'
-        run: cat cycle-analysis/combined_step_summary.md >> "$GITHUB_STEP_SUMMARY"
+        run: cat cycle-analysis/inner/cycle_estimation_report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Run outer loop cycle analysis
+        if: matrix.target == 'EK-TM4C1294XL'
+        uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
+        with:
+          comment-marker: "<!-- cycle-analysis-outer-comment -->"
+          config-path: targets/sync_foc_sensored/main/cycle-analysis-outer.json
+          elf-path: build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf
+          target: ${{ matrix.target }}
+          build-config: ${{ matrix.configuration }}
+          clock-mhz: "120"
+          cortex: "m4"
+          output-dir: cycle-analysis/outer
+          fail-over-max-cycles: "20000"
+          post-comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          artifact-name: cycle-analysis-outer
+      - name: Outer loop cycle analysis summary
+        if: matrix.target == 'EK-TM4C1294XL'
+        run: cat cycle-analysis/outer/cycle_estimation_report.md >> "$GITHUB_STEP_SUMMARY"
       - name: Run memory analysis
         if: matrix.target == 'EK-TM4C1294XL'
         uses: embedded-pro/cortex-memory-budget@cc5057b824ad7a5c340dfa6a3c8d22be0b89b35c
@@ -226,7 +238,7 @@ jobs:
           build-config: ${{ matrix.configuration }}
           cortex: "m4"
           output-dir: memory-analysis
-          post-comment: "true"
+          post-comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
           artifact-name: memory-analysis
       - name: Memory analysis summary
         if: matrix.target == 'EK-TM4C1294XL'

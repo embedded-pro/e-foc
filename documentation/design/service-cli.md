@@ -45,67 +45,76 @@ date: 2026-04-07
 
 ## Component Details
 
-### Three-Layer Interactor Hierarchy
+### Command Registration
 
-The CLI is structured as a three-level inheritance hierarchy of interactors. Each level adds commands specific to a control mode while inheriting the common commands of the level above.
+Every command is registered by the control-mode coordinator, which owns the only lifetime-safe
+reference to the active control mode. There is no per-mode interactor object in production: the
+active mode lives inside a `std::variant` that is replaced on a mode switch, so an object holding a
+reference to it could outlive its target. The coordinator instead dispatches each command to
+whichever mode is active and rejects the command when it does not apply.
 
 ```mermaid
 classDiagram
-    class TerminalFocBaseInteractor {
-        +start()
-        +stop()
-        +set-pid(kp, ki, kd)
-        #FocBase reference
-        #TerminalWithStorage reference
+    class ControlModeStateMachine {
+        +RegisterCliCommands()
+        -TrySetTorque(iq)
+        -TrySetSpeed(omega)
+        -TrySetPosition(theta)
+        -ActiveStateMachine()
     }
-    class TerminalFocTorqueInteractor {
-        +set-torque(Id, Iq)
+    class TerminalWithStorage {
+        +AddCommand(descriptor, handler)
     }
-    class TerminalFocSpeedInteractor {
-        +set-speed(ω)
-        +set-speed-pid(kp, ki, kd)
-    }
-    class TerminalFocPositionInteractor {
-        +set-position(θ)
-        +set-speed-pid(kp, ki, kd)
-        +set-position-pid(kp, ki, kd)
-    }
-
-    TerminalFocBaseInteractor <|-- TerminalFocTorqueInteractor
-    TerminalFocBaseInteractor <|-- TerminalFocSpeedInteractor
-    TerminalFocBaseInteractor <|-- TerminalFocPositionInteractor
+    ControlModeStateMachine --> TerminalWithStorage : registers
 ```
 
-Only one interactor is active at a time; the application constructs exactly the interactor matching the desired control mode and connects it to the `FocStateMachine`.
+#### Lifecycle Commands
 
-#### `TerminalFocBaseInteractor` — Shared Commands
+| Command             | Alias | Arguments | Action                                         |
+|---------------------|-------|-----------|------------------------------------------------|
+| `calibrate`         | `cal` | —         | Runs the calibration sequence                  |
+| `enable`            | `en`  | —         | Enables the motor; rejected outside `Ready`    |
+| `disable`           | `dis` | —         | Disables the motor                             |
+| `clear_fault`       | `cf`  | —         | Clears a latched fault                         |
+| `clear_calibration` | `cc`  | —         | Invalidates stored calibration                 |
+| `active_mode`       | `am`  | —         | Prints the active control mode                 |
+| `apply_estimates`   | `ae`  | —         | Applies the online estimates to the loop gains |
+| `estimate_status`   | `es`  | —         | Prints the current online estimates            |
 
-| Command      | Arguments            | Action                                                         |
-|--------------|----------------------|----------------------------------------------------------------|
-| `set_dq_pid` | kp, ki, kd×2 (float) | Sets current-loop PID gains via `FocBase::SetCurrentTunings()` |
+#### Algorithm Selection
 
-This command is available in all control modes.
+| Command                     | Alias | Arguments                               | Action                                                                                                     |
+|-----------------------------|-------|-----------------------------------------|------------------------------------------------------------------------------------------------------------|
+| `select_current_algorithm`  | `sca` | pid \| decoupled \| deadbeat \| sliding | Selects the current-loop law; rejected while enabled or before the motor model is identified               |
+| `select_speed_algorithm`    | `ssa` | pid \| lqi \| adrc \| twodof            | Selects the speed-loop law; speed and position modes only                                                  |
+| `select_position_algorithm` | `spa` | pid \| cascadep \| lqr \| lqi \| twodof | Selects the position-loop law; position mode only. LQR and LQI are refused when their Riccati design fails |
+| `active_algorithms`         | `aa`  | —                                       | Prints the active current, speed and position laws                                                         |
 
-#### `TerminalFocTorqueInteractor` — Torque Mode
+#### Setpoints
 
-| Command      | Arguments      | Action                                                                   |
-|--------------|----------------|--------------------------------------------------------------------------|
-| `set-torque` | Id (A), Iq (A) | Sets the d-axis and q-axis current setpoints via `FocTorque::SetPoint()` |
+Each setpoint command applies to exactly one control mode and is rejected with a mode-mismatch
+message in the others, and rejected when the lifecycle state does not accept setpoints.
 
-#### `TerminalFocSpeedInteractor` — Speed Mode
+| Command        | Alias | Arguments     | Mode     |
+|----------------|-------|---------------|----------|
+| `set_torque`   | `st`  | Iq (A)        | Torque   |
+| `set_speed`    | `ss`  | omega (rad/s) | Speed    |
+| `set_position` | `sp`  | theta (rad)   | Position |
 
-| Command         | Arguments          | Action                                                      |
-|-----------------|--------------------|-------------------------------------------------------------|
-| `set-speed`     | ω (rad/s)          | Sets the speed setpoint via `FocSpeed::SetPoint()`          |
-| `set-speed-pid` | kp, ki, kd (float) | Sets speed-loop PID gains via `FocSpeed::SetSpeedTunings()` |
+The torque command takes the q-axis current only. The d-axis reference is held at zero by the
+control law, so exposing it would let an operator command a flux reference the cascade immediately
+overwrites.
 
-#### `TerminalFocPositionInteractor` — Position Mode
+#### Bandwidths
 
-| Command            | Arguments          | Action                                                               |
-|--------------------|--------------------|----------------------------------------------------------------------|
-| `set-position`     | θ (rad)            | Sets the position setpoint via `FocPosition::SetPoint()`             |
-| `set-speed-pid`    | kp, ki, kd (float) | Sets speed-loop PID gains within the position cascade                |
-| `set-position-pid` | kp, ki, kd (float) | Sets position-loop PID gains via `FocPosition::SetPositionTunings()` |
+| Command                  | Alias  | Arguments         | Availability             |
+|--------------------------|--------|-------------------|--------------------------|
+| `set_current_bandwidth`  | `scbw` | bandwidth (rad/s) | All modes                |
+| `set_speed_bandwidth`    | `ssbw` | bandwidth (rad/s) | Speed and position modes |
+| `set_position_bandwidth` | `spbw` | bandwidth (rad/s) | Position mode            |
+
+Retuning is refused while the motor is enabled, and refused when the active law cannot be redesigned
+for the requested bandwidth.
 
 ### `TerminalWithBanner` — Decorator
 
@@ -199,17 +208,17 @@ Registered command handlers are stored in a fixed-size look-up structure in the 
 
 ### Provided
 
-| Interface                                    | Purpose                                                                                                                                                                    | Contract                                                                              |
-|----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
-| `TerminalFocBaseInteractor` (and subclasses) | Registers the `set_dq_pid` command on `TerminalWithStorage`; exposes a `Terminal()` accessor for the `FocStateMachine` to register lifecycle commands on the same terminal | Constructed once per application; exactly one interactor subclass is active at a time |
-| `TerminalWithBanner`                         | Decorates `TerminalWithStorage` to print a welcome banner on first connection                                                                                              | Transparent to the underlying terminal after the banner has been printed              |
+| Interface                                    | Purpose                                                                                                                                                                               | Contract                                                                              |
+|----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
+| `TerminalFocBaseInteractor` (and subclasses) | Registers the `set_current_bandwidth` command on `TerminalWithStorage`; exposes a `Terminal()` accessor for the `FocStateMachine` to register lifecycle commands on the same terminal | Constructed once per application; exactly one interactor subclass is active at a time |
+| `TerminalWithBanner`                         | Decorates `TerminalWithStorage` to print a welcome banner on first connection                                                                                                         | Transparent to the underlying terminal after the banner has been printed              |
 
 ### Required
 
 | Interface                                | Purpose                                                                                                | Contract                                                                             |
 |------------------------------------------|--------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
 | `TerminalWithStorage`                    | Receives and dispatches parsed command tokens; writes string responses to the serial output            | Must be connected to the physical serial driver before any interactor is constructed |
-| `FocBase`                                | Provides `Enable()`, `Disable()`, and `SetCurrentTunings()` shared by all control modes                | Must remain valid for the lifetime of the interactor                                 |
+| `CurrentLoopTunable`                     | Provides `SetCurrentTunings()`, shared by all control modes                                            | Must remain valid for the lifetime of the interactor                                 |
 | `FocTorque` / `FocSpeed` / `FocPosition` | Provides mode-specific setpoint and tuning methods                                                     | The concrete interface must match the constructed interactor subclass                |
 | DC bus voltage (`Volts`)                 | Supplied to the interactor for normalising PID gain inputs before forwarding them to the FOC component | Must reflect the actual DC bus voltage at the time tunings are applied               |
 

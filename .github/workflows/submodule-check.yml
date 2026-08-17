@@ -16,8 +16,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Configure Git
+        env:
+          PRIVATE_REPO_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
         run: |
-          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          if [ -n "$PRIVATE_REPO_TOKEN" ]; then
+            git config --global url."https://${PRIVATE_REPO_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
           git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Checkout repository
@@ -25,7 +29,7 @@ jobs:
         with:
           submodules: true
           fetch-depth: 0
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          token: ${{ secrets.PRIVATE_REPO_TOKEN || github.token }}
 
       - name: Verify submodules are on main
         run: |

@@ -234,7 +234,7 @@ graph TD
 
 ### Effective Memory Window (Forgetting Factor)
 
-```
+```text
 Sample weight w[k] = λ^(N-k)
 
 w │

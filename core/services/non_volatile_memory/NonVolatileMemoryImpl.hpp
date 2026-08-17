@@ -12,8 +12,8 @@ namespace services
     // data of that type, protecting against silent corruption after a firmware update.
     static constexpr uint32_t CalibrationMagic = 0xCAFEF00D;
     static constexpr uint32_t ConfigMagic = 0xDEADBEEF;
-    static constexpr uint8_t CalibrationLayoutVersion = 1;
-    static constexpr uint8_t ConfigLayoutVersion = 2;
+    static constexpr uint8_t CalibrationLayoutVersion = 3;
+    static constexpr uint8_t ConfigLayoutVersion = 4;
 
     class NonVolatileMemoryImpl
         : public NonVolatileMemory
@@ -52,6 +52,11 @@ namespace services
 
         void OnCalibrationSectorFormattedDuringFormat();
 
+        void CompleteCalibration(NvmStatus status);
+        void CompleteConfig(NvmStatus status);
+        void CompleteFormat(NvmStatus status);
+        void CompleteIsCalibrationValid(bool valid);
+
         static uint32_t ComputeCrc(infra::ConstByteRange bytes);
 
         NvmRegion& calibrationRegion;
@@ -69,5 +74,7 @@ namespace services
 
         CalibrationData* pendingCalibrationOutput = nullptr;
         ConfigData* pendingConfigOutput = nullptr;
+
+        bool busy{ false };
     };
 }

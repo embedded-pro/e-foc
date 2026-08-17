@@ -55,18 +55,27 @@ namespace application
         // Implementation of LowPriorityInterrupt
         void Trigger() override;
         void Register(const infra::Function<void()>& handler) override;
+        void Unregister() override;
 
-        void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>&) override
-        {}
+        void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>& onProtection) override
+        {
+            onBoardProtection = onProtection;
+        }
 
-        // Implementation of foc::ThreePhaseInverter
+        void RaiseBoardProtection(PlatformFactory::BoardProtectionReason reason) const
+        {
+            if (onBoardProtection != nullptr)
+                onBoardProtection(reason);
+        }
+
+        // Implementation of drivers::ThreePhaseInverter
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
         void Stop() override;
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
 
-        // Implementation of foc::Encoder
+        // Implementation of drivers::Encoder
         foc::Radians Read() override;
         void Set(foc::Radians value) override;
         void SetZero() override;
@@ -85,6 +94,11 @@ namespace application
             void Register(const infra::Function<void()>& handler) override
             {
                 this->handler = handler;
+            }
+
+            void Unregister() override
+            {
+                handler = nullptr;
             }
 
         private:
@@ -233,8 +247,9 @@ namespace application
         EepromStub eepromStub;
         ResetCause resetCause{ ResetCause::powerUp };
         infra::BoundedString::WithStorage<1024> faultStatusString;
-        hal::Hertz pwmBaseFrequency{ 10000 };
+        hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
+        infra::Function<void(PlatformFactory::BoardProtectionReason)> onBoardProtection;
     };
 }

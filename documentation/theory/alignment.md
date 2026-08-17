@@ -197,7 +197,7 @@ stateDiagram-v2
 
 ### Multi-Step Sweep (12 steps, p = 4)
 
-```
+```text
 Electrical angle steps (30° each):
   0°  →  30°  →  60°  →  90°  →  120°  →  150°  →  180°
   ↓
@@ -209,7 +209,7 @@ Final step (360°=0°): rotor at θ_m_settled → θ_offset := θ_m_settled.
 
 ### Settling Signal (ASCII representation)
 
-```
+```text
   │
 1.0├──────────────────────────────── target (aligned position)
    │          ╭──────╮

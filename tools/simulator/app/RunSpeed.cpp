@@ -1,8 +1,8 @@
+#include "core/foc/instantiations/LowPriorityInterruptImpl.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
-#include "foc/implementations/LowPriorityInterruptImpl.hpp"
 #include "foc/instantiations/FocController.hpp"
 #include "foc/interfaces/Units.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
@@ -38,12 +38,25 @@ namespace simulator
         foc::FocSpeedController controller{ model, model, foc::Ampere{ defaults::maxCurrentAmps }, baseFrequency,
             lowPriorityInterrupt, hal::Hertz{ defaults::lowPriorityFrequencyHz } };
 
-        controller.SetSpeedTunings(vdc, controllers::PidTunings<float>{ defaults::speedKp, defaults::speedKi, defaults::speedKd });
-        controller.SetCurrentTunings(vdc,
-            foc::IdAndIqTunings{
-                { defaults::currentKp, defaults::currentKi, defaults::currentKd },
-                { defaults::currentKp, defaults::currentKi, defaults::currentKd } });
-        controller.SetPolePairs(motorParams.p);
+        auto motorModel = foc::MotorModelParameters{};
+        motorModel.resistance = motorParams.R;
+        motorModel.inductance = foc::MilliHenry{ motorParams.Ld.Value() * 1000.0f };
+        motorModel.fluxLinkage = motorParams.psi_f;
+        motorModel.busVoltage = vdc;
+        motorModel.samplingFrequency = baseFrequency;
+        motorModel.polePairs = motorParams.p;
+        controller.Configure(motorModel);
+
+        auto mechanics = foc::MechanicalModelParameters{};
+        mechanics.inertia = foc::NewtonMeterSecondSquared{ motorParams.J.Value() };
+        mechanics.viscousFriction = motorParams.B;
+        mechanics.torqueConstant = foc::NewtonMeter{ 1.5f * motorParams.p * motorParams.psi_f.Value() };
+        mechanics.maxCurrent = foc::Ampere{ defaults::maxCurrentAmps };
+        mechanics.samplingFrequency = hal::Hertz{ defaults::lowPriorityFrequencyHz };
+        controller.ConfigureMechanics(mechanics);
+
+        controller.SetCurrentTunings(foc::CurrentLoopTunings{});
+        controller.SetSpeedTunings(foc::SpeedLoopTunings{});
         controller.SetPoint(foc::RadiansPerSecond{ 0.0f });
 
         const ParametersPanel::PidParameters pidParameters{

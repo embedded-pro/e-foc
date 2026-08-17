@@ -87,7 +87,7 @@ Two independent incremental PID controllers regulate the direct (d) and quadratu
 
 - **Output clamping**: symmetric to [−1, +1], representing a normalised fraction of the DC bus voltage.
 - **Anti-windup**: the integrator is clamped whenever the output reaches the saturation boundary, preventing integrator wind-up during transients.
-- **Gain normalisation**: when `SetCurrentTunings()` is called, the raw proportional, integral, and derivative gains are scaled internally by `1 / (√3 · Vdc)`. This decouples the tuning parameters from the specific DC bus voltage, so gains remain meaningful across different supply configurations.
+- **Gain derivation**: the current regulator derives its own gains from the motor model (phase resistance, inductance) and the requested closed-loop bandwidth, normalised by the DC bus voltage. Tuning is therefore expressed as a single bandwidth in radians per second rather than raw controller gains.
 - **Incrementalism**: the PID uses the incremental (velocity) form, accumulating output from step to step, which naturally limits abrupt changes at Enable transitions.
 
 The d-axis setpoint is normally 0 A for a surface PMSM (Id = 0 gives maximum torque per ampere). Setting Id_setpoint to a non-zero negative value for flux weakening is structurally possible but the operational consequences are outside the scope of this document.
@@ -117,14 +117,14 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 
 ### Provided
 
-| Interface         | Purpose                                                              | Contract                                                                                        |
-|-------------------|----------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
-| SetPolePairs      | Configures the motor's pole-pair count used in the θe calculation.   | Must be called before the first `Calculate()`. Must not be changed while Enabled.               |
-| Enable            | Arms both PID controllers and resets their integrator state.         | Safe to call repeatedly. PIDs start from a clean state each time. Last setpoints are preserved. |
-| Disable           | Disarms both PID controllers and forces zero duty cycle output.      | Safe to call from any context. `Calculate()` returns zero while disabled.                       |
-| SetCurrentTunings | Provides proportional, integral, and derivative gains for both PIDs. | Gains are internally normalised by 1/(√3·Vdc). Takes effect on the next `Calculate()` call.     |
-| SetPoint          | Sets the (Id, Iq) current setpoint in Ampere.                        | New setpoint is used on the next `Calculate()` invocation. Can be called while Enabled.         |
-| Calculate         | Executes the full 11-step FOC torque loop for one control cycle.     | Must be called at 20 kHz from ISR context. Returns `PhasePwmDutyCycles`. Must not block.        |
+| Interface         | Purpose                                                                                                         | Contract                                                                                                       |
+|-------------------|-----------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+| Configure         | Supplies the motor model: resistance, inductance, flux linkage, bus voltage, sampling frequency and pole pairs. | Must be called before the first `Calculate()`. Must not be changed while Enabled.                              |
+| Enable            | Arms both PID controllers and resets their integrator state.                                                    | Safe to call repeatedly. PIDs start from a clean state each time. Last setpoints are preserved.                |
+| Disable           | Disarms both PID controllers and forces zero duty cycle output.                                                 | Safe to call from any context. `Calculate()` returns zero while disabled.                                      |
+| SetCurrentTunings | Provides the current loop closed-loop bandwidth.                                                                | Gains are derived from the motor model and normalised internally. Takes effect on the next `Calculate()` call. |
+| SetPoint          | Sets the (Id, Iq) current setpoint in Ampere.                                                                   | New setpoint is used on the next `Calculate()` invocation. Can be called while Enabled.                        |
+| Calculate         | Executes the full 11-step FOC torque loop for one control cycle.                                                | Must be called at 20 kHz from ISR context. Returns `PhasePwmDutyCycles`. Must not block.                       |
 
 ### Required
 
@@ -151,16 +151,16 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 
 ## Constraints & Limitations
 
-| Constraint                      | Value / Description                                                                                       |
-|---------------------------------|-----------------------------------------------------------------------------------------------------------|
-| Control loop rate               | 20 kHz — must be called once per PWM switching period from the FOC interrupt.                             |
-| Cycle budget                    | <= 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz) for the full `Calculate()` execution. |
-| No virtual dispatch in hot path | `Calculate()` must not incur virtual function call overhead.                                              |
-| Output duty cycle format        | Normalised floating-point [0.0, 1.0]; conversion to PWM timer counts is the Runner's responsibility.      |
-| Electrical angle wrapping       | Handled by the LUT normalisation within FastTrigonometry — no explicit modulo operation required in loop. |
-| Gain normalisation dependency   | `SetCurrentTunings()` requires the DC bus voltage (Vdc) to be known at configuration time.                |
-| No flux weakening               | Id_setpoint ≠ 0 is structurally accepted but operational flux-weakening strategy is not yet defined.      |
-| PID state at Enable             | Integrators are always zeroed on Enable, regardless of previous state.                                    |
+| Constraint                      | Value / Description                                                                                                   |
+|---------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| Control loop rate               | 20 kHz — must be called once per PWM switching period from the FOC interrupt.                                         |
+| Cycle budget                    | <= 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz) for the full `Calculate()` execution.       |
+| No virtual dispatch in hot path | `Calculate()` must not incur virtual function call overhead.                                                          |
+| Output duty cycle format        | Normalised floating-point [0.0, 1.0]; conversion to PWM timer counts is the Runner's responsibility.                  |
+| Electrical angle wrapping       | Handled by the LUT normalisation within FastTrigonometry — no explicit modulo operation required in loop.             |
+| Gain derivation dependency      | Gain derivation requires the motor model — including the DC bus voltage — to be supplied through `Configure()` first. |
+| No flux weakening               | Id_setpoint ≠ 0 is structurally accepted but operational flux-weakening strategy is not yet defined.                  |
+| PID state at Enable             | Integrators are always zeroed on Enable, regardless of previous state.                                                |
 
 ---
 

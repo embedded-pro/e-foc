@@ -2,9 +2,9 @@
 title: "Position Loop Controllers and Friction Compensation"
 type: theory
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: "position-loop-controllers"
-date: 2026-08-10
+date: 2026-08-17
 ---
 
 | Field     | Value                                               |
@@ -12,9 +12,9 @@ date: 2026-08-10
 | Title     | Position Loop Controllers and Friction Compensation |
 | Type      | theory                                              |
 | Status    | draft                                               |
-| Version   | 0.1.0                                               |
+| Version   | 0.2.0                                               |
 | Component | position-loop-controllers                           |
-| Date      | 2026-08-10                                          |
+| Date      | 2026-08-17                                          |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -206,6 +206,20 @@ vs. stiffness tradeoff inherent in single-DOF position controllers.
 $$
 e_{fb}[k] = F(z)\,\theta_m^*[k] - \theta_m[k]
 $$
+
+**Wrapping constraint**: $\theta_m$ lives on the circle, not on the line, so $F(z)$ must not be run
+directly on the wrapped angle: filtering from $+3.0$ rad towards $-3.0$ rad would interpolate through
+$0$ and execute a $344^\circ$ rotation instead of the $16^\circ$ move across the seam. The
+first-order prefilter is therefore realised on the wrapped error
+
+$$
+\boxed{\theta_f[k] = \mathrm{wrap}\Bigl(\theta_f[k-1] + \alpha \cdot \mathrm{wrap}\bigl(\theta_m^*[k] - \theta_f[k-1]\bigr)\Bigr)}
+$$
+
+with $\alpha = 1 - e^{-T_o/\tau_{ff}}$ and $\mathrm{wrap}(\cdot)$ folding onto $(-\pi, \pi]$. The state
+$\theta_f$ is seeded from the measured angle on reset and on the first sample; seeding it at zero
+would ramp the reference in from absolute zero on every enable. For $\tau_{ff} \le 0$ the prefilter
+is transparent and the raw setpoint passes through.
 
 **Relation to P2**: When $F(z) = 1$ and the feedback controller is a proportional P, the structure
 collapses to Cascade P→PI. Two-DOF position control is the generalisation — $F(z)$ independently

@@ -1,10 +1,10 @@
 #pragma once
 
 #ifndef Q_MOC_RUN
-#include "core/foc/implementations/TransformsClarkePark.hpp"
+#include "core/foc/transforms/TransformsClarkePark.hpp"
 #endif
-#include "core/foc/interfaces/Driver.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "infra/util/Function.hpp"
 #include "infra/util/Observer.hpp"
 #include <cstddef>
@@ -28,21 +28,19 @@ namespace simulator
     };
 
     class ThreePhaseMotorModel
-        : public foc::ThreePhaseInverter
-        , public foc::Encoder
+        : public drivers::ThreePhaseInverter
+        , public drivers::Encoder
         , public infra::Subject<ThreePhaseMotorModelObserver>
     {
     public:
         struct Parameters
         {
-            // Motor electrical parameters (based on typical small PMSM, similar to Maxon EC 45)
             foc::Ohm R;       // Phase resistance [Ohm]
             foc::Henry Ld;    // d-axis inductance [H]
             foc::Henry Lq;    // q-axis inductance [H] (SPM: Ld ≈ Lq)
             foc::Weber psi_f; // Permanent magnet flux linkage [Wb]
             uint8_t p;        // Pole pairs
 
-            // Mechanical parameters
             foc::KilogramMeterSquared J;       // Rotor inertia [kg·m²]
             foc::NewtonMeterSecondPerRadian B; // Viscous friction coefficient [N·m·s/rad]
         };
@@ -83,14 +81,9 @@ namespace simulator
         foc::Henry EffectiveInductanceQ() const;
         void SetWindingTemperatureForTest(float celsius);
 
-        // Enables continuous PWM cycling driven by the event dispatcher. Mirrors the
-        // behavior of a real PWM peripheral whose carrier keeps running once enabled.
-        // Once enabled, every call to ThreePhasePwmOutput becomes a duty-cycle register
-        // update; the model schedules its own next sample via the dispatcher. Tests that
-        // drive the model synchronously must NOT enable self-driving (use StepForTest).
         void EnableSelfDriving();
 
-        // Implementation of foc::ThreePhaseInverter
+        // Implementation of drivers::ThreePhaseInverter
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
         void Start() override;
@@ -98,14 +91,11 @@ namespace simulator
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
 
-        // Implementation of foc::Encoder
+        // Implementation of drivers::Encoder
         foc::Radians Read() override;
         void Set(foc::Radians value) override;
         void SetZero() override;
 
-        // Synchronous single-cycle execution for unit tests. Bypasses the event
-        // dispatcher and the controller callback so legacy step-driven tests can
-        // observe the model state directly.
         void StepForTest(const foc::PhasePwmDutyCycles& dutyPhases);
 
     private:

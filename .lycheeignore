@@ -1,0 +1,7 @@
+# The MegaLinter workflow checks out without submodules, so nothing under infra/
+# exists in that job and lychee cannot resolve links that point into one. These
+# targets are verified by the submodule-check workflow instead.
+file://.*infra/.*
+
+# Templated download URL; the version placeholder is expanded at run time.
+https://binaries\.sonarsource\.com/Distribution/sonar-scanner-cli/.*\$

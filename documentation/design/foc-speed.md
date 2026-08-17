@@ -79,11 +79,14 @@ The outer loop is triggered by the `LowPriorityInterrupt` at a prescale ratio de
 
 The angular velocity is estimated from the difference between the current mechanical angle sample and the previous angle sample, divided by the outer-loop period Δt:
 
-```
+```text
 ω = Δθ / Δt
 ```
 
-Because the encoder angle wraps around at 2π, the raw angle difference may be discontinuous at the wrap boundary. Wrap-around compensation applies a correction: if the computed Δθ is greater than +π, it is shifted by −2π; if it is less than −π, it is shifted by +2π. This produces a signed angular velocity in the range (−π/Δt, +π/Δt) radians per second for any physical speed below half the Nyquist rate of the sampling interval.
+Because the encoder angle wraps around at 2π, the raw angle difference may be discontinuous at the wrap
+boundary. Wrap-around compensation applies a correction: if the computed Δθ is greater than +π, it is shifted
+by −2π; if it is less than −π, it is shifted by +2π. This produces a signed angular velocity in the range
+(−π/Δt, +π/Δt) radians per second for any physical speed below half the Nyquist rate of the sampling interval.
 
 **Speed PID:**
 
@@ -94,6 +97,8 @@ The d-axis setpoint remains 0 A throughout.
 ### LowPriorityInterrupt — Outer Loop Scheduling
 
 The `LowPriorityInterrupt` is an abstract scheduling interface. The speed control component registers its outer-loop handler with this interface at construction time. The inner-loop ISR counts cycles and triggers the `LowPriorityInterrupt` at the appropriate prescale ratio, causing the outer-loop handler to execute without RTOS involvement.
+
+The registered handler captures the cascade instance, so its lifetime is bound to that instance. The cascade calls `Unregister()` from its destructor; after `Unregister()` returns, an already queued trigger must be discarded rather than dispatched, so a mode switch that destroys the cascade cannot leave a handler pointing at freed storage.
 
 `OuterLoopFrequency()` returns the configured outer-loop rate so the application layer can assert or configure the LPI trigger frequency correctly.
 
@@ -116,18 +121,18 @@ stateDiagram-v2
 
 ### Provided
 
-| Interface          | Purpose                                                              | Contract                                                                                   |
-|--------------------|----------------------------------------------------------------------|--------------------------------------------------------------------------------------------|
-| SetPolePairs       | Configures the pole-pair count for the electrical angle calculation. | Must be called before the first `Calculate()`. Must not be changed while Enabled.          |
-| Enable             | Arms all three PIDs and resets their integrator state.               | Safe to call repeatedly. Speed setpoint is preserved.                                      |
-| Disable            | Disarms all PIDs and forces zero duty cycle output.                  | Safe to call from any context.                                                             |
-| SetCurrentTunings  | Sets P, I, D gains for the d-axis and q-axis current PIDs.           | Gains normalised by 1/(√3·Vdc) internally. Takes effect on the next `Calculate()`.         |
-| SetSpeedTunings    | Sets P, I, D gains for the outer speed PID.                          | Output of speed PID is clamped to ± maxCurrent. Takes effect on the next outer-loop cycle. |
-| SetPoint           | Sets the speed setpoint in radians per second.                       | Written atomically; used on the next outer-loop cycle.                                     |
-| Calculate          | Executes the inner 20 kHz FOC torque loop for one cycle.             | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                     |
-| OuterLoopFrequency | Returns the configured outer-loop frequency in Hz.                   | Pure query; no side effects. Can be called before Enable.                                  |
-| SetOnlineMechanicalEstimator | Attaches an online mechanical parameter estimator (optional). | If attached, the estimator is updated automatically on each outer-loop cycle. No separate estimator Enable/Disable interface is defined here; detach or omit the estimator to stop updates. |
-| SetOnlineElectricalEstimator | Attaches an online electrical parameter estimator (optional). | If attached, the estimator is updated automatically on each outer-loop cycle using reconstructed Vd from inner-loop cached state. Assumes non-salient motor (Ld ≈ Lq). |
+| Interface                    | Purpose                                                                                | Contract                                                                                                                                                                                    |
+|------------------------------|----------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Configure                    | Supplies the motor model, including the pole-pair count used for the electrical angle. | Must be called before the first `Calculate()`. Must not be changed while Enabled.                                                                                                           |
+| Enable                       | Arms all three PIDs and resets their integrator state.                                 | Safe to call repeatedly. Speed setpoint is preserved.                                                                                                                                       |
+| Disable                      | Disarms all PIDs and forces zero duty cycle output.                                    | Safe to call from any context.                                                                                                                                                              |
+| SetCurrentTunings            | Sets the current loop closed-loop bandwidth.                                           | Gains are derived from the motor model and normalised internally. Takes effect on the next `Calculate()`.                                                                                   |
+| SetSpeedTunings              | Sets the speed loop closed-loop bandwidth.                                             | Gains are derived from the mechanical model supplied through `ConfigureMechanics()`. Output is clamped to ± maxCurrent.                                                                     |
+| SetPoint                     | Sets the speed setpoint in radians per second.                                         | Written atomically; used on the next outer-loop cycle.                                                                                                                                      |
+| Calculate                    | Executes the inner 20 kHz FOC torque loop for one cycle.                               | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                                                                                                      |
+| OuterLoopFrequency           | Returns the configured outer-loop frequency in Hz.                                     | Pure query; no side effects. Can be called before Enable.                                                                                                                                   |
+| SetOnlineMechanicalEstimator | Attaches an online mechanical parameter estimator (optional).                          | If attached, the estimator is updated automatically on each outer-loop cycle. No separate estimator Enable/Disable interface is defined here; detach or omit the estimator to stop updates. |
+| SetOnlineElectricalEstimator | Attaches an online electrical parameter estimator (optional).                          | If attached, the estimator is updated automatically on each outer-loop cycle using reconstructed Vd from inner-loop cached state. Assumes non-salient motor (Ld ≈ Lq).                      |
 
 ### Required
 
@@ -197,14 +202,14 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint                     | Value / Description                                                                                        |
-|--------------------------------|------------------------------------------------------------------------------------------------------------|
-| Inner loop rate                | 20 kHz — called from the FOC ISR once per PWM period.                                                      |
-| Outer loop rate                | Configurable; default 1 kHz. Must be a integer divisor of 20 kHz.                                          |
-| Iq saturation                  | Speed PID output clamped to ± maxCurrent (Ampere). This limits peak torque.                                |
-| Speed estimator wrap threshold | Assumes physical speed below π / Δt rad/s (half the Nyquist limit of the outer-loop sampling rate).        |
-| No flux weakening              | Id = 0 is fixed. Operating above base speed without flux weakening is the application's responsibility.    |
-| LPI scheduling                 | The outer loop does not use an RTOS. The inner loop ISR triggers the LPI — no timer or task involved.      |
+| Constraint                     | Value / Description                                                                                                  |
+|--------------------------------|----------------------------------------------------------------------------------------------------------------------|
+| Inner loop rate                | 20 kHz — called from the FOC ISR once per PWM period.                                                                |
+| Outer loop rate                | Configurable; default 1 kHz. Must be a integer divisor of 20 kHz.                                                    |
+| Iq saturation                  | Speed PID output clamped to ± maxCurrent (Ampere). This limits peak torque.                                          |
+| Speed estimator wrap threshold | Assumes physical speed below π / Δt rad/s (half the Nyquist limit of the outer-loop sampling rate).                  |
+| No flux weakening              | Id = 0 is fixed. Operating above base speed without flux weakening is the application's responsibility.              |
+| LPI scheduling                 | The outer loop does not use an RTOS. The inner loop ISR triggers the LPI — no timer or task involved.                |
 | Cycle budget                   | Inner loop `Calculate()` must complete in <= 4500 cycles (75% of the 6000-cycle control period at 120 MHz / 20 kHz). |
 | Setpoint atomicity             | The Iq setpoint written by the outer loop must be read atomically by the inner loop on 32-bit ARM targets.           |
 

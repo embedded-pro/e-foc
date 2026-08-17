@@ -73,3 +73,36 @@
   shall: >
     All state machine transitions and calibration service calls shall execute
     without dynamic memory allocation.
+
+- id: REQ-SM-013
+  title: Emergency stop is accepted from every state
+  shall: >
+    When an emergency-stop command is issued, the state machine shall stop the FOC
+    controller and its PWM output before evaluating any state guard, shall complete
+    any pending command callback with the abortedByFault result, and shall report
+    the command as accepted regardless of the state it was issued from.
+
+- id: REQ-SM-014
+  title: Emergency stop preserves a valid calibration
+  shall: >
+    From the Enabled or Calibrating state, when an emergency-stop command is issued
+    while valid calibration data is held, the state machine shall transition to the
+    Ready state carrying that calibration data, so that a subsequent enable command
+    is accepted without recalibration.
+
+- id: REQ-SM-015
+  title: Emergency stop without valid calibration returns to Idle
+  shall: >
+    From the Enabled or Calibrating state, when an emergency-stop command is issued
+    while no valid calibration data is held, the state machine shall transition to
+    the Idle state. From the Idle, Ready or Fault state an emergency-stop command
+    shall leave the current state unchanged.
+
+- id: REQ-SM-016
+  title: Mode selection is refused while asynchronous work is outstanding
+  shall: >
+    The control-mode coordinator shall refuse a control-mode selection with a busy
+    result while the active state machine still owns an outstanding asynchronous
+    callback, namely a pending command callback, an in-flight boot-time
+    non-volatile-memory check, or a running calibration step, so that the state
+    machine is never destroyed while such a callback can still be invoked.

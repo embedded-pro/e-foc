@@ -1,20 +1,20 @@
 ---
 title: "Runtime Controller Selection"
 type: design
-status: draft
-version: 0.1.0
+status: accepted
+version: 0.3.0
 component: "controller-selection"
-date: 2026-08-10
+date: 2026-08-17
 ---
 
 | Field     | Value                        |
 |-----------|------------------------------|
 | Title     | Runtime Controller Selection |
 | Type      | design                       |
-| Status    | draft                        |
-| Version   | 0.1.0                        |
+| Status    | accepted                     |
+| Version   | 0.3.0                        |
 | Component | controller-selection         |
-| Date      | 2026-08-10                   |
+| Date      | 2026-08-17                   |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -40,7 +40,7 @@ date: 2026-08-10
 - Persisting the active algorithm identifier for each loop to non-volatile memory upon each selection
 - Restoring the persisted algorithm identifiers at boot and re-configuring the controllers from NVM
   before the first Enable command
-- Exposing algorithm selection to the CLI terminal and the CAN bus interface
+- Exposing algorithm selection to the CLI terminal
 
 **Is NOT responsible for:**
 - Implementing the control algorithms themselves — each concrete controller is self-contained
@@ -80,19 +80,19 @@ is listed under; there is no sharing of algorithm identifiers across loops.
 
 **Position loop** — executes at 1 kHz in the low-priority handler:
 
-| Algorithm | Description                                                       |
-|-----------|-------------------------------------------------------------------|
-| PID       | Incremental PD/PID baseline                                       |
-| Cascade P | Industry-standard P position → speed loop; single Kv parameter    |
-| LQR       | DARE-computed state-feedback (θ, ω)                               |
-| LQI       | LQR with position integral augmentation                           |
-| Two-DOF   | Reference pre-filter + feedback; decoupled tracking and stiffness |
-| ILC       | Iterative learning control for repetitive servo tasks             |
+| Algorithm | Output            | Description                                                  |
+|-----------|-------------------|--------------------------------------------------------------|
+| PID       | Speed reference   | Incremental PI on the wrapped position error                 |
+| Cascade P | Speed reference   | Industry-standard P position → speed loop; single gain       |
+| LQR       | Current reference | DARE-computed state feedback on (θ, ω)                       |
+| LQI       | Current reference | LQR with position integral augmentation                      |
+| Two-DOF   | Speed reference   | Reference pre-filter + PI; tracking and stiffness tune apart |
 
-**Friction compensation** is not an algorithm in any of the three enumerations. It is an independent
-on/off augmentation that adds a nonlinear feedforward correction to the $i_q^*$ output of the speed
-or position controller before it enters the current loop. It can be enabled alongside any speed or
-position algorithm. See Part I.
+Each position algorithm declares whether it produces a speed reference or a current reference.
+A speed reference runs through the existing speed and current loops unchanged. A current
+reference bypasses the speed loop and feeds the current loop directly, because the state
+feedback laws already regulate speed as part of their own state vector; running them on top of
+a speed loop would stack two regulators on the same state.
 
 The enumeration for each loop is fixed at build time. The default for all loops at first boot is PID.
 
@@ -184,6 +184,55 @@ or the previous controller was in.
 
 ---
 
+### Part D2 — Design Feasibility for the Position State Feedback Laws
+
+The position plant is a near double integrator, which makes its discrete Riccati solve far more
+fragile than the first-order speed plant. Solved on the raw state $(\theta, \omega)$ at a 1 kHz
+outer rate it does not converge at all in single precision. Three conditioning measures make it
+tractable:
+
+1. **Time-scaled state.** The design runs on $(\theta,\ \omega T_s)$ rather than
+   $(\theta,\ \omega)$, so the state matrix becomes
+   $A = \begin{bmatrix} 1 & 1 \\ 0 & 1 - \tfrac{B_f}{J} T_s \end{bmatrix}$
+   with every entry near unity.
+2. **Normalised input.** The input matrix is fixed at $B = [0\ \ 1]^T$ by folding the actuator
+   authority $\tfrac{K_t}{J} T_s^2 I_{max}$ into a scalar applied to the resulting command. The
+   Riccati recursion therefore never sees the motor's torque scale.
+3. **Bandwidth-derived effort weight.** $R = 1 / (\omega_{bw} T_s)^2$, with $\omega_{bw} T_s$
+   clamped to $[10^{-3},\ 0.5]$. This makes settling time scale as $2 / \omega_{bw}$ seconds
+   with roughly 4 % overshoot across four decades of bandwidth, so `bandwidth` remains the single
+   aggressiveness knob it is for every other loop.
+
+The state weights are shape knobs only. `positionErrorWeight` anchors the cost at one and the
+remaining weights enter as ratios against it, clamped to $[10^{-3},\ 10^3]$. Anchoring matters
+for more than conditioning: if the position entry of $Q$ can reach zero the cost stops penalising
+the integrator state and the recursion has no stabilising solution to find.
+
+These measures shrink but do not eliminate non-convergence. `Lqr::TryCreate` is therefore used
+throughout in preference to the aborting constructor, and feasibility is part of the selection
+rule rather than an afterthought:
+
+- `PositionControllerTraits::IsSelectable` runs the actual Riccati solve for LQR and LQI. A
+  selection whose design does not converge returns `invalidParameters` and **leaves the
+  previously active algorithm running**, so the motor never ends up holding a silently dead loop.
+- `SetPositionTunings` is refused outright while the motor is enabled, returning `busy`. A live
+  motor is not a safe place to redesign the law that is holding it.
+- When disabled, `SetPositionTunings` revalidates the new tunings against the active algorithm
+  and rejects them if the design fails, keeping the last accepted gains live.
+
+This is why `SetPositionTunings` returns `SelectResult` where the current and speed loops return
+`void`: those loops derive their gains algebraically and cannot fail.
+
+`IntegralStateFeedbackLqi` is not used for the LQI position law even though it now offers a
+`TryCreate` factory. It augments the plant with `C · (−Ts)`, which reintroduces the sample period
+into the integral row and undoes the time scaling above; at a 1 kHz outer rate that row is three
+orders of magnitude smaller than the rest of the matrix and the solve stops converging. The
+augmentation is therefore written out explicitly in the scaled coordinates, where the integral
+state simply accumulates the position deviation per sample, and solved with
+`Lqr<float, 3, 1>::TryCreate`.
+
+---
+
 ### Part E — Motor Model Parameter Flow
 
 When an algorithm is selected, it is immediately configured using the most recent snapshot of the
@@ -216,38 +265,30 @@ flowchart LR
 
 ### Part F — CLI Interface
 
-The CLI terminal service exposes algorithm selection through a `ctrl` command group, consistent with
-the existing `TerminalTorque`, `TerminalSpeed`, and `TerminalPosition` command handlers.
+`ControlModeStateMachine` registers the selection commands on the terminal.
 
-| Command                     | Effect                                                       |
-|-----------------------------|--------------------------------------------------------------|
-| `ctrl current <algorithm>`  | Selects the current-loop algorithm. Returns `ok` or `busy`.  |
-| `ctrl speed <algorithm>`    | Selects the speed-loop algorithm. Returns `ok` or `busy`.    |
-| `ctrl position <algorithm>` | Selects the position-loop algorithm. Returns `ok` or `busy`. |
-| `ctrl status`               | Prints the active algorithm for each loop.                   |
+| Command                           | Alias | Effect                                    |
+|-----------------------------------|-------|-------------------------------------------|
+| `select_current_algorithm <alg>`  | `sca` | Selects the current-loop algorithm        |
+| `select_speed_algorithm <alg>`    | `ssa` | Selects the speed-loop algorithm          |
+| `select_position_algorithm <alg>` | `spa` | Selects the position-loop algorithm       |
+| `active_algorithms`               | `aa`  | Prints the active algorithm for each loop |
 
-Valid `<algorithm>` tokens are the lower-case algorithm names (e.g., `pid`, `decoupled_pid`,
-`sliding_mode`, `lqi`, `adrc`, `lqr`). Unknown tokens produce a usage error without altering state.
+Valid `<alg>` tokens are the lower-case algorithm names: `pid`, `decoupled`, `deadbeat` and
+`sliding` for the current loop; `pid`, `lqi`, `adrc` and `twodof` for the speed loop; and `pid`,
+`cascadep`, `lqr`, `lqi` and `twodof` for the position loop. Unknown tokens produce a usage
+error without altering state.
 
-The CLI handler enforces the same motor-enabled guard described in Part D. The `busy` response is
-returned without side effects if the motor is enabled.
+The commands enforce the motor-enabled guard described in Part D and report the `SelectResult`
+verbatim, so an operator always learns why a selection was refused.
 
 ---
 
 ### Part G — CAN Interface
 
-Algorithm selection is exposed as a CAN frame in the existing `FocMotorCanBridge` message set.
-Two frame types are added:
-
-| Frame                       | Direction     | Payload                                                           |
-|-----------------------------|---------------|-------------------------------------------------------------------|
-| `SetControllerAlgorithm`    | Host → Device | Loop identifier (1 byte) + Algorithm identifier (1 byte)          |
-| `GetControllerAlgorithm`    | Host → Device | Loop identifier (1 byte)                                          |
-| `ControllerAlgorithmStatus` | Device → Host | Loop (1 byte) + Active algorithm (1 byte) + SelectResult (1 byte) |
-
-The device responds to `SetControllerAlgorithm` with a `ControllerAlgorithmStatus` frame containing
-the resulting `SelectResult`. The `Busy` result follows the same `CanAckStatus` mapping as the
-existing `SetControlMode` command.
+Algorithm selection is **not** exposed over CAN. The `can-lite` `foc_motor` category defines no
+frame for it, and the CAN bridge does not reinterpret an existing frame to carry an algorithm
+identifier. Selection and query are CLI-only; see REQ-CTRL-001 and REQ-CTRL-013.
 
 ---
 
@@ -299,72 +340,57 @@ RLS and are available as soon as electrical calibration completes.
 
 **Position loop:**
 
-| Parameter                   |     PID      |    Cascade P    |         LQR         |         LQI         |   Two-DOF    |       ILC       |
-|-----------------------------|:------------:|:---------------:|:-------------------:|:-------------------:|:------------:|:---------------:|
-| $J$, $B_f$ (mechanical RLS) | Not required |  Not required   |      Required       |      Required       | Not required |  Not required   |
-| $K_t$ (derived)             | Not required |  Not required   |      Required       |      Required       | Not required |  Not required   |
-| $I_{q,max}$                 |  For clamp   | Speed-loop dep. | Required — R weight | Required — R weight |  For clamp   | Speed-loop dep. |
-| Trial length $N$ (samples)  |      —       |        —        |          —          |          —          |      —       |    Required     |
-
-ILC requires the trial length $N$ to be specified at selection time. It does not require
-mechanical RLS parameters — it learns the correction empirically — but it does require a stable
-inner feedback controller (Cascade P, LQR, or Two-DOF) to be active first.
-
-**Friction compensation augmentation:**
-
-| Parameter                                 | Source                        | Notes                             |
-|-------------------------------------------|-------------------------------|-----------------------------------|
-| $T_c$ — Coulomb torque (N·m)              | Friction sweep identification | Not from RLS                      |
-| $T_s$ — Static torque (N·m)               | Friction sweep identification | $T_s > T_c$ always                |
-| $\omega_{st}$ — Stribeck velocity (rad/s) | Friction sweep identification | Typically 0.1–2 rad/s             |
-| $K_t$                                     | Derived from $\psi_f$, $p$    | Used to convert $T_f$ to $i_{ff}$ |
+| Parameter                   |     PID      |    Cascade P    |         LQR         |         LQI         |   Two-DOF    |
+|-----------------------------|:------------:|:---------------:|:-------------------:|:-------------------:|:------------:|
+| $J$, $B_f$ (mechanical RLS) | Not required |  Not required   |      Required       |      Required       | Not required |
+| $K_t$ (derived)             | Not required |  Not required   |      Required       |      Required       | Not required |
+| $I_{q,max}$                 |  For clamp   | Speed-loop dep. | Required — R weight | Required — R weight |  For clamp   |
 
 #### Tuning Knobs (design choices, not estimated)
 
-Each algorithm exposes a small set of tuning parameters that encode the operator's performance intent.
-These are not estimated — they are set explicitly and stored alongside the algorithm identifier.
+Each loop exposes one tuning record shared by all of its algorithms: a single closed-loop bandwidth
+plus a small set of law-specific weights. The record is not estimated — it encodes the operator's
+performance intent, and each algorithm reads only the fields that apply to it. Gains are always
+derived from the bandwidth and the motor model, never supplied per axis.
 
 **Current loop:**
 
-| Algorithm     | Tuning knobs                                   | Suggested starting point                                                 |
-|---------------|------------------------------------------------|--------------------------------------------------------------------------|
-| PID           | $K_p$, $K_i$, $K_d$                            | Pole-zero cancellation: $K_p = L_s \omega_{bw}$, $K_i = R_s \omega_{bw}$ |
-| Decoupled PID | Current bandwidth $\omega_{bw}$                | $2\pi \cdot 1000$ rad/s — same as plain PID                              |
-| Deadbeat      | One-step / two-step variant                    | Two-step for $L_s < 0.3$ mH; one-step otherwise                          |
-| Sliding-mode  | Switching gain $K_{sw}$, boundary layer $\phi$ | $\phi = 0.2$ A; $K_{sw} = 2$–$3\times$ worst-case coupling               |
+| Knob             | Default       | Consumed by        |
+|------------------|---------------|--------------------|
+| Bandwidth        | 2π·1000 rad/s | PID, Decoupled PID |
+| Switching gain   | 0.2           | Sliding-mode       |
+| Boundary layer   | 0.5           | Sliding-mode       |
+| Two-step variant | off           | Deadbeat           |
+
+The sliding-mode error map inside the boundary layer contracts only while the switching gain stays
+below the boundary layer, so the ratio of the two is bounded by design.
 
 **Speed loop:**
 
-| Algorithm | Tuning knobs                                                | Suggested starting point                                   |
-|-----------|-------------------------------------------------------------|------------------------------------------------------------|
-| PID       | $K_p$, $K_i$, $K_d$                                         | $K_p = 2 J \omega_c / K_t$, $K_i = K_p B_f / J$            |
-| LQI       | $q_\omega$, $q_I$, $R$                                      | $q_\omega = 1$, $q_I = 0.1$, $R = 1 / I_{q,max}^2$         |
-| ADRC      | Observer bandwidth $\omega_o$, control bandwidth $\omega_c$ | $\omega_c = 2\pi \cdot 30$ rad/s; $\omega_o = 5\,\omega_c$ |
-| Two-DOF   | $K_p$, $K_i$ (feedback), $\tau_{ff}$ (pre-filter)           | PI gains as PID; $\tau_{ff} = 1/\omega_c$                  |
+| Knob                     | Default     | Consumed by |
+|--------------------------|-------------|-------------|
+| Bandwidth                | 2π·30 rad/s | PID, ADRC   |
+| Speed error weight       | 1.0         | LQI         |
+| Integral weight          | 0.1         | LQI         |
+| Observer bandwidth ratio | 5.0         | ADRC        |
+| Reference time constant  | 5.3 ms      | Two-DOF     |
 
 **Position loop:**
 
-| Algorithm | Tuning knobs                  | Suggested starting point                                |
-|-----------|-------------------------------|---------------------------------------------------------|
-| PID       | $K_p$, $K_i$, $K_d$           | $K_p = \omega_{pos}^2 J / K_t$; light derivative        |
-| Cascade P | $K_v$, $K_{ff}$               | $K_v = \omega_{speed}/5$; $K_{ff} = 0$ initially        |
-| LQR       | $q_\theta$, $q_\omega$, $R$   | $q_\theta = 1$, $q_\omega = T_s^o$, $R = 1/I_{q,max}^2$ |
-| LQI       | As LQR plus $q_I$             | $q_I = 0.01$ added to LQR starting point                |
-| Two-DOF   | Feedback gains, $\tau_{ff}$   | Feedback as LQR; $\tau_{ff} = 1/\omega_{pos}$           |
-| ILC       | $Q$, $\ell$, trial length $N$ | $Q = 0.95$, $\ell = 0.5$, $N$ = task period × 1000      |
+| Knob                    | Default    | Consumed by              |
+|-------------------------|------------|--------------------------|
+| Bandwidth               | 2π·3 rad/s | PID, Cascade P, LQR, LQI |
+| Position error weight   | 1.0        | PID, LQR, LQI            |
+| Speed error weight      | 0.1        | LQR, LQI                 |
+| Integral weight         | 0.05       | PID, LQI                 |
+| Reference time constant | 53 ms      | Two-DOF                  |
 
-**Friction compensation (augmentation):**
+Two-DOF on both outer loops derives its feedback part from the same bandwidth as the corresponding
+PID law and adds only the reference pre-filter time constant on top.
 
-| Knob            | Description                                                  | Suggested           |
-|-----------------|--------------------------------------------------------------|---------------------|
-| $T_c$           | Coulomb torque (N·m)                                         | From friction sweep |
-| $T_s$           | Static torque (N·m)                                          | From friction sweep |
-| $\omega_{st}$   | Stribeck velocity (rad/s)                                    | From friction sweep |
-| Dead-zone width | Linear ramp around $\omega_m=0$ to smooth sign discontinuity | 0.05–0.2 rad/s      |
-
-Tuning knobs are stored in NVM alongside the algorithm identifier and are restored on boot. They are
-not recalculated from RLS parameters — they represent the operator's tuning intent and persist
-independently of parameter updates.
+Of these knobs only the current loop bandwidth and the speed loop bandwidth are persisted, as part
+of the calibration record. The remaining weights and the position loop bandwidth are not stored and
+return to their defaults on boot.
 
 #### Readiness Gate per Algorithm
 
@@ -395,60 +421,28 @@ Speed and position algorithms (LQI, ADRC, LQR) additionally require mechanical i
 
 ---
 
-### Part I — Friction Compensation Augmentation
-
-Friction compensation is an independently controlled feedforward layer, separate from the algorithm
-variant selection described in Parts A–C. It is not part of the discriminated union and does not
-replace any feedback controller; instead it adds a nonlinear $i_q^*$ correction that cancels the
-expected Coulomb and Stribeck friction before the current loop sees it.
-
-#### Enable/Disable
-
-Friction compensation has a single on/off enable flag stored in NVM. It can be toggled independently
-of the active algorithm on each loop, with the same motor-stopped guard as algorithm selection. The
-enable state survives power cycles.
-
-#### Parameter Source
-
-The three friction parameters ($T_c$, $T_s$, $\omega_{st}$) come from a dedicated friction
-identification step that is separate from the mechanical RLS calibration. The mechanical RLS
-estimates only the viscous coefficient $B_f$. Friction parameters must be identified by a friction
-sweep (constant-velocity ramp while logging steady-state $i_q^*$) and stored in NVM. Friction
-compensation cannot be enabled until this identification has been completed.
-
-#### Signal Path
-
-```mermaid
-flowchart LR
-    CTRL["Speed or position\nfeedback controller"] -->|"Iq*_ctrl"| SUM["Σ"]
-    FRIC["Friction feedforward\nIq_ff(ωm)"] --> SUM
-    ENC["Encoder\nωm"] --> FRIC
-    FRIC_EN{"Friction\nenabled?"} -->|yes| SUM
-    SUM -->|"Iq*_total"| CLOOP["Current loop"]
-```
-
-When friction compensation is disabled the feedforward output is zero and the signal path is
-identical to the non-augmented case.
-
-#### Guard Conditions
-
-| Condition                   | Effect                                                                              |
-|-----------------------------|-------------------------------------------------------------------------------------|
-| Motor enabled               | Enable/disable of friction compensation rejected (same NACK as algorithm selection) |
-| Friction not yet identified | Attempting to enable returns InvalidParameters                                      |
-| Algorithm changed           | Friction compensation state is preserved — it is independent of algorithm           |
-
----
-
-### Part J — NVM Persistence
+### Part I — NVM Persistence
 
 The active algorithm identifier for each loop is stored as three additional fields in the existing
-`ConfigData` structure alongside `previousDefaultControlMode`. On boot:
+`ConfigData` structure alongside `defaultControlMode`. On boot:
 
 1. NVM is read and validated.
 2. If valid, the persisted algorithm identifiers are loaded and used to configure each loop's
    controller using the also-persisted motor model parameters.
 3. If invalid (first boot, CRC mismatch), the default (PID for all loops) is used and written.
+
+Restoration is driven by the state machine's transition into `Ready`, not by construction of the
+control mode: the motor model only reaches the loops when the calibration record has been applied,
+which happens asynchronously after the NVM read completes. Applying the persisted identifiers any
+earlier would reject every model-dependent algorithm (deadbeat, decoupled PID, speed LQI, speed
+ADRC, position LQR, position LQI).
+
+Two failure kinds are distinguished when a persisted identifier cannot be activated:
+
+| Failure                                                     | Effect on `ConfigData`                                        |
+|-------------------------------------------------------------|---------------------------------------------------------------|
+| Byte out of enum range, or names no algorithm for that loop | Corrected to the active algorithm — the record is meaningless |
+| Valid algorithm, not selectable yet (`InvalidParameters`)   | Preserved, and retried on the next entry to `Ready`           |
 
 The persistence ensures that an operator who selects ADRC for the speed loop does not need to
 repeat the selection after every power cycle. The motor state machine will transition directly to
@@ -487,32 +481,27 @@ repeat the selection after every power cycle. The motor state machine will trans
 
 ## Data Model
 
-| Entity               | Field             | Type / Unit       | Range                                         | Notes                                                              |
-|----------------------|-------------------|-------------------|-----------------------------------------------|--------------------------------------------------------------------|
-| CurrentAlgorithm     | enum              | uint8             | pid, decoupledPid, slidingMode                | Selectable current-loop strategy                                   |
-| SpeedAlgorithm       | enum              | uint8             | pid, lqi, adrc                                | Selectable speed-loop strategy                                     |
-| PositionAlgorithm    | enum              | uint8             | pid, lqr, lqi                                 | Selectable position-loop strategy                                  |
-| SelectResult         | enum              | uint8             | ok, busy, invalidAlgorithm, invalidParameters | Return code from SelectAlgorithm                                   |
-| MotorModelParameters | Rs                | Ohm (float)       | > 0                                           | From electrical RLS                                                |
-| MotorModelParameters | Ls                | Henry (float)     | > 0                                           | From electrical RLS                                                |
-| MotorModelParameters | psiF              | Weber (float)     | > 0                                           | From alignment calibration                                         |
-| MotorModelParameters | polePairs         | uint8             | ≥ 1                                           | Motor constant                                                     |
-| MotorModelParameters | Vdc               | Volt (float)      | > 0                                           | Measured dynamically                                               |
-| MotorModelParameters | J                 | kg·m² (float)     | > 0                                           | From mechanical RLS                                                |
-| MotorModelParameters | Bf                | N·m·s/rad (float) | ≥ 0                                           | From mechanical RLS                                                |
-| MotorModelParameters | Kt                | N·m/A (float)     | > 0                                           | Derived from psiF and polePairs                                    |
-| NvmRecord            | currentAlgorithm  | uint8             | 0–255                                         | Validated on load; invalid → default (PID)                         |
-| NvmRecord            | speedAlgorithm    | uint8             | 0–255                                         | As above                                                           |
-| NvmRecord            | positionAlgorithm | uint8             | 0–255                                         | As above                                                           |
-| NvmRecord            | frictionEnabled   | bool              | true/false                                    | Friction augmentation enable flag                                  |
-| AlgorithmTuning      | currentTuning     | float[2]          | domain-specific                               | [ωbw] for PID/Dec-PID; [Ksw, φ] for SMC; variant flag for Deadbeat |
-| AlgorithmTuning      | speedTuning       | float[3]          | domain-specific                               | [qω, qI, R] for LQI; [ωo, ωc] for ADRC; [Kp, Ki, τff] for Two-DOF  |
-| AlgorithmTuning      | positionTuning    | float[4]          | domain-specific                               | [Kv, Kff] Cascade P; [qθ, qω, R] LQR; +qI for LQI; [Q, ℓ, N] ILC   |
-| FrictionParams       | Tc                | float / N·m       | > 0                                           | Coulomb torque; from friction sweep                                |
-| FrictionParams       | Ts                | float / N·m       | > Tc                                          | Static torque; from friction sweep                                 |
-| FrictionParams       | omegaSt           | float / rad·s⁻¹   | > 0                                           | Stribeck velocity; from friction sweep                             |
-| FrictionParams       | deadZone          | float / rad·s⁻¹   | > 0                                           | Sign-function linear ramp width                                    |
-| IlcConfig            | trialLength       | uint16            | 1–65535 samples                               | Fixed at ILC selection time; cannot change at runtime              |
+| Entity               | Field                | Type / Unit       | Range                                         | Notes                                                            |
+|----------------------|----------------------|-------------------|-----------------------------------------------|------------------------------------------------------------------|
+| CurrentAlgorithm     | enum                 | uint8             | pid, decoupledPid, deadbeat, slidingMode      | Selectable current-loop strategy                                 |
+| SpeedAlgorithm       | enum                 | uint8             | pid, lqi, adrc, twoDof                        | Selectable speed-loop strategy                                   |
+| PositionAlgorithm    | enum                 | uint8             | pid, cascadeP, lqr, lqi, twoDof               | Selectable position-loop strategy                                |
+| PositionOutputKind   | enum                 | uint8             | speedReference, currentReference              | Declares whether a position law drives the speed or current loop |
+| SelectResult         | enum                 | uint8             | ok, busy, invalidAlgorithm, invalidParameters | Return code from SelectAlgorithm                                 |
+| MotorModelParameters | Rs                   | Ohm (float)       | > 0                                           | From electrical RLS                                              |
+| MotorModelParameters | Ls                   | Henry (float)     | > 0                                           | From electrical RLS                                              |
+| MotorModelParameters | psiF                 | Weber (float)     | > 0                                           | From alignment calibration                                       |
+| MotorModelParameters | polePairs            | uint8             | ≥ 1                                           | Motor constant                                                   |
+| MotorModelParameters | Vdc                  | Volt (float)      | > 0                                           | Measured dynamically                                             |
+| MotorModelParameters | currentLoopRate      | Hertz (uint32)    | > 0                                           | $1/T_s^i$; required to discretize the plant for Deadbeat and SMC |
+| MotorModelParameters | J                    | kg·m² (float)     | > 0                                           | From mechanical RLS                                              |
+| MotorModelParameters | Bf                   | N·m·s/rad (float) | ≥ 0                                           | From mechanical RLS                                              |
+| MotorModelParameters | Kt                   | N·m/A (float)     | > 0                                           | Derived from psiF and polePairs                                  |
+| NvmRecord            | currentAlgorithm     | uint8             | 0–255                                         | Validated on load; invalid → default (PID)                       |
+| NvmRecord            | speedAlgorithm       | uint8             | 0–255                                         | As above                                                         |
+| NvmRecord            | positionAlgorithm    | uint8             | 0–255                                         | As above                                                         |
+| CalibrationRecord    | currentLoopBandwidth | rad/s (float)     | ≥ 0                                           | Persisted current loop bandwidth                                 |
+| CalibrationRecord    | speedLoopBandwidth   | rad/s (float)     | ≥ 0                                           | Persisted speed loop bandwidth                                   |
 
 ---
 
@@ -568,14 +557,16 @@ sequenceDiagram
     Boot->>Selector: Initialize()
     Selector->>NVM: Read()
     NVM-->>Selector: {currentAlgorithm=decoupledPid, speedAlgorithm=adrc, positionAlgorithm=pid}
+    NVM-->>StateMachine: calibration record
+    StateMachine->>Selector: Configure(motor model)
+    StateMachine->>Selector: OnReady()
     Selector->>Selector: ConstructInPlace<DecoupledPidCurrentController>
     Selector->>Selector: Configure(GetElectricalParameters())
     Selector->>Selector: ConstructInPlace<AdrcSpeedController>
     Selector->>Selector: Configure(GetMechanicalParameters())
     Selector->>Selector: ConstructInPlace<PidPositionController>
     Selector->>Selector: Configure(GetMechanicalParameters())
-    Selector-->>Boot: Ready
-    Boot->>StateMachine: TransitionToReady()
+    Selector-->>StateMachine: restored
 ```
 
 ---
