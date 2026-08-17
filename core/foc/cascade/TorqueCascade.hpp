@@ -31,8 +31,6 @@ namespace foc
         CurrentControllerSelector currentLoop;
         [[no_unique_address]] SpaceVectorModulation spaceVectorModulator;
         float polePairs{ 0.0f };
-        // Written from command context, read from the control interrupt; it also gates algorithm
-        // replacement, which must never run while the interrupt can visit the selector variant.
         volatile bool enabled{ false };
         IdAndIqPoint lastSetPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
         // Torque mode has no outer loop to measure speed, so the decoupling feedforward is fed

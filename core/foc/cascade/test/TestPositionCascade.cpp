@@ -182,7 +182,6 @@ TEST_F(TestPositionCascade, set_pole_pairs)
         scaled.cascade->SetPoint(foc::Radians{ 0.002f });
         reference.cascade->SetPoint(foc::Radians{ 0.002f });
 
-        // Both start at zero, so the outer loops see the same error and command the same current
         foc::Radians scaledStart{ 0.0f };
         foc::Radians referenceStart{ 0.0f };
         scaled.cascade->Calculate(ZeroCurrents(), scaledStart);
@@ -393,8 +392,6 @@ TEST_F(TestPositionCascade, a_current_commanding_algorithm_still_drives_the_inve
 
 TEST_F(TestPositionCascade, the_cascade_p_algorithm_drives_the_inverter)
 {
-    // The P law ignores the integral weight the PID designs its gains from, which is what makes
-    // the two laws tell apart at the inverter
     auto tunings = foc::PositionLoopTunings{};
     tunings.integralWeight = 100.0f;
 
@@ -409,8 +406,6 @@ TEST_F(TestPositionCascade, the_cascade_p_algorithm_drives_the_inverter)
 
 TEST_F(TestPositionCascade, the_two_dof_algorithm_drives_the_inverter)
 {
-    // The prefilter admits about one percent of the step per outer sample, so both the step and the
-    // number of cycles have to be larger than elsewhere before the shaped command reaches the inverter
     constexpr float shapedSetPoint{ 1.0f };
     constexpr int outerCycles{ 3 };
 
@@ -445,8 +440,6 @@ TEST_F(TestPositionCascade, a_setpoint_across_the_encoder_seam_moves_the_short_w
     constexpr float shortWay{ 0.5f };
     const float measured{ pi - 0.001f };
 
-    // A second outer cycle lets the speed estimate settle after the jump the enable leaves behind,
-    // and state feedback keeps no integrator that would carry that first sample forward
     constexpr int outerCycles{ 2 };
 
     PositionCascadeUnderTest acrossTheSeam{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::lqr };
@@ -503,8 +496,6 @@ TEST_F(TestPositionCascade, registered_online_estimators_are_fed_from_the_outer_
     lowPriorityInterruptMock.TriggerHandler();
 }
 
-// The cascade owns the current envelope and outer-loop rate; forwarding the caller's placeholder
-// zeros to the position loop left the default PID with zero gains and made LQR/LQI unselectable.
 TEST_F(TestPositionCascade, the_position_loop_receives_the_effective_current_envelope_and_rate)
 {
     PositionCascadeUnderTest cascade{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };

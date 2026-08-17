@@ -6,12 +6,73 @@
 
 namespace foc
 {
+    SpeedDifferentiator::SpeedDifferentiator(hal::Hertz outerLoopFrequency)
+        : samplePeriod{ 1.0f / static_cast<float>(outerLoopFrequency.Value()) }
+    {}
+
+    void SpeedDifferentiator::Restart()
+    {
+        currentAngle = 0.0f;
+        previousAngle = 0.0f;
+        previousAngleValid = false;
+    }
+
+    OPTIMIZE_FOR_SPEED
+    float SpeedDifferentiator::Measure()
+    {
+        if (!previousAngleValid)
+        {
+            previousAngle = currentAngle;
+            previousAngleValid = true;
+            return 0.0f;
+        }
+
+        const auto speed = detail::PositionWithWrapAround(currentAngle - previousAngle) / samplePeriod;
+        previousAngle = currentAngle;
+        return speed;
+    }
+
+    void EstimatorChannel::SetMechanical(OnlineMechanicalEstimator& estimator)
+    {
+        mechanical = &estimator;
+    }
+
+    void EstimatorChannel::SetElectrical(OnlineElectricalEstimator& estimator)
+    {
+        electrical = &estimator;
+    }
+
+    void EstimatorChannel::UpdateMechanical(float mechanicalSpeed)
+    {
+        if (mechanical == nullptr)
+            return;
+
+        const auto& snapshot = Ready();
+        mechanical->Update(
+            snapshot.phaseCurrents,
+            RadiansPerSecond{ mechanicalSpeed },
+            Radians{ snapshot.electricalAngle });
+    }
+
+    void EstimatorChannel::UpdateElectrical(float electricalSpeed, float vdcInvScale)
+    {
+        if (electrical == nullptr)
+            return;
+
+        const auto& snapshot = Ready();
+        electrical->Update(
+            Volts{ snapshot.normalizedVd * vdcInvScale },
+            Ampere{ snapshot.measuredId },
+            Ampere{ snapshot.measuredIq },
+            RadiansPerSecond{ electricalSpeed });
+    }
+
     OPTIMIZE_FOR_SPEED
     CascadeWithSpeedLoop::CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)
         : lowPriorityInterrupt(lowPriorityInterrupt)
         , maxCurrent{ maxCurrent }
         , outerLoopFrequency{ lowPriorityFrequency }
-        , speedDt{ 1.0f / static_cast<float>(lowPriorityFrequency.Value()) }
+        , speedDifferentiator{ lowPriorityFrequency }
         , prescaler{ baseFrequency.Value() / lowPriorityFrequency.Value() }
     {
         really_assert(maxCurrent.Value() > 0);
@@ -57,9 +118,7 @@ namespace foc
         currentLoop.Reset();
         speedLoop.Reset();
 
-        currentMechanicalAngle = 0.0f;
-        previousSpeedPosition = 0.0f;
-        previousSpeedPositionValid = false;
+        speedDifferentiator.Restart();
         lastSpeedLoopOutput = 0.0f;
         lastElectricalSpeed = 0.0f;
         triggerCounter = 0;
@@ -107,7 +166,7 @@ namespace foc
 
         auto mechanicalAngle = position.Value();
         auto electricalAngle = mechanicalAngle * polePairs;
-        currentMechanicalAngle = mechanicalAngle;
+        speedDifferentiator.Track(mechanicalAngle);
 
         auto cosTheta = FastTrigonometry::Cosine(electricalAngle);
         auto sinTheta = FastTrigonometry::Sine(electricalAngle);
@@ -138,16 +197,7 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     float CascadeWithSpeedLoop::MeasureMechanicalSpeed()
     {
-        if (!previousSpeedPositionValid)
-        {
-            previousSpeedPosition = currentMechanicalAngle;
-            previousSpeedPositionValid = true;
-            lastElectricalSpeed = 0.0f;
-            return 0.0f;
-        }
-
-        auto mechanicalSpeed = detail::PositionWithWrapAround(currentMechanicalAngle - previousSpeedPosition) / speedDt;
-        previousSpeedPosition = currentMechanicalAngle;
+        const auto mechanicalSpeed = speedDifferentiator.Measure();
         lastElectricalSpeed = mechanicalSpeed * polePairs;
         return mechanicalSpeed;
     }
@@ -166,7 +216,7 @@ namespace foc
 
     float CascadeWithSpeedLoop::CurrentMechanicalAngle() const
     {
-        return currentMechanicalAngle;
+        return speedDifferentiator.CurrentAngle();
     }
 
     float CascadeWithSpeedLoop::PolePairs() const
@@ -181,37 +231,21 @@ namespace foc
 
     void CascadeWithSpeedLoop::SetOnlineMechanicalEstimatorImpl(OnlineMechanicalEstimator& estimator)
     {
-        estimators.mechanical = &estimator;
+        estimators.SetMechanical(estimator);
     }
 
     void CascadeWithSpeedLoop::SetOnlineElectricalEstimatorImpl(OnlineElectricalEstimator& estimator)
     {
-        estimators.electrical = &estimator;
+        estimators.SetElectrical(estimator);
     }
 
     void CascadeWithSpeedLoop::UpdateOnlineMechanicalEstimator(float mechanicalSpeed)
     {
-        if (estimators.mechanical == nullptr)
-            return;
-
-        const auto& snapshot = estimators.Ready();
-        estimators.mechanical->Update(
-            snapshot.phaseCurrents,
-            RadiansPerSecond{ mechanicalSpeed },
-            Radians{ snapshot.electricalAngle });
+        estimators.UpdateMechanical(mechanicalSpeed);
     }
 
     void CascadeWithSpeedLoop::UpdateOnlineElectricalEstimator(float electricalSpeed)
     {
-        if (estimators.electrical == nullptr)
-            return;
-
-        const auto& snapshot = estimators.Ready();
-        const float physicalVd = snapshot.normalizedVd * vdcInvScale;
-        estimators.electrical->Update(
-            Volts{ physicalVd },
-            Ampere{ snapshot.measuredId },
-            Ampere{ snapshot.measuredIq },
-            RadiansPerSecond{ electricalSpeed });
+        estimators.UpdateElectrical(electricalSpeed, vdcInvScale);
     }
 }

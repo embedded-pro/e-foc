@@ -108,28 +108,33 @@ namespace application
         pendingCommandCallback = onDone;
         nvm.InvalidateCalibration([this](services::NvmStatus status)
             {
-                if (!HasPendingCommand() || !state_machine::IsStopped(currentState))
-                    return;
-
-                if (status == services::NvmStatus::Busy)
-                {
-                    CompletePendingCommand(state_machine::CommandResult::rejected);
-                    return;
-                }
-
-                if (status != services::NvmStatus::Ok)
-                {
-                    CompletePendingCommand(state_machine::CommandResult::nvmFailed);
-                    EnterFault(state_machine::FaultCode::hardwareFault);
-                }
-                else
-                {
-                    tracer.Trace() << "[SM] Calibration invalidated in NVM";
-                    calibrationData = services::CalibrationData{};
-                    currentState = state_machine::Idle{};
-                    CompletePendingCommand(state_machine::CommandResult::ok);
-                }
+                OnCalibrationInvalidated(status);
             });
+    }
+
+    void FocStateMachineCommon::OnCalibrationInvalidated(services::NvmStatus status)
+    {
+        if (!HasPendingCommand() || !state_machine::IsStopped(currentState))
+            return;
+
+        if (status == services::NvmStatus::Busy)
+        {
+            CompletePendingCommand(state_machine::CommandResult::rejected);
+            return;
+        }
+
+        if (status != services::NvmStatus::Ok)
+        {
+            CompletePendingCommand(state_machine::CommandResult::nvmFailed);
+            EnterFault(state_machine::FaultCode::hardwareFault);
+        }
+        else
+        {
+            tracer.Trace() << "[SM] Calibration invalidated in NVM";
+            calibrationData = services::CalibrationData{};
+            currentState = state_machine::Idle{};
+            CompletePendingCommand(state_machine::CommandResult::ok);
+        }
     }
 
     state_machine::CommandResult FocStateMachineCommon::CmdEmergencyStop()

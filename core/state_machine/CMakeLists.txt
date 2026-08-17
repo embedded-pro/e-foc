@@ -34,12 +34,11 @@ target_sources(e_foc.state_machine PRIVATE
     FocStateMachineCommon.cpp
     OuterLoopStateMachine.hpp
     OuterLoopStateMachine.cpp
+    OuterLoopStateMachineFor.hpp
     PlatformFaultNotifier.hpp
     PlatformFaultNotifier.cpp
     PositionStateMachine.hpp
-    PositionStateMachine.cpp
     SpeedStateMachine.hpp
-    SpeedStateMachine.cpp
     TorqueStateMachine.hpp
     TorqueStateMachine.cpp
     TransitionPolicies.hpp

@@ -12,8 +12,6 @@ namespace
     const hal::Hertz lowPriorityFrequency{ 2000 };
     constexpr float tolerance = 1.0f;
 
-    // The shipped current-loop bandwidth drives the modulator onto its rails for every current
-    // reference a speed loop can ask for, which would hide the differences these tests look for.
     foc::CurrentLoopTunings UnsaturatedCurrentTunings()
     {
         auto tunings = foc::CurrentLoopTunings{};
@@ -168,8 +166,6 @@ TEST_F(TestSpeedCascade, duty_cycles_are_bounded_0_to_100)
     ExpectValidDuty(result);
 }
 
-// theta_e = theta_m * pole_pairs: p pole pairs at a mechanical angle must land on the same
-// electrical angle - and therefore the same duty cycles - as 1 pole pair at p times that angle.
 TEST_F(TestSpeedCascade, set_pole_pairs)
 {
     constexpr float mechanicalAngle{ 0.3f };
@@ -186,7 +182,6 @@ TEST_F(TestSpeedCascade, set_pole_pairs)
         scaled.cascade->SetPoint(foc::RadiansPerSecond{ 0.2f });
         reference.cascade->SetPoint(foc::RadiansPerSecond{ 0.2f });
 
-        // Both start at zero, so the outer loop measures the same standstill and commands the same current
         foc::Radians scaledStart{ 0.0f };
         foc::Radians referenceStart{ 0.0f };
         scaled.cascade->Calculate(ZeroCurrents(), scaledStart);
@@ -252,8 +247,6 @@ TEST_F(TestSpeedCascade, different_positions_produce_different_outputs)
 
 TEST_F(TestSpeedCascade, consecutive_calls_update_speed_estimation)
 {
-    // 50 urad of rotation is 0.35 mrad electrically for the seven pole pairs under test, far below
-    // the one percent the duty cycles resolve, so only the measured speed separates the two runs.
     constexpr float step{ 0.00005f };
 
     focSpeed->SetCurrentTunings(UnsaturatedCurrentTunings());
@@ -387,14 +380,11 @@ TEST(TestSpeedCascadeLifetime, destruction_unregisters_the_outer_loop_handler_so
         cascade.Enable();
     }
 
-    // Stands in for a trigger that was already queued when the cascade was destroyed
     lowPriorityInterrupt.TriggerHandler();
 
     EXPECT_FALSE(lowPriorityInterrupt.HasHandler());
 }
 
-// A stationary rotor at a non-zero angle must not be read as motion on the first outer sample:
-// zeroing the differentiator on enable made pi rad look like a 3000 rad/s step at 1 kHz.
 TEST_F(TestSpeedCascade, the_speed_estimate_does_not_spike_on_the_first_sample_after_enable)
 {
     SpeedCascadeUnderTest atOrigin{ polePairs, foc::SpeedLoopTunings{} };

@@ -17,6 +17,7 @@ namespace application
             state_machine::TransitionPolicy transitionPolicy);
 
         foc::FocTorque& GetController();
+        const foc::FocTorque& GetController() const;
 
     protected:
         foc::FocBase& GetFoc() override;

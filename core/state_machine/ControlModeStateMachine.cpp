@@ -386,17 +386,29 @@ namespace state_machine
 
     const foc::CurrentLoopSelectable* ControlModeStateMachine::CurrentSelectable() const
     {
-        return const_cast<ControlModeStateMachine*>(this)->CurrentSelectable();
+        if (const auto* sm = std::get_if<application::TorqueStateMachine>(&activeSm))
+            return &sm->GetController();
+        if (const auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
+            return &sm->GetController();
+        if (const auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
+            return &sm->GetController();
+        return nullptr;
     }
 
     const foc::SpeedLoopSelectable* ControlModeStateMachine::SpeedSelectable() const
     {
-        return const_cast<ControlModeStateMachine*>(this)->SpeedSelectable();
+        if (const auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
+            return &sm->GetController();
+        if (const auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
+            return &sm->GetController();
+        return nullptr;
     }
 
     const foc::PositionLoopSelectable* ControlModeStateMachine::PositionSelectable() const
     {
-        return const_cast<ControlModeStateMachine*>(this)->PositionSelectable();
+        if (const auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
+            return &sm->GetController();
+        return nullptr;
     }
 
     // Only a byte that names no algorithm is corrected; a valid choice that the loop cannot accept
@@ -761,7 +773,11 @@ namespace state_machine
 
     const application::FocStateMachineCommon& ControlModeStateMachine::ActiveCommon() const
     {
-        return const_cast<ControlModeStateMachine*>(this)->ActiveCommon();
+        if (const auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
+            return *sm;
+        if (const auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
+            return *sm;
+        return std::get<application::TorqueStateMachine>(activeSm);
     }
 
     void ControlModeStateMachine::SetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(CommandResult)>& onDone)

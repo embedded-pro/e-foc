@@ -22,6 +22,11 @@ namespace application
         return focController;
     }
 
+    const foc::FocTorque& TorqueStateMachine::GetController() const
+    {
+        return focController;
+    }
+
     foc::FocBase& TorqueStateMachine::GetFoc()
     {
         return focController;

@@ -137,7 +137,6 @@ TEST_F(TestTorqueCascade, enable_disable_cycle)
     foc::Radians position{ 0.2f };
     auto result = focTorque->Calculate(ZeroCurrents(), position);
 
-    // An integrator carried across the cycle would hold the output where the wound-up loop left it
     ExpectCentredDuty(result);
 }
 

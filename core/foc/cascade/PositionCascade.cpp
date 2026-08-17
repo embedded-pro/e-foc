@@ -136,7 +136,6 @@ namespace foc
     {
         auto mechanicalSpeed = MeasureMechanicalSpeed();
 
-        // Identification drives the speed loop itself; the position law must not fight it
         if (speedCommandActive)
         {
             SetSpeedReference(speedCommand);

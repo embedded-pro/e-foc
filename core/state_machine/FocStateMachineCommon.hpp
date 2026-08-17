@@ -126,6 +126,8 @@ namespace application
         services::CalibrationData calibrationData{};
         float pendingFluxLinkage{ 0.0f };
         bool bootCheckInFlight{ false };
+        void OnCalibrationInvalidated(services::NvmStatus status);
+
         infra::AutoResetFunction<void(state_machine::CommandResult)> pendingCommandCallback;
         infra::Function<void()> readyHandler;
     };

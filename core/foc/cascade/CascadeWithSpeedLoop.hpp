@@ -36,6 +36,12 @@ namespace foc
             ready = writeSlot;
         }
 
+        void SetMechanical(OnlineMechanicalEstimator& estimator);
+        void SetElectrical(OnlineElectricalEstimator& estimator);
+        void UpdateMechanical(float mechanicalSpeed);
+        void UpdateElectrical(float electricalSpeed, float vdcInvScale);
+
+    private:
         ALWAYS_INLINE_HOT const EstimatorSnapshot& Ready() const
         {
             return slots[ready];
@@ -43,17 +49,40 @@ namespace foc
 
         OnlineMechanicalEstimator* mechanical{ nullptr };
         OnlineElectricalEstimator* electrical{ nullptr };
-
-    private:
         std::array<EstimatorSnapshot, 2> slots{};
         volatile uint8_t ready{ 0 };
+    };
+
+    class SpeedDifferentiator
+    {
+    public:
+        explicit SpeedDifferentiator(hal::Hertz outerLoopFrequency);
+
+        void Restart();
+
+        ALWAYS_INLINE_HOT void Track(float mechanicalAngle)
+        {
+            currentAngle = mechanicalAngle;
+        }
+
+        ALWAYS_INLINE_HOT float CurrentAngle() const
+        {
+            return currentAngle;
+        }
+
+        float Measure();
+
+    private:
+        float samplePeriod;
+        float currentAngle{ 0.0f };
+        float previousAngle{ 0.0f };
+        bool previousAngleValid{ false };
     };
 
     class CascadeWithSpeedLoop
     {
     protected:
         explicit CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency);
-        // Non-virtual: cascades live inside a variant and are always destroyed as their concrete type
         ~CascadeWithSpeedLoop();
 
         void ConfigureImpl(const MotorModelParameters& parameters);
@@ -92,19 +121,14 @@ namespace foc
         LowPriorityInterrupt& lowPriorityInterrupt;
         Ampere maxCurrent;
         hal::Hertz outerLoopFrequency;
-        float currentMechanicalAngle{ 0.0f };
-        float previousSpeedPosition{ 0.0f };
-        bool previousSpeedPositionValid{ false };
+        SpeedDifferentiator speedDifferentiator;
         float lastSpeedLoopOutput{ 0.0f };
         float lastElectricalSpeed{ 0.0f };
         RadiansPerSecond speedReference{ 0.0f };
-        float speedDt;
         uint32_t prescaler;
         uint32_t triggerCounter{ 0 };
         float polePairs{ 0.0f };
         float vdcInvScale{ 1.0f };
-        // Written from command context, read from the control interrupt; it also gates algorithm
-        // replacement, which must never run while the interrupt can visit the selector variant.
         volatile bool enabled{ false };
 
         EstimatorChannel estimators;
