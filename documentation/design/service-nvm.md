@@ -209,16 +209,16 @@ stateDiagram-v2
 
 **ConfigData** (20 bytes total):
 
-| Field                 | Physical unit | Description                                  |
-|-----------------------|---------------|----------------------------------------------|
-| canNodeId             | —             | CAN bus node identifier                      |
-| canBaudrate           | bit/s         | CAN bus baud rate                            |
-| telemetryRateHz       | Hz            | Rate at which telemetry frames are sent      |
-| encoderResolution     | —             | Encoder counts per mechanical revolution      |
-| defaultControlMode    | —             | Control mode selected on power-up            |
-| currentAlgorithm      | —             | Current-loop algorithm selected on power-up  |
-| speedAlgorithm        | —             | Speed-loop algorithm selected on power-up    |
-| positionAlgorithm     | —             | Position-loop algorithm selected on power-up |
+| Field              | Physical unit | Description                                  |
+|--------------------|---------------|----------------------------------------------|
+| canNodeId          | —             | CAN bus node identifier                      |
+| canBaudrate        | bit/s         | CAN bus baud rate                            |
+| telemetryRateHz    | Hz            | Rate at which telemetry frames are sent      |
+| encoderResolution  | —             | Encoder counts per mechanical revolution     |
+| defaultControlMode | —             | Control mode selected on power-up            |
+| currentAlgorithm   | —             | Current-loop algorithm selected on power-up  |
+| speedAlgorithm     | —             | Speed-loop algorithm selected on power-up    |
+| positionAlgorithm  | —             | Position-loop algorithm selected on power-up |
 
 The four selection fields are stored as raw byte identifiers. A record can pass the integrity check
 and still hold a byte outside the valid range for its selection, so each value is range-checked
@@ -232,16 +232,16 @@ byte is corrected to match what is actually running.
 
 ### Provided
 
-| Interface                       | Purpose                                                                       | Contract                                                                |
-|---------------------------------|-------------------------------------------------------------------------------|-------------------------------------------------------------------------|
+| Interface                       | Purpose                                                                       | Contract                                                                 |
+|---------------------------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------|
 | `SaveCalibration(data, onDone)` | Erases calibration sector, writes record, verifies read-back                  | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied |
 | `LoadCalibration(onDone)`       | Reads and integrity-checks the calibration record                             | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied |
-| `InvalidateCalibration(onDone)` | Erases the calibration sector without writing a new record                    | Makes `IsCalibrationValid` return false; `onDone(NvmStatus)` fires once |
+| `InvalidateCalibration(onDone)` | Erases the calibration sector without writing a new record                    | Makes `IsCalibrationValid` return false; `onDone(NvmStatus)` fires once  |
 | `IsCalibrationValid(onDone)`    | Reads and integrity-checks the calibration record, reporting validity only    | `onDone(bool)` fires exactly once; `false` if the device is occupied     |
 | `SaveConfig(data, onDone)`      | Same write+verify sequence for the configuration region                       | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied |
 | `LoadConfig(onDone)`            | Reads and integrity-checks the configuration record                           | `onDone(NvmStatus)` fires exactly once; `Busy` if the device is occupied |
-| `ResetConfigToDefaults(onDone)` | Writes a record containing factory-default values to the configuration region | Follows the same erase/write/verify sequence as `SaveConfig`            |
-| `Format(onDone)`                | Erases both calibration and configuration regions                             | `onDone(NvmStatus)` fires once, after both regions are erased           |
+| `ResetConfigToDefaults(onDone)` | Writes a record containing factory-default values to the configuration region | Follows the same erase/write/verify sequence as `SaveConfig`             |
+| `Format(onDone)`                | Erases both calibration and configuration regions                             | `onDone(NvmStatus)` fires once, after both regions are erased            |
 
 ### Required
 

@@ -98,7 +98,11 @@ A stale comment is worse than no comment. When you change code, delete or correc
 
 ## Documentation — MANDATORY
 
-**Documentation-first rule**: If a change alters any component's observable behavior, the corresponding architecture or design document in `documentation/` must be updated **before or alongside** the code. Code must follow documentation, not the opposite. If no architecture/design document exists for the affected component, create one using `documentation/templates/architecture.md` or `documentation/templates/design.md` before writing production code.
+**Documentation-first rule**: If a change alters any component's observable behavior, the corresponding
+architecture or design document in `documentation/` must be updated **before or alongside** the code. Code
+must follow documentation, not the opposite. If no architecture/design document exists for the affected
+component, create one using `documentation/templates/architecture.md` or `documentation/templates/design.md`
+before writing production code.
 
 For every FOC algorithm or motor model change, update the corresponding `documentation/theory/{topic}.md`. For timing-critical changes, update `documentation/performance-optimization/README.md`.
 

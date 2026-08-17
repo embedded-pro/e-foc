@@ -1,9 +1,9 @@
+# e-foc
+
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=embedded-pro_e-foc&metric=alert_status&token=2d1b7ae361d044a96ba29c5afcbdb009cac319d2)](https://sonarcloud.io/summary/new_code?id=embedded-pro_e-foc)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=embedded-pro_e-foc&metric=coverage&token=2d1b7ae361d044a96ba29c5afcbdb009cac319d2)](https://sonarcloud.io/summary/new_code?id=embedded-pro_e-foc)
 [![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=embedded-pro_e-foc&metric=duplicated_lines_density&token=2d1b7ae361d044a96ba29c5afcbdb009cac319d2)](https://sonarcloud.io/summary/new_code?id=embedded-pro_e-foc)
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=embedded-pro_e-foc&metric=vulnerabilities&token=2d1b7ae361d044a96ba29c5afcbdb009cac319d2)](https://sonarcloud.io/summary/new_code?id=embedded-pro_e-foc)
-
-# e-foc
 
 An embedded motor control application implementing Field-Oriented Control (FOC) for BLDC and PMSM motors with strict real-time and memory constraints. Built for deterministic execution on resource-constrained microcontrollers.
 
@@ -65,7 +65,7 @@ cmake --build --preset EK-TM4C1294XL-Debug
 ```
 
 ## Project Structure
-```
+```text
 e-foc/
 ├── core/                            # FOC library code (no application entry points)
 │   ├── foc/                         # Field-Oriented Control
@@ -180,15 +180,15 @@ always-visible SVPWM hexagon.
 
 ### Troubleshooting
 
-| Problem | Solution |
-|---|---|
-| `cannot open display` | Ensure the X server is running on the host and "Disable access control" is enabled |
-| Black window or no rendering | Set `LIBGL_ALWAYS_INDIRECT=1` (already configured in the Dev Container) |
-| Windows firewall blocks display | Allow VcXsrv (`vcxsrv.exe`) through the Windows firewall for private networks |
+| Problem                         | Solution                                                                           |
+|---------------------------------|------------------------------------------------------------------------------------|
+| `cannot open display`           | Ensure the X server is running on the host and "Disable access control" is enabled |
+| Black window or no rendering    | Set `LIBGL_ALWAYS_INDIRECT=1` (already configured in the Dev Container)            |
+| Windows firewall blocks display | Allow VcXsrv (`vcxsrv.exe`) through the Windows firewall for private networks      |
 
 ## Documentation
 
-### Architecture
+### Architecture Documents
 
 | Document                                                    | Description                                                |
 |-------------------------------------------------------------|------------------------------------------------------------|

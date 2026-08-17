@@ -50,7 +50,7 @@ date: 2026-04-07
 
 The mechanical dynamics of a PMSM rotor are governed by Newton's second law for rotation:
 
-```
+```text
 τ_motor = J · dω/dt + B · ω + τ_friction
 ```
 
@@ -69,7 +69,7 @@ This is a linear model in the three unknowns [J, B, τ_friction]. The RLS estima
 
 At each sampling callback, the instantaneous electromagnetic torque is estimated from the q-axis current:
 
-```
+```text
 τ_motor = Kt × Iq
 ```
 
@@ -81,7 +81,7 @@ The d-axis contribution to torque is zero for surface PMSM under the Id = 0 oper
 
 Angular velocity (ω) at each observation instant is obtained from two successive encoder angle samples using a finite difference with wrap-around compensation:
 
-```
+```text
 ω_k = (θ_k − θ_{k−1}) / Δt
 ```
 
@@ -89,7 +89,7 @@ where Δt is the sampling period and wrap-around compensation shifts the raw dif
 
 Angular acceleration (dω/dt) is obtained from two successive velocity estimates by a further finite difference:
 
-```
+```text
 α_k = (ω_k − ω_{k−1}) / Δt
 ```
 
@@ -99,31 +99,31 @@ The double finite difference amplifies noise; the quality of the acceleration es
 
 The RLS estimator maintains a 3×1 parameter vector θ = [J, B, τ_friction]ᵀ and a 3×3 covariance matrix P. At each observation k, a 1×3 regressor row vector is formed:
 
-```
+```text
 φ_k = [ dω/dt_k,  ω_k,  1 ]
 ```
 
 and the scalar observation is:
 
-```
+```text
 y_k = τ_motor_k
 ```
 
 The prediction error is:
 
-```
+```text
 e_k = y_k − φ_k · θ_{k−1}
 ```
 
 The Kalman gain vector is:
 
-```
+```text
 K_k = P_{k−1} · φ_kᵀ · (λ + φ_k · P_{k−1} · φ_kᵀ)⁻¹
 ```
 
 The parameter and covariance updates are:
 
-```
+```text
 θ_k = θ_{k−1} + K_k · e_k
 P_k = (P_{k−1} − K_k · φ_k · P_{k−1}) / λ
 ```
@@ -213,7 +213,11 @@ No explicit persistence-of-excitation gate is applied. When the motor is at stan
 
 ### Seeding and Warm Start
 
-When calibration data is loaded (from NVM or after a fresh calibration run), the online estimator is seeded with the calibration values $(J_{cal}, B_{cal})$. This initialises the RLS coefficient vector to $\theta = [0,\ J_{cal},\ B_{cal}]^T$, setting the Coulomb-friction intercept to zero and warm-starting the inertia and viscous-friction estimates at the identified operating point. This avoids a cold-start transient where estimates are physically meaningless during the initial operating period.
+When calibration data is loaded (from NVM or after a fresh calibration run), the online estimator is seeded
+with the calibration values $(J_{cal}, B_{cal})$. This initialises the RLS coefficient vector to $\theta =
+[0,\ J_{cal},\ B_{cal}]^T$, setting the Coulomb-friction intercept to zero and warm-starting the inertia and
+viscous-friction estimates at the identified operating point. This avoids a cold-start transient where
+estimates are physically meaningless during the initial operating period.
 
 ### Forgetting Factor
 

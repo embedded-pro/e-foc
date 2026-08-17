@@ -324,14 +324,14 @@ which estimates only the linear viscous coefficient $B_f$.
 
 ## Numerical Properties
 
-| Property                    |   PID    |  Cascade P (P2)   | LQR/LQI (P1) | Two-DOF (P3) |         ILC (P4)          |
+| Property                    | PID      | Cascade P (P2)    | LQR/LQI (P1) | Two-DOF (P3) | ILC (P4)                  |
 |-----------------------------|:--------:|:-----------------:|:------------:|:------------:|:-------------------------:|
-| Ops per 1 kHz cycle         | ~6 MACs  |      2 MACs       |    4 MACs    |   ~8 MACs    |    2 MACs + array read    |
-| Steady-state position error | Zero (D) |  Speed-loop dep.  |  Zero (LQI)  | Configurable | Near-zero after learning  |
-| Tracking vs. stiffness      | Coupled  |      Coupled      |   Coupled    |  Decoupled   |    N/A — periodic only    |
-| Industry prevalence         |  Common  | Dominant in servo | Modern servo | Modern servo |        Specialist         |
-| Requires J, Bf              |    No    |        No         |     Yes      |      No      |            No             |
-| Storage                     | Constant |     Constant      |   Constant   |   Constant   | N × float (bounded array) |
+| Ops per 1 kHz cycle         | ~6 MACs  | 2 MACs            | 4 MACs       | ~8 MACs      | 2 MACs + array read       |
+| Steady-state position error | Zero (D) | Speed-loop dep.   | Zero (LQI)   | Configurable | Near-zero after learning  |
+| Tracking vs. stiffness      | Coupled  | Coupled           | Coupled      | Decoupled    | N/A — periodic only       |
+| Industry prevalence         | Common   | Dominant in servo | Modern servo | Modern servo | Specialist                |
+| Requires J, Bf              | No       | No                | Yes          | No           | No                        |
+| Storage                     | Constant | Constant          | Constant     | Constant     | N × float (bounded array) |
 
 ---
 

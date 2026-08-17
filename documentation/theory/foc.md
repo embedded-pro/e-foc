@@ -368,7 +368,7 @@ graph TD
 
 ### Coordinate System Relationships
 
-```
+```text
                  β
                  ↑
                  |    q (rotates)
@@ -388,17 +388,17 @@ See also: `documentation/theory/images/foc_coordinates.svg` and `documentation/t
 
 ## Numerical Properties
 
-| Property            | Value / Condition                                     |
-|---------------------|-------------------------------------------------------|
-| Control rate        | 20 kHz (50 µs period)                                 |
-| Transform latency   | < 20 CPU cycles (Clarke + Park combined)              |
-| LUT angle error     | <= $\pi/512 \approx 0.35°$ truncated; $\approx 1.9\times10^{-5}$ interpolated |
-| SVM duty resolution | 1% per step — `PhasePwmDutyCycles` carries `hal::Percent` (`uint8_t`) |
+| Property            | Value / Condition                                                                              |
+|---------------------|------------------------------------------------------------------------------------------------|
+| Control rate        | 20 kHz (50 µs period)                                                                          |
+| Transform latency   | < 20 CPU cycles (Clarke + Park combined)                                                       |
+| LUT angle error     | <= $\pi/512 \approx 0.35°$ truncated; $\approx 1.9\times10^{-5}$ interpolated                  |
+| SVM duty resolution | 1% per step — `PhasePwmDutyCycles` carries `hal::Percent` (`uint8_t`)                          |
 | PI output range     | Applied $v_{dq}$ limited to the unit circle $\lVert v \rVert \le 1$; anti-windup on that limit |
-| Torque linearity    | $\tau_e \propto i_q$ within MTPA region               |
-| Over-modulation     | Clamp-based saturation; duty cycles bounded to [0, 1] |
-| Gain normalisation  | $K_{p,norm} = K_{p,phys} \cdot \sqrt{3}/V_{dc}$       |
-| LUT memory          | 512 × 4 bytes = 2048 bytes flash                      |
+| Torque linearity    | $\tau_e \propto i_q$ within MTPA region                                                        |
+| Over-modulation     | Clamp-based saturation; duty cycles bounded to [0, 1]                                          |
+| Gain normalisation  | $K_{p,norm} = K_{p,phys} \cdot \sqrt{3}/V_{dc}$                                                |
+| LUT memory          | 512 × 4 bytes = 2048 bytes flash                                                               |
 
 ### Sensitivity Analysis
 

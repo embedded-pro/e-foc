@@ -46,15 +46,20 @@ The test suite uses the **amp-cucumber-cpp-runner v4.0.0** framework. Scenarios 
 
 ### Platform Factory Mock
 
-`PlatformFactoryMock` mocks every pure virtual of `application::PlatformFactory`, including the inverter hot-path methods it inherits from `foc::ThreePhaseInverter` (`PhaseCurrentsReady`, `ThreePhasePwmOutput`, `Start`, `Stop`, `BaseFrequency`, `MaxCurrentSupported`) and the encoder methods from `foc::Encoder` (`Read`, `Set`, `SetZero`), plus the configuration methods (`ConfigureAdcAndPwm`, `SetEncoderResolution`, `ConfigureCanBus`, `CanBus`). There are no creator proxies, no per-peripheral wrapper mocks, and no `PlatformAdapter`.
+`PlatformFactoryMock` mocks every pure virtual of `application::PlatformFactory`, including the inverter
+hot-path methods it inherits from `foc::ThreePhaseInverter` (`PhaseCurrentsReady`, `ThreePhasePwmOutput`,
+`Start`, `Stop`, `BaseFrequency`, `MaxCurrentSupported`) and the encoder methods from `foc::Encoder` (`Read`,
+`Set`, `SetZero`), plus the configuration methods (`ConfigureAdcAndPwm`, `SetEncoderResolution`,
+`ConfigureCanBus`, `CanBus`). There are no creator proxies, no per-peripheral wrapper mocks, and no
+`PlatformAdapter`.
 
 The fixture registers standing `EXPECT_CALL` defaults in its constructor:
 
-| Method | Default expectation |
-|---|---|
-| `PhaseCurrentsReady`, `ThreePhasePwmOutput`, `Start`, `Stop`, `Set`, `SetZero` | `Times(AnyNumber())` |
-| `BaseFrequency` | `WillRepeatedly(Return(hal::Hertz{ 10000 }))` |
-| `Read` | `WillRepeatedly(Return(foc::Radians{ 0.0f }))` |
+| Method                                                                         | Default expectation                            |
+|--------------------------------------------------------------------------------|------------------------------------------------|
+| `PhaseCurrentsReady`, `ThreePhasePwmOutput`, `Start`, `Stop`, `Set`, `SetZero` | `Times(AnyNumber())`                           |
+| `BaseFrequency`                                                                | `WillRepeatedly(Return(hal::Hertz{ 10000 }))`  |
+| `Read`                                                                         | `WillRepeatedly(Return(foc::Radians{ 0.0f }))` |
 
 The `EepromStub` (512-byte in-memory array, all `0xFF` at construction, synchronous R/W) is a separate non-mock class owned by the fixture. The NVM regions reference the stub directly.
 

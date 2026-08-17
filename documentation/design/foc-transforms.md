@@ -55,7 +55,7 @@ The Clarke transform is a geometric projection that reduces a balanced three-pha
 The amplitude-invariant Clarke transform uses all three measured phases, so it stays correct when
 the currents are not perfectly balanced:
 
-```
+```text
 Iα = (2/3)·(Ia - (Ib + Ic)/2)
 Iβ = (Ib - Ic) / √3
 ```
@@ -81,7 +81,7 @@ The Park transform rotates the stationary αβ frame to align with the rotor mag
 
 **Forward transform** (αβ → dq):
 
-```
+```text
 Id =  Iα·cos(θe) + Iβ·sin(θe)
 Iq = −Iα·sin(θe) + Iβ·cos(θe)
 ```
@@ -90,7 +90,7 @@ The d-axis (direct) current component is aligned with the rotor flux. For a surf
 
 **Inverse transform** (dq → αβ):
 
-```
+```text
 Vα = Vd·cos(θe) − Vq·sin(θe)
 Vβ = Vd·sin(θe) + Vq·cos(θe)
 ```
@@ -101,7 +101,7 @@ The inverse Park transform is applied after the PID controllers produce voltage 
 
 The electrical angle θe is obtained by multiplying the mechanical rotor angle θm by the motor's pole-pair count P:
 
-```
+```text
 θe = θm · P
 ```
 
@@ -174,17 +174,17 @@ Direct hardware transcendental functions (`sin`, `cos`) introduce variable laten
 
 ### Provided
 
-| Interface                        | Purpose                                       | Contract                                                                                                                    |
-|----------------------------------|-----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
-| Clarke — Forward                 | Converts (Ia, Ib) to (Iα, Iβ)                 | Ic is derived internally; inputs must satisfy the balanced-phase assumption. Output is immediately valid.                   |
-| Clarke — Inverse                 | Converts (Vα, Vβ) to (Va, Vb, Vc)             | Produces all three phase voltages. The sum of outputs is zero.                                                              |
-| Park — Forward                   | Converts (Iα, Iβ, θe) to (Id, Iq)             | Caller supplies pre-computed or LUT-evaluated cos(θe) and sin(θe). Stateless.                                               |
-| Park — Inverse                   | Converts (Vd, Vq, θe) to (Vα, Vβ)             | Uses the same θe as the forward Park in the same control cycle.                                                             |
-| ClarkePark — Forward             | Converts (Ia, Ib, θe) to (Id, Iq) in one call | Computes cos/sin once; result is identical to chaining Clarke then Park separately.                                         |
-| ClarkePark — Inverse             | Converts (Vd, Vq, θe) to (Vα, Vβ) in one call | Computes cos/sin once; result is identical to chaining inverse Park then inverse Clarke separately.                         |
+| Interface                        | Purpose                                       | Contract                                                                                                                                       |
+|----------------------------------|-----------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| Clarke — Forward                 | Converts (Ia, Ib) to (Iα, Iβ)                 | Ic is derived internally; inputs must satisfy the balanced-phase assumption. Output is immediately valid.                                      |
+| Clarke — Inverse                 | Converts (Vα, Vβ) to (Va, Vb, Vc)             | Produces all three phase voltages. The sum of outputs is zero.                                                                                 |
+| Park — Forward                   | Converts (Iα, Iβ, θe) to (Id, Iq)             | Caller supplies pre-computed or LUT-evaluated cos(θe) and sin(θe). Stateless.                                                                  |
+| Park — Inverse                   | Converts (Vd, Vq, θe) to (Vα, Vβ)             | Uses the same θe as the forward Park in the same control cycle.                                                                                |
+| ClarkePark — Forward             | Converts (Ia, Ib, θe) to (Id, Iq) in one call | Computes cos/sin once; result is identical to chaining Clarke then Park separately.                                                            |
+| ClarkePark — Inverse             | Converts (Vd, Vq, θe) to (Vα, Vβ) in one call | Computes cos/sin once; result is identical to chaining inverse Park then inverse Clarke separately.                                            |
 | SpaceVectorModulation — Generate | Converts (Vα, Vβ) to three duty cycles        | Inputs must be per-unit relative to `V_dc/√3`. Outputs are always in [0.0, 1.0]. Common-mode injection is internal; there is no sector branch. |
-| FastTrigonometry — Sine          | Returns an approximation of sin(θ)            | θ is normalised to [0, 2π) internally. ROM LUT; no floating-point transcendental at runtime.                                |
-| FastTrigonometry — Cosine        | Returns an approximation of cos(θ)            | Derived from the sine LUT via a quarter-period offset. Same ROM, no additional storage.                                     |
+| FastTrigonometry — Sine          | Returns an approximation of sin(θ)            | θ is normalised to [0, 2π) internally. ROM LUT; no floating-point transcendental at runtime.                                                   |
+| FastTrigonometry — Cosine        | Returns an approximation of cos(θ)            | Derived from the sine LUT via a quarter-period offset. Same ROM, no additional storage.                                                        |
 
 ### Required
 

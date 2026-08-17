@@ -70,36 +70,36 @@ classDiagram
 
 #### Lifecycle Commands
 
-| Command             | Alias | Arguments | Action                                                              |
-|---------------------|-------|-----------|---------------------------------------------------------------------|
-| `calibrate`         | `cal` | —         | Runs the calibration sequence                                       |
-| `enable`            | `en`  | —         | Enables the motor; rejected outside `Ready`                         |
-| `disable`           | `dis` | —         | Disables the motor                                                  |
-| `clear_fault`       | `cf`  | —         | Clears a latched fault                                              |
-| `clear_calibration` | `cc`  | —         | Invalidates stored calibration                                      |
-| `active_mode`       | `am`  | —         | Prints the active control mode                                      |
-| `apply_estimates`   | `ae`  | —         | Applies the online estimates to the loop gains                      |
-| `estimate_status`   | `es`  | —         | Prints the current online estimates                                 |
+| Command             | Alias | Arguments | Action                                         |
+|---------------------|-------|-----------|------------------------------------------------|
+| `calibrate`         | `cal` | —         | Runs the calibration sequence                  |
+| `enable`            | `en`  | —         | Enables the motor; rejected outside `Ready`    |
+| `disable`           | `dis` | —         | Disables the motor                             |
+| `clear_fault`       | `cf`  | —         | Clears a latched fault                         |
+| `clear_calibration` | `cc`  | —         | Invalidates stored calibration                 |
+| `active_mode`       | `am`  | —         | Prints the active control mode                 |
+| `apply_estimates`   | `ae`  | —         | Applies the online estimates to the loop gains |
+| `estimate_status`   | `es`  | —         | Prints the current online estimates            |
 
 #### Algorithm Selection
 
-| Command                     | Alias | Arguments                               | Action                                                                                                       |
-|-----------------------------|-------|-----------------------------------------|--------------------------------------------------------------------------------------------------------------|
-| `select_current_algorithm`  | `sca` | pid \| decoupled \| deadbeat \| sliding | Selects the current-loop law; rejected while enabled or before the motor model is identified                 |
-| `select_speed_algorithm`    | `ssa` | pid \| lqi \| adrc \| twodof            | Selects the speed-loop law; speed and position modes only                                                    |
-| `select_position_algorithm` | `spa` | pid \| cascadep \| lqr \| lqi \| twodof | Selects the position-loop law; position mode only. LQR and LQI are refused when their Riccati design fails   |
-| `active_algorithms`         | `aa`  | —                                       | Prints the active current, speed and position laws                                                           |
+| Command                     | Alias | Arguments                               | Action                                                                                                     |
+|-----------------------------|-------|-----------------------------------------|------------------------------------------------------------------------------------------------------------|
+| `select_current_algorithm`  | `sca` | pid \| decoupled \| deadbeat \| sliding | Selects the current-loop law; rejected while enabled or before the motor model is identified               |
+| `select_speed_algorithm`    | `ssa` | pid \| lqi \| adrc \| twodof            | Selects the speed-loop law; speed and position modes only                                                  |
+| `select_position_algorithm` | `spa` | pid \| cascadep \| lqr \| lqi \| twodof | Selects the position-loop law; position mode only. LQR and LQI are refused when their Riccati design fails |
+| `active_algorithms`         | `aa`  | —                                       | Prints the active current, speed and position laws                                                         |
 
 #### Setpoints
 
 Each setpoint command applies to exactly one control mode and is rejected with a mode-mismatch
 message in the others, and rejected when the lifecycle state does not accept setpoints.
 
-| Command        | Alias | Arguments      | Mode     |
-|----------------|-------|----------------|----------|
-| `set_torque`   | `st`  | Iq (A)         | Torque   |
-| `set_speed`    | `ss`  | omega (rad/s)  | Speed    |
-| `set_position` | `sp`  | theta (rad)    | Position |
+| Command        | Alias | Arguments     | Mode     |
+|----------------|-------|---------------|----------|
+| `set_torque`   | `st`  | Iq (A)        | Torque   |
+| `set_speed`    | `ss`  | omega (rad/s) | Speed    |
+| `set_position` | `sp`  | theta (rad)   | Position |
 
 The torque command takes the q-axis current only. The d-axis reference is held at zero by the
 control law, so exposing it would let an operator command a flux reference the cascade immediately
@@ -107,11 +107,11 @@ overwrites.
 
 #### Bandwidths
 
-| Command                  | Alias  | Arguments             | Availability                       |
-|--------------------------|--------|-----------------------|------------------------------------|
-| `set_current_bandwidth`  | `scbw` | bandwidth (rad/s)     | All modes                          |
-| `set_speed_bandwidth`    | `ssbw` | bandwidth (rad/s)     | Speed and position modes           |
-| `set_position_bandwidth` | `spbw` | bandwidth (rad/s)     | Position mode                      |
+| Command                  | Alias  | Arguments         | Availability             |
+|--------------------------|--------|-------------------|--------------------------|
+| `set_current_bandwidth`  | `scbw` | bandwidth (rad/s) | All modes                |
+| `set_speed_bandwidth`    | `ssbw` | bandwidth (rad/s) | Speed and position modes |
+| `set_position_bandwidth` | `spbw` | bandwidth (rad/s) | Position mode            |
 
 Retuning is refused while the motor is enabled, and refused when the active law cannot be redesigned
 for the requested bandwidth.

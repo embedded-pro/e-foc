@@ -79,11 +79,14 @@ The outer loop is triggered by the `LowPriorityInterrupt` at a prescale ratio de
 
 The angular velocity is estimated from the difference between the current mechanical angle sample and the previous angle sample, divided by the outer-loop period Δt:
 
-```
+```text
 ω = Δθ / Δt
 ```
 
-Because the encoder angle wraps around at 2π, the raw angle difference may be discontinuous at the wrap boundary. Wrap-around compensation applies a correction: if the computed Δθ is greater than +π, it is shifted by −2π; if it is less than −π, it is shifted by +2π. This produces a signed angular velocity in the range (−π/Δt, +π/Δt) radians per second for any physical speed below half the Nyquist rate of the sampling interval.
+Because the encoder angle wraps around at 2π, the raw angle difference may be discontinuous at the wrap
+boundary. Wrap-around compensation applies a correction: if the computed Δθ is greater than +π, it is shifted
+by −2π; if it is less than −π, it is shifted by +2π. This produces a signed angular velocity in the range
+(−π/Δt, +π/Δt) radians per second for any physical speed below half the Nyquist rate of the sampling interval.
 
 **Speed PID:**
 

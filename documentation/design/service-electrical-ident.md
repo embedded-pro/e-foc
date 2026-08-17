@@ -56,7 +56,7 @@ A known DC voltage is applied to the d-axis of the motor (q-axis voltage = 0, el
 
 At the end of the settle period, the steady-state phase current is captured from the ADC. Because the motor is stationary and the current is DC, the only impedance in the circuit is the winding resistance:
 
-```
+```text
 R = V_applied / I_steady_state
 ```
 
@@ -68,7 +68,7 @@ Immediately after the DC settle phase, an additional voltage step is applied and
 
 Once the buffer is full, the inductance is derived from the first-order step-response approximation:
 
-```
+```text
 L = V_step × Δt / ΔI
 ```
 
@@ -112,7 +112,7 @@ Over N full electrical revolutions, the total electrical angle advanced is 2π �
 
 The pole pairs are then:
 
-```
+```text
 P = round( total_electrical_angle / total_mechanical_angle )
 ```
 

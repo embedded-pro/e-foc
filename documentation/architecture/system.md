@@ -108,15 +108,15 @@ The simulator implements the same PAL contracts as real hardware. Control logic 
 
 The heart of the system. Decomposed into sub-layers following a strict separation of vocabulary, generic numerics, transform algorithms, orchestration, and wiring. Dependencies flow in one direction only — from wiring down towards vocabulary; no lower layer may depend on a higher one:
 
-| Sub-component   | Responsibility                                                                                                                                                                                               |
-|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Sub-component   | Responsibility                                                                                                                                                                                                                                                               |
+|-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Interfaces      | Define the FOC vocabulary (units, phase and frame signal types) and the abstract contracts for control modes (Torque, Speed, Position) and execution (low-priority interrupt, controllable). No algorithms. Hardware ports live in the platform abstraction layer, not here. |
-| Math            | Generic numerical helpers that are not specific to field-oriented control — fast trigonometry by lookup table, angle wrap-around. Header-only, dependency-free.                                              |
-| Transforms      | The field-oriented control mathematics proper: the Clarke and Park transforms in both directions, and Space Vector Modulation.                                                                               |
-| Loop algorithms | Interchangeable control laws for each loop, under `current_loop/`, `speed_loop/` and `position_loop/`, together with their plant models and gain design.                                                     |
-| Selection       | The `ControllerSelector` template that stores the active algorithm of a loop in a fixed-size `std::variant` and dispatches to it without allocation.                                                         |
-| Cascade         | Orchestration of the control cascade — the per-mode control loops that combine the current, speed and position algorithms.                                                                                  |
-| Instantiations  | Wiring that combines a control-mode cascade with the execution runner to produce a ready-to-use FOC controller.                                                                                              |
+| Math            | Generic numerical helpers that are not specific to field-oriented control — fast trigonometry by lookup table, angle wrap-around. Header-only, dependency-free.                                                                                                              |
+| Transforms      | The field-oriented control mathematics proper: the Clarke and Park transforms in both directions, and Space Vector Modulation.                                                                                                                                               |
+| Loop algorithms | Interchangeable control laws for each loop, under `current_loop/`, `speed_loop/` and `position_loop/`, together with their plant models and gain design.                                                                                                                     |
+| Selection       | The `ControllerSelector` template that stores the active algorithm of a loop in a fixed-size `std::variant` and dispatches to it without allocation.                                                                                                                         |
+| Cascade         | Orchestration of the control cascade — the per-mode control loops that combine the current, speed and position algorithms.                                                                                                                                                   |
+| Instantiations  | Wiring that combines a control-mode cascade with the execution runner to produce a ready-to-use FOC controller.                                                                                                                                                              |
 
 Because Interfaces, Math, and Transforms carry no dependency on the control cascade, the identification, alignment, and simulation components consume them directly without pulling in the control loops.
 
@@ -184,7 +184,12 @@ graph LR
 
 The wiring layer. Assembles the concrete PAL implementation, the selected FOC mode(s), and the services into a runnable system. This is the only layer that is aware of the specific combination in use — all other layers depend only on abstractions.
 
-The `FocStateMachine` is the central lifecycle authority. It owns the full motor commissioning and operation lifecycle: it enforces a formal five-state machine (`Idle → Calibrating → Ready ⇄ Enabled, Fault`), orchestrates the sequential calibration chain (electrical identification, alignment, and mechanical identification for speed/position modes), and responds to hardware fault notifications by immediately stopping the inverter and entering the `Fault` state. Only after `FocStateMachine` has reached `Ready` can the motor be enabled.
+The `FocStateMachine` is the central lifecycle authority. It owns the full motor commissioning and operation
+lifecycle: it enforces a formal five-state machine (`Idle → Calibrating → Ready ⇄ Enabled, Fault`),
+orchestrates the sequential calibration chain (electrical identification, alignment, and mechanical
+identification for speed/position modes), and responds to hardware fault notifications by immediately stopping
+the inverter and entering the `Fault` state. Only after `FocStateMachine` has reached `Ready` can the motor be
+enabled.
 
 In CLI mode, `ControlModeStateMachine` registers the lifecycle commands `calibrate`, `enable`, `disable`, `clear_fault`, `clear_cal`, `apply_estimates`, and `active_mode` on the terminal. These commands delegate to the currently active state machine. The `TerminalFocBaseInteractor` (and its control-mode subclasses) register PID tuning and setpoint commands on the same terminal.
 
@@ -247,12 +252,12 @@ These are never used directly by the FOC core or services — only by the PAL co
 
 ### Required Interfaces (consumed from the PAL)
 
-| Interface              | Direction | Purpose                                                                                                    | Invariants                                                                                                          |
-|------------------------|-----------|------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
-| `ThreePhaseInverter`   | required  | Triggers ADC phase-current sampling and applies PWM duty cycles to the three-phase bridge                  | `PhaseCurrentsReady()` installs the callback invoked by the ADC interrupt. Must be called before `Start()`.         |
-| `Encoder`              | required  | Reads rotor mechanical angle and supports zero-offset calibration                                          | Read must be non-blocking and complete in <= a few cycles.                                                          |
+| Interface              | Direction | Purpose                                                                                                    | Invariants                                                                                                                                                                                                                               |
+|------------------------|-----------|------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ThreePhaseInverter`   | required  | Triggers ADC phase-current sampling and applies PWM duty cycles to the three-phase bridge                  | `PhaseCurrentsReady()` installs the callback invoked by the ADC interrupt. Must be called before `Start()`.                                                                                                                              |
+| `Encoder`              | required  | Reads rotor mechanical angle and supports zero-offset calibration                                          | Read must be non-blocking and complete in <= a few cycles.                                                                                                                                                                               |
 | `LowPriorityInterrupt` | required  | Schedules periodic execution of the speed and position outer loops at a lower rate than the FOC inner loop | `Register()` installs the callback. `Trigger()` is called from the FOC inner loop at the configured prescale ratio. `Unregister()` detaches it: after it returns, neither an already queued nor a future trigger may invoke the handler. |
-| `NonVolatileMemory`    | required  | Persists and retrieves calibration and configuration data                                                  | All operations are asynchronous and invoke a callback on completion.                                                |
+| `NonVolatileMemory`    | required  | Persists and retrieves calibration and configuration data                                                  | All operations are asynchronous and invoke a callback on completion.                                                                                                                                                                     |
 
 ### SOLID Principles Applied
 
@@ -364,7 +369,12 @@ The integration test suite verifies the cooperative behaviour of three core subs
 2. **Non-Volatile Memory stack** — the chain from the NVM region abstraction through the EEPROM interface to the concrete NVM service. Integration tests use a real in-memory EEPROM stub rather than a mocked NVM service.
 3. **CAN-to-State-Machine bridge** — the observer that translates CAN FOC motor commands into state machine transition commands.
 
-Platform hardware is mocked by replacing `PlatformFactory` with a `PlatformFactoryMock` that stubs the inherited `foc::ThreePhaseInverter` (`PhaseCurrentsReady`, `ThreePhasePwmOutput`, `Start`, `Stop`, `BaseFrequency`, `MaxCurrentSupported`) and `foc::Encoder` (`Read`, `Set`, `SetZero`) methods directly. There is no separate platform-adapter layer between the factory and the FOC pipeline. EEPROM storage is provided by an in-memory stub that satisfies the EEPROM interface and persists data across the lifetime of a single test scenario.
+Platform hardware is mocked by replacing `PlatformFactory` with a `PlatformFactoryMock` that stubs the
+inherited `foc::ThreePhaseInverter` (`PhaseCurrentsReady`, `ThreePhasePwmOutput`, `Start`, `Stop`,
+`BaseFrequency`, `MaxCurrentSupported`) and `foc::Encoder` (`Read`, `Set`, `SetZero`) methods directly. There
+is no separate platform-adapter layer between the factory and the FOC pipeline. EEPROM storage is provided by
+an in-memory stub that satisfies the EEPROM interface and persists data across the lifetime of a single test
+scenario.
 
 Integration tests run exclusively on the host build. The host event dispatcher simulates the asynchronous callback chains used by NVM and calibration services. All mock instances use strict mock policies; lenient mocking is forbidden.
 

@@ -317,34 +317,34 @@ time for gain normalisation.
 
 **Current loop:**
 
-| Parameter                     |           PID            |      Decoupled PID       |         Deadbeat         |       Sliding-mode        |
+| Parameter                     | PID                      | Decoupled PID            | Deadbeat                 | Sliding-mode              |
 |-------------------------------|:------------------------:|:------------------------:|:------------------------:|:-------------------------:|
-| $R_s$, $L_s$ (electrical RLS) |         Required         |         Required         |     Required (tight)     |         Required          |
-| $\psi_f$ (datasheet)          |       Not required       |  Required — back-EMF FF  |       Not required       |       Not required        |
+| $R_s$, $L_s$ (electrical RLS) | Required                 | Required                 | Required (tight)         | Required                  |
+| $\psi_f$ (datasheet)          | Not required             | Required — back-EMF FF   | Not required             | Not required              |
 | $V_{dc}$                      | Required — normalisation | Required — normalisation | Required — normalisation | Required — normalisation  |
-| $I_{q,max}$                   |     For output clamp     |     For output clamp     |        For clamp         | For switching gain sizing |
+| $I_{q,max}$                   | For output clamp         | For output clamp         | For clamp                | For switching gain sizing |
 
 Deadbeat requires the tightest RLS convergence. Decoupled PID is the only current-loop algorithm
 that requires $\psi_f$ from the motor datasheet.
 
 **Speed loop:**
 
-| Parameter                   |     PID      |          LQI          |          ADRC          |   Two-DOF    |
+| Parameter                   | PID          | LQI                   | ADRC                   | Two-DOF      |
 |-----------------------------|:------------:|:---------------------:|:----------------------:|:------------:|
 | $J$, $B_f$ (mechanical RLS) | Not required | Required — DARE plant | Required — $b_0=K_t/J$ | Not required |
-| $K_t$ (derived)             | Not required |       Required        |        Required        | Not required |
-| $I_{q,max}$                 |  For clamp   |  Required — R weight  |       For clamp        |  For clamp   |
+| $K_t$ (derived)             | Not required | Required              | Required               | Not required |
+| $I_{q,max}$                 | For clamp    | Required — R weight   | For clamp              | For clamp    |
 
 ADRC is the most forgiving: $b_0$ tolerates ±50% error. Two-DOF and PID require no mechanical
 RLS and are available as soon as electrical calibration completes.
 
 **Position loop:**
 
-| Parameter                   |     PID      |    Cascade P    |         LQR         |         LQI         |   Two-DOF    |
+| Parameter                   | PID          | Cascade P       | LQR                 | LQI                 | Two-DOF      |
 |-----------------------------|:------------:|:---------------:|:-------------------:|:-------------------:|:------------:|
-| $J$, $B_f$ (mechanical RLS) | Not required |  Not required   |      Required       |      Required       | Not required |
-| $K_t$ (derived)             | Not required |  Not required   |      Required       |      Required       | Not required |
-| $I_{q,max}$                 |  For clamp   | Speed-loop dep. | Required — R weight | Required — R weight |  For clamp   |
+| $J$, $B_f$ (mechanical RLS) | Not required | Not required    | Required            | Required            | Not required |
+| $K_t$ (derived)             | Not required | Not required    | Required            | Required            | Not required |
+| $I_{q,max}$                 | For clamp    | Speed-loop dep. | Required — R weight | Required — R weight | For clamp    |
 
 #### Tuning Knobs (design choices, not estimated)
 
@@ -355,35 +355,35 @@ derived from the bandwidth and the motor model, never supplied per axis.
 
 **Current loop:**
 
-| Knob             | Default          | Consumed by                      |
-|------------------|------------------|----------------------------------|
-| Bandwidth        | 2π·1000 rad/s    | PID, Decoupled PID               |
-| Switching gain   | 0.2              | Sliding-mode                     |
-| Boundary layer   | 0.5              | Sliding-mode                     |
-| Two-step variant | off              | Deadbeat                         |
+| Knob             | Default       | Consumed by        |
+|------------------|---------------|--------------------|
+| Bandwidth        | 2π·1000 rad/s | PID, Decoupled PID |
+| Switching gain   | 0.2           | Sliding-mode       |
+| Boundary layer   | 0.5           | Sliding-mode       |
+| Two-step variant | off           | Deadbeat           |
 
 The sliding-mode error map inside the boundary layer contracts only while the switching gain stays
 below the boundary layer, so the ratio of the two is bounded by design.
 
 **Speed loop:**
 
-| Knob                      | Default      | Consumed by  |
-|---------------------------|--------------|--------------|
-| Bandwidth                 | 2π·30 rad/s  | PID, ADRC    |
-| Speed error weight        | 1.0          | LQI          |
-| Integral weight           | 0.1          | LQI          |
-| Observer bandwidth ratio  | 5.0          | ADRC         |
-| Reference time constant   | 5.3 ms       | Two-DOF      |
+| Knob                     | Default     | Consumed by |
+|--------------------------|-------------|-------------|
+| Bandwidth                | 2π·30 rad/s | PID, ADRC   |
+| Speed error weight       | 1.0         | LQI         |
+| Integral weight          | 0.1         | LQI         |
+| Observer bandwidth ratio | 5.0         | ADRC        |
+| Reference time constant  | 5.3 ms      | Two-DOF     |
 
 **Position loop:**
 
-| Knob                    | Default     | Consumed by            |
-|-------------------------|-------------|------------------------|
-| Bandwidth               | 2π·3 rad/s  | PID, Cascade P, LQR, LQI |
-| Position error weight   | 1.0         | PID, LQR, LQI          |
-| Speed error weight      | 0.1         | LQR, LQI               |
-| Integral weight         | 0.05        | PID, LQI               |
-| Reference time constant | 53 ms       | Two-DOF                |
+| Knob                    | Default    | Consumed by              |
+|-------------------------|------------|--------------------------|
+| Bandwidth               | 2π·3 rad/s | PID, Cascade P, LQR, LQI |
+| Position error weight   | 1.0        | PID, LQR, LQI            |
+| Speed error weight      | 0.1        | LQR, LQI                 |
+| Integral weight         | 0.05       | PID, LQI                 |
+| Reference time constant | 53 ms      | Two-DOF                  |
 
 Two-DOF on both outer loops derives its feedback part from the same bandwidth as the corresponding
 PID law and adds only the reference pre-filter time constant on top.
@@ -439,8 +439,8 @@ ADRC, position LQR, position LQI).
 
 Two failure kinds are distinguished when a persisted identifier cannot be activated:
 
-| Failure                                                    | Effect on `ConfigData`                                        |
-|------------------------------------------------------------|---------------------------------------------------------------|
+| Failure                                                     | Effect on `ConfigData`                                        |
+|-------------------------------------------------------------|---------------------------------------------------------------|
 | Byte out of enum range, or names no algorithm for that loop | Corrected to the active algorithm — the record is meaningless |
 | Valid algorithm, not selectable yet (`InvalidParameters`)   | Preserved, and retried on the next entry to `Ready`           |
 
@@ -481,27 +481,27 @@ repeat the selection after every power cycle. The motor state machine will trans
 
 ## Data Model
 
-| Entity               | Field             | Type / Unit       | Range                                         | Notes                                                              |
-|----------------------|-------------------|-------------------|-----------------------------------------------|--------------------------------------------------------------------|
-| CurrentAlgorithm     | enum              | uint8             | pid, decoupledPid, deadbeat, slidingMode      | Selectable current-loop strategy                                   |
-| SpeedAlgorithm       | enum              | uint8             | pid, lqi, adrc, twoDof                        | Selectable speed-loop strategy                                     |
-| PositionAlgorithm    | enum              | uint8             | pid, cascadeP, lqr, lqi, twoDof               | Selectable position-loop strategy                                  |
-| PositionOutputKind   | enum              | uint8             | speedReference, currentReference               | Declares whether a position law drives the speed or current loop   |
-| SelectResult         | enum              | uint8             | ok, busy, invalidAlgorithm, invalidParameters | Return code from SelectAlgorithm                                   |
-| MotorModelParameters | Rs                | Ohm (float)       | > 0                                           | From electrical RLS                                                |
-| MotorModelParameters | Ls                | Henry (float)     | > 0                                           | From electrical RLS                                                |
-| MotorModelParameters | psiF              | Weber (float)     | > 0                                           | From alignment calibration                                         |
-| MotorModelParameters | polePairs         | uint8             | ≥ 1                                           | Motor constant                                                     |
-| MotorModelParameters | Vdc               | Volt (float)      | > 0                                           | Measured dynamically                                               |
-| MotorModelParameters | currentLoopRate   | Hertz (uint32)    | > 0                                           | $1/T_s^i$; required to discretize the plant for Deadbeat and SMC   |
-| MotorModelParameters | J                 | kg·m² (float)     | > 0                                           | From mechanical RLS                                                |
-| MotorModelParameters | Bf                | N·m·s/rad (float) | ≥ 0                                           | From mechanical RLS                                                |
-| MotorModelParameters | Kt                | N·m/A (float)     | > 0                                           | Derived from psiF and polePairs                                    |
-| NvmRecord            | currentAlgorithm  | uint8             | 0–255                                         | Validated on load; invalid → default (PID)                         |
-| NvmRecord            | speedAlgorithm    | uint8             | 0–255                                         | As above                                                           |
-| NvmRecord            | positionAlgorithm | uint8             | 0–255                                         | As above                                                           |
-| CalibrationRecord    | currentLoopBandwidth | rad/s (float)  | ≥ 0                                           | Persisted current loop bandwidth                                   |
-| CalibrationRecord    | speedLoopBandwidth   | rad/s (float)  | ≥ 0                                           | Persisted speed loop bandwidth                                     |
+| Entity               | Field                | Type / Unit       | Range                                         | Notes                                                            |
+|----------------------|----------------------|-------------------|-----------------------------------------------|------------------------------------------------------------------|
+| CurrentAlgorithm     | enum                 | uint8             | pid, decoupledPid, deadbeat, slidingMode      | Selectable current-loop strategy                                 |
+| SpeedAlgorithm       | enum                 | uint8             | pid, lqi, adrc, twoDof                        | Selectable speed-loop strategy                                   |
+| PositionAlgorithm    | enum                 | uint8             | pid, cascadeP, lqr, lqi, twoDof               | Selectable position-loop strategy                                |
+| PositionOutputKind   | enum                 | uint8             | speedReference, currentReference              | Declares whether a position law drives the speed or current loop |
+| SelectResult         | enum                 | uint8             | ok, busy, invalidAlgorithm, invalidParameters | Return code from SelectAlgorithm                                 |
+| MotorModelParameters | Rs                   | Ohm (float)       | > 0                                           | From electrical RLS                                              |
+| MotorModelParameters | Ls                   | Henry (float)     | > 0                                           | From electrical RLS                                              |
+| MotorModelParameters | psiF                 | Weber (float)     | > 0                                           | From alignment calibration                                       |
+| MotorModelParameters | polePairs            | uint8             | ≥ 1                                           | Motor constant                                                   |
+| MotorModelParameters | Vdc                  | Volt (float)      | > 0                                           | Measured dynamically                                             |
+| MotorModelParameters | currentLoopRate      | Hertz (uint32)    | > 0                                           | $1/T_s^i$; required to discretize the plant for Deadbeat and SMC |
+| MotorModelParameters | J                    | kg·m² (float)     | > 0                                           | From mechanical RLS                                              |
+| MotorModelParameters | Bf                   | N·m·s/rad (float) | ≥ 0                                           | From mechanical RLS                                              |
+| MotorModelParameters | Kt                   | N·m/A (float)     | > 0                                           | Derived from psiF and polePairs                                  |
+| NvmRecord            | currentAlgorithm     | uint8             | 0–255                                         | Validated on load; invalid → default (PID)                       |
+| NvmRecord            | speedAlgorithm       | uint8             | 0–255                                         | As above                                                         |
+| NvmRecord            | positionAlgorithm    | uint8             | 0–255                                         | As above                                                         |
+| CalibrationRecord    | currentLoopBandwidth | rad/s (float)     | ≥ 0                                           | Persisted current loop bandwidth                                 |
+| CalibrationRecord    | speedLoopBandwidth   | rad/s (float)     | ≥ 0                                           | Persisted speed loop bandwidth                                   |
 
 ---
 

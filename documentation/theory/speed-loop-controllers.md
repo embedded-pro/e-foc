@@ -256,14 +256,14 @@ filter.
 
 ## Numerical Properties
 
-| Property                   | PID (baseline) |   LQI (S1)    |       ADRC (S2)       |  Two-DOF (S3)   |
+| Property                   | PID (baseline) | LQI (S1)      | ADRC (S2)             | Two-DOF (S3)    |
 |----------------------------|:--------------:|:-------------:|:---------------------:|:---------------:|
-| Ops per 1 kHz cycle        |    ~6 MACs     |    2 MACs     |        6 MACs         |     ~8 MACs     |
-| Steady-state error         |    Zero (I)    |   Zero (I)    |      Zero (ESO)       |    Zero (I)     |
-| Load disturbance rejection |   PI quality   |  PI quality   | Explicit cancellation |   PI quality    |
-| Tracking vs. stiffness     |    Coupled     |    Coupled    |        Coupled        |    Decoupled    |
-| Tuning knobs               | 3 (Kp, Ki, Kd) | 3 (qω, qI, R) |      2 (ωo, ωc)       | 3 (Kp, Ki, τff) |
-| Requires mechanical RLS    |       No       |  Yes (J, Bf)  |      Yes (Kt, J)      |       No        |
+| Ops per 1 kHz cycle        | ~6 MACs        | 2 MACs        | 6 MACs                | ~8 MACs         |
+| Steady-state error         | Zero (I)       | Zero (I)      | Zero (ESO)            | Zero (I)        |
+| Load disturbance rejection | PI quality     | PI quality    | Explicit cancellation | PI quality      |
+| Tracking vs. stiffness     | Coupled        | Coupled       | Coupled               | Decoupled       |
+| Tuning knobs               | 3 (Kp, Ki, Kd) | 3 (qω, qI, R) | 2 (ωo, ωc)            | 3 (Kp, Ki, τff) |
+| Requires mechanical RLS    | No             | Yes (J, Bf)   | Yes (Kt, J)           | No              |
 
 ### DARE Timing
 

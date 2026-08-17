@@ -175,7 +175,7 @@ where $\Delta\theta_{mech,total}$ is the measured total mechanical rotation duri
 
 ### 6. Complete Identification Sequence
 
-```
+```text
 1. Drive alignment: rotate field through N_steps to θ_e = 0.
    Record encoder offset θ_offset (see alignment theory).
 
@@ -218,7 +218,7 @@ graph TD
 
 ### RL Step Response — ASCII Approximation
 
-```
+```text
 i_d (normalised: I_ss = 1.0)
   │
 1.0├───────────────────────────────── I_ss = V/R (steady state)
@@ -256,14 +256,14 @@ i_d (normalised: I_ss = 1.0)
 
 ### Sensitivity Analysis
 
-| Source of Error            | Effect on $R_s$                      | Effect on $L_s$                          |
-|----------------------------|--------------------------------------|------------------------------------------|
-| ADC current offset         | Directly biases $I_{ss}$             | Indirect via $R_s$ error                 |
-| $V_{dc}$ variation         | Biases $V_{step}$                    | Indirect via $R_s$ error                 |
-| Thermal drift in $R_s$     | Measurement valid at $T_{meas}$ only | —                                        |
-| Filter delay corrected with the wrong sign | —                     | $L_s$ underestimated by $N_{avg}$ steps |
-| Insufficient buffer        | $I_{ss}$ underestimated              | $\tau$ underestimated                    |
-| Magnetic saturation        | $R_s$ underestimated                 | $L_s$ underestimated (nonlinear)         |
+| Source of Error                            | Effect on $R_s$                      | Effect on $L_s$                         |
+|--------------------------------------------|--------------------------------------|-----------------------------------------|
+| ADC current offset                         | Directly biases $I_{ss}$             | Indirect via $R_s$ error                |
+| $V_{dc}$ variation                         | Biases $V_{step}$                    | Indirect via $R_s$ error                |
+| Thermal drift in $R_s$                     | Measurement valid at $T_{meas}$ only | —                                       |
+| Filter delay corrected with the wrong sign | —                                    | $L_s$ underestimated by $N_{avg}$ steps |
+| Insufficient buffer                        | $I_{ss}$ underestimated              | $\tau$ underestimated                   |
+| Magnetic saturation                        | $R_s$ underestimated                 | $L_s$ underestimated (nonlinear)        |
 
 ---
 
