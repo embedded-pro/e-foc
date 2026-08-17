@@ -50,22 +50,33 @@ steady-state, and inductance from the measured time constant.
 
 ## Mathematical Foundation
 
-### 1. d-Axis Alignment and Back-EMF Suppression
+### 1. Terminal Excitation and Back-EMF Suppression
 
-Before applying the voltage step, the motor is aligned to $\theta_e = 0$ (rotor d-axis aligned
-with stator $\alpha$-axis). In this condition:
+The step is applied at the inverter terminals: phase A is driven at the test duty while phases B and
+C are held together at the neutral duty. The rotor is stationary, so $\omega_e = 0$ and the back-EMF
+$e = \psi_f \omega_e$ vanishes regardless of rotor angle; no d-axis alignment is required or
+performed. The excitation is a pure RL step.
 
-- The back-EMF is $e_\alpha = -\psi_f \omega_e \sin(0) = 0$.
-- The q-axis current is forced to zero: $i_q = 0$.
-- Only the d-axis RL circuit is excited.
-
-The stator d-axis circuit model reduces to:
+**Terminal versus per-phase values.** Driving one terminal against the other two shorted does not
+measure a single winding. For a wye machine the driven phase sees $R_s$ in series with the other two
+in parallel, and for a delta machine it sees two windings in parallel:
 
 $$
-v_d = R_s\, i_d + L_s \frac{di_d}{dt}
+R_{terminal} = \begin{cases} \tfrac{3}{2} R_s & \text{wye} \\[2pt] \tfrac{1}{2} R_s & \text{delta} \end{cases}
 $$
 
-This is a first-order linear system driven by a unit step of amplitude $V_{step}$.
+The same factor applies to $L_{terminal}$, so the time constant $\tau = L_{terminal}/R_{terminal} =
+L_s/R_s$ is unaffected, but both reported parameters must be divided by the topology factor. The
+applied step amplitude is the *differential* duty $(D_{test} - D_{neutral}) \cdot V_{dc}$, not
+$D_{test} \cdot V_{dc}$.
+
+The circuit model is therefore first order:
+
+$$
+v = R\, i + L \frac{di}{dt}
+$$
+
+driven by a unit step of amplitude $V_{step}$.
 
 ### 2. RL Step Response
 
@@ -120,21 +131,23 @@ $$
 
 #### Moving Average Filter Correction
 
-A causal moving average filter of length $N_{avg}$ is applied to the raw current samples before
-threshold detection:
+A moving average of length $N_{avg}$ is applied to the raw current samples before threshold
+detection. The implementation buffers samples until the window is full, averages, then discards the
+oldest sample, so filtered index $n$ spans raw samples $n \dots n + N_{avg} - 1$:
 
 $$
-\bar{i}[n] = \frac{1}{N_{avg}} \sum_{k=0}^{N_{avg}-1} i[n-k]
+\bar{i}[n] = \frac{1}{N_{avg}} \sum_{k=0}^{N_{avg}-1} i[n+k]
 $$
 
-This FIR filter introduces a lag of $(N_{avg} - 1)/2$ samples. The threshold index is corrected:
+The centre of mass of that window is the raw instant $n + (N_{avg} - 1)/2$, so the threshold index is
+corrected by **adding** the group delay rather than subtracting it:
 
 $$
-n_\tau^{corrected} = n_\tau - \left\lfloor \frac{N_{avg} - 1}{2} \right\rfloor - 1
+n_\tau^{corrected} = n_\tau + \frac{N_{avg} - 1}{2}
 $$
 
-Without this correction, $\tau$ is overestimated by the filter group delay, leading to an overestimate
-of $L_s$.
+For $N_{avg} = 5$ the correction is $+2$ samples. Subtracting instead — or subtracting $N_{avg}$ —
+underestimates $\tau$ and therefore underestimates $L_s$.
 
 **Filter trade-off**: larger $N_{avg}$ reduces noise variance $\propto 1/N_{avg}$ but increases the
 index correction and requires a corresponding increase in buffer size $N_{buf}$.
@@ -166,7 +179,7 @@ where $\Delta\theta_{mech,total}$ is the measured total mechanical rotation duri
 1. Drive alignment: rotate field through N_steps to θ_e = 0.
    Record encoder offset θ_offset (see alignment theory).
 
-2. Apply step voltage V_step on d-axis (i_q* = 0, v_d = V_step).
+2. Apply the differential step (D_test - D_neutral) * Vdc across phase A versus B and C.
 
 3. Sample i_d at f_s = 10 kHz for N_buf samples.
 
@@ -248,7 +261,7 @@ i_d (normalised: I_ss = 1.0)
 | ADC current offset         | Directly biases $I_{ss}$             | Indirect via $R_s$ error                 |
 | $V_{dc}$ variation         | Biases $V_{step}$                    | Indirect via $R_s$ error                 |
 | Thermal drift in $R_s$     | Measurement valid at $T_{meas}$ only | —                                        |
-| Filter delay not corrected | —                                    | $L_s$ overestimated by $N_{avg}/2$ steps |
+| Filter delay corrected with the wrong sign | —                     | $L_s$ underestimated by $N_{avg}$ steps |
 | Insufficient buffer        | $I_{ss}$ underestimated              | $\tau$ underestimated                    |
 | Magnetic saturation        | $R_s$ underestimated                 | $L_s$ underestimated (nonlinear)         |
 
@@ -265,15 +278,21 @@ $$I_{ss} = \frac{2}{1.2} \approx 1.667\ \text{A}$$
 
 $$\tau = \frac{L_s}{R_s} = \frac{0.6 \times 10^{-3}}{1.2} = 0.5\ \text{ms} = 5\ T_s$$
 
-At the 63.2% threshold: $i_d[n_\tau] \geq 0.6321 \times 1.667 = 1.054\ \text{A}$
+At the 63.2% threshold: $i[n_\tau] \geq 0.6321 \times 1.667 = 1.054\ \text{A}$
 
-The raw crossing occurs at $n_\tau = 5$. Filter delay correction: $n_\tau^{corr} = 5 - 2 - 1 = 2$.
+The true crossing is at raw sample 5. The filtered sequence reaches the threshold at index 3, because
+$\bar{i}[3]$ spans raw samples 3 through 7 and is centred on raw sample 5. Adding the group delay
+recovers the true index: $n_\tau^{corr} = 3 + 2 = 5$.
 
-$$L_{s,\mathrm{mH}} = 1.2 \times 2 \times 100 \times 10^{-6} \times 1000 = 0.24\ \text{mH}$$
+$$L_{terminal} = 1.2 \times 5 \times 100 \times 10^{-6} = 0.6\ \text{mH}$$
 
-> The example shows that a very short $\tau$ (5 samples) combined with a 5-tap filter and a
-> 2-sample delay correction can yield significant estimation error. In practice $\tau$ should be
-> at least 15–20 samples for accurate identification.
+For a wye motor the reported per-phase values are $R_s = R_{terminal}/1.5$ and
+$L_s = L_{terminal}/1.5$.
+
+> Subtracting the delay instead of adding it — or subtracting $N_{avg}$ — would give
+> $n_\tau^{corr} \le 2$ here and underestimate $L_s$ by 60 % or more. Even with the correct
+> sign, $\tau$ should span at least 15–20 samples for accurate identification, since the
+> correction is a whole-sample quantity.
 
 ---
 
