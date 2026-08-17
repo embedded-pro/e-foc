@@ -269,8 +269,6 @@ namespace
     };
 }
 
-// --- Boot / NVM ---
-
 TEST_F(FocStateMachineSpeedCliTest, nvm_invalid_on_boot_remains_in_idle)
 {
     GivenFaultNotifierRegistered();
@@ -307,8 +305,6 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_load_failure_on_boot_remains_in_idle)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
-
-// --- Calibration success ---
 
 TEST_F(FocStateMachineSpeedCliTest, calibration_calls_mech_ident_after_alignment)
 {
@@ -363,8 +359,6 @@ TEST_F(FocStateMachineSpeedCliTest, calibrate_from_enabled_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
-
-// --- Calibration failures ---
 
 TEST_F(FocStateMachineSpeedCliTest, pole_pairs_nullopt_enters_fault)
 {
@@ -428,8 +422,6 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_save_failure_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-// --- Enable / Disable ---
-
 TEST_F(FocStateMachineSpeedCliTest, enable_from_ready_enters_enabled)
 {
     GivenFaultNotifierRegistered();
@@ -477,8 +469,6 @@ TEST_F(FocStateMachineSpeedCliTest, disable_from_ready_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-// --- Fault handling ---
-
 TEST_F(FocStateMachineSpeedCliTest, fault_from_enabled_enters_fault)
 {
     GivenFaultNotifierRegistered();
@@ -515,8 +505,6 @@ TEST_F(FocStateMachineSpeedCliTest, fault_code_is_recorded)
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
 
-// --- Clear fault ---
-
 TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_fault_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
@@ -539,8 +527,6 @@ TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_non_fault_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
-
-// --- Clear calibration ---
 
 TEST_F(FocStateMachineSpeedCliTest, clear_cal_from_ready_returns_to_idle)
 {
@@ -570,8 +556,6 @@ TEST_F(FocStateMachineSpeedCliTest, clear_cal_from_enabled_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
-
-// --- CLI command invocation exercises RegisterCliCommands lambdas ---
 
 TEST_F(FocStateMachineSpeedCliTest, cli_cal_command_triggers_calibration)
 {
@@ -642,8 +626,6 @@ TEST_F(FocStateMachineSpeedCliTest, cli_cc_command_clears_calibration)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
-
-// --- Async callback safety: late callbacks after fault must be silently ignored ---
 
 TEST_F(FocStateMachineSpeedCliTest, late_pole_pairs_callback_after_fault_is_ignored)
 {
@@ -746,8 +728,6 @@ TEST_F(FocStateMachineSpeedCliTest, late_mech_ident_callback_after_fault_is_igno
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-// --- CmdClearCalibration safety ---
-
 TEST_F(FocStateMachineSpeedCliTest, clear_cal_during_calibrating_is_rejected)
 {
     GivenFaultNotifierRegistered();
@@ -778,8 +758,6 @@ TEST_F(FocStateMachineSpeedCliTest, clear_cal_nvm_failure_enters_fault)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
-
-// --- Async callback safety: remaining gaps ---
 
 TEST_F(FocStateMachineSpeedCliTest, late_resistance_callback_after_fault_is_ignored)
 {
@@ -877,8 +855,6 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_boot_callback_ignored_if_calibration_sta
     bootCb(true);
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
-
-// --- CmdClearCalibration async callback races ---
 
 TEST_F(FocStateMachineSpeedCliTest, clear_cal_invalidate_callback_after_enable_is_ignored)
 {
@@ -986,10 +962,6 @@ TEST_F(FocStateMachineSpeedCliTest, cli_ae_command_applies_estimates_when_enable
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
-
-// ==========================================================================
-// Speed-mode with TransitionPolicy::Auto
-// ==========================================================================
 
 namespace
 {
@@ -1207,8 +1179,6 @@ namespace
     };
 }
 
-// --- Boot ---
-
 TEST_F(FocStateMachineSpeedAutoTest, starts_in_idle_when_nvm_invalid)
 {
     GivenFaultNotifierRegistered();
@@ -1246,8 +1216,6 @@ TEST_F(FocStateMachineSpeedAutoTest, nvm_load_failure_on_boot_remains_in_idle)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-// --- Calibration ---
-
 TEST_F(FocStateMachineSpeedAutoTest, calibrate_enable_disable_cycle)
 {
     GivenFaultNotifierRegistered();
@@ -1279,8 +1247,6 @@ TEST_F(FocStateMachineSpeedAutoTest, calibrate_from_enabled_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
-
-// --- Calibration failures ---
 
 TEST_F(FocStateMachineSpeedAutoTest, pole_pairs_nullopt_enters_fault)
 {
@@ -1342,8 +1308,6 @@ TEST_F(FocStateMachineSpeedAutoTest, nvm_save_failure_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-// --- Enable / Disable guards ---
-
 TEST_F(FocStateMachineSpeedAutoTest, enable_from_idle_is_rejected)
 {
     GivenFaultNotifierRegistered();
@@ -1365,8 +1329,6 @@ TEST_F(FocStateMachineSpeedAutoTest, disable_from_ready_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
-
-// --- Fault handling ---
 
 TEST_F(FocStateMachineSpeedAutoTest, fault_from_enabled_enters_fault)
 {
@@ -1394,8 +1356,6 @@ TEST_F(FocStateMachineSpeedAutoTest, fault_and_clear_cycle)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
-
-// --- Clear calibration ---
 
 TEST_F(FocStateMachineSpeedAutoTest, clear_cal_from_ready_returns_to_idle)
 {
@@ -1425,8 +1385,6 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_cal_from_enabled_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
-
-// --- Auto policy: async callback safety ---
 
 TEST_F(FocStateMachineSpeedAutoTest, late_pole_pairs_callback_after_fault_is_ignored)
 {
@@ -1626,8 +1584,6 @@ TEST_F(FocStateMachineSpeedAutoTest, nvm_boot_callback_ignored_if_calibration_st
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-// --- Auto policy: CmdClearCalibration async callback races ---
-
 TEST_F(FocStateMachineSpeedAutoTest, clear_cal_during_calibrating_is_rejected)
 {
     GivenFaultNotifierRegistered();
@@ -1726,8 +1682,6 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_cal_invalidate_failure_callback_after
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
 
-// --- CmdCalibrate forbidden source states ---
-
 TEST_F(FocStateMachineSpeedCliTest, calibrate_from_calibrating_is_rejected)
 {
     GivenFaultNotifierRegistered();
@@ -1783,8 +1737,6 @@ TEST_F(FocStateMachineSpeedAutoTest, calibrate_from_fault_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
-
-// --- CmdEnable forbidden source states ---
 
 TEST_F(FocStateMachineSpeedCliTest, enable_from_calibrating_is_rejected)
 {
@@ -1872,8 +1824,6 @@ TEST_F(FocStateMachineSpeedAutoTest, enable_from_enabled_does_not_call_start_aga
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-// --- CmdDisable forbidden source states ---
-
 TEST_F(FocStateMachineSpeedCliTest, disable_from_idle_is_rejected)
 {
     GivenFaultNotifierRegistered();
@@ -1951,8 +1901,6 @@ TEST_F(FocStateMachineSpeedAutoTest, disable_from_fault_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
-
-// --- CmdClearFault forbidden source states ---
 
 TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_idle_is_rejected)
 {
@@ -2036,8 +1984,6 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_fault_from_enabled_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-// --- CmdClearCalibration forbidden source states ---
-
 TEST_F(FocStateMachineSpeedCliTest, clear_cal_from_fault_is_rejected)
 {
     GivenFaultNotifierRegistered();
@@ -2063,8 +2009,6 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_cal_from_fault_is_rejected)
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
-
-// --- ApplyOnlineEstimates and GetFoc ---
 
 TEST_F(FocStateMachineSpeedCliTest, apply_mechanical_estimates_applies_when_physical_values)
 {

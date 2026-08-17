@@ -147,6 +147,11 @@ End with a summary: total criticals, warnings, suggestions, and overall verdict 
 ### 11. Comments (SUGGESTION)
 
 - [ ] No comments restating what code does — code is self-documenting
+- [ ] Every comment states something the code cannot: a non-obvious *why*, a unit or frame the types do not carry, or a concurrency contract
+- [ ] No comment addresses a reviewer or describes the change rather than the code
+- [ ] No comment is stale — every one still matches the code it sits above
+- [ ] No test comment claims a verification the assertions do not perform
+- [ ] No commented-out code
 - [ ] No `TODO`, `FIXME`, `HACK` in production code
 - [ ] No function/method docstrings unless API is non-obvious
 - [ ] Unit annotations acceptable in non-obvious math expressions

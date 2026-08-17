@@ -98,10 +98,8 @@ namespace simulator
 
     void ThreePhaseMotorModel::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        // Mirror real PWM hardware: writing to the duty registers latches the new
-        // duties and (re-)arms the carrier. The carrier keeps cycling at the base
-        // frequency until Stop() is called. Re-entrant calls from within the
-        // controller callback simply update the latched duties.
+        // Mirrors PWM hardware: writing the duty registers latches the duties and re-arms the
+        // carrier, which keeps cycling until Stop(), so a re-entrant call only relatches.
         selfDrive.pendingDuties = dutyPhases;
         EnableSelfDriving();
     }
@@ -142,9 +140,7 @@ namespace simulator
                 observer.StatorVoltages(vAbc, vAlphaBeta);
             });
 
-        // Invoke the controller callback directly. Any re-entrant call to
-        // ThreePhasePwmOutput from inside the callback only updates pendingDuties,
-        // so the dispatcher queue never grows.
+        // Called directly: a re-entrant ThreePhasePwmOutput only relatches duties, so the queue never grows.
         if (onCurrentPhasesReady && !justFinished)
             onCurrentPhasesReady({ currentNoise.iaLast, currentNoise.ibLast, currentNoise.icLast });
 
@@ -205,8 +201,7 @@ namespace simulator
                 observer.Started();
             });
 
-        // Real PWM peripheral starts cycling on enable; the model mirrors this by
-        // self-driving until Stop().
+        // A real PWM peripheral starts cycling on enable; the model mirrors that until Stop().
         EnableSelfDriving();
     }
 
@@ -219,8 +214,8 @@ namespace simulator
         motorState.ib = foc::Ampere{ 0.0f };
         motorState.ic = foc::Ampere{ 0.0f };
         selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } };
-        // Drop the callback so a stale controller cannot be invoked when a calibration
-        // service writes new duties before installing its own callback.
+        // Dropped so a stale controller cannot run when a calibration service writes duties
+        // before installing its own callback.
         onCurrentPhasesReady = nullptr;
     }
 
@@ -288,7 +283,6 @@ namespace simulator
         motorState.ib = foc::Ampere{ i_abc.b };
         motorState.ic = foc::Ampere{ i_abc.c };
 
-        // Thermal update
         const auto pCu = rEff * (motorState.ia.Value() * motorState.ia.Value() + motorState.ib.Value() * motorState.ib.Value() + motorState.ic.Value() * motorState.ic.Value());
         thermal.windingTempCelsius += dt * (pCu - (thermal.windingTempCelsius - thermal.config.ambientCelsius) / thermal.config.thermalResistance) / thermal.config.thermalCapacitance;
 

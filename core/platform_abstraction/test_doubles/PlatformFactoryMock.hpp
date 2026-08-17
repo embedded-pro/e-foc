@@ -23,7 +23,6 @@ namespace application
         MOCK_METHOD(infra::BoundedConstString, FaultStatus, (), (const, override));
         MOCK_METHOD(void, RegisterBoardProtection, (const infra::Function<void(PlatformFactory::BoardProtectionReason)>&), (override));
 
-        // Configuration
         MOCK_METHOD(void, ConfigureAdcAndPwm, (hal::Hertz, std::chrono::nanoseconds, SampleAndHold), (override));
         MOCK_METHOD(void, SetEncoderResolution, (uint32_t), (override));
         MOCK_METHOD(void, ConfigureCanBus, (uint32_t, bool), (override));

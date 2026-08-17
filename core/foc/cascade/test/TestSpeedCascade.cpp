@@ -307,8 +307,6 @@ TEST_F(TestSpeedCascade, set_speed_tunings)
 
 TEST_F(TestSpeedCascade, prescaler_triggers_low_priority_at_correct_rate)
 {
-    // baseFrequency = 20000, lowPriorityFrequency = 2000 → prescaler = 10
-    // LowPriorityInterrupt::Trigger() must be called exactly once every 10 iterations.
     focSpeed->SetPoint(foc::RadiansPerSecond{ 0.0f });
 
     const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();

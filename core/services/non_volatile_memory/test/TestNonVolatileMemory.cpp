@@ -12,10 +12,7 @@ namespace
 {
     using namespace testing;
 
-    // ---------------------------------------------------------------------------
-    // NvmRegionStub — in-memory region that dispatches callbacks via the event loop,
-    // matching the async behaviour of real non-volatile memory implementations.
-    // ---------------------------------------------------------------------------
+    // Dispatches callbacks via the event loop, matching the async behaviour of real memory devices.
     class NvmRegionStub
         : public services::NvmRegion
     {
@@ -50,10 +47,7 @@ namespace
         std::vector<uint8_t> storage;
     };
 
-    // ---------------------------------------------------------------------------
-    // Helper: build a calibration record directly into a region's storage buffer.
     // Record layout: [magic:4][version:1][crc32:4][data:sizeof(CalibrationData)]
-    // ---------------------------------------------------------------------------
     static constexpr std::size_t recordMagicOffset = 0;
     static constexpr std::size_t recordVersionOffset = 4;
     static constexpr std::size_t recordCrc32Offset = 5;
@@ -73,9 +67,7 @@ namespace
         std::memcpy(region.storage.data() + recordCrc32Offset, &crcValue, sizeof(crcValue));
     }
 
-    // ---------------------------------------------------------------------------
-    // Field-by-field equality helpers — avoids relying on memcmp over padding bytes.
-    // ---------------------------------------------------------------------------
+    // Compared field by field so padding bytes never take part.
     void ExpectCalibrationDataEqual(const services::CalibrationData& actual,
         const services::CalibrationData& expected)
     {
@@ -106,9 +98,6 @@ namespace
         EXPECT_EQ(actual.defaultControlMode, expected.defaultControlMode);
     }
 
-    // ---------------------------------------------------------------------------
-    // Fixture
-    // ---------------------------------------------------------------------------
     class NonVolatileMemoryTest
         : public ::testing::Test
         , public infra::EventDispatcherFixture
@@ -163,10 +152,8 @@ namespace
         }
     };
 
-    // ---------------------------------------------------------------------------
-    // Single-writer fixture — both records share one device, so an operation issued
-    // while another is in flight must be rejected without ever reaching a region.
-    // ---------------------------------------------------------------------------
+    // Both records share one device, so an operation issued while another is in flight
+    // must be rejected without ever reaching a region.
     class NvmRegionMock
         : public services::NvmRegion
     {
@@ -207,7 +194,6 @@ namespace
             callback();
         }
 
-        // Walks the erase -> write -> read-back sequence to completion.
         void FinishWrite(testing::StrictMock<NvmRegionMock>& region)
         {
             EXPECT_CALL(region, Write(_, _)).WillOnce(SaveArg<1>(&pendingRegionCallback));

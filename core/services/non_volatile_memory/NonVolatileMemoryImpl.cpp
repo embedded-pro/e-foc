@@ -7,7 +7,6 @@ namespace services
 {
     namespace
     {
-        // Storage records are private to this translation unit.
         // Layout: [magic:4][version:1][crc32:4][data:N]
         // The data structs are padding-free by design (see static_asserts in their headers),
         // so no #pragma pack is needed — every byte stored is a meaningful field byte.

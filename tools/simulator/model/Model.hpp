@@ -35,14 +35,12 @@ namespace simulator
     public:
         struct Parameters
         {
-            // Motor electrical parameters (based on typical small PMSM, similar to Maxon EC 45)
             foc::Ohm R;       // Phase resistance [Ohm]
             foc::Henry Ld;    // d-axis inductance [H]
             foc::Henry Lq;    // q-axis inductance [H] (SPM: Ld ≈ Lq)
             foc::Weber psi_f; // Permanent magnet flux linkage [Wb]
             uint8_t p;        // Pole pairs
 
-            // Mechanical parameters
             foc::KilogramMeterSquared J;       // Rotor inertia [kg·m²]
             foc::NewtonMeterSecondPerRadian B; // Viscous friction coefficient [N·m·s/rad]
         };
@@ -83,11 +81,8 @@ namespace simulator
         foc::Henry EffectiveInductanceQ() const;
         void SetWindingTemperatureForTest(float celsius);
 
-        // Enables continuous PWM cycling driven by the event dispatcher. Mirrors the
-        // behavior of a real PWM peripheral whose carrier keeps running once enabled.
-        // Once enabled, every call to ThreePhasePwmOutput becomes a duty-cycle register
-        // update; the model schedules its own next sample via the dispatcher. Tests that
-        // drive the model synchronously must NOT enable self-driving (use StepForTest).
+        // Mirrors a real PWM peripheral whose carrier keeps running once enabled: the model then
+        // schedules its own samples, so synchronously driven tests must use StepForTest instead.
         void EnableSelfDriving();
 
         // Implementation of drivers::ThreePhaseInverter
@@ -103,9 +98,7 @@ namespace simulator
         void Set(foc::Radians value) override;
         void SetZero() override;
 
-        // Synchronous single-cycle execution for unit tests. Bypasses the event
-        // dispatcher and the controller callback so legacy step-driven tests can
-        // observe the model state directly.
+        // Bypasses the event dispatcher and the controller callback so a test can step the model itself.
         void StepForTest(const foc::PhasePwmDutyCycles& dutyPhases);
 
     private:

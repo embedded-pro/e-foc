@@ -55,7 +55,7 @@ namespace integration
         // CanCommandAcknowledger
         void SendCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status) override;
 
-        // Helper: dispatch a message through the motor category server and emit ACK like CanProtocolServer would.
+        // Dispatches through the motor category server and emits the ACK CanProtocolServer would.
         void DispatchToMotor(uint8_t messageType, const hal::Can::Message& data);
 
         static services::CalibrationData MakeDefaultCalibrationData();

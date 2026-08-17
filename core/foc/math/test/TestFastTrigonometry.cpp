@@ -104,8 +104,6 @@ TEST_F(TestFastTrigonometry, phase_negative_real_axis)
     EXPECT_NEAR(foc::FastTrigonometry::Phase(-1.0f, 0.0f), pi, exactTolerance);
 }
 
-// ── Negative-angle tests ──────────────────────────────────────────────────────
-
 TEST_F(TestFastTrigonometry, sine_negative_pi_over_2)
 {
     EXPECT_NEAR(foc::FastTrigonometry::Sine(-pi / 2.0f), -1.0f, lutTolerance);

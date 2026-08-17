@@ -209,6 +209,10 @@ Follow the TDD Red-Green-Refactor cycle. **Ask clarifying questions before writi
 - Do NOT add features beyond what was requested
 - Do NOT refactor code not related to the task
 - Do NOT add docstrings or comments unless the API is non-obvious to a domain expert
+- A comment must state what the code cannot: a non-obvious *why*, a unit or frame the types do not carry, or a concurrency contract. One short line.
+- Never write a comment that restates the next line, addresses a reviewer, describes your change, or claims behaviour the code does not implement
+- No commented-out code, no `TODO`/`FIXME`/`HACK` in production code
+- When you change code, delete or correct every comment that no longer matches it
 - Do NOT add error handling for impossible scenarios
 - Do NOT create abstractions for one-time operations
 - Do NOT reimplement Clarke, Park, or SVM — use `TransformsClarkePark` and `SpaceVectorModulation`

@@ -269,8 +269,6 @@ namespace
         }
     };
 
-    // ---- QueryMotorType: returns current active mode ----
-
     TEST_F(FocMotorCanBridgeTest, OnQueryMotorType_ReturnsTorqueByDefault)
     {
         ConstructFixture();
@@ -283,8 +281,6 @@ namespace
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
         EXPECT_EQ(lastSentMessageType, services::focMotorTypeResponseId);
     }
-
-    // ---- SetPid*: accepted in matching mode, modeMismatch otherwise ----
 
     TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_IsRejected)
     {
@@ -386,8 +382,6 @@ namespace
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::notImplemented);
     }
 
-    // ---- Start/Stop: acknowledge the outcome of the lifecycle command ----
-
     TEST_F(FocMotorCanBridgeTest, OnStart_RejectedInIdle_DoesNotAcknowledgeSuccess)
     {
         ConstructFixture();
@@ -427,8 +421,6 @@ namespace
         ASSERT_TRUE(ackSpy.last.has_value());
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
     }
-
-    // ---- IdentifyElectrical: delegates to CmdCalibrate ----
 
     TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_TransitionsToCalibrating)
     {
@@ -484,8 +476,6 @@ namespace
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
-    // ---- ClearFault / EmergencyStop ----
-
     TEST_F(FocMotorCanBridgeTest, OnClearFault_RejectedInIdle_DoesNotAcknowledgeSuccess)
     {
         ConstructFixture();
@@ -511,8 +501,6 @@ namespace
         ASSERT_TRUE(ackSpy.last.has_value());
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
-
-    // ---- SelectControlMode: defers ACK, emits success ACK + response on OK ----
 
     TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_Speed_AcksSuccess_AndEmitsResponse)
     {
@@ -561,8 +549,6 @@ namespace
         EXPECT_EQ(lastCategoryErrorOriginCmd, services::focSelectControlModeId);
         EXPECT_EQ(lastCategoryErrorReason, services::FocMotorCategoryError::persistenceFailed);
     }
-
-    // ---- Setpoint validation: payload range, active mode, lifecycle state ----
 
     TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_AcceptedInReady)
     {

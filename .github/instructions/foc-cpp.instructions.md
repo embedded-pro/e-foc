@@ -63,11 +63,30 @@ Use unit-typed aliases throughout: `Ampere`, `Radians`, `Volts`, `RevPerMinute`,
 - Allman braces (opening brace on new line), 4-space indent
 - Functions ~30 lines max (hard limit ~50)
 - `Calculate()` delegates to focused helper methods
-- Self-documenting code — avoid unnecessary comments
+- Self-documenting code — see the comment policy below
 - No implementation in headers — only templated classes may have their implementation in the header file. All other method bodies go in `.cpp` files.
 - `const` on all non-mutating methods, `constexpr` where possible
 - Fixed-size types: `uint8_t`, `int32_t`, etc.
 - Prefer `{}` initialization over `()` for variables and member data (e.g., `float x{0.0f}`, `std::size_t n{0}`)
+
+## Comments
+
+A comment must state something the code cannot state on its own. Keep it to one short line.
+
+Write a comment only for:
+- a non-obvious *why* — a hardware quirk, a datasheet constraint, an ordering requirement, a deliberate deviation from the obvious implementation
+- a unit, frame or convention that the type system does not carry (electrical vs mechanical, per-unit vs volts, per-sample vs continuous gain)
+- a concurrency contract — which context writes a field and which reads it
+
+Delete or never write:
+- comments that restate the next line (`// increment the counter`)
+- comments addressed to a reviewer or describing the change rather than the code (`// now uses the new API`, `// fixed the bug`)
+- section banners and decorative separators
+- commented-out code — delete it, version control remembers
+- `TODO`, `FIXME`, `HACK`, `XXX` in production code — raise an issue instead
+- docstrings on self-explanatory methods, and any comment claiming behaviour the code does not implement
+
+A stale comment is worse than no comment. When you change code, delete or correct every comment that no longer matches it. In tests, a comment must never claim a verification the assertions do not perform.
 
 ## Design
 

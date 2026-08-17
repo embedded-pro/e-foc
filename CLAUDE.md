@@ -141,7 +141,15 @@ namespace foc
 - Follow Arrange-Act-Assert pattern
 - Use `EXPECT_NEAR` with explicit tolerance for floating-point assertions
 
-## 9. Documentation — Always Updated
+## 9. Comments
+
+A comment must state something the code cannot, in one short line: a non-obvious *why* (hardware quirk, ordering requirement, deliberate deviation), a unit or frame the types do not carry (electrical vs mechanical, per-unit vs volts, per-sample vs continuous gain), or a concurrency contract (which context writes a field, which reads it).
+
+Do not write comments that restate the next line, address a reviewer, describe your change, or claim behaviour the code does not implement. No section banners, no commented-out code, no `TODO`/`FIXME`/`HACK` in production code. In tests, a comment must never claim a verification the assertions do not perform.
+
+A stale comment is worse than no comment — when you change code, delete or correct every comment that no longer matches it.
+
+## 10. Documentation — Always Updated
 
 - Documentation-first: for behavioral changes, update the corresponding architecture/design doc in `documentation/` **before or alongside** code changes. Code must follow documentation.
 - `documentation/theory/` — update for any FOC algorithm or motor model change
@@ -149,27 +157,27 @@ namespace foc
 - `documentation/templates/` — use as starting template for new documents
 - All visuals in docs must use Mermaid code blocks or ASCII art — no external image references
 
-## 10. Build System
+## 11. Build System
 
 - Presets are the primary interface: see `CMakePresets.json`
 - Toolchains for embedded boards: `infra/embedded-infra-lib/cmake/toolchain-*.cmake`
 - `compile_commands.json` generated in build dirs; use for language server/analysis
 
-## 11. Performance Optimization
+## 12. Performance Optimization
 
 - See `documentation/performance-optimization/README.md` for key techniques
 - Use `#pragma GCC optimize("O3", "fast-math")` and `OPTIMIZE_FOR_SPEED` for critical files
 - Debug builds use `-Og` to maintain debuggability
 - Use `arm-none-eabi-objdump -d -C` to analyze generated assembly
 
-## 12. Numerical Toolbox
+## 13. Numerical Toolbox
 
 - Located at `infra/numerical-toolbox/`
 - Has its own detailed guidance at `infra/numerical-toolbox/.github/copilot-instructions.md`
 - When editing numerical code, preserve algorithm-level constraints from that file
 - Implement float first, then Q15/Q31 variants; add typed GoogleTest suites
 
-## 13. Design Principles
+## 14. Design Principles
 
 - **SOLID**: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
 - **DRY**: Reuse `infra/numerical-toolbox/` PID, filters, and transforms — do not duplicate

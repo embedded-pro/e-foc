@@ -106,6 +106,10 @@ Reuse `Clarke`, `Park`, `ClarkePark` and `SpaceVectorModulation` from `core/foc/
 - If no such document exists yet, create one using `documentation/templates/architecture.md` or `documentation/templates/design.md` as a template BEFORE writing production code.
 - All visuals in documentation files must be Mermaid code blocks or ASCII art — external image references (`![alt](path)`) are **not allowed**.
 
+### Comments
+
+A comment must state what the code cannot, in one short line: a non-obvious *why*, a unit or frame the types do not carry, or a concurrency contract. Never write a comment that restates the next line, addresses a reviewer, describes your change, or claims behaviour the code does not implement. No commented-out code, no `TODO`/`FIXME`/`HACK` in production code. When you change code, delete or correct every comment that no longer matches it.
+
 ### Brace Style — Allman, 4-Space Indent
 
 ```cpp

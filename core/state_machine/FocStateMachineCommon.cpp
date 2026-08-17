@@ -108,9 +108,8 @@ namespace application
         pendingCommandCallback = onDone;
         nvm.InvalidateCalibration([this](services::NvmStatus status)
             {
-                // Drop stale callbacks: a fault, mode-switch or other intervening
-                // command may have already moved the SM elsewhere and cleared the
-                // pending callback. Acting now would corrupt state.
+                // A fault or mode switch may already have moved the state machine on and cleared
+                // the pending callback, so acting on this late callback would corrupt state.
                 if (!HasPendingCommand() || !state_machine::IsStopped(currentState))
                     return;
 

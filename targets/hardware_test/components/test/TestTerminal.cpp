@@ -30,7 +30,6 @@ namespace
         MOCK_METHOD(application::ResetCause, GetResetCause, (), (const, override));
         MOCK_METHOD(infra::BoundedConstString, FaultStatus, (), (const, override));
 
-        // Configuration
         MOCK_METHOD(void, ConfigureAdcAndPwm, (hal::Hertz, std::chrono::nanoseconds, SampleAndHold), (override));
         MOCK_METHOD(void, SetEncoderResolution, (uint32_t), (override));
         MOCK_METHOD(void, ConfigureCanBus, (uint32_t, bool), (override));
@@ -1044,8 +1043,6 @@ TEST_F(TestHardwareTerminal, encoder_returns_negative_position)
 
     ExecuteAllActions();
 }
-
-// CAN command tests
 
 TEST_F(TestHardwareTerminal, can_start_command)
 {

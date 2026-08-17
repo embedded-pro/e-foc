@@ -136,8 +136,6 @@ namespace
     };
 }
 
-// ---- Active() initial state ----
-
 TEST_F(ControlModeStateMachineTest, Active_Returns_Torque_After_Default_Construction)
 {
     GivenNvmAlwaysInvalid();
@@ -153,8 +151,6 @@ TEST_F(ControlModeStateMachineTest, Active_Returns_Speed_When_Constructed_With_S
 
     EXPECT_EQ(subject->Active(), state_machine::ControlMode::speed);
 }
-
-// ---- TrySet* returns false when wrong mode active ----
 
 TEST_F(ControlModeStateMachineTest, TrySetSpeed_Returns_False_When_Torque_Active)
 {
@@ -182,8 +178,6 @@ TEST_F(ControlModeStateMachineTest, TrySetTorque_Returns_False_When_Speed_Active
 
     EXPECT_FALSE(subject->TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } }));
 }
-
-// ---- Select() NVM success ----
 
 TEST_F(ControlModeStateMachineTest, Select_Switches_Active_To_Speed_On_Nvm_Ok)
 {
@@ -216,8 +210,6 @@ TEST_F(ControlModeStateMachineTest, Select_Switches_Active_To_Position_On_Nvm_Ok
     EXPECT_EQ(result, state_machine::SelectResult::ok);
     EXPECT_EQ(subject->Active(), state_machine::ControlMode::position);
 }
-
-// ---- C3: NVM failure rollback ----
 
 TEST_F(ControlModeStateMachineTest, Select_RollsBack_Mode_On_Nvm_Failure)
 {
@@ -270,8 +262,6 @@ TEST_F(ControlModeStateMachineTest, Select_Remains_Usable_After_Nvm_Reports_Busy
     EXPECT_EQ(subject->Active(), state_machine::ControlMode::speed);
 }
 
-// ---- C2: In-flight select guard ----
-
 TEST_F(ControlModeStateMachineTest, Select_While_Previous_Select_Pending_Reports_Busy)
 {
     GivenNvmAlwaysInvalid();
@@ -291,8 +281,6 @@ TEST_F(ControlModeStateMachineTest, Select_While_Previous_Select_Pending_Reports
 
     EXPECT_EQ(result, state_machine::SelectResult::busy);
 }
-
-// ---- M2: mode replacement is rejected while the active machine owns async work ----
 
 TEST_F(ControlModeStateMachineTest, Select_While_Active_Machine_Has_Pending_Nvm_Command_Reports_Busy)
 {
@@ -366,8 +354,6 @@ TEST_F(ControlModeStateMachineTest, Select_While_Boot_Nvm_Check_In_Flight_Report
     EXPECT_EQ(retryResult, state_machine::SelectResult::ok);
     EXPECT_EQ(subject->Active(), state_machine::ControlMode::speed);
 }
-
-// ---- Additional helpers ----
 
 namespace
 {
@@ -466,8 +452,6 @@ namespace
     };
 }
 
-// ---- Rotor flux linkage ----
-
 TEST_F(ControlModeStateMachineExtTest, DecoupledPidIsSelectableWithConfiguredFluxLinkage)
 {
     GivenNvmValid();
@@ -541,8 +525,6 @@ TEST_F(ControlModeStateMachineExtTest, Cli_SetFluxLinkage_RejectsNonPositiveValu
     EXPECT_FLOAT_EQ(subject->ActiveFluxLinkage().Value(), 0.007f);
 }
 
-// ---- Active() — position branch ----
-
 TEST_F(ControlModeStateMachineExtTest, Active_Returns_Position_When_Constructed_With_Position_Default)
 {
     GivenNvmAlwaysInvalid();
@@ -550,8 +532,6 @@ TEST_F(ControlModeStateMachineExtTest, Active_Returns_Position_When_Constructed_
 
     EXPECT_EQ(subject->Active(), state_machine::ControlMode::position);
 }
-
-// ---- TrySet* returns true when correct mode active ----
 
 TEST_F(ControlModeStateMachineExtTest, TrySetTorque_Returns_True_When_Torque_Mode_Active)
 {
@@ -583,8 +563,6 @@ TEST_F(ControlModeStateMachineExtTest, TrySetPosition_Returns_True_When_Position
     EXPECT_TRUE(subject->TrySetPosition(foc::Radians{ 1.0f }));
 }
 
-// ---- TrySetTorque returns false when position active ----
-
 TEST_F(ControlModeStateMachineExtTest, TrySetTorque_Returns_False_When_Position_Active)
 {
     GivenNvmAlwaysInvalid();
@@ -595,8 +573,6 @@ TEST_F(ControlModeStateMachineExtTest, TrySetTorque_Returns_False_When_Position_
 
     EXPECT_FALSE(subject->TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } }));
 }
-
-// ---- ActiveStateMachine() in each mode ----
 
 TEST_F(ControlModeStateMachineExtTest, ActiveStateMachine_Is_Accessible_In_Speed_Mode)
 {
@@ -621,8 +597,6 @@ TEST_F(ControlModeStateMachineExtTest, ActiveStateMachine_Is_Accessible_In_Posit
     subject->ActiveStateMachine().CmdDisable();
 }
 
-// ---- Select() returns busy when motor is enabled ----
-
 TEST_F(ControlModeStateMachineExtTest, Select_Returns_Busy_When_Motor_Is_Enabled)
 {
     GivenNvmValid();
@@ -639,8 +613,6 @@ TEST_F(ControlModeStateMachineExtTest, Select_Returns_Busy_When_Motor_Is_Enabled
 
     EXPECT_EQ(result, state_machine::SelectResult::busy);
 }
-
-// ---- CLI commands: no-ops in Idle ----
 
 TEST_F(ControlModeStateMachineExtTest, Cli_Enable_Is_NoOp_In_Idle)
 {
@@ -675,8 +647,6 @@ TEST_F(ControlModeStateMachineExtTest, Cli_ClearFault_Is_NoOp_In_Idle)
         subject->ActiveStateMachine().CurrentState()));
 }
 
-// ---- CLI: calibrate starts calibration sequence ----
-
 TEST_F(ControlModeStateMachineExtTest, Cli_Calibrate_In_Idle_Starts_Calibration)
 {
     GivenNvmAlwaysInvalid();
@@ -695,8 +665,6 @@ TEST_F(ControlModeStateMachineExtTest, Cli_Calibrate_In_Idle_Starts_Calibration)
         subject->ActiveStateMachine().CurrentState()));
 }
 
-// ---- CLI: clear_cal from Idle invalidates NVM ----
-
 TEST_F(ControlModeStateMachineExtTest, Cli_ClearCal_In_Idle_Calls_InvalidateCalibration)
 {
     GivenNvmAlwaysInvalid();
@@ -712,8 +680,6 @@ TEST_F(ControlModeStateMachineExtTest, Cli_ClearCal_In_Idle_Calls_InvalidateCali
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
         subject->ActiveStateMachine().CurrentState()));
 }
-
-// ---- CLI: apply_estimates ----
 
 TEST_F(ControlModeStateMachineExtTest, Cli_ApplyEstimates_Is_NoOp_In_Torque_Mode)
 {
@@ -734,8 +700,6 @@ TEST_F(ControlModeStateMachineExtTest, Cli_ApplyEstimates_In_Speed_Mode_Does_Not
     // ApplyOnlineEstimates() returns early when SM is not Enabled — no mock expectations
     InvokeCliCommand("ae");
 }
-
-// ---- CLI: active_mode prints each mode ----
 
 TEST_F(ControlModeStateMachineExtTest, Cli_ActiveMode_Prints_Torque)
 {
@@ -764,8 +728,6 @@ TEST_F(ControlModeStateMachineExtTest, Cli_ActiveMode_Prints_Position)
 
     InvokeCliCommand("am");
 }
-
-// ---- Full lifecycle tests covering all 3 NoOp state machine types ----
 
 namespace
 {
@@ -835,8 +797,6 @@ namespace
     };
 }
 
-// ---- Torque mode full lifecycle ----
-
 TEST_F(ControlModeStateMachineLifecycleTest, Full_Calibration_Completes_To_Ready_In_Torque_Mode)
 {
     GivenNvmAlwaysInvalid();
@@ -890,8 +850,6 @@ TEST_F(ControlModeStateMachineLifecycleTest, Fault_And_ClearFault_In_Torque_Mode
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
         subject->ActiveStateMachine().CurrentState()));
 }
-
-// ---- Speed mode full lifecycle ----
 
 TEST_F(ControlModeStateMachineLifecycleTest, Full_Calibration_Completes_To_Ready_In_Speed_Mode)
 {
@@ -973,8 +931,6 @@ TEST_F(ControlModeStateMachineLifecycleTest, ApplyOnlineEstimates_When_Enabled_I
         subject->ActiveStateMachine().CurrentState()));
 }
 
-// ---- Position mode full lifecycle ----
-
 TEST_F(ControlModeStateMachineLifecycleTest, Full_Calibration_Completes_To_Ready_In_Position_Mode)
 {
     GivenNvmAlwaysInvalid();
@@ -1034,8 +990,6 @@ TEST_F(ControlModeStateMachineLifecycleTest, Fault_And_ClearFault_In_Position_Mo
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
         subject->ActiveStateMachine().CurrentState()));
 }
-
-// ---- TrySet*PidGains: accepted by matching mode(s) ----
 
 TEST_F(ControlModeStateMachineExtTest, TrySetCurrentBandwidth_AcceptedInTorqueMode)
 {
@@ -1153,8 +1107,6 @@ TEST_F(ControlModeStateMachineExtTest, SelectSpeedAlgorithm_RejectedWithoutMecha
     EXPECT_EQ(subject->SelectSpeedAlgorithm(foc::SpeedAlgorithm::lqi), foc::SelectResult::invalidParameters);
 }
 
-// ---- CLI: algorithm selection parses every accepted name and rejects the rest ----
-
 TEST_F(ControlModeStateMachineExtTest, Cli_SelectCurrentAlgorithm_AcceptsEveryName)
 {
     GivenNvmValid();
@@ -1223,8 +1175,6 @@ TEST_F(ControlModeStateMachineExtTest, Cli_SelectPositionAlgorithm_RejectedOutsi
     EXPECT_EQ(subject->SelectPositionAlgorithm(foc::PositionAlgorithm::lqr), foc::SelectResult::invalidAlgorithm);
 }
 
-// ---- CLI: active_algorithms names every enumerator ----
-
 TEST_F(ControlModeStateMachineExtTest, Cli_ActiveAlgorithms_NamesEveryCurrentAlgorithm)
 {
     GivenNvmValid();
@@ -1266,8 +1216,6 @@ TEST_F(ControlModeStateMachineExtTest, Cli_ActiveAlgorithms_NamesEveryPositionAl
     }
 }
 
-// ---- Bandwidth commands reach each loop ----
-
 TEST_F(ControlModeStateMachineExtTest, TrySetBandwidths_AreAcceptedInPositionMode)
 {
     GivenNvmAlwaysInvalid();
@@ -1289,8 +1237,6 @@ TEST_F(ControlModeStateMachineExtTest, TrySetSpeedAndPositionBandwidth_AreReject
     EXPECT_FALSE(subject->TrySetSpeedBandwidth(188.5f));
     EXPECT_FALSE(subject->TrySetPositionBandwidth(18.8f));
 }
-
-// ---- Persisted algorithms are restored once the motor model exists (REQ-CTRL-006) ----
 
 TEST_F(ControlModeStateMachineExtTest, PersistedAlgorithmIsKeptInConfigWhileStillUnselectable)
 {
@@ -1371,8 +1317,6 @@ TEST_F(ControlModeStateMachineLifecycleTest, PersistedSpeedAlgorithmIsAppliedOnc
 
     EXPECT_EQ(subject->ActiveSpeedAlgorithm(), foc::SpeedAlgorithm::lqi);
 }
-
-// ---- CLI: setpoint and bandwidth commands registered on the coordinator ----
 
 namespace
 {

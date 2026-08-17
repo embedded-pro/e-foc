@@ -32,29 +32,23 @@ namespace integration
     {
         FocIntegrationFixture();
 
-        // Helpers for deferred state machine construction
         void ConstructWithInvalidNvm();
         void ConstructWithValidNvm(services::CalibrationData data = MakeDefaultCalibrationData());
 
-        // Set up expectations on service mocks so the full calibration sequence can proceed.
         void SetupCalibrationExpectations();
 
-        // Wire up the CAN category server and bridge to the state machine.
         // Must be called after ConstructWithInvalidNvm() or ConstructWithValidNvm().
         void SetupCanIntegration();
 
-        // Inject a CAN message directly into the category server.
         void InjectCanStart();
         void InjectCanStop();
         void InjectCanClearFault();
         void InjectCanEmergencyStop();
 
-        // Defer the NVM invalidation triggered by CmdClearCalibration so the state can
-        // change before the callback fires.
+        // Holds back the NVM invalidation so the state can change before the callback fires.
         void DeferClearCalibration();
         void CompleteInvalidate(services::NvmStatus status);
 
-        // Complete a previously captured calibration step callback.
         void CompletePolePairsEstimation(std::size_t polePairs);
         void CompleteRLEstimation(foc::Ohm resistance, foc::MilliHenry inductance);
         void CompleteAlignment(foc::Radians offset);

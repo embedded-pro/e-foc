@@ -12,9 +12,8 @@
 
 namespace simulator
 {
-    // Thin Qt observer that adapts the simulator's three-phase model samples
-    // to the production RealTimeResistanceAndInductanceEstimator and re-emits
-    // the resulting estimates as Qt signals for the GUI scopes.
+    // Adapts the simulator's model samples to the production estimator and re-emits its
+    // estimates as Qt signals for the GUI scopes.
     class OnlineElectricalRls
         : public QObject
         , public ThreePhaseMotorModelObserver

@@ -43,6 +43,7 @@ This file is a concise, task-oriented guide for AI coding agents to be immediate
 - Avoid recursion and virtual calls in ISR/hot paths.
 - Favor `constexpr`, `inline`, and `const` correctness for performance.
 - No implementation in headers — only templated classes may have method bodies in `.hpp` files. All other implementation goes in `.cpp` files.
+- Comments must state what the code cannot: a non-obvious *why*, a unit or frame the types do not carry, or a concurrency contract. One short line. No comments that restate the next line, address a reviewer, describe the change, or claim behaviour the code does not implement. No commented-out code, no `TODO`/`FIXME`/`HACK`. Delete or correct any comment your change makes stale.
 
 4) Patterns & code locations (concrete examples)
 - Add a new FOC algorithm:

@@ -33,8 +33,6 @@ namespace application
         infra::Function<void(foc::Ampere phaseA, foc::Ampere phaseB, foc::Ampere phaseC)> onMeasurementDone;
     };
 
-    // Implementation
-
     template<typename Impl>
     requires std::derived_from<Impl, hal::AdcMultiChannel>
     template<typename... Args>
