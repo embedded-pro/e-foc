@@ -13,6 +13,7 @@ namespace application
         foc::Ampere maxCurrent;
         hal::Hertz baseFrequency;
         foc::LowPriorityInterrupt& lowPriorityInterrupt;
+        hal::Hertz outerLoopFrequency{ 1000 };
     };
 
     class OuterLoopStateMachine

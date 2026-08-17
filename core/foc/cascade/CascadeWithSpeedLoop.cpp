@@ -53,6 +53,7 @@ namespace foc
 
         currentMechanicalAngle = 0.0f;
         previousSpeedPosition = 0.0f;
+        previousSpeedPositionValid = false;
         lastSpeedLoopOutput = 0.0f;
         lastElectricalSpeed = 0.0f;
         triggerCounter = 0;
@@ -131,8 +132,17 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     float CascadeWithSpeedLoop::MeasureMechanicalSpeed()
     {
+        if (!previousSpeedPositionValid)
+        {
+            previousSpeedPosition = currentMechanicalAngle;
+            previousSpeedPositionValid = true;
+            lastElectricalSpeed = 0.0f;
+            return 0.0f;
+        }
+
         auto mechanicalSpeed = detail::PositionWithWrapAround(currentMechanicalAngle - previousSpeedPosition) / speedDt;
         previousSpeedPosition = currentMechanicalAngle;
+        lastElectricalSpeed = mechanicalSpeed * polePairs;
         return mechanicalSpeed;
     }
 
@@ -140,7 +150,6 @@ namespace foc
     void CascadeWithSpeedLoop::RunSpeedLoop(float mechanicalSpeed)
     {
         lastSpeedLoopOutput = speedLoop.Compute(SpeedControlContext{ RadiansPerSecond{ mechanicalSpeed }, speedReference }).Value();
-        lastElectricalSpeed = mechanicalSpeed * polePairs;
     }
 
     OPTIMIZE_FOR_SPEED

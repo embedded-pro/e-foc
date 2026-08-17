@@ -14,9 +14,9 @@ namespace application
         : OuterLoopStateMachine(terminalAndTracer, hardware, nvm,
               calibServices.electricalIdent, calibServices.motorAlignment,
               calibServices.mechTorqueConstant)
-        , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt)
-        , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, outerLoopArgs.baseFrequency)
-        , onlineElecEstimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, outerLoopArgs.baseFrequency)
+        , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt, outerLoopArgs.outerLoopFrequency)
+        , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
+        , onlineElecEstimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
         , mechIdentPtr(calibServices.mechIdentOverride)
     {
         focController.SetOnlineMechanicalEstimator(onlineMechEstimator);

@@ -1,6 +1,7 @@
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include <gmock/gmock.h>
+#include <numbers>
 
 namespace
 {
@@ -117,6 +118,19 @@ namespace
         testing::StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterrupt;
         std::optional<foc::SpeedCascade> cascade;
     };
+
+    foc::PhasePwmDutyCycles FirstDutyAtStandstill(SpeedCascadeUnderTest& speedCascade, float stationaryAngle)
+    {
+        speedCascade.cascade->Enable();
+        speedCascade.cascade->SetPoint(foc::RadiansPerSecond{ 0.0f });
+
+        foc::Radians position{ stationaryAngle };
+        speedCascade.cascade->Calculate(ZeroCurrents(), position);
+        speedCascade.lowPriorityInterrupt.TriggerHandler();
+
+        foc::Radians held{ stationaryAngle };
+        return speedCascade.cascade->Calculate(ZeroCurrents(), held);
+    }
 
     foc::PhasePwmDutyCycles FirstDutyAfterSpeedStep(SpeedCascadeUnderTest& speedCascade, float setPoint)
     {
@@ -352,4 +366,17 @@ TEST_F(TestSpeedCascade, a_speed_loop_configured_without_limits_still_drives_the
 
     ExpectValidDuty(result);
     ExpectOffCentreDuty(result);
+}
+
+// A stationary rotor at a non-zero angle must not be read as motion on the first outer sample:
+// zeroing the differentiator on enable made pi rad look like a 3000 rad/s step at 1 kHz.
+TEST_F(TestSpeedCascade, the_speed_estimate_does_not_spike_on_the_first_sample_after_enable)
+{
+    SpeedCascadeUnderTest atOrigin{ polePairs, foc::SpeedLoopTunings{} };
+    SpeedCascadeUnderTest awayFromOrigin{ polePairs, foc::SpeedLoopTunings{} };
+
+    auto atOriginDuty = FirstDutyAtStandstill(atOrigin, 0.0f);
+    auto awayFromOriginDuty = FirstDutyAtStandstill(awayFromOrigin, std::numbers::pi_v<float> - 0.01f);
+
+    ExpectSameDuty(awayFromOriginDuty, atOriginDuty);
 }

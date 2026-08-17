@@ -92,6 +92,7 @@ namespace foc
         hal::Hertz outerLoopFrequency;
         float currentMechanicalAngle{ 0.0f };
         float previousSpeedPosition{ 0.0f };
+        bool previousSpeedPositionValid{ false };
         float lastSpeedLoopOutput{ 0.0f };
         float lastElectricalSpeed{ 0.0f };
         RadiansPerSecond speedReference{ 0.0f };
