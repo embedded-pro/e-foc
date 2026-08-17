@@ -108,12 +108,9 @@ namespace application
         pendingCommandCallback = onDone;
         nvm.InvalidateCalibration([this](services::NvmStatus status)
             {
-                // A fault or mode switch may already have moved the state machine on and cleared
-                // the pending callback, so acting on this late callback would corrupt state.
                 if (!HasPendingCommand() || !state_machine::IsStopped(currentState))
                     return;
 
-                // A busy device means nothing was written; reject without faulting.
                 if (status == services::NvmStatus::Busy)
                 {
                     CompletePendingCommand(state_machine::CommandResult::rejected);
@@ -151,8 +148,6 @@ namespace application
 
         if (wasActive)
         {
-            // An aborted calibration never commits into calibrationData, so any previously
-            // applied calibration is still valid and the motor stays enableable.
             if (HasValidCalibration())
                 EnterReady(calibrationData);
             else
@@ -176,7 +171,6 @@ namespace application
         tracer.Trace() << "[SM] Entering Calibrating";
         currentState = state_machine::Calibrating{};
 
-        // No calibration step measures the flux linkage, so the record keeps the value already in force.
         std::get<state_machine::Calibrating>(currentState).pendingData.fluxLinkage = EffectiveFluxLinkage(calibrationData).Value();
 
         RunPolePairsStep();

@@ -98,8 +98,6 @@ namespace simulator
 
     void ThreePhaseMotorModel::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        // Mirrors PWM hardware: writing the duty registers latches the duties and re-arms the
-        // carrier, which keeps cycling until Stop(), so a re-entrant call only relatches.
         selfDrive.pendingDuties = dutyPhases;
         EnableSelfDriving();
     }
@@ -140,7 +138,6 @@ namespace simulator
                 observer.StatorVoltages(vAbc, vAlphaBeta);
             });
 
-        // Called directly: a re-entrant ThreePhasePwmOutput only relatches duties, so the queue never grows.
         if (onCurrentPhasesReady && !justFinished)
             onCurrentPhasesReady({ currentNoise.iaLast, currentNoise.ibLast, currentNoise.icLast });
 
@@ -201,7 +198,6 @@ namespace simulator
                 observer.Started();
             });
 
-        // A real PWM peripheral starts cycling on enable; the model mirrors that until Stop().
         EnableSelfDriving();
     }
 
@@ -214,8 +210,6 @@ namespace simulator
         motorState.ib = foc::Ampere{ 0.0f };
         motorState.ic = foc::Ampere{ 0.0f };
         selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } };
-        // Dropped so a stale controller cannot run when a calibration service writes duties
-        // before installing its own callback.
         onCurrentPhasesReady = nullptr;
     }
 

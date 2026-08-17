@@ -45,7 +45,6 @@ namespace integration
         void InjectCanClearFault();
         void InjectCanEmergencyStop();
 
-        // Holds back the NVM invalidation so the state can change before the callback fires.
         void DeferClearCalibration();
         void CompleteInvalidate(services::NvmStatus status);
 

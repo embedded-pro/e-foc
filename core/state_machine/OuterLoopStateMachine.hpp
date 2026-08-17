@@ -38,7 +38,6 @@ namespace application
 
         void RunMechanicalIdentStep();
 
-        // Without an injected service the mode owns one, so a blank NVM can still be commissioned.
         static services::MechanicalParametersIdentification& ResolveMechIdent(
             const CalibrationServices& calibServices,
             std::optional<services::MechanicalParametersIdentificationImpl>& ownMechIdent,

@@ -32,12 +32,8 @@ namespace state_machine
         void OnEmergencyStop(const infra::Function<void()>& onDone) override;
         void OnConfigureTelemetryRate(uint8_t, const infra::Function<void()>&) override;
 
-        // The position law folds its error into [-pi, pi], so a request beyond one mechanical
-        // revolution aliases onto an angle inside it and can only be a scaling mistake.
         static constexpr float maxPositionSetpoint{ 6.2831853f };
 
-        // The position cascade never commands more than +-1000 rad/s (documentation/design/foc-position.md),
-        // so a speed commanded directly over the bus is bounded the same way.
         static constexpr float maxSpeedSetpoint{ 1000.0f };
 
     private:

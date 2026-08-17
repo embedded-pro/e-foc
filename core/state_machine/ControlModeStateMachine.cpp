@@ -13,7 +13,6 @@ namespace
     constexpr auto wrongModeMessage = "rejected: command does not apply to the active control mode.";
     constexpr auto wrongStateMessage = "rejected: setpoints are only accepted in Ready or Enabled.";
 
-    // Returns the rejection to report, or nothing when the single float argument was accepted.
     std::optional<CliStatusWithMessage> ParseSingleFloat(const infra::BoundedConstString& input, float& value)
     {
         infra::Tokenizer tokenizer(input, ' ');
@@ -123,8 +122,6 @@ namespace
         }
     }
 
-    // A CRC-valid record can still hold a byte outside the enum domain, so every persisted
-    // selection is range-checked before it reaches a static_cast.
     std::optional<foc::CurrentAlgorithm> CurrentAlgorithmFromRaw(uint8_t raw)
     {
         if (raw > static_cast<uint8_t>(foc::CurrentAlgorithm::slidingMode))

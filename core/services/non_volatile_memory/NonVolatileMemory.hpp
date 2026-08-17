@@ -13,7 +13,6 @@ namespace services
         VersionMismatch,
         WriteFailed,
         HardwareFault,
-        // Another operation is already in flight; the device serialises all access.
         Busy
     };
 

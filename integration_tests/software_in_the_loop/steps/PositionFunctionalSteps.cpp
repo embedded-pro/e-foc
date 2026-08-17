@@ -14,15 +14,11 @@ namespace
     const hal::Hertz baseFrequency{ 20000 };
     const hal::Hertz outerLoopFrequency{ 1000 };
 
-    // The shipped current-loop bandwidth rails the modulator for every reference an outer loop can
-    // ask for, which would hide the differences these scenarios look for.
     constexpr float nominalCurrentBandwidth{ 628.3185f };
     const float nominalSpeedBandwidth{ foc::SpeedLoopTunings{}.bandwidth };
     const float nominalPositionBandwidth{ foc::PositionLoopTunings{}.bandwidth };
     constexpr float detuneFactor{ 100.0f };
 
-    // Small enough to keep the modulator off its rails, large enough to move it by more than the
-    // one percent quantisation of hal::Percent
     constexpr float positionStep{ 0.05f };
 
     foc::MotorModelParameters MotorParameters()
@@ -107,8 +103,6 @@ namespace
         std::optional<foc::PositionCascade> cascade;
     };
 
-    // Enable re-applies the standing setpoint, so a setpoint commanded in a WHEN step survives;
-    // the cascade is left disabled because retuning is rejected while it runs.
     foc::PhasePwmDutyCycles DutyAfterOuterCycle(PositionCascadeUnderTest& positionCascade)
     {
         positionCascade.cascade->Enable();
@@ -132,7 +126,6 @@ namespace
 
     struct PositionFunctionalContext
     {
-        // The position loop starts detuned so the scenario that configures it changes something
         PositionCascadeUnderTest underTest{ nominalCurrentBandwidth, nominalSpeedBandwidth, nominalPositionBandwidth / detuneFactor };
     };
 }

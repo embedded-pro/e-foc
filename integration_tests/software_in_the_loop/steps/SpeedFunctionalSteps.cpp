@@ -14,13 +14,9 @@ namespace
     const hal::Hertz baseFrequency{ 20000 };
     const hal::Hertz outerLoopFrequency{ 1000 };
 
-    // The shipped current-loop bandwidth rails the modulator for every reference the speed loop can
-    // ask for, which would hide the differences these scenarios look for.
     constexpr float nominalCurrentBandwidth{ 628.3185f };
     constexpr float detuneFactor{ 100.0f };
 
-    // Small enough to keep the modulator off its rails, large enough to move it by more than the
-    // one percent quantisation of hal::Percent
     constexpr float speedStep{ 2.0f };
 
     foc::MotorModelParameters MotorParameters()
@@ -83,7 +79,6 @@ namespace
         std::optional<foc::SpeedCascade> cascade;
     };
 
-    // Enable re-applies the standing setpoint, so a setpoint commanded in a WHEN step survives.
     foc::PhasePwmDutyCycles DutyAfterOuterCycle(SpeedCascadeUnderTest& speedCascade)
     {
         speedCascade.cascade->Enable();

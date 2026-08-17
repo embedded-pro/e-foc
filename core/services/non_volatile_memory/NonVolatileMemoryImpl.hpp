@@ -75,7 +75,6 @@ namespace services
         CalibrationData* pendingCalibrationOutput = nullptr;
         ConfigData* pendingConfigOutput = nullptr;
 
-        // Both regions share one device, so admission is device-wide, not per record.
         bool busy{ false };
     };
 }

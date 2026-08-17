@@ -37,7 +37,6 @@ namespace application
         services::MotorAlignment& motorAlignment;
         std::optional<std::reference_wrapper<services::MechanicalParametersIdentification>> mechIdentOverride{ std::nullopt };
         foc::NewtonMeter mechTorqueConstant{ foc::NewtonMeter{ 0.1f } };
-        // No identification procedure measures the rotor flux linkage, so the datasheet value is configured here.
         foc::Weber fluxLinkage{ foc::Weber{ 0.0f } };
     };
 

@@ -134,7 +134,6 @@ namespace application
 
     void PlatformFactoryImpl::PendSvLowPriorityInterrupt::Unregister()
     {
-        // Detach before clearing so an already pending PendSV finds no callback
         pendSvHandlerCallback = nullptr;
         onLowPriorityInterrupt = nullptr;
     }

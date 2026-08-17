@@ -60,7 +60,6 @@ namespace state_machine
         virtual const State& CurrentState() const = 0;
         virtual FaultCode LastFaultCode() const = 0;
 
-        // True while any service callback capturing this object is still outstanding.
         virtual bool HasPendingAsyncWork() const = 0;
 
         virtual void CmdCalibrate(const infra::Function<void(CommandResult)>& onDone) = 0;

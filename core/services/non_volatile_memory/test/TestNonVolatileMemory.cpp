@@ -12,7 +12,6 @@ namespace
 {
     using namespace testing;
 
-    // Dispatches callbacks via the event loop, matching the async behaviour of real memory devices.
     class NvmRegionStub
         : public services::NvmRegion
     {
@@ -67,7 +66,6 @@ namespace
         std::memcpy(region.storage.data() + recordCrc32Offset, &crcValue, sizeof(crcValue));
     }
 
-    // Compared field by field so padding bytes never take part.
     void ExpectCalibrationDataEqual(const services::CalibrationData& actual,
         const services::CalibrationData& expected)
     {
@@ -152,8 +150,6 @@ namespace
         }
     };
 
-    // Both records share one device, so an operation issued while another is in flight
-    // must be rejected without ever reaching a region.
     class NvmRegionMock
         : public services::NvmRegion
     {
@@ -655,8 +651,6 @@ TEST_F(NonVolatileMemoryTest, save_config_write_verify_failure_returns_write_fai
 
 TEST_F(NonVolatileMemoryTest, concurrent_save_calibration_second_call_is_rejected)
 {
-    // Start a save that won't complete (no ExecuteAllActions) then call again — the
-    // second call must be answered with Busy without interfering with the first.
     bool firstDone = false;
 
     nvm.SaveCalibration(MakeTestCalibration(), [&](auto)

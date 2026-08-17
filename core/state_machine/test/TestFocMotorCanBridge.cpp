@@ -198,8 +198,6 @@ namespace
             Construct();
         }
 
-        // Boots the active state machine straight into Ready, the state in which setpoints and
-        // start are meaningful.
         void ConstructFixtureInReady()
         {
             GivenNvmHoldsValidCalibration();

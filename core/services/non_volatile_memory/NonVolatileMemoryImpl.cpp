@@ -76,8 +76,6 @@ namespace services
     void NonVolatileMemoryImpl::SaveCalibration(const CalibrationData& data,
         infra::Function<void(NvmStatus)> onDone)
     {
-        // One device backs both regions, and its driver asserts exclusivity, so admission is
-        // device-wide rather than per record. A refused request still completes its callback.
         if (busy)
         {
             onDone(NvmStatus::Busy);

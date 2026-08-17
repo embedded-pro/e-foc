@@ -51,8 +51,6 @@ namespace state_machine
         }
     }
 
-    // A frame carries an arbitrary byte, so a value outside the enum domain must stay
-    // distinguishable from torque instead of collapsing onto it.
     inline std::optional<ControlMode> FromCanMode(services::FocMotorMode mode)
     {
         switch (mode)

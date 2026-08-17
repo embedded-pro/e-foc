@@ -31,7 +31,6 @@ namespace application
         static constexpr uint32_t configRegionSize = 128;
         static constexpr uint32_t controlLoopFrequencyHz = 20000;
         static constexpr uint32_t pwmDeadTimeNs = 500;
-        // JK42BLS01-X038ED datasheet rotor flux linkage; overridable at runtime with set_flux_linkage.
         static constexpr float motorFluxLinkageWb = 0.007f;
 
         using ControlMode = state_machine::ControlModeStateMachine;

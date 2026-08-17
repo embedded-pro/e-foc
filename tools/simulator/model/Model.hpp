@@ -81,8 +81,6 @@ namespace simulator
         foc::Henry EffectiveInductanceQ() const;
         void SetWindingTemperatureForTest(float celsius);
 
-        // Mirrors a real PWM peripheral whose carrier keeps running once enabled: the model then
-        // schedules its own samples, so synchronously driven tests must use StepForTest instead.
         void EnableSelfDriving();
 
         // Implementation of drivers::ThreePhaseInverter
@@ -98,7 +96,6 @@ namespace simulator
         void Set(foc::Radians value) override;
         void SetZero() override;
 
-        // Bypasses the event dispatcher and the controller callback so a test can step the model itself.
         void StepForTest(const foc::PhasePwmDutyCycles& dutyPhases);
 
     private:

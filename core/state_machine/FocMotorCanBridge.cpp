@@ -39,9 +39,6 @@ namespace state_machine
         ReportCommandOutcome(services::focStopId, controlMode.ActiveStateMachine().CmdDisable(), onDone);
     }
 
-    // Raw PID gains are no longer part of the FOC contract; tuning is bandwidth-based.
-    // can-lite has no bandwidth message yet, so these legacy frames are rejected rather than
-    // reinterpreted, which would apply a gain value as a bandwidth on a live motor.
     void FocMotorCanBridge::OnSetPidCurrent(const services::FocPidGains&, const infra::Function<void()>&)
     {
         server.SendCategoryError(services::focSetPidCurrentId, services::FocMotorCategoryError::applicationError);
@@ -215,8 +212,6 @@ namespace state_machine
         return false;
     }
 
-    // A stored setpoint is re-applied by the cascade on the next enable, so only the states from
-    // which the motor can actually run may accept one.
     bool FocMotorCanBridge::SetpointAllowedInCurrentState() const
     {
         const auto& state = controlMode.ActiveStateMachine().CurrentState();
@@ -235,7 +230,6 @@ namespace state_machine
             return;
         }
 
-        // lD is held in millihenry, so the wire value carries microhenry resolution.
         callback(services::FocElectricalParams{
             ToWire(ready->loadedData.rPhase, services::focResistanceScale),
             ToWire(ready->loadedData.lD, services::focInductanceScale) });

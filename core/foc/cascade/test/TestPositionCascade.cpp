@@ -15,12 +15,8 @@ namespace
     const hal::Hertz lowPriorityFrequency{ 2000 };
     constexpr float tolerance = 1.0f;
 
-    // Duty cycles are whole percents, so the stimulus has to move the modulator by more than that
-    // quantisation step while staying well inside the current envelope
     constexpr float observableError{ 0.05f };
 
-    // The shipped current-loop bandwidth drives the modulator onto its rails for every current
-    // reference an outer loop can ask for, which would hide the differences these tests look for.
     foc::CurrentLoopTunings UnsaturatedCurrentTunings()
     {
         auto tunings = foc::CurrentLoopTunings{};
@@ -170,8 +166,6 @@ TEST_F(TestPositionCascade, duty_cycles_are_bounded_0_to_100)
     ExpectValidDuty(result);
 }
 
-// theta_e = theta_m * pole_pairs: p pole pairs at a mechanical angle must land on the same
-// electrical angle - and therefore the same duty cycles - as 1 pole pair at p times that angle.
 TEST_F(TestPositionCascade, set_pole_pairs)
 {
     constexpr float mechanicalAngle{ 0.3f };
@@ -255,8 +249,6 @@ TEST_F(TestPositionCascade, different_positions_produce_different_outputs)
 
 TEST_F(TestPositionCascade, position_pid_drives_speed_reference)
 {
-    // The position PID hands the speed loop a reference of error * bandwidth, so a speed cascade
-    // driven straight from that setpoint has to produce the very same duty cycles.
     constexpr float positionError{ observableError };
 
     PositionCascadeUnderTest positionCascade{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };

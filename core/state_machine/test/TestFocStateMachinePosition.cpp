@@ -1635,7 +1635,6 @@ TEST_F(FocStateMachinePositionCliTest, clear_cal_invalidate_failure_callback_aft
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
 
-// Without its own mechanical identification, position mode could never be commissioned on the production target.
 TEST_F(FocStateMachinePositionAutoTest, no_mech_ident_override_uses_its_own_identification)
 {
     GivenFaultNotifierRegistered();

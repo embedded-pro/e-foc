@@ -12,8 +12,6 @@
 
 namespace simulator
 {
-    // Adapts the simulator's model samples to the production estimator and re-emits its
-    // estimates as Qt signals for the GUI scopes.
     class OnlineElectricalRls
         : public QObject
         , public ThreePhaseMotorModelObserver
