@@ -24,3 +24,24 @@
     All CAN motor commands shall be dispatched through the FocMotorCategoryServer
     observer interface. No CAN protocol internals shall be exposed to the state
     machine layer.
+
+- id: REQ-INT-005
+  title: CAN Start is rejected while in Idle
+  shall: >
+    When the FocMotorCategoryServer receives a Start command (focStartId) while the
+    state machine is in the Idle state, the state machine shall remain in Idle and
+    shall not activate the FOC control loop.
+
+- id: REQ-INT-006
+  title: CAN EmergencyStop disables an enabled motor
+  shall: >
+    When the FocMotorCategoryServer receives an EmergencyStop command
+    (focEmergencyStopId) while the state machine is in the Enabled state, the state
+    machine shall transition to the Ready state, deactivating the FOC control loop.
+
+- id: REQ-INT-007
+  title: CAN EmergencyStop in Ready has no effect
+  shall: >
+    When the FocMotorCategoryServer receives an EmergencyStop command
+    (focEmergencyStopId) while the state machine is in the Ready state, the state
+    machine shall remain in the Ready state and shall not enter the Fault state.

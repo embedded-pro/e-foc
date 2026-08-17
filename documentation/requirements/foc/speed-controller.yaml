@@ -2,8 +2,7 @@
   title: Speed cascade architecture
   shall: >
     The speed controller shall implement a cascade control architecture with an outer
-    velocity loop executing at 1 kHz and an inner current loop executing at a frequency
-    at least 10 times the outer loop rate.
+    velocity loop executing at 1 kHz and an inner current loop executing at 20 kHz.
 
 - id: REQ-SPD-002
   title: Speed setpoint acceptance
@@ -12,17 +11,22 @@
     as the primary control setpoint.
 
 - id: REQ-SPD-003
-  title: Independent current tunings
+  title: Independent bandwidth-based tuning per loop
   shall: >
-    The speed controller shall accept independent d-axis and q-axis current PID tunings
-    that are configured separately from the outer velocity loop gains.
+    The current loop and the velocity loop shall each be tuned through their own
+    closed-loop bandwidth together with the weights specific to the active law,
+    configurable independently of one another. Each loop shall derive its gains from
+    that bandwidth and the identified motor model rather than from externally supplied
+    per-axis proportional, integral, and derivative gains.
 
 - id: REQ-SPD-004
-  title: Speed PID tunings with anti-windup
+  title: Velocity loop bandwidth with anti-windup
   shall: >
-    The speed controller shall accept proportional, integral, and derivative gains for
-    the outer velocity loop. The integrator shall implement anti-windup clamping to
-    prevent integrator saturation.
+    The speed controller shall accept a closed-loop bandwidth for the outer velocity
+    loop and apply it to the active velocity control law. Every velocity control law
+    that accumulates an integral state shall bound that state whenever the commanded
+    current saturates, so that the accumulated term cannot grow while the output is
+    limited.
 
 - id: REQ-SPD-005
   title: Outer loop frequency reporting
@@ -33,6 +37,15 @@
 - id: REQ-SPD-006
   title: FOC loop CPU budget
   shall: >
-    The complete speed control cycle, including sensing, transforms, current PID,
-    velocity PID, and PWM output, shall not exceed 75 percent of available CPU time
-    per control period at the configured inner loop rate.
+    The complete speed control cycle, including sensing, transforms, the active current
+    law, and PWM output, shall execute at a 20 kHz inner loop rate and shall not exceed
+    4500 cycles at 120 MHz, which is 75 percent of the available CPU time per control
+    period.
+
+- id: REQ-SPD-007
+  title: Runtime-selectable speed control law
+  shall: >
+    The speed controller shall dispatch the per-sample velocity computation to one of a
+    fixed set of control laws selected at runtime. All laws shall reside simultaneously
+    in fixed-size storage held by a variant, and neither selection nor per-sample
+    dispatch shall perform any dynamic memory allocation.

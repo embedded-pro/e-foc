@@ -111,30 +111,3 @@
     via the CLI (active_algorithms command) and shall reflect the algorithm that
     is currently dispatched in the ISR, not the value most recently requested or
     persisted.
-
-- id: REQ-CTRL-014
-  status: deferred
-  title: Iterative Learning Control trial length
-  shall: >
-    When ILC is selected as the active position-loop algorithm, the operator shall
-    specify the trial length N in samples at selection time. The system shall
-    allocate a bounded, statically-sized array of N float values for the learned
-    correction signal at build time. The trial length shall not be changeable at
-    runtime; a new selection with a different N requires stopping the motor and
-    reissuing the select command. The maximum trial length N_max shall be a
-    build-time constant.
-
-- id: REQ-CTRL-015
-  status: deferred
-  title: Friction compensation augmentation
-  shall: >
-    The system shall provide a friction compensation feedforward augmentation that
-    can be independently enabled or disabled regardless of the active speed or
-    position algorithm. When enabled, a nonlinear Coulomb and Stribeck friction
-    model shall compute an additional Iq feedforward correction added to the speed
-    or position controller output before it enters the current loop. The friction
-    compensation enable state and its parameters shall be persisted to NVM. Enabling
-    friction compensation shall be rejected with a NACK (same condition as
-    REQ-CTRL-003) while the motor is running. Friction compensation shall not be
-    available until the friction identification parameters (Tc, Ts, omega_st) have
-    been stored via a dedicated friction identification step.

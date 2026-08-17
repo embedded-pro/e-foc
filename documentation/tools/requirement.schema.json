@@ -23,13 +23,6 @@
             "shall": {
                 "type": "string",
                 "pattern": "(?i)shall"
-            },
-            "status": {
-                "type": "string",
-                "enum": [
-                    "accepted",
-                    "deferred"
-                ]
             }
         }
     }
