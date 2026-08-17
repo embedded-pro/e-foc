@@ -98,6 +98,7 @@ namespace
                 EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _)).Times(AnyNumber());
                 EXPECT_CALL(inverterMock, Stop()).Times(AnyNumber());
                 EXPECT_CALL(lowPriorityInterruptMock, Register(_)).Times(AnyNumber());
+                EXPECT_CALL(lowPriorityInterruptMock, Unregister()).Times(AnyNumber());
                 EXPECT_CALL(faultNotifierMock, Register(_))
                     .Times(AnyNumber())
                     .WillRepeatedly(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)

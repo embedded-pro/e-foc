@@ -51,6 +51,7 @@ namespace
         void SetUp() override
         {
             EXPECT_CALL(lowPriorityInterruptMock, Register(_)).WillOnce(Invoke(&lowPriorityInterruptMock, &foc::LowPriorityInterruptMock::StoreHandler));
+            EXPECT_CALL(lowPriorityInterruptMock, Unregister()).WillOnce(Invoke(&lowPriorityInterruptMock, &foc::LowPriorityInterruptMock::ClearHandler));
 
             focSpeed.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterruptMock, lowPriorityFrequency);
             focSpeed->Configure(MotorParameters(polePairs));
@@ -107,6 +108,7 @@ namespace
         SpeedCascadeUnderTest(std::size_t polePairs, const foc::SpeedLoopTunings& speedTunings)
         {
             EXPECT_CALL(lowPriorityInterrupt, Register(_)).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
+            EXPECT_CALL(lowPriorityInterrupt, Unregister()).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::ClearHandler));
 
             cascade.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency);
             cascade->Configure(MotorParameters(polePairs));
@@ -366,6 +368,31 @@ TEST_F(TestSpeedCascade, a_speed_loop_configured_without_limits_still_drives_the
 
     ExpectValidDuty(result);
     ExpectOffCentreDuty(result);
+}
+
+TEST(TestSpeedCascadeLifetime, destruction_unregisters_the_outer_loop_handler_so_a_queued_trigger_is_inert)
+{
+    StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterrupt;
+
+    {
+        InSequence sequence;
+        EXPECT_CALL(lowPriorityInterrupt, Register(_)).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
+        EXPECT_CALL(lowPriorityInterrupt, Unregister()).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::ClearHandler));
+    }
+
+    {
+        foc::SpeedCascade cascade{ foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency };
+        cascade.Configure(MotorParameters(7));
+        cascade.ConfigureMechanics(MechanicalParameters());
+        cascade.SetCurrentTunings(foc::CurrentLoopTunings{});
+        cascade.SetSpeedTunings(foc::SpeedLoopTunings{});
+        cascade.Enable();
+    }
+
+    // Stands in for a trigger that was already queued when the cascade was destroyed
+    lowPriorityInterrupt.TriggerHandler();
+
+    EXPECT_FALSE(lowPriorityInterrupt.HasHandler());
 }
 
 // A stationary rotor at a non-zero angle must not be read as motion on the first outer sample:

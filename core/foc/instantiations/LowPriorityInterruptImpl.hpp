@@ -14,12 +14,19 @@ namespace foc
             this->handler = _handler;
         }
 
+        void Unregister() override
+        {
+            handler = nullptr;
+        }
+
         void Trigger() override
         {
             if (handler)
                 infra::EventDispatcherWithWeakPtr::Instance().Schedule([this]()
                     {
-                        handler();
+                        // Re-checked here because Unregister may run after this event was queued
+                        if (handler)
+                            handler();
                     });
         }
 

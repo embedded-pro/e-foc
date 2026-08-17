@@ -12,10 +12,7 @@ namespace foc
         , encoder{ encoder }
         , foc{ foc }
     {
-        inverter.PhaseCurrentsReady(inverter.BaseFrequency(), [this](auto currentPhases)
-            {
-                OnPhaseCurrents(currentPhases);
-            });
+        RegisterPhaseCurrents();
     }
 
     Runner::~Runner()
@@ -25,19 +22,36 @@ namespace foc
 
     void Runner::Enable()
     {
+        // Calibration services take over the single-slot current callback, so it must be reclaimed here.
+        RegisterPhaseCurrents();
         foc.Enable();
+        enabled = true;
         inverter.Start();
     }
 
     void Runner::Disable()
     {
+        enabled = false;
         inverter.Stop();
         foc.Disable();
+    }
+
+    void Runner::RegisterPhaseCurrents()
+    {
+        inverter.PhaseCurrentsReady(inverter.BaseFrequency(), [this](auto currentPhases)
+            {
+                OnPhaseCurrents(currentPhases);
+            });
     }
 
     OPTIMIZE_FOR_SPEED
     void Runner::OnPhaseCurrents(const PhaseCurrents& currentPhases)
     {
+        // A conversion already in flight when Stop() ran must not write duty cycles: on TI that
+        // re-enables the generator and outputs, which would re-energise the bridge after a fault.
+        if (!enabled)
+            return;
+
         auto position = encoder.Read();
         inverter.ThreePhasePwmOutput(foc.Calculate(currentPhases, position));
     }

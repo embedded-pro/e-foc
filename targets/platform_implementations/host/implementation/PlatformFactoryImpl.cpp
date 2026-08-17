@@ -72,6 +72,11 @@ namespace application
         simpleLowPriorityInterrupt.Register(handler);
     }
 
+    void PlatformFactoryImpl::Unregister()
+    {
+        simpleLowPriorityInterrupt.Unregister();
+    }
+
     void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds /*deadTime*/, SampleAndHold /*sampleAndHold*/)
     {
         phaseCurrentAdc.reset();

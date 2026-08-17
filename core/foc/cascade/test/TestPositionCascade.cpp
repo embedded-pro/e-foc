@@ -58,6 +58,7 @@ namespace
         void SetUp() override
         {
             EXPECT_CALL(lowPriorityInterruptMock, Register(_)).WillOnce(Invoke(&lowPriorityInterruptMock, &foc::LowPriorityInterruptMock::StoreHandler));
+            EXPECT_CALL(lowPriorityInterruptMock, Unregister()).WillOnce(Invoke(&lowPriorityInterruptMock, &foc::LowPriorityInterruptMock::ClearHandler));
 
             focPosition.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterruptMock, lowPriorityFrequency);
             focPosition->Configure(MotorParameters(polePairs));
@@ -117,6 +118,7 @@ namespace
         PositionCascadeUnderTest(std::size_t polePairs, const foc::SpeedLoopTunings& speedTunings, const foc::PositionLoopTunings& positionTunings, foc::PositionAlgorithm algorithm)
         {
             EXPECT_CALL(lowPriorityInterrupt, Register(_)).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
+            EXPECT_CALL(lowPriorityInterrupt, Unregister()).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::ClearHandler));
 
             cascade.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency);
             cascade->Configure(MotorParameters(polePairs));
@@ -261,6 +263,7 @@ TEST_F(TestPositionCascade, position_pid_drives_speed_reference)
 
     testing::StrictMock<foc::LowPriorityInterruptMock> speedInterrupt;
     EXPECT_CALL(speedInterrupt, Register(_)).WillOnce(Invoke(&speedInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
+    EXPECT_CALL(speedInterrupt, Unregister()).WillOnce(Invoke(&speedInterrupt, &foc::LowPriorityInterruptMock::ClearHandler));
 
     foc::SpeedCascade speedCascade{ foc::Ampere{ 10.0f }, baseFrequency, speedInterrupt, lowPriorityFrequency };
     speedCascade.Configure(MotorParameters(polePairs));

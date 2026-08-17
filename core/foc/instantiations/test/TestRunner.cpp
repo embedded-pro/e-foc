@@ -77,8 +77,11 @@ TEST_F(TestRunner, DisableStopsInverterThenFoc)
 
 TEST_F(TestRunner, PhaseCurrentsCallbackReadsEncoderCalculatesFocAndOutputsPwm)
 {
+    // Registration happens in the constructor and again in Enable(), which reclaims the single
+    // callback slot from any calibration service that took it over.
     EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _))
-        .WillOnce([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+        .Times(2)
+        .WillRepeatedly([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
             {
                 inverterMock.StorePhaseCurrentsCallback(onDone);
             });
@@ -90,6 +93,8 @@ TEST_F(TestRunner, PhaseCurrentsCallbackReadsEncoderCalculatesFocAndOutputsPwm)
 
     {
         testing::InSequence seq;
+        EXPECT_CALL(focMock, Enable());
+        EXPECT_CALL(inverterMock, Start());
         EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.5f }));
         EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(expectedDuties));
         EXPECT_CALL(inverterMock, ThreePhasePwmOutput(DutiesEqual(expectedDuties)));
@@ -97,6 +102,7 @@ TEST_F(TestRunner, PhaseCurrentsCallbackReadsEncoderCalculatesFocAndOutputsPwm)
         EXPECT_CALL(focMock, Disable());
     }
 
+    runner.Enable();
     inverterMock.TriggerPhaseCurrentsCallback(testCurrents);
 }
 
@@ -125,4 +131,44 @@ TEST_F(TestRunner, MultipleEnableDisableCyclesWork)
     runner.Enable();
     runner.Disable();
     // destructor calls Disable() again
+}
+
+// A conversion already in flight when Stop() ran must not write duty cycles: on TI that call
+// re-enables the generator and outputs, which would re-energise the bridge after a fault.
+TEST_F(TestRunner, ALateCallbackAfterDisableDoesNotDriveThePwm)
+{
+    EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _))
+        .Times(2)
+        .WillRepeatedly([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+            {
+                inverterMock.StorePhaseCurrentsCallback(onDone);
+            });
+
+    foc::Runner runner{ inverterMock, encoderMock, focMock };
+
+    EXPECT_CALL(focMock, Enable());
+    EXPECT_CALL(inverterMock, Start());
+    runner.Enable();
+
+    EXPECT_CALL(inverterMock, Stop()).Times(2);
+    EXPECT_CALL(focMock, Disable()).Times(2);
+    runner.Disable();
+
+    inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
+}
+
+TEST_F(TestRunner, ACallbackBeforeEnableDoesNotDriveThePwm)
+{
+    EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+            {
+                inverterMock.StorePhaseCurrentsCallback(onDone);
+            });
+
+    foc::Runner runner{ inverterMock, encoderMock, focMock };
+
+    EXPECT_CALL(inverterMock, Stop());
+    EXPECT_CALL(focMock, Disable());
+
+    inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
 }

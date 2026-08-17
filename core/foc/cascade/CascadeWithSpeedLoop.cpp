@@ -20,6 +20,11 @@ namespace foc
         really_assert(baseFrequency.Value() % lowPriorityFrequency.Value() == 0);
     }
 
+    CascadeWithSpeedLoop::~CascadeWithSpeedLoop()
+    {
+        lowPriorityInterrupt.Unregister();
+    }
+
     void CascadeWithSpeedLoop::ConfigureImpl(const MotorModelParameters& parameters)
     {
         polePairs = static_cast<float>(parameters.polePairs);

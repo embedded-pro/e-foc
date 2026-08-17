@@ -125,6 +125,13 @@ namespace application
         pendSvHandlerCallback = &onLowPriorityInterrupt;
     }
 
+    void PlatformFactoryImpl::PendSvLowPriorityInterrupt::Unregister()
+    {
+        // Detach before clearing so an already pending PendSV finds no callback
+        pendSvHandlerCallback = nullptr;
+        onLowPriorityInterrupt = nullptr;
+    }
+
     PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::PerformanceTrackerImpl(hal::DataWatchPointAndTrace& dwt, hal::OutputPin& pin)
         : dwt(dwt)
         , pin(pin)

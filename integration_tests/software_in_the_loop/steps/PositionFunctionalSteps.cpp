@@ -93,6 +93,7 @@ namespace
         PositionCascadeUnderTest(float currentBandwidth, float speedBandwidth, float positionBandwidth)
         {
             EXPECT_CALL(lowPriorityInterrupt, Register(_)).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::StoreHandler));
+            EXPECT_CALL(lowPriorityInterrupt, Unregister()).WillOnce(Invoke(&lowPriorityInterrupt, &foc::LowPriorityInterruptMock::ClearHandler));
 
             cascade.emplace(foc::Ampere{ 10.0f }, baseFrequency, lowPriorityInterrupt, outerLoopFrequency);
             cascade->Configure(MotorParameters());

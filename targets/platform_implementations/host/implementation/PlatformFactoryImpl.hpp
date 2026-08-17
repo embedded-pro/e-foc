@@ -55,6 +55,7 @@ namespace application
         // Implementation of LowPriorityInterrupt
         void Trigger() override;
         void Register(const infra::Function<void()>& handler) override;
+        void Unregister() override;
 
         void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>&) override
         {}
@@ -85,6 +86,11 @@ namespace application
             void Register(const infra::Function<void()>& handler) override
             {
                 this->handler = handler;
+            }
+
+            void Unregister() override
+            {
+                handler = nullptr;
             }
 
         private:

@@ -116,6 +116,11 @@ namespace application
         pendSvLowPriorityInterrupt.Register(handler);
     }
 
+    void PlatformFactoryImpl::Unregister()
+    {
+        pendSvLowPriorityInterrupt.Unregister();
+    }
+
     void PlatformFactoryImpl::PendSvLowPriorityInterrupt::Trigger()
     {
         SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
@@ -125,6 +130,13 @@ namespace application
     {
         onLowPriorityInterrupt = handler;
         pendSvHandlerCallback = &onLowPriorityInterrupt;
+    }
+
+    void PlatformFactoryImpl::PendSvLowPriorityInterrupt::Unregister()
+    {
+        // Detach before clearing so an already pending PendSV finds no callback
+        pendSvHandlerCallback = nullptr;
+        onLowPriorityInterrupt = nullptr;
     }
 
     void PlatformFactoryImpl::Start()

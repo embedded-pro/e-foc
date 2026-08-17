@@ -95,6 +95,8 @@ The d-axis setpoint remains 0 A throughout.
 
 The `LowPriorityInterrupt` is an abstract scheduling interface. The speed control component registers its outer-loop handler with this interface at construction time. The inner-loop ISR counts cycles and triggers the `LowPriorityInterrupt` at the appropriate prescale ratio, causing the outer-loop handler to execute without RTOS involvement.
 
+The registered handler captures the cascade instance, so its lifetime is bound to that instance. The cascade calls `Unregister()` from its destructor; after `Unregister()` returns, an already queued trigger must be discarded rather than dispatched, so a mode switch that destroys the cascade cannot leave a handler pointing at freed storage.
+
 `OuterLoopFrequency()` returns the configured outer-loop rate so the application layer can assert or configure the LPI trigger frequency correctly.
 
 ### Enable and Disable

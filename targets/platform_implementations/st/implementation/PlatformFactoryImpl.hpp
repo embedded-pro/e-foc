@@ -55,6 +55,7 @@ namespace application
         // Implementation of LowPriorityInterrupt
         void Trigger() override;
         void Register(const infra::Function<void()>& handler) override;
+        void Unregister() override;
 
         // Implementation of drivers::ThreePhaseInverter
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
@@ -74,6 +75,7 @@ namespace application
         {
             void Trigger() override;
             void Register(const infra::Function<void()>& handler) override;
+            void Unregister() override;
 
             infra::Function<void()> onLowPriorityInterrupt;
         };

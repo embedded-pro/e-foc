@@ -49,6 +49,7 @@ namespace
                 EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _)).Times(AnyNumber());
                 EXPECT_CALL(inverterMock, Stop()).Times(AnyNumber());
                 EXPECT_CALL(lowPriorityInterruptMock, Register(_)).Times(AnyNumber());
+                EXPECT_CALL(lowPriorityInterruptMock, Unregister()).Times(AnyNumber());
             } };
 
         void GivenFaultNotifierRegistered()
@@ -676,6 +677,7 @@ namespace
                 EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _)).Times(AnyNumber());
                 EXPECT_CALL(inverterMock, Stop()).Times(AnyNumber());
                 EXPECT_CALL(lowPriorityInterruptMock, Register(_)).Times(AnyNumber());
+                EXPECT_CALL(lowPriorityInterruptMock, Unregister()).Times(AnyNumber());
             } };
 
         void GivenFaultNotifierRegistered()

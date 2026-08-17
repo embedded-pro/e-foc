@@ -73,6 +73,11 @@ namespace
             this->handler = handler;
         }
 
+        void Unregister() override
+        {
+            handler = nullptr;
+        }
+
     private:
         infra::Function<void()> handler;
     };

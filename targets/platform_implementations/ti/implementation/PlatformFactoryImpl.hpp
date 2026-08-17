@@ -78,6 +78,7 @@ namespace application
         {
             void Trigger() override;
             void Register(const infra::Function<void()>& handler) override;
+            void Unregister() override;
 
             infra::Function<void()> onLowPriorityInterrupt;
         };

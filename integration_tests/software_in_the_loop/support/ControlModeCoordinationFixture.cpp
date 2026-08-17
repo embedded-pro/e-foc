@@ -19,6 +19,7 @@ namespace integration
         EXPECT_CALL(platformFactory, Set(_)).Times(AnyNumber());
         EXPECT_CALL(platformFactory, SetZero()).Times(AnyNumber());
         EXPECT_CALL(lowPriorityInterruptMock, Register(_)).Times(AnyNumber());
+        EXPECT_CALL(lowPriorityInterruptMock, Unregister()).Times(AnyNumber());
     }
 
     void ControlModeCoordinationFixture::ConstructCoordinator(services::ConfigData data)

@@ -53,6 +53,8 @@ namespace foc
     {
     protected:
         explicit CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency);
+        // Non-virtual: cascades live inside a variant and are always destroyed as their concrete type
+        ~CascadeWithSpeedLoop();
 
         void ConfigureImpl(const MotorModelParameters& parameters);
         MechanicalModelParameters ConfigureMechanicsImpl(const MechanicalModelParameters& parameters);
