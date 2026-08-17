@@ -13,6 +13,7 @@ namespace integration
         EXPECT_CALL(platformFactory, PhaseCurrentsReady(_, _)).Times(AnyNumber());
         EXPECT_CALL(platformFactory, ThreePhasePwmOutput(_)).Times(AnyNumber());
         EXPECT_CALL(platformFactory, BaseFrequency()).Times(AnyNumber()).WillRepeatedly(Return(hal::Hertz{ 10000 }));
+        EXPECT_CALL(platformFactory, MaxCurrentSupported()).Times(AnyNumber()).WillRepeatedly(Return(foc::Ampere{ 15.0f }));
         EXPECT_CALL(platformFactory, Start()).Times(AnyNumber());
         EXPECT_CALL(platformFactory, Stop()).Times(AnyNumber());
         EXPECT_CALL(platformFactory, Read()).Times(AnyNumber()).WillRepeatedly(Return(foc::Radians{ 0.0f }));
@@ -118,7 +119,7 @@ namespace integration
         canTransport.emplace(transportCanMock, 1);
         motorCategoryServer.emplace(*canTransport);
         motorCategoryServer->SetAcknowledger(*this);
-        motorBridge.emplace(*motorCategoryServer, *coordinator);
+        motorBridge.emplace(*motorCategoryServer, *coordinator, platformFactory);
     }
 
     void ControlModeCoordinationFixture::SendCommandAck(uint8_t /*categoryId*/, uint8_t commandType, services::CanAckStatus status)

@@ -33,20 +33,28 @@ namespace
         void CmdCalibrate(const infra::Function<void(state_machine::CommandResult)>&) override
         {}
 
-        void CmdEnable() override
-        {}
+        state_machine::CommandResult CmdEnable() override
+        {
+            return state_machine::CommandResult::ok;
+        }
 
-        void CmdDisable() override
-        {}
+        state_machine::CommandResult CmdDisable() override
+        {
+            return state_machine::CommandResult::ok;
+        }
 
-        void CmdClearFault() override
-        {}
+        state_machine::CommandResult CmdClearFault() override
+        {
+            return state_machine::CommandResult::ok;
+        }
 
         void CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>&) override
         {}
 
-        void CmdEmergencyStop() override
-        {}
+        state_machine::CommandResult CmdEmergencyStop() override
+        {
+            return state_machine::CommandResult::ok;
+        }
 
     private:
         state_machine::State state{ state_machine::Idle{} };

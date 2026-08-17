@@ -47,11 +47,11 @@ namespace application
         state_machine::FaultCode LastFaultCode() const override;
 
         void CmdCalibrate(const infra::Function<void(state_machine::CommandResult)>& onDone) override;
-        void CmdEnable() override;
-        void CmdDisable() override;
-        void CmdClearFault() override;
+        state_machine::CommandResult CmdEnable() override;
+        state_machine::CommandResult CmdDisable() override;
+        state_machine::CommandResult CmdClearFault() override;
         void CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>& onDone) override;
-        void CmdEmergencyStop() override;
+        state_machine::CommandResult CmdEmergencyStop() override;
 
         void RegisterReadyHandler(const infra::Function<void()>& onReady);
 

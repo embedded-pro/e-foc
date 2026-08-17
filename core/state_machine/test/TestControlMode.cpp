@@ -42,7 +42,15 @@ namespace
     TEST(TestControlMode, FromCanMode_ToCanMode_Roundtrip_AllModes)
     {
         for (auto mode : { FocMotorMode::torque, FocMotorMode::speed, FocMotorMode::position })
-            EXPECT_EQ(ToCanMode(FromCanMode(mode)), mode);
+        {
+            ASSERT_TRUE(FromCanMode(mode).has_value());
+            EXPECT_EQ(ToCanMode(*FromCanMode(mode)), mode);
+        }
+    }
+
+    TEST(TestControlMode, FromCanMode_UnrecognisedByte_ReturnsNullopt)
+    {
+        EXPECT_FALSE(FromCanMode(static_cast<FocMotorMode>(7)).has_value());
     }
 
     // -------- ToAckStatus --------

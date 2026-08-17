@@ -62,31 +62,34 @@ namespace application
         EnterCalibrating();
     }
 
-    void FocStateMachineCommon::CmdEnable()
+    state_machine::CommandResult FocStateMachineCommon::CmdEnable()
     {
         if (!std::holds_alternative<state_machine::Ready>(currentState))
-            return;
+            return state_machine::CommandResult::rejected;
 
         EnterEnabled();
+        return state_machine::CommandResult::ok;
     }
 
-    void FocStateMachineCommon::CmdDisable()
+    state_machine::CommandResult FocStateMachineCommon::CmdDisable()
     {
         if (!std::holds_alternative<state_machine::Enabled>(currentState))
-            return;
+            return state_machine::CommandResult::rejected;
 
         GetFocControl().Stop();
         EnterReady(calibrationData);
+        return state_machine::CommandResult::ok;
     }
 
-    void FocStateMachineCommon::CmdClearFault()
+    state_machine::CommandResult FocStateMachineCommon::CmdClearFault()
     {
         if (!std::holds_alternative<state_machine::Fault>(currentState))
-            return;
+            return state_machine::CommandResult::rejected;
 
         tracer.Trace() << "[SM] Fault cleared";
 
         currentState = state_machine::Idle{};
+        return state_machine::CommandResult::ok;
     }
 
     void FocStateMachineCommon::CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>& onDone)
@@ -128,7 +131,7 @@ namespace application
             });
     }
 
-    void FocStateMachineCommon::CmdEmergencyStop()
+    state_machine::CommandResult FocStateMachineCommon::CmdEmergencyStop()
     {
         GetFocControl().Stop();
 
@@ -140,10 +143,12 @@ namespace application
         CompletePendingCommand(state_machine::CommandResult::abortedByFault);
 
         if (std::holds_alternative<state_machine::Fault>(currentState))
-            return;
+            return state_machine::CommandResult::ok;
 
         if (wasActive)
             currentState = state_machine::Idle{};
+
+        return state_machine::CommandResult::ok;
     }
 
     void FocStateMachineCommon::ApplyModeSpecificCalibration(const services::CalibrationData& /*data*/)

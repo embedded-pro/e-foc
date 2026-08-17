@@ -34,7 +34,7 @@ namespace application
                         this->hardware.MaxCurrentSupported(),
                         this->hardware.BaseFrequency(),
                         this->hardware.LowPriorityInterrupt() });
-                canBridge.emplace(*motorCanServer, *controlMode);
+                canBridge.emplace(*motorCanServer, *controlMode, this->hardware);
             });
     }
 }

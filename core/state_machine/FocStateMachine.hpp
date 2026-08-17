@@ -61,11 +61,11 @@ namespace state_machine
         virtual FaultCode LastFaultCode() const = 0;
 
         virtual void CmdCalibrate(const infra::Function<void(CommandResult)>& onDone) = 0;
-        virtual void CmdEnable() = 0;
-        virtual void CmdDisable() = 0;
-        virtual void CmdClearFault() = 0;
+        virtual CommandResult CmdEnable() = 0;
+        virtual CommandResult CmdDisable() = 0;
+        virtual CommandResult CmdClearFault() = 0;
         virtual void CmdClearCalibration(const infra::Function<void(CommandResult)>& onDone) = 0;
-        virtual void CmdEmergencyStop() = 0;
+        virtual CommandResult CmdEmergencyStop() = 0;
 
         virtual void ApplyOnlineEstimates()
         {}
