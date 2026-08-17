@@ -12,3 +12,5 @@ target_link_libraries(e_foc.foc.selection INTERFACE
 target_sources(e_foc.foc.selection INTERFACE
     ControllerSelector.hpp
 )
+
+add_subdirectory(test)

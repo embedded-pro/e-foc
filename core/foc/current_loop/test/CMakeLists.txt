@@ -9,6 +9,7 @@ target_link_libraries(e_foc.foc.current_loop_test PUBLIC
 
 target_sources(e_foc.foc.current_loop_test PRIVATE
     TestCurrentControllerSelector.cpp
+    TestCurrentPlantModel.cpp
     TestDeadbeatCurrentController.cpp
     TestDecoupledPidCurrentController.cpp
     TestPidCurrentController.cpp

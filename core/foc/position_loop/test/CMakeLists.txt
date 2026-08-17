@@ -8,6 +8,11 @@ target_link_libraries(e_foc.foc.position_loop_test PUBLIC
 )
 
 target_sources(e_foc.foc.position_loop_test PRIVATE
+    TestCascadePPositionController.cpp
+    TestLqiPositionController.cpp
+    TestLqrPositionController.cpp
+    TestPidPositionController.cpp
     TestPositionControllerSelector.cpp
+    TestPositionPlantModel.cpp
     TestTwoDofPositionController.cpp
 )

@@ -12,5 +12,6 @@ target_sources(e_foc.foc.speed_loop_test PRIVATE
     TestLqiSpeedController.cpp
     TestPidSpeedController.cpp
     TestSpeedControllerSelector.cpp
+    TestSpeedPlantModel.cpp
     TestTwoDofSpeedController.cpp
 )

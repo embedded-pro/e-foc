@@ -8,5 +8,6 @@ target_link_libraries(e_foc.foc.math_test PUBLIC
 )
 
 target_sources(e_foc.foc.math_test PRIVATE
+    TestAngleWrap.cpp
     TestFastTrigonometry.cpp
 )
