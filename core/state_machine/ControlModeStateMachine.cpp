@@ -297,33 +297,43 @@ namespace state_machine
             ActiveStateMachine().CmdEmergencyStop();
 
         if (mode == ControlMode::speed)
-            activeSm.emplace<application::SpeedStateMachine>(
+            AttachAlgorithmRestore(activeSm.emplace<application::SpeedStateMachine>(
                 terminalAndTracer,
                 hardware,
                 nvm,
                 calibServices,
                 faultNotifier,
                 TransitionPolicy::Auto,
-                outerLoopArgs);
+                outerLoopArgs));
         else if (mode == ControlMode::position)
-            activeSm.emplace<application::PositionStateMachine>(
+            AttachAlgorithmRestore(activeSm.emplace<application::PositionStateMachine>(
                 terminalAndTracer,
                 hardware,
                 nvm,
                 calibServices,
                 faultNotifier,
                 TransitionPolicy::Auto,
-                outerLoopArgs);
+                outerLoopArgs));
         else
-            activeSm.emplace<application::TorqueStateMachine>(
+            AttachAlgorithmRestore(activeSm.emplace<application::TorqueStateMachine>(
                 terminalAndTracer,
                 hardware,
                 nvm,
                 calibServices,
                 faultNotifier,
-                TransitionPolicy::Auto);
+                TransitionPolicy::Auto));
+    }
 
-        ApplyPersistedAlgorithms();
+    void ControlModeStateMachine::AttachAlgorithmRestore(application::FocStateMachineCommon& stateMachine)
+    {
+        stateMachine.RegisterReadyHandler([this]()
+            {
+                ApplyPersistedAlgorithms();
+            });
+
+        // A synchronous NVM read reaches Ready inside the constructor, before the handler exists
+        if (std::holds_alternative<Ready>(stateMachine.CurrentState()))
+            ApplyPersistedAlgorithms();
     }
 
     foc::CurrentLoopSelectable* ControlModeStateMachine::CurrentSelectable()
@@ -368,26 +378,37 @@ namespace state_machine
         return const_cast<ControlModeStateMachine*>(this)->PositionSelectable();
     }
 
+    // Only a byte that names no algorithm is corrected; a valid choice that the loop cannot accept
+    // yet keeps its place in configData and is retried on the next entry to Ready (REQ-CTRL-006).
     void ControlModeStateMachine::ApplyPersistedAlgorithms()
     {
         if (auto* selectable = CurrentSelectable())
         {
             const auto algorithm = CurrentAlgorithmFromRaw(configData.currentAlgorithm);
-            if (!algorithm.has_value() || selectable->SelectCurrentAlgorithm(*algorithm) != foc::SelectResult::ok)
+            if (!algorithm.has_value())
+                configData.currentAlgorithm = static_cast<uint8_t>(selectable->ActiveCurrentAlgorithm());
+            else if (*algorithm != selectable->ActiveCurrentAlgorithm() &&
+                     selectable->SelectCurrentAlgorithm(*algorithm) == foc::SelectResult::invalidAlgorithm)
                 configData.currentAlgorithm = static_cast<uint8_t>(selectable->ActiveCurrentAlgorithm());
         }
 
         if (auto* selectable = SpeedSelectable())
         {
             const auto algorithm = SpeedAlgorithmFromRaw(configData.speedAlgorithm);
-            if (!algorithm.has_value() || selectable->SelectSpeedAlgorithm(*algorithm) != foc::SelectResult::ok)
+            if (!algorithm.has_value())
+                configData.speedAlgorithm = static_cast<uint8_t>(selectable->ActiveSpeedAlgorithm());
+            else if (*algorithm != selectable->ActiveSpeedAlgorithm() &&
+                     selectable->SelectSpeedAlgorithm(*algorithm) == foc::SelectResult::invalidAlgorithm)
                 configData.speedAlgorithm = static_cast<uint8_t>(selectable->ActiveSpeedAlgorithm());
         }
 
         if (auto* selectable = PositionSelectable())
         {
             const auto algorithm = PositionAlgorithmFromRaw(configData.positionAlgorithm);
-            if (!algorithm.has_value() || selectable->SelectPositionAlgorithm(*algorithm) != foc::SelectResult::ok)
+            if (!algorithm.has_value())
+                configData.positionAlgorithm = static_cast<uint8_t>(selectable->ActivePositionAlgorithm());
+            else if (*algorithm != selectable->ActivePositionAlgorithm() &&
+                     selectable->SelectPositionAlgorithm(*algorithm) == foc::SelectResult::invalidAlgorithm)
                 configData.positionAlgorithm = static_cast<uint8_t>(selectable->ActivePositionAlgorithm());
         }
     }

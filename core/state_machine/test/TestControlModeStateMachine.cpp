@@ -1104,3 +1104,85 @@ TEST_F(ControlModeStateMachineExtTest, TrySetSpeedAndPositionBandwidth_AreReject
     EXPECT_FALSE(subject->TrySetSpeedBandwidth(188.5f));
     EXPECT_FALSE(subject->TrySetPositionBandwidth(18.8f));
 }
+
+// ---- Persisted algorithms are restored once the motor model exists (REQ-CTRL-006) ----
+
+TEST_F(ControlModeStateMachineExtTest, PersistedAlgorithmIsKeptInConfigWhileStillUnselectable)
+{
+    GivenNvmAlwaysInvalid();
+
+    services::ConfigData config{};
+    config.currentAlgorithm = static_cast<uint8_t>(foc::CurrentAlgorithm::deadbeat);
+    ConstructSubjectWithConfig(config);
+
+    EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
+
+    uint8_t persisted{ 0 };
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([&persisted](const services::ConfigData& saved, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                persisted = saved.currentAlgorithm;
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    subject->Select(state_machine::ControlMode::torque, [](auto) {});
+
+    EXPECT_EQ(persisted, static_cast<uint8_t>(foc::CurrentAlgorithm::deadbeat));
+}
+
+TEST_F(ControlModeStateMachineExtTest, PersistedAlgorithmOutsideEnumRangeIsCorrectedInConfig)
+{
+    GivenNvmAlwaysValid();
+
+    services::ConfigData config{};
+    config.currentAlgorithm = 200;
+    ConstructSubjectWithConfig(config);
+
+    uint8_t persisted{ 200 };
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([&persisted](const services::ConfigData& saved, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                persisted = saved.currentAlgorithm;
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    subject->Select(state_machine::ControlMode::torque, [](auto) {});
+
+    EXPECT_EQ(persisted, static_cast<uint8_t>(foc::CurrentAlgorithm::pid));
+}
+
+TEST_F(ControlModeStateMachineLifecycleTest, PersistedCurrentAlgorithmIsAppliedOnceReadyIsReached)
+{
+    GivenNvmAlwaysInvalid();
+    SetUpTorqueCalibrationCaptures();
+
+    services::ConfigData config{};
+    config.currentAlgorithm = static_cast<uint8_t>(foc::CurrentAlgorithm::deadbeat);
+    ConstructSubjectWithConfig(config);
+
+    EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
+
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_Torque();
+
+    EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::deadbeat);
+}
+
+TEST_F(ControlModeStateMachineLifecycleTest, PersistedSpeedAlgorithmIsAppliedOnceReadyIsReached)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigAlwaysSucceeds();
+    SetUpMechIdentCalibrationCaptures();
+
+    services::ConfigData config{};
+    config.defaultControlMode = static_cast<uint8_t>(state_machine::ControlMode::speed);
+    config.speedAlgorithm = static_cast<uint8_t>(foc::SpeedAlgorithm::lqi);
+    ConstructSubjectWithConfig(config);
+
+    EXPECT_EQ(subject->ActiveSpeedAlgorithm(), foc::SpeedAlgorithm::pid);
+
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_WithMechIdent();
+
+    EXPECT_EQ(subject->ActiveSpeedAlgorithm(), foc::SpeedAlgorithm::lqi);
+}

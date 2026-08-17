@@ -162,11 +162,19 @@ namespace application
         RunPolePairsStep();
     }
 
+    void FocStateMachineCommon::RegisterReadyHandler(const infra::Function<void()>& onReady)
+    {
+        readyHandler = onReady;
+    }
+
     void FocStateMachineCommon::EnterReady(const services::CalibrationData& data)
     {
         tracer.Trace() << "[SM] Entering Ready";
         calibrationData = data;
         currentState = state_machine::Ready{ data };
+
+        if (readyHandler != nullptr)
+            readyHandler();
     }
 
     void FocStateMachineCommon::EnterEnabled()

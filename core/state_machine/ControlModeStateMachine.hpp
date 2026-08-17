@@ -52,6 +52,7 @@ namespace state_machine
 
     private:
         void Activate(ControlMode mode);
+        void AttachAlgorithmRestore(application::FocStateMachineCommon& stateMachine);
         void ApplyPersistedAlgorithms();
         void PersistConfig();
         foc::CurrentLoopSelectable* CurrentSelectable();

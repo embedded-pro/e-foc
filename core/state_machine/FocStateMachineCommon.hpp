@@ -53,6 +53,8 @@ namespace application
         void CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>& onDone) override;
         void CmdEmergencyStop() override;
 
+        void RegisterReadyHandler(const infra::Function<void()>& onReady);
+
     protected:
         FocStateMachineCommon(const TerminalAndTracer& terminalAndTracer,
             const MotorHardware& hardware,
@@ -116,6 +118,7 @@ namespace application
         state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::none };
         services::CalibrationData calibrationData{};
         infra::AutoResetFunction<void(state_machine::CommandResult)> pendingCommandCallback;
+        infra::Function<void()> readyHandler;
     };
 
     template<class GetActiveSm>

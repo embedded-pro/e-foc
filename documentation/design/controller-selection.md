@@ -511,6 +511,19 @@ The active algorithm identifier for each loop is stored as three additional fiel
    controller using the also-persisted motor model parameters.
 3. If invalid (first boot, CRC mismatch), the default (PID for all loops) is used and written.
 
+Restoration is driven by the state machine's transition into `Ready`, not by construction of the
+control mode: the motor model only reaches the loops when the calibration record has been applied,
+which happens asynchronously after the NVM read completes. Applying the persisted identifiers any
+earlier would reject every model-dependent algorithm (deadbeat, decoupled PID, speed LQI, speed
+ADRC, position LQR, position LQI).
+
+Two failure kinds are distinguished when a persisted identifier cannot be activated:
+
+| Failure                                                    | Effect on `ConfigData`                                        |
+|------------------------------------------------------------|---------------------------------------------------------------|
+| Byte out of enum range, or names no algorithm for that loop | Corrected to the active algorithm — the record is meaningless |
+| Valid algorithm, not selectable yet (`InvalidParameters`)   | Preserved, and retried on the next entry to `Ready`           |
+
 The persistence ensures that an operator who selects ADRC for the speed loop does not need to
 repeat the selection after every power cycle. The motor state machine will transition directly to
 `Ready` with the previously selected algorithms active, ready to enable.
@@ -630,14 +643,16 @@ sequenceDiagram
     Boot->>Selector: Initialize()
     Selector->>NVM: Read()
     NVM-->>Selector: {currentAlgorithm=decoupledPid, speedAlgorithm=adrc, positionAlgorithm=pid}
+    NVM-->>StateMachine: calibration record
+    StateMachine->>Selector: Configure(motor model)
+    StateMachine->>Selector: OnReady()
     Selector->>Selector: ConstructInPlace<DecoupledPidCurrentController>
     Selector->>Selector: Configure(GetElectricalParameters())
     Selector->>Selector: ConstructInPlace<AdrcSpeedController>
     Selector->>Selector: Configure(GetMechanicalParameters())
     Selector->>Selector: ConstructInPlace<PidPositionController>
     Selector->>Selector: Configure(GetMechanicalParameters())
-    Selector-->>Boot: Ready
-    Boot->>StateMachine: TransitionToReady()
+    Selector-->>StateMachine: restored
 ```
 
 ---
