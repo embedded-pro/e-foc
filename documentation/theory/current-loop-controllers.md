@@ -2,9 +2,9 @@
 title: "Current Loop Controllers"
 type: theory
 status: draft
-version: 0.5.0
+version: 0.6.0
 component: "current-loop-controllers"
-date: 2026-08-14
+date: 2026-08-17
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-08-14
 | Title     | Current Loop Controllers |
 | Type      | theory                   |
 | Status    | draft                    |
-| Version   | 0.5.0                    |
+| Version   | 0.6.0                    |
 | Component | current-loop-controllers |
-| Date      | 2026-08-14               |
+| Date      | 2026-08-17               |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -223,11 +223,19 @@ $$
 The surface $s = 0$ is the desired zero-error manifold. This is the sign convention the toolbox
 `SlidingModeControl` uses, and it is the one implemented.
 
-**Discrete equivalent control**: The voltage that would maintain $s[k+1] = 0$:
+**Discrete equivalent control**: The voltage that would maintain $s[k+1] = 0$. With the plant
+$i[k+1] = A_d^i i[k] + B_d^i u[k]$ the error propagates as
+$e[k+1] = A_d^i e[k] + B_d^i u[k] + (A_d^i - 1) i^*[k]$, so holding the surface needs the error term
+*and* the voltage that sustains the reference itself:
 
 $$
-u_{eq}[k] = -\frac{A_d^i}{B_d^i} \cdot e[k]
+\boxed{u_{eq}[k] = -\frac{A_d^i}{B_d^i} \cdot e[k] + \frac{1 - A_d^i}{B_d^i} \cdot i^*[k]}
 $$
+
+Because $B_d^i = (1 - A_d^i)/R_s$, the second term is exactly $R_s i^*[k]$ — the resistive drop the
+reference current requires. Omitting it leaves a standing error
+$e_\infty = (A_d^i - 1) i^* / (1 + K_{sw}/\phi)$, which this controller has no integral action to
+remove.
 
 **Switching control**: Drives the state onto the surface:
 
@@ -254,11 +262,25 @@ $$
 - $\phi$: boundary layer width (A). Typical: $0.1$–$0.5$ A. Smaller gives tighter tracking but
   more high-frequency actuation.
 
+**Discrete stability constraint** — this bounds both parameters together and is not optional. Inside
+the boundary layer $\mathrm{sat}(e/\phi) = e/\phi$, so the equivalent term cancels the plant pole and
+the closed-loop error obeys
+
+$$
+e[k+1] = -\frac{K_{sw}}{\phi}\, e[k]
+$$
+
+The error therefore contracts **only if $K_{sw} < \phi$**. A ratio at or above unity makes the
+discrete loop diverge no matter how the equivalent term is computed, so the sizing rule above must be
+capped by this constraint. The shipped defaults are $K_{sw} = 0.2$ A and $\phi = 0.5$ A, a ratio of
+$0.4$.
+
 **Robustness**: Insensitive to $R_s/L_s$ mismatch as long as mismatch is bounded by $K_{sw}$.
 Covers $\pm 50\%$ thermal variation in $R_s$ and the initial RLS convergence transient.
 
 **Relation to toolbox**: `SlidingModeControl<float,1,1>` implements equivalent + switching with
-boundary-layer saturation. Plant matrices $A_d^i, B_d^i$ are constructed from RLS estimates.
+boundary-layer saturation on the error alone; the equilibrium term $R_s i^*$ is added by
+`SlidingModeCurrentController`. Plant matrices $A_d^i, B_d^i$ are constructed from RLS estimates.
 
 ---
 

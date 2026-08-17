@@ -9,4 +9,5 @@ target_link_libraries(e_foc.foc.position_loop_test PUBLIC
 
 target_sources(e_foc.foc.position_loop_test PRIVATE
     TestPositionControllerSelector.cpp
+    TestTwoDofPositionController.cpp
 )

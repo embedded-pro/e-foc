@@ -42,11 +42,13 @@ namespace foc
         {
             slidingMode = Inert();
             normalizationScale = 0.0f;
+            equilibriumGain = 0.0f;
             return;
         }
 
         const auto plant = CurrentPlantModel::FromParameters(parameters);
         normalizationScale = NormalizationScale(parameters.busVoltage);
+        equilibriumGain = (1.0f - plant.ad) / plant.bd;
 
         // Both axes share the same decoupled RL plant, so a single stateless controller serves d and q
         slidingMode = ScalarSlidingMode{ ScalarSlidingMode::PlantType::WithFullStateOutput(

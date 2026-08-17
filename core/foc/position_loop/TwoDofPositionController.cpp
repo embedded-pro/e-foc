@@ -24,18 +24,20 @@ namespace foc
     void TwoDofPositionController::Reset()
     {
         feedback.Reset();
-        referenceFilter.Reset();
+        seeded = false;
     }
 
     // Pre-filtering the setpoint shapes tracking without touching the feedback gains that set load stiffness
     void TwoDofPositionController::ApplyReferenceFilter()
     {
-        if (samplingFrequency.Value() == 0 || referenceTimeConstant <= 0.0f)
+        filterActive = samplingFrequency.Value() != 0 && referenceTimeConstant > 0.0f;
+
+        if (!filterActive)
         {
-            referenceFilter.SetAlpha(1.0f);
+            alpha = 1.0f;
             return;
         }
 
-        referenceFilter.SetAlpha(1.0f - math::Exp(-OuterSamplePeriod(samplingFrequency) / referenceTimeConstant));
+        alpha = 1.0f - math::Exp(-OuterSamplePeriod(samplingFrequency) / referenceTimeConstant);
     }
 }

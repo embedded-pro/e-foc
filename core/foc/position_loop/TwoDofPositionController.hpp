@@ -1,7 +1,7 @@
 #pragma once
 
+#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/position_loop/PidPositionController.hpp"
-#include "numerical/filters/passive/ExponentialMovingAverage.hpp"
 
 namespace foc
 {
@@ -18,7 +18,7 @@ namespace foc
         OPTIMIZE_FOR_SPEED PositionOutput Compute(const PositionControlContext& context)
         {
             auto shaped = context;
-            shaped.reference = Radians{ referenceFilter.Filter(context.reference.Value()) };
+            shaped.reference = ShapedReference(context);
 
             return feedback.Compute(shaped);
         }
@@ -26,10 +26,32 @@ namespace foc
     private:
         void ApplyReferenceFilter();
 
+        // An angle is not a linear quantity: the state advances along the wrapped error, so a setpoint
+        // on the far side of the seam is approached the short way round instead of all the way back
+        OPTIMIZE_FOR_SPEED Radians ShapedReference(const PositionControlContext& context)
+        {
+            if (!filterActive)
+                return context.reference;
+
+            if (!seeded)
+            {
+                shapedReference = context.measured.Value();
+                seeded = true;
+            }
+
+            shapedReference = detail::PositionWithWrapAround(
+                shapedReference + alpha * WrappedPositionError(context.reference, Radians{ shapedReference }));
+
+            return Radians{ shapedReference };
+        }
+
         PidPositionController feedback;
-        filters::passive::ExponentialMovingAverage<float> referenceFilter{ 1.0f };
         hal::Hertz samplingFrequency{ 0 };
         float referenceTimeConstant{ PositionLoopTunings{}.referenceTimeConstant };
+        float alpha{ 1.0f };
+        float shapedReference{ 0.0f };
+        bool filterActive{ false };
+        bool seeded{ false };
     };
 
     static_assert(PositionController<TwoDofPositionController>);

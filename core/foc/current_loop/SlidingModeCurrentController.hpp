@@ -28,18 +28,21 @@ namespace foc
         static ScalarSlidingMode Inert();
         void Construct();
 
+        // The error-only law holds the error where it is; the equilibrium voltage (1 - ad) / bd * i*
+        // is what keeps a non-zero reference standing, see documentation/theory/current-loop-controllers.md A3
         OPTIMIZE_FOR_SPEED float ComputeAxis(float measured, float reference)
         {
             const auto control = slidingMode.ComputeControl(ScalarSlidingMode::StateVector{ measured },
                 ScalarSlidingMode::StateVector{ reference });
 
-            return control.at(0, 0) * normalizationScale;
+            return (control.at(0, 0) + equilibriumGain * reference) * normalizationScale;
         }
 
         MotorModelParameters parameters{};
         float switchingGain{ CurrentLoopTunings{}.switchingGain };
         float boundaryLayer{ CurrentLoopTunings{}.boundaryLayer };
         float normalizationScale{ 0.0f };
+        float equilibriumGain{ 0.0f };
         ScalarSlidingMode slidingMode{ Inert() };
     };
 

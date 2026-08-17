@@ -26,7 +26,6 @@ namespace foc
         MechanicalModelParameters parameters{};
         float speedErrorWeight{ SpeedLoopTunings{}.speedErrorWeight };
         float integralWeight{ SpeedLoopTunings{}.integralWeight };
-        bool integratorHalted{ false };
         SpeedLqi lqi{ Inert() };
     };
 

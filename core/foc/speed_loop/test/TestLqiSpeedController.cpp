@@ -31,6 +31,22 @@ namespace
             return speed;
         }
 
+        float RelativeOvershoot(float reference, std::size_t steps)
+        {
+            const auto plant = foc::SpeedPlantModel::FromParameters(ValidParameters());
+            float speed{ 0.0f };
+            float peak{ 0.0f };
+
+            for (std::size_t step = 0; step != steps; ++step)
+            {
+                auto current = controller.Compute({ foc::RadiansPerSecond{ speed }, foc::RadiansPerSecond{ reference } });
+                speed = plant.ad * speed + plant.bd * current.Value();
+                peak = std::max(peak, speed);
+            }
+
+            return peak / reference - 1.0f;
+        }
+
         foc::LqiSpeedController controller;
     };
 }
@@ -85,6 +101,32 @@ TEST_F(TestLqiSpeedController, saturation_freezes_the_integrator)
 
     EXPECT_LT(peak, 2200.0f);
     EXPECT_NEAR(speed, 2000.0f, 1.0f);
+}
+
+TEST_F(TestLqiSpeedController, a_saturated_sample_leaves_the_integral_state_untouched)
+{
+    controller.Configure(ValidParameters());
+
+    const foc::SpeedControlContext saturating{ foc::RadiansPerSecond{ 0.0f }, foc::RadiansPerSecond{ 1.0e4f } };
+    auto first = controller.Compute(saturating);
+
+    for (std::size_t step = 0; step != 50; ++step)
+        EXPECT_NEAR(controller.Compute(saturating).Value(), first.Value(), tolerance);
+
+    auto released = controller.Compute({ foc::RadiansPerSecond{ 0.0f }, foc::RadiansPerSecond{ 0.0f } });
+
+    EXPECT_NEAR(released.Value(), 0.0f, tolerance);
+}
+
+TEST_F(TestLqiSpeedController, a_saturating_step_overshoots_no_more_than_a_linear_one)
+{
+    controller.Configure(ValidParameters());
+    const auto saturated = RelativeOvershoot(2000.0f, 5000);
+
+    controller.Reset();
+    const auto linear = RelativeOvershoot(1.0f, 5000);
+
+    EXPECT_LE(saturated, linear + 1.0e-3f);
 }
 
 TEST_F(TestLqiSpeedController, reset_clears_the_integrator)

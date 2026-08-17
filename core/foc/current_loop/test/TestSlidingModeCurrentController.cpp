@@ -10,8 +10,8 @@ namespace
     constexpr float inductanceInHenry = 0.0005f;
     constexpr float samplePeriod = 1.0f / 20000.0f;
     constexpr float busVoltage = 24.0f;
-    constexpr float switchingGain = 1.0f;
-    constexpr float boundaryLayer = 0.2f;
+    constexpr float switchingGain = foc::CurrentLoopTunings{}.switchingGain;
+    constexpr float boundaryLayer = foc::CurrentLoopTunings{}.boundaryLayer;
 
     foc::MotorModelParameters ValidParameters()
     {
@@ -38,13 +38,27 @@ namespace
         const float error = measured - reference;
         const float saturated = std::clamp(error / boundaryLayer, -1.0f, 1.0f);
 
-        return Normalized(-(Ad() * error + switchingGain * saturated) / Bd());
+        return Normalized((-(Ad() * error + switchingGain * saturated) + (1.0f - Ad()) * reference) / Bd());
     }
 
     class TestSlidingModeCurrentController
         : public ::testing::Test
     {
     public:
+        float SettledCurrent(float reference)
+        {
+            const float denormalize = busVoltage / std::numbers::sqrt3_v<float>;
+            float current = 0.0f;
+
+            for (int step = 0; step != 500; ++step)
+            {
+                auto output = controller.Compute({ { current, 0.0f }, { reference, 0.0f }, 0.0f });
+                current = Ad() * current + Bd() * output.d * denormalize;
+            }
+
+            return current;
+        }
+
         foc::SlidingModeCurrentController controller;
     };
 }
@@ -119,4 +133,24 @@ TEST_F(TestSlidingModeCurrentController, non_positive_boundary_layer_disables_th
 
     EXPECT_NEAR(output.d, 0.0f, tolerance);
     EXPECT_NEAR(output.q, 0.0f, tolerance);
+}
+
+// The shipped defaults must satisfy the discrete contraction condition Ksw < phi, otherwise the
+// error map inside the boundary layer diverges regardless of the equivalent-control term.
+TEST_F(TestSlidingModeCurrentController, default_tunings_settle_on_a_non_zero_reference)
+{
+    controller.Configure(ValidParameters());
+    controller.SetTunings(foc::CurrentLoopTunings{});
+
+    EXPECT_NEAR(SettledCurrent(1.0f), 1.0f, tolerance);
+}
+
+TEST_F(TestSlidingModeCurrentController, closed_loop_settles_on_a_non_zero_reference)
+{
+    controller.Configure(ValidParameters());
+
+    // A switching gain below the boundary layer makes the discrete error map contracting
+    controller.SetTunings({ 6283.185307f, 0.2f, 0.5f, false });
+
+    EXPECT_NEAR(SettledCurrent(1.0f), 1.0f, tolerance);
 }

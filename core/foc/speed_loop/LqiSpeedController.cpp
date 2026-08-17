@@ -30,7 +30,6 @@ namespace foc
     void LqiSpeedController::Reset()
     {
         lqi.Reset();
-        integratorHalted = false;
     }
 
     OPTIMIZE_FOR_SPEED
@@ -38,12 +37,17 @@ namespace foc
     {
         const SpeedLqi::StateVector state{ context.measured.Value() };
         const SpeedLqi::OutputVector measured{ context.measured.Value() };
-
-        // Conditional integration: a zero error while saturated freezes the integral state
-        const SpeedLqi::OutputVector reference{ integratorHalted ? context.measured.Value() : context.reference.Value() };
+        const SpeedLqi::OutputVector reference{ context.reference.Value() };
 
         const auto control = lqi.ComputeControl(state, reference, measured).at(0, 0);
-        integratorHalted = math::Abs(control) > 1.0f;
+
+        // Same-sample conditional integration: the toolbox integrates before it returns, so a
+        // saturated command replays the mirrored error, which undoes the step just taken
+        if (math::Abs(control) > 1.0f)
+        {
+            const SpeedLqi::OutputVector mirrored{ 2.0f * context.measured.Value() - context.reference.Value() };
+            lqi.ComputeControl(state, mirrored, measured);
+        }
 
         return LimitToCurrentEnvelope(control * parameters.maxCurrent.Value(), parameters.maxCurrent);
     }
