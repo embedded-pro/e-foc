@@ -55,7 +55,7 @@ namespace foc
         explicit CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency);
 
         void ConfigureImpl(const MotorModelParameters& parameters);
-        void ConfigureMechanicsImpl(const MechanicalModelParameters& parameters);
+        MechanicalModelParameters ConfigureMechanicsImpl(const MechanicalModelParameters& parameters);
         void SetCurrentTuningsImpl(const CurrentLoopTunings& tunings);
         void SetSpeedTuningsImpl(const SpeedLoopTunings& tunings);
         SelectResult SelectCurrentAlgorithmImpl(CurrentAlgorithm algorithm);

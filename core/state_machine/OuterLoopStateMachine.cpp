@@ -16,6 +16,7 @@ namespace application
 
     void OuterLoopStateMachine::ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth)
     {
+        // The cascade owns the current envelope and the outer-loop rate and substitutes them for these placeholders.
         SpeedTunable().ConfigureMechanics(foc::MechanicalModelParameters{
             inertia,
             friction,

@@ -27,12 +27,13 @@ namespace foc
         currentLoop.Configure(parameters);
     }
 
-    void CascadeWithSpeedLoop::ConfigureMechanicsImpl(const MechanicalModelParameters& parameters)
+    MechanicalModelParameters CascadeWithSpeedLoop::ConfigureMechanicsImpl(const MechanicalModelParameters& parameters)
     {
         auto withLimits = parameters;
         withLimits.maxCurrent = maxCurrent;
         withLimits.samplingFrequency = outerLoopFrequency;
         speedLoop.Configure(withLimits);
+        return withLimits;
     }
 
     void CascadeWithSpeedLoop::SetCurrentTuningsImpl(const CurrentLoopTunings& tunings)

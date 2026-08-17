@@ -507,3 +507,18 @@ TEST_F(TestPositionCascade, registered_online_estimators_are_fed_from_the_outer_
     focPosition->Calculate(ZeroCurrents(), position);
     lowPriorityInterruptMock.TriggerHandler();
 }
+
+// The cascade owns the current envelope and outer-loop rate; forwarding the caller's placeholder
+// zeros to the position loop left the default PID with zero gains and made LQR/LQI unselectable.
+TEST_F(TestPositionCascade, the_position_loop_receives_the_effective_current_envelope_and_rate)
+{
+    PositionCascadeUnderTest cascade{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::pid };
+
+    auto placeholders = MechanicalParameters();
+    placeholders.maxCurrent = foc::Ampere{ 0.0f };
+    placeholders.samplingFrequency = hal::Hertz{ 0 };
+    cascade.cascade->ConfigureMechanics(placeholders);
+
+    EXPECT_EQ(cascade.cascade->SelectPositionAlgorithm(foc::PositionAlgorithm::lqr), foc::SelectResult::ok);
+    ExpectOffCentreDuty(DutyAfterOuterCycles(cascade, observableError, 0.0f));
+}

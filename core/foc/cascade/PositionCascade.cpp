@@ -23,8 +23,7 @@ namespace foc
 
     void PositionCascade::ConfigureMechanics(const MechanicalModelParameters& parameters)
     {
-        ConfigureMechanicsImpl(parameters);
-        positionLoop.Configure(parameters);
+        positionLoop.Configure(ConfigureMechanicsImpl(parameters));
     }
 
     OPTIMIZE_FOR_SPEED
