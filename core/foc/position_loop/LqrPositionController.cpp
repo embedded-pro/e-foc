@@ -57,11 +57,8 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     PositionOutput LqrPositionController::Compute(const PositionControlContext& context)
     {
-        if (!designed)
-            return { PositionOutputKind::currentReference, 0.0f };
-
         const auto deviation = -WrappedPositionError(context.reference, context.measured);
-        const auto scaledSpeed = context.measuredSpeed.Value() * OuterSamplePeriod(parameters.samplingFrequency);
+        const auto scaledSpeed = context.measuredSpeed.Value() * samplePeriod;
         const auto command = design.ComputeControl(Design::StateVector{ deviation, scaledSpeed });
 
         return { PositionOutputKind::currentReference,
@@ -72,9 +69,10 @@ namespace foc
     {
         auto solved = Solve(parameters, tunings);
 
-        // A rejected design leaves the loop inert rather than running unknown gains
-        designed = solved.has_value();
+        // A rejected design leaves the loop inert without a hot-path branch: zero gains and a zero
+        // input scale drive the command to zero, and a zero sample period keeps the state finite.
         design = solved ? *solved : Inert();
         currentPerNormalizedInput = solved ? PositionPlantModel::FromParameters(parameters).currentPerNormalizedInput : 0.0f;
+        samplePeriod = solved ? OuterSamplePeriod(parameters.samplingFrequency) : 0.0f;
     }
 }

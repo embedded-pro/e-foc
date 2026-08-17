@@ -30,7 +30,7 @@ namespace foc
         MechanicalModelParameters parameters{};
         PositionLoopTunings tunings{};
         float currentPerNormalizedInput{ 0.0f };
-        bool designed{ false };
+        float samplePeriod{ 0.0f };
         Design design{ Inert() };
     };
 
