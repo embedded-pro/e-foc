@@ -1,9 +1,9 @@
-#include "core/foc/current_loop/CurrentControllerSelector.hpp"
-#include "core/foc/current_loop/CurrentPlantModel.hpp"
-
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC optimize("O3", "fast-math")
 #endif
+
+#include "core/foc/current_loop/CurrentControllerSelector.hpp"
+#include "core/foc/current_loop/CurrentPlantModel.hpp"
 
 namespace foc
 {
@@ -12,7 +12,8 @@ namespace foc
         if (!AreElectricalParametersValid(parameters))
             return false;
 
-        return algorithm != CurrentAlgorithm::decoupledPid || parameters.fluxLinkage.Value() > 0.0f;
+        const bool requiresFluxLinkage = algorithm == CurrentAlgorithm::decoupledPid || algorithm == CurrentAlgorithm::deadbeat;
+        return !requiresFluxLinkage || parameters.fluxLinkage.Value() > 0.0f;
     }
 
     SelectResult CurrentControllerSelector::Select(CurrentAlgorithm algorithm)

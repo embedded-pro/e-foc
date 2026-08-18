@@ -39,12 +39,12 @@ Feature: FOC State Machine Lifecycle
     Then the state machine shall be in the Fault state
 
   @REQ-SM-009
-  Scenario: Clear fault command transitions state machine from Fault to Idle
+  Scenario: Clear fault command transitions state machine from Fault to Ready when calibrated
     Given the system is initialised with valid calibration data
     And the enable command is issued
     And a hardware fault is raised by the platform
     When the clear fault command is issued
-    Then the state machine shall be in the Idle state
+    Then the state machine shall be in the Ready state
 
   # Forbidden transitions — enable from wrong states
   Scenario: Enable command is rejected when motor is in Idle state

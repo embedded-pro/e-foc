@@ -93,7 +93,11 @@ namespace application
 
         tracer.Trace() << "[SM] Fault cleared";
 
-        currentState = state_machine::Idle{};
+        if (HasValidCalibration())
+            EnterReady(calibrationData);
+        else
+            currentState = state_machine::Idle{};
+
         return state_machine::CommandResult::ok;
     }
 

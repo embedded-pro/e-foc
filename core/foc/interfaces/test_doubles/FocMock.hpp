@@ -53,6 +53,7 @@ namespace foc
     {
     public:
         MOCK_METHOD(void, EnableSpeedCommand, (), (override));
+        MOCK_METHOD(void, DisableSpeedCommand, (), (override));
         MOCK_METHOD(void, CommandSpeed, (RadiansPerSecond speed), (override));
         MOCK_METHOD(hal::Hertz, SpeedCommandFrequency, (), (const, override));
     };

@@ -17,6 +17,7 @@
         "CascadeWithSpeedLoop::SetDirectCurrentReference",
         "CascadeWithSpeedLoop::CurrentMechanicalAngle",
         "CascadeWithSpeedLoop::PolePairs",
+        "SpeedDifferentiator::Measure",
         "PidSpeedController::Compute",
         "LqiSpeedController::Compute",
         "AdrcSpeedController::Compute",
@@ -38,6 +39,7 @@
       "required": false,
       "patterns": [
         "CascadeWithSpeedLoop::UpdateOnlineMechanicalEstimator",
+        "EstimatorChannel::UpdateMechanical",
         "RealTimeFrictionAndInertiaEstimator::Update",
         "ClarkePark::Forward",
         "RecursiveLeastSquares<float, 3u>::Update"
@@ -48,6 +50,7 @@
       "required": false,
       "patterns": [
         "CascadeWithSpeedLoop::UpdateOnlineElectricalEstimator",
+        "EstimatorChannel::UpdateElectrical",
         "RealTimeResistanceAndInductanceEstimator::Update",
         "RealTimeResistanceAndInductanceEstimator::ComputeEstimate",
         "RecursiveLeastSquares<float, 2u>::Update"

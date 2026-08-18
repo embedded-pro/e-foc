@@ -33,14 +33,15 @@ namespace services
         controller.EnableSpeedCommand();
         controller.CommandSpeed(config.targetSpeed);
 
-        driver.PhaseCurrentsReady(hal::Hertz{ 10000 }, [this, torqueConstant](auto currents)
+        driver.PhaseCurrentsReady(driver.BaseFrequency(), [this, torqueConstant](auto currents)
             {
                 OnSamplingUpdate(currents, torqueConstant);
             });
 
         timeoutTimer.Start(config.timeout, [this]()
             {
-                driver.PhaseCurrentsReady(hal::Hertz{ 10000 }, [](auto) {});
+                driver.PhaseCurrentsReady(driver.BaseFrequency(), [](auto) {});
+                controller.DisableSpeedCommand();
                 this->onDone(std::nullopt, std::nullopt);
             });
     }
@@ -61,7 +62,8 @@ namespace services
         if (MotorRLS::EvaluateConvergence(metrics, 1e-4f, 1e-2f) == estimators::State::converged)
         {
             timeoutTimer.Cancel();
-            driver.PhaseCurrentsReady(hal::Hertz{ 10000 }, [](auto) {});
+            driver.PhaseCurrentsReady(driver.BaseFrequency(), [](auto) {});
+            controller.DisableSpeedCommand();
 
             auto& theta = rls->Coefficients();
             onDone(

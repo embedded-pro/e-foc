@@ -32,6 +32,7 @@ namespace foc
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
 
         void EnableSpeedCommand() override;
+        void DisableSpeedCommand() override;
         void CommandSpeed(RadiansPerSecond speed) override;
         hal::Hertz SpeedCommandFrequency() const override;
 

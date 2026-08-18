@@ -786,10 +786,14 @@ TEST_F(NonVolatileMemorySingleWriterTest, calibration_request_is_accepted_after_
     ASSERT_TRUE(configStatus.has_value());
 
     EXPECT_CALL(calibrationRegion, Erase(_)).WillOnce(SaveArg<0>(&pendingRegionCallback));
+    EXPECT_CALL(calibrationRegion, Read(_, _)).WillOnce(SaveArg<1>(&pendingRegionCallback));
     nvm.InvalidateCalibration([this](services::NvmStatus status)
         {
             calibrationStatus = status;
         });
+    EXPECT_FALSE(calibrationStatus.has_value());
+
+    InvokePendingRegionCallback();
     EXPECT_FALSE(calibrationStatus.has_value());
 
     InvokePendingRegionCallback();

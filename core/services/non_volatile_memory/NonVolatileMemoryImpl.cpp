@@ -8,8 +8,7 @@ namespace services
     namespace
     {
         // Layout: [magic:4][version:1][crc32:4][data:N]
-        // The data structs are padding-free by design (see static_asserts in their headers),
-        // so no #pragma pack is needed — every byte stored is a meaningful field byte.
+        // pragma pack prevents inter-field padding so the CRC covers exactly the stored bytes.
 #pragma pack(push, 1)
 
         struct CalibrationStorageRecord
@@ -189,7 +188,12 @@ namespace services
         onCalibrationDone = onDone;
         calibrationRegion.Erase([this]
             {
-                CompleteCalibration(NvmStatus::Ok);
+                calibrationRegion.Read(
+                    infra::ByteRange(calibrationReadBackBuffer),
+                    [this]
+                    {
+                        OnCalibrationInvalidationVerified();
+                    });
             });
     }
 
@@ -349,11 +353,48 @@ namespace services
             });
     }
 
+    void NonVolatileMemoryImpl::OnCalibrationInvalidationVerified()
+    {
+        uint32_t magic{};
+        std::memcpy(&magic, calibrationReadBackBuffer.data(), sizeof(magic));
+        CompleteCalibration(magic == CalibrationMagic ? NvmStatus::WriteFailed : NvmStatus::Ok);
+    }
+
     void NonVolatileMemoryImpl::OnCalibrationSectorFormattedDuringFormat()
     {
+        calibrationRegion.Read(
+            infra::ByteRange(calibrationReadBackBuffer),
+            [this]
+            {
+                OnCalibrationFormatVerified();
+            });
+    }
+
+    void NonVolatileMemoryImpl::OnCalibrationFormatVerified()
+    {
+        uint32_t magic{};
+        std::memcpy(&magic, calibrationReadBackBuffer.data(), sizeof(magic));
+        if (magic == CalibrationMagic)
+        {
+            CompleteFormat(NvmStatus::WriteFailed);
+            return;
+        }
+
         configRegion.Erase([this]
             {
-                CompleteFormat(NvmStatus::Ok);
+                configRegion.Read(
+                    infra::ByteRange(configReadBackBuffer),
+                    [this]
+                    {
+                        OnConfigSectorFormattedDuringFormat();
+                    });
             });
+    }
+
+    void NonVolatileMemoryImpl::OnConfigSectorFormattedDuringFormat()
+    {
+        uint32_t magic{};
+        std::memcpy(&magic, configReadBackBuffer.data(), sizeof(magic));
+        CompleteFormat(magic == ConfigMagic ? NvmStatus::WriteFailed : NvmStatus::Ok);
     }
 }

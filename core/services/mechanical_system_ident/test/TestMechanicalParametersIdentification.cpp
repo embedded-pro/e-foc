@@ -20,6 +20,7 @@ namespace
         infra::Execute setOuterLoopFrequency{ [this]()
             {
                 EXPECT_CALL(controllerMock, SpeedCommandFrequency()).WillRepeatedly(Return(hal::Hertz{ 10000 }));
+                EXPECT_CALL(driverMock, BaseFrequency()).WillRepeatedly(Return(hal::Hertz{ 10000 }));
             } };
         services::MechanicalParametersIdentificationImpl identification{ controllerMock, driverMock, encoderMock };
 
@@ -74,6 +75,7 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_calculates_damp
         .WillRepeatedly(::testing::Return(foc::Radians{ 0.01f }));
     EXPECT_CALL(controllerMock, EnableSpeedCommand());
     EXPECT_CALL(controllerMock, CommandSpeed(::testing::_));
+    EXPECT_CALL(controllerMock, DisableSpeedCommand()).Times(::testing::AtMost(1));
     EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_))
         .WillOnce(::testing::SaveArg<1>(&phaseCurrentsCallback))
         .WillRepeatedly(::testing::Return());
@@ -106,6 +108,7 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_timeout_calls_d
     EXPECT_CALL(encoderMock, Read()).WillOnce(::testing::Return(foc::Radians{ 0.0f }));
     EXPECT_CALL(controllerMock, EnableSpeedCommand());
     EXPECT_CALL(controllerMock, CommandSpeed(foc::RadiansPerSecond{ 52.36f }));
+    EXPECT_CALL(controllerMock, DisableSpeedCommand());
     EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_)).Times(2);
 
     identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [&](auto friction, auto inertia)

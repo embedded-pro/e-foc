@@ -16,7 +16,6 @@
                 "CMAKE_COMPILE_WARNING_AS_ERROR": "On",
                 "CMAKE_C_COMPILER_LAUNCHER": "ccache",
                 "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
-                "E_FOC_AUTO_TRANSITION_POLICY": false,
                 "E_FOC_EMBEDDED_BUILD": false
             }
         },

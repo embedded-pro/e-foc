@@ -1,8 +1,8 @@
-#include "core/foc/position_loop/LqiPositionController.hpp"
-
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC optimize("O3", "fast-math")
 #endif
+
+#include "core/foc/position_loop/LqiPositionController.hpp"
 
 namespace foc
 {

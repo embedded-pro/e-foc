@@ -6,10 +6,6 @@
 #include <cstdint>
 #include <numbers>
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC optimize("O3", "fast-math")
-#endif
-
 namespace foc
 {
     namespace detail

@@ -1,8 +1,8 @@
-#include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
-
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC optimize("O3", "fast-math")
 #endif
+
+#include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
 
 namespace foc
 {
@@ -67,7 +67,6 @@ namespace foc
             RadiansPerSecond{ electricalSpeed });
     }
 
-    OPTIMIZE_FOR_SPEED
     CascadeWithSpeedLoop::CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)
         : lowPriorityInterrupt(lowPriorityInterrupt)
         , maxCurrent{ maxCurrent }
@@ -89,7 +88,7 @@ namespace foc
     void CascadeWithSpeedLoop::ConfigureImpl(const MotorModelParameters& parameters)
     {
         polePairs = static_cast<float>(parameters.polePairs);
-        vdcInvScale = detail::invSqrt3 * parameters.busVoltage.Value();
+        vdcInvScale = std::numbers::inv_sqrt3_v<float> * parameters.busVoltage.Value();
         currentLoop.Configure(parameters);
     }
 
@@ -112,7 +111,6 @@ namespace foc
         speedLoop.SetTunings(tunings);
     }
 
-    OPTIMIZE_FOR_SPEED
     void CascadeWithSpeedLoop::EnableSpeedLoop()
     {
         currentLoop.Reset();
@@ -125,7 +123,6 @@ namespace foc
         enabled = true;
     }
 
-    OPTIMIZE_FOR_SPEED
     void CascadeWithSpeedLoop::DisableSpeedLoop()
     {
         enabled = false;
