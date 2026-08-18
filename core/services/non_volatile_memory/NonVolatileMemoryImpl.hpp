@@ -50,7 +50,10 @@ namespace services
         void OnConfigReadBack();
         void OnConfigReadForLoad();
 
+        void OnCalibrationInvalidationVerified();
         void OnCalibrationSectorFormattedDuringFormat();
+        void OnCalibrationFormatVerified();
+        void OnConfigSectorFormattedDuringFormat();
 
         void CompleteCalibration(NvmStatus status);
         void CompleteConfig(NvmStatus status);

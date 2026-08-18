@@ -847,7 +847,7 @@ TEST_F(ControlModeStateMachineLifecycleTest, Fault_And_ClearFault_In_Torque_Mode
     EXPECT_EQ(subject->ActiveStateMachine().LastFaultCode(), state_machine::FaultCode::hardwareFault);
 
     subject->ActiveStateMachine().CmdClearFault();
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
         subject->ActiveStateMachine().CurrentState()));
 }
 
@@ -907,7 +907,7 @@ TEST_F(ControlModeStateMachineLifecycleTest, Fault_And_ClearFault_In_Speed_Mode)
     EXPECT_EQ(subject->ActiveStateMachine().LastFaultCode(), state_machine::FaultCode::hardwareFault);
 
     subject->ActiveStateMachine().CmdClearFault();
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
         subject->ActiveStateMachine().CurrentState()));
 }
 
@@ -987,7 +987,7 @@ TEST_F(ControlModeStateMachineLifecycleTest, Fault_And_ClearFault_In_Position_Mo
     EXPECT_EQ(subject->ActiveStateMachine().LastFaultCode(), state_machine::FaultCode::hardwareFault);
 
     subject->ActiveStateMachine().CmdClearFault();
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
         subject->ActiveStateMachine().CurrentState()));
 }
 
@@ -1056,12 +1056,12 @@ TEST_F(ControlModeStateMachineExtTest, SelectCurrentAlgorithm_PersistsToNvmOnceC
     EXPECT_CALL(nvmMock, SaveConfig(_, _))
         .WillOnce(Invoke([](const services::ConfigData& config, infra::Function<void(services::NvmStatus)> onDone)
             {
-                EXPECT_EQ(config.currentAlgorithm, static_cast<uint8_t>(foc::CurrentAlgorithm::deadbeat));
+                EXPECT_EQ(config.currentAlgorithm, static_cast<uint8_t>(foc::CurrentAlgorithm::slidingMode));
                 onDone(services::NvmStatus::Ok);
             }));
 
-    EXPECT_EQ(subject->SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::ok);
-    EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::deadbeat);
+    EXPECT_EQ(subject->SelectCurrentAlgorithm(foc::CurrentAlgorithm::slidingMode), foc::SelectResult::ok);
+    EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::slidingMode);
 }
 
 TEST_F(ControlModeStateMachineExtTest, PersistedAlgorithmOutsideEnumRangeFallsBackToDefault)
@@ -1288,7 +1288,7 @@ TEST_F(ControlModeStateMachineLifecycleTest, PersistedCurrentAlgorithmIsAppliedO
     SetUpTorqueCalibrationCaptures();
 
     services::ConfigData config{};
-    config.currentAlgorithm = static_cast<uint8_t>(foc::CurrentAlgorithm::deadbeat);
+    config.currentAlgorithm = static_cast<uint8_t>(foc::CurrentAlgorithm::slidingMode);
     ConstructSubjectWithConfig(config);
 
     EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::pid);
@@ -1296,7 +1296,7 @@ TEST_F(ControlModeStateMachineLifecycleTest, PersistedCurrentAlgorithmIsAppliedO
     subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
     CompleteCalibration_Torque();
 
-    EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::deadbeat);
+    EXPECT_EQ(subject->ActiveCurrentAlgorithm(), foc::CurrentAlgorithm::slidingMode);
 }
 
 TEST_F(ControlModeStateMachineLifecycleTest, PersistedSpeedAlgorithmIsAppliedOnceReadyIsReached)

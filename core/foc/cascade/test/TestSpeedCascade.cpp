@@ -1,5 +1,6 @@
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
+#include "core/foc/interfaces/test_doubles/OnlineEstimatorsMock.hpp"
 #include <gmock/gmock.h>
 #include <numbers>
 
@@ -330,8 +331,6 @@ TEST_F(TestSpeedCascade, second_prescaler_cycle_triggers_again)
 
 TEST_F(TestSpeedCascade, the_cascade_supplies_the_current_envelope_and_rate_the_caller_cannot_know)
 {
-    // Callers outside the cascade have no view of maxCurrent or the outer loop rate, so they pass
-    // zeros; the cascade must substitute its own before the speed loop validates the model.
     auto withoutLimits = MechanicalParameters();
     withoutLimits.maxCurrent = foc::Ampere{ 0.0f };
     withoutLimits.samplingFrequency = hal::Hertz{ 0 };
@@ -394,4 +393,60 @@ TEST_F(TestSpeedCascade, the_speed_estimate_does_not_spike_on_the_first_sample_a
     auto awayFromOriginDuty = FirstDutyAtStandstill(awayFromOrigin, std::numbers::pi_v<float> - 0.01f);
 
     ExpectSameDuty(awayFromOriginDuty, atOriginDuty);
+}
+
+TEST_F(TestSpeedCascade, outer_loop_frequency_equals_configured_low_priority_frequency)
+{
+    EXPECT_EQ(focSpeed->OuterLoopFrequency().Value(), lowPriorityFrequency.Value());
+}
+
+TEST_F(TestSpeedCascade, registered_online_estimators_are_fed_from_the_outer_loop)
+{
+    testing::StrictMock<foc::OnlineMechanicalEstimatorMock> mechanicalEstimator;
+    testing::StrictMock<foc::OnlineElectricalEstimatorMock> electricalEstimator;
+
+    focSpeed->SetOnlineMechanicalEstimator(mechanicalEstimator);
+    focSpeed->SetOnlineElectricalEstimator(electricalEstimator);
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 10.0f });
+
+    EXPECT_CALL(mechanicalEstimator, Update(_, _, _));
+    EXPECT_CALL(electricalEstimator, Update(_, _, _, _));
+
+    foc::Radians position{ 0.0f };
+    focSpeed->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+}
+
+TEST_F(TestSpeedCascade, enable_speed_command_drives_the_motor_at_commanded_speed)
+{
+    focSpeed->EnableSpeedCommand();
+    focSpeed->CommandSpeed(foc::RadiansPerSecond{ 50.0f });
+
+    foc::Radians position{ 0.0f };
+    focSpeed->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+
+    foc::Radians second{ 0.0f };
+    ExpectValidDuty(focSpeed->Calculate(ZeroCurrents(), second));
+}
+
+TEST_F(TestSpeedCascade, disable_speed_command_produces_bounded_duty)
+{
+    focSpeed->EnableSpeedCommand();
+    focSpeed->CommandSpeed(foc::RadiansPerSecond{ 50.0f });
+
+    foc::Radians position{ 0.0f };
+    focSpeed->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+
+    focSpeed->DisableSpeedCommand();
+
+    foc::Radians stopped{ 0.0f };
+    ExpectValidDuty(focSpeed->Calculate(ZeroCurrents(), stopped));
+}
+
+TEST_F(TestSpeedCascade, speed_command_frequency_equals_outer_loop_frequency)
+{
+    EXPECT_EQ(focSpeed->SpeedCommandFrequency().Value(), focSpeed->OuterLoopFrequency().Value());
 }

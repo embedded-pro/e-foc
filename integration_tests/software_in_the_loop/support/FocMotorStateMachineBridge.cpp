@@ -64,7 +64,7 @@ namespace integration
 
     void FocMotorStateMachineBridge::OnEmergencyStop(const infra::Function<void()>& onDone)
     {
-        stateMachine.CmdDisable();
+        stateMachine.CmdEmergencyStop();
         onDone();
     }
 

@@ -2,6 +2,7 @@
 
 #include "core/foc/interfaces/Units.hpp"
 #include "hal/interfaces/AdcMultiChannel.hpp"
+#include "numerical/math/CompilerOptimizations.hpp"
 #include <concepts>
 #include <utility>
 
@@ -45,7 +46,7 @@ namespace application
 
     template<typename Impl>
     requires std::derived_from<Impl, hal::AdcMultiChannel>
-    void AdcPhaseCurrentMeasurementImpl<Impl>::Measure(const infra::Function<void(foc::Ampere phaseA, foc::Ampere phaseB, foc::Ampere phaseC)>& onDone)
+    OPTIMIZE_FOR_SPEED void AdcPhaseCurrentMeasurementImpl<Impl>::Measure(const infra::Function<void(foc::Ampere phaseA, foc::Ampere phaseB, foc::Ampere phaseC)>& onDone)
     {
         onMeasurementDone = onDone;
         adc.Measure([this](auto samples)

@@ -22,7 +22,7 @@ Feature: CAN FOC Motor Category Commands
     And the enable command is issued
     And a hardware fault is raised by the platform
     When the CAN ClearFault command is received
-    Then the state machine shall be in the Idle state
+    Then the state machine shall be in the Ready state
 
   # Forbidden CAN transitions
   Scenario: CAN Stop command is ignored when motor is already in Ready state
@@ -46,13 +46,13 @@ Feature: CAN FOC Motor Category Commands
     When the CAN Start command is received
     Then the state machine shall be in the Fault state
 
-  # REQ-INT-005: CAN Start rejected when motor is in Idle state
-  Scenario: CAN Start command is rejected when motor is in Idle state
+  # REQ-INT-005: CAN Start command after fault recovery with valid calibration re-enables motor
+  Scenario: CAN Start command after fault recovery with valid calibration reaches Enabled
     And the enable command is issued
     And a hardware fault is raised by the platform
     And the CAN ClearFault command is received
     When the CAN Start command is received
-    Then the state machine shall be in the Idle state
+    Then the state machine shall be in the Enabled state
 
   # REQ-INT-006: CAN EmergencyStop in Enabled returns motor to Ready
   Scenario: CAN EmergencyStop in Enabled returns motor to Ready

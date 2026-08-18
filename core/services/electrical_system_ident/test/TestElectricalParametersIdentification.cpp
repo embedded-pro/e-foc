@@ -402,6 +402,57 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_wit
     EXPECT_EQ(*resultPolePairs, expectedPolePairs);
 }
 
+TEST_F(ElectricalParametersIdentificationTest, concurrent_rl_estimate_is_rejected_immediately)
+{
+    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
+        hal::Percent{ 15 }, std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
+    };
+
+    struct RlResult { bool called = false; std::optional<foc::Ohm> r; std::optional<foc::MilliHenry> l; } second;
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_));
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_));
+
+    identification.EstimateResistanceAndInductance(config, [](auto, auto) {});
+
+    // Second call while first is in-flight must return immediately with nullopt
+    identification.EstimateResistanceAndInductance(config, [&second](auto r, auto l)
+        {
+            second.called = true;
+            second.r = r;
+            second.l = l;
+        });
+
+    EXPECT_TRUE(second.called);
+    EXPECT_FALSE(second.r.has_value());
+    EXPECT_FALSE(second.l.has_value());
+}
+
+TEST_F(ElectricalParametersIdentificationTest, concurrent_pole_pairs_estimate_is_rejected_immediately)
+{
+    services::ElectricalParametersIdentification::PolePairsConfig config{
+        hal::Percent{ 20 }, 5, std::chrono::milliseconds{ 50 }
+    };
+
+    struct PpResult { bool called = false; bool hasValue = true; } second;
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(::testing::Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_));
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_));
+
+    identification.EstimateNumberOfPolePairs(config, [](auto) {});
+
+    // Second call while first is in-flight must return immediately with nullopt
+    identification.EstimateNumberOfPolePairs(config, [&second](auto result)
+        {
+            second.called = true;
+            second.hasValue = result.has_value();
+        });
+
+    EXPECT_TRUE(second.called);
+    EXPECT_FALSE(second.hasValue);
+}
+
 TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_with_8_pole_motor)
 {
     services::ElectricalParametersIdentification::PolePairsConfig config{

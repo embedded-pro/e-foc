@@ -14,8 +14,10 @@
   title: Calibration step sequencing
   shall: >
     During calibration, the state machine shall execute steps in the following
-    fixed order: pole-pairs estimation, resistance and inductance estimation,
-    encoder alignment. Each step shall complete before the next begins.
+    fixed order: (1) pole-pairs estimation, (2) resistance and inductance estimation,
+    (3) encoder alignment, and (4) mechanical parameter estimation (friction and
+    inertia) for speed and position control modes only. Each step shall complete
+    before the next begins. Step 4 is skipped for torque-only control modes.
 
 - id: REQ-SM-004
   title: Calibration success transitions to Ready

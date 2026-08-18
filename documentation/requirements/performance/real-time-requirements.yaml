@@ -1,5 +1,7 @@
 - id: REQ-PERF-001
-  title: FOC execution time
+  title: FOC inner-loop execution time
   shall: >
-    The motor control system shall complete all field-oriented control
-    calculations within 50 microseconds per control cycle.
+    The Calculate() method of the FOC inner loop shall complete within 4500 CPU
+    cycles at 120 MHz (37.5 microseconds), leaving 25% headroom in the 50 microsecond
+    control period for ISR entry/exit, encoder reads, and PWM writes. This budget
+    is enforced by the cortex-cycle-budget CI gate (fail-over-max-cycles: 4500).

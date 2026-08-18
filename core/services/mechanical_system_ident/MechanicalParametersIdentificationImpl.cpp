@@ -22,6 +22,11 @@ namespace services
 
     void MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone)
     {
+        if (rls.has_value())
+        {
+            onDone(std::nullopt, std::nullopt);
+            return;
+        }
         this->currentConfig = config;
         this->onDone = onDone;
         this->previousPosition = encoder.Read().Value();
@@ -33,14 +38,16 @@ namespace services
         controller.EnableSpeedCommand();
         controller.CommandSpeed(config.targetSpeed);
 
-        driver.PhaseCurrentsReady(hal::Hertz{ 10000 }, [this, torqueConstant](auto currents)
+        driver.PhaseCurrentsReady(driver.BaseFrequency(), [this, torqueConstant](auto currents)
             {
                 OnSamplingUpdate(currents, torqueConstant);
             });
 
         timeoutTimer.Start(config.timeout, [this]()
             {
-                driver.PhaseCurrentsReady(hal::Hertz{ 10000 }, [](auto) {});
+                driver.PhaseCurrentsReady(driver.BaseFrequency(), [](auto) {});
+                controller.DisableSpeedCommand();
+                rls.reset();
                 this->onDone(std::nullopt, std::nullopt);
             });
     }
@@ -61,12 +68,14 @@ namespace services
         if (MotorRLS::EvaluateConvergence(metrics, 1e-4f, 1e-2f) == estimators::State::converged)
         {
             timeoutTimer.Cancel();
-            driver.PhaseCurrentsReady(hal::Hertz{ 10000 }, [](auto) {});
+            driver.PhaseCurrentsReady(driver.BaseFrequency(), [](auto) {});
+            controller.DisableSpeedCommand();
 
             auto& theta = rls->Coefficients();
-            onDone(
-                foc::NewtonMeterSecondPerRadian{ theta.at(2, 0) },
-                foc::NewtonMeterSecondSquared{ theta.at(1, 0) });
+            const auto friction = foc::NewtonMeterSecondPerRadian{ theta.at(2, 0) };
+            const auto inertia = foc::NewtonMeterSecondSquared{ theta.at(1, 0) };
+            rls.reset();
+            onDone(friction, inertia);
         }
 
         previousPosition = mechanicalPos;

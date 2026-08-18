@@ -499,7 +499,7 @@ TEST_F(FocStateMachineTorqueCliTest, fault_code_is_recorded)
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_fault_returns_to_idle)
+TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_fault_without_calibration_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
@@ -509,6 +509,19 @@ TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_fault_returns_to_idle)
     sm.CmdClearFault();
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_fault_with_valid_calibration_returns_to_ready)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(inverterMock, Stop()).Times(1);
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+    sm.CmdClearFault();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_enabled_is_rejected)

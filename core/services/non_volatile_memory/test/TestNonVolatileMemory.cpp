@@ -330,6 +330,53 @@ TEST_F(NonVolatileMemoryTest, load_calibration_returns_invalid_data_on_crc_corru
     EXPECT_EQ(result, services::NvmStatus::InvalidData);
 }
 
+TEST_F(NonVolatileMemoryTest, load_calibration_on_magic_mismatch_zero_initialises_the_output)
+{
+    // Blank flash leaves the magic field at 0xFFFFFFFF, which does not match CalibrationMagic.
+    std::fill(calibrationRegion.storage.begin(), calibrationRegion.storage.end(), 0xFF);
+
+    services::CalibrationData out = MakeTestCalibration();
+    bool done = false;
+    services::NvmStatus result{};
+
+    nvm.LoadCalibration(out, [&](services::NvmStatus s)
+        {
+            result = s;
+            done = true;
+        });
+
+    RunUntilDone(done);
+    EXPECT_EQ(result, services::NvmStatus::InvalidData);
+    ExpectCalibrationDataEqual(out, services::CalibrationData{});
+}
+
+TEST_F(NonVolatileMemoryTest, load_calibration_on_crc_mismatch_zero_initialises_the_output)
+{
+    bool saveDone = false;
+    nvm.SaveCalibration(MakeTestCalibration(), [&](auto)
+        {
+            saveDone = true;
+        });
+    RunUntilDone(saveDone);
+
+    // Corrupt the data so the stored CRC no longer matches while magic and version stay valid.
+    calibrationRegion.storage[recordDataOffset] ^= 0xFF;
+
+    services::CalibrationData out = MakeTestCalibration();
+    bool done = false;
+    services::NvmStatus result{};
+
+    nvm.LoadCalibration(out, [&](services::NvmStatus s)
+        {
+            result = s;
+            done = true;
+        });
+
+    RunUntilDone(done);
+    EXPECT_EQ(result, services::NvmStatus::InvalidData);
+    ExpectCalibrationDataEqual(out, services::CalibrationData{});
+}
+
 TEST_F(NonVolatileMemoryTest, is_calibration_valid_returns_true_after_save)
 {
     bool saveDone = false;
@@ -537,7 +584,7 @@ TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_on_crc_corruption)
     ExpectConfigDataEqual(loaded, defaults);
 }
 
-TEST_F(NonVolatileMemoryTest, save_calibration_write_verify_failure_returns_write_failed)
+TEST_F(NonVolatileMemoryTest, save_calibration_write_verify_failure_returns_hardware_fault)
 {
     // Override Read to return corrupted data so the readback comparison fails.
     struct CorruptingRegion
@@ -592,10 +639,10 @@ TEST_F(NonVolatileMemoryTest, save_calibration_write_verify_failure_returns_writ
         });
 
     RunUntilDone(done);
-    EXPECT_EQ(result, services::NvmStatus::WriteFailed);
+    EXPECT_EQ(result, services::NvmStatus::HardwareFault);
 }
 
-TEST_F(NonVolatileMemoryTest, save_config_write_verify_failure_returns_write_failed)
+TEST_F(NonVolatileMemoryTest, save_config_write_verify_failure_returns_hardware_fault)
 {
     struct CorruptingRegion
         : public services::NvmRegion
@@ -646,7 +693,7 @@ TEST_F(NonVolatileMemoryTest, save_config_write_verify_failure_returns_write_fai
         });
 
     RunUntilDone(done);
-    EXPECT_EQ(result, services::NvmStatus::WriteFailed);
+    EXPECT_EQ(result, services::NvmStatus::HardwareFault);
 }
 
 TEST_F(NonVolatileMemoryTest, concurrent_save_calibration_second_call_is_rejected)
@@ -786,10 +833,14 @@ TEST_F(NonVolatileMemorySingleWriterTest, calibration_request_is_accepted_after_
     ASSERT_TRUE(configStatus.has_value());
 
     EXPECT_CALL(calibrationRegion, Erase(_)).WillOnce(SaveArg<0>(&pendingRegionCallback));
+    EXPECT_CALL(calibrationRegion, Read(_, _)).WillOnce(SaveArg<1>(&pendingRegionCallback));
     nvm.InvalidateCalibration([this](services::NvmStatus status)
         {
             calibrationStatus = status;
         });
+    EXPECT_FALSE(calibrationStatus.has_value());
+
+    InvokePendingRegionCallback();
     EXPECT_FALSE(calibrationStatus.has_value());
 
     InvokePendingRegionCallback();

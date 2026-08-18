@@ -1,9 +1,9 @@
-#include "core/foc/instantiations/Runner.hpp"
-#include "numerical/math/CompilerOptimizations.hpp"
-
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC optimize("O3", "fast-math")
 #endif
+
+#include "core/foc/instantiations/Runner.hpp"
+#include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc
 {
@@ -24,8 +24,8 @@ namespace foc
     {
         RegisterPhaseCurrents();
         foc.Enable();
-        enabled = true;
         inverter.Start();
+        enabled = true;
     }
 
     void Runner::Disable()

@@ -1,4 +1,5 @@
 #include "core/foc/speed_loop/PidSpeedController.hpp"
+#include <algorithm>
 #include <gmock/gmock.h>
 
 namespace
@@ -100,7 +101,8 @@ TEST_F(TestPidSpeedController, gains_follow_the_inertia_based_design)
     const float inertia = parameters.inertia.Value();
     const float samplePeriod = 1.0f / static_cast<float>(parameters.samplingFrequency.Value());
     const float kp = 2.0f * inertia * bandwidth / parameters.torqueConstant.Value();
-    const float ki = kp * parameters.viscousFriction.Value() / inertia * samplePeriod;
+    const float integralZero = std::max(parameters.viscousFriction.Value() / inertia, bandwidth / 10.0f);
+    const float ki = kp * integralZero * samplePeriod;
 
     auto output = controller.Compute({ foc::RadiansPerSecond{ 0.0f }, foc::RadiansPerSecond{ error } });
 

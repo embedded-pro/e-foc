@@ -210,6 +210,7 @@ namespace state_machine
             return ControlMode::speed;
         if (std::holds_alternative<application::PositionStateMachine>(activeSm))
             return ControlMode::position;
+        really_assert(std::holds_alternative<application::TorqueStateMachine>(activeSm));
         return ControlMode::torque;
     }
 
@@ -219,6 +220,7 @@ namespace state_machine
             return *sm;
         if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
             return *sm;
+        really_assert(std::holds_alternative<application::TorqueStateMachine>(activeSm));
         return std::get<application::TorqueStateMachine>(activeSm);
     }
 
@@ -228,6 +230,7 @@ namespace state_machine
             return *sm;
         if (const auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
             return *sm;
+        really_assert(std::holds_alternative<application::TorqueStateMachine>(activeSm));
         return std::get<application::TorqueStateMachine>(activeSm);
     }
 

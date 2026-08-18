@@ -265,7 +265,7 @@ The electrical estimator is seeded using `lD` (d-axis inductance), as the underl
 
 When `ApplyOnlineEstimates()` is called while in `Enabled` state:
 1. Current inertia and friction estimates are read from the mechanical estimator
-2. Speed PID gains are recomputed: $k_p = J \cdot \omega_{bw}$, $k_i = B \cdot \omega_{bw}$
+2. Speed PID gains are recomputed using the bandwidth-based derivation from `speed-loop-controllers.md`: $k_p = 2 J \omega_{bw} / K_t$, $k_i = B_f \omega_{bw} / K_t$, where $J$ is the estimated inertia, $B_f$ the viscous friction, and $K_t$ the torque constant
 3. Current resistance and inductance estimates are read from the electrical estimator
 4. Current PID gains are recomputed from the bandwidth-based tuning rule
 

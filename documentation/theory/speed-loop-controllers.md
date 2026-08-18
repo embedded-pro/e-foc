@@ -117,7 +117,7 @@ $$
 **Control law** (run-time: two multiplications and one addition):
 
 $$
-u[k] = -K_\omega\,(\omega_m[k] - \omega_m^*[k]) + K_I\, x_I[k]
+u[k] = -K_\omega\,(\omega_m[k] - \omega_m^*[k]) - K_I\, x_I[k]
 $$
 
 Structurally identical to a discrete PI but with gains derived from physical parameters and an

@@ -1,12 +1,11 @@
-#include "core/foc/cascade/SpeedCascade.hpp"
-
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC optimize("O3", "fast-math")
 #endif
 
+#include "core/foc/cascade/SpeedCascade.hpp"
+
 namespace foc
 {
-    OPTIMIZE_FOR_SPEED
     SpeedCascade::SpeedCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)
         : CascadeWithSpeedLoop(maxCurrent, baseFrequency, lowPriorityInterrupt, lowPriorityFrequency)
         , outerLoopFrequency(lowPriorityFrequency)
@@ -27,7 +26,6 @@ namespace foc
         ConfigureMechanicsImpl(parameters);
     }
 
-    OPTIMIZE_FOR_SPEED
     void SpeedCascade::SetPoint(RadiansPerSecond point)
     {
         lastSpeedSetPoint = point;
@@ -74,14 +72,12 @@ namespace foc
         SetOnlineElectricalEstimatorImpl(estimator);
     }
 
-    OPTIMIZE_FOR_SPEED
     void SpeedCascade::Enable()
     {
         EnableSpeedLoop();
         SetPoint(lastSpeedSetPoint);
     }
 
-    OPTIMIZE_FOR_SPEED
     void SpeedCascade::Disable()
     {
         DisableSpeedLoop();
@@ -105,6 +101,11 @@ namespace foc
     void SpeedCascade::EnableSpeedCommand()
     {
         Enable();
+    }
+
+    void SpeedCascade::DisableSpeedCommand()
+    {
+        Disable();
     }
 
     void SpeedCascade::CommandSpeed(RadiansPerSecond speed)

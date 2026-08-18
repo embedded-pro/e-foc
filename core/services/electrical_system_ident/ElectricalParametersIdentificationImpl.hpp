@@ -48,6 +48,8 @@ namespace services
         infra::AutoResetFunction<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)> onResistanceAndInductanceDone;
         infra::AutoResetFunction<void(std::optional<std::size_t>)> onPolePairsDone;
 
+        bool rlRunning{ false };
+        bool polePairsRunning{ false };
         infra::TimerSingleShot settleTimer;
     };
 }

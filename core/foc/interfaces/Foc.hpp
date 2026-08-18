@@ -83,6 +83,7 @@ namespace foc
     {
     public:
         virtual void EnableSpeedCommand() = 0;
+        virtual void DisableSpeedCommand() = 0;
         virtual void CommandSpeed(RadiansPerSecond speed) = 0;
         virtual hal::Hertz SpeedCommandFrequency() const = 0;
     };

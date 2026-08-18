@@ -1,12 +1,12 @@
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC optimize("O3", "fast-math")
+#endif
+
 #include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "numerical/math/Math.hpp"
-
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC optimize("O3", "fast-math")
-#endif
 
 namespace foc
 {

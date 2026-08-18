@@ -62,7 +62,7 @@ The position loop fires **before** the speed loop within the same LPI callback. 
 graph TB
     PSP["Position Setpoint\n(Radians)"] --> PPID["Position PID\n1 kHz (LPI, first)"]
     APOS["Actual Position\nθm (Radians)"] --> PPID
-    PPID -->|"Speed Setpoint\n(RadiansPerSecond)\nclamped ± 1000 rad/s"| SPID["Speed PID\n1 kHz (LPI, second)"]
+    PPID -->|"Speed Setpoint\n(RadiansPerSecond)\nclamped ±bandwidth·π rad/s"| SPID["Speed PID\n1 kHz (LPI, second)"]
     AV["Estimated Angular\nVelocity Δθ/Δt"] --> SPID
     SPID -->|"Iq Setpoint\n(Ampere)"| CPID["Current PIDs\nInner loop 20 kHz"]
     ZERO["Id Setpoint = 0 A"] --> CPID
@@ -153,7 +153,7 @@ This ordering guarantees that the Iq setpoint used by the inner loop is always t
 |---------------------|--------------|--------------------------|----------------------|---------------------------------------------------------------------|
 | Position setpoint   | θ_sp         | Radians (float)          | Application-defined  | Not wrapped — application must supply single-turn-compatible target |
 | Actual position     | θm           | Radians (float)          | [0, 2π)              | Mechanical angle from encoder                                       |
-| Position PID output | ω_sp         | RadiansPerSecond (float) | [−1000, +1000] rad/s | Clamped speed setpoint for middle loop                              |
+| Position PID output | ω_sp         | RadiansPerSecond (float) | [−bw·π, +bw·π] rad/s | Clamped speed setpoint; saturation = one speed-loop bandwidth per π rad of error |
 | Estimated speed     | ω            | RadiansPerSecond (float) | computed from Δθ/Δt  | Finite difference with ±π wrap correction                           |
 | Speed PID output    | Iq_sp        | Ampere (float)           | ± maxCurrent         | Written to inner loop                                               |
 | d-axis setpoint     | Id_sp        | Ampere (float)           | 0 A fixed            | SPMSM maximum torque per ampere                                     |
@@ -161,7 +161,7 @@ This ordering guarantees that the Iq setpoint used by the inner loop is always t
 | Outer loop period   | Δt           | Seconds (float)          | 1 / outer_frequency  | Constant after construction                                         |
 | Pole pairs          | P            | Integer (unsigned)       | ≥ 1                  | Motor property                                                      |
 | Max current         | maxCurrent   | Ampere (float)           | > 0                  | Upper bound on Iq setpoint from speed PID                           |
-| Speed clamp         | ± 1000 rad/s | RadiansPerSecond (float) | fixed                | Position PID output saturation; determines approach speed cap       |
+| Speed clamp         | ± bandwidth·π rad/s | RadiansPerSecond (float) | derived from speed-loop bandwidth | Position PID output saturation; determines approach speed cap |
 
 ---
 
@@ -179,7 +179,7 @@ sequenceDiagram
     LPI->>PosLoop: LowPriorityHandler fires
     PosLoop->>PosLoop: Read θm (current position)
     PosLoop->>PosLoop: error = θ_setpoint − θm
-    PosLoop->>PosLoop: ω_setpoint = PositionPID(error), clamped ± 1000 rad/s
+    PosLoop->>PosLoop: ω_setpoint = PositionPID(error), clamped ± bandwidth·π rad/s
     PosLoop->>SpdLoop: Write ω_setpoint
     SpdLoop->>SpdLoop: Compute Δθ = θm − θm_prev (±π wrap correction)
     SpdLoop->>SpdLoop: ω = Δθ / Δt; save θm as θm_prev
@@ -195,7 +195,7 @@ sequenceDiagram
 ```mermaid
 graph LR
     PSP["Position\nSetpoint (rad)"] --> PPID["Position\nPID"]
-    PPID -->|"ω_sp\n±1000 rad/s"| SPID["Speed\nPID"]
+    PPID -->|"ω_sp\n±bw·π rad/s"| SPID["Speed\nPID"]
     SPID -->|"Iq_sp\n±I_max"| TORQ["Torque /\nCurrent Loop"]
     TORQ -->|"PWM duty\ncycles"| INV["Three-Phase\nInverter"]
     INV -->|"Motor\nphase voltages"| MOTOR["PMSM\nMotor"]

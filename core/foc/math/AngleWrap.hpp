@@ -1,28 +1,15 @@
 #pragma once
 
-#include <numbers>
-
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC optimize("O3", "fast-math")
-#endif
-
 #include "numerical/math/CompilerOptimizations.hpp"
+#include <cmath>
+#include <numbers>
 
 namespace foc::detail
 {
-    constexpr float invSqrt3 = std::numbers::inv_sqrt3_v<float>;
-
     OPTIMIZE_FOR_SPEED
     inline float PositionWithWrapAround(float position)
     {
-        constexpr float pi = std::numbers::pi_v<float>;
-        constexpr float two_pi = 2.0f * pi;
-
-        if (position > pi)
-            position -= two_pi;
-        else if (position < -pi)
-            position += two_pi;
-
-        return position;
+        constexpr float two_pi = 2.0f * std::numbers::pi_v<float>;
+        return position - two_pi * std::round(position / two_pi);
     }
 }

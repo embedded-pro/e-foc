@@ -191,15 +191,15 @@ namespace state_machine
 
     bool FocMotorCanBridge::SetpointRejected(uint8_t commandId, ControlMode requiredMode, bool withinRange)
     {
-        if (!withinRange)
-        {
-            server.SendCommandAck(commandId, services::CanAckStatus::invalidPayload);
-            return true;
-        }
-
         if (controlMode.Active() != requiredMode)
         {
             server.SendCategoryError(commandId, services::FocMotorCategoryError::modeMismatch);
+            return true;
+        }
+
+        if (!withinRange)
+        {
+            server.SendCommandAck(commandId, services::CanAckStatus::invalidPayload);
             return true;
         }
 

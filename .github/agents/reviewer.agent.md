@@ -1,14 +1,7 @@
 ---
 description: "Use when reviewing code changes in e-foc. Performs structured code review against all project standards: memory safety (no heap), real-time determinism, FOC theory correctness, motor control best practices, embedded optimizations, documentation alignment, SOLID principles, and test coverage."
 tools: [execute/runInTerminal, execute/getTerminalOutput, execute/runTests, execute/testFailure, read/readFile, read/problems, read/terminalLastCommand, read/getTaskOutput, read/viewImage, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/textSearch, search/usages]
-model: "GPT-5.4"
-handoffs:
-  - label: "Fix Issues"
-    agent: executor
-    prompt: "Fix the issues identified in the review above, following all e-foc project conventions."
-  - label: "Re-plan"
-    agent: planner
-    prompt: "Revise the implementation plan based on the review feedback above."
+model: claude-sonnet-4-6
 ---
 
 # Reviewer Agent

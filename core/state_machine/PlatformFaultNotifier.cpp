@@ -3,6 +3,7 @@
 namespace state_machine
 {
     PlatformFaultNotifier::PlatformFaultNotifier(application::PlatformFactory& platform)
+        : platform(platform)
     {
         platform.RegisterBoardProtection([this](application::PlatformFactory::BoardProtectionReason reason)
             {
@@ -14,6 +15,11 @@ namespace state_machine
     void PlatformFaultNotifier::Register(const infra::Function<void(FaultCode)>& onFault)
     {
         this->onFault = onFault;
+        platform.CanBus().SetOnError([this](application::CanBusAdapter::CanError error)
+            {
+                if (error == application::CanBusAdapter::CanError::busOff && this->onFault != nullptr)
+                    this->onFault(FaultCode::hardwareFault);
+            });
     }
 
     FaultCode PlatformFaultNotifier::ToFaultCode(application::PlatformFactory::BoardProtectionReason reason)

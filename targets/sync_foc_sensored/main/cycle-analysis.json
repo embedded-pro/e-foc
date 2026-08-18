@@ -11,13 +11,13 @@
       "patterns": [
         "Adc0Sequence.*Handler",
         "InterruptTable::Invoke",
-        "ImmediateInterruptHandler::Invoke"
+        "ImmediateInterruptHandler::Invoke",
+        "Runner::OnPhaseCurrents"
       ]
     },
     {
       "label": "Encoder Read",
       "patterns": [
-        "PlatformAdapter::Read",
         "QuadratureEncoderDecorator.*::Read",
         "QuadratureEncoder::Position",
         "QuadratureEncoder::Resolution"
@@ -26,6 +26,8 @@
     {
       "label": "FOC Inner Loop (Calculate)",
       "patterns": [
+        "TorqueCascade::Calculate",
+        "SpeedCascade::Calculate",
         "PositionCascade::Calculate",
         "CascadeWithSpeedLoop::CalculateInnerLoop",
         "Clarke::Forward",
@@ -45,6 +47,8 @@
         "PidIncrementalSynchronous.*::Process",
         "PidIncrementalSynchronous.*::SetPoint",
         "PositionWithWrapAround",
+        "LowPriorityInterrupt::Trigger",
+        "PendSvLowPriorityInterrupt::Trigger",
         "std::array<float.*>::operator\\[\\]",
         "std::clamp",
         "std::max<float>",
@@ -54,7 +58,6 @@
     {
       "label": "PWM Output",
       "patterns": [
-        "PlatformAdapter::ThreePhasePwmOutput",
         "SynchronousPwm::Start.*Percent.*Percent.*Percent",
         "SynchronousPwm::SetComparator",
         "SynchronousPwm::Sync"

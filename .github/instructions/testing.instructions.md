@@ -1,6 +1,6 @@
 ---
 description: "e-foc testing guidelines: prefer TEST_F for fixture-based tests, TYPED_TEST for multi-type tests, FOC transform correctness tests, PID anti-windup tests, SVM sector tests, host simulation for integration, Arrange-Act-Assert pattern. StrictMock required; NiceMock forbidden."
-applyTo: "**/test/**"
+applyTo: "**/test/**,**/test_doubles/**"
 ---
 
 # e-foc Testing Guidelines
