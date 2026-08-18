@@ -1,85 +1,14 @@
-# e-foc — Copilot / AI agent instructions
+# GitHub Copilot Instructions — e-foc
 
-This file is a concise, task-oriented guide for AI coding agents to be immediately productive in this repository.
+Canonical rules: **[AGENTS.md](../AGENTS.md)** (shared with Claude; VS Code auto-loads it).
+Sub-agent definitions: `.claude/agents/`. Build presets: `CMakePresets.json`.
 
-1) Big-picture architecture (short)
-- Purpose: Field-Oriented Control (FOC) for BLDC/PMSM with strict realtime and memory constraints.
-- Major components:
-  - `core/` — FOC implementations, platform abstraction interfaces, and services (libraries only).
-  - `core/foc/interfaces/` — FOC vocabulary and contracts only (`Units.hpp`, `Signals.hpp`, `Foc.hpp`, `Execution.hpp`, `OnlineEstimators.hpp`). No algorithms.
-  - `core/foc/math/` — Header-only generic numerics (`FastTrigonometry.hpp`, `AngleWrap.hpp`); not FOC-specific.
-  - `core/foc/transforms/` — Clarke/Park transforms and Space Vector Modulation.
-  - `core/foc/cascade/` — Cascade orchestration and gain design; no hardware dependency.
-  - `core/foc/instantiations/` — Execution wiring (`Runner`, `LowPriorityInterruptImpl`, `FocController`).
-  - `core/platform_abstraction/interfaces/` — Hardware ports in namespace `drivers` (`ThreePhaseInverter`, `Encoder`, `HallSensor`).
-  - `core/foc/selection/`, `core/foc/current_loop/`, `core/foc/speed_loop/` — Runtime-selectable control algorithm sets in the `foc` namespace.
-  - `core/services/` — Application-level services only (alignment, CLI, system identification, NVM).
-  - `core/platform_abstraction/` — Abstract `PlatformFactory` interface and shared adapters.
-  - `core/state_machine/` — `FocStateMachineBase` (interface) and `FocStateMachineCommon` (shared implementation): formal motor lifecycle state machine (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`). Transition mode is the `state_machine::TransitionPolicy` enum (`::Cli` for terminal commands, `::Auto` for direct calls). Uses `std::variant` for states.
-  - `targets/` — Application entry points (`hardware_test`, `sync_foc_sensored`) and platform implementations under `targets/platform_implementations/` (Host, ti, st).
-  - `numerical-toolbox/` — Generic numerical algorithms (PID, filters, fixed-point helpers). Located at `infra/numerical-toolbox/`.
-  - `embedded-infra-lib/` — Infrastructure: bounded containers, build helpers, toolchain cmake pieces. Located at `infra/embedded-infra-lib/`.
-  - `tools/simulator/` — Host simulation models for validation.
-  - `tools/can_commander/` — CAN bus command interface tool.
-
-2) Critical developer workflows (exact commands)
-- Clone (with submodules):
-  - `git clone --recursive <repo>`
-- Configure & build host (recommended first step):
-  - `cmake --preset host`
-  - `cmake --build --preset host-Debug`
-- Run unit tests (GoogleTest):
-  - `ctest --preset host`
-- Build embedded target (example board):
-  - `cmake --preset EK-TM4C1294XL`
-  - `cmake --build --preset EK-TM4C1294XL-Debug`
-- Coverage/analysis presets are defined in `CMakePresets.json` — use `coverage` preset for coverage builds.
-
-3) Project-specific constraints and conventions (must follow these)
-- NO HEAP: avoid `new/delete`, `malloc/free`, `std::make_unique`, etc.
-- NO dynamic STL containers in embedded code: use `infra::BoundedVector`, `infra::BoundedString`, etc. (see `embedded-infra-lib`).
-- Avoid `virtual ~Dtor() = 0` (pure virtual destructors) — they add significant flash/RAM overhead. The default is **no pure virtual destructor**.
-- Prefer fixed-size integer types (`uint8_t`, `int32_t`, ...).
-- Avoid recursion and virtual calls in ISR/hot paths.
-- Favor `constexpr`, `inline`, and `const` correctness for performance.
-- No implementation in headers — only templated classes may have method bodies in `.hpp` files. All other implementation goes in `.cpp` files.
-- Comments must state what the code cannot: a non-obvious *why*, a unit or frame the types do not carry, or a concurrency contract. One short line. No comments that restate the next line, address a reviewer, describe the change, or claim behaviour the code does not implement. No commented-out code, no `TODO`/`FIXME`/`HACK`. Delete or correct any comment your change makes stale.
-
-4) Patterns & code locations (concrete examples)
-- Add a new FOC algorithm:
-  - Implement code in `core/foc/cascade/` and keep public interfaces in `core/foc/interfaces/`. Pure transforms belong in `core/foc/transforms/`, generic numerics in `core/foc/math/`.
-  - Motor-specific application code lives under `targets/sync_foc_sensored/` and `targets/hardware_test/`.
-- State machine: see `core/state_machine/FocStateMachine.hpp` for the `FocStateMachineBase` interface and `core/state_machine/FocStateMachineCommon.hpp` for the shared implementation. Transition mode is the `state_machine::TransitionPolicy` enum (`::Cli` or `::Auto`), declared in `TransitionPolicies.hpp`. `ControlModeStateMachine.cpp` shows how the per-mode machines are wired to hardware.
-- Platform abstraction & factory: see `core/platform_abstraction/PlatformFactory.hpp` for how peripherals and adapters are created and injected.
-- Numerical algorithms: follow patterns in `infra/numerical-toolbox/` — implement float first, then Q15/Q31 variants, and add typed GoogleTest suites.
-
-5) Testing & CI expectations
-- Unit tests run on host using GoogleTest. Use typed tests for multiple numeric types (float, Q15, Q31).
-- Prefer small, deterministic tests that do not require hardware.
-- If adding platform-specific tests, provide host stubs/mocks in `targets/platform_implementations/Host/`.
-- Always use `testing::StrictMock<>` for all mock instances — `NiceMock` and `NaggyMock` are **forbidden**.
-
-6) Build system tips
-- Presets are the primary interface: see `CMakePresets.json` to pick host vs embedded and board presets.
-- Toolchains for embedded boards live under `infra/embedded-infra-lib/cmake/toolchain-*.cmake`.
-- `compile_commands.json` is generated in build dirs; use it for language server/analysis.
-
-7) What to preserve from existing docs
-- There is an existing, detailed guidance file for the numerical toolbox at `infra/numerical-toolbox/.github/copilot-instructions.md` — preserve algorithm-level constraints from there when editing numerical code.
-
-8) When making changes, be explicit
-- Update corresponding `doc/` entries for algorithms and any example in `examples/`.
-- For algorithmic code, include numerical properties (stability, range, complexity) in `doc/`.
-
-9) Quick pointers for reviewers / code suggestions
-- If suggesting new APIs, prefer interface-driven DI and small, testable functions.
-- For performance changes, provide before/after size/runtime metrics and ensure host tests cover correctness.
-
-10) Performance optimization
-- For performance-critical code (FOC, PID, ISRs), see `documentation/performance-optimization/README.md`.
-- Key techniques: avoid virtual dispatch in hot paths, use `#pragma GCC optimize("O3", "fast-math")` for critical files, prefer static inline functions over virtual methods.
-- Debug builds use `-Og` to maintain debuggability while enabling basic optimizations.
-- Use `arm-none-eabi-objdump -d -C` to analyze generated assembly and verify optimizations.
-- Target cycle budgets: the 20 kHz ISR path must stay within 4500 cycles at 120 MHz (75% of the 6000-cycle control period). CI measures the inner and outer loops separately via `targets/sync_foc_sensored/main/cycle-analysis.json` (20 kHz) and `cycle-analysis-outer.json` (1 kHz).
-
-If any section appears incomplete or you want deeper coverage (build-on-target, hardware flashing steps, or CI specifics), tell me which area to expand.
+Essentials (full detail in AGENTS.md):
+- **No heap** — bounded containers / `std::array` / `std::optional`; no recursion; no `virtual ~D() = 0`; tests too. Scope: `core/foc/`, `core/platform_abstraction/`, `core/state_machine/`, `targets/`, ISR paths.
+- **Real-time** — `Calculate()` at 20 kHz; ≤4500 cycles at 120 MHz. No virtual dispatch, no heap, no blocking, no raw `sin`/`cos` in hot path. `#pragma GCC optimize("O3","fast-math")` + `OPTIMIZE_FOR_SPEED`.
+- **FOC theory** — Clarke/Park/SVM from `core/foc/transforms/`; reuse, don't reimplement. Anti-windup on all PIDs. Unit types: `Ampere`, `Radians`, `Volts`, `RevPerMinute`.
+- **Style** — Allman braces, 4-space, `{}` init, PascalCase types/methods, camelCase members. No comments except non-obvious *why*.
+- **Tests** — `TEST_F`, `StrictMock` only, `EXPECT_NEAR`, no heap. `NiceMock`/`NaggyMock` forbidden.
+- **No exceptions** — `std::optional`/status enums; interfaces `virtual ~I() = default`.
+- **Docs-first** — update `documentation/` before/alongside behavioral changes. Mermaid/ASCII only.
+- **Be terse** — minimal prose; report file paths + pass/fail.
