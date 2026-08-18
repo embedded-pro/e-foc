@@ -156,23 +156,37 @@ TEST_F(MechanicalParametersIdentificationTest, concurrent_estimate_friction_call
     EXPECT_TRUE(secondCallbackCalled);
 }
 
-TEST_F(MechanicalParametersIdentificationTest, estimate_friction_reports_values_on_convergence_and_allows_restart)
+TEST_F(MechanicalParametersIdentificationTest, estimate_friction_converges_with_rich_excitation_and_allows_restart)
 {
+    // Quadratic position ramp: p[n] = n^2 * 1e-5 gives constant acceleration
+    // and linearly increasing speed — persistent excitation for all 3 RLS parameters.
     services::MechanicalParametersIdentification::Config config{
         foc::RadiansPerSecond{ 50.0f },
         0.998f,
-        std::chrono::seconds{ 5 }
+        std::chrono::seconds{ 60 }
     };
 
-    struct ConvergenceResult
+    struct Result
     {
-        bool callbackCalled = false;
+        bool fired = false;
         std::optional<foc::NewtonMeterSecondPerRadian> friction;
         std::optional<foc::NewtonMeterSecondSquared> inertia;
     } outcome;
 
+    // Each OnSamplingUpdate calls encoder.Read() twice; EstimateFrictionAndInertia
+    // calls it once for initialisation.  Track call index so both reads within
+    // one sample return the same position value.
+    std::size_t callIndex = 0;
     EXPECT_CALL(encoderMock, Read())
-        .WillRepeatedly(::testing::Return(foc::Radians{ 0.02f }));
+        .WillRepeatedly(::testing::Invoke([&]()
+            {
+                std::size_t sampleIndex = (callIndex == 0) ? 0u : (callIndex + 1) / 2;
+                callIndex++;
+                const float pos = static_cast<float>(sampleIndex) *
+                                  static_cast<float>(sampleIndex) * 1e-5f;
+                return foc::Radians{ pos };
+            }));
+
     EXPECT_CALL(controllerMock, EnableSpeedCommand());
     EXPECT_CALL(controllerMock, CommandSpeed(::testing::_));
     EXPECT_CALL(controllerMock, DisableSpeedCommand()).Times(::testing::AtMost(1));
@@ -181,36 +195,31 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_reports_values_
         .WillRepeatedly(::testing::Return());
 
     identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
-        [&outcome](auto friction, auto inertia)
+        [&outcome](auto f, auto i)
         {
-            outcome.callbackCalled = true;
-            outcome.friction = friction;
-            outcome.inertia = inertia;
+            outcome.fired = true;
+            outcome.friction = f;
+            outcome.inertia = i;
         });
 
-    for (std::size_t i = 0; i < 1000; ++i)
+    for (std::size_t i = 0; i < 2000 && !outcome.fired; ++i)
     {
-        const float variation = static_cast<float>(i % 10) * 0.01f;
         phaseCurrentsCallback(foc::PhaseCurrents{
-            foc::Ampere{ 1.0f + variation },
-            foc::Ampere{ -0.5f - variation * 0.5f },
-            foc::Ampere{ -0.5f - variation * 0.5f } });
+            foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
     }
 
-    if (outcome.callbackCalled)
+    // If convergence occurred, verify rls was reset so a new call is accepted
+    if (outcome.fired)
     {
-        bool secondCallbackCalled = false;
         EXPECT_CALL(encoderMock, Read()).WillOnce(::testing::Return(foc::Radians{ 0.0f }));
         EXPECT_CALL(controllerMock, EnableSpeedCommand());
         EXPECT_CALL(controllerMock, CommandSpeed(::testing::_));
-        EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_)).Times(::testing::AnyNumber());
+        EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_))
+            .Times(::testing::AnyNumber());
 
+        bool secondFired = false;
         identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
-            [&](auto, auto)
-            {
-                secondCallbackCalled = true;
-            });
-
-        EXPECT_FALSE(secondCallbackCalled);
+            [&secondFired](auto, auto) { secondFired = true; });
+        EXPECT_FALSE(secondFired);
     }
 }

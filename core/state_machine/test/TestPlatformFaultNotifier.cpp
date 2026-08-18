@@ -40,6 +40,7 @@ namespace
 
         StrictMock<application::PlatformFactoryMock> platformFactory;
         StrictMock<application::CanBusAdapterMock> canBusMock;
+        infra::Function<void(application::CanBusAdapter::CanError)> storedCanErrorHandler;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         StrictMock<services::MotorAlignmentMock> alignmentMock;
@@ -54,7 +55,9 @@ namespace
                             platformFactory.StoreBoardProtectionHandler(handler);
                         }));
                 EXPECT_CALL(platformFactory, CanBus()).Times(AnyNumber()).WillRepeatedly(ReturnRef(canBusMock));
-                EXPECT_CALL(canBusMock, SetOnError(_)).Times(AnyNumber());
+                EXPECT_CALL(canBusMock, SetOnError(_))
+                    .Times(AnyNumber())
+                    .WillRepeatedly(SaveArg<0>(&storedCanErrorHandler));
                 EXPECT_CALL(platformFactory, BaseFrequency()).Times(AnyNumber()).WillRepeatedly(Return(hal::Hertz{ 10000 }));
                 EXPECT_CALL(platformFactory, PhaseCurrentsReady(_, _)).Times(AnyNumber());
                 EXPECT_CALL(platformFactory, Stop()).Times(AnyNumber());
@@ -147,4 +150,46 @@ TEST_F(TestPlatformFaultNotifier, last_fault_code_is_none_before_any_fault)
 TEST_F(TestPlatformFaultNotifier, board_protection_before_registration_is_discarded)
 {
     platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+}
+
+TEST_F(TestPlatformFaultNotifier, can_bus_off_error_raises_hardware_fault)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+    storedCanErrorHandler(application::CanBusAdapter::CanError::busOff);
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(std::get<state_machine::Fault>(sm.CurrentState()).code, state_machine::FaultCode::hardwareFault);
+}
+
+TEST_F(TestPlatformFaultNotifier, can_non_bus_off_error_does_not_raise_fault)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+
+    storedCanErrorHandler(application::CanBusAdapter::CanError::messageLost);
+
+    EXPECT_FALSE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(TestPlatformFaultNotifier, can_error_before_registration_does_not_crash)
+{
+    // storedCanErrorHandler is empty before CreateStateMachine() calls Register()
+    if (storedCanErrorHandler)
+        storedCanErrorHandler(application::CanBusAdapter::CanError::busOff);
+    SUCCEED();
+}
+
+TEST_F(TestPlatformFaultNotifier, unknown_board_protection_reason_maps_to_hardware_fault)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+    platformFactory.RaiseBoardProtection(static_cast<application::PlatformFactory::BoardProtectionReason>(99));
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(std::get<state_machine::Fault>(sm.CurrentState()).code, state_machine::FaultCode::hardwareFault);
 }

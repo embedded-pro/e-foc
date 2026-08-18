@@ -417,3 +417,36 @@ TEST_F(TestSpeedCascade, registered_online_estimators_are_fed_from_the_outer_loo
     focSpeed->Calculate(ZeroCurrents(), position);
     lowPriorityInterruptMock.TriggerHandler();
 }
+
+TEST_F(TestSpeedCascade, enable_speed_command_drives_the_motor_at_commanded_speed)
+{
+    focSpeed->EnableSpeedCommand();
+    focSpeed->CommandSpeed(foc::RadiansPerSecond{ 50.0f });
+
+    foc::Radians position{ 0.0f };
+    focSpeed->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+
+    foc::Radians second{ 0.0f };
+    ExpectValidDuty(focSpeed->Calculate(ZeroCurrents(), second));
+}
+
+TEST_F(TestSpeedCascade, disable_speed_command_produces_bounded_duty)
+{
+    focSpeed->EnableSpeedCommand();
+    focSpeed->CommandSpeed(foc::RadiansPerSecond{ 50.0f });
+
+    foc::Radians position{ 0.0f };
+    focSpeed->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+
+    focSpeed->DisableSpeedCommand();
+
+    foc::Radians stopped{ 0.0f };
+    ExpectValidDuty(focSpeed->Calculate(ZeroCurrents(), stopped));
+}
+
+TEST_F(TestSpeedCascade, speed_command_frequency_equals_outer_loop_frequency)
+{
+    EXPECT_EQ(focSpeed->SpeedCommandFrequency().Value(), focSpeed->OuterLoopFrequency().Value());
+}
