@@ -32,7 +32,16 @@ namespace application
         static hal::tiva::GpioPin pwmPhase3a{ hal::tiva::Port::E, 4 };
         static hal::tiva::GpioPin pwmPhase3b{ hal::tiva::Port::E, 5 };
 
-        static hal::tiva::GpioPin led1{ hal::tiva::Port::F, 1 };
+        static hal::tiva::GpioPin operationalLed{ hal::tiva::Port::F, 1 };
+        static hal::tiva::GpioPin warningLed{ hal::tiva::Port::F, 1 };
+        static hal::tiva::GpioPin failureLed{ hal::tiva::Port::F, 1 };
+
+        // Placeholders — this board has no CAN node ID straps or power-good signal.
+        // hasBoardIdPins=false / hasPowerStatusPin=false prevents these from being read.
+        static hal::tiva::GpioPin boardId0{ hal::tiva::Port::D, 0 };
+        static hal::tiva::GpioPin boardId1{ hal::tiva::Port::D, 1 };
+        static hal::tiva::GpioPin boardId2{ hal::tiva::Port::D, 2 };
+        static hal::tiva::GpioPin powerStatus{ hal::tiva::Port::D, 4 };
 
         static hal::tiva::GpioPin uartTx{ hal::tiva::Port::A, 0 };
         static hal::tiva::GpioPin uartRx{ hal::tiva::Port::A, 1 };
@@ -56,6 +65,8 @@ namespace application
 
         // Fault comparator support is not available on EK-TM4C123GXL.
         constexpr static bool hasFaultComparators{ false };
+        constexpr static bool hasBoardIdPins{ false };
+        constexpr static bool hasPowerStatusPin{ false };
         constexpr static uint8_t OvercurrentComparatorIndex{ 0 };
         constexpr static uint8_t OvervoltageComparatorIndex{ 1 };
         constexpr static float adcReferenceVoltage{ 3.3f };
