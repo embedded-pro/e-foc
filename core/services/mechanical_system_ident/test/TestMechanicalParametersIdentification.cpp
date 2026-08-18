@@ -101,7 +101,6 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_timeout_calls_d
         std::chrono::milliseconds{ 500 }
     };
 
-    // Use a sentinel value (has_value()==true) so we can detect whether the callback was called.
     std::optional<foc::NewtonMeterSecondPerRadian> resultFriction = foc::NewtonMeterSecondPerRadian{ 99.0f };
     std::optional<foc::NewtonMeterSecondSquared> resultInertia = foc::NewtonMeterSecondSquared{ 99.0f };
 
@@ -140,9 +139,11 @@ TEST_F(MechanicalParametersIdentificationTest, concurrent_estimate_friction_call
     EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_)).Times(::testing::AnyNumber());
 
     identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
-        [&](auto, auto) { firstCallbackCalled = true; });
+        [&](auto, auto)
+        {
+            firstCallbackCalled = true;
+        });
 
-    // Second call while first is running — must be rejected immediately
     identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
         [&](auto friction, auto inertia)
         {
@@ -163,7 +164,6 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_reports_values_
         std::chrono::seconds{ 5 }
     };
 
-    // Aggregate the callback outputs in one capture so the lambda fits infra::Function storage.
     struct ConvergenceResult
     {
         bool callbackCalled = false;
@@ -188,7 +188,6 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_reports_values_
             outcome.inertia = inertia;
         });
 
-    // Send enough samples to converge — vary current slightly to build the RLS regressor
     for (std::size_t i = 0; i < 1000; ++i)
     {
         const float variation = static_cast<float>(i % 10) * 0.01f;
@@ -198,10 +197,8 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_reports_values_
             foc::Ampere{ -0.5f - variation * 0.5f } });
     }
 
-    // If convergence happened, callback should have been called with values and rls reset
     if (outcome.callbackCalled)
     {
-        // After convergence rls is reset — a new call should be accepted (not re-entrancy rejected)
         bool secondCallbackCalled = false;
         EXPECT_CALL(encoderMock, Read()).WillOnce(::testing::Return(foc::Radians{ 0.0f }));
         EXPECT_CALL(controllerMock, EnableSpeedCommand());
@@ -209,7 +206,10 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_reports_values_
         EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_)).Times(::testing::AnyNumber());
 
         identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
-            [&](auto, auto) { secondCallbackCalled = true; });
+            [&](auto, auto)
+            {
+                secondCallbackCalled = true;
+            });
 
         EXPECT_FALSE(secondCallbackCalled);
     }
