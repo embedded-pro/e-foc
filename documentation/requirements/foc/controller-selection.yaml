@@ -97,7 +97,7 @@
   title: Mechanical parameter availability guard
   shall: >
     Selection of any speed or position algorithm that requires mechanical parameters
-    (LQI, ADRC, LQR for speed; LQR, LQI for position) shall be rejected with an
+    (LQI, ADRC for speed; LQR, LQI for position) shall be rejected with an
     InvalidParameters result code if the mechanical RLS identification has not been
     completed and valid estimates of J and Bf are not available. PID, Two-DOF and
     Cascade P do not require mechanical RLS and shall remain selectable before

@@ -537,7 +537,7 @@ TEST_F(NonVolatileMemoryTest, load_config_returns_defaults_on_crc_corruption)
     ExpectConfigDataEqual(loaded, defaults);
 }
 
-TEST_F(NonVolatileMemoryTest, save_calibration_write_verify_failure_returns_write_failed)
+TEST_F(NonVolatileMemoryTest, save_calibration_write_verify_failure_returns_hardware_fault)
 {
     // Override Read to return corrupted data so the readback comparison fails.
     struct CorruptingRegion
@@ -592,10 +592,10 @@ TEST_F(NonVolatileMemoryTest, save_calibration_write_verify_failure_returns_writ
         });
 
     RunUntilDone(done);
-    EXPECT_EQ(result, services::NvmStatus::WriteFailed);
+    EXPECT_EQ(result, services::NvmStatus::HardwareFault);
 }
 
-TEST_F(NonVolatileMemoryTest, save_config_write_verify_failure_returns_write_failed)
+TEST_F(NonVolatileMemoryTest, save_config_write_verify_failure_returns_hardware_fault)
 {
     struct CorruptingRegion
         : public services::NvmRegion
@@ -646,7 +646,7 @@ TEST_F(NonVolatileMemoryTest, save_config_write_verify_failure_returns_write_fai
         });
 
     RunUntilDone(done);
-    EXPECT_EQ(result, services::NvmStatus::WriteFailed);
+    EXPECT_EQ(result, services::NvmStatus::HardwareFault);
 }
 
 TEST_F(NonVolatileMemoryTest, concurrent_save_calibration_second_call_is_rejected)

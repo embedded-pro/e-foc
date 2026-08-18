@@ -20,6 +20,7 @@ namespace state_machine
     class FaultNotifier
     {
     public:
+        virtual ~FaultNotifier() = default;
         virtual void Register(const infra::Function<void(FaultCode)>& onFault) = 0;
     };
 

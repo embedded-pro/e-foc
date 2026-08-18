@@ -1,3 +1,4 @@
+#include "core/platform_abstraction/test_doubles/CanBusAdapterMock.hpp"
 #include "core/platform_abstraction/test_doubles/PlatformFactoryMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
@@ -38,6 +39,7 @@ namespace
         services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
 
         StrictMock<application::PlatformFactoryMock> platformFactory;
+        StrictMock<application::CanBusAdapterMock> canBusMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         StrictMock<services::MotorAlignmentMock> alignmentMock;
@@ -51,6 +53,8 @@ namespace
                         {
                             platformFactory.StoreBoardProtectionHandler(handler);
                         }));
+                EXPECT_CALL(platformFactory, CanBus()).Times(AnyNumber()).WillRepeatedly(ReturnRef(canBusMock));
+                EXPECT_CALL(canBusMock, SetOnError(_)).Times(AnyNumber());
                 EXPECT_CALL(platformFactory, BaseFrequency()).Times(AnyNumber()).WillRepeatedly(Return(hal::Hertz{ 10000 }));
                 EXPECT_CALL(platformFactory, PhaseCurrentsReady(_, _)).Times(AnyNumber());
                 EXPECT_CALL(platformFactory, Stop()).Times(AnyNumber());

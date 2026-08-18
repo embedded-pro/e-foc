@@ -122,7 +122,7 @@ namespace services
         if (calibrationBuffer == calibrationReadBackBuffer)
             CompleteCalibration(NvmStatus::Ok);
         else
-            CompleteCalibration(NvmStatus::WriteFailed);
+            CompleteCalibration(NvmStatus::HardwareFault);
     }
 
     void NonVolatileMemoryImpl::LoadCalibration(CalibrationData& data,
@@ -154,12 +154,14 @@ namespace services
 
         if (record.magic != CalibrationMagic)
         {
+            *pendingCalibrationOutput = CalibrationData{};
             CompleteCalibration(NvmStatus::InvalidData);
             return;
         }
 
         if (record.version != CalibrationLayoutVersion)
         {
+            *pendingCalibrationOutput = CalibrationData{};
             CompleteCalibration(NvmStatus::VersionMismatch);
             return;
         }
@@ -167,6 +169,7 @@ namespace services
         const uint32_t computed = ComputeCrc(infra::MakeConstByteRange(record.data));
         if (computed != record.crc32)
         {
+            *pendingCalibrationOutput = CalibrationData{};
             CompleteCalibration(NvmStatus::InvalidData);
             return;
         }
@@ -282,7 +285,7 @@ namespace services
         if (configBuffer == configReadBackBuffer)
             CompleteConfig(NvmStatus::Ok);
         else
-            CompleteConfig(NvmStatus::WriteFailed);
+            CompleteConfig(NvmStatus::HardwareFault);
     }
 
     void NonVolatileMemoryImpl::LoadConfig(ConfigData& data,

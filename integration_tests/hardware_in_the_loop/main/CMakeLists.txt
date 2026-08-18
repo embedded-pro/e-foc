@@ -16,3 +16,6 @@ target_link_libraries(e_foc.hil_tests PRIVATE
     e_foc.hil_tests.support
     cucumber_cpp
 )
+
+add_test(NAME e_foc.hil_tests COMMAND e_foc.hil_tests)
+set_tests_properties(e_foc.hil_tests PROPERTIES LABELS hardware)

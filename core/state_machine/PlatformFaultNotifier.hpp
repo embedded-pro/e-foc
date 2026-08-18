@@ -16,6 +16,7 @@ namespace state_machine
     private:
         static FaultCode ToFaultCode(application::PlatformFactory::BoardProtectionReason reason);
 
+        application::PlatformFactory& platform;
         infra::Function<void(FaultCode)> onFault;
     };
 }

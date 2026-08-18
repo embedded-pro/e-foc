@@ -22,6 +22,11 @@ namespace services
 
     void MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone)
     {
+        if (rls.has_value())
+        {
+            onDone(std::nullopt, std::nullopt);
+            return;
+        }
         this->currentConfig = config;
         this->onDone = onDone;
         this->previousPosition = encoder.Read().Value();
@@ -42,6 +47,7 @@ namespace services
             {
                 driver.PhaseCurrentsReady(driver.BaseFrequency(), [](auto) {});
                 controller.DisableSpeedCommand();
+                rls.reset();
                 this->onDone(std::nullopt, std::nullopt);
             });
     }
@@ -66,9 +72,10 @@ namespace services
             controller.DisableSpeedCommand();
 
             auto& theta = rls->Coefficients();
-            onDone(
-                foc::NewtonMeterSecondPerRadian{ theta.at(2, 0) },
-                foc::NewtonMeterSecondSquared{ theta.at(1, 0) });
+            const auto friction = foc::NewtonMeterSecondPerRadian{ theta.at(2, 0) };
+            const auto inertia = foc::NewtonMeterSecondSquared{ theta.at(1, 0) };
+            rls.reset();
+            onDone(friction, inertia);
         }
 
         previousPosition = mechanicalPos;

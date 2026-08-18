@@ -290,7 +290,12 @@
             "name": "host",
             "configurePreset": "host",
             "configuration": "Debug",
-            "inherits": "defaults"
+            "inherits": "defaults",
+            "filter": {
+                "exclude": {
+                    "label": "integration|hardware"
+                }
+            }
         },
         {
             "name": "coverage",

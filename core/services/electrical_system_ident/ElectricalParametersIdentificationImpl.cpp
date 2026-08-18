@@ -82,6 +82,12 @@ namespace services
 
     void ElectricalParametersIdentificationImpl::EstimateResistanceAndInductance(const ResistanceAndInductanceConfig& config, const infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)>& onDone)
     {
+        if (rlRunning)
+        {
+            onDone(std::nullopt, std::nullopt);
+            return;
+        }
+        rlRunning = true;
         resistanceAndInductanceConfig = config;
         onResistanceAndInductanceDone = onDone;
         currentSamples.clear();
@@ -120,7 +126,10 @@ namespace services
         auto steadyStateCurrent = GetSteadyStateCurrent(filteredCurrentSample);
 
         if (steadyStateCurrent <= 0.0f)
+        {
+            rlRunning = false;
             onResistanceAndInductanceDone(std::nullopt, std::nullopt);
+        }
         else
         {
             auto tau = GetTauFromCurrentSamples(filteredCurrentSample, steadyStateCurrent, averageFilter);
@@ -129,8 +138,10 @@ namespace services
             auto terminalResistance = CalculateResistance(appliedDuty * vdc.Value() / 100.0f, steadyStateCurrent);
             auto resistance = terminalResistance.has_value() ? std::optional<foc::Ohm>{ foc::Ohm{ terminalResistance->Value() / terminalFactor } } : std::nullopt;
 
-            if (resistance.has_value() && tau.has_value())
-                onResistanceAndInductanceDone(resistance, CalculateInductance(resistance.value(), tau.value_or(0.0f)));
+            rlRunning = false;
+            if (resistance.has_value())
+                onResistanceAndInductanceDone(resistance,
+                    tau.has_value() ? CalculateInductance(resistance.value(), tau.value()) : std::optional<foc::MilliHenry>{});
             else
                 onResistanceAndInductanceDone(std::nullopt, std::nullopt);
 
@@ -140,6 +151,12 @@ namespace services
 
     void ElectricalParametersIdentificationImpl::EstimateNumberOfPolePairs(const PolePairsConfig& config, const infra::Function<void(std::optional<std::size_t>)>& onDone)
     {
+        if (polePairsRunning)
+        {
+            onDone(std::nullopt);
+            return;
+        }
+        polePairsRunning = true;
         polePairsConfig = config;
         onPolePairsDone = onDone;
         currentSampleIndex = 0;
@@ -191,6 +208,7 @@ namespace services
         if (onPolePairsDone)
         {
             auto mechanicalRotation = std::abs(accumulatedRotation);
+            polePairsRunning = false;
 
             if (mechanicalRotation > minRotationThreshold)
             {

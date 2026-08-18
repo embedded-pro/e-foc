@@ -10,7 +10,7 @@ namespace integration
     {
         EXPECT_CALL(platformFactory, PhaseCurrentsReady(_, _)).Times(AnyNumber());
         EXPECT_CALL(platformFactory, ThreePhasePwmOutput(_)).Times(AnyNumber());
-        EXPECT_CALL(platformFactory, BaseFrequency()).Times(AnyNumber()).WillRepeatedly(Return(hal::Hertz{ 10000 }));
+        EXPECT_CALL(platformFactory, BaseFrequency()).Times(AnyNumber()).WillRepeatedly(Return(hal::Hertz{ 20000 }));
         EXPECT_CALL(platformFactory, Start()).Times(AnyNumber());
         EXPECT_CALL(platformFactory, Stop()).Times(AnyNumber());
         EXPECT_CALL(platformFactory, Read()).Times(AnyNumber()).WillRepeatedly(Return(foc::Radians{ 0.0f }));

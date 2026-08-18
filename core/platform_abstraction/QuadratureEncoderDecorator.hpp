@@ -2,6 +2,7 @@
 
 #include "core/foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousQuadratureEncoder.hpp"
+#include "numerical/math/CompilerOptimizations.hpp"
 #include <cmath>
 #include <numbers>
 
@@ -40,7 +41,7 @@ namespace application
 
     template<typename Impl>
     requires std::derived_from<Impl, hal::SynchronousQuadratureEncoder>
-    foc::Radians QuadratureEncoderDecoratorImpl<Impl>::Read()
+    OPTIMIZE_FOR_SPEED foc::Radians QuadratureEncoderDecoratorImpl<Impl>::Read()
     {
         static constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
         static constexpr float pi = std::numbers::pi_v<float>;

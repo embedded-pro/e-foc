@@ -10,3 +10,4 @@ target_link_libraries(e_foc.integration_tests PRIVATE
 
 add_test(NAME e_foc.integration_tests
     COMMAND e_foc.integration_tests -- ${CMAKE_CURRENT_SOURCE_DIR}/../features)
+set_tests_properties(e_foc.integration_tests PROPERTIES LABELS integration)
