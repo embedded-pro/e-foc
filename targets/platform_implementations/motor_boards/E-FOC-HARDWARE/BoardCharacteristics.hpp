@@ -4,17 +4,12 @@
 
 namespace application
 {
-    // E-FOC-HARDWARE custom motor control board.
-    // Analog front-end values are identical to FRDM-MC-LVPMSM (same voltage divider ratio and
-    // current sensor gain). Verified correct as initial bring-up defaults; update when schematic differs.
     struct BoardCharacteristics
     {
         static constexpr float voltageToVolts{ 21.25f };
         static constexpr float overvoltageThresholdVolts{ 58.0f };
 
         static constexpr float voltageToCurrent{ 5.0f };
-        // maxCurrentAmps is the ADC/comparator full-scale (denominator of the overcurrent threshold);
-        // ratedCurrentAmps is the usable limit reported to the application.
         static constexpr float maxCurrentAmps{ 15.0f };
         static constexpr float ratedCurrentAmps{ 3.0f };
         static constexpr float overcurrentThresholdAmps{ 12.0f };
