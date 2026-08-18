@@ -51,7 +51,7 @@ The service manages two independent EEPROM regions. Each region holds exactly on
 
 | Region        | Magic        | Data structure    | Data size |
 |---------------|--------------|-------------------|-----------|
-| Calibration   | `0xCAFEF00D` | `CalibrationData` | 52 bytes  |
+| Calibration   | `0xCAFEF00D` | `CalibrationData` | 56 bytes  |
 | Configuration | `0xDEADBEEF` | `ConfigData`      | 20 bytes  |
 
 The two regions use different `NvmRegion` instances (injected at construction) and can be read, written, and erased independently. An operation on the calibration region has no effect on the configuration region and vice versa.

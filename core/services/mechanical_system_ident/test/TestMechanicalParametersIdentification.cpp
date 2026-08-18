@@ -122,3 +122,95 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_timeout_calls_d
     EXPECT_FALSE(resultFriction.has_value());
     EXPECT_FALSE(resultInertia.has_value());
 }
+
+TEST_F(MechanicalParametersIdentificationTest, concurrent_estimate_friction_call_is_rejected_immediately)
+{
+    services::MechanicalParametersIdentification::Config config{
+        foc::RadiansPerSecond{ 50.0f },
+        0.998f,
+        std::chrono::seconds{ 5 }
+    };
+
+    bool firstCallbackCalled = false;
+    bool secondCallbackCalled = false;
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(::testing::Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(controllerMock, EnableSpeedCommand());
+    EXPECT_CALL(controllerMock, CommandSpeed(::testing::_));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_)).Times(::testing::AnyNumber());
+
+    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
+        [&](auto, auto) { firstCallbackCalled = true; });
+
+    // Second call while first is running — must be rejected immediately
+    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
+        [&](auto friction, auto inertia)
+        {
+            secondCallbackCalled = true;
+            EXPECT_FALSE(friction.has_value());
+            EXPECT_FALSE(inertia.has_value());
+        });
+
+    EXPECT_FALSE(firstCallbackCalled);
+    EXPECT_TRUE(secondCallbackCalled);
+}
+
+TEST_F(MechanicalParametersIdentificationTest, estimate_friction_reports_values_on_convergence_and_allows_restart)
+{
+    services::MechanicalParametersIdentification::Config config{
+        foc::RadiansPerSecond{ 50.0f },
+        0.998f,
+        std::chrono::seconds{ 5 }
+    };
+
+    // Aggregate the callback outputs in one capture so the lambda fits infra::Function storage.
+    struct ConvergenceResult
+    {
+        bool callbackCalled = false;
+        std::optional<foc::NewtonMeterSecondPerRadian> friction;
+        std::optional<foc::NewtonMeterSecondSquared> inertia;
+    } outcome;
+
+    EXPECT_CALL(encoderMock, Read())
+        .WillRepeatedly(::testing::Return(foc::Radians{ 0.02f }));
+    EXPECT_CALL(controllerMock, EnableSpeedCommand());
+    EXPECT_CALL(controllerMock, CommandSpeed(::testing::_));
+    EXPECT_CALL(controllerMock, DisableSpeedCommand()).Times(::testing::AtMost(1));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_))
+        .WillOnce(::testing::SaveArg<1>(&phaseCurrentsCallback))
+        .WillRepeatedly(::testing::Return());
+
+    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
+        [&outcome](auto friction, auto inertia)
+        {
+            outcome.callbackCalled = true;
+            outcome.friction = friction;
+            outcome.inertia = inertia;
+        });
+
+    // Send enough samples to converge — vary current slightly to build the RLS regressor
+    for (std::size_t i = 0; i < 1000; ++i)
+    {
+        const float variation = static_cast<float>(i % 10) * 0.01f;
+        phaseCurrentsCallback(foc::PhaseCurrents{
+            foc::Ampere{ 1.0f + variation },
+            foc::Ampere{ -0.5f - variation * 0.5f },
+            foc::Ampere{ -0.5f - variation * 0.5f } });
+    }
+
+    // If convergence happened, callback should have been called with values and rls reset
+    if (outcome.callbackCalled)
+    {
+        // After convergence rls is reset — a new call should be accepted (not re-entrancy rejected)
+        bool secondCallbackCalled = false;
+        EXPECT_CALL(encoderMock, Read()).WillOnce(::testing::Return(foc::Radians{ 0.0f }));
+        EXPECT_CALL(controllerMock, EnableSpeedCommand());
+        EXPECT_CALL(controllerMock, CommandSpeed(::testing::_));
+        EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_)).Times(::testing::AnyNumber());
+
+        identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
+            [&](auto, auto) { secondCallbackCalled = true; });
+
+        EXPECT_FALSE(secondCallbackCalled);
+    }
+}

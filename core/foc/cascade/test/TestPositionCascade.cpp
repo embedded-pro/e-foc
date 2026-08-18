@@ -508,3 +508,69 @@ TEST_F(TestPositionCascade, the_position_loop_receives_the_effective_current_env
     EXPECT_EQ(cascade.cascade->SelectPositionAlgorithm(foc::PositionAlgorithm::lqr), foc::SelectResult::ok);
     ExpectOffCentreDuty(DutyAfterOuterCycles(cascade, observableError, 0.0f));
 }
+
+TEST_F(TestPositionCascade, speed_command_frequency_equals_outer_loop_frequency)
+{
+    EXPECT_EQ(focPosition->SpeedCommandFrequency().Value(), lowPriorityFrequency.Value());
+}
+
+TEST_F(TestPositionCascade, enable_speed_command_allows_direct_speed_reference_bypass)
+{
+    focPosition->EnableSpeedCommand();
+    focPosition->CommandSpeed(foc::RadiansPerSecond{ 50.0f });
+
+    foc::Radians position{ 0.0f };
+    focPosition->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+
+    foc::Radians secondPosition{ 0.0f };
+    auto result = focPosition->Calculate(ZeroCurrents(), secondPosition);
+
+    ExpectValidDuty(result);
+}
+
+TEST_F(TestPositionCascade, disable_speed_command_restores_normal_position_control)
+{
+    focPosition->EnableSpeedCommand();
+    focPosition->CommandSpeed(foc::RadiansPerSecond{ 50.0f });
+
+    foc::Radians runPosition{ 0.0f };
+    focPosition->Calculate(ZeroCurrents(), runPosition);
+    lowPriorityInterruptMock.TriggerHandler();
+
+    focPosition->DisableSpeedCommand();
+
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 0.0f });
+
+    foc::Radians centredPosition{ 0.0f };
+    auto result = focPosition->Calculate(ZeroCurrents(), centredPosition);
+
+    ExpectValidDuty(result);
+}
+
+TEST_F(TestPositionCascade, speed_command_produces_non_centred_duty_at_nonzero_speed)
+{
+    focPosition->EnableSpeedCommand();
+    focPosition->CommandSpeed(foc::RadiansPerSecond{ 50.0f });
+
+    foc::Radians position{ 0.0f };
+    focPosition->Calculate(ZeroCurrents(), position);
+    lowPriorityInterruptMock.TriggerHandler();
+
+    foc::Radians second{ 0.0f };
+    auto withSpeed = focPosition->Calculate(ZeroCurrents(), second);
+
+    focPosition->DisableSpeedCommand();
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 0.0f });
+
+    foc::Radians third{ 0.0f };
+    focPosition->Calculate(ZeroCurrents(), third);
+    lowPriorityInterruptMock.TriggerHandler();
+
+    foc::Radians fourth{ 0.0f };
+    auto atTarget = focPosition->Calculate(ZeroCurrents(), fourth);
+
+    EXPECT_TRUE(DutiesDiffer(withSpeed, atTarget));
+}

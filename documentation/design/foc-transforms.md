@@ -116,7 +116,7 @@ The caller is responsible for supplying the correct θe.
 The ClarkePark composite combines the forward Clarke and forward Park transforms (or their inverses) into a single operation. The motivation is efficiency: cos(θe) and sin(θe) are computed exactly once and reused for both the Park rotation in the forward direction and the inverse Park rotation.
 
 The forward composite takes (Ia, Ib, θe) and produces (Id, Iq) directly.  
-The inverse composite takes (Vd, Vq, θe) and produces (Vα, Vβ) directly.
+The inverse composite takes (Vd, Vq, θe), performs inverse Park to (Vα, Vβ), then inverse Clarke to (Va, Vb, Vc), producing all three phase voltages in one call.
 
 This is the form used by all inner-control-loop implementations in this project.
 
@@ -176,12 +176,12 @@ Direct hardware transcendental functions (`sin`, `cos`) introduce variable laten
 
 | Interface                        | Purpose                                       | Contract                                                                                                                                       |
 |----------------------------------|-----------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
-| Clarke — Forward                 | Converts (Ia, Ib) to (Iα, Iβ)                 | Ic is derived internally; inputs must satisfy the balanced-phase assumption. Output is immediately valid.                                      |
+| Clarke — Forward                 | Converts (Ia, Ib, Ic) to (Iα, Iβ)             | All three phase currents are measured; no phase is reconstructed. The amplitude-invariant form remains valid for unbalanced phases.            |
 | Clarke — Inverse                 | Converts (Vα, Vβ) to (Va, Vb, Vc)             | Produces all three phase voltages. The sum of outputs is zero.                                                                                 |
 | Park — Forward                   | Converts (Iα, Iβ, θe) to (Id, Iq)             | Caller supplies pre-computed or LUT-evaluated cos(θe) and sin(θe). Stateless.                                                                  |
 | Park — Inverse                   | Converts (Vd, Vq, θe) to (Vα, Vβ)             | Uses the same θe as the forward Park in the same control cycle.                                                                                |
 | ClarkePark — Forward             | Converts (Ia, Ib, θe) to (Id, Iq) in one call | Computes cos/sin once; result is identical to chaining Clarke then Park separately.                                                            |
-| ClarkePark — Inverse             | Converts (Vd, Vq, θe) to (Vα, Vβ) in one call | Computes cos/sin once; result is identical to chaining inverse Park then inverse Clarke separately.                                            |
+| ClarkePark — Inverse             | Converts (Vd, Vq, θe) to (Va, Vb, Vc) in one call | Chains inverse Park → inverse Clarke; computes cos/sin once. Output is three phase voltages, not (Vα, Vβ).                               |
 | SpaceVectorModulation — Generate | Converts (Vα, Vβ) to three duty cycles        | Inputs must be per-unit relative to `V_dc/√3`. Outputs are always in [0.0, 1.0]. Common-mode injection is internal; there is no sector branch. |
 | FastTrigonometry — Sine          | Returns an approximation of sin(θ)            | θ is normalised to [0, 2π) internally. ROM LUT; no floating-point transcendental at runtime.                                                   |
 | FastTrigonometry — Cosine        | Returns an approximation of cos(θ)            | Derived from the sine LUT via a quarter-period offset. Same ROM, no additional storage.                                                        |
@@ -233,7 +233,7 @@ graph LR
 
 | Constraint                      | Value / Description                                                                                  |
 |---------------------------------|------------------------------------------------------------------------------------------------------|
-| Two-sensor current topology     | Ic is derived, not measured. Clarke forward is invalid if the three-phase system is unbalanced.      |
+| Three-sensor current topology   | All three phase currents are measured directly. The amplitude-invariant Clarke form is valid regardless of phase balance. |
 | LUT ROM footprint               | 2 048 bytes (2 KB) of read-only memory.                                                              |
 | LUT accuracy                    | Approximation error is bounded and below the noise floor of 12-bit ADC current sensing.              |
 | SVM input normalisation         | Vα, Vβ must be dimensionless fractions in [−1, +1] relative to the DC bus, not physical volt values. |

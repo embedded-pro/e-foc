@@ -330,6 +330,53 @@ TEST_F(NonVolatileMemoryTest, load_calibration_returns_invalid_data_on_crc_corru
     EXPECT_EQ(result, services::NvmStatus::InvalidData);
 }
 
+TEST_F(NonVolatileMemoryTest, load_calibration_on_magic_mismatch_zero_initialises_the_output)
+{
+    // Blank flash leaves the magic field at 0xFFFFFFFF, which does not match CalibrationMagic.
+    std::fill(calibrationRegion.storage.begin(), calibrationRegion.storage.end(), 0xFF);
+
+    services::CalibrationData out = MakeTestCalibration();
+    bool done = false;
+    services::NvmStatus result{};
+
+    nvm.LoadCalibration(out, [&](services::NvmStatus s)
+        {
+            result = s;
+            done = true;
+        });
+
+    RunUntilDone(done);
+    EXPECT_EQ(result, services::NvmStatus::InvalidData);
+    ExpectCalibrationDataEqual(out, services::CalibrationData{});
+}
+
+TEST_F(NonVolatileMemoryTest, load_calibration_on_crc_mismatch_zero_initialises_the_output)
+{
+    bool saveDone = false;
+    nvm.SaveCalibration(MakeTestCalibration(), [&](auto)
+        {
+            saveDone = true;
+        });
+    RunUntilDone(saveDone);
+
+    // Corrupt the data so the stored CRC no longer matches while magic and version stay valid.
+    calibrationRegion.storage[recordDataOffset] ^= 0xFF;
+
+    services::CalibrationData out = MakeTestCalibration();
+    bool done = false;
+    services::NvmStatus result{};
+
+    nvm.LoadCalibration(out, [&](services::NvmStatus s)
+        {
+            result = s;
+            done = true;
+        });
+
+    RunUntilDone(done);
+    EXPECT_EQ(result, services::NvmStatus::InvalidData);
+    ExpectCalibrationDataEqual(out, services::CalibrationData{});
+}
+
 TEST_F(NonVolatileMemoryTest, is_calibration_valid_returns_true_after_save)
 {
     bool saveDone = false;
