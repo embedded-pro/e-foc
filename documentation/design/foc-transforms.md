@@ -231,8 +231,8 @@ graph LR
 
 ## Constraints & Limitations
 
-| Constraint                      | Value / Description                                                                                  |
-|---------------------------------|------------------------------------------------------------------------------------------------------|
+| Constraint                      | Value / Description                                                                                                       |
+|---------------------------------|---------------------------------------------------------------------------------------------------------------------------|
 | Three-sensor current topology   | All three phase currents are measured directly. The amplitude-invariant Clarke form is valid regardless of phase balance. |
 | LUT ROM footprint               | 2 048 bytes (2 KB) of read-only memory.                                                              |
 | LUT accuracy                    | Approximation error is bounded and below the noise floor of 12-bit ADC current sensing.              |
