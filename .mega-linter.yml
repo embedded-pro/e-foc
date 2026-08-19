@@ -26,3 +26,4 @@ SARIF_REPORTER: true
 SHOW_SKIPPED_LINTERS: false
 FILTER_REGEX_EXCLUDE: (hal_st/middlewares/STM32_WPAN/|st/)
 JSON_JSONLINT_ARGUMENTS: --mode cjson
+REPOSITORY_TRUFFLEHOG_ARGUMENTS: --fail --only-verified --no-update --exclude-paths=.trufflehog-exclude-paths.txt
