@@ -20,7 +20,6 @@ namespace application
     class PlatformFactoryImpl
         : public PlatformFactory
         , public hal::PerformanceTracker
-        , public foc::LowPriorityInterrupt
     {
     public:
         explicit PlatformFactoryImpl(const infra::Function<void()>& onInitialized);
@@ -63,11 +62,6 @@ namespace application
         // Implementation of hal::PerformanceTracker (Start also satisfies ThreePhaseInverter::Start — no-op on ST)
         void Start() override;
         uint32_t ElapsedCycles() override;
-
-        // Implementation of LowPriorityInterrupt
-        void Trigger() override;
-        void Register(const infra::Function<void()>& handler) override;
-        void Unregister() override;
 
         // Implementation of drivers::ThreePhaseInverter
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;

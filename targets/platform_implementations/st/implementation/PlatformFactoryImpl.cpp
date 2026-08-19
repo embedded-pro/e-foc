@@ -125,21 +125,6 @@ namespace application
         return pendSvLowPriorityInterrupt;
     }
 
-    void PlatformFactoryImpl::Trigger()
-    {
-        pendSvLowPriorityInterrupt.Trigger();
-    }
-
-    void PlatformFactoryImpl::Register(const infra::Function<void()>& handler)
-    {
-        pendSvLowPriorityInterrupt.Register(handler);
-    }
-
-    void PlatformFactoryImpl::Unregister()
-    {
-        pendSvLowPriorityInterrupt.Unregister();
-    }
-
     void PlatformFactoryImpl::PendSvLowPriorityInterrupt::Trigger()
     {
         SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;

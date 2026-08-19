@@ -81,21 +81,6 @@ namespace application
         return 0;
     }
 
-    void PlatformFactoryImpl::Trigger()
-    {
-        simpleLowPriorityInterrupt.Trigger();
-    }
-
-    void PlatformFactoryImpl::Register(const infra::Function<void()>& handler)
-    {
-        simpleLowPriorityInterrupt.Register(handler);
-    }
-
-    void PlatformFactoryImpl::Unregister()
-    {
-        simpleLowPriorityInterrupt.Unregister();
-    }
-
     void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds /*deadTime*/, SampleAndHold /*sampleAndHold*/)
     {
         phaseCurrentAdc.reset();
