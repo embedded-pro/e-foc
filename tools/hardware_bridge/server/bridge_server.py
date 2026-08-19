@@ -24,6 +24,10 @@ Usage examples:
     # CAN with CANable (Candle API, no WinUSB driver swap needed, Windows)
     python bridge_server.py --can-interface candle --can-channel 0
 
+    # List all CAN interfaces/channels detected on this machine
+    python bridge_server.py --list-can
+    python bridge_server.py --list-can --json
+
     # Both serial and CAN (SocketCAN on Linux)
     python bridge_server.py \\
         --serial-port /dev/ttyACM0 --serial-baudrate 921600 \\
@@ -82,6 +86,17 @@ def parse_args() -> argparse.Namespace:
     can_group.add_argument(
         "--can-tcp-port", type=int, default=5001, help="TCP port for CAN bridge (default: 5001)"
     )
+    can_group.add_argument(
+        "--list-can",
+        action="store_true",
+        help="List all CAN interfaces and channels available on this machine, then exit.",
+    )
+    can_group.add_argument(
+        "--json",
+        action="store_true",
+        dest="output_json",
+        help="With --list-can: output as JSON array instead of a table.",
+    )
 
     parser.add_argument(
         "--log-level",
@@ -99,6 +114,16 @@ async def main() -> None:
         level=getattr(logging, args.log_level),
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
+
+    if getattr(args, "list_can", False):
+        from list_can_interfaces import gather_all, format_table
+        import json as _json
+        configs = gather_all()
+        if args.output_json:
+            print(_json.dumps(configs, indent=2))
+        else:
+            print(format_table(configs))
+        return
 
     if args.serial_port is None and args.can_interface is None:
         logger.error("At least one of --serial-port or --can-interface must be specified.")
