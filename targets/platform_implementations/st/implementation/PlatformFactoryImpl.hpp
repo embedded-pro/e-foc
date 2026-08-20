@@ -20,7 +20,6 @@ namespace application
     class PlatformFactoryImpl
         : public PlatformFactory
         , public hal::PerformanceTracker
-        , public foc::LowPriorityInterrupt
     {
     public:
         explicit PlatformFactoryImpl(const infra::Function<void()>& onInitialized);
@@ -35,7 +34,11 @@ namespace application
         void Run() override;
         services::Tracer& Tracer() override;
         services::TerminalWithCommands& Terminal() override;
-        infra::MemoryRange<hal::GpioPin> Leds() override;
+        hal::GpioPin& OperationalLed() override;
+        hal::GpioPin& WarningLed() override;
+        hal::GpioPin& FailureLed() override;
+        uint8_t BoardId() const override;
+        bool PowerStatus() const override;
         hal::PerformanceTracker& PerformanceTimer() override;
         hal::Hertz SystemClock() const override;
         foc::Volts PowerSupplyVoltage() override;
@@ -59,11 +62,6 @@ namespace application
         // Implementation of hal::PerformanceTracker (Start also satisfies ThreePhaseInverter::Start — no-op on ST)
         void Start() override;
         uint32_t ElapsedCycles() override;
-
-        // Implementation of LowPriorityInterrupt
-        void Trigger() override;
-        void Register(const infra::Function<void()>& handler) override;
-        void Unregister() override;
 
         // Implementation of drivers::ThreePhaseInverter
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
@@ -224,7 +222,9 @@ namespace application
         infra::Function<void()> onInitialized;
         PendSvLowPriorityInterrupt pendSvLowPriorityInterrupt;
         static constexpr uint32_t timerId = 1;
-        GpioPinStub pin;
+        GpioPinStub operationalPin;
+        GpioPinStub warningPin;
+        GpioPinStub failurePin;
         SerialCommunicationStub serial;
         TerminalAndTracer terminalAndTracer{ serial };
         std::optional<AdcPhaseCurrentMeasurementImpl<AdcMultiChannelStub>> phaseCurrentAdc;

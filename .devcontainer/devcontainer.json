@@ -13,7 +13,8 @@
   "containerEnv": {
     "DISPLAY": "host.docker.internal:0.0",
     "QT_X11_NO_MITSHM": "1",
-    "LIBGL_ALWAYS_INDIRECT": "1"
+    "LIBGL_ALWAYS_INDIRECT": "1",
+    "DEBUGINFOD_URLS": ""
   },
   "runArgs": [
     "--add-host=host.docker.internal:host-gateway",

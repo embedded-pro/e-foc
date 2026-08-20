@@ -45,7 +45,11 @@ namespace application
         void Run() override;
         services::Tracer& Tracer() override;
         services::TerminalWithCommands& Terminal() override;
-        infra::MemoryRange<hal::GpioPin> Leds() override;
+        hal::GpioPin& OperationalLed() override;
+        hal::GpioPin& WarningLed() override;
+        hal::GpioPin& FailureLed() override;
+        uint8_t BoardId() const override;
+        bool PowerStatus() const override;
         hal::PerformanceTracker& PerformanceTimer() override;
         hal::Hertz SystemClock() const override;
         foc::Volts PowerSupplyVoltage() override;

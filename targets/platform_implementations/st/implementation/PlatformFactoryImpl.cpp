@@ -1,5 +1,4 @@
 #include "targets/platform_implementations/st/implementation/PlatformFactoryImpl.hpp"
-#include "infra/util/MemoryRange.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
 
@@ -76,9 +75,29 @@ namespace application
         return terminalAndTracer.terminal;
     }
 
-    infra::MemoryRange<hal::GpioPin> PlatformFactoryImpl::Leds()
+    hal::GpioPin& PlatformFactoryImpl::OperationalLed()
     {
-        return infra::MakeRangeFromSingleObject(pin);
+        return operationalPin;
+    }
+
+    hal::GpioPin& PlatformFactoryImpl::WarningLed()
+    {
+        return warningPin;
+    }
+
+    hal::GpioPin& PlatformFactoryImpl::FailureLed()
+    {
+        return failurePin;
+    }
+
+    uint8_t PlatformFactoryImpl::BoardId() const
+    {
+        return 0;
+    }
+
+    bool PlatformFactoryImpl::PowerStatus() const
+    {
+        return true;
     }
 
     hal::PerformanceTracker& PlatformFactoryImpl::PerformanceTimer()
@@ -104,21 +123,6 @@ namespace application
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
     {
         return pendSvLowPriorityInterrupt;
-    }
-
-    void PlatformFactoryImpl::Trigger()
-    {
-        pendSvLowPriorityInterrupt.Trigger();
-    }
-
-    void PlatformFactoryImpl::Register(const infra::Function<void()>& handler)
-    {
-        pendSvLowPriorityInterrupt.Register(handler);
-    }
-
-    void PlatformFactoryImpl::Unregister()
-    {
-        pendSvLowPriorityInterrupt.Unregister();
     }
 
     void PlatformFactoryImpl::PendSvLowPriorityInterrupt::Trigger()
