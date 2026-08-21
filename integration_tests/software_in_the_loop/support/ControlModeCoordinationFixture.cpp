@@ -1,5 +1,4 @@
 #include "integration_tests/software_in_the_loop/support/ControlModeCoordinationFixture.hpp"
-#include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
 #include "can-lite/core/CanFrameCodec.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 
@@ -60,7 +59,6 @@ namespace integration
         motorBridge.reset();
         coordinator.reset();
 
-        // Simulate a full power cycle: the terminal command registry is also fresh.
         terminalAfterRestart.emplace(terminalWithCommands, tracer);
         services::TerminalWithStorage& freshTerminal = *terminalAfterRestart;
 
@@ -105,28 +103,28 @@ namespace integration
             .WillRepeatedly(Invoke([this](hal::Can::Id id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
                 {
                     lastSentMessageType = services::ExtractCanMessageType(id.Get29BitId());
-                    if (lastSentMessageType == services::focSelectControlModeResponseId)
+                    if (lastSentMessageType == can::focSelectControlModeResponseId)
                         selectResponseSent = true;
-                    if (lastSentMessageType == services::focCategoryErrorResponseId && msg.size() >= 2)
+                    if (lastSentMessageType == services::canCategoryErrorResponseMessageTypeId && msg.size() >= 2)
                     {
                         categoryErrorSent = true;
                         lastCategoryErrorOriginCmd = msg[0];
-                        lastCategoryErrorReason = static_cast<services::FocMotorCategoryError>(msg[1]);
+                        lastCategoryErrorReason = static_cast<can::FocMotorCategoryError>(msg[1]);
+                    }
+                    if (lastSentMessageType == services::canCommandAckMessageTypeId && msg.size() >= services::canCommandAckSize)
+                    {
+                        commandAckSent = true;
+                        lastCommandAckMessageType = msg[1];
+                        lastCommandAckStatus = static_cast<services::CanAckStatus>(msg[2]);
                     }
                     cb(true);
                 }));
+        EXPECT_CALL(transportCanMock, ReceiveData(_)).Times(AnyNumber());
 
-        canTransport.emplace(transportCanMock, 1);
-        motorCategoryServer.emplace(*canTransport);
-        motorCategoryServer->SetAcknowledger(*this);
-        motorBridge.emplace(*motorCategoryServer, *coordinator, platformFactory);
-    }
-
-    void ControlModeCoordinationFixture::SendCommandAck(uint8_t /*categoryId*/, uint8_t commandType, services::CanAckStatus status)
-    {
-        commandAckSent = true;
-        lastCommandAckMessageType = commandType;
-        lastCommandAckStatus = status;
+        canProtocolServer.emplace(transportCanMock, services::CanProtocolServer::Config{ .nodeId = 1 });
+        motorCategoryServer.emplace(canProtocolServer->Transport());
+        canProtocolServer->RegisterCategory(*motorCategoryServer);
+        motorBridge.emplace(*motorCategoryServer, *coordinator, platformFactory, tracer);
     }
 
     void ControlModeCoordinationFixture::DispatchToMotor(uint8_t messageType, const hal::Can::Message& data)
@@ -139,7 +137,7 @@ namespace integration
         commandAckSent = false;
         hal::Can::Message data;
         data.push_back(0x01);
-        DispatchToMotor(services::focStartId, data);
+        DispatchToMotor(can::focStartId, data);
         ExecuteAllActions();
     }
 
@@ -147,11 +145,11 @@ namespace integration
     {
         hal::Can::Message data;
         data.push_back(0x01);
-        DispatchToMotor(services::focStopId, data);
+        DispatchToMotor(can::focStopId, data);
         ExecuteAllActions();
     }
 
-    void ControlModeCoordinationFixture::InjectCanSelectControlMode(services::FocMotorMode mode)
+    void ControlModeCoordinationFixture::InjectCanSelectControlMode(can::FocMotorMode mode)
     {
         commandAckSent = false;
         selectResponseSent = false;
@@ -161,7 +159,7 @@ namespace integration
         data.resize(2, 0);
         data[0] = 0;
         data[1] = static_cast<uint8_t>(mode);
-        DispatchToMotor(services::focSelectControlModeId, data);
+        DispatchToMotor(can::focSelectControlModeId, data);
         ExecuteAllActions();
     }
 
@@ -174,7 +172,7 @@ namespace integration
         data.resize(3, 0);
         data[0] = 0;
         services::CanFrameCodec::WriteInt16(data, 1, value);
-        DispatchToMotor(services::focSetTorqueSetpointId, data);
+        DispatchToMotor(can::focSetTorqueSetpointId, data);
         ExecuteAllActions();
     }
 
@@ -187,7 +185,7 @@ namespace integration
         data.resize(3, 0);
         data[0] = 0;
         services::CanFrameCodec::WriteInt16(data, 1, value);
-        DispatchToMotor(services::focSetSpeedSetpointId, data);
+        DispatchToMotor(can::focSetSpeedSetpointId, data);
         ExecuteAllActions();
     }
 
@@ -200,7 +198,7 @@ namespace integration
         data.resize(3, 0);
         data[0] = 0;
         services::CanFrameCodec::WriteInt16(data, 1, value);
-        DispatchToMotor(services::focSetPositionSetpointId, data);
+        DispatchToMotor(can::focSetPositionSetpointId, data);
         ExecuteAllActions();
     }
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
+#include "core/can/FocMotorMessages.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include <cstdint>
 #include <optional>
@@ -37,29 +37,29 @@ namespace state_machine
         }
     }
 
-    inline services::FocMotorMode ToCanMode(ControlMode mode)
+    inline can::FocMotorMode ToCanMode(ControlMode mode)
     {
         switch (mode)
         {
             case ControlMode::speed:
-                return services::FocMotorMode::speed;
+                return can::FocMotorMode::speed;
             case ControlMode::position:
-                return services::FocMotorMode::position;
+                return can::FocMotorMode::position;
             case ControlMode::torque:
             default:
-                return services::FocMotorMode::torque;
+                return can::FocMotorMode::torque;
         }
     }
 
-    inline std::optional<ControlMode> FromCanMode(services::FocMotorMode mode)
+    inline std::optional<ControlMode> FromCanMode(can::FocMotorMode mode)
     {
         switch (mode)
         {
-            case services::FocMotorMode::torque:
+            case can::FocMotorMode::torque:
                 return ControlMode::torque;
-            case services::FocMotorMode::speed:
+            case can::FocMotorMode::speed:
                 return ControlMode::speed;
-            case services::FocMotorMode::position:
+            case can::FocMotorMode::position:
                 return ControlMode::position;
         }
 
@@ -81,31 +81,31 @@ namespace state_machine
         }
     }
 
-    inline services::FocMotorCategoryError ToCategoryError(SelectResult result)
+    inline can::FocMotorCategoryError ToCategoryError(SelectResult result)
     {
         switch (result)
         {
             case SelectResult::nvmFailed:
-                return services::FocMotorCategoryError::persistenceFailed;
+                return can::FocMotorCategoryError::persistenceFailed;
             case SelectResult::busy:
             default:
-                return services::FocMotorCategoryError::busy;
+                return can::FocMotorCategoryError::busy;
         }
     }
 
-    inline services::FocMotorCategoryError ToCategoryError(CommandResult result)
+    inline can::FocMotorCategoryError ToCategoryError(CommandResult result)
     {
         switch (result)
         {
             case CommandResult::calibrationFailed:
-                return services::FocMotorCategoryError::calibrationFailed;
+                return can::FocMotorCategoryError::calibrationFailed;
             case CommandResult::nvmFailed:
-                return services::FocMotorCategoryError::persistenceFailed;
+                return can::FocMotorCategoryError::persistenceFailed;
             case CommandResult::abortedByFault:
-                return services::FocMotorCategoryError::abortedByFault;
+                return can::FocMotorCategoryError::abortedByFault;
             case CommandResult::rejected:
             default:
-                return services::FocMotorCategoryError::modeMismatch;
+                return can::FocMotorCategoryError::modeMismatch;
         }
     }
 }

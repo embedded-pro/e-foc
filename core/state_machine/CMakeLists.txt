@@ -6,7 +6,7 @@ target_include_directories(e_foc.state_machine PUBLIC
 )
 
 target_link_libraries(e_foc.state_machine PUBLIC
-    can_lite.categories.foc_motor
+    can_lite.core
     e_foc.foc.cascade
     e_foc.foc.instantiations
     e_foc.platform_abstraction
@@ -26,8 +26,6 @@ target_sources(e_foc.state_machine PRIVATE
     ControlModeStateMachine.cpp
     FaultNotifier.hpp
     FaultNotifierImpl.cpp
-    FocMotorCanBridge.hpp
-    FocMotorCanBridge.cpp
     FocStateMachine.hpp
     FocStateMachineImpl.cpp
     FocStateMachineCommon.hpp

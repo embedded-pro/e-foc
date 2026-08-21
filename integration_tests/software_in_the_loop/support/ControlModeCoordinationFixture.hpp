@@ -1,8 +1,10 @@
 #pragma once
 
-#include "can-lite/categories/foc_motor/FocMotorCategoryServer.hpp"
-#include "can-lite/core/CanFrameTransport.hpp"
 #include "can-lite/core/test/CanMock.hpp"
+#include "can-lite/server/CanProtocolServer.hpp"
+#include "core/can/FocMotorCanBridge.hpp"
+#include "core/can/FocMotorCategoryServer.hpp"
+#include "core/can/FocMotorMessages.hpp"
 #include "core/foc/cascade/PositionCascade.hpp"
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/cascade/TorqueCascade.hpp"
@@ -15,12 +17,10 @@
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
-#include "core/state_machine/FocMotorCanBridge.hpp"
 #include "core/state_machine/test_doubles/FaultNotifierMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
-#include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
-#include "infra/stream/OutputStream.hpp"
 #include "infra/stream/test/StreamMock.hpp"
+#include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/Function.hpp"
 #include "integration_tests/software_in_the_loop/support/EepromStub.hpp"
 #include "integration_tests/software_in_the_loop/support/PlatformFactoryMock.hpp"
@@ -32,12 +32,10 @@
 namespace integration
 {
     struct ControlModeCoordinationFixture
-        : infra::EventDispatcherWithWeakPtrFixture
-        , services::CanCommandAcknowledger
+        : infra::ClockFixture
     {
         using CoordinatorType = state_machine::ControlModeStateMachine;
-
-        using BridgeType = state_machine::FocMotorCanBridge;
+        using BridgeType = can::FocMotorCanBridge;
 
         ControlModeCoordinationFixture();
 
@@ -47,13 +45,10 @@ namespace integration
         void SetupCanIntegration();
         void InjectCanStart();
         void InjectCanStop();
-        void InjectCanSelectControlMode(services::FocMotorMode mode);
+        void InjectCanSelectControlMode(can::FocMotorMode mode);
         void InjectCanSetTorqueSetpoint(int16_t value);
         void InjectCanSetSpeedSetpoint(int16_t value);
         void InjectCanSetPositionSetpoint(int16_t value);
-
-        // CanCommandAcknowledger
-        void SendCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status) override;
 
         void DispatchToMotor(uint8_t messageType, const hal::Can::Message& data);
 
@@ -79,8 +74,6 @@ namespace integration
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ serialCommunication, tracer };
         services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
-        // A fresh command registry used after RestartCoordinator() to simulate a
-        // power cycle where the terminal is also re-initialised.
         std::optional<services::TerminalWithStorage::WithMaxSize<20>> terminalAfterRestart;
 
         testing::StrictMock<PlatformFactoryMock> platformFactory;
@@ -105,11 +98,11 @@ namespace integration
         uint8_t lastCommandAckMessageType{ 0 };
         bool categoryErrorSent{ false };
         uint8_t lastCategoryErrorOriginCmd{ 0 };
-        services::FocMotorCategoryError lastCategoryErrorReason{ services::FocMotorCategoryError::busy };
+        can::FocMotorCategoryError lastCategoryErrorReason{ can::FocMotorCategoryError::busy };
 
         testing::StrictMock<hal::CanMock> transportCanMock;
-        std::optional<services::CanFrameTransport> canTransport;
-        std::optional<services::FocMotorCategoryServer> motorCategoryServer;
+        std::optional<services::CanProtocolServer> canProtocolServer;
+        std::optional<can::FocMotorCategoryServer> motorCategoryServer;
         std::optional<BridgeType> motorBridge;
     };
 }

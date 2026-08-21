@@ -83,7 +83,7 @@ namespace tool
                 client.SendEmergencyStop();
                 timeoutTimer.start(2000);
             });
-        connect(commandPanel, &CommandPanel::SetControlModeRequested, [this](services::FocMotorMode mode)
+        connect(commandPanel, &CommandPanel::SetControlModeRequested, [this](can::FocMotorMode mode)
             {
                 client.SendSetControlMode(mode);
                 commandPanel->SetActiveControlMode(mode);
@@ -177,7 +177,7 @@ namespace tool
         logView->appendPlainText(QString("ERROR: %1").arg(QString::fromUtf8(message.data(), static_cast<int>(message.size()))));
     }
 
-    void MainWindow::OnControlModeAcknowledged(services::FocMotorMode activeMode)
+    void MainWindow::OnControlModeAcknowledged(can::FocMotorMode activeMode)
     {
         logView->appendPlainText(QString("Active control mode: %1").arg(static_cast<int>(activeMode)));
     }
@@ -191,7 +191,7 @@ namespace tool
                 .arg(QString::fromUtf8(services::CanAckStatusToString(status))));
     }
 
-    void MainWindow::OnMotorStatusReceived(services::FocMotorState state, services::FocFaultCode fault)
+    void MainWindow::OnMotorStatusReceived(tool::FocMotorState state, tool::FocFaultCode fault)
     {
         telemetryPanel->OnMotorStatus(state, fault);
     }
@@ -211,7 +211,7 @@ namespace tool
         telemetryPanel->OnBusVoltage(voltage);
     }
 
-    void MainWindow::OnFaultEventReceived(services::FocFaultCode fault)
+    void MainWindow::OnFaultEventReceived(tool::FocFaultCode fault)
     {
         telemetryPanel->OnFaultEvent(fault);
     }

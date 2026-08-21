@@ -1,7 +1,10 @@
 #pragma once
 
-#include "can-lite/categories/foc_motor/FocMotorCategoryServer.hpp"
-#include "can-lite/core/CanFrameTransport.hpp"
+#include "can-lite/server/CanProtocolServer.hpp"
+#include "can-lite/tracing/TracingCan.hpp"
+#include "can-lite/tracing/TracingCanProtocolServerObserver.hpp"
+#include "core/can/FocMotorCanBridge.hpp"
+#include "core/can/FocMotorCategoryServer.hpp"
 #include "core/foc/cascade/PositionCascade.hpp"
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/cascade/TorqueCascade.hpp"
@@ -12,7 +15,6 @@
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
-#include "core/state_machine/FocMotorCanBridge.hpp"
 #include "core/state_machine/PlatformFaultNotifier.hpp"
 #include "services/peripheral/DebugLed.hpp"
 #include <optional>
@@ -47,9 +49,11 @@ namespace application
         state_machine::PlatformFaultNotifier platformFaultNotifier;
         services::ConfigData configData;
 
-        std::optional<services::CanFrameTransport> canTransport;
-        std::optional<services::FocMotorCategoryServer> motorCanServer;
+        std::optional<services::TracingCan> tracingCan;
+        std::optional<services::CanProtocolServer> canServer;
+        std::optional<services::TracingCanProtocolServerObserver> tracingServerObserver;
+        std::optional<can::FocMotorCategoryServer> motorCanServer;
         std::optional<ControlMode> controlMode;
-        std::optional<state_machine::FocMotorCanBridge> canBridge;
+        std::optional<can::FocMotorCanBridge> canBridge;
     };
 }

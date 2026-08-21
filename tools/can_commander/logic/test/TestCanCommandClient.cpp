@@ -1,5 +1,5 @@
-#include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
+#include "core/can/FocMotorMessages.hpp"
 #include "hal/interfaces/Can.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "tools/can_commander/logic/test/CanBusAdapterMock.hpp"
@@ -10,7 +10,6 @@
 namespace
 {
     using namespace tool;
-    using namespace services;
     using testing::_;
     using testing::Invoke;
     using testing::StrictMock;
@@ -117,6 +116,23 @@ namespace
             });
     }
 
+    TEST_F(TestCanCommandClient, category_error_received_does_not_call_any_observer)
+    {
+        EXPECT_CALL(observer, OnConnectionChanged(true));
+
+        hal::Can::Message data;
+        data.push_back(can::focStartId);
+        data.push_back(static_cast<uint8_t>(can::FocMotorCategoryError::busy));
+
+        auto canId = hal::Can::Id::Create29BitId(
+            services::MakeCanId(services::CanPriority::response,
+                can::focMotorCategoryId,
+                services::canCategoryErrorResponseMessageTypeId,
+                1));
+        receiveCallback(canId, data);
+        // StrictMock: OnCategoryError is a no-op — no observer method should fire
+    }
+
     // ---------- Command busy management ----------
 
     TEST_F(TestCanCommandClient, send_start_motor_clears_busy)
@@ -185,7 +201,7 @@ namespace
 
     TEST_F(TestCanCommandClient, send_set_control_mode_clears_busy)
     {
-        client.SendSetControlMode(FocMotorMode::speed);
+        client.SendSetControlMode(can::FocMotorMode::speed);
         EXPECT_FALSE(client.IsBusy());
     }
 
@@ -242,9 +258,9 @@ namespace
 
         hal::Can::Message emptyPayload;
         auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::heartbeat,
-                canSystemCategoryId,
-                canHeartbeatMessageTypeId,
+            services::MakeCanId(services::CanPriority::heartbeat,
+                services::canSystemCategoryId,
+                services::canHeartbeatMessageTypeId,
                 1));
         receiveCallback(canId, emptyPayload);
     }
@@ -255,9 +271,9 @@ namespace
 
         hal::Can::Message emptyPayload;
         auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::heartbeat,
-                canSystemCategoryId,
-                canHeartbeatMessageTypeId,
+            services::MakeCanId(services::CanPriority::heartbeat,
+                services::canSystemCategoryId,
+                services::canHeartbeatMessageTypeId,
                 1));
         receiveCallback(canId, emptyPayload);
 
@@ -268,20 +284,23 @@ namespace
 
     TEST_F(TestCanCommandClient, command_ack_frame_forwards_to_observer_and_keeps_busy_false)
     {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
-        EXPECT_CALL(observer, OnCommandAck(focMotorCategoryId, focStartId, CanAckStatus::success));
+        EXPECT_CALL(observer, OnCommandAck(can::focMotorCategoryId, can::focStartId, services::CanAckStatus::success));
 
-        hal::Can::Message ackPayload;
-        ackPayload.push_back(focMotorCategoryId);
-        ackPayload.push_back(focStartId);
-        ackPayload.push_back(static_cast<uint8_t>(CanAckStatus::success));
+        CanFrame ackData;
+        ackData.push_back(can::focMotorCategoryId);
+        ackData.push_back(can::focStartId);
+        ackData.push_back(static_cast<uint8_t>(services::CanAckStatus::success));
+        ackData.push_back(0);
 
-        auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::response,
-                canSystemCategoryId,
-                canCommandAckMessageTypeId,
-                1));
-        receiveCallback(canId, ackPayload);
+        const uint32_t rawId = services::MakeCanId(services::CanPriority::response,
+            services::canSystemCategoryId,
+            services::canCommandAckMessageTypeId,
+            1);
+
+        adapter.NotifyObservers([rawId, &ackData](auto& obs)
+            {
+                obs.OnFrameLog(false, rawId, ackData);
+            });
 
         EXPECT_FALSE(client.IsBusy());
     }
@@ -290,25 +309,27 @@ namespace
 
     TEST_F(TestCanCommandClient, telemetry_status_notifies_motor_status_and_speed_position)
     {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
         EXPECT_CALL(observer, OnMotorStatusReceived(FocMotorState::running, FocFaultCode::none));
-        EXPECT_CALL(observer, OnSpeedPositionReceived(testing::FloatNear(1.0f, 0.01f), testing::FloatNear(0.1f, 0.01f)));
+        EXPECT_CALL(observer, OnSpeedPositionReceived(testing::FloatNear(10.0f, 0.01f), testing::FloatNear(1.0f, 0.001f)));
 
-        hal::Can::Message data;
+        CanFrame data;
         data.resize(6, 0);
         data[0] = static_cast<uint8_t>(FocMotorState::running);
         data[1] = static_cast<uint8_t>(FocFaultCode::none);
         data[2] = 0;
-        data[3] = 10; // speed wire = 10 → physical = 10 / focSpeedScale(10) = 1.0 rad/s
+        data[3] = 10; // speed wire = 10 → physical = 10 / focSpeedScale(1) = 10.0 rad/s
         data[4] = 0;
-        data[5] = 100; // position wire = 100 → physical = 100 / focPositionScale(1000) = 0.1 rad
+        data[5] = 100; // position wire = 100 → physical = 100 / focPositionScale(100) = 1.0 rad
 
-        auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::telemetry,
-                focMotorCategoryId,
-                focTelemetryStatusResponseId,
-                1));
-        receiveCallback(canId, data);
+        const uint32_t rawId = services::MakeCanId(services::CanPriority::telemetry,
+            can::focMotorCategoryId,
+            can::focTelemetryStatusResponseId,
+            1);
+
+        adapter.NotifyObservers([rawId, &data](auto& obs)
+            {
+                obs.OnFrameLog(false, rawId, data);
+            });
     }
 
     TEST_F(TestCanCommandClient, telemetry_status_with_fault_notifies_fault_event)
@@ -320,17 +341,17 @@ namespace
 
         hal::Can::Message data;
         data.resize(6, 0);
-        data[0] = static_cast<uint8_t>(FocMotorState::fault);
-        data[1] = static_cast<uint8_t>(FocFaultCode::overCurrent);
+        data[0] = static_cast<uint8_t>(tool::FocMotorState::fault);
+        data[1] = static_cast<uint8_t>(tool::FocFaultCode::overCurrent);
         data[2] = 0;
         data[3] = 0;
         data[4] = 0;
         data[5] = 0;
 
         auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::telemetry,
-                focMotorCategoryId,
-                focTelemetryStatusResponseId,
+            services::MakeCanId(services::CanPriority::telemetry,
+                can::focMotorCategoryId,
+                can::focTelemetryStatusResponseId,
                 1));
         receiveCallback(canId, data);
     }
@@ -338,25 +359,25 @@ namespace
     TEST_F(TestCanCommandClient, telemetry_electrical_notifies_current_and_voltage)
     {
         EXPECT_CALL(observer, OnConnectionChanged(true));
-        EXPECT_CALL(observer, OnCurrentMeasurementReceived(testing::FloatNear(0.3f, 0.01f),
-                                  testing::FloatNear(0.5f, 0.01f)));
+        EXPECT_CALL(observer, OnCurrentMeasurementReceived(testing::FloatNear(3.0f, 0.01f),
+                                  testing::FloatNear(5.0f, 0.01f)));
         EXPECT_CALL(observer, OnBusVoltageReceived(testing::FloatNear(24.0f, 0.01f)));
 
         hal::Can::Message data;
         data.resize(8, 0);
         data[0] = 0;
-        data[1] = 240; // voltage wire = 240 → physical = 240 / 10 = 24.0 V
+        data[1] = 240; // voltage wire = 240 → physical = 240 / focVoltageScale(10) = 24.0 V
         data[2] = 0;
         data[3] = 0;
         data[4] = 0;
-        data[5] = 50; // iq wire = 50 → physical = 50 / focCurrentScale(100) = 0.5 A
+        data[5] = 50; // iq wire = 50 → physical = 50 / focCurrentScale(10) = 5.0 A
         data[6] = 0;
-        data[7] = 30; // id wire = 30 → physical = 30 / focCurrentScale(100) = 0.3 A
+        data[7] = 30; // id wire = 30 → physical = 30 / focCurrentScale(10) = 3.0 A
 
         auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::telemetry,
-                focMotorCategoryId,
-                focTelemetryElectricalResponseId,
+            services::MakeCanId(services::CanPriority::telemetry,
+                can::focMotorCategoryId,
+                can::focTelemetryElectricalResponseId,
                 1));
         receiveCallback(canId, data);
     }
@@ -366,12 +387,12 @@ namespace
         EXPECT_CALL(observer, OnConnectionChanged(true));
 
         hal::Can::Message data;
-        data.push_back(static_cast<uint8_t>(FocMotorMode::speed));
+        data.push_back(static_cast<uint8_t>(can::FocMotorMode::speed));
 
         auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::response,
-                focMotorCategoryId,
-                focMotorTypeResponseId,
+            MakeCanId(services::CanPriority::response,
+                can::focMotorCategoryId,
+                can::focMotorTypeResponseId,
                 1));
         receiveCallback(canId, data);
         // StrictMock: no observer method should be called — OnMotorTypeResponse is a no-op
@@ -385,9 +406,9 @@ namespace
         data.resize(4, 0);
 
         auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::response,
-                focMotorCategoryId,
-                focElectricalParamsResponseId,
+            services::MakeCanId(services::CanPriority::response,
+                can::focMotorCategoryId,
+                can::focElectricalParamsResponseId,
                 1));
         receiveCallback(canId, data);
         // StrictMock: no observer method should be called — OnElectricalParamsResponse is a no-op
@@ -401,9 +422,9 @@ namespace
         data.resize(4, 0);
 
         auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::response,
-                focMotorCategoryId,
-                focMechanicalParamsResponseId,
+            services::MakeCanId(services::CanPriority::response,
+                can::focMotorCategoryId,
+                can::focMechanicalParamsResponseId,
                 1));
         receiveCallback(canId, data);
         // StrictMock: no observer method should be called — OnMechanicalParamsResponse is a no-op
@@ -414,16 +435,16 @@ namespace
     TEST_F(TestCanCommandClient, select_control_mode_response_notifies_control_mode_acknowledged)
     {
         EXPECT_CALL(observer, OnConnectionChanged(true));
-        EXPECT_CALL(observer, OnControlModeAcknowledged(FocMotorMode::speed));
+        EXPECT_CALL(observer, OnControlModeAcknowledged(can::FocMotorMode::speed));
 
         hal::Can::Message data;
         data.resize(1, 0);
-        data[0] = static_cast<uint8_t>(FocMotorMode::speed);
+        data[0] = static_cast<uint8_t>(can::FocMotorMode::speed);
 
         auto canId = hal::Can::Id::Create29BitId(
-            MakeCanId(CanPriority::response,
-                focMotorCategoryId,
-                focSelectControlModeResponseId,
+            services::MakeCanId(services::CanPriority::response,
+                can::focMotorCategoryId,
+                can::focSelectControlModeResponseId,
                 1));
         receiveCallback(canId, data);
     }
@@ -440,11 +461,11 @@ namespace
                     cb(true);
                 }));
 
-        client.SendSetTorqueSetpoint(5.0f); // 5.0 A * focCurrentScale(100) = 500 = 0x01F4
+        client.SendSetTorqueSetpoint(5.0f); // 5.0 A * focCurrentScale(10) = 50 = 0x0032
 
         ASSERT_EQ(capturedData.size(), 3u);
-        EXPECT_EQ(capturedData[1], 0x01u); // high byte of 500
-        EXPECT_EQ(capturedData[2], 0xF4u); // low  byte of 500
+        EXPECT_EQ(capturedData[1], 0x00u); // high byte of 50
+        EXPECT_EQ(capturedData[2], 0x32u); // low  byte of 50
     }
 
     // ---------- Encoding: speed setpoint clamps to INT16_MAX when overrange ----------
@@ -459,7 +480,7 @@ namespace
                     cb(true);
                 }));
 
-        client.SendSetSpeedSetpoint(100000.0f); // 100000 * 10 = 1000000 > INT16_MAX → clamped to 32767 = 0x7FFF
+        client.SendSetSpeedSetpoint(100000.0f); // 100000 * focSpeedScale(1) = 100000 > INT16_MAX → clamped to 32767 = 0x7FFF
 
         ASSERT_EQ(capturedData.size(), 3u);
         EXPECT_EQ(capturedData[1], 0x7Fu); // high byte of INT16_MAX
@@ -476,7 +497,7 @@ namespace
                     cb(true);
                 }));
 
-        client.SendSetSpeedSetpoint(-100000.0f); // -100000 * 10 = -1000000 < INT16_MIN → clamped to -32768 = 0x8000
+        client.SendSetSpeedSetpoint(-100000.0f); // -100000 * focSpeedScale(1) = -100000 < INT16_MIN → clamped to -32768 = 0x8000
 
         ASSERT_EQ(capturedData.size(), 3u);
         EXPECT_EQ(capturedData[1], 0x80u); // high byte of INT16_MIN
@@ -493,11 +514,11 @@ namespace
                     cb(true);
                 }));
 
-        client.SendSetPositionSetpoint(0.1f); // 0.1 * focPositionScale(1000) = 100 = 0x0064
+        client.SendSetPositionSetpoint(0.1f); // 0.1 * focPositionScale(100) = 10 = 0x000A
 
         ASSERT_EQ(capturedData.size(), 3u);
-        EXPECT_EQ(capturedData[1], 0x00u); // high byte of 100
-        EXPECT_EQ(capturedData[2], 0x64u); // low  byte of 100
+        EXPECT_EQ(capturedData[1], 0x00u); // high byte of 10
+        EXPECT_EQ(capturedData[2], 0x0Au); // low  byte of 10
     }
 
     // ---------- Adapter send failure: busy stays true ----------
@@ -557,7 +578,7 @@ namespace
 
     TEST_F(TestCanCommandClientAdapterFails, send_set_control_mode_clears_busy_even_when_adapter_reports_failure)
     {
-        client.SendSetControlMode(FocMotorMode::speed);
+        client.SendSetControlMode(can::FocMotorMode::speed);
         EXPECT_FALSE(client.IsBusy());
     }
 

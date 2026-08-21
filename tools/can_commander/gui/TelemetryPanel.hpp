@@ -1,6 +1,6 @@
 #pragma once
 
-#include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
+#include "tools/can_commander/logic/CanCommandClient.hpp"
 #include <QGroupBox>
 #include <QLabel>
 #include <QWidget>
@@ -15,15 +15,15 @@ namespace tool
         explicit TelemetryPanel(QWidget* parent = nullptr);
 
     public slots:
-        void OnMotorStatus(services::FocMotorState state, services::FocFaultCode fault);
+        void OnMotorStatus(FocMotorState state, FocFaultCode fault);
         void OnCurrentMeasurement(float idCurrent, float iqCurrent);
         void OnSpeedPosition(float speed, float position);
         void OnBusVoltage(float voltage);
-        void OnFaultEvent(services::FocFaultCode fault);
+        void OnFaultEvent(FocFaultCode fault);
 
     private:
-        static QString MotorStateName(services::FocMotorState state);
-        static QString FaultCodeName(services::FocFaultCode fault);
+        static QString MotorStateName(FocMotorState state);
+        static QString FaultCodeName(FocFaultCode fault);
 
         QLabel* motorStateLabel;
         QLabel* faultLabel;

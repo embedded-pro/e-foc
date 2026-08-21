@@ -1,6 +1,5 @@
 #pragma once
 
-#include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"

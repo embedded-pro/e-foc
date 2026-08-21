@@ -45,3 +45,54 @@
     When the FocMotorCategoryServer receives an EmergencyStop command
     (focEmergencyStopId) while the state machine is in the Ready state, the state
     machine shall remain in the Ready state and shall not enter the Fault state.
+
+- id: REQ-INT-008
+  title: CAN client sends Start command and receives ACK
+  shall: >
+    When FocMotorCanClient.Start() is called, the client shall encode a Start
+    command frame (focStartId, category 0x02) and transmit it to the target node.
+    On receipt of a CanAckStatus from the server, the client shall invoke the
+    caller-supplied callback with the received status.
+
+- id: REQ-INT-009
+  title: CAN client sends typed setpoints
+  shall: >
+    FocMotorCanClient shall provide SendSetTorqueSetpoint(Ampere, callback),
+    SendSetSpeedSetpoint(RevPerMinute, callback), and SendSetPositionSetpoint(Radians,
+    callback). Each call shall encode the physical value to the wire format using the
+    scale factors defined in FocMotorMessages.hpp and transmit the corresponding
+    command frame.
+
+- id: REQ-INT-010
+  title: CAN client surfaces ACK/NACK status to caller
+  shall: >
+    For every command that carries a completion callback, FocMotorCategoryClient shall
+    invoke that callback exactly once upon receipt of the corresponding CanCommandAck
+    frame. The callback shall receive the CanAckStatus value extracted from the ACK
+    frame without modification.
+
+- id: REQ-INT-011
+  title: Stub commands return applicationError
+  shall: >
+    FocMotorCanBridge shall respond with a category error of type applicationError for
+    any command whose implementation is deferred to a future iteration. The error frame
+    shall be sent synchronously within the handler, before returning. No state machine
+    transition shall occur for a stub command.
+
+- id: REQ-INT-012
+  title: CAN frames and protocol events are observable via tracing decorators
+  shall: >
+    The instantiation layer shall wrap the raw hal::Can interface with TracingCan
+    and attach TracingCanProtocolServerObserver to the CanProtocolServer so that every
+    CAN frame and every server online/offline event is emitted to the system tracer.
+    The client path shall similarly attach TracingCanProtocolClientObserver.
+
+- id: REQ-INT-013
+  title: Hardware faults are broadcast over CAN as telemetry status frames
+  shall: >
+    When a hardware fault is detected by PlatformFaultNotifier, FocMotorCanBridge
+    shall immediately broadcast a telemetry status frame (focTelemetryStatusResponseId)
+    with FocMotorState::fault and the mapped FocFaultCode. The broadcast shall be
+    synchronous and shall not depend on any prior CAN command. FaultCode values are
+    mapped as follows: overcurrent→overCurrent, overvoltage→overVoltage,
+    overtemperature→overTemperature, encoderLoss→sensorFault; all other codes→none.

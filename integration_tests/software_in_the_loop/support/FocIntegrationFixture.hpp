@@ -1,9 +1,8 @@
 #pragma once
 
-#include "can-lite/categories/foc_motor/FocMotorCategoryServer.hpp"
-#include "can-lite/core/CanCategory.hpp"
-#include "can-lite/core/CanFrameTransport.hpp"
 #include "can-lite/core/test/CanMock.hpp"
+#include "can-lite/server/CanProtocolServer.hpp"
+#include "core/can/FocMotorCategoryServer.hpp"
 #include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
@@ -13,9 +12,8 @@
 #include "core/state_machine/TorqueStateMachine.hpp"
 #include "core/state_machine/test_doubles/FaultNotifierMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
-#include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
-#include "infra/stream/OutputStream.hpp"
 #include "infra/stream/test/StreamMock.hpp"
+#include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/Function.hpp"
 #include "integration_tests/software_in_the_loop/support/EepromStub.hpp"
 #include "integration_tests/software_in_the_loop/support/FocMotorStateMachineBridge.hpp"
@@ -28,7 +26,7 @@
 namespace integration
 {
     struct FocIntegrationFixture
-        : infra::EventDispatcherWithWeakPtrFixture
+        : infra::ClockFixture
     {
         FocIntegrationFixture();
 
@@ -96,16 +94,8 @@ namespace integration
         infra::Function<void(std::optional<foc::Radians>)> capturedAlignmentCallback;
 
         testing::StrictMock<hal::CanMock> transportCanMock;
-        std::optional<services::CanFrameTransport> canTransport;
-        std::optional<services::FocMotorCategoryServer> motorCategoryServer;
+        std::optional<services::CanProtocolServer> canProtocolServer;
+        std::optional<can::FocMotorCategoryServer> motorCategoryServer;
         std::optional<FocMotorStateMachineBridge> motorBridge;
-
-        struct NullAcknowledger : services::CanCommandAcknowledger
-        {
-            void SendCommandAck(uint8_t, uint8_t, services::CanAckStatus) override
-            {}
-        };
-
-        NullAcknowledger nullAcknowledger;
     };
 }

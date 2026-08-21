@@ -29,15 +29,15 @@ namespace tool
     private:
         void OnCommandTimeout() override;
         void OnBusyChanged(bool busy) override;
-        void OnMotorStatusReceived(services::FocMotorState state, services::FocFaultCode fault) override;
+        void OnMotorStatusReceived(FocMotorState state, FocFaultCode fault) override;
         void OnCurrentMeasurementReceived(float idCurrent, float iqCurrent) override;
         void OnSpeedPositionReceived(float speed, float position) override;
         void OnBusVoltageReceived(float voltage) override;
-        void OnFaultEventReceived(services::FocFaultCode fault) override;
+        void OnFaultEventReceived(FocFaultCode fault) override;
         void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) override;
         void OnConnectionChanged(bool connected) override;
         void OnAdapterError(infra::BoundedConstString message) override;
-        void OnControlModeAcknowledged(services::FocMotorMode activeMode) override;
+        void OnControlModeAcknowledged(can::FocMotorMode activeMode) override;
         void OnCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status) override;
 
         void SetupSocketNotifier();
