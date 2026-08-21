@@ -21,8 +21,14 @@ namespace application
                     configData = services::MakeDefaultConfigData();
                 this->hardware.SetEncoderResolution(this->configData.encoderResolution);
                 this->hardware.ConfigureCanBus(this->configData.canBaudrate, false);
-                canTransport.emplace(this->hardware.CanBus(), static_cast<uint16_t>(this->configData.canNodeId));
-                motorCanServer.emplace(*canTransport);
+
+                tracingCan.emplace(this->hardware.CanBus(), this->hardware.Tracer());
+                canServer.emplace(*tracingCan, services::CanProtocolServer::Config{
+                    .nodeId = static_cast<uint16_t>(this->configData.canNodeId) });
+                tracingServerObserver.emplace(*canServer, this->hardware.Tracer());
+                motorCanServer.emplace(canServer->Transport());
+                canServer->RegisterCategory(*motorCanServer);
+
                 controlMode.emplace(
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
                     MotorHardware{ this->hardware, this->hardware, vdc },
@@ -34,7 +40,7 @@ namespace application
                         this->hardware.MaxCurrentSupported(),
                         this->hardware.BaseFrequency(),
                         this->hardware.LowPriorityInterrupt() });
-                canBridge.emplace(*motorCanServer, *controlMode, this->hardware);
+                canBridge.emplace(*motorCanServer, *controlMode, this->hardware, this->hardware.Tracer());
             });
     }
 }

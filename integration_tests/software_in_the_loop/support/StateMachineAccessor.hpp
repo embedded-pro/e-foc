@@ -1,7 +1,7 @@
 #pragma once
 
-#include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
+#include "core/can/FocMotorMessages.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
 #include "core/state_machine/ControlMode.hpp"
@@ -32,7 +32,7 @@ namespace integration
 
         // Coordinator-specific (populated only by ControlModeCoordinationFixture).
         std::function<void()> setupCanIntegrationWithCoordinator;
-        std::function<void(services::FocMotorMode)> injectCanSelectControlMode;
+        std::function<void(can::FocMotorMode)> injectCanSelectControlMode;
         std::function<void(int16_t)> injectCanSetTorqueSetpoint;
         std::function<void(int16_t)> injectCanSetSpeedSetpoint;
         std::function<void(int16_t)> injectCanSetPositionSetpoint;
@@ -43,7 +43,7 @@ namespace integration
         std::function<services::CanAckStatus()> lastCommandAckStatus;
         std::function<uint8_t()> lastCommandAckMessageType;
         std::function<bool()> wasCategoryErrorSent;
-        std::function<services::FocMotorCategoryError()> lastCategoryErrorReason;
+        std::function<can::FocMotorCategoryError()> lastCategoryErrorReason;
         std::function<uint8_t()> lastCategoryErrorOriginCmd;
         std::function<std::size_t()> nvmWriteCount;
         std::size_t nvmWriteBaseline{ 0 };

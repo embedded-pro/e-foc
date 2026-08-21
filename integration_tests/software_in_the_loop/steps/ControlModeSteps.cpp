@@ -1,4 +1,5 @@
-#include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
+#include "can-lite/core/CanProtocolDefinitions.hpp"
+#include "core/can/FocMotorMessages.hpp"
 #include "core/state_machine/ControlMode.hpp"
 #include "cucumber_cpp/Steps.hpp"
 #include "integration_tests/software_in_the_loop/support/ControlModeCoordinationFixture.hpp"
@@ -12,14 +13,14 @@ using namespace integration;
 
 namespace
 {
-    services::FocMotorMode ModeFromString(const std::string& mode)
+    can::FocMotorMode ModeFromString(const std::string& mode)
     {
         if (mode == "torque")
-            return services::FocMotorMode::torque;
+            return can::FocMotorMode::torque;
         if (mode == "speed")
-            return services::FocMotorMode::speed;
+            return can::FocMotorMode::speed;
         if (mode == "position")
-            return services::FocMotorMode::position;
+            return can::FocMotorMode::position;
         throw std::invalid_argument("Unknown control mode: " + mode);
     }
 
@@ -49,18 +50,18 @@ namespace
         throw std::invalid_argument("Unknown ack status: " + reason);
     }
 
-    services::FocMotorCategoryError CategoryErrorFromString(const std::string& reason)
+    can::FocMotorCategoryError CategoryErrorFromString(const std::string& reason)
     {
         if (reason == "busy")
-            return services::FocMotorCategoryError::busy;
+            return can::FocMotorCategoryError::busy;
         if (reason == "nvmFailed" || reason == "persistenceFailed")
-            return services::FocMotorCategoryError::persistenceFailed;
+            return can::FocMotorCategoryError::persistenceFailed;
         if (reason == "controlModeMismatch" || reason == "modeMismatch")
-            return services::FocMotorCategoryError::modeMismatch;
+            return can::FocMotorCategoryError::modeMismatch;
         if (reason == "calibrationFailed")
-            return services::FocMotorCategoryError::calibrationFailed;
+            return can::FocMotorCategoryError::calibrationFailed;
         if (reason == "abortedByFault")
-            return services::FocMotorCategoryError::abortedByFault;
+            return can::FocMotorCategoryError::abortedByFault;
         throw std::invalid_argument("Unknown category-error reason: " + reason);
     }
 
@@ -83,7 +84,7 @@ namespace
         {
             fixture.InjectCanStop();
         };
-        accessor.injectCanSelectControlMode = [&fixture](services::FocMotorMode mode)
+        accessor.injectCanSelectControlMode = [&fixture](can::FocMotorMode mode)
         {
             fixture.InjectCanSelectControlMode(mode);
         };
@@ -123,7 +124,7 @@ namespace
         {
             return fixture.categoryErrorSent;
         };
-        accessor.lastCategoryErrorReason = [&fixture]() -> services::FocMotorCategoryError
+        accessor.lastCategoryErrorReason = [&fixture]() -> can::FocMotorCategoryError
         {
             return fixture.lastCategoryErrorReason;
         };
@@ -232,7 +233,7 @@ THEN(R"(a CommandRejected frame shall be emitted with reason controlModeMismatch
     EXPECT_TRUE(accessor.wasCommandAckSent());
     EXPECT_EQ(accessor.lastCommandAckStatus(), services::CanAckStatus::categoryError);
     EXPECT_TRUE(accessor.wasCategoryErrorSent());
-    EXPECT_EQ(accessor.lastCategoryErrorReason(), services::FocMotorCategoryError::modeMismatch);
+    EXPECT_EQ(accessor.lastCategoryErrorReason(), can::FocMotorCategoryError::modeMismatch);
 }
 
 THEN(R"(no CommandRejected frame shall be emitted)")

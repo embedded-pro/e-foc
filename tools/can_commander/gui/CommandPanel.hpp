@@ -1,6 +1,6 @@
 #pragma once
 
-#include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
+#include "core/can/FocMotorMessages.hpp"
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QGroupBox>
@@ -25,7 +25,7 @@ namespace tool
         void StartMotorRequested();
         void StopMotorRequested();
         void EmergencyStopRequested();
-        void SetControlModeRequested(services::FocMotorMode mode);
+        void SetControlModeRequested(can::FocMotorMode mode);
         void SetTorqueSetpointRequested(float iqCurrent);
         void SetSpeedSetpointRequested(float speedRadPerSec);
         void SetPositionSetpointRequested(float positionRad);
@@ -38,7 +38,7 @@ namespace tool
 
     public slots:
         void SetCommandsEnabled(bool enabled);
-        void SetActiveControlMode(services::FocMotorMode mode);
+        void SetActiveControlMode(can::FocMotorMode mode);
 
     private:
         QWidget* CreateMotorControlTab();

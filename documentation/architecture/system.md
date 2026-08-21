@@ -64,6 +64,7 @@ graph TD
         SVC["Services\n(Alignment · NVM · Ident · CLI)"]
         FOC["FOC Core\n(Torque / Speed / Position)"]
         HF["Platform Abstraction\n(PlatformFactory interface + adapters)"]
+        CAN_SVC["CAN Service\n(FocMotorCategoryServer · FocMotorCategoryClient\nFocMotorCanBridge · FocMotorCanClient)"]
     end
 
     subgraph INFRA["Infrastructure Tier (submodules)"]
@@ -82,6 +83,7 @@ graph TD
     INST --> FOC
     INST --> SVC
     INST --> HF
+    INST --> CAN_SVC
     INST --> PAL_TI
     INST --> PAL_ST
     INST --> PAL_HOST
@@ -89,12 +91,15 @@ graph TD
     FOC --> NT
     SVC --> EMIL
     HF --> EMIL
+    CAN_SVC --> CAN
+    CAN_SVC --> FOC
     PAL_TI --> HAL_TI
     PAL_ST --> HAL_ST
     PAL_HOST --> EMIL
     PAL_TI --> EMIL
     PAL_ST --> EMIL
     CAN --> EMIL
+    TOOLS --> CAN_SVC
     TOOLS --> FOC
 ```
 
@@ -140,14 +145,28 @@ The `Runner` is the only component that interacts with the PAL inverter and enco
 
 Higher-level, non-real-time services that support commissioning and runtime operation. Each service is independently usable:
 
-| Service                          | Responsibility                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-|----------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Alignment                        | Forces a known electrical angle on the rotor at startup so the FOC reference frame is correctly initialised before normal operation.                                                                                                                                                                                                                                                                                                                                          |
-| Electrical System Identification | Estimates phase resistance, d/q inductances, and pole pairs by injecting test signals and measuring the response.                                                                                                                                                                                                                                                                                                                                                             |
-| Mechanical System Identification | Estimates rotor inertia and viscous friction coefficient from closed-loop speed response data.                                                                                                                                                                                                                                                                                                                                                                                |
-| Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration (including `defaultControlMode`) across power cycles.                                                                                                                                                                                                                                                                                                                               |
-| CLI                              | A terminal-based command interface for triggering services, querying state, and setting parameters from a serial console.                                                                                                                                                                                                                                                                                                                                                     |
-| Control Mode                     | Owns the three `FocStateMachine` instances (torque, speed, position) as a `std::variant`; only one is live at a time. Exposes `Select(mode, onDone)` which enforces the motor-stopped precondition, persists the selection to NVM, then switches the active state machine. `FocMotorCanBridge` translates incoming CAN `SelectControlMode`, `SetTorqueSetpoint`, `SetSpeedSetpoint`, and `SetPositionSetpoint` frames into the corresponding `ControlModeStateMachine` calls. |
+| Service                          | Responsibility                                                                                                                                                                                                                                                              |
+|----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Alignment                        | Forces a known electrical angle on the rotor at startup so the FOC reference frame is correctly initialised before normal operation.                                                                                                                                         |
+| Electrical System Identification | Estimates phase resistance, d/q inductances, and pole pairs by injecting test signals and measuring the response.                                                                                                                                                            |
+| Mechanical System Identification | Estimates rotor inertia and viscous friction coefficient from closed-loop speed response data.                                                                                                                                                                               |
+| Non-Volatile Memory (NVM)        | Persists calibration data (R, L, pole pairs, encoder offset, PID gains) and configuration (including `defaultControlMode`) across power cycles.                                                                                                                              |
+| CLI                              | A terminal-based command interface for triggering services, querying state, and setting parameters from a serial console.                                                                                                                                                    |
+| Control Mode                     | Owns the three `FocStateMachine` instances (torque, speed, position) as a `std::variant`; only one is live at a time. Exposes `Select(mode, onDone)` which enforces the motor-stopped precondition, persists the selection to NVM, then switches the active state machine. |
+
+### 3. CAN Service
+
+The CAN service layer (`core/can/`) provides the FOC motor CAN category as a server/client pair and the bridge that connects the server to the `ControlModeStateMachine`. It is split into two halves:
+
+**Server half** (runs on the embedded target):
+- `FocMotorCategoryServer` — a `CanCategoryServer` subclass. Decodes incoming CAN frames into typed observer callbacks. Encodes typed results back into response frames. Wire scaling (int16 ↔ physical unit) is contained entirely here.
+- `FocMotorCanBridge` — implements the server observer interface. Translates CAN motor commands (`Start`, `Stop`, `SelectControlMode`, `SetTorqueSetpoint`, `SetSpeedSetpoint`, `SetPositionSetpoint`, `ClearFault`, `EmergencyStop`) into the corresponding `ControlModeStateMachine` calls. Commands that are not yet implemented return `applicationError` immediately.
+
+**Client half** (runs on the desktop host — CAN Commander, SIL tests):
+- `FocMotorCategoryClient` — a `CanCategoryClient` subclass. Encodes typed setpoints into CAN frames and decodes response frames into typed callbacks.
+- `FocMotorCanClient` — user-facing API that composes `CanFrameTransport`, `CanProtocolClient`, and `FocMotorCategoryClient` internally. Takes a `hal::Can&` and a node ID; exposes `Start`, `Stop`, `SetTorque`, `SetSpeed`, and `SetPosition` methods.
+
+Tracing is applied at every layer boundary via the `can-lite` tracing decorators (`TracingCan`, `TracingCanProtocolServerObserver`, `TracingCanProtocolClientObserver`).
 
 Services communicate via asynchronous callbacks (zero-allocation closures from `embedded-infra-lib`), not return values. This allows long-running operations (identification, alignment) to yield the CPU and complete asynchronously without blocking.
 
@@ -180,7 +199,7 @@ graph LR
     HOST --> SIM_MODEL["Motor Model\n(PMSM physics simulation)"]
 ```
 
-### 4. Application / Instantiation
+### 4. Application / Instantiation (was §3)
 
 The wiring layer. Assembles the concrete PAL implementation, the selected FOC mode(s), and the services into a runnable system. This is the only layer that is aware of the specific combination in use — all other layers depend only on abstractions.
 
@@ -193,7 +212,7 @@ enabled.
 
 In CLI mode, `ControlModeStateMachine` registers the lifecycle commands `calibrate`, `enable`, `disable`, `clear_fault`, `clear_cal`, `apply_estimates`, and `active_mode` on the terminal. These commands delegate to the currently active state machine. The `TerminalFocBaseInteractor` (and its control-mode subclasses) register PID tuning and setpoint commands on the same terminal.
 
-### 5. Tools
+### 5. Tools (was §4)
 
 Host-only tools that do not run on the embedded target:
 
@@ -202,7 +221,7 @@ Host-only tools that do not run on the embedded target:
 | Simulator     | Closed-loop software simulation: real FOC control code drives a physics-based PMSM model (Euler integration of the dq electrical equations). Used for validating control loops without hardware. |
 | CAN Commander | Desktop application for sending CAN commands and logging motor telemetry.                                                                                                                        |
 
-### 6. Infrastructure
+### 6. Infrastructure (was §5)
 
 External repositories consumed as Git submodules. This project does not modify them.
 
@@ -226,7 +245,7 @@ workaround until the fix lands. Two such defects shaped the position loop and ar
 Should a comparable defect appear again, record it in this table with the workaround and the
 condition for retiring it, so a workaround does not quietly become permanent.
 
-### 7. Vendor HAL
+### 7. Vendor HAL (was §6)
 
 Vendor-provided hardware abstraction libraries consumed as Git submodules. They supply the low-level peripheral register access and interrupt management that the PAL concrete implementations use.
 
@@ -400,7 +419,7 @@ graph TD
 
     subgraph "CAN Integration"
         MCS[FocMotorCategoryServer]
-        BRG[State Machine Bridge]
+        BRG[FocMotorCanBridge]
     end
 
     FIF --> PFM
@@ -452,3 +471,13 @@ graph TD
 | REQ-INT-002    | `can_foc_motor.feature` — CAN Stop disables motor                                                                 |
 | REQ-INT-003    | `can_foc_motor.feature` — CAN ClearFault clears fault                                                             |
 | REQ-INT-004    | Not scenario-based — routing through the category server is a structural constraint verified by the bridge design |
+| REQ-CM-001     | `can_control_mode.feature` — SelectControlMode transitions the active mode                                        |
+| REQ-CM-002     | `can_control_mode.feature` — SetTorqueSetpoint accepted in torque mode                                            |
+| REQ-CM-003     | `can_control_mode.feature` — SetSpeedSetpoint accepted in speed mode                                              |
+| REQ-CM-004     | `can_control_mode.feature` — SetPositionSetpoint accepted in position mode                                        |
+| REQ-CM-005     | `can_control_mode.feature` — Setpoint rejected when mode does not match                                           |
+| REQ-INT-008    | `core/can/test/TestFocMotorCanClient.cpp` — client sends Start and receives ACK                                   |
+| REQ-INT-009    | `core/can/test/TestFocMotorCategoryClient.cpp` — client sends typed setpoints                                     |
+| REQ-INT-010    | `core/can/test/TestFocMotorCategoryClient.cpp` — client surfaces ACK/NACK to caller                               |
+| REQ-INT-011    | `core/can/test/TestFocMotorCanBridge.cpp` — stub commands return applicationError                                 |
+| REQ-INT-012    | `core/can/test/TestFocMotorCanBridge.cpp` — tracing decorators are observable                                     |

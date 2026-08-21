@@ -1,35 +1,35 @@
 #pragma once
 
-#include "can-lite/categories/foc_motor/FocMotorCategoryServer.hpp"
+#include "core/can/FocMotorCategoryServer.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include "infra/util/Function.hpp"
 
 namespace integration
 {
     class FocMotorStateMachineBridge
-        : public services::FocMotorCategoryServerObserver
+        : public can::FocMotorCategoryServerObserver
     {
     public:
-        FocMotorStateMachineBridge(services::FocMotorCategoryServer& server,
+        FocMotorStateMachineBridge(can::FocMotorCategoryServer& server,
             state_machine::FocStateMachineBase& stateMachine);
 
-        void OnQueryMotorType(const infra::Function<void(services::FocMotorMode)>&) override;
-        void OnStart(const infra::Function<void()>& onDone) override;
-        void OnStop(const infra::Function<void()>& onDone) override;
-        void OnSetPidCurrent(const services::FocPidGains&, const infra::Function<void()>&) override;
-        void OnSetPidSpeed(const services::FocPidGains&, const infra::Function<void()>&) override;
-        void OnSetPidPosition(const services::FocPidGains&, const infra::Function<void()>&) override;
-        void OnIdentifyElectrical(const infra::Function<void(services::FocElectricalParams)>&) override;
-        void OnIdentifyMechanical(const infra::Function<void(services::FocMechanicalParams)>&) override;
-        void OnRequestTelemetry(const infra::Function<void(services::FocTelemetryElectrical, services::FocTelemetryStatus)>&) override;
-        void OnSetEncoderResolution(uint16_t, const infra::Function<void()>&) override;
-        void OnSelectControlMode(services::FocMotorMode, const infra::Function<void(services::FocMotorMode)>&) override;
-        void OnSetTorqueSetpoint(int16_t, const infra::Function<void()>&) override;
-        void OnSetSpeedSetpoint(int16_t, const infra::Function<void()>&) override;
-        void OnSetPositionSetpoint(int16_t, const infra::Function<void()>&) override;
-        void OnClearFault(const infra::Function<void()>& onDone) override;
-        void OnEmergencyStop(const infra::Function<void()>& onDone) override;
-        void OnConfigureTelemetryRate(uint8_t, const infra::Function<void()>&) override;
+        void OnStart(const infra::Function<void(services::CanAckStatus)>& onDone) override;
+        void OnStop(const infra::Function<void(services::CanAckStatus)>& onDone) override;
+        void OnClearFault(const infra::Function<void(services::CanAckStatus)>& onDone) override;
+        void OnEmergencyStop(const infra::Function<void(services::CanAckStatus)>& onDone) override;
+        void OnSelectControlMode(can::FocMotorMode, const infra::Function<void(can::FocMotorMode)>&) override;
+        void OnSetTorqueSetpoint(foc::Ampere, const infra::Function<void()>&) override;
+        void OnSetSpeedSetpoint(foc::RadiansPerSecond, const infra::Function<void()>&) override;
+        void OnSetPositionSetpoint(foc::Radians, const infra::Function<void()>&) override;
+
+        void OnSetPidCurrent(const infra::Function<void()>&) override;
+        void OnSetPidSpeed(const infra::Function<void()>&) override;
+        void OnSetPidPosition(const infra::Function<void()>&) override;
+        void OnIdentifyElectrical(const infra::Function<void()>&) override;
+        void OnIdentifyMechanical(const infra::Function<void()>&) override;
+        void OnRequestTelemetry(const infra::Function<void()>&) override;
+        void OnSetEncoderResolution(const infra::Function<void()>&) override;
+        void OnConfigureTelemetryRate(const infra::Function<void()>&) override;
 
     private:
         state_machine::FocStateMachineBase& stateMachine;

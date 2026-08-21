@@ -49,9 +49,9 @@ namespace tool
         auto* modeGroup = new QGroupBox("Control Mode");
         auto* modeLayout = new QHBoxLayout(modeGroup);
         auto* modeCombo = new QComboBox();
-        modeCombo->addItem("Torque", static_cast<int>(FocMotorMode::torque));
-        modeCombo->addItem("Speed", static_cast<int>(FocMotorMode::speed));
-        modeCombo->addItem("Position", static_cast<int>(FocMotorMode::position));
+        modeCombo->addItem("Torque", static_cast<int>(can::FocMotorMode::torque));
+        modeCombo->addItem("Speed", static_cast<int>(can::FocMotorMode::speed));
+        modeCombo->addItem("Position", static_cast<int>(can::FocMotorMode::position));
         auto* modeButton = new QPushButton("Set Mode");
         modeLabel = new QLabel("Active: Unknown");
         modeLabel->setStyleSheet("font-weight: bold; color: #555;");
@@ -63,7 +63,7 @@ namespace tool
         commandButtons.push_back(modeButton);
         connect(modeButton, &QPushButton::clicked, [this, modeCombo]()
             {
-                emit SetControlModeRequested(static_cast<FocMotorMode>(modeCombo->currentData().toInt()));
+                emit SetControlModeRequested(static_cast<can::FocMotorMode>(modeCombo->currentData().toInt()));
             });
 
         setpointStack = new QStackedWidget();
@@ -223,7 +223,7 @@ namespace tool
             button->setEnabled(enabled);
     }
 
-    void CommandPanel::SetActiveControlMode(services::FocMotorMode mode)
+    void CommandPanel::SetActiveControlMode(can::FocMotorMode mode)
     {
         int index = static_cast<int>(mode);
         setpointStack->setCurrentIndex(index);

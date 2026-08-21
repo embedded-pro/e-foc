@@ -1,5 +1,6 @@
 #include "integration_tests/software_in_the_loop/support/PositionIntegrationFixture.hpp"
-#include "can-lite/categories/foc_motor/FocMotorDefinitions.hpp"
+#include "can-lite/server/CanProtocolServer.hpp"
+#include "core/can/FocMotorMessages.hpp"
 
 namespace integration
 {
@@ -89,9 +90,11 @@ namespace integration
                     cb(true);
                 }));
 
-        canTransport.emplace(transportCanMock, 1);
-        motorCategoryServer.emplace(*canTransport);
-        motorCategoryServer->SetAcknowledger(nullAcknowledger);
+        EXPECT_CALL(transportCanMock, ReceiveData(_)).Times(AnyNumber());
+
+        canProtocolServer.emplace(transportCanMock, services::CanProtocolServer::Config{ .nodeId = 1 });
+        motorCategoryServer.emplace(canProtocolServer->Transport());
+        canProtocolServer->RegisterCategory(*motorCategoryServer);
         motorBridge.emplace(*motorCategoryServer, *motorStateMachine);
     }
 
@@ -99,7 +102,7 @@ namespace integration
     {
         hal::Can::Message data;
         data.push_back(0x01);
-        motorCategoryServer->HandleMessage(services::focStartId, data);
+        motorCategoryServer->HandleMessage(can::focStartId, data);
         ExecuteAllActions();
     }
 
@@ -107,7 +110,7 @@ namespace integration
     {
         hal::Can::Message data;
         data.push_back(0x01);
-        motorCategoryServer->HandleMessage(services::focStopId, data);
+        motorCategoryServer->HandleMessage(can::focStopId, data);
         ExecuteAllActions();
     }
 
@@ -115,7 +118,7 @@ namespace integration
     {
         hal::Can::Message data;
         data.push_back(0x01);
-        motorCategoryServer->HandleMessage(services::focClearFaultId, data);
+        motorCategoryServer->HandleMessage(can::focClearFaultId, data);
         ExecuteAllActions();
     }
 
@@ -123,7 +126,7 @@ namespace integration
     {
         hal::Can::Message data;
         data.push_back(0x01);
-        motorCategoryServer->HandleMessage(services::focEmergencyStopId, data);
+        motorCategoryServer->HandleMessage(can::focEmergencyStopId, data);
         ExecuteAllActions();
     }
 

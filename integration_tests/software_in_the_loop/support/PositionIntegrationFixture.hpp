@@ -1,9 +1,8 @@
 #pragma once
 
-#include "can-lite/categories/foc_motor/FocMotorCategoryServer.hpp"
-#include "can-lite/core/CanCategory.hpp"
-#include "can-lite/core/CanFrameTransport.hpp"
 #include "can-lite/core/test/CanMock.hpp"
+#include "can-lite/server/CanProtocolServer.hpp"
+#include "core/can/FocMotorCategoryServer.hpp"
 #include "core/foc/cascade/PositionCascade.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
@@ -16,7 +15,7 @@
 #include "core/state_machine/PositionStateMachine.hpp"
 #include "core/state_machine/test_doubles/FaultNotifierMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
-#include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
+#include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/stream/OutputStream.hpp"
 #include "infra/stream/test/StreamMock.hpp"
 #include "infra/util/Function.hpp"
@@ -31,7 +30,7 @@
 namespace integration
 {
     struct PositionIntegrationFixture
-        : infra::EventDispatcherWithWeakPtrFixture
+        : infra::ClockFixture
     {
         PositionIntegrationFixture();
 
@@ -103,16 +102,8 @@ namespace integration
         infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)> capturedMechIdentCallback;
 
         testing::StrictMock<hal::CanMock> transportCanMock;
-        std::optional<services::CanFrameTransport> canTransport;
-        std::optional<services::FocMotorCategoryServer> motorCategoryServer;
+        std::optional<services::CanProtocolServer> canProtocolServer;
+        std::optional<can::FocMotorCategoryServer> motorCategoryServer;
         std::optional<FocMotorStateMachineBridge> motorBridge;
-
-        struct NullAcknowledger : services::CanCommandAcknowledger
-        {
-            void SendCommandAck(uint8_t, uint8_t, services::CanAckStatus) override
-            {}
-        };
-
-        NullAcknowledger nullAcknowledger;
     };
 }

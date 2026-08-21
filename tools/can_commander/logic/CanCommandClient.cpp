@@ -1,4 +1,6 @@
 #include "tools/can_commander/logic/CanCommandClient.hpp"
+#include "can-lite/core/CanFrameCodec.hpp"
+#include "can-lite/core/CanPayload.hpp"
 #include <algorithm>
 #include <limits>
 
@@ -7,26 +9,18 @@ namespace tool
     using namespace services;
 
     CanCommandClient::CanCommandClient(CanBusAdapter& adapter)
-        : focTransport(adapter, 0)
-        , protocolClient(adapter)
-        , focCategory(focTransport, protocolClient)
+        : focClient{ adapter, nodeId }
     {
-        protocolClient.RegisterCategory(focCategory);
-        protocolClient.SystemCategory().onCommandAck = [this](uint8_t categoryId, uint8_t commandType, CanAckStatus status)
-        {
-            HandleCommandAck(categoryId, commandType, status);
-        };
-        CanProtocolClientObserver::Attach(protocolClient);
-        FocMotorCategoryClientObserver::Attach(focCategory);
+        CanProtocolClientObserver::Attach(focClient.ProtocolClient());
+        can::FocMotorCategoryClientObserver::Attach(focClient.CategoryClient());
         CanBusAdapterObserver::Attach(adapter);
     }
 
     CanCommandClient::~CanCommandClient()
     {
-        FocMotorCategoryClientObserver::Detach();
+        can::FocMotorCategoryClientObserver::Detach();
         CanProtocolClientObserver::Detach();
         CanBusAdapterObserver::Detach();
-        protocolClient.UnregisterCategory(focCategory);
     }
 
     void CanCommandClient::SetNodeId(uint16_t id)
@@ -59,66 +53,65 @@ namespace tool
     void CanCommandClient::SendStartMotor()
     {
         SetBusy(true);
-        if (focCategory.SendStart(nodeId))
+        if (focClient.Start())
             SetBusy(false);
     }
 
     void CanCommandClient::SendStopMotor()
     {
         SetBusy(true);
-        if (focCategory.SendStop(nodeId))
+        if (focClient.Stop())
             SetBusy(false);
     }
 
     void CanCommandClient::SendEmergencyStop()
     {
         SetBusy(true);
-        if (focCategory.SendEmergencyStop(nodeId))
+        if (focClient.EmergencyStop())
             SetBusy(false);
     }
 
-    void CanCommandClient::SendSetControlMode(FocMotorMode mode)
+    void CanCommandClient::SendSetControlMode(can::FocMotorMode mode)
     {
         SetBusy(true);
-        if (focCategory.SendSelectControlMode(nodeId, mode))
+        if (focClient.SelectControlMode(mode))
             SetBusy(false);
     }
 
     void CanCommandClient::SendSetTorqueSetpoint(float iqCurrent)
     {
         SetBusy(true);
-        const auto scaled = std::clamp(static_cast<int32_t>(iqCurrent * focCurrentScale),
+        const auto scaled = std::clamp(static_cast<int32_t>(iqCurrent * can::focCurrentScale),
             static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
             static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
-        if (focCategory.SendSetTorqueSetpoint(nodeId, static_cast<int16_t>(scaled)))
+        if (focClient.SetTorque(foc::Ampere{ static_cast<float>(scaled) / can::focCurrentScale }))
             SetBusy(false);
     }
 
     void CanCommandClient::SendSetSpeedSetpoint(float speedRadPerSec)
     {
         SetBusy(true);
-        const auto scaled = std::clamp(static_cast<int32_t>(speedRadPerSec * focSpeedScale),
+        const auto scaled = std::clamp(static_cast<int32_t>(speedRadPerSec * can::focSpeedScale),
             static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
             static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
-        if (focCategory.SendSetSpeedSetpoint(nodeId, static_cast<int16_t>(scaled)))
+        if (focClient.SetSpeed(foc::RadiansPerSecond{ static_cast<float>(scaled) / can::focSpeedScale }))
             SetBusy(false);
     }
 
     void CanCommandClient::SendSetPositionSetpoint(float positionRad)
     {
         SetBusy(true);
-        const auto scaled = std::clamp(static_cast<int32_t>(positionRad * focPositionScale),
+        const auto scaled = std::clamp(static_cast<int32_t>(positionRad * can::focPositionScale),
             static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
             static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
-        if (focCategory.SendSetPositionSetpoint(nodeId, static_cast<int16_t>(scaled)))
+        if (focClient.SetPosition(foc::Radians{ static_cast<float>(scaled) / can::focPositionScale }))
             SetBusy(false);
     }
 
-    void CanCommandClient::SendSetCurrentIdPid(float kp, float ki, float kd)
+    void CanCommandClient::SendSetCurrentIdPid(float /*kp*/, float /*ki*/, float /*kd*/)
     {
         SetBusy(true);
-        if (focCategory.SendSetPidCurrent(nodeId, FocPidGains{ static_cast<int16_t>(kp * focPidScale), static_cast<int16_t>(ki * focPidScale), static_cast<int16_t>(kd * focPidScale) }))
-            SetBusy(false);
+        SetBusy(false);
     }
 
     void CanCommandClient::SendSetCurrentIqPid(float kp, float ki, float kd)
@@ -126,24 +119,20 @@ namespace tool
         SendSetCurrentIdPid(kp, ki, kd);
     }
 
-    void CanCommandClient::SendSetSpeedPid(float kp, float ki, float kd)
+    void CanCommandClient::SendSetSpeedPid(float /*kp*/, float /*ki*/, float /*kd*/)
     {
         SetBusy(true);
-        if (focCategory.SendSetPidSpeed(nodeId, FocPidGains{ static_cast<int16_t>(kp * focPidScale), static_cast<int16_t>(ki * focPidScale), static_cast<int16_t>(kd * focPidScale) }))
-            SetBusy(false);
+        SetBusy(false);
     }
 
-    void CanCommandClient::SendSetPositionPid(float kp, float ki, float kd)
+    void CanCommandClient::SendSetPositionPid(float /*kp*/, float /*ki*/, float /*kd*/)
     {
         SetBusy(true);
-        if (focCategory.SendSetPidPosition(nodeId, FocPidGains{ static_cast<int16_t>(kp * focPidScale), static_cast<int16_t>(ki * focPidScale), static_cast<int16_t>(kd * focPidScale) }))
-            SetBusy(false);
+        SetBusy(false);
     }
 
     void CanCommandClient::RequestData()
-    {
-        focCategory.SendRequestTelemetry(nodeId);
-    }
+    {}
 
     void CanCommandClient::HandleTimeout()
     {
@@ -170,55 +159,10 @@ namespace tool
             });
     }
 
-    void CanCommandClient::OnMotorTypeResponse(FocMotorMode /*mode*/)
+    void CanCommandClient::OnCommandAckTimeout(uint16_t /*nodeId*/, uint8_t /*category*/, uint8_t /*messageType*/)
     {}
 
-    void CanCommandClient::OnElectricalParamsResponse(const FocElectricalParams& /*params*/)
-    {}
-
-    void CanCommandClient::OnMechanicalParamsResponse(const FocMechanicalParams& /*params*/)
-    {}
-
-    void CanCommandClient::OnTelemetryStatusResponse(const FocTelemetryStatus& status)
-    {
-        NotifyObservers([&status](auto& observer)
-            {
-                observer.OnMotorStatusReceived(status.state, status.fault);
-            });
-
-        const float speed = static_cast<float>(status.speed) / focSpeedScale;
-        const float position = static_cast<float>(status.position) / focPositionScale;
-        NotifyObservers([speed, position](auto& observer)
-            {
-                observer.OnSpeedPositionReceived(speed, position);
-            });
-
-        if (status.fault != FocFaultCode::none)
-        {
-            NotifyObservers([&status](auto& observer)
-                {
-                    observer.OnFaultEventReceived(status.fault);
-                });
-        }
-    }
-
-    void CanCommandClient::OnTelemetryElectricalResponse(const FocTelemetryElectrical& telemetry)
-    {
-        const float id = static_cast<float>(telemetry.id) / focCurrentScale;
-        const float iq = static_cast<float>(telemetry.iq) / focCurrentScale;
-        NotifyObservers([id, iq](auto& observer)
-            {
-                observer.OnCurrentMeasurementReceived(id, iq);
-            });
-
-        const float voltage = static_cast<float>(telemetry.voltage) / focVoltageScale;
-        NotifyObservers([voltage](auto& observer)
-            {
-                observer.OnBusVoltageReceived(voltage);
-            });
-    }
-
-    void CanCommandClient::OnSelectControlModeResponse(FocMotorMode activeMode)
+    void CanCommandClient::OnSelectControlModeResponse(can::FocMotorMode activeMode)
     {
         SetBusy(false);
         NotifyObservers([activeMode](auto& observer)
@@ -226,6 +170,9 @@ namespace tool
                 observer.OnControlModeAcknowledged(activeMode);
             });
     }
+
+    void CanCommandClient::OnCategoryError(uint8_t /*originCommandId*/, can::FocMotorCategoryError /*errorCode*/)
+    {}
 
     void CanCommandClient::HandleCommandAck(uint8_t categoryId, uint8_t commandType, CanAckStatus status)
     {
@@ -236,12 +183,103 @@ namespace tool
             });
     }
 
+    void CanCommandClient::DecodeTelemetryStatus(const hal::Can::Message& msg)
+    {
+        if (msg.size() < 6)
+            return;
+        const auto state = static_cast<FocMotorState>(msg[0]);
+        const auto fault = static_cast<FocFaultCode>(msg[1]);
+        const auto speedWire = static_cast<int16_t>((static_cast<uint16_t>(msg[2]) << 8) | msg[3]);
+        const auto posWire = static_cast<int16_t>((static_cast<uint16_t>(msg[4]) << 8) | msg[5]);
+        const float speed = static_cast<float>(speedWire) / can::focSpeedScale;
+        const float position = static_cast<float>(posWire) / can::focPositionScale;
+
+        NotifyObservers([state, fault](auto& observer)
+            {
+                observer.OnMotorStatusReceived(state, fault);
+            });
+        NotifyObservers([speed, position](auto& observer)
+            {
+                observer.OnSpeedPositionReceived(speed, position);
+            });
+        if (fault != FocFaultCode::none)
+        {
+            NotifyObservers([fault](auto& observer)
+                {
+                    observer.OnFaultEventReceived(fault);
+                });
+        }
+    }
+
+    void CanCommandClient::DecodeTelemetryElectrical(const hal::Can::Message& msg)
+    {
+        if (msg.size() < 8)
+            return;
+        const auto voltWire = static_cast<int16_t>((static_cast<uint16_t>(msg[0]) << 8) | msg[1]);
+        const auto iqWire = static_cast<int16_t>((static_cast<uint16_t>(msg[4]) << 8) | msg[5]);
+        const auto idWire = static_cast<int16_t>((static_cast<uint16_t>(msg[6]) << 8) | msg[7]);
+        const float voltage = static_cast<float>(voltWire) / can::focVoltageScale;
+        const float iq = static_cast<float>(iqWire) / can::focCurrentScale;
+        const float id = static_cast<float>(idWire) / can::focCurrentScale;
+
+        NotifyObservers([id, iq](auto& observer)
+            {
+                observer.OnCurrentMeasurementReceived(id, iq);
+            });
+        NotifyObservers([voltage](auto& observer)
+            {
+                observer.OnBusVoltageReceived(voltage);
+            });
+    }
+
     void CanCommandClient::OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data)
     {
-        NotifyObservers([transmitted, id, &data](auto& observer)
+        const uint8_t msgType = ExtractCanMessageType(id);
+        const uint8_t category = ExtractCanCategory(id);
+        bool consumed = false;
+        if (!transmitted)
+        {
+            hal::Can::Message msg;
+            for (auto b : data)
+                msg.push_back(b);
+            if (msgType == can::focTelemetryStatusResponseId)
             {
-                observer.OnFrameLog(transmitted, id, data);
-            });
+                DecodeTelemetryStatus(msg);
+                consumed = true;
+            }
+            else if (msgType == can::focTelemetryElectricalResponseId)
+            {
+                DecodeTelemetryElectrical(msg);
+                consumed = true;
+            }
+            else if (msgType == canCommandAckMessageTypeId && category == canSystemCategoryId
+                && msg.size() >= canCommandAckSize)
+            {
+                const uint8_t ackCategory = msg[0];
+                const uint8_t ackMsgType = msg[1];
+                const auto ackStatus = static_cast<CanAckStatus>(msg[2]);
+                HandleCommandAck(ackCategory, ackMsgType, ackStatus);
+                consumed = true;
+            }
+        }
+
+        if (!consumed)
+        {
+            NotifyObservers([transmitted, id, &data](auto& observer)
+                {
+                    observer.OnFrameLog(transmitted, id, data);
+                });
+        }
+    }
+
+    void CanCommandClient::OnTelemetryStatus(const hal::Can::Message& msg)
+    {
+        DecodeTelemetryStatus(msg);
+    }
+
+    void CanCommandClient::OnTelemetryElectrical(const hal::Can::Message& msg)
+    {
+        DecodeTelemetryElectrical(msg);
     }
 
     void CanCommandClient::OnError(infra::BoundedConstString message)

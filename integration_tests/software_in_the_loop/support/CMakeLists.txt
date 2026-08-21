@@ -21,6 +21,7 @@ target_include_directories(e_foc.integration_tests.support PUBLIC
 
 target_link_libraries(e_foc.integration_tests.support PUBLIC
     e_foc.state_machine
+    e_foc.can
     e_foc.foc.cascade
     e_foc.platform_abstraction
     e_foc.platform_abstraction_mock
@@ -30,7 +31,6 @@ target_link_libraries(e_foc.integration_tests.support PUBLIC
     e_foc.services.mechanical_system_ident_mock
     e_foc.foc_mock
     can_lite.test_util
-    can_lite.categories.foc_motor
     hal.interfaces_test_doubles
     infra.event_test_helper
     infra.util_test_helper

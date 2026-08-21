@@ -9,12 +9,12 @@ target_include_directories(e_foc.sync_foc_sensored.main.inst PUBLIC
 target_link_libraries(e_foc.sync_foc_sensored.main.inst PUBLIC
     e_foc.platform_abstraction
     e_foc.state_machine
+    e_foc.can
     e_foc.foc.cascade
     e_foc.services.cli
     e_foc.services.electrical_system_ident
     e_foc.services.alignment
     e_foc.services.non_volatile_memory
-    can_lite.categories.foc_motor
     numerical.controllers.implementations
     services.peripheral
 )
