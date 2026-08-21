@@ -15,6 +15,7 @@
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/stream/OutputStream.hpp"
 #include "infra/stream/test/StreamMock.hpp"
+#include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/Function.hpp"
 #include "integration_tests/software_in_the_loop/support/EepromStub.hpp"
 #include "integration_tests/software_in_the_loop/support/FocMotorStateMachineBridge.hpp"

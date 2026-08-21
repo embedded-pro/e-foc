@@ -252,8 +252,7 @@ namespace tool
                 DecodeTelemetryElectrical(msg);
                 consumed = true;
             }
-            else if (msgType == canCommandAckMessageTypeId && category == canSystemCategoryId
-                && msg.size() >= canCommandAckSize)
+            else if (msgType == canCommandAckMessageTypeId && category == canSystemCategoryId && msg.size() >= canCommandAckSize)
             {
                 const uint8_t ackCategory = msg[0];
                 const uint8_t ackMsgType = msg[1];

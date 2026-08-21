@@ -24,7 +24,7 @@ namespace application
 
                 tracingCan.emplace(this->hardware.CanBus(), this->hardware.Tracer());
                 canServer.emplace(*tracingCan, services::CanProtocolServer::Config{
-                    .nodeId = static_cast<uint16_t>(this->configData.canNodeId) });
+                                                   .nodeId = static_cast<uint16_t>(this->configData.canNodeId) });
                 tracingServerObserver.emplace(*canServer, this->hardware.Tracer());
                 motorCanServer.emplace(canServer->Transport());
                 canServer->RegisterCategory(*motorCanServer);

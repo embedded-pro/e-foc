@@ -7,14 +7,14 @@ component: can-service
 date: 2026-08-21
 ---
 
-| Field     | Value                     |
-|-----------|---------------------------|
-| Title     | CAN Service Layer Design  |
-| Type      | design                    |
-| Status    | draft                     |
-| Version   | 0.1.0                     |
-| Component | can-service               |
-| Date      | 2026-08-21                |
+| Field     | Value                    |
+|-----------|--------------------------|
+| Title     | CAN Service Layer Design |
+| Type      | design                   |
+| Status    | draft                    |
+| Version   | 0.1.0                    |
+| Component | can-service              |
+| Date      | 2026-08-21               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -54,15 +54,15 @@ The category occupies slot `0x02` (the first application-reserved category ID). 
 
 Physical-to-wire conversions use fixed-point scale factors:
 
-| Quantity  | Wire type | Scale factor | Example                          |
-|-----------|-----------|--------------|----------------------------------|
-| Current   | int16     | 10           | 1.5 A → 15 wire                  |
-| Speed     | int16     | 1            | 300 rad/s → 300 wire             |
-| Position  | int16     | 100          | 3.14 rad → 314 wire              |
-| Voltage   | int16     | 10           | 24.0 V → 240 wire                |
-| PID gain  | int16     | 1            | passed through unscaled          |
-| Resistance| int16     | 1000         | 0.5 Ω → 500 wire                 |
-| Inductance| int16     | 1000         | 1.0 mH → 1000 wire               |
+| Quantity   | Wire type | Scale factor | Example                 |
+|------------|-----------|--------------|-------------------------|
+| Current    | int16     | 10           | 1.5 A → 15 wire         |
+| Speed      | int16     | 1            | 300 rad/s → 300 wire    |
+| Position   | int16     | 100          | 3.14 rad → 314 wire     |
+| Voltage    | int16     | 10           | 24.0 V → 240 wire       |
+| PID gain   | int16     | 1            | passed through unscaled |
+| Resistance | int16     | 1000         | 0.5 Ω → 500 wire        |
+| Inductance | int16     | 1000         | 1.0 mH → 1000 wire      |
 
 ### Part B — FocMotorCategoryServer
 
@@ -104,11 +104,11 @@ Provides the same `Send*` API as `FocMotorCategoryClient` but hides the transpor
 
 All tracing is applied via `can-lite`'s decorator classes:
 
-| Decorator                        | Wraps                   | Traces                                         |
-|----------------------------------|-------------------------|------------------------------------------------|
-| `TracingCan`                     | `hal::Can`              | Every raw CAN frame sent and received          |
-| `TracingCanProtocolServerObserver` | `CanProtocolServer`   | Server online/offline events                   |
-| `TracingCanProtocolClientObserver` | `CanProtocolClient`   | Server online/offline, ACK timeouts per node   |
+| Decorator                          | Wraps               | Traces                                       |
+|------------------------------------|---------------------|----------------------------------------------|
+| `TracingCan`                       | `hal::Can`          | Every raw CAN frame sent and received        |
+| `TracingCanProtocolServerObserver` | `CanProtocolServer` | Server online/offline events                 |
+| `TracingCanProtocolClientObserver` | `CanProtocolClient` | Server online/offline, ACK timeouts per node |
 
 These are composed in the instantiation layer (`Logic.hpp`) so the production code paths gain full observability without any tracing logic in the category or bridge classes themselves.
 
@@ -118,32 +118,32 @@ These are composed in the instantiation layer (`Logic.hpp`) so the production co
 
 ### Provided
 
-| Interface                      | Purpose                                                                           | Contract                                                                         |
-|--------------------------------|-----------------------------------------------------------------------------------|----------------------------------------------------------------------------------|
-| FocMotorCategoryServerObserver | Observer interface for the server category                                        | Callbacks must not block or allocate; called from the event dispatcher context   |
-| FocMotorCategoryClientObserver | Observer interface for the client category                                        | Callbacks must not block or allocate                                              |
-| FocMotorCanClient public API   | User-facing send methods (`Start`, `Stop`, `SetTorque`, `SetSpeed`, `SetPosition`) | Returns `bool` indicating whether the frame was queued; ACK is delivered async   |
+| Interface                      | Purpose                                                                            | Contract                                                                       |
+|--------------------------------|------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| FocMotorCategoryServerObserver | Observer interface for the server category                                         | Callbacks must not block or allocate; called from the event dispatcher context |
+| FocMotorCategoryClientObserver | Observer interface for the client category                                         | Callbacks must not block or allocate                                           |
+| FocMotorCanClient public API   | User-facing send methods (`Start`, `Stop`, `SetTorque`, `SetSpeed`, `SetPosition`) | Returns `bool` indicating whether the frame was queued; ACK is delivered async |
 
 ### Required
 
-| Interface                 | Purpose                                          | Contract                                                                  |
-|---------------------------|--------------------------------------------------|---------------------------------------------------------------------------|
-| `CanFrameTransport`       | Sends and receives raw CAN frames                | Provided by `can-lite`; must be constructed before the category objects   |
-| `ControlModeStateMachine` | Accepts motor control commands                   | All methods are synchronous or deliver results via `infra::Function`      |
-| `hal::Can`                | Raw CAN bus access                               | Required by `CanProtocolServer` and `CanProtocolClient`                   |
-| `services::Tracer`        | Diagnostic output                                | Must outlive the tracing decorator objects                                |
+| Interface                 | Purpose                           | Contract                                                                |
+|---------------------------|-----------------------------------|-------------------------------------------------------------------------|
+| `CanFrameTransport`       | Sends and receives raw CAN frames | Provided by `can-lite`; must be constructed before the category objects |
+| `ControlModeStateMachine` | Accepts motor control commands    | All methods are synchronous or deliver results via `infra::Function`    |
+| `hal::Can`                | Raw CAN bus access                | Required by `CanProtocolServer` and `CanProtocolClient`                 |
+| `services::Tracer`        | Diagnostic output                 | Must outlive the tracing decorator objects                              |
 
 ---
 
 ## Data Model
 
-| Entity                  | Field          | Type / Unit | Range                 | Notes                            |
-|-------------------------|----------------|-------------|------------------------|----------------------------------|
-| FocMotorMode            | mode           | enum uint8  | torque=0, speed=1, position=2 | Transmitted as single byte |
-| Torque setpoint         | iq             | int16 wire  | INT16_MIN – INT16_MAX  | Physical = wire / 10 [A]        |
-| Speed setpoint          | speed          | int16 wire  | INT16_MIN – INT16_MAX  | Physical = wire / 1 [rad/s]     |
-| Position setpoint       | position       | int16 wire  | INT16_MIN – INT16_MAX  | Physical = wire / 100 [rad]     |
-| FocMotorCategoryError   | code           | enum uint8  | 0–5                    | See FocMotorMessages.hpp        |
+| Entity                | Field    | Type / Unit | Range                         | Notes                       |
+|-----------------------|----------|-------------|-------------------------------|-----------------------------|
+| FocMotorMode          | mode     | enum uint8  | torque=0, speed=1, position=2 | Transmitted as single byte  |
+| Torque setpoint       | iq       | int16 wire  | INT16_MIN – INT16_MAX         | Physical = wire / 10 [A]    |
+| Speed setpoint        | speed    | int16 wire  | INT16_MIN – INT16_MAX         | Physical = wire / 1 [rad/s] |
+| Position setpoint     | position | int16 wire  | INT16_MIN – INT16_MAX         | Physical = wire / 100 [rad] |
+| FocMotorCategoryError | code     | enum uint8  | 0–5                           | See FocMotorMessages.hpp    |
 
 ---
 
@@ -228,20 +228,20 @@ graph LR
 
 ## Constraints & Limitations
 
-| Constraint                   | Value / Description                                                                              |
-|------------------------------|--------------------------------------------------------------------------------------------------|
-| Stub command policy          | Commands not yet implemented return `applicationError` via `SendCategoryError` immediately       |
-| No heap                      | All objects are value members or statically allocated; `infra::Function` for callbacks           |
-| One observer per server      | `CanCategoryServer` uses `infra::Subject<Observer>` — only one bridge may attach at a time       |
-| Setpoint range               | Torque: bounded by inverter `MaxCurrentSupported`; speed: 1000 rad/s; position: ±2π rad         |
-| Sequence byte                | Server handlers always skip the first byte (sequence number) before reading payload fields       |
+| Constraint              | Value / Description                                                                        |
+|-------------------------|--------------------------------------------------------------------------------------------|
+| Stub command policy     | Commands not yet implemented return `applicationError` via `SendCategoryError` immediately |
+| No heap                 | All objects are value members or statically allocated; `infra::Function` for callbacks     |
+| One observer per server | `CanCategoryServer` uses `infra::Subject<Observer>` — only one bridge may attach at a time |
+| Setpoint range          | Torque: bounded by inverter `MaxCurrentSupported`; speed: 1000 rad/s; position: ±2π rad    |
+| Sequence byte           | Server handlers always skip the first byte (sequence number) before reading payload fields |
 
 ---
 
 ## Open Questions
 
-| # | Question                                                          | Options                                               | Status |
-|---|-------------------------------------------------------------------|-------------------------------------------------------|--------|
-| 1 | Implement telemetry push (BroadcastFaultStatus, periodic status)  | Periodic timer vs on-demand vs fault-triggered        | open   |
-| 2 | PID gain commands                                                 | Accept and persist vs remain applicationError         | open   |
-| 3 | Mechanical identification via CAN                                 | Delegate to existing service vs stub                  | open   |
+| # | Question                                                         | Options                                        | Status |
+|---|------------------------------------------------------------------|------------------------------------------------|--------|
+| 1 | Implement telemetry push (BroadcastFaultStatus, periodic status) | Periodic timer vs on-demand vs fault-triggered | open   |
+| 2 | PID gain commands                                                | Accept and persist vs remain applicationError  | open   |
+| 3 | Mechanical identification via CAN                                | Delegate to existing service vs stub           | open   |

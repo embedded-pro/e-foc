@@ -19,7 +19,6 @@
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/test_doubles/FaultNotifierMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
-#include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/stream/OutputStream.hpp"
 #include "infra/stream/test/StreamMock.hpp"
 #include "infra/util/Function.hpp"
