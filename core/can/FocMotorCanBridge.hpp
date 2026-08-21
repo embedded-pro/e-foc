@@ -4,6 +4,7 @@
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/state_machine/ControlMode.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
+#include "core/state_machine/FaultNotifier.hpp"
 #include "infra/util/Function.hpp"
 #include "services/tracer/Tracer.hpp"
 
@@ -21,6 +22,8 @@ namespace can
 
         static constexpr float maxPositionSetpoint{ 6.2831853f };
         static constexpr float maxSpeedSetpoint{ 1000.0f };
+
+        void BroadcastFault(state_machine::FaultCode code);
 
         void OnStart(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnStop(const infra::Function<void(services::CanAckStatus)>& onDone) override;
@@ -41,6 +44,8 @@ namespace can
         void OnConfigureTelemetryRate(const infra::Function<void()>& onDone) override;
 
     private:
+        static FocFaultCode ToCanFaultCode(state_machine::FaultCode code);
+
         void ReportCommandOutcome(uint8_t commandId, state_machine::CommandResult result,
             const infra::Function<void(services::CanAckStatus)>& onDone);
         void ReportSelectFailure(state_machine::SelectResult result);

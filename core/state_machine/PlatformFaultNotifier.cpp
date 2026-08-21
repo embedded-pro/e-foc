@@ -7,8 +7,11 @@ namespace state_machine
     {
         platform.RegisterBoardProtection([this](application::PlatformFactory::BoardProtectionReason reason)
             {
+                const auto code = ToFaultCode(reason);
                 if (onFault != nullptr)
-                    onFault(ToFaultCode(reason));
+                    onFault(code);
+                if (onFaultSecondary != nullptr)
+                    onFaultSecondary(code);
             });
     }
 
@@ -17,9 +20,19 @@ namespace state_machine
         this->onFault = onFault;
         platform.CanBus().SetOnError([this](application::CanBusAdapter::CanError error)
             {
-                if (error == application::CanBusAdapter::CanError::busOff && this->onFault != nullptr)
-                    this->onFault(FaultCode::hardwareFault);
+                if (error == application::CanBusAdapter::CanError::busOff)
+                {
+                    if (this->onFault != nullptr)
+                        this->onFault(FaultCode::hardwareFault);
+                    if (this->onFaultSecondary != nullptr)
+                        this->onFaultSecondary(FaultCode::hardwareFault);
+                }
             });
+    }
+
+    void PlatformFaultNotifier::RegisterSecondary(const infra::Function<void(FaultCode)>& onFault)
+    {
+        this->onFaultSecondary = onFault;
     }
 
     FaultCode PlatformFaultNotifier::ToFaultCode(application::PlatformFactory::BoardProtectionReason reason)

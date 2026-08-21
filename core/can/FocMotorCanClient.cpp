@@ -4,9 +4,8 @@ namespace can
 {
     FocMotorCanClient::FocMotorCanClient(hal::Can& can, uint16_t targetNodeId)
         : nodeId{ targetNodeId }
-        , transport{ can, targetNodeId }
         , protocolClient{ can }
-        , categoryClient{ transport, protocolClient }
+        , categoryClient{ protocolClient.Transport(), protocolClient }
     {
         protocolClient.RegisterCategory(categoryClient);
     }

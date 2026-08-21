@@ -108,30 +108,33 @@ namespace tool
             SetBusy(false);
     }
 
-    void CanCommandClient::SendSetCurrentIdPid(float /*kp*/, float /*ki*/, float /*kd*/)
+    void CanCommandClient::CompleteImmediately()
     {
         SetBusy(true);
         SetBusy(false);
     }
 
-    void CanCommandClient::SendSetCurrentIqPid(float kp, float ki, float kd)
+    void CanCommandClient::SendSetCurrentIdPid(float /*kp*/, float /*ki*/, float /*kd*/)
     {
-        SendSetCurrentIdPid(kp, ki, kd);
+        CompleteImmediately();
+    }
+
+    void CanCommandClient::SendSetCurrentIqPid(float /*kp*/, float /*ki*/, float /*kd*/)
+    {
+        CompleteImmediately();
     }
 
     void CanCommandClient::SendSetSpeedPid(float /*kp*/, float /*ki*/, float /*kd*/)
     {
-        SetBusy(true);
-        SetBusy(false);
+        CompleteImmediately();
     }
 
     void CanCommandClient::SendSetPositionPid(float /*kp*/, float /*ki*/, float /*kd*/)
     {
-        SetBusy(true);
-        SetBusy(false);
+        CompleteImmediately();
     }
 
-    void CanCommandClient::RequestData()
+    void CanCommandClient::RequestData() const
     {}
 
     void CanCommandClient::HandleTimeout()
@@ -183,7 +186,7 @@ namespace tool
             });
     }
 
-    void CanCommandClient::DecodeTelemetryStatus(const hal::Can::Message& msg)
+    void CanCommandClient::DecodeTelemetryStatus(const hal::Can::Message& msg) const
     {
         if (msg.size() < 6)
             return;
@@ -211,7 +214,7 @@ namespace tool
         }
     }
 
-    void CanCommandClient::DecodeTelemetryElectrical(const hal::Can::Message& msg)
+    void CanCommandClient::DecodeTelemetryElectrical(const hal::Can::Message& msg) const
     {
         if (msg.size() < 8)
             return;

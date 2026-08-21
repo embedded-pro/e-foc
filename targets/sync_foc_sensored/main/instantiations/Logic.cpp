@@ -1,4 +1,5 @@
 #include "targets/sync_foc_sensored/main/instantiations/Logic.hpp"
+#include "infra/event/EventDispatcher.hpp"
 
 namespace application
 {
@@ -41,6 +42,13 @@ namespace application
                         this->hardware.BaseFrequency(),
                         this->hardware.LowPriorityInterrupt() });
                 canBridge.emplace(*motorCanServer, *controlMode, this->hardware, this->hardware.Tracer());
+                platformFaultNotifier.RegisterSecondary([this](state_machine::FaultCode code)
+                    {
+                        infra::EventDispatcher::Instance().Schedule([this, code]()
+                            {
+                                canBridge->BroadcastFault(code);
+                            });
+                    });
             });
     }
 }

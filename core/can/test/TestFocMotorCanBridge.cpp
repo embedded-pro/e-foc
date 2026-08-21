@@ -103,6 +103,7 @@ namespace
                 .WillRepeatedly(Invoke([this](hal::Can::Id id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
                     {
                         lastSentMsgType = services::ExtractCanMessageType(id.Get29BitId());
+                        lastSentData = msg;
                         if (lastSentMsgType == services::canCategoryErrorResponseMessageTypeId && msg.size() >= 2)
                         {
                             categoryErrorSent = true;
@@ -229,6 +230,7 @@ namespace
         std::optional<can::FocMotorCanBridge> bridge;
 
         uint8_t lastSentMsgType{};
+        hal::Can::Message lastSentData;
         bool categoryErrorSent{ false };
         uint8_t lastCategoryErrorOriginCmd{};
         can::FocMotorCategoryError lastCategoryError{ can::FocMotorCategoryError::busy };
@@ -437,6 +439,191 @@ namespace
         ASSERT_TRUE(ackSpy.last.has_value());
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
         EXPECT_FALSE(selectResponseSent);
+    }
+
+    // OnSelectControlMode — busy path (second select while one is pending)
+    TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_WhilePending_RejectsBusy)
+    {
+        ConstructFixture();
+
+        EXPECT_CALL(nvmMock, SaveConfig(_, _)).Times(AnyNumber());
+
+        hal::Can::Message data;
+        data.resize(2, 0);
+        data[1] = static_cast<uint8_t>(can::FocMotorMode::speed);
+        motorServer->HandleMessage(can::focSelectControlModeId, data);
+
+        ResetCaptures();
+        motorServer->HandleMessage(can::focSelectControlModeId, data);
+        ExecuteAllActions();
+
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
+    }
+
+    // OnSelectControlMode — invalid mode byte
+    TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_InvalidMode_RejectsInvalidPayload)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        hal::Can::Message data;
+        data.resize(2, 0);
+        data[1] = 0xFF;
+        Dispatch(can::focSelectControlModeId, data);
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+        EXPECT_FALSE(selectResponseSent);
+    }
+
+    // OnSelectControlMode — select rejected (motor enabled)
+    TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_WhenEnabled_RejectsWithCategoryError)
+    {
+        ConstructFixtureInReady();
+        Dispatch(can::focStartId, {});
+        ResetCaptures();
+
+        EXPECT_CALL(nvmMock, SaveConfig(_, _)).Times(0);
+
+        hal::Can::Message data;
+        data.resize(2, 0);
+        data[1] = static_cast<uint8_t>(can::FocMotorMode::speed);
+        Dispatch(can::focSelectControlModeId, data);
+
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_FALSE(selectResponseSent);
+    }
+
+    // Remaining stub handlers — REQ-INT-011
+    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_ReturnsApplicationError)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        Dispatch(can::focIdentifyElectricalId, {});
+
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryErrorOriginCmd, can::focIdentifyElectricalId);
+        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::applicationError);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_ReturnsApplicationError)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        Dispatch(can::focIdentifyMechanicalId, {});
+
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::applicationError);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_ReturnsApplicationError)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        Dispatch(can::focRequestTelemetryId, {});
+
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::applicationError);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnSetEncoderResolution_ReturnsApplicationError)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        Dispatch(can::focSetEncoderResolutionId, {});
+
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::applicationError);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_ReturnsApplicationError)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        Dispatch(can::focConfigureTelemetryRateId, {});
+
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::applicationError);
+    }
+
+    // REQ-INT-013 — BroadcastFault sends telemetry status frame with fault state
+    TEST_F(FocMotorCanBridgeTest, BroadcastFault_Overcurrent_EmitsTelemetryStatusFrameWithFaultState)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        bridge->BroadcastFault(state_machine::FaultCode::overcurrent);
+
+        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+        ASSERT_GE(lastSentData.size(), 2u);
+        EXPECT_EQ(lastSentData[0], static_cast<uint8_t>(can::FocMotorState::fault));
+        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::overCurrent));
+    }
+
+    TEST_F(FocMotorCanBridgeTest, BroadcastFault_Overvoltage_MapsToOverVoltage)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        bridge->BroadcastFault(state_machine::FaultCode::overvoltage);
+
+        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+        ASSERT_GE(lastSentData.size(), 2u);
+        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::overVoltage));
+    }
+
+    TEST_F(FocMotorCanBridgeTest, BroadcastFault_Overtemperature_MapsToOverTemperature)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        bridge->BroadcastFault(state_machine::FaultCode::overtemperature);
+
+        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+        ASSERT_GE(lastSentData.size(), 2u);
+        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::overTemperature));
+    }
+
+    TEST_F(FocMotorCanBridgeTest, BroadcastFault_EncoderLoss_MapsToSensorFault)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        bridge->BroadcastFault(state_machine::FaultCode::encoderLoss);
+
+        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+        ASSERT_GE(lastSentData.size(), 2u);
+        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::sensorFault));
+    }
+
+    TEST_F(FocMotorCanBridgeTest, BroadcastFault_HardwareFault_MapsToNone)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        bridge->BroadcastFault(state_machine::FaultCode::hardwareFault);
+
+        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+        ASSERT_GE(lastSentData.size(), 2u);
+        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::none));
+    }
+
+    TEST_F(FocMotorCanBridgeTest, BroadcastFault_TelemetryFrame_HasSixBytesWithZeroSpeedAndPosition)
+    {
+        ConstructFixture();
+        ResetCaptures();
+
+        bridge->BroadcastFault(state_machine::FaultCode::overcurrent);
+
+        ASSERT_EQ(lastSentData.size(), 6u);
+        EXPECT_EQ(services::CanFrameCodec::ReadInt16(lastSentData, 2), 0);
+        EXPECT_EQ(services::CanFrameCodec::ReadInt16(lastSentData, 4), 0);
     }
 
     // REQ-INT-012 — ctor emits one trace line

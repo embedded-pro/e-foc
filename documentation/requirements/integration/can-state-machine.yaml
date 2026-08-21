@@ -86,3 +86,13 @@
     and attach TracingCanProtocolServerObserver to the CanProtocolServer so that every
     CAN frame and every server online/offline event is emitted to the system tracer.
     The client path shall similarly attach TracingCanProtocolClientObserver.
+
+- id: REQ-INT-013
+  title: Hardware faults are broadcast over CAN as telemetry status frames
+  shall: >
+    When a hardware fault is detected by PlatformFaultNotifier, FocMotorCanBridge
+    shall immediately broadcast a telemetry status frame (focTelemetryStatusResponseId)
+    with FocMotorState::fault and the mapped FocFaultCode. The broadcast shall be
+    synchronous and shall not depend on any prior CAN command. FaultCode values are
+    mapped as follows: overcurrent→overCurrent, overvoltage→overVoltage,
+    overtemperature→overTemperature, encoderLoss→sensorFault; all other codes→none.

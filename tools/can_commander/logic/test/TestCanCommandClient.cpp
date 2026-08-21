@@ -116,6 +116,23 @@ namespace
             });
     }
 
+    TEST_F(TestCanCommandClient, category_error_received_does_not_call_any_observer)
+    {
+        EXPECT_CALL(observer, OnConnectionChanged(true));
+
+        hal::Can::Message data;
+        data.push_back(can::focStartId);
+        data.push_back(static_cast<uint8_t>(can::FocMotorCategoryError::busy));
+
+        auto canId = hal::Can::Id::Create29BitId(
+            services::MakeCanId(services::CanPriority::response,
+                can::focMotorCategoryId,
+                services::canCategoryErrorResponseMessageTypeId,
+                1));
+        receiveCallback(canId, data);
+        // StrictMock: OnCategoryError is a no-op — no observer method should fire
+    }
+
     // ---------- Command busy management ----------
 
     TEST_F(TestCanCommandClient, send_start_motor_clears_busy)

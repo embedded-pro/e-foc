@@ -17,6 +17,23 @@ namespace can
         tracer.Trace() << "FocMotorCanBridge: initialised";
     }
 
+    void FocMotorCanBridge::BroadcastFault(state_machine::FaultCode code)
+    {
+        server.BroadcastFaultStatus(ToCanFaultCode(code));
+    }
+
+    FocFaultCode FocMotorCanBridge::ToCanFaultCode(state_machine::FaultCode code)
+    {
+        switch (code)
+        {
+            case state_machine::FaultCode::overcurrent:     return FocFaultCode::overCurrent;
+            case state_machine::FaultCode::overvoltage:     return FocFaultCode::overVoltage;
+            case state_machine::FaultCode::overtemperature: return FocFaultCode::overTemperature;
+            case state_machine::FaultCode::encoderLoss:     return FocFaultCode::sensorFault;
+            default:                                         return FocFaultCode::none;
+        }
+    }
+
     void FocMotorCanBridge::OnStart(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
         ReportCommandOutcome(can::focStartId, controlMode.ActiveStateMachine().CmdEnable(), onDone);
@@ -104,49 +121,41 @@ namespace can
     void FocMotorCanBridge::OnSetPidCurrent(const infra::Function<void()>&)
     {
         server.SendCategoryError(can::focSetPidCurrentId, FocMotorCategoryError::applicationError);
-        // TODO(next-iteration): implement SetPidCurrent
     }
 
     void FocMotorCanBridge::OnSetPidSpeed(const infra::Function<void()>&)
     {
         server.SendCategoryError(can::focSetPidSpeedId, FocMotorCategoryError::applicationError);
-        // TODO(next-iteration): implement SetPidSpeed
     }
 
     void FocMotorCanBridge::OnSetPidPosition(const infra::Function<void()>&)
     {
         server.SendCategoryError(can::focSetPidPositionId, FocMotorCategoryError::applicationError);
-        // TODO(next-iteration): implement SetPidPosition
     }
 
     void FocMotorCanBridge::OnIdentifyElectrical(const infra::Function<void()>&)
     {
         server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::applicationError);
-        // TODO(next-iteration): implement IdentifyElectrical
     }
 
     void FocMotorCanBridge::OnIdentifyMechanical(const infra::Function<void()>&)
     {
         server.SendCategoryError(can::focIdentifyMechanicalId, FocMotorCategoryError::applicationError);
-        // TODO(next-iteration): implement IdentifyMechanical
     }
 
     void FocMotorCanBridge::OnRequestTelemetry(const infra::Function<void()>&)
     {
         server.SendCategoryError(can::focRequestTelemetryId, FocMotorCategoryError::applicationError);
-        // TODO(next-iteration): implement RequestTelemetry
     }
 
     void FocMotorCanBridge::OnSetEncoderResolution(const infra::Function<void()>&)
     {
         server.SendCategoryError(can::focSetEncoderResolutionId, FocMotorCategoryError::applicationError);
-        // TODO(next-iteration): implement SetEncoderResolution
     }
 
     void FocMotorCanBridge::OnConfigureTelemetryRate(const infra::Function<void()>&)
     {
         server.SendCategoryError(can::focConfigureTelemetryRateId, FocMotorCategoryError::applicationError);
-        // TODO(next-iteration): implement ConfigureTelemetryRate
     }
 
     void FocMotorCanBridge::ReportCommandOutcome(uint8_t commandId, state_machine::CommandResult result,

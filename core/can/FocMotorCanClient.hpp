@@ -1,7 +1,6 @@
 #pragma once
 
 #include "can-lite/client/CanProtocolClient.hpp"
-#include "can-lite/core/CanFrameTransport.hpp"
 #include "core/can/FocMotorCategoryClient.hpp"
 #include "core/can/FocMotorMessages.hpp"
 #include "core/foc/interfaces/Units.hpp"
@@ -29,7 +28,6 @@ namespace can
 
     private:
         uint16_t nodeId;
-        services::CanFrameTransport transport;
         services::CanProtocolClient protocolClient;
         FocMotorCategoryClient categoryClient;
     };

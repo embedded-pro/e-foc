@@ -82,11 +82,12 @@ namespace tool
         void SendSetSpeedPid(float kp, float ki, float kd);
         void SendSetPositionPid(float kp, float ki, float kd);
 
-        void RequestData();
+        void RequestData() const;
         void HandleTimeout();
 
     private:
         void SetBusy(bool newBusy);
+        void CompleteImmediately();
 
         // CanProtocolClientObserver
         void OnServerOnline(uint16_t nodeId) override;
@@ -105,11 +106,11 @@ namespace tool
         void OnConnectionChanged(bool connected) override;
 
         void HandleCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status);
-        void DecodeTelemetryStatus(const hal::Can::Message& msg);
-        void DecodeTelemetryElectrical(const hal::Can::Message& msg);
+        void DecodeTelemetryStatus(const hal::Can::Message& msg) const;
+        void DecodeTelemetryElectrical(const hal::Can::Message& msg) const;
 
-        can::FocMotorCanClient focClient;
         uint16_t nodeId{ 1 };
+        can::FocMotorCanClient focClient;
         bool busy{ false };
     };
 }

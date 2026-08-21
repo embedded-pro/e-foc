@@ -48,8 +48,11 @@ namespace can
 
         uint8_t Id() const override;
 
+        using services::CanCategoryServer::SendCategoryError;
+
         void SendSelectControlModeResponse(FocMotorMode activeMode);
         void SendCategoryError(uint8_t origCommandId, FocMotorCategoryError errorCode);
+        void BroadcastFaultStatus(FocFaultCode fault);
 
     private:
         void HandleStart(const hal::Can::Message& data);

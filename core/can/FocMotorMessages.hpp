@@ -39,6 +39,24 @@ namespace can
         position = 2
     };
 
+    enum class FocMotorState : uint8_t
+    {
+        idle = 0,
+        running = 1,
+        fault = 2,
+        calibrating = 3
+    };
+
+    enum class FocFaultCode : uint8_t
+    {
+        none = 0,
+        overCurrent = 1,
+        overVoltage = 2,
+        underVoltage = 3,
+        overTemperature = 4,
+        sensorFault = 5
+    };
+
     enum class FocMotorCategoryError : uint8_t
     {
         busy = 0,

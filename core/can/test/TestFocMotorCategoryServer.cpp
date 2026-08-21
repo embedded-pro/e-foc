@@ -274,4 +274,94 @@ namespace
         ASSERT_TRUE(ackSpy.last.has_value());
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
     }
+
+    TEST_F(FocMotorCategoryServerTest, HandleSelectControlMode_InvalidMode_AcksInvalidPayload)
+    {
+        hal::Can::Message data;
+        data.push_back(0);
+        data.push_back(0xFF);
+        server.HandleMessage(can::focSelectControlModeId, data);
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    }
+
+    TEST_F(FocMotorCategoryServerTest, HandleSetTorqueSetpoint_ShortPayload_AcksInvalidPayload)
+    {
+        server.HandleMessage(can::focSetTorqueSetpointId, MakePayload(1));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    }
+
+    TEST_F(FocMotorCategoryServerTest, HandleSetSpeedSetpoint_ShortPayload_AcksInvalidPayload)
+    {
+        server.HandleMessage(can::focSetSpeedSetpointId, MakePayload(1));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    }
+
+    TEST_F(FocMotorCategoryServerTest, HandleSetPositionSetpoint_ShortPayload_AcksInvalidPayload)
+    {
+        server.HandleMessage(can::focSetPositionSetpointId, MakePayload(1));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    }
+
+    TEST_F(FocMotorCategoryServerTest, HandleIdentifyElectrical_InvokesObserver)
+    {
+        EXPECT_CALL(observer, OnIdentifyElectrical(_))
+            .WillOnce(Invoke([](const infra::Function<void()>& done) { done(); }));
+
+        server.HandleMessage(can::focIdentifyElectricalId, MakePayload(1));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    }
+
+    TEST_F(FocMotorCategoryServerTest, HandleIdentifyMechanical_InvokesObserver)
+    {
+        EXPECT_CALL(observer, OnIdentifyMechanical(_))
+            .WillOnce(Invoke([](const infra::Function<void()>& done) { done(); }));
+
+        server.HandleMessage(can::focIdentifyMechanicalId, MakePayload(1));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    }
+
+    TEST_F(FocMotorCategoryServerTest, HandleRequestTelemetry_InvokesObserver)
+    {
+        EXPECT_CALL(observer, OnRequestTelemetry(_))
+            .WillOnce(Invoke([](const infra::Function<void()>& done) { done(); }));
+
+        server.HandleMessage(can::focRequestTelemetryId, MakePayload(1));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    }
+
+    TEST_F(FocMotorCategoryServerTest, HandleSetEncoderResolution_InvokesObserver)
+    {
+        EXPECT_CALL(observer, OnSetEncoderResolution(_))
+            .WillOnce(Invoke([](const infra::Function<void()>& done) { done(); }));
+
+        server.HandleMessage(can::focSetEncoderResolutionId, MakePayload(1));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    }
+
+    TEST_F(FocMotorCategoryServerTest, HandleConfigureTelemetryRate_InvokesObserver)
+    {
+        EXPECT_CALL(observer, OnConfigureTelemetryRate(_))
+            .WillOnce(Invoke([](const infra::Function<void()>& done) { done(); }));
+
+        server.HandleMessage(can::focConfigureTelemetryRateId, MakePayload(1));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    }
 }
