@@ -15,6 +15,7 @@
 #include "core/state_machine/SpeedStateMachine.hpp"
 #include "core/state_machine/test_doubles/FaultNotifierMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
+#include "infra/stream/test/StreamMock.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/Function.hpp"
 #include "integration_tests/software_in_the_loop/support/EepromStub.hpp"
