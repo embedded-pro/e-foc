@@ -66,6 +66,7 @@ namespace can
     bool FocMotorCategoryClient::SendSetCurrentIdPid(uint16_t targetNodeId, float kp, float ki, float kd)
     {
         services::CanPayloadWriter payload;
+        payload.WriteUInt8(focPidAxisId);
         payload.WriteFixed16(kp, focPidScale);
         payload.WriteFixed16(ki, focPidScale);
         payload.WriteFixed16(kd, focPidScale);
@@ -75,6 +76,7 @@ namespace can
     bool FocMotorCategoryClient::SendSetCurrentIqPid(uint16_t targetNodeId, float kp, float ki, float kd)
     {
         services::CanPayloadWriter payload;
+        payload.WriteUInt8(focPidAxisIq);
         payload.WriteFixed16(kp, focPidScale);
         payload.WriteFixed16(ki, focPidScale);
         payload.WriteFixed16(kd, focPidScale);
