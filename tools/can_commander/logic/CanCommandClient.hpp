@@ -87,7 +87,6 @@ namespace tool
 
     private:
         void SetBusy(bool newBusy);
-        void CompleteImmediately();
 
         // CanProtocolClientObserver
         void OnServerOnline(uint16_t nodeId) override;

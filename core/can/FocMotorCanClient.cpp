@@ -50,6 +50,26 @@ namespace can
         return categoryClient.SendSetPositionSetpoint(nodeId, value);
     }
 
+    bool FocMotorCanClient::SetCurrentIdPid(float kp, float ki, float kd)
+    {
+        return categoryClient.SendSetCurrentIdPid(nodeId, kp, ki, kd);
+    }
+
+    bool FocMotorCanClient::SetCurrentIqPid(float kp, float ki, float kd)
+    {
+        return categoryClient.SendSetCurrentIqPid(nodeId, kp, ki, kd);
+    }
+
+    bool FocMotorCanClient::SetSpeedPid(float kp, float ki, float kd)
+    {
+        return categoryClient.SendSetSpeedPid(nodeId, kp, ki, kd);
+    }
+
+    bool FocMotorCanClient::SetPositionPid(float kp, float ki, float kd)
+    {
+        return categoryClient.SendSetPositionPid(nodeId, kp, ki, kd);
+    }
+
     services::CanProtocolClient& FocMotorCanClient::ProtocolClient()
     {
         return protocolClient;

@@ -23,6 +23,11 @@ namespace can
         bool SetSpeed(foc::RadiansPerSecond value);
         bool SetPosition(foc::Radians value);
 
+        bool SetCurrentIdPid(float kp, float ki, float kd);
+        bool SetCurrentIqPid(float kp, float ki, float kd);
+        bool SetSpeedPid(float kp, float ki, float kd);
+        bool SetPositionPid(float kp, float ki, float kd);
+
         services::CanProtocolClient& ProtocolClient();
         FocMotorCategoryClient& CategoryClient();
 

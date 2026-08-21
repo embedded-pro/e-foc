@@ -63,6 +63,42 @@ namespace can
         return SendCommand(targetNodeId, focSetPositionSetpointId, payload);
     }
 
+    bool FocMotorCategoryClient::SendSetCurrentIdPid(uint16_t targetNodeId, float kp, float ki, float kd)
+    {
+        services::CanPayloadWriter payload;
+        payload.WriteFixed16(kp, focPidScale);
+        payload.WriteFixed16(ki, focPidScale);
+        payload.WriteFixed16(kd, focPidScale);
+        return SendCommand(targetNodeId, focSetPidCurrentId, payload);
+    }
+
+    bool FocMotorCategoryClient::SendSetCurrentIqPid(uint16_t targetNodeId, float kp, float ki, float kd)
+    {
+        services::CanPayloadWriter payload;
+        payload.WriteFixed16(kp, focPidScale);
+        payload.WriteFixed16(ki, focPidScale);
+        payload.WriteFixed16(kd, focPidScale);
+        return SendCommand(targetNodeId, focSetPidCurrentId, payload);
+    }
+
+    bool FocMotorCategoryClient::SendSetSpeedPid(uint16_t targetNodeId, float kp, float ki, float kd)
+    {
+        services::CanPayloadWriter payload;
+        payload.WriteFixed16(kp, focPidScale);
+        payload.WriteFixed16(ki, focPidScale);
+        payload.WriteFixed16(kd, focPidScale);
+        return SendCommand(targetNodeId, focSetPidSpeedId, payload);
+    }
+
+    bool FocMotorCategoryClient::SendSetPositionPid(uint16_t targetNodeId, float kp, float ki, float kd)
+    {
+        services::CanPayloadWriter payload;
+        payload.WriteFixed16(kp, focPidScale);
+        payload.WriteFixed16(ki, focPidScale);
+        payload.WriteFixed16(kd, focPidScale);
+        return SendCommand(targetNodeId, focSetPidPositionId, payload);
+    }
+
     void FocMotorCategoryClient::HandleSelectControlModeResponse(const hal::Can::Message& data)
     {
         services::CanPayloadReader reader{ data };

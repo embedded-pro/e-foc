@@ -26,11 +26,16 @@ namespace can
     {
         switch (code)
         {
-            case state_machine::FaultCode::overcurrent:     return FocFaultCode::overCurrent;
-            case state_machine::FaultCode::overvoltage:     return FocFaultCode::overVoltage;
-            case state_machine::FaultCode::overtemperature: return FocFaultCode::overTemperature;
-            case state_machine::FaultCode::encoderLoss:     return FocFaultCode::sensorFault;
-            default:                                         return FocFaultCode::none;
+            case state_machine::FaultCode::overcurrent:
+                return FocFaultCode::overCurrent;
+            case state_machine::FaultCode::overvoltage:
+                return FocFaultCode::overVoltage;
+            case state_machine::FaultCode::overtemperature:
+                return FocFaultCode::overTemperature;
+            case state_machine::FaultCode::encoderLoss:
+                return FocFaultCode::sensorFault;
+            default:
+                return FocFaultCode::none;
         }
     }
 

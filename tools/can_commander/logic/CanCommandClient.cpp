@@ -108,30 +108,32 @@ namespace tool
             SetBusy(false);
     }
 
-    void CanCommandClient::CompleteImmediately()
+    void CanCommandClient::SendSetCurrentIdPid(float kp, float ki, float kd)
     {
         SetBusy(true);
-        SetBusy(false);
+        if (focClient.SetCurrentIdPid(kp, ki, kd))
+            SetBusy(false);
     }
 
-    void CanCommandClient::SendSetCurrentIdPid(float /*kp*/, float /*ki*/, float /*kd*/)
+    void CanCommandClient::SendSetCurrentIqPid(float kp, float ki, float kd)
     {
-        CompleteImmediately();
+        SetBusy(true);
+        if (focClient.SetCurrentIqPid(kp, ki, kd))
+            SetBusy(false);
     }
 
-    void CanCommandClient::SendSetCurrentIqPid(float /*kp*/, float /*ki*/, float /*kd*/)
+    void CanCommandClient::SendSetSpeedPid(float kp, float ki, float kd)
     {
-        CompleteImmediately();
+        SetBusy(true);
+        if (focClient.SetSpeedPid(kp, ki, kd))
+            SetBusy(false);
     }
 
-    void CanCommandClient::SendSetSpeedPid(float /*kp*/, float /*ki*/, float /*kd*/)
+    void CanCommandClient::SendSetPositionPid(float kp, float ki, float kd)
     {
-        CompleteImmediately();
-    }
-
-    void CanCommandClient::SendSetPositionPid(float /*kp*/, float /*ki*/, float /*kd*/)
-    {
-        CompleteImmediately();
+        SetBusy(true);
+        if (focClient.SetPositionPid(kp, ki, kd))
+            SetBusy(false);
     }
 
     void CanCommandClient::RequestData() const
