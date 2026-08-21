@@ -51,6 +51,8 @@ namespace can
         bool SendSetPositionPid(uint16_t targetNodeId, float kp, float ki, float kd);
 
     private:
+        bool SendSetCurrentPid(uint16_t targetNodeId, uint8_t axis, float kp, float ki, float kd);
+
         void HandleSelectControlModeResponse(const hal::Can::Message& data);
         void HandleCategoryError(const hal::Can::Message& data);
         void HandleTelemetryStatus(const hal::Can::Message& data);
