@@ -74,6 +74,8 @@ namespace can
     static constexpr int32_t focResistanceScale = 1000;
     static constexpr int32_t focInductanceScale = 1000;
     static constexpr int32_t focPidScale = 1;
+    static constexpr int32_t focFrictionScale = 10000;
+    static constexpr int32_t focInertiaScale = 10000;
 
     static constexpr uint8_t focPidAxisId = 0x00;
     static constexpr uint8_t focPidAxisIq = 0x01;

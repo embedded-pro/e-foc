@@ -22,14 +22,14 @@ namespace integration
         void OnSetSpeedSetpoint(foc::RadiansPerSecond, const infra::Function<void()>&) override;
         void OnSetPositionSetpoint(foc::Radians, const infra::Function<void()>&) override;
 
-        void OnSetPidCurrent(const infra::Function<void()>&) override;
-        void OnSetPidSpeed(const infra::Function<void()>&) override;
-        void OnSetPidPosition(const infra::Function<void()>&) override;
+        void OnSetPidCurrent(float bandwidth, const infra::Function<void()>&) override;
+        void OnSetPidSpeed(float bandwidth, const infra::Function<void()>&) override;
+        void OnSetPidPosition(float bandwidth, const infra::Function<void()>&) override;
         void OnIdentifyElectrical(const infra::Function<void()>&) override;
         void OnIdentifyMechanical(const infra::Function<void()>&) override;
         void OnRequestTelemetry(const infra::Function<void()>&) override;
-        void OnSetEncoderResolution(const infra::Function<void()>&) override;
-        void OnConfigureTelemetryRate(const infra::Function<void()>&) override;
+        void OnSetEncoderResolution(uint32_t resolution, const infra::Function<void()>&) override;
+        void OnConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>&) override;
 
     private:
         state_machine::FocStateMachineBase& stateMachine;

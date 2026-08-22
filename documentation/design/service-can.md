@@ -35,7 +35,9 @@ date: 2026-08-21
 - Bridging the server category to `ControlModeStateMachine`, translating motor control commands into state machine transitions.
 - Providing a user-facing client API that composes the protocol client, transport, and category client into a single object for use by host-side tools and SIL tests.
 - Applying tracing decorators at every layer boundary so all CAN frames and protocol lifecycle events are observable.
-- Immediately returning `applicationError` for commands not yet implemented in this iteration.
+- Delegating identification commands to `ElectricalParametersIdentification` and `MechanicalParametersIdentification` services and broadcasting results via response frames.
+- Persisting encoder resolution and telemetry rate changes to `NonVolatileMemory`.
+- Broadcasting on-demand telemetry status frames in response to `RequestTelemetry`.
 
 **Is NOT responsible for:**
 - The CAN protocol framing, sequence validation, or ACK dispatch — those belong to `can-lite` core.
@@ -72,7 +74,11 @@ The observer interface provides callbacks for:
 - `OnStart`, `OnStop`, `OnClearFault`, `OnEmergencyStop` — lifecycle commands with a `CanAckStatus` result callback.
 - `OnSelectControlMode` — takes a `FocMotorMode` and a result callback.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` — take a typed unit quantity and a completion callback.
-- All other commands (`OnSetPidCurrent`, `OnSetPidSpeed`, `OnSetPidPosition`, `OnIdentifyElectrical`, `OnIdentifyMechanical`, `OnRequestTelemetry`, `OnSetEncoderResolution`, `OnConfigureTelemetryRate`) — the default bridge implementation returns `applicationError` immediately.
+- `OnSetPidCurrent`, `OnSetPidSpeed`, `OnSetPidPosition` — receive a bandwidth parameter parsed from the CAN frame and forward to the corresponding `TrySet*Bandwidth` on `ControlModeStateMachine`.
+- `OnIdentifyElectrical` — delegates to `ElectricalParametersIdentification`; on success broadcasts `focElectricalParamsResponseId` with resistance, inductance, and pole-pair count.
+- `OnIdentifyMechanical` — requires Ready state; delegates to `MechanicalParametersIdentification`; on success broadcasts `focMechanicalParamsResponseId` with friction and inertia.
+- `OnRequestTelemetry` — broadcasts current state and fault code via `focTelemetryStatusResponseId`.
+- `OnSetEncoderResolution`, `OnConfigureTelemetryRate` — validate payload, update and persist `ConfigData` via `NonVolatileMemory`.
 
 ### Part C — FocMotorCategoryClient
 
@@ -90,7 +96,10 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
 - `OnEmergencyStop` → `CmdEmergencyStop()`.
 - `OnSelectControlMode` → `Select(mode, onDone)`; the result callback sends the mode response or a category error.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` → validate mode and range, then delegate to `TrySet*` on the state machine.
-- All stub commands → `SendCategoryError(commandId, applicationError)`.
+- PID bandwidth commands → `TrySet*Bandwidth(bandwidth)` on the state machine; `invalidPayload` if rejected.
+- Identification commands → delegate to the injected identification services; broadcast parameter response frames on success; `calibrationFailed` on estimation failure; `busy` if a prior identification is in progress.
+- `OnRequestTelemetry` → broadcast current state and fault code via `focTelemetryStatusResponseId`; always succeeds.
+- `OnSetEncoderResolution` / `OnConfigureTelemetryRate` → persist to `NonVolatileMemory`; `persistenceFailed` on write error; `busy` if a prior NVM save is in flight.
 
 The bridge validates that the correct control mode is active before accepting a setpoint command. An out-of-range setpoint results in `invalidPayload`. A mode mismatch results in `categoryError/modeMismatch`.
 
@@ -228,20 +237,23 @@ graph LR
 
 ## Constraints & Limitations
 
-| Constraint              | Value / Description                                                                        |
-|-------------------------|--------------------------------------------------------------------------------------------|
-| Stub command policy     | Commands not yet implemented return `applicationError` via `SendCategoryError` immediately |
-| No heap                 | All objects are value members or statically allocated; `infra::Function` for callbacks     |
-| One observer per server | `CanCategoryServer` uses `infra::Subject<Observer>` — only one bridge may attach at a time |
-| Setpoint range          | Torque: bounded by inverter `MaxCurrentSupported`; speed: 1000 rad/s; position: ±2π rad    |
-| Sequence byte           | Server handlers always skip the first byte (sequence number) before reading payload fields |
+| Constraint              | Value / Description                                                                                        |
+|-------------------------|------------------------------------------------------------------------------------------------------------|
+| No heap                 | All objects are value members or statically allocated; `infra::Function` for callbacks                     |
+| One observer per server | `CanCategoryServer` uses `infra::Subject<Observer>` — only one bridge may attach at a time                 |
+| Setpoint range          | Torque: bounded by inverter `MaxCurrentSupported`; speed: 1000 rad/s; position: ±2π rad                    |
+| Sequence byte           | Server handlers always skip the first byte (sequence number) before reading payload fields                 |
+| Ident re-entrancy       | A second identification command while one is in-flight returns `busy` via `SendCategoryError`              |
+| NVM re-entrancy         | A second config-persist command while one is in-flight returns `busy` via `SendCategoryError`              |
+| Mechanical ident        | `mechIdent` is optional (nullable pointer); if absent, `OnIdentifyMechanical` returns `notImplemented`     |
+| Telemetry speed/pos     | `focTelemetryStatusResponseId` frames encode zero for speed and position (live readings not yet available) |
 
 ---
 
 ## Open Questions
 
-| # | Question                                                         | Options                                        | Status |
-|---|------------------------------------------------------------------|------------------------------------------------|--------|
-| 1 | Implement telemetry push (BroadcastFaultStatus, periodic status) | Periodic timer vs on-demand vs fault-triggered | open   |
-| 2 | PID gain commands                                                | Accept and persist vs remain applicationError  | open   |
-| 3 | Mechanical identification via CAN                                | Delegate to existing service vs stub           | open   |
+| # | Question                                                         | Resolution                                                                                   | Status   |
+|---|------------------------------------------------------------------|----------------------------------------------------------------------------------------------|----------|
+| 1 | Implement telemetry push (BroadcastFaultStatus, periodic status) | On-demand via `OnRequestTelemetry`; periodic timer deferred                                  | resolved |
+| 2 | PID gain commands                                                | Accepted: kp field mapped to loop bandwidth via `TrySet*Bandwidth`                           | resolved |
+| 3 | Mechanical identification via CAN                                | Delegated to injected `MechanicalParametersIdentification*`; nullable for targets lacking it | resolved |
