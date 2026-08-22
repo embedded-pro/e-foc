@@ -25,6 +25,7 @@ namespace can
             const drivers::ThreePhaseInverter& inverter,
             services::ElectricalParametersIdentification& electricalIdent,
             services::MechanicalParametersIdentification* mechIdent,
+            foc::NewtonMeter mechTorqueConstant,
             services::NonVolatileMemory& nvm,
             services::ConfigData configData,
             services::Tracer& tracer);
@@ -67,6 +68,7 @@ namespace can
         const drivers::ThreePhaseInverter& inverter;
         services::ElectricalParametersIdentification& electricalIdent;
         services::MechanicalParametersIdentification* mechIdent;
+        foc::NewtonMeter mechTorqueConstant;
         services::NonVolatileMemory& nvm;
         services::ConfigData configData;
 

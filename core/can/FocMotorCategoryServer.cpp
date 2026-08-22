@@ -33,12 +33,7 @@ namespace can
 
     void FocMotorCategoryServer::BroadcastFaultStatus(FocFaultCode fault)
     {
-        services::CanPayloadWriter payload;
-        payload.WriteUInt8(static_cast<uint8_t>(FocMotorState::fault));
-        payload.WriteUInt8(static_cast<uint8_t>(fault));
-        payload.WriteFixed16(0.0f, focSpeedScale);
-        payload.WriteFixed16(0.0f, focPositionScale);
-        SendTelemetry(focTelemetryStatusResponseId, payload);
+        BroadcastTelemetryStatus(FocMotorState::fault, fault);
     }
 
     void FocMotorCategoryServer::HandleStart(const hal::Can::Message&)

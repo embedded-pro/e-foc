@@ -34,6 +34,7 @@ namespace application
         static constexpr uint32_t controlLoopFrequencyHz = 20000;
         static constexpr uint32_t pwmDeadTimeNs = 500;
         static constexpr float motorFluxLinkageWb = 0.007f;
+        static constexpr float motorTorqueConstantNm = 0.1f;
 
         using ControlMode = state_machine::ControlModeStateMachine;
 

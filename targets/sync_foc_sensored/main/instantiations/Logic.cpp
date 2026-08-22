@@ -41,7 +41,7 @@ namespace application
                         this->hardware.MaxCurrentSupported(),
                         this->hardware.BaseFrequency(),
                         this->hardware.LowPriorityInterrupt() });
-                canBridge.emplace(*motorCanServer, *controlMode, this->hardware, electricalIdent, nullptr, nvm, configData, this->hardware.Tracer());
+                canBridge.emplace(*motorCanServer, *controlMode, this->hardware, electricalIdent, nullptr, foc::NewtonMeter{ motorTorqueConstantNm }, nvm, configData, this->hardware.Tracer());
                 platformFaultNotifier.RegisterSecondary([this](state_machine::FaultCode code)
                     {
                         infra::EventDispatcher::Instance().Schedule([this, code]()

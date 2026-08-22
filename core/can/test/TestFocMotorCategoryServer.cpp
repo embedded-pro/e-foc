@@ -356,6 +356,68 @@ namespace
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
+    TEST_F(FocMotorCategoryServerTest, HandleSetPidSpeed_ParsesBandwidthAndInvokesObserver)
+    {
+        EXPECT_CALL(observer, OnSetPidSpeed(_, _))
+            .WillOnce(Invoke([](float, const infra::Function<void()>& done) { done(); }));
+
+        server.HandleMessage(can::focSetPidSpeedId, MakeSetpointPayload(100));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    }
+
+    TEST_F(FocMotorCategoryServerTest, HandleSetPidPosition_ParsesBandwidthAndInvokesObserver)
+    {
+        EXPECT_CALL(observer, OnSetPidPosition(_, _))
+            .WillOnce(Invoke([](float, const infra::Function<void()>& done) { done(); }));
+
+        server.HandleMessage(can::focSetPidPositionId, MakeSetpointPayload(18));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    }
+
+    TEST_F(FocMotorCategoryServerTest, HandleSetPidCurrent_ShortPayload_AcksInvalidPayload)
+    {
+        server.HandleMessage(can::focSetPidCurrentId, MakePayload(1));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    }
+
+    TEST_F(FocMotorCategoryServerTest, HandleSetPidSpeed_ShortPayload_AcksInvalidPayload)
+    {
+        server.HandleMessage(can::focSetPidSpeedId, MakePayload(1));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    }
+
+    TEST_F(FocMotorCategoryServerTest, HandleSetPidPosition_ShortPayload_AcksInvalidPayload)
+    {
+        server.HandleMessage(can::focSetPidPositionId, MakePayload(1));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    }
+
+    TEST_F(FocMotorCategoryServerTest, HandleSetEncoderResolution_ShortPayload_AcksInvalidPayload)
+    {
+        server.HandleMessage(can::focSetEncoderResolutionId, MakePayload(1));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    }
+
+    TEST_F(FocMotorCategoryServerTest, HandleConfigureTelemetryRate_ShortPayload_AcksInvalidPayload)
+    {
+        server.HandleMessage(can::focConfigureTelemetryRateId, MakePayload(1));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    }
+
     TEST_F(FocMotorCategoryServerTest, HandleSetEncoderResolution_ParsesResolutionAndInvokesObserver)
     {
         EXPECT_CALL(observer, OnSetEncoderResolution(4000u, _))

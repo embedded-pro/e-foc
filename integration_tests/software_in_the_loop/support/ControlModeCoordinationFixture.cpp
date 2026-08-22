@@ -124,7 +124,7 @@ namespace integration
         canProtocolServer.emplace(transportCanMock, services::CanProtocolServer::Config{ .nodeId = 1 });
         motorCategoryServer.emplace(canProtocolServer->Transport());
         canProtocolServer->RegisterCategory(*motorCategoryServer);
-        motorBridge.emplace(*motorCategoryServer, *coordinator, platformFactory, electricalIdentMock, &mechIdentMock, nvm, services::MakeDefaultConfigData(), tracer);
+        motorBridge.emplace(*motorCategoryServer, *coordinator, platformFactory, electricalIdentMock, &mechIdentMock, foc::NewtonMeter{ 0.1f }, nvm, services::MakeDefaultConfigData(), tracer);
     }
 
     void ControlModeCoordinationFixture::DispatchToMotor(uint8_t messageType, const hal::Can::Message& data)

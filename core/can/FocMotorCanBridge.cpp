@@ -10,6 +10,7 @@ namespace can
         const drivers::ThreePhaseInverter& inverter,
         services::ElectricalParametersIdentification& electricalIdent,
         services::MechanicalParametersIdentification* mechIdent,
+        foc::NewtonMeter mechTorqueConstant,
         services::NonVolatileMemory& nvm,
         services::ConfigData configData,
         services::Tracer& tracer)
@@ -19,6 +20,7 @@ namespace can
         , inverter(inverter)
         , electricalIdent(electricalIdent)
         , mechIdent{ mechIdent }
+        , mechTorqueConstant{ mechTorqueConstant }
         , nvm(nvm)
         , configData(configData)
     {
@@ -243,7 +245,7 @@ namespace can
         pendingMechIdentDoneCallback = onDone;
 
         mechIdent->EstimateFrictionAndInertia(
-            foc::NewtonMeter{ cal.fluxLinkage },
+            mechTorqueConstant,
             static_cast<std::size_t>(cal.polePairs),
             {},
             [this](std::optional<foc::NewtonMeterSecondPerRadian> friction,
