@@ -50,9 +50,11 @@ OUTPUT_STEM = "eFocDesign"
 BOOK_TITLE = "e-foc"
 BOOK_SUBTITLE = "The Design Booklet"
 REPO_BLOB = "https://github.com/embedded-pro/e-foc/blob/main"
+MATHJAX_CDN = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
 
 LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+\.md)(#[^)]*)?\)")
 H1_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
+FRONT_MATTER_TITLE_RE = re.compile(r'^title:\s+"?(.+?)"?\s*$', re.MULTILINE)
 HEADING_RE = re.compile(r"^(#{1,6})\s")
 IMAGE_RE = re.compile(r"(!\[[^\]]*\]\()([^)]+)(\))")
 MERMAID_RE = re.compile(r"```mermaid\n(.*?)```", re.DOTALL)
@@ -123,7 +125,14 @@ def _page_name(source):
 
 
 def _title_of(path):
-    text = _strip_front_matter(path.read_text(encoding="utf-8"))
+    text = path.read_text(encoding="utf-8")
+    if text.startswith("---"):
+        end = text.find("\n---", 3)
+        if end != -1:
+            m = FRONT_MATTER_TITLE_RE.search(text[3:end])
+            if m:
+                return m.group(1).strip()
+            text = text[end + 4:].lstrip("\n")
     match = H1_RE.search(text)
     return match.group(1).strip() if match else path.stem.replace("-", " ").title()
 
@@ -177,10 +186,22 @@ def _render_mermaid(code, skip_diagrams):
     return svg_out
 
 
+def _diagram_alt(code):
+    first = code.strip().splitlines()[0].strip().lower() if code.strip() else ""
+    if "sequencediagram" in first:
+        return "Sequence diagram"
+    if "statediagram" in first:
+        return "State diagram"
+    if "classdiagram" in first:
+        return "Class diagram"
+    return "Block diagram"
+
+
 def _replace_diagrams(text, skip_diagrams):
     def replace(match):
-        svg = _render_mermaid(match.group(1), skip_diagrams)
-        return f"![]({svg})" if svg else match.group(0)
+        code = match.group(1)
+        svg = _render_mermaid(code, skip_diagrams)
+        return f"![{_diagram_alt(code)}]({svg})" if svg else match.group(0)
 
     return MERMAID_RE.sub(replace, text)
 
@@ -281,7 +302,7 @@ def render_pdf(book_md):
     return _run(command, output)
 
 
-def _sidebar(chapters, current):
+def _sidebar(chapters, current, pdf_available=True):
     items = []
     part = None
     for chapter in chapters:
@@ -294,14 +315,18 @@ def _sidebar(chapters, current):
             f"{chapter.number}. {html.escape(chapter.title)}</a></li>"
         )
 
+    download = (
+        f'<a class="download" href="{OUTPUT_STEM}.pdf">Download PDF</a>\n'
+        if pdf_available else ""
+    )
     return (
         '<div class="layout">\n'
         '<nav class="sidebar">\n'
         f'<a class="brand" href="index.html">{html.escape(BOOK_TITLE)}</a>\n'
         f'<span class="brand-sub">{html.escape(BOOK_SUBTITLE)}</span>\n'
         "<ol>\n" + "\n".join(items) + "\n</ol>\n"
-        f'<a class="download" href="{OUTPUT_STEM}.pdf">Download PDF</a>\n'
-        "</nav>\n<main>\n"
+        + download
+        + "</nav>\n<main>\n"
     )
 
 
@@ -318,7 +343,7 @@ def _pager(chapters, current):
     return f'<div class="pager">{prev}{nxt}</div>\n</main>\n</div>\n'
 
 
-def render_site(chapters, skip_diagrams):
+def render_site(chapters, skip_diagrams, pdf_available=True):
     SITE_DIR.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(ASSETS / "book.css", SITE_DIR / "book.css")
 
@@ -334,7 +359,11 @@ def render_site(chapters, skip_diagrams):
 
     for chapter in chapters:
         markdown = _prepare(chapter.source, chapters, "html", skip_diagrams)
-        markdown = re.sub(rf"!\[\]\({re.escape(str(DIAGRAMS_DIR))}/", "![](diagrams/", markdown)
+        markdown = re.sub(
+            rf"!\[([^\]]*)\]\({re.escape(str(DIAGRAMS_DIR))}/",
+            r"![\1](diagrams/",
+            markdown,
+        )
         markdown = re.sub(r"\A#\s+.+?\n", "", markdown, count=1)
 
         chapter_md = fragments / f"{chapter.source.stem}.md"
@@ -343,7 +372,7 @@ def render_site(chapters, skip_diagrams):
         heading = f'<h1 class="title">{html.escape(chapter.title)}</h1>'
         before = fragments / f"{chapter.source.stem}-before.html"
         after = fragments / f"{chapter.source.stem}-after.html"
-        before.write_text(_sidebar(chapters, chapter) + heading + "\n", encoding="utf-8")
+        before.write_text(_sidebar(chapters, chapter, pdf_available) + heading + "\n", encoding="utf-8")
         after.write_text(_pager(chapters, chapter), encoding="utf-8")
 
         command = [
@@ -351,6 +380,7 @@ def render_site(chapters, skip_diagrams):
             "--standalone",
             "--from", "markdown",
             "--toc", "--toc-depth=3",
+            f"--mathjax={MATHJAX_CDN}",
             "--css", "book.css",
             "-M", f"pagetitle={chapter.title} — {BOOK_TITLE} {BOOK_SUBTITLE}",
             "-M", "document-css=false",
@@ -360,13 +390,13 @@ def render_site(chapters, skip_diagrams):
         ]
         status |= _run(command, SITE_DIR / chapter.page, quiet=True)
 
-    status |= _render_landing(chapters)
+    status |= _render_landing(chapters, pdf_available)
     if status == 0:
         print(f"Wrote site with {len(chapters)} chapters → {SITE_DIR}")
     return status
 
 
-def _render_landing(chapters):
+def _render_landing(chapters, pdf_available=True):
     sections = []
     part = None
     for chapter in chapters:
@@ -384,6 +414,10 @@ def _render_landing(chapters):
         sections.append("</div>")
 
     title = f"{BOOK_TITLE} — {BOOK_SUBTITLE}"
+    pdf_blurb = (
+        f' Also available as a single <a href="{OUTPUT_STEM}.pdf">PDF</a>.'
+        if pdf_available else ""
+    )
     page = [
         "<!DOCTYPE html>",
         '<html lang="en">',
@@ -394,11 +428,10 @@ def _render_landing(chapters):
         '<link rel="stylesheet" href="book.css">',
         "</head>",
         "<body>",
-        _sidebar(chapters, None),
+        _sidebar(chapters, None, pdf_available),
         f'<h1 class="title">{html.escape(title)}</h1>',
         "<p>Theory, design, and architecture of the e-foc Field-Oriented Control firmware. "
-        "No source code — components, responsibilities, and signal flows only. "
-        f'Also available as a single <a href="{OUTPUT_STEM}.pdf">PDF</a>.</p>',
+        f"No source code — components, responsibilities, and signal flows only.{pdf_blurb}</p>",
         *sections,
         f'<p class="build-meta">Revision <code>{html.escape(_git_version())}</code> · '
         f"built {date.today():%B %d, %Y}</p>",
@@ -452,10 +485,11 @@ def main():
         return 2
 
     status = 0
-    if args.format in ("pdf", "all"):
+    pdf_available = args.format in ("pdf", "all")
+    if pdf_available:
         status |= render_pdf(book_md)
     if args.format in ("html", "all"):
-        status |= render_site(chapters, args.skip_diagrams)
+        status |= render_site(chapters, args.skip_diagrams, pdf_available)
         pdf = BUILD_DIR / f"{OUTPUT_STEM}.pdf"
         if pdf.is_file():
             shutil.copyfile(pdf, SITE_DIR / pdf.name)

@@ -38,7 +38,7 @@
             "environment": [
                 {
                     "name": "DISPLAY",
-                    "value": "host.docker.internal:0.0",
+                    "value": "host.docker.internal:0.0"
                 }
             ],
             "externalConsole": false,
