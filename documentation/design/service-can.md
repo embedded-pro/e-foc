@@ -241,7 +241,7 @@ graph LR
 |-------------------------|------------------------------------------------------------------------------------------------------------|
 | No heap                 | All objects are value members or statically allocated; `infra::Function` for callbacks                     |
 | One observer per server | `CanCategoryServer` uses `infra::Subject<Observer>` — only one bridge may attach at a time                 |
-| Setpoint range          | Torque: bounded by inverter `MaxCurrentSupported`; speed: 1000 rad/s; position: ±2π rad                   |
+| Setpoint range          | Torque: bounded by inverter `MaxCurrentSupported`; speed: 1000 rad/s; position: ±2π rad                    |
 | Sequence byte           | Server handlers always skip the first byte (sequence number) before reading payload fields                 |
 | Ident re-entrancy       | A second identification command while one is in-flight returns `busy` via `SendCategoryError`              |
 | NVM re-entrancy         | A second config-persist command while one is in-flight returns `busy` via `SendCategoryError`              |
@@ -252,8 +252,8 @@ graph LR
 
 ## Open Questions
 
-| # | Question                                                           | Resolution                                                                                  | Status   |
-|---|--------------------------------------------------------------------|---------------------------------------------------------------------------------------------|----------|
-| 1 | Implement telemetry push (BroadcastFaultStatus, periodic status)   | On-demand via `OnRequestTelemetry`; periodic timer deferred                                 | resolved |
-| 2 | PID gain commands                                                  | Accepted: kp field mapped to loop bandwidth via `TrySet*Bandwidth`                          | resolved |
-| 3 | Mechanical identification via CAN                                  | Delegated to injected `MechanicalParametersIdentification*`; nullable for targets lacking it | resolved |
+| # | Question                                                         | Resolution                                                                                   | Status   |
+|---|------------------------------------------------------------------|----------------------------------------------------------------------------------------------|----------|
+| 1 | Implement telemetry push (BroadcastFaultStatus, periodic status) | On-demand via `OnRequestTelemetry`; periodic timer deferred                                  | resolved |
+| 2 | PID gain commands                                                | Accepted: kp field mapped to loop bandwidth via `TrySet*Bandwidth`                           | resolved |
+| 3 | Mechanical identification via CAN                                | Delegated to injected `MechanicalParametersIdentification*`; nullable for targets lacking it | resolved |

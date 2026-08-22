@@ -247,7 +247,7 @@ namespace can
             static_cast<std::size_t>(cal.polePairs),
             {},
             [this](std::optional<foc::NewtonMeterSecondPerRadian> friction,
-                   std::optional<foc::NewtonMeterSecondSquared> inertia)
+                std::optional<foc::NewtonMeterSecondSquared> inertia)
             {
                 auto callback = pendingMechIdentDoneCallback;
                 pendingMechIdentDoneCallback = nullptr;
@@ -267,8 +267,8 @@ namespace can
     {
         const auto& state = controlMode.ActiveStateMachine().CurrentState();
         const auto faultCode = std::holds_alternative<state_machine::Fault>(state)
-            ? ToCanFaultCode(controlMode.ActiveStateMachine().LastFaultCode())
-            : FocFaultCode::none;
+                                   ? ToCanFaultCode(controlMode.ActiveStateMachine().LastFaultCode())
+                                   : FocFaultCode::none;
 
         server.BroadcastTelemetryStatus(ToCanMotorState(state), faultCode);
         onDone();
