@@ -182,7 +182,7 @@ sequenceDiagram
     PosLoop->>PosLoop: ω_setpoint = PositionPID(error), clamped ± bandwidth·π rad/s
     PosLoop->>SpdLoop: Write ω_setpoint
     SpdLoop->>SpdLoop: Compute Δθ = θm − θm_prev (±π wrap correction)
-    SpdLoop->>SpdLoop: ω = Δθ / Δt; save θm as θm_prev
+    SpdLoop->>SpdLoop: ω = Δθ / Δt, store θm_prev
     SpdLoop->>SpdLoop: Iq_setpoint = SpeedPID(ω_setpoint − ω), clamped ± maxCurrent
     SpdLoop->>Inner: Write Iq_setpoint (atomic)
     Note over Inner: Next 20 kHz ISR picks up updated Iq_setpoint

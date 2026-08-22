@@ -129,23 +129,21 @@ during alignment. $V_{dc}$ is measured dynamically.
 coupling is $\omega_e L_s i_q = 2.5$ V — 10% of a 24 V bus. This is the dominant current control
 error at speed for an uncompensated PI.
 
-<!-- tikz:diagrams/current-loop-a1-feedforward.tex -->
 ```mermaid
 graph LR
-    Iref["Id*, Iq*"] --> ERRD["Σ Id*-Id"]
-    Iref --> ERRQ["Σ Iq*-Iq"]
-    MEAS["Id, Iq"] --> ERRD
-    MEAS --> ERRQ
-    ERRD --> PID_D["PI d-axis"]
-    ERRQ --> PID_Q["PI q-axis"]
-    PID_D --> SUM_D["Σ +fd"]
-    PID_Q --> SUM_Q["Σ +fq"]
-    FF["fd = -ωe·Ls·Iq"] --> SUM_D
-    FFQ["fq = +ωe·Ls·Id\n    +ωe·ψf"] --> SUM_Q
-    SUM_D --> OUT["inv-Park + SVM"]
-    SUM_Q --> OUT
+    IREF_D["Id*"] --> ED["Σ"]
+    IREF_Q["Iq*"] --> EQ["Σ"]
+    IDQ["Id, Iq"] -->|"−"| ED
+    IDQ -->|"−"| EQ
+    ED --> PD["PI d-axis"]
+    EQ --> PQ["PI q-axis"]
+    PD --> SD["Σ"]
+    PQ --> SQ["Σ"]
+    FF_D["fd = −ωe·Ls·Iq"] --> SD
+    FF_Q["fq = +ωe·Ls·Id + ωe·ψf"] --> SQ
+    SD -->|"vd"| OUT["inv-Park + SVM"]
+    SQ -->|"vq"| OUT
 ```
-<!-- /tikz -->
 
 ---
 
