@@ -46,14 +46,14 @@ namespace
         MOCK_METHOD(void, OnSetTorqueSetpoint, (foc::Ampere, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnSetSpeedSetpoint, (foc::RadiansPerSecond, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnSetPositionSetpoint, (foc::Radians, (const infra::Function<void()>&)), (override));
-        MOCK_METHOD(void, OnSetPidCurrent, (const infra::Function<void()>&), (override));
-        MOCK_METHOD(void, OnSetPidSpeed, (const infra::Function<void()>&), (override));
-        MOCK_METHOD(void, OnSetPidPosition, (const infra::Function<void()>&), (override));
+        MOCK_METHOD(void, OnSetPidCurrent, (float, (const infra::Function<void()>&)), (override));
+        MOCK_METHOD(void, OnSetPidSpeed, (float, (const infra::Function<void()>&)), (override));
+        MOCK_METHOD(void, OnSetPidPosition, (float, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnIdentifyElectrical, (const infra::Function<void()>&), (override));
         MOCK_METHOD(void, OnIdentifyMechanical, (const infra::Function<void()>&), (override));
         MOCK_METHOD(void, OnRequestTelemetry, (const infra::Function<void()>&), (override));
-        MOCK_METHOD(void, OnSetEncoderResolution, (const infra::Function<void()>&), (override));
-        MOCK_METHOD(void, OnConfigureTelemetryRate, (const infra::Function<void()>&), (override));
+        MOCK_METHOD(void, OnSetEncoderResolution, (uint32_t, (const infra::Function<void()>&)), (override));
+        MOCK_METHOD(void, OnConfigureTelemetryRate, (uint32_t, (const infra::Function<void()>&)), (override));
     };
 
     class FocMotorCategoryServerTest : public Test
@@ -98,6 +98,14 @@ namespace
             hal::Can::Message msg;
             msg.resize(2, 0);
             msg[1] = static_cast<uint8_t>(mode);
+            return msg;
+        }
+
+        hal::Can::Message MakeUInt32Payload(uint32_t value)
+        {
+            hal::Can::Message msg;
+            msg.resize(5, 0);
+            services::CanFrameCodec::WriteUInt32(msg, 1, value);
             return msg;
         }
 
@@ -241,10 +249,15 @@ namespace
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::notImplemented);
     }
 
-    TEST_F(FocMotorCategoryServerTest, HandleSetPidCurrent_InvokesStubObserver)
+    TEST_F(FocMotorCategoryServerTest, HandleSetPidCurrent_ParsesBandwidthAndInvokesObserver)
     {
-        EXPECT_CALL(observer, OnSetPidCurrent(_));
-        server.HandleMessage(can::focSetPidCurrentId, MakePayload(1));
+        EXPECT_CALL(observer, OnSetPidCurrent(_, _))
+            .WillOnce(Invoke([](float, const infra::Function<void()>& done) { done(); }));
+
+        server.HandleMessage(can::focSetPidCurrentId, MakeSetpointPayload(1000));
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
     TEST_F(FocMotorCategoryServerTest, HandleClearFault_InvokesOnClearFaultObserver)
@@ -343,23 +356,23 @@ namespace
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
-    TEST_F(FocMotorCategoryServerTest, HandleSetEncoderResolution_InvokesObserver)
+    TEST_F(FocMotorCategoryServerTest, HandleSetEncoderResolution_ParsesResolutionAndInvokesObserver)
     {
-        EXPECT_CALL(observer, OnSetEncoderResolution(_))
-            .WillOnce(Invoke([](const infra::Function<void()>& done) { done(); }));
+        EXPECT_CALL(observer, OnSetEncoderResolution(4000u, _))
+            .WillOnce(Invoke([](uint32_t, const infra::Function<void()>& done) { done(); }));
 
-        server.HandleMessage(can::focSetEncoderResolutionId, MakePayload(1));
+        server.HandleMessage(can::focSetEncoderResolutionId, MakeUInt32Payload(4000));
 
         ASSERT_TRUE(ackSpy.last.has_value());
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
-    TEST_F(FocMotorCategoryServerTest, HandleConfigureTelemetryRate_InvokesObserver)
+    TEST_F(FocMotorCategoryServerTest, HandleConfigureTelemetryRate_ParsesRateAndInvokesObserver)
     {
-        EXPECT_CALL(observer, OnConfigureTelemetryRate(_))
-            .WillOnce(Invoke([](const infra::Function<void()>& done) { done(); }));
+        EXPECT_CALL(observer, OnConfigureTelemetryRate(100u, _))
+            .WillOnce(Invoke([](uint32_t, const infra::Function<void()>& done) { done(); }));
 
-        server.HandleMessage(can::focConfigureTelemetryRateId, MakePayload(1));
+        server.HandleMessage(can::focConfigureTelemetryRateId, MakeUInt32Payload(100));
 
         ASSERT_TRUE(ackSpy.last.has_value());
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);

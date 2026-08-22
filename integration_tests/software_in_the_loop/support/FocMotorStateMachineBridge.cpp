@@ -44,13 +44,13 @@ namespace integration
     void FocMotorStateMachineBridge::OnSetPositionSetpoint(foc::Radians, const infra::Function<void()>&)
     {}
 
-    void FocMotorStateMachineBridge::OnSetPidCurrent(const infra::Function<void()>&)
+    void FocMotorStateMachineBridge::OnSetPidCurrent(float, const infra::Function<void()>&)
     {}
 
-    void FocMotorStateMachineBridge::OnSetPidSpeed(const infra::Function<void()>&)
+    void FocMotorStateMachineBridge::OnSetPidSpeed(float, const infra::Function<void()>&)
     {}
 
-    void FocMotorStateMachineBridge::OnSetPidPosition(const infra::Function<void()>&)
+    void FocMotorStateMachineBridge::OnSetPidPosition(float, const infra::Function<void()>&)
     {}
 
     void FocMotorStateMachineBridge::OnIdentifyElectrical(const infra::Function<void()>&)
@@ -62,9 +62,9 @@ namespace integration
     void FocMotorStateMachineBridge::OnRequestTelemetry(const infra::Function<void()>&)
     {}
 
-    void FocMotorStateMachineBridge::OnSetEncoderResolution(const infra::Function<void()>&)
+    void FocMotorStateMachineBridge::OnSetEncoderResolution(uint32_t, const infra::Function<void()>&)
     {}
 
-    void FocMotorStateMachineBridge::OnConfigureTelemetryRate(const infra::Function<void()>&)
+    void FocMotorStateMachineBridge::OnConfigureTelemetryRate(uint32_t, const infra::Function<void()>&)
     {}
 }

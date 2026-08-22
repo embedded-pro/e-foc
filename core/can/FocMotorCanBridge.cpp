@@ -8,11 +8,19 @@ namespace can
         FocMotorCategoryServer& server,
         state_machine::ControlModeStateMachine& controlMode,
         const drivers::ThreePhaseInverter& inverter,
+        services::ElectricalParametersIdentification& electricalIdent,
+        services::MechanicalParametersIdentification* mechIdent,
+        services::NonVolatileMemory& nvm,
+        services::ConfigData configData,
         services::Tracer& tracer)
         : FocMotorCategoryServerObserver(server)
         , server(server)
         , controlMode(controlMode)
         , inverter(inverter)
+        , electricalIdent(electricalIdent)
+        , mechIdent{ mechIdent }
+        , nvm(nvm)
+        , configData(configData)
     {
         tracer.Trace() << "FocMotorCanBridge: initialised";
     }
@@ -37,6 +45,17 @@ namespace can
             default:
                 return FocFaultCode::none;
         }
+    }
+
+    FocMotorState FocMotorCanBridge::ToCanMotorState(const state_machine::State& state)
+    {
+        if (std::holds_alternative<state_machine::Fault>(state))
+            return FocMotorState::fault;
+        if (std::holds_alternative<state_machine::Calibrating>(state))
+            return FocMotorState::calibrating;
+        if (std::holds_alternative<state_machine::Enabled>(state))
+            return FocMotorState::running;
+        return FocMotorState::idle;
     }
 
     void FocMotorCanBridge::OnStart(const infra::Function<void(services::CanAckStatus)>& onDone)
@@ -123,44 +142,192 @@ namespace can
             server.SendCategoryError(can::focSetPositionSetpointId, FocMotorCategoryError::modeMismatch);
     }
 
-    void FocMotorCanBridge::OnSetPidCurrent(const infra::Function<void()>&)
+    void FocMotorCanBridge::OnSetPidCurrent(float bandwidth, const infra::Function<void()>& onDone)
     {
-        server.SendCategoryError(can::focSetPidCurrentId, FocMotorCategoryError::applicationError);
+        if (!controlMode.TrySetCurrentBandwidth(bandwidth))
+        {
+            server.SendCommandAck(can::focSetPidCurrentId, services::CanAckStatus::invalidPayload);
+            return;
+        }
+        onDone();
     }
 
-    void FocMotorCanBridge::OnSetPidSpeed(const infra::Function<void()>&)
+    void FocMotorCanBridge::OnSetPidSpeed(float bandwidth, const infra::Function<void()>& onDone)
     {
-        server.SendCategoryError(can::focSetPidSpeedId, FocMotorCategoryError::applicationError);
+        if (!controlMode.TrySetSpeedBandwidth(bandwidth))
+        {
+            server.SendCommandAck(can::focSetPidSpeedId, services::CanAckStatus::invalidPayload);
+            return;
+        }
+        onDone();
     }
 
-    void FocMotorCanBridge::OnSetPidPosition(const infra::Function<void()>&)
+    void FocMotorCanBridge::OnSetPidPosition(float bandwidth, const infra::Function<void()>& onDone)
     {
-        server.SendCategoryError(can::focSetPidPositionId, FocMotorCategoryError::applicationError);
+        if (!controlMode.TrySetPositionBandwidth(bandwidth))
+        {
+            server.SendCommandAck(can::focSetPidPositionId, services::CanAckStatus::invalidPayload);
+            return;
+        }
+        onDone();
     }
 
-    void FocMotorCanBridge::OnIdentifyElectrical(const infra::Function<void()>&)
+    void FocMotorCanBridge::OnIdentifyElectrical(const infra::Function<void()>& onDone)
     {
-        server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::applicationError);
+        if (pendingElectricalIdentDoneCallback != nullptr)
+        {
+            server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::busy);
+            return;
+        }
+
+        pendingElectricalIdentDoneCallback = onDone;
+
+        electricalIdent.EstimateResistanceAndInductance({},
+            [this](std::optional<foc::Ohm> r, std::optional<foc::MilliHenry> l)
+            {
+                if (!r.has_value() || !l.has_value())
+                {
+                    pendingElectricalIdentDoneCallback = nullptr;
+                    server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::calibrationFailed);
+                    return;
+                }
+
+                pendingElectricalR = r;
+                pendingElectricalL = l;
+
+                electricalIdent.EstimateNumberOfPolePairs({},
+                    [this](std::optional<std::size_t> polePairs)
+                    {
+                        auto callback = pendingElectricalIdentDoneCallback;
+                        pendingElectricalIdentDoneCallback = nullptr;
+
+                        if (!polePairs.has_value())
+                        {
+                            pendingElectricalR.reset();
+                            pendingElectricalL.reset();
+                            server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::calibrationFailed);
+                            return;
+                        }
+
+                        server.BroadcastElectricalParams(*pendingElectricalR, *pendingElectricalL, *polePairs);
+                        pendingElectricalR.reset();
+                        pendingElectricalL.reset();
+                        callback();
+                    });
+            });
     }
 
-    void FocMotorCanBridge::OnIdentifyMechanical(const infra::Function<void()>&)
+    void FocMotorCanBridge::OnIdentifyMechanical(const infra::Function<void()>& onDone)
     {
-        server.SendCategoryError(can::focIdentifyMechanicalId, FocMotorCategoryError::applicationError);
+        if (mechIdent == nullptr)
+        {
+            server.SendCommandAck(can::focIdentifyMechanicalId, services::CanAckStatus::notImplemented);
+            return;
+        }
+
+        if (pendingMechIdentDoneCallback != nullptr)
+        {
+            server.SendCategoryError(can::focIdentifyMechanicalId, FocMotorCategoryError::busy);
+            return;
+        }
+
+        const auto& state = controlMode.ActiveStateMachine().CurrentState();
+        const auto* ready = std::get_if<state_machine::Ready>(&state);
+        if (ready == nullptr)
+        {
+            server.SendCommandAck(can::focIdentifyMechanicalId, services::CanAckStatus::invalidState);
+            return;
+        }
+
+        const auto& cal = ready->loadedData;
+        pendingMechIdentDoneCallback = onDone;
+
+        mechIdent->EstimateFrictionAndInertia(
+            foc::NewtonMeter{ cal.fluxLinkage },
+            static_cast<std::size_t>(cal.polePairs),
+            {},
+            [this](std::optional<foc::NewtonMeterSecondPerRadian> friction,
+                   std::optional<foc::NewtonMeterSecondSquared> inertia)
+            {
+                auto callback = pendingMechIdentDoneCallback;
+                pendingMechIdentDoneCallback = nullptr;
+
+                if (!friction.has_value() || !inertia.has_value())
+                {
+                    server.SendCategoryError(can::focIdentifyMechanicalId, FocMotorCategoryError::calibrationFailed);
+                    return;
+                }
+
+                server.BroadcastMechanicalParams(*friction, *inertia);
+                callback();
+            });
     }
 
-    void FocMotorCanBridge::OnRequestTelemetry(const infra::Function<void()>&)
+    void FocMotorCanBridge::OnRequestTelemetry(const infra::Function<void()>& onDone)
     {
-        server.SendCategoryError(can::focRequestTelemetryId, FocMotorCategoryError::applicationError);
+        const auto& state = controlMode.ActiveStateMachine().CurrentState();
+        const auto faultCode = std::holds_alternative<state_machine::Fault>(state)
+            ? ToCanFaultCode(controlMode.ActiveStateMachine().LastFaultCode())
+            : FocFaultCode::none;
+
+        server.BroadcastTelemetryStatus(ToCanMotorState(state), faultCode);
+        onDone();
     }
 
-    void FocMotorCanBridge::OnSetEncoderResolution(const infra::Function<void()>&)
+    void FocMotorCanBridge::OnSetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone)
     {
-        server.SendCategoryError(can::focSetEncoderResolutionId, FocMotorCategoryError::applicationError);
+        if (pendingNvmDoneCallback != nullptr)
+        {
+            server.SendCategoryError(can::focSetEncoderResolutionId, FocMotorCategoryError::busy);
+            return;
+        }
+
+        if (resolution == 0)
+        {
+            server.SendCommandAck(can::focSetEncoderResolutionId, services::CanAckStatus::invalidPayload);
+            return;
+        }
+
+        configData.encoderResolution = resolution;
+        pendingNvmDoneCallback = onDone;
+
+        nvm.SaveConfig(configData, [this](services::NvmStatus status)
+            {
+                auto callback = pendingNvmDoneCallback;
+                pendingNvmDoneCallback = nullptr;
+                if (status == services::NvmStatus::Ok)
+                    callback();
+                else
+                    server.SendCategoryError(can::focSetEncoderResolutionId, FocMotorCategoryError::persistenceFailed);
+            });
     }
 
-    void FocMotorCanBridge::OnConfigureTelemetryRate(const infra::Function<void()>&)
+    void FocMotorCanBridge::OnConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone)
     {
-        server.SendCategoryError(can::focConfigureTelemetryRateId, FocMotorCategoryError::applicationError);
+        if (pendingNvmDoneCallback != nullptr)
+        {
+            server.SendCategoryError(can::focConfigureTelemetryRateId, FocMotorCategoryError::busy);
+            return;
+        }
+
+        if (rateHz == 0 || rateHz > 10000)
+        {
+            server.SendCommandAck(can::focConfigureTelemetryRateId, services::CanAckStatus::invalidPayload);
+            return;
+        }
+
+        configData.telemetryRateHz = rateHz;
+        pendingNvmDoneCallback = onDone;
+
+        nvm.SaveConfig(configData, [this](services::NvmStatus status)
+            {
+                auto callback = pendingNvmDoneCallback;
+                pendingNvmDoneCallback = nullptr;
+                if (status == services::NvmStatus::Ok)
+                    callback();
+                else
+                    server.SendCategoryError(can::focConfigureTelemetryRateId, FocMotorCategoryError::persistenceFailed);
+            });
     }
 
     void FocMotorCanBridge::ReportCommandOutcome(uint8_t commandId, state_machine::CommandResult result,

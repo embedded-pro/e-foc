@@ -168,33 +168,57 @@ namespace can
             });
     }
 
-    void FocMotorCategoryServer::HandleSetPidCurrent(const hal::Can::Message&)
+    void FocMotorCategoryServer::HandleSetPidCurrent(const hal::Can::Message& data)
     {
-        NotifyObservers([this](auto& observer)
+        services::CanPayloadReader reader{ data };
+        reader.Skip(1);
+        const auto bandwidth = reader.ReadFixed16(focPidScale);
+        if (!reader.Valid())
+        {
+            SendCommandAck(focSetPidCurrentId, services::CanAckStatus::invalidPayload);
+            return;
+        }
+        NotifyObservers([this, bandwidth](auto& observer)
             {
-                observer.OnSetPidCurrent([this]()
+                observer.OnSetPidCurrent(bandwidth, [this]()
                     {
                         SendCommandAck(focSetPidCurrentId, services::CanAckStatus::success);
                     });
             });
     }
 
-    void FocMotorCategoryServer::HandleSetPidSpeed(const hal::Can::Message&)
+    void FocMotorCategoryServer::HandleSetPidSpeed(const hal::Can::Message& data)
     {
-        NotifyObservers([this](auto& observer)
+        services::CanPayloadReader reader{ data };
+        reader.Skip(1);
+        const auto bandwidth = reader.ReadFixed16(focPidScale);
+        if (!reader.Valid())
+        {
+            SendCommandAck(focSetPidSpeedId, services::CanAckStatus::invalidPayload);
+            return;
+        }
+        NotifyObservers([this, bandwidth](auto& observer)
             {
-                observer.OnSetPidSpeed([this]()
+                observer.OnSetPidSpeed(bandwidth, [this]()
                     {
                         SendCommandAck(focSetPidSpeedId, services::CanAckStatus::success);
                     });
             });
     }
 
-    void FocMotorCategoryServer::HandleSetPidPosition(const hal::Can::Message&)
+    void FocMotorCategoryServer::HandleSetPidPosition(const hal::Can::Message& data)
     {
-        NotifyObservers([this](auto& observer)
+        services::CanPayloadReader reader{ data };
+        reader.Skip(1);
+        const auto bandwidth = reader.ReadFixed16(focPidScale);
+        if (!reader.Valid())
+        {
+            SendCommandAck(focSetPidPositionId, services::CanAckStatus::invalidPayload);
+            return;
+        }
+        NotifyObservers([this, bandwidth](auto& observer)
             {
-                observer.OnSetPidPosition([this]()
+                observer.OnSetPidPosition(bandwidth, [this]()
                     {
                         SendCommandAck(focSetPidPositionId, services::CanAckStatus::success);
                     });
@@ -234,11 +258,19 @@ namespace can
             });
     }
 
-    void FocMotorCategoryServer::HandleSetEncoderResolution(const hal::Can::Message&)
+    void FocMotorCategoryServer::HandleSetEncoderResolution(const hal::Can::Message& data)
     {
-        NotifyObservers([this](auto& observer)
+        services::CanPayloadReader reader{ data };
+        reader.Skip(1);
+        const auto resolution = reader.ReadUInt32();
+        if (!reader.Valid())
+        {
+            SendCommandAck(focSetEncoderResolutionId, services::CanAckStatus::invalidPayload);
+            return;
+        }
+        NotifyObservers([this, resolution](auto& observer)
             {
-                observer.OnSetEncoderResolution([this]()
+                observer.OnSetEncoderResolution(resolution, [this]()
                     {
                         SendCommandAck(focSetEncoderResolutionId, services::CanAckStatus::success);
                     });
@@ -250,14 +282,49 @@ namespace can
         SendCommandAck(focQueryMotorTypeId, services::CanAckStatus::notImplemented);
     }
 
-    void FocMotorCategoryServer::HandleConfigureTelemetryRate(const hal::Can::Message&)
+    void FocMotorCategoryServer::HandleConfigureTelemetryRate(const hal::Can::Message& data)
     {
-        NotifyObservers([this](auto& observer)
+        services::CanPayloadReader reader{ data };
+        reader.Skip(1);
+        const auto rateHz = reader.ReadUInt32();
+        if (!reader.Valid())
+        {
+            SendCommandAck(focConfigureTelemetryRateId, services::CanAckStatus::invalidPayload);
+            return;
+        }
+        NotifyObservers([this, rateHz](auto& observer)
             {
-                observer.OnConfigureTelemetryRate([this]()
+                observer.OnConfigureTelemetryRate(rateHz, [this]()
                     {
                         SendCommandAck(focConfigureTelemetryRateId, services::CanAckStatus::success);
                     });
             });
+    }
+
+    void FocMotorCategoryServer::BroadcastTelemetryStatus(FocMotorState state, FocFaultCode fault)
+    {
+        services::CanPayloadWriter payload;
+        payload.WriteUInt8(static_cast<uint8_t>(state));
+        payload.WriteUInt8(static_cast<uint8_t>(fault));
+        payload.WriteFixed16(0.0f, focSpeedScale);
+        payload.WriteFixed16(0.0f, focPositionScale);
+        SendTelemetry(focTelemetryStatusResponseId, payload);
+    }
+
+    void FocMotorCategoryServer::BroadcastElectricalParams(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs)
+    {
+        services::CanPayloadWriter payload;
+        payload.WriteFixed16(resistance.Value(), focResistanceScale);
+        payload.WriteFixed16(inductance.Value(), focInductanceScale);
+        payload.WriteUInt8(static_cast<uint8_t>(polePairs));
+        SendResponse(focElectricalParamsResponseId, payload);
+    }
+
+    void FocMotorCategoryServer::BroadcastMechanicalParams(foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia)
+    {
+        services::CanPayloadWriter payload;
+        payload.WriteFixed16(friction.Value(), focFrictionScale);
+        payload.WriteFixed16(inertia.Value(), focInertiaScale);
+        SendResponse(focMechanicalParamsResponseId, payload);
     }
 }

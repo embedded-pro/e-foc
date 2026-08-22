@@ -29,14 +29,14 @@ namespace can
         virtual void OnSetSpeedSetpoint(foc::RadiansPerSecond value, const infra::Function<void()>& onDone) = 0;
         virtual void OnSetPositionSetpoint(foc::Radians value, const infra::Function<void()>& onDone) = 0;
 
-        virtual void OnSetPidCurrent(const infra::Function<void()>& onDone) = 0;
-        virtual void OnSetPidSpeed(const infra::Function<void()>& onDone) = 0;
-        virtual void OnSetPidPosition(const infra::Function<void()>& onDone) = 0;
+        virtual void OnSetPidCurrent(float bandwidth, const infra::Function<void()>& onDone) = 0;
+        virtual void OnSetPidSpeed(float bandwidth, const infra::Function<void()>& onDone) = 0;
+        virtual void OnSetPidPosition(float bandwidth, const infra::Function<void()>& onDone) = 0;
         virtual void OnIdentifyElectrical(const infra::Function<void()>& onDone) = 0;
         virtual void OnIdentifyMechanical(const infra::Function<void()>& onDone) = 0;
         virtual void OnRequestTelemetry(const infra::Function<void()>& onDone) = 0;
-        virtual void OnSetEncoderResolution(const infra::Function<void()>& onDone) = 0;
-        virtual void OnConfigureTelemetryRate(const infra::Function<void()>& onDone) = 0;
+        virtual void OnSetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone) = 0;
+        virtual void OnConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone) = 0;
     };
 
     class FocMotorCategoryServer
@@ -53,6 +53,9 @@ namespace can
         void SendSelectControlModeResponse(FocMotorMode activeMode);
         void SendCategoryError(uint8_t origCommandId, FocMotorCategoryError errorCode);
         void BroadcastFaultStatus(FocFaultCode fault);
+        void BroadcastTelemetryStatus(FocMotorState state, FocFaultCode fault);
+        void BroadcastElectricalParams(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs);
+        void BroadcastMechanicalParams(foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia);
 
     private:
         void HandleStart(const hal::Can::Message& data);

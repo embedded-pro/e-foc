@@ -72,12 +72,23 @@
     frame without modification.
 
 - id: REQ-INT-011
-  title: Stub commands return applicationError
+  title: Deferred commands are fully implemented
   shall: >
-    FocMotorCanBridge shall respond with a category error of type applicationError for
-    any command whose implementation is deferred to a future iteration. The error frame
-    shall be sent synchronously within the handler, before returning. No state machine
-    transition shall occur for a stub command.
+    FocMotorCanBridge shall implement all previously deferred commands.
+    OnSetPidCurrent, OnSetPidSpeed, and OnSetPidPosition shall parse the bandwidth
+    field from the CAN frame and forward it to the corresponding TrySet*Bandwidth
+    method on ControlModeStateMachine, responding with success or invalidPayload.
+    OnIdentifyElectrical shall delegate to ElectricalParametersIdentification,
+    broadcast the result via focElectricalParamsResponseId, and acknowledge success,
+    or send calibrationFailed on estimation failure.
+    OnIdentifyMechanical shall require the state machine to be in Ready state, delegate
+    to MechanicalParametersIdentification, broadcast via focMechanicalParamsResponseId,
+    and acknowledge success; it shall respond invalidState if not in Ready, and
+    notImplemented if no MechanicalParametersIdentification service is available.
+    OnRequestTelemetry shall broadcast the current motor state and fault code via
+    focTelemetryStatusResponseId and acknowledge success.
+    OnSetEncoderResolution and OnConfigureTelemetryRate shall validate their payloads,
+    persist to NonVolatileMemory, and acknowledge success or persistenceFailed.
 
 - id: REQ-INT-012
   title: CAN frames and protocol events are observable via tracing decorators
