@@ -252,7 +252,7 @@ graph LR
 
 ## Open Questions
 
-| # | Question                                                           | Resolution                                                                                   | Status   |
+| # | Question                                                         | Resolution                                                                                   | Status   |
 |---|------------------------------------------------------------------|----------------------------------------------------------------------------------------------|----------|
 | 1 | Implement telemetry push (BroadcastFaultStatus, periodic status) | On-demand via `OnRequestTelemetry`; periodic timer deferred                                  | resolved |
 | 2 | PID gain commands                                                | Accepted: kp field mapped to loop bandwidth via `TrySet*Bandwidth`                           | resolved |
