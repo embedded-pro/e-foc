@@ -129,16 +129,15 @@ inside the unit circle. Guaranteed by the DARE solution when the plant is contro
 **Relation to toolbox**: `Lqr<float,2,1>` provides the gain container. DARE computed at configuration
 time via `DiscreteAlgebraicRiccatiEquation`. `IntegralStateFeedbackLqi` provides the LQI variant.
 
-<!-- tikz:diagrams/position-loop-lqr.tex -->
 ```mermaid
 graph LR
-    XREF["θ*, ω*"] --> ERR["Σ error state"]
-    XMEAS["θm, ωm"] --> ERR
-    ERR --> GAIN["K = Kθ, Kω\nfrom DARE"]
-    GAIN --> IQ["Iq*"]
-    DARE["DARE at config\nJ, Bf, Kt"] -.-> GAIN
+    XREF["θ*, ω*"] --> ERR["Σ state error"]
+    XMEAS["θm, ωm"] -->|"−"| ERR
+    DARE["DARE solver\nJ, Bf, Kt"] -.->|"K = [Kθ, Kω]"| GAIN["State feedback\n−K·e"]
+    ERR --> GAIN
+    GAIN -->|"Iq*"| PLANT["Speed + Current\nPlant"]
+    PLANT -->|"θm, ωm"| XMEAS
 ```
-<!-- /tikz -->
 
 ---
 
@@ -159,17 +158,17 @@ $$
 The speed reference $\omega_m^*[k]$ is passed to the selected speed-loop controller (PID, LQI,
 ADRC, or Two-DOF). Cascade P is a position-loop choice; it does not constrain the speed-loop algorithm.
 
-<!-- tikz:diagrams/position-loop-cascade-p.tex -->
 ```mermaid
 graph LR
     THR["θ*"] --> SE["Σ"]
-    TH["θm"] --> SE
+    TH["θm"] -->|"−"| SE
     SE -->|"eθ"| KV["Kv"]
     KV -->|"ω*"| SFF["Σ"]
     THDOT["θ̇* (opt.)"] --> KFF["Kff"] --> SFF
-    SFF --> SPD["Speed Controller"] --> IQ["Iq*"]
+    SFF -->|"ω* + ff"| SPD["Speed Controller"]
+    SPD -->|"Iq*"| PLANT["Current Plant"]
+    PLANT -->|"θm"| TH
 ```
-<!-- /tikz -->
 
 **Position-loop bandwidth**:
 

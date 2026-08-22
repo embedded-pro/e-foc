@@ -196,19 +196,16 @@ $1/\omega_o$ seconds — typically an order of magnitude faster than integral ac
 control law — the template parameter is the plant order, and the extended state carrying $\hat{f}$ is
 added on top of it. `Compute(ω_ref, ω_meas)` is called once per 1 kHz handler cycle.
 
-<!-- tikz:diagrams/speed-loop-adrc.tex -->
 ```mermaid
 graph LR
-    W_REF["ω*"] --> U0["u₀ = ωc(ω*-ω̂)"]
-    ESO["ESO"] --> XHAT["ω̂, f̂"]
-    XHAT --> U0
-    XHAT --> CANCEL["u = (u₀-f̂)/b₀"]
-    U0 --> CANCEL
-    CANCEL --> IQ["Iq*"]
-    W_MEAS["ωm"] --> ESO
-    IQ --> ESO
+    W_REF["ω*"] --> ERR["Σ ω*−ω̂"]
+    ESO["Extended State Observer"] -->|"ω̂"| ERR
+    ESO -->|"f̂ (total disturbance)"| CANCEL["Σ (u₀−f̂)/b₀"]
+    ERR -->|"u₀ = ωc·e"| CANCEL
+    CANCEL -->|"Iq*"| PLANT["Speed Plant"]
+    PLANT -->|"ωm"| ESO
+    CANCEL -->|"Iq*"| ESO
 ```
-<!-- /tikz -->
 
 ---
 

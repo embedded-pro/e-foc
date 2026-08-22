@@ -58,13 +58,12 @@ actual motor parameters without manual re-tuning.
 
 ## Algorithm Map
 
-<!-- tikz:diagrams/algorithm-map.tex -->
 ```mermaid
 graph TD
     ENC(["Encoder θm"])
-    ADC(["ADC phase currents"])
+    ADC(["ADC ia, ib"])
     subgraph POS["Position loop — 1 kHz"]
-        PC["PID · Cascade P · LQR · LQI · Two-DOF · ILC"]
+        PC["PID · Cascade P · LQR/LQI · Two-DOF · ILC"]
     end
     subgraph SPD["Speed loop — 1 kHz"]
         SC["PID · LQI · ADRC · Two-DOF"]
@@ -77,12 +76,11 @@ graph TD
     POS -->|"ω*"| SPD
     SPD -->|"Iq*"| CUR
     CC --> SVM
-    ADC -->|"Clarke/Park"| CUR
-    ENC --> CUR
-    ENC --> SPD
-    ENC --> POS
+    ADC -->|"iα, iβ via Clarke/Park"| CUR
+    ENC -->|"θe"| CUR
+    ENC -->|"ωm"| SPD
+    ENC -->|"θm"| POS
 ```
-<!-- /tikz -->
 
 ---
 

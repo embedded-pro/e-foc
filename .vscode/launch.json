@@ -18,6 +18,7 @@
             "externalConsole": false,
             "MIMode": "gdb",
             "miDebuggerPath": "/usr/bin/gdb",
+            "miDebuggerArgs": "-iex \"set debuginfod urls\"",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -37,12 +38,13 @@
             "environment": [
                 {
                     "name": "DISPLAY",
-                    "value": "host.docker.internal:0.0"
+                    "value": "host.docker.internal:0.0",
                 }
             ],
             "externalConsole": false,
             "MIMode": "gdb",
             "miDebuggerPath": "/usr/bin/gdb",
+            "miDebuggerArgs": "-iex \"set debuginfod urls\"",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -68,6 +70,7 @@
             "externalConsole": false,
             "MIMode": "gdb",
             "miDebuggerPath": "/usr/bin/gdb",
+            "miDebuggerArgs": "-iex \"set debuginfod urls\"",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -93,6 +96,7 @@
             "externalConsole": false,
             "MIMode": "gdb",
             "miDebuggerPath": "/usr/bin/gdb",
+            "miDebuggerArgs": "-iex \"set debuginfod urls\"",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -147,6 +151,7 @@
             "externalConsole": false,
             "MIMode": "gdb",
             "miDebuggerPath": "/usr/bin/gdb",
+            "miDebuggerArgs": "-iex \"set debuginfod urls\"",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",

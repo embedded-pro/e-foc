@@ -1,0 +1,23 @@
+{
+  "theme": "neutral",
+  "themeVariables": {
+    "fontFamily": "DejaVu Sans, Helvetica, Arial, sans-serif",
+    "fontSize": "15px"
+  },
+  "flowchart": {
+    "useMaxWidth": false,
+    "htmlLabels": true
+  },
+  "sequence": {
+    "useMaxWidth": false,
+    "actorFontSize": 14,
+    "noteFontSize": 13,
+    "messageFontSize": 13
+  },
+  "class": {
+    "useMaxWidth": false
+  },
+  "stateDiagram": {
+    "useMaxWidth": false
+  }
+}
