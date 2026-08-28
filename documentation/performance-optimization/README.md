@@ -319,6 +319,18 @@ vmovgt.f32 s0, s1
 
 ---
 
+## Measurement tiers
+
+Three complementary approaches verify cycle budgets. See [qemu-sil.md](qemu-sil.md) for full detail on Tier 2.
+
+| Tier | Tool | Purpose | Authoritative for |
+|---|---|---|---|
+| 1 — Static estimate | `cortex-cycle-budget` CI action | Merge gate | Absolute budget (≤ 4500 / ≤ 20000) |
+| 2 — QEMU SIL | `qemu-system-arm` + DWT CYCCNT | Regression signal | ARM ISA correctness, instruction-count delta |
+| 3 — On-silicon DWT | `PlatformFactory::ElapsedCycles()` via TIVA HIL | Ground truth | Absolute silicon timing |
+
+---
+
 ## Measuring Performance
 
 ### Cycle Counter (DWT)
