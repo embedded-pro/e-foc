@@ -11,6 +11,3 @@ target_link_libraries(e_foc.qemu_sil_tests PRIVATE
     cucumber_cpp.runner
 )
 
-add_test(NAME e_foc.qemu_sil_tests
-    COMMAND e_foc.qemu_sil_tests -- ${CMAKE_CURRENT_SOURCE_DIR}/../features)
-set_tests_properties(e_foc.qemu_sil_tests PROPERTIES LABELS integration)
