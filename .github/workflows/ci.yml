@@ -294,9 +294,61 @@ jobs:
             echo "_Note: QEMU CYCCNT is an instruction-count proxy, not silicon cycle time._"
             echo "_Authoritative budget gate: cortex-cycle-budget static analysis (≤ 4500 cycles)._"
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload QEMU SIL ELF
+        if: matrix.preset == 'qemu-cortex-m4'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e_foc.sil_qemu.elf
+          path: build/${{ matrix.preset }}/integration_tests/software_in_the_loop/qemu_target/RelWithDebInfo/e_foc.sil_qemu.elf
+          if-no-files-found: warn
       - name: Upload test logs
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: qemu-test-logs-${{ matrix.preset }}
           path: build/${{ matrix.preset }}/Testing/Temporary/
+
+  qemu_sil_behavioral_tests:
+    name: QEMU SIL Behavioral Tests (host runner)
+    runs-on: ubuntu-latest
+    container: gabrielfrasantos/embedded-devcontainer-cpp:v7.3.0@sha256:4f92e9c86dfc5a9688b6134944e7a40c9eb3c658022ea62dc9e57e4c3b056940
+    needs: [host_build_test_ubuntu, qemu_sil_tests]
+    steps:
+      - name: Configure Git
+        run: |
+          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git config --global --add safe.directory '*'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
+        with:
+          key: ${{ github.job }}-ubuntu-latest
+          max-size: 2G
+          save: ${{ github.ref == 'refs/heads/main' }}
+      - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
+        with:
+          configurePreset: "host"
+          buildPreset: "host-Debug"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: e_foc.sil_qemu.elf
+          path: qemu_elf/
+      - name: Run QEMU SIL behavioral tests
+        env:
+          QEMU_SIL_ELF: ${{ github.workspace }}/qemu_elf/e_foc.sil_qemu.elf
+        run: |
+          qemu_test=$(find build/host -name "e_foc.qemu_sil_tests" -type f -executable -print -quit)
+          if [[ -z "$qemu_test" ]]; then
+            echo "::error::QEMU SIL behavioral test executable not found"
+            exit 1
+          fi
+          $qemu_test --format summary pretty junit:qemu-sil-test-report.xml -- integration_tests/software_in_the_loop/features
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: qemu-sil-test-report
+          path: qemu-sil-test-report.xml
+          if-no-files-found: ignore
