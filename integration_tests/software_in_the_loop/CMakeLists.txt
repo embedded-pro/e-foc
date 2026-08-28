@@ -1,3 +1,8 @@
+if(EMIL_BUILD_QEMU)
+    add_subdirectory(qemu_target)
+    return()
+endif()
+
 add_subdirectory(support)
 add_subdirectory(hooks)
 add_subdirectory(steps)

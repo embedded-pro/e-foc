@@ -10,6 +10,10 @@ add_library(e_foc.integration_tests.support OBJECT
     PlatformFactoryMock.hpp
     PositionIntegrationFixture.cpp
     PositionIntegrationFixture.hpp
+    QemuSilFixture.cpp
+    QemuSilFixture.hpp
+    QemuSilSession.cpp
+    QemuSilSession.hpp
     SpeedIntegrationFixture.cpp
     SpeedIntegrationFixture.hpp
     StateMachineAccessor.hpp
@@ -36,4 +40,9 @@ target_link_libraries(e_foc.integration_tests.support PUBLIC
     infra.util_test_helper
     GTest::gtest
     GTest::gmock
+)
+
+set(QEMU_SIL_ELF_DEFAULT "${CMAKE_SOURCE_DIR}/build/qemu-cortex-m4/integration_tests/software_in_the_loop/qemu_target/RelWithDebInfo/e_foc.sil_qemu.elf")
+target_compile_definitions(e_foc.integration_tests.support PUBLIC
+    "QEMU_SIL_ELF_DEFAULT_PATH=\"${QEMU_SIL_ELF_DEFAULT}\""
 )
