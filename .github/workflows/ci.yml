@@ -110,6 +110,12 @@ jobs:
           name: e_foc
           path: build/host/e_foc-*-Linux.tar.gz
           if-no-files-found: error
+      - name: Upload QEMU SIL test runner
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e_foc.qemu_sil_tests
+          path: build/host/integration_tests/software_in_the_loop/qemu_main/e_foc.qemu_sil_tests
+          if-no-files-found: error
       - name: Upload test logs
         if: ${{ failure() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -315,23 +321,15 @@ jobs:
     needs: [host_build_test_ubuntu, qemu_sil_tests]
     steps:
       - name: Configure Git
-        run: |
-          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
-          git config --global --add safe.directory '*'
+        run: git config --global --add safe.directory '*'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          submodules: recursive
-      - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
+          submodules: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          key: ${{ github.job }}-ubuntu-latest
-          max-size: 2G
-          save: ${{ github.ref == 'refs/heads/main' }}
-      - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
-        with:
-          configurePreset: "host"
-          buildPreset: "host-Debug"
+          name: e_foc.qemu_sil_tests
+          path: qemu_runner/
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: e_foc.sil_qemu.elf
@@ -340,14 +338,58 @@ jobs:
         env:
           QEMU_SIL_ELF: ${{ github.workspace }}/qemu_elf/e_foc.sil_qemu.elf
         run: |
-          qemu_test=$(find build/host -name "e_foc.qemu_sil_tests" -type f -executable -print -quit)
-          if [[ -z "$qemu_test" ]]; then
-            echo "::error::QEMU SIL behavioral test executable not found"
-            exit 1
-          fi
-          $qemu_test --format summary pretty junit:qemu-sil-test-report.xml -- integration_tests/software_in_the_loop/features
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+          chmod +x qemu_runner/e_foc.qemu_sil_tests
+          qemu_runner/e_foc.qemu_sil_tests \
+            --format summary pretty junit:qemu-sil-test-report.xml \
+            -- integration_tests/software_in_the_loop/features
+      - name: Generate QEMU SIL test summary
         if: always()
+        run: |
+          if [[ ! -f qemu-sil-test-report.xml ]]; then
+            {
+              echo "## QEMU SIL Behavioral Test Results"
+              echo ""
+              echo "_Report not generated — test step did not produce output._"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "## QEMU SIL Behavioral Test Results"
+            echo ""
+            python3 -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('qemu-sil-test-report.xml')
+          root = tree.getroot()
+          suites = root.findall('.//testsuite') if root.tag == 'testsuites' else [root]
+          features = {}
+          for suite in suites:
+              for tc in suite.findall('testcase'):
+                  feature = tc.get('classname', 'Unknown')
+                  name = tc.get('name', 'Unknown')
+                  failed = tc.find('failure') is not None
+                  skipped = tc.find('skipped') is not None
+                  status = ':x:' if failed else ':zzz:' if skipped else ':white_check_mark:'
+                  features.setdefault(feature, []).append((name, status))
+          for feature, scenarios in features.items():
+              print(f'### {feature}')
+              print('| Scenario | Status |')
+              print('|---|---|')
+              for name, status in scenarios:
+                  print(f'| {name} | {status} |')
+              print()
+          "
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: EnricoMi/publish-unit-test-result-action@d0a4676d0e0b938bc201470d88276b7c74c712b3 # v2.24.0
+        if: always()
+        with:
+          check_name: QEMU SIL Behavioral Test Results
+          comment_title: QEMU SIL Behavioral Test Results
+          files: qemu-sil-test-report.xml
+          report_individual_runs: true
+          report_suite_logs: info
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: qemu-sil-test-report
           path: qemu-sil-test-report.xml
