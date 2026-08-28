@@ -2,17 +2,6 @@
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
 
-namespace
-{
-    infra::Function<void()>* pendSvHandlerCallback = nullptr;
-}
-
-extern "C" void PendSV_Handler()
-{
-    if (pendSvHandlerCallback != nullptr && *pendSvHandlerCallback)
-        (*pendSvHandlerCallback)();
-}
-
 unsigned int hse_value = 8'000'000;
 
 namespace
@@ -123,23 +112,6 @@ namespace application
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
     {
         return pendSvLowPriorityInterrupt;
-    }
-
-    void PlatformFactoryImpl::PendSvLowPriorityInterrupt::Trigger()
-    {
-        SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
-    }
-
-    void PlatformFactoryImpl::PendSvLowPriorityInterrupt::Register(const infra::Function<void()>& handler)
-    {
-        onLowPriorityInterrupt = handler;
-        pendSvHandlerCallback = &onLowPriorityInterrupt;
-    }
-
-    void PlatformFactoryImpl::PendSvLowPriorityInterrupt::Unregister()
-    {
-        pendSvHandlerCallback = nullptr;
-        onLowPriorityInterrupt = nullptr;
     }
 
     void PlatformFactoryImpl::Start()

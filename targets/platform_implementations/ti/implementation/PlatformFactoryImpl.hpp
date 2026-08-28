@@ -6,6 +6,7 @@
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
+#include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal_tiva/cortex/DataWatchpointAndTrace.hpp"
@@ -76,16 +77,6 @@ namespace application
     private:
         static constexpr float adcReferenceVoltage = 3.3f;
         static constexpr float adcResolution = 4096.0f;
-
-        struct PendSvLowPriorityInterrupt
-            : public foc::LowPriorityInterrupt
-        {
-            void Trigger() override;
-            void Register(const infra::Function<void()>& handler) override;
-            void Unregister() override;
-
-            infra::Function<void()> onLowPriorityInterrupt;
-        };
 
         struct Cortex
         {
@@ -236,7 +227,7 @@ namespace application
 
     private:
         infra::Function<void()> onInitialized;
-        PendSvLowPriorityInterrupt pendSvLowPriorityInterrupt;
+        FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         ResetCause resetCause{ ResetCause::powerUp };
         infra::BoundedString::WithStorage<1024> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
