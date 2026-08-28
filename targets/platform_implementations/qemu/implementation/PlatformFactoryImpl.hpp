@@ -8,46 +8,33 @@
 #include "hal/cortex_m/SystemTickTimerService.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "infra/stream/OutputStream.hpp"
+#include "infra/timer/Timer.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "services/util/Terminal.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "targets/platform_implementations/qemu/implementation/ArrayEeprom.hpp"
-#include "targets/platform_implementations/qemu/implementation/SemihostingCan.hpp"
+#include "targets/platform_implementations/qemu/implementation/QemuTimer.hpp"
+#include "targets/platform_implementations/qemu/implementation/QemuConstants.hpp"
+#include "targets/platform_implementations/qemu/implementation/SemihostingCanBusAdapter.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingSerial.hpp"
 #include <optional>
 
 namespace application
 {
-    class SemihostingCanBusAdapter
-        : public CanBusAdapter
-    {
-    public:
-        void SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion) override;
-        void ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction) override;
-        void SetOnError(const infra::Function<void(CanError)>& handler) override;
-
-        void PollIncoming();
-
-    private:
-        sil::SemihostingCan can;
-        infra::Function<void(CanError)> onError;
-    };
-
     class PlatformFactoryImpl
         : public PlatformFactory
     {
     public:
-        explicit PlatformFactoryImpl(const infra::Function<void()>& onInitialized);
+        explicit PlatformFactoryImpl(const foc::ThreePhaseMotorModel::Parameters& motorParams,
+                                     const infra::Function<void()>& onInitialized);
 
-        // PlatformFactory — configuration
         void ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold) override;
         void SetEncoderResolution(uint32_t resolution) override;
         void ConfigureCanBus(uint32_t bitRate, bool testMode) override;
         CanBusAdapter& CanBus() override;
 
-        // PlatformFactory — accessors
         void Run() override;
         services::Tracer& Tracer() override;
         services::TerminalWithCommands& Terminal() override;
@@ -66,7 +53,6 @@ namespace application
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
 
-        // drivers::ThreePhaseInverter
         OPTIMIZE_FOR_SPEED void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone) override;
         OPTIMIZE_FOR_SPEED void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
         void Start() override;
@@ -74,7 +60,6 @@ namespace application
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
 
-        // drivers::Encoder
         OPTIMIZE_FOR_SPEED foc::Radians Read() override;
         void Set(foc::Radians value) override;
         void SetZero() override;
@@ -111,7 +96,7 @@ namespace application
         {
             hal::cortex::InterruptTable::WithStorage<64> interruptTable;
             hal::cortex::EventDispatcherCortex::WithSize<50> eventDispatcher;
-            hal::cortex::SystemTickTimerService systemTick{ 25000000u, std::chrono::milliseconds(1) };
+            hal::cortex::SystemTickTimerService systemTick{ kQemuSystemClockHz, std::chrono::milliseconds(1) };
         };
 
         struct TerminalAndTracerBlock
@@ -129,10 +114,13 @@ namespace application
             services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<32, 4> terminal;
         };
 
+        void FocTimerIsr();
+
     private:
         infra::Function<void()> onInitialized;
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         Cortex cortex;
+        QemuTimer focTimer{ 0x40000000u, 8, kQemuSystemClockHz, 20000u, [this]() { FocTimerIsr(); } };
         SemihostingSerial serial;
         TerminalAndTracerBlock terminalAndTracer{ serial };
         ArrayEeprom eeprom;
@@ -140,8 +128,12 @@ namespace application
         GpioPinStub warningPin;
         GpioPinStub failurePin;
         NoOpPerformanceTracker performanceTracker;
-        simulator::ThreePhaseMotorModel model;
+        foc::ThreePhaseMotorModel model;
         std::optional<SemihostingCanBusAdapter> canBusAdapter;
+        infra::TimerRepeating canPollTimer;
         hal::Hertz baseFrequency{ 20000 };
+        infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
+        foc::PhasePwmDutyCycles lastDutyPhases{};
+        foc::PhaseCurrents lastCurrents{};
     };
 }

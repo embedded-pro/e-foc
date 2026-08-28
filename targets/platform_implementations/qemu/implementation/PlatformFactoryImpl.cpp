@@ -3,36 +3,17 @@
 #endif
 
 #include "targets/platform_implementations/qemu/implementation/PlatformFactoryImpl.hpp"
-#include QEMU_MOTOR_MODEL_HEADER
 #include "services/tracer/GlobalTracer.hpp"
+#include <chrono>
 #include <cstdio>
 
 namespace application
 {
-    void SemihostingCanBusAdapter::SendData(Id id, const Message& data, const infra::Function<void(bool)>& actionOnCompletion)
-    {
-        can.SendData(id, data, actionOnCompletion);
-    }
-
-    void SemihostingCanBusAdapter::ReceiveData(const infra::Function<void(Id, const Message&)>& receivedAction)
-    {
-        can.ReceiveData(receivedAction);
-    }
-
-    void SemihostingCanBusAdapter::SetOnError(const infra::Function<void(CanError)>& handler)
-    {
-        onError = handler;
-    }
-
-    void SemihostingCanBusAdapter::PollIncoming()
-    {
-        can.PollIncoming();
-    }
-
-    PlatformFactoryImpl::PlatformFactoryImpl(const infra::Function<void()>& onInit)
+    PlatformFactoryImpl::PlatformFactoryImpl(const foc::ThreePhaseMotorModel::Parameters& motorParams,
+                                             const infra::Function<void()>& onInit)
         : onInitialized(onInit)
         , model(
-              simulator::JK42BLS01_X038ED::parameters,
+              motorParams,
               foc::Volts{ 48.0f },
               hal::Hertz{ 20000 },
               std::nullopt)
@@ -40,6 +21,7 @@ namespace application
         cortex.systemTick.Start();
         services::SetGlobalTracerInstance(terminalAndTracer.tracer);
         onInitialized();
+        focTimer.Start();
     }
 
     void PlatformFactoryImpl::Run()
@@ -48,11 +30,7 @@ namespace application
         std::fflush(stdout);
 
         while (true)
-        {
             cortex.eventDispatcher.ExecuteAllActions();
-            if (canBusAdapter)
-                canBusAdapter->PollIncoming();
-        }
     }
 
     services::Tracer& PlatformFactoryImpl::Tracer()
@@ -97,7 +75,7 @@ namespace application
 
     hal::Hertz PlatformFactoryImpl::SystemClock() const
     {
-        return hal::Hertz{ 25000000u };
+        return hal::Hertz{ kQemuSystemClockHz };
     }
 
     foc::Volts PlatformFactoryImpl::PowerSupplyVoltage()
@@ -142,7 +120,13 @@ namespace application
     void PlatformFactoryImpl::ConfigureCanBus(uint32_t, bool)
     {
         if (!canBusAdapter)
+        {
             canBusAdapter.emplace();
+            canPollTimer.Start(std::chrono::milliseconds(1), [this]()
+            {
+                canBusAdapter->PollIncoming();
+            });
+        }
     }
 
     CanBusAdapter& PlatformFactoryImpl::CanBus()
@@ -153,12 +137,20 @@ namespace application
     OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz freq, const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
         baseFrequency = freq;
-        model.PhaseCurrentsReady(freq, onDone);
+        onPhaseCurrentsReady = onDone;
+        model.PhaseCurrentsReady(freq, [this](foc::PhaseCurrents currents) { lastCurrents = currents; });
     }
 
     OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        model.ThreePhasePwmOutput(dutyPhases);
+        lastDutyPhases = dutyPhases;
+    }
+
+    void PlatformFactoryImpl::FocTimerIsr()
+    {
+        model.StepForTest(lastDutyPhases);
+        if (onPhaseCurrentsReady)
+            onPhaseCurrentsReady(lastCurrents);
     }
 
     void PlatformFactoryImpl::Start()

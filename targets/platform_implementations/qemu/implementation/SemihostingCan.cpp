@@ -21,6 +21,66 @@ namespace
             return c - 'A' + 10;
         return -1;
     }
+
+    bool TryReadLine(char* buf, int size)
+    {
+        return std::fgets(buf, size, stdin) != nullptr;
+    }
+
+    bool ParseHexByte(const char* s, uint8_t& out)
+    {
+        const int hi = hexDigitValue(s[0]);
+        const int lo = hexDigitValue(s[1]);
+        if (hi < 0 || lo < 0)
+            return false;
+        out = static_cast<uint8_t>((hi << 4) | lo);
+        return true;
+    }
+
+    bool ParseCanLine(const char* line, hal::Can::Id& id, hal::Can::Message& msg)
+    {
+        constexpr const char* prefix = "CAN_RX ";
+        constexpr int prefixLen = 7;
+        if (std::strncmp(line, prefix, static_cast<std::size_t>(prefixLen)) != 0)
+            return false;
+
+        const char* idStr = line + prefixLen;
+        const char* space = std::strchr(idStr, ' ');
+        if (space == nullptr)
+            return false;
+
+        const int idLen = static_cast<int>(space - idStr);
+        if (idLen < 1 || idLen > 8)
+            return false;
+
+        uint32_t rawId = 0;
+        for (int i = 0; i < idLen; ++i)
+        {
+            const int d = hexDigitValue(idStr[i]);
+            if (d < 0)
+                return false;
+            rawId = (rawId << 4) | static_cast<uint32_t>(d);
+        }
+
+        const char* dataStr = space + 1;
+        const int dataLen = static_cast<int>(std::strlen(dataStr));
+
+        for (int i = 0; i + 1 < dataLen; i += 2)
+        {
+            const char ch = dataStr[i];
+            if (ch == '\n' || ch == '\r' || ch == '\0')
+                break;
+            uint8_t byte{};
+            if (!ParseHexByte(dataStr + i, byte))
+                break;
+            if (msg.full())
+                break;
+            msg.push_back(byte);
+        }
+
+        id = hal::Can::Id::Create11BitId(rawId);
+        return true;
+    }
 }
 
 namespace sil
@@ -59,53 +119,15 @@ namespace sil
     void SemihostingCan::PollIncoming()
     {
         char line[64]{};
-        if (std::fgets(line, static_cast<int>(sizeof(line)), stdin) == nullptr)
+        if (!TryReadLine(line, static_cast<int>(sizeof(line))))
             return;
 
-        const char* prefix = "CAN_RX ";
-        const int prefixLen = 7;
-        if (std::strncmp(line, prefix, static_cast<std::size_t>(prefixLen)) != 0)
-            return;
-
-        const char* idStr = line + prefixLen;
-        const char* space = std::strchr(idStr, ' ');
-        if (space == nullptr)
-            return;
-
-        const int idLen = static_cast<int>(space - idStr);
-        if (idLen < 1 || idLen > 8)
-            return;
-
-        uint32_t rawId = 0;
-        for (int i = 0; i < idLen; ++i)
-        {
-            const int d = hexDigitValue(idStr[i]);
-            if (d < 0)
-                return;
-            rawId = (rawId << 4) | static_cast<uint32_t>(d);
-        }
-
-        const char* dataStr = space + 1;
+        hal::Can::Id id{ hal::Can::Id::Create11BitId(0) };
         hal::Can::Message msg;
-        const int dataLen = static_cast<int>(std::strlen(dataStr));
-
-        for (int i = 0; i + 1 < dataLen; i += 2)
-        {
-            const char ch = dataStr[i];
-            if (ch == '\n' || ch == '\r' || ch == '\0')
-                break;
-            const int hi = hexDigitValue(ch);
-            const int lo = hexDigitValue(dataStr[i + 1]);
-            if (hi < 0 || lo < 0)
-                break;
-            if (msg.full())
-                break;
-            msg.push_back(static_cast<uint8_t>((hi << 4) | lo));
-        }
-
-        const hal::Can::Id canId = hal::Can::Id::Create11BitId(rawId);
+        if (!ParseCanLine(line, id, msg))
+            return;
 
         if (receiveCallback)
-            receiveCallback(canId, msg);
+            receiveCallback(id, msg);
     }
 }

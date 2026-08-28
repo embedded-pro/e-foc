@@ -4,10 +4,15 @@ emil_build_for(e_foc.platform_abstraction_qemu ALL All BOOL EMIL_BUILD_QEMU)
 target_sources(e_foc.platform_abstraction_qemu PRIVATE
     ArrayEeprom.cpp
     ArrayEeprom.hpp
+    QemuTimer.cpp
+    QemuTimer.hpp
     PlatformFactoryImpl.cpp
     PlatformFactoryImpl.hpp
+    QemuConstants.hpp
     SemihostingCan.cpp
     SemihostingCan.hpp
+    SemihostingCanBusAdapter.cpp
+    SemihostingCanBusAdapter.hpp
     SemihostingSerial.cpp
     SemihostingSerial.hpp
 )
@@ -16,11 +21,8 @@ target_include_directories(e_foc.platform_abstraction_qemu PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
 )
 
-set(QEMU_MOTOR_MODEL_HEADER "core/foc/model/Jk42bls01X038ed.hpp"
-    CACHE STRING "Motor parameter header included by QEMU PlatformFactoryImpl")
-
-target_compile_definitions(e_foc.platform_abstraction_qemu PRIVATE
-    QEMU_MOTOR_MODEL_HEADER="${QEMU_MOTOR_MODEL_HEADER}"
+target_compile_definitions(e_foc.platform_abstraction_qemu PUBLIC
+    E_FOC_QEMU_TARGET
 )
 
 target_link_libraries(e_foc.platform_abstraction_qemu PUBLIC
@@ -36,6 +38,5 @@ target_link_libraries(e_foc.platform_abstraction_qemu PUBLIC
     hal.qemu.syscalls
     hal.qemu.sync
     hal.qemu.cortex
-    hal.qemu.mps2
     e_foc.platform_abstraction_cortex_m_common
 )

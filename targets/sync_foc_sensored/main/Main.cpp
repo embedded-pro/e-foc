@@ -2,10 +2,19 @@
 #include "targets/sync_foc_sensored/main/instantiations/Logic.hpp"
 #include <optional>
 
+#ifdef E_FOC_QEMU_TARGET
+#include "motor_parameters/Jk42bls01X038ed.hpp"
+#endif
+
 int main()
 {
     static std::optional<application::Logic> logic;
-    static application::PlatformFactoryImpl hardware([]()
+
+    static application::PlatformFactoryImpl hardware(
+#ifdef E_FOC_QEMU_TARGET
+        foc::JK42BLS01_X038ED::parameters,
+#endif
+        [&]()
         {
             logic.emplace(hardware);
         });
