@@ -2,7 +2,7 @@
 #include "can-lite/server/CanProtocolServer.hpp"
 #include "core/can/FocMotorMessages.hpp"
 
-namespace integration
+namespace sil
 {
     const foc::Volts SpeedIntegrationFixture::testVdc{ 24.0f };
     using namespace testing;

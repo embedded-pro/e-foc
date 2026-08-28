@@ -2,7 +2,7 @@
 #include "integration_tests/software_in_the_loop/support/QemuSilFixture.hpp"
 #include <gtest/gtest.h>
 
-using namespace integration;
+using namespace sil;
 
 GIVEN(R"(the QEMU SIL target is running)")
 {

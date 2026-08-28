@@ -4,7 +4,7 @@
 #include <gtest/gtest.h>
 
 using namespace testing;
-using namespace integration;
+using namespace sil;
 
 static void PopulateTorqueAccessor(StateMachineAccessor& accessor, FocIntegrationFixture& fixture)
 {

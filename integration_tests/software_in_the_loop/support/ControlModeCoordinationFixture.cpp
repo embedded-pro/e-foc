@@ -2,7 +2,7 @@
 #include "can-lite/core/CanFrameCodec.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 
-namespace integration
+namespace sil
 {
     const foc::Volts ControlModeCoordinationFixture::testVdc{ 24.0f };
     using namespace testing;

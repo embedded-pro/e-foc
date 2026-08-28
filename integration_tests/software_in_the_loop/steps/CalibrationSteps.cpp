@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 
 using namespace testing;
-using namespace integration;
+using namespace sil;
 
 GIVEN(R"(calibration service expectations are configured)")
 {

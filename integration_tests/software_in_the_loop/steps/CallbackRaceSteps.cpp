@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 
 using namespace testing;
-using namespace integration;
+using namespace sil;
 
 WHEN(R"(a clear-calibration command is issued with deferred NVM completion)")
 {

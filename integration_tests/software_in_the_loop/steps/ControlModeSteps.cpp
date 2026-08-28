@@ -9,7 +9,7 @@
 #include <string>
 
 using namespace testing;
-using namespace integration;
+using namespace sil;
 
 namespace
 {

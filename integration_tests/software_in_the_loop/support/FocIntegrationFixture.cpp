@@ -1,7 +1,7 @@
 #include "integration_tests/software_in_the_loop/support/FocIntegrationFixture.hpp"
 #include "core/can/FocMotorMessages.hpp"
 
-namespace integration
+namespace sil
 {
     const foc::Volts FocIntegrationFixture::testVdc{ 24.0f };
     using namespace testing;
