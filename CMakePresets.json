@@ -214,6 +214,27 @@
                 "CMAKE_CROSSCOMPILING_EMULATOR": "qemu-system-arm;-M;mps2-an500;-nographic;-semihosting-config;enable=on,target=native;-kernel",
                 "CMAKE_CXX_FLAGS": "-DGTEST_HAS_STREAM_REDIRECTION=0 -DGTEST_HAS_POSIX_RE=0 -D_POSIX_C_SOURCE=200112L"
             }
+        },
+        {
+            "name": "qemu-foc-sensored",
+            "displayName": "QEMU FOC Sensored (Cortex-M4, full application)",
+            "description": "Builds e_foc.sync_foc_sensored.main for emulated Cortex-M4 with motor model",
+            "inherits": "defaults",
+            "toolchainFile": "${sourceDir}/infra/embedded-infra-lib/cmake/toolchain-arm-gcc-m4-fpv4-sp-d16.cmake",
+            "generator": "Ninja Multi-Config",
+            "cacheVariables": {
+                "CMAKE_CONFIGURATION_TYPES": "RelWithDebInfo",
+                "EMIL_BUILD_QEMU": "On",
+                "EMIL_BUILD_CORTEX_M": "On",
+                "TARGET_CORTEX": "m4",
+                "E_FOC_TARGET_PLATFORM": "qemu",
+                "E_FOC_BUILD_TESTS": "Off",
+                "E_FOC_BUILD_SIMULATOR": "Off",
+                "E_FOC_BUILD_HIL_TESTS": "Off",
+                "E_FOC_EMBEDDED_BUILD": "On",
+                "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": "On",
+                "CMAKE_CROSSCOMPILING_EMULATOR": "qemu-system-arm;-M;mps2-an386;-nographic;-semihosting-config;enable=on,target=native;-kernel"
+            }
         }
     ],
     "buildPresets": [
@@ -325,8 +346,7 @@
                 "e_foc.foc.math_test",
                 "e_foc.foc.speed_loop_test",
                 "e_foc.foc.position_loop_test",
-                "e_foc.foc.selection_test",
-                "e_foc.sil_qemu"
+                "e_foc.foc.selection_test"
             ]
         },
         {
@@ -339,9 +359,14 @@
                 "e_foc.foc.math_test",
                 "e_foc.foc.speed_loop_test",
                 "e_foc.foc.position_loop_test",
-                "e_foc.foc.selection_test",
-                "e_foc.sil_qemu"
+                "e_foc.foc.selection_test"
             ]
+        },
+        {
+            "name": "qemu-foc-sensored-RelWithDebInfo",
+            "configuration": "RelWithDebInfo",
+            "configurePreset": "qemu-foc-sensored",
+            "targets": ["e_foc.sync_foc_sensored.main"]
         }
     ],
     "testPresets": [
