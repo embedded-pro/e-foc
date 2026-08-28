@@ -7,7 +7,6 @@ target_include_directories(e_foc.foc.model PUBLIC
 target_sources(e_foc.foc.model PRIVATE
     ThreePhaseMotorModel.cpp
     ThreePhaseMotorModel.hpp
-    Jk42bls01X038ed.hpp
 )
 
 target_link_libraries(e_foc.foc.model PUBLIC
@@ -20,3 +19,5 @@ target_link_libraries(e_foc.foc.model PUBLIC
     infra.util
     numerical.math
 )
+
+add_subdirectory(test)

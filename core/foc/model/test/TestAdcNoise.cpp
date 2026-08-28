@@ -1,6 +1,6 @@
+#include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include "tools/simulator/model/Jk42bls01X038ed.hpp"
-#include "tools/simulator/model/Model.hpp"
+#include "motor_parameters/Jk42bls01X038ed.hpp"
 #include <array>
 #include <cmath>
 #include <gtest/gtest.h>
@@ -14,8 +14,8 @@ namespace
     protected:
         infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
 
-        simulator::ThreePhaseMotorModel model{
-            simulator::JK42BLS01_X038ED::parameters,
+        foc::ThreePhaseMotorModel model{
+            foc::JK42BLS01_X038ED::parameters,
             foc::Volts{ 24.0f },
             hal::Hertz{ 100000 },
             std::optional<std::size_t>{}
@@ -23,10 +23,10 @@ namespace
     };
 
     class CurrentCollector
-        : public simulator::ThreePhaseMotorModelObserver
+        : public foc::ThreePhaseMotorModelObserver
     {
     public:
-        explicit CurrentCollector(simulator::ThreePhaseMotorModel& model)
+        explicit CurrentCollector(foc::ThreePhaseMotorModel& model)
             : ThreePhaseMotorModelObserver(model)
         {}
 
@@ -47,7 +47,7 @@ namespace
         std::vector<float> samples;
     };
 
-    void DriveModelCycles(simulator::ThreePhaseMotorModel& model, int cycles)
+    void DriveModelCycles(foc::ThreePhaseMotorModel& model, int cycles)
     {
         const foc::PhasePwmDutyCycles duty{
             hal::Percent{ 60 },
@@ -61,7 +61,7 @@ namespace
 
 TEST_F(TestAdcNoise, zero_sigma_produces_finite_currents)
 {
-    model.SetAdcNoise(simulator::ThreePhaseMotorModel::NoiseConfig{});
+    model.SetAdcNoise(foc::ThreePhaseMotorModel::NoiseConfig{});
 
     CurrentCollector collector{ model };
     DriveModelCycles(model, 200);
@@ -89,14 +89,14 @@ TEST_F(TestAdcNoise, nonzero_sigma_increases_variance_over_zero_sigma_baseline)
     const float baseMean = baseSum / baselineSize;
     const float baseVar = baseSum2 / baselineSize - baseMean * baseMean;
 
-    simulator::ThreePhaseMotorModel model2{
-        simulator::JK42BLS01_X038ED::parameters,
+    foc::ThreePhaseMotorModel model2{
+        foc::JK42BLS01_X038ED::parameters,
         foc::Volts{ 24.0f },
         hal::Hertz{ 100000 },
         std::optional<std::size_t>{}
     };
     constexpr float sigma = 0.1f;
-    model2.SetAdcNoise(simulator::ThreePhaseMotorModel::NoiseConfig{ .sigmaAmpere = sigma });
+    model2.SetAdcNoise(foc::ThreePhaseMotorModel::NoiseConfig{ .sigmaAmpere = sigma });
 
     CurrentCollector noisyCollector{ model2 };
     const foc::PhasePwmDutyCycles duty{ hal::Percent{ 60 }, hal::Percent{ 50 }, hal::Percent{ 40 } };
@@ -114,6 +114,5 @@ TEST_F(TestAdcNoise, nonzero_sigma_increases_variance_over_zero_sigma_baseline)
     const float noisyMean = noisySum / noisySize;
     const float noisyVar = noisySum2 / noisySize - noisyMean * noisyMean;
 
-    EXPECT_GT(noisyVar, baseVar + (sigma * sigma) * 0.5f)
-        << "Noisy channel should have clearly higher variance than pristine channel";
+    EXPECT_GT(noisyVar, baseVar + (sigma * sigma) * 0.5f);
 }

@@ -2,7 +2,8 @@
 
 #include "core/foc/interfaces/Execution.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include "tools/simulator/model/Model.hpp"
+#include "core/foc/model/ThreePhaseMotorModel.hpp"
+using namespace foc;
 #include "tools/simulator/view/gui/Gui.hpp"
 #include "tools/simulator/view/gui/ParametersPanel.hpp"
 #include <QTimer>

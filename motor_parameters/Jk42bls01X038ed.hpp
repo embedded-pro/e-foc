@@ -2,7 +2,7 @@
 
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 
-namespace simulator
+namespace foc
 {
     struct JK42BLS01_X038ED
     {

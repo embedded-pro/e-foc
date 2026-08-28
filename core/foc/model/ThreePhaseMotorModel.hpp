@@ -10,7 +10,7 @@
 #include <optional>
 #include <random>
 
-namespace simulator
+namespace foc
 {
     class ThreePhaseMotorModel;
 
@@ -161,20 +161,5 @@ namespace simulator
         ThermalState thermal;
         EncoderNoiseState encoderNoise;
         SelfDriveState selfDrive;
-    };
-
-    class SimulationFinishedObserver
-        : public ThreePhaseMotorModelObserver
-    {
-    public:
-        SimulationFinishedObserver(ThreePhaseMotorModel& model, const infra::Function<void()>& onFinished);
-
-        void Started() override;
-        void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta, foc::RadiansPerSecond omegaMech) override;
-        void StatorVoltages(foc::ThreePhase phaseVoltages, foc::TwoPhase alphaBeta) override;
-        void Finished() override;
-
-    private:
-        infra::Function<void()> onFinished;
     };
 }

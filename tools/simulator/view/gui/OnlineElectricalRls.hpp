@@ -4,7 +4,8 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
-#include "tools/simulator/model/Model.hpp"
+#include "core/foc/model/ThreePhaseMotorModel.hpp"
+using namespace foc;
 
 #include <QObject>
 #include <cstdint>

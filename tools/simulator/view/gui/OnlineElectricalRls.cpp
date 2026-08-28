@@ -26,7 +26,6 @@ namespace simulator
         estimator.Update(foc::Volts{ vdq.d }, foc::Ampere{ idq.d }, foc::Ampere{ idq.q },
             foc::RadiansPerSecond{ static_cast<float>(polePairs) * omegaMech.Value() });
 
-        // ScopesPanel scales Lhat by 1000 to display millihenries; emit henries.
         emit electricalEstimatesChanged(estimator.CurrentResistance().Value(),
             estimator.CurrentInductance().Value() * 0.001f);
     }

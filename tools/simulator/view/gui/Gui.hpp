@@ -5,7 +5,8 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include "tools/simulator/model/Model.hpp"
+#include "core/foc/model/ThreePhaseMotorModel.hpp"
+using namespace foc;
 #include "tools/simulator/view/gui/ControlPanel.hpp"
 #include "tools/simulator/view/gui/ParametersPanel.hpp"
 #include "tools/simulator/view/gui/ScopesPanel.hpp"

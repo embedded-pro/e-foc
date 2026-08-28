@@ -1,6 +1,6 @@
+#include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/foc/interfaces/Units.hpp"
-#include "tools/simulator/model/Jk42bls01X038ed.hpp"
-#include "tools/simulator/model/Model.hpp"
+#include "motor_parameters/Jk42bls01X038ed.hpp"
 #include <cmath>
 #include <gtest/gtest.h>
 #include <numbers>
@@ -13,8 +13,8 @@ namespace
         : public ::testing::Test
     {
     protected:
-        simulator::ThreePhaseMotorModel model{
-            simulator::JK42BLS01_X038ED::parameters,
+        foc::ThreePhaseMotorModel model{
+            foc::JK42BLS01_X038ED::parameters,
             foc::Volts{ 24.0f },
             hal::Hertz{ 100000 },
             std::optional<std::size_t>{}
@@ -31,7 +31,7 @@ TEST_F(TestEncoderNoise, zero_config_returns_exact_angle)
 TEST_F(TestEncoderNoise, bias_is_constant_offset)
 {
     constexpr float bias = 0.25f;
-    model.SetEncoderNoise(simulator::ThreePhaseMotorModel::EncoderNoiseConfig{ 0.0f, bias });
+    model.SetEncoderNoise(foc::ThreePhaseMotorModel::EncoderNoiseConfig{ 0.0f, bias });
     model.Set(foc::Radians{ 1.0f });
 
     for (int i = 0; i < 50; ++i)
@@ -44,7 +44,7 @@ TEST_F(TestEncoderNoise, sigma_yields_zero_mean_perturbation)
     constexpr int samples = 4000;
     constexpr float baseAngle = 2.0f;
 
-    model.SetEncoderNoise(simulator::ThreePhaseMotorModel::EncoderNoiseConfig{ sigma, 0.0f });
+    model.SetEncoderNoise(foc::ThreePhaseMotorModel::EncoderNoiseConfig{ sigma, 0.0f });
     model.Set(foc::Radians{ baseAngle });
 
     double sum = 0.0;
@@ -57,7 +57,7 @@ TEST_F(TestEncoderNoise, sigma_yields_zero_mean_perturbation)
 
 TEST_F(TestEncoderNoise, output_is_wrapped_into_zero_to_two_pi)
 {
-    model.SetEncoderNoise(simulator::ThreePhaseMotorModel::EncoderNoiseConfig{ 0.0f, 1.0f });
+    model.SetEncoderNoise(foc::ThreePhaseMotorModel::EncoderNoiseConfig{ 0.0f, 1.0f });
     model.Set(foc::Radians{ two_pi - 0.5f });
 
     const auto value = model.Read().Value();

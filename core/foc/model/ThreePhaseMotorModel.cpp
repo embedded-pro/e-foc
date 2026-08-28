@@ -6,7 +6,7 @@
 #include <cmath>
 #include <numbers>
 
-namespace simulator
+namespace foc
 {
     namespace
     {
@@ -295,28 +295,5 @@ namespace simulator
 
         motorState.theta_mech = foc::Radians{ WrapAngle(motorState.theta_mech.Value()) };
         motorState.theta = foc::Radians{ WrapAngle(motorState.theta.Value()) };
-    }
-
-    SimulationFinishedObserver::SimulationFinishedObserver(ThreePhaseMotorModel& model, const infra::Function<void()>& onFinished)
-        : ThreePhaseMotorModelObserver(model)
-        , onFinished(onFinished)
-    {
-    }
-
-    void SimulationFinishedObserver::Started()
-    {
-    }
-
-    void SimulationFinishedObserver::PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents /*currentPhases*/, foc::Radians /*theta*/, foc::RadiansPerSecond /*omegaMech*/)
-    {
-    }
-
-    void SimulationFinishedObserver::StatorVoltages(foc::ThreePhase /*phaseVoltages*/, foc::TwoPhase /*alphaBeta*/)
-    {
-    }
-
-    void SimulationFinishedObserver::Finished()
-    {
-        onFinished();
     }
 }

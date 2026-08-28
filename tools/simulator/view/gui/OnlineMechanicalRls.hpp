@@ -3,16 +3,14 @@
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
-#include "tools/simulator/model/Model.hpp"
+#include "core/foc/model/ThreePhaseMotorModel.hpp"
+using namespace foc;
 
 #include <QObject>
 #include <cstdint>
 
 namespace simulator
 {
-    // Thin Qt observer that adapts the simulator's three-phase model samples
-    // to the production RealTimeFrictionAndInertiaEstimator and re-emits the
-    // resulting estimates as Qt signals for the GUI scopes.
     class OnlineMechanicalRls
         : public QObject
         , public ThreePhaseMotorModelObserver
