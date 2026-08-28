@@ -1,5 +1,4 @@
 if(EMIL_BUILD_QEMU)
-    add_subdirectory(qemu_target)
     return()
 endif()
 
