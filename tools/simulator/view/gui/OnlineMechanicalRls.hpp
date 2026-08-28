@@ -1,10 +1,9 @@
 #pragma once
 
-#ifndef Q_MOC_RUN
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include "tools/simulator/model/Model.hpp"
-#endif
 
 #include <QObject>
 #include <cstdint>
