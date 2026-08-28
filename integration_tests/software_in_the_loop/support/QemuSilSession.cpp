@@ -251,6 +251,9 @@ namespace sil
             return false;
         }
 
+        if (rawId > 0x7FFu)
+            return false;
+
         const hal::Can::Id parsedId = hal::Can::Id::Create11BitId(rawId);
         if (parsedId != expectedId)
             return false;
@@ -260,9 +263,12 @@ namespace sil
 
         auto hexVal = [](char c) -> int
         {
-            if (c >= '0' && c <= '9') return c - '0';
-            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            if (c >= '0' && c <= '9')
+                return c - '0';
+            if (c >= 'a' && c <= 'f')
+                return c - 'a' + 10;
+            if (c >= 'A' && c <= 'F')
+                return c - 'A' + 10;
             return -1;
         };
 

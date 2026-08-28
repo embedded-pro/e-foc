@@ -9,6 +9,5 @@ function(e_foc_link_qemu_runtime target)
         hal.qemu.default_init
         hal.qemu.sync
         hal.qemu.cortex
-        gmock_main
     )
 endfunction()

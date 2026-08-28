@@ -28,9 +28,8 @@ namespace sil
     SemihostingCan::SemihostingCan()
     {
         const int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
-        if (flags >= 0)
-            fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
-        nonBlockingSet = true;
+        if (flags >= 0 && fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK) == 0)
+            nonBlockingSet = true;
     }
 
     void SemihostingCan::SendData(Id id, const Message& data, const infra::Function<void(bool)>& onDone)
