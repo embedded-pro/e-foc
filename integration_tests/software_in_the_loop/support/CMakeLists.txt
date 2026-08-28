@@ -10,14 +10,19 @@ add_library(e_foc.integration_tests.support OBJECT
     PlatformFactoryMock.hpp
     PositionIntegrationFixture.cpp
     PositionIntegrationFixture.hpp
-    QemuSilFixture.cpp
-    QemuSilFixture.hpp
-    QemuSilSession.cpp
-    QemuSilSession.hpp
     SpeedIntegrationFixture.cpp
     SpeedIntegrationFixture.hpp
     StateMachineAccessor.hpp
 )
+
+if(UNIX)
+    target_sources(e_foc.integration_tests.support PRIVATE
+        QemuSilFixture.cpp
+        QemuSilFixture.hpp
+        QemuSilSession.cpp
+        QemuSilSession.hpp
+    )
+endif()
 
 target_include_directories(e_foc.integration_tests.support PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../../..>"

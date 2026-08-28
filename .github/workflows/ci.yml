@@ -275,18 +275,45 @@ jobs:
         with:
           configurePreset: ${{ matrix.preset }}
           buildPreset: ${{ matrix.preset }}-RelWithDebInfo
-          testPreset: ${{ matrix.preset }}
+      - name: Run QEMU unit tests
+        run: |
+          PRESET="${{ matrix.preset }}"
+          BUILD_DIR="build/${PRESET}"
+          [[ "${PRESET}" == *m7* ]] && MACHINE="mps2-an500" || MACHINE="mps2-an386"
+          QEMU="qemu-system-arm -M ${MACHINE} -nographic -semihosting-config enable=on,target=native -kernel"
+          for name in \
+              e_foc.foc.transforms_test \
+              e_foc.foc.current_loop_test \
+              e_foc.foc.math_test \
+              e_foc.foc.speed_loop_test \
+              e_foc.foc.position_loop_test \
+              e_foc.foc.selection_test
+          do
+            elf=$(find "${BUILD_DIR}" -name "${name}.elf" -print -quit 2>/dev/null)
+            [[ -z "$elf" ]] && continue
+            echo "=== ${name} ==="
+            ${QEMU} "${elf}"
+          done
+      - name: Run QEMU cycle benchmark
+        run: |
+          PRESET="${{ matrix.preset }}"
+          BUILD_DIR="build/${PRESET}"
+          [[ "${PRESET}" == *m7* ]] && MACHINE="mps2-an500" || MACHINE="mps2-an386"
+          QEMU="qemu-system-arm -M ${MACHINE} -nographic -semihosting-config enable=on,target=native -kernel"
+          BENCH_ELF=$(find "${BUILD_DIR}" -name "e_foc.sil_qemu.elf" -print -quit 2>/dev/null)
+          if [[ -n "$BENCH_ELF" ]]; then
+            ${QEMU} "${BENCH_ELF}" --benchmark | tee benchmark.log
+          fi
       - name: Extract cycle counts
         if: always()
         run: |
-          log_file="build/${{ matrix.preset }}/Testing/Temporary/LastTest.log"
           {
             echo "## QEMU Cycle Counts — ${{ matrix.preset }}"
             echo ""
             echo "| Test | Cycles (instruction proxy) |"
             echo "|---|---|"
-            if [[ -f "$log_file" ]]; then
-              grep '\[\[CYCLES\]\]' "$log_file" | while IFS= read -r line; do
+            if [[ -f benchmark.log ]]; then
+              grep '\[\[CYCLES\]\]' benchmark.log | while IFS= read -r line; do
                 for kv in $(echo "$line" | grep -oP '\w+=\d+'); do
                   key="${kv%%=*}"
                   val="${kv##*=}"
@@ -294,7 +321,7 @@ jobs:
                 done
               done
             else
-              echo "| _log not found_ | — |"
+              echo "| _benchmark not run_ | — |"
             fi
             echo ""
             echo "_Note: QEMU CYCCNT is an instruction-count proxy, not silicon cycle time._"
@@ -307,12 +334,13 @@ jobs:
           name: e_foc.sil_qemu.elf
           path: build/${{ matrix.preset }}/integration_tests/software_in_the_loop/qemu_target/RelWithDebInfo/e_foc.sil_qemu.elf
           if-no-files-found: warn
-      - name: Upload test logs
+      - name: Upload benchmark log
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: qemu-test-logs-${{ matrix.preset }}
-          path: build/${{ matrix.preset }}/Testing/Temporary/
+          name: qemu-benchmark-log-${{ matrix.preset }}
+          path: benchmark.log
+          if-no-files-found: ignore
 
   qemu_sil_behavioral_tests:
     name: QEMU SIL Behavioral Tests (host runner)
