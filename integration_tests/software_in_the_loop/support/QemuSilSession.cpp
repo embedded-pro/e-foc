@@ -1,5 +1,6 @@
 #include "integration_tests/software_in_the_loop/support/QemuSilSession.hpp"
 #include <chrono>
+#include <cstdio>
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
@@ -8,7 +9,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-namespace integration
+namespace sil
 {
     QemuSilSession::~QemuSilSession()
     {
@@ -180,5 +181,102 @@ namespace integration
     bool QemuSilSession::IsRunning() const
     {
         return pid >= 0;
+    }
+
+    bool QemuSilSession::SendCanFrame(hal::Can::Id id, const hal::Can::Message& data)
+    {
+        return SendLine(EncodeCanFrame(id, data, "CAN_RX"));
+    }
+
+    bool QemuSilSession::WaitForCanFrame(hal::Can::Id expectedId, hal::Can::Message& out,
+        std::chrono::milliseconds timeout)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+
+        while (true)
+        {
+            const auto remaining = deadline - std::chrono::steady_clock::now();
+            if (remaining <= std::chrono::milliseconds{ 0 })
+                return false;
+
+            std::string line;
+            if (!ReadLine(line, std::chrono::duration_cast<std::chrono::milliseconds>(remaining)))
+                return false;
+
+            if (ParseCanFrame(line, "CAN_TX", expectedId, out))
+                return true;
+        }
+    }
+
+    std::string QemuSilSession::EncodeCanFrame(hal::Can::Id id, const hal::Can::Message& data,
+        const std::string& prefix)
+    {
+        const uint32_t rawId = id.Is11BitId() ? id.Get11BitId() : id.Get29BitId();
+
+        char buf[32]{};
+        int pos = 0;
+        for (const uint8_t byte : data)
+        {
+            buf[pos++] = "0123456789abcdef"[(byte >> 4) & 0xF];
+            buf[pos++] = "0123456789abcdef"[byte & 0xF];
+        }
+        buf[pos] = '\0';
+
+        char idBuf[16]{};
+        std::snprintf(idBuf, sizeof(idBuf), "%03lx", static_cast<unsigned long>(rawId));
+
+        return prefix + " " + idBuf + " " + buf;
+    }
+
+    bool QemuSilSession::ParseCanFrame(const std::string& line, const std::string& prefix,
+        hal::Can::Id expectedId, hal::Can::Message& out)
+    {
+        const std::string fullPrefix = prefix + " ";
+        if (line.rfind(fullPrefix, 0) != 0)
+            return false;
+
+        const std::string rest = line.substr(fullPrefix.size());
+        const auto spacePos = rest.find(' ');
+        if (spacePos == std::string::npos)
+            return false;
+
+        const std::string idStr = rest.substr(0, spacePos);
+        uint32_t rawId = 0;
+        try
+        {
+            rawId = static_cast<uint32_t>(std::stoul(idStr, nullptr, 16));
+        }
+        catch (...)
+        {
+            return false;
+        }
+
+        const hal::Can::Id parsedId = hal::Can::Id::Create11BitId(rawId);
+        if (parsedId != expectedId)
+            return false;
+
+        const std::string dataStr = rest.substr(spacePos + 1);
+        out.clear();
+
+        auto hexVal = [](char c) -> int
+        {
+            if (c >= '0' && c <= '9') return c - '0';
+            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            return -1;
+        };
+
+        for (std::size_t i = 0; i + 1 < dataStr.size(); i += 2)
+        {
+            const int hi = hexVal(dataStr[i]);
+            const int lo = hexVal(dataStr[i + 1]);
+            if (hi < 0 || lo < 0)
+                break;
+            if (out.full())
+                break;
+            out.push_back(static_cast<uint8_t>((hi << 4) | lo));
+        }
+
+        return true;
     }
 }

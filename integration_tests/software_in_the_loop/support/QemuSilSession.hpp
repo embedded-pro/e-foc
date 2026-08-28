@@ -1,9 +1,10 @@
 #pragma once
+#include "hal/interfaces/Can.hpp"
 #include <chrono>
 #include <cstdint>
 #include <string>
 
-namespace integration
+namespace sil
 {
     class QemuSilSession
     {
@@ -20,7 +21,16 @@ namespace integration
 
         bool IsRunning() const;
 
+        bool SendCanFrame(hal::Can::Id id, const hal::Can::Message& data);
+        bool WaitForCanFrame(hal::Can::Id expectedId, hal::Can::Message& out,
+            std::chrono::milliseconds timeout);
+
     private:
+        static std::string EncodeCanFrame(hal::Can::Id id, const hal::Can::Message& data,
+            const std::string& prefix);
+        static bool ParseCanFrame(const std::string& line, const std::string& prefix,
+            hal::Can::Id expectedId, hal::Can::Message& out);
+
         pid_t pid{ -1 };
         int stdinFd{ -1 };
         int stdoutFd{ -1 };

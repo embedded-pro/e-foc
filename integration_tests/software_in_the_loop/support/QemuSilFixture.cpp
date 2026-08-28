@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <string>
+#include <sys/stat.h>
 
 namespace
 {
@@ -26,7 +27,7 @@ namespace
         {}
     }
 
-    void ReadUntilDone(integration::QemuSilSession& session, std::map<std::string, uint32_t>& counts)
+    void ReadUntilDone(sil::QemuSilSession& session, std::map<std::string, uint32_t>& counts)
     {
         const std::chrono::milliseconds lineTimeout{ 10000 };
         std::string line;
@@ -40,17 +41,20 @@ namespace
     }
 }
 
-namespace integration
+namespace sil
 {
     QemuSilFixture::QemuSilFixture()
     {
         const char* envPath = std::getenv("QEMU_SIL_ELF");
         const std::string elfPath = (envPath != nullptr) ? envPath : QEMU_SIL_ELF_DEFAULT_PATH;
 
+        struct stat st{};
+        if (stat(elfPath.c_str(), &st) != 0)
+            return;
+
         if (!session.Start(elfPath))
             return;
 
-        ReadUntilDone(session, cycleCounts);
         available = true;
     }
 
@@ -74,5 +78,39 @@ namespace integration
         if (it == cycleCounts.end())
             return 0;
         return it->second;
+    }
+
+    bool QemuSilFixture::SendCanFrame(hal::Can::Id id, const hal::Can::Message& message,
+        std::chrono::milliseconds /*timeout*/)
+    {
+        if (!available)
+            return false;
+        return session.SendCanFrame(id, message);
+    }
+
+    bool QemuSilFixture::WaitForCanFrame(hal::Can::Id expectedId, hal::Can::Message& outPayload,
+        std::chrono::milliseconds timeout, std::chrono::milliseconds& outElapsed)
+    {
+        if (!available)
+            return false;
+
+        const auto start = std::chrono::steady_clock::now();
+        const bool found = session.WaitForCanFrame(expectedId, outPayload, timeout);
+        outElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start);
+        return found;
+    }
+
+    bool QemuSilFixture::SendCommand(const std::string& command,
+        std::chrono::milliseconds timeout)
+    {
+        if (!available)
+            return false;
+
+        if (!session.SendLine(command))
+            return false;
+
+        std::string line;
+        return session.WaitFor("DONE", line, timeout);
     }
 }
