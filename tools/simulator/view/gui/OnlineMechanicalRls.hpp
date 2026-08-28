@@ -4,10 +4,10 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
-using namespace foc;
-
 #include <QObject>
 #include <cstdint>
+
+using namespace foc;
 
 namespace simulator
 {

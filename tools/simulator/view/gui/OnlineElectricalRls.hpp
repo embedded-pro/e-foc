@@ -5,10 +5,10 @@
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
-using namespace foc;
-
 #include <QObject>
 #include <cstdint>
+
+using namespace foc;
 
 namespace simulator
 {

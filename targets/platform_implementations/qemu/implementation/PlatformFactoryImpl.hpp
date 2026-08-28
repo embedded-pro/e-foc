@@ -69,16 +69,45 @@ namespace application
             : public hal::GpioPin
         {
         public:
-            bool Get() const override { return pinState; }
-            void Set(bool value) override { pinState = value; }
-            bool GetOutputLatch() const override { return pinState; }
-            void SetAsInput() override {}
-            bool IsInput() const override { return false; }
-            void Config(hal::PinConfigType) override {}
-            void Config(hal::PinConfigType, bool startOutputState) override { pinState = startOutputState; }
-            void ResetConfig() override {}
-            void EnableInterrupt(const infra::Function<void()>&, hal::InterruptTrigger, hal::InterruptType) override {}
-            void DisableInterrupt() override {}
+            bool Get() const override
+            {
+                return pinState;
+            }
+
+            void Set(bool value) override
+            {
+                pinState = value;
+            }
+
+            bool GetOutputLatch() const override
+            {
+                return pinState;
+            }
+
+            void SetAsInput() override
+            {}
+
+            bool IsInput() const override
+            {
+                return false;
+            }
+
+            void Config(hal::PinConfigType) override
+            {}
+
+            void Config(hal::PinConfigType, bool startOutputState) override
+            {
+                pinState = startOutputState;
+            }
+
+            void ResetConfig() override
+            {}
+
+            void EnableInterrupt(const infra::Function<void()>&, hal::InterruptTrigger, hal::InterruptType) override
+            {}
+
+            void DisableInterrupt() override
+            {}
 
         private:
             bool pinState{ false };
@@ -88,8 +117,13 @@ namespace application
             : public hal::PerformanceTracker
         {
         public:
-            void Start() override {}
-            uint32_t ElapsedCycles() override { return 0; }
+            void Start() override
+            {}
+
+            uint32_t ElapsedCycles() override
+            {
+                return 0;
+            }
         };
 
         struct Cortex
