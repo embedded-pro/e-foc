@@ -44,6 +44,8 @@ endif()
 
 set_directory_properties(PROPERTY USE_FOLDERS ON)
 
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/QemuHelpers.cmake")
+
 set(E_FOC_EXCLUDE_FROM_ALL "")
 
 set(EMIL_INCLUDE_ECHO Off CACHE BOOL "" FORCE)
@@ -54,7 +56,7 @@ set(EMIL_INCLUDE_MBEDTLS Off CACHE BOOL "" FORCE)
 
 add_subdirectory(infra/embedded-infra-lib)
 
-if (E_FOC_BUILD_TESTS)
+if (E_FOC_BUILD_TESTS AND NOT EMIL_BUILD_QEMU)
     set(CCR_FETCH_DEPS On CACHE BOOL "" FORCE)
     set(CCR_BUILD_TESTS Off CACHE BOOL "" FORCE)
 
@@ -87,13 +89,19 @@ endif()
 
 add_subdirectory(infra/numerical-toolbox)
 add_subdirectory(core)
-add_subdirectory(targets)
 
-if (E_FOC_BUILD_TESTS)
+if(NOT EMIL_BUILD_QEMU)
+    add_subdirectory(targets)
+endif()
+
+if (E_FOC_BUILD_TESTS OR EMIL_BUILD_QEMU)
     add_subdirectory(integration_tests)
 endif()
 
-set(E_FOC_CLANGFORMAT_DIRS core targets)
+set(E_FOC_CLANGFORMAT_DIRS core)
+if(NOT EMIL_BUILD_QEMU)
+    list(APPEND E_FOC_CLANGFORMAT_DIRS targets)
+endif()
 
 if (NOT E_FOC_EMBEDDED_BUILD)
     add_subdirectory(tools)

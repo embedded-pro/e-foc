@@ -172,6 +172,48 @@
                 "E_FOC_TARGET_BOARD": "NUCLEO-H563ZI",
                 "E_FOC_MOTOR_BOARD": "FRDM-MC-LVPMSM"
             }
+        },
+        {
+            "name": "qemu-cortex-m4",
+            "displayName": "QEMU Cortex-M4 SIL Tests",
+            "description": "Run core unit tests and cycle benchmark on emulated Cortex-M4 (mps2-an386)",
+            "inherits": "defaults",
+            "toolchainFile": "${sourceDir}/infra/embedded-infra-lib/cmake/toolchain-arm-gcc-m4-fpv4-sp-d16.cmake",
+            "generator": "Ninja Multi-Config",
+            "cacheVariables": {
+                "CMAKE_CONFIGURATION_TYPES": "RelWithDebInfo",
+                "EMIL_BUILD_QEMU": "On",
+                "EMIL_BUILD_CORTEX_M": "On",
+                "TARGET_CORTEX": "m4",
+                "E_FOC_BUILD_TESTS": "On",
+                "E_FOC_BUILD_SIMULATOR": "Off",
+                "E_FOC_BUILD_HIL_TESTS": "Off",
+                "E_FOC_EMBEDDED_BUILD": "On",
+                "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": "On",
+                "CMAKE_CROSSCOMPILING_EMULATOR": "qemu-system-arm;-M;mps2-an386;-nographic;-semihosting-config;enable=on,target=native;-kernel",
+                "CMAKE_CXX_FLAGS": "-DGTEST_HAS_STREAM_REDIRECTION=0 -DGTEST_HAS_POSIX_RE=0 -D_POSIX_C_SOURCE=200112L"
+            }
+        },
+        {
+            "name": "qemu-cortex-m7",
+            "displayName": "QEMU Cortex-M7 SIL Tests",
+            "description": "Run core unit tests and cycle benchmark on emulated Cortex-M7 (mps2-an500)",
+            "inherits": "defaults",
+            "toolchainFile": "${sourceDir}/infra/embedded-infra-lib/cmake/toolchain-arm-gcc-m7-fpv5-d16.cmake",
+            "generator": "Ninja Multi-Config",
+            "cacheVariables": {
+                "CMAKE_CONFIGURATION_TYPES": "RelWithDebInfo",
+                "EMIL_BUILD_QEMU": "On",
+                "EMIL_BUILD_CORTEX_M": "On",
+                "TARGET_CORTEX": "m7",
+                "E_FOC_BUILD_TESTS": "On",
+                "E_FOC_BUILD_SIMULATOR": "Off",
+                "E_FOC_BUILD_HIL_TESTS": "Off",
+                "E_FOC_EMBEDDED_BUILD": "On",
+                "NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS": "On",
+                "CMAKE_CROSSCOMPILING_EMULATOR": "qemu-system-arm;-M;mps2-an500;-nographic;-semihosting-config;enable=on,target=native;-kernel",
+                "CMAKE_CXX_FLAGS": "-DGTEST_HAS_STREAM_REDIRECTION=0 -DGTEST_HAS_POSIX_RE=0 -D_POSIX_C_SOURCE=200112L"
+            }
         }
     ],
     "buildPresets": [
@@ -272,6 +314,34 @@
             "name": "NUCLEO-H563ZI-Debug",
             "configuration": "Debug",
             "configurePreset": "NUCLEO-H563ZI"
+        },
+        {
+            "name": "qemu-cortex-m4-RelWithDebInfo",
+            "configuration": "RelWithDebInfo",
+            "configurePreset": "qemu-cortex-m4",
+            "targets": [
+                "e_foc.foc.transforms_test",
+                "e_foc.foc.current_loop_test",
+                "e_foc.foc.math_test",
+                "e_foc.foc.speed_loop_test",
+                "e_foc.foc.position_loop_test",
+                "e_foc.foc.selection_test",
+                "e_foc.sil_qemu"
+            ]
+        },
+        {
+            "name": "qemu-cortex-m7-RelWithDebInfo",
+            "configuration": "RelWithDebInfo",
+            "configurePreset": "qemu-cortex-m7",
+            "targets": [
+                "e_foc.foc.transforms_test",
+                "e_foc.foc.current_loop_test",
+                "e_foc.foc.math_test",
+                "e_foc.foc.speed_loop_test",
+                "e_foc.foc.position_loop_test",
+                "e_foc.foc.selection_test",
+                "e_foc.sil_qemu"
+            ]
         }
     ],
     "testPresets": [
@@ -307,6 +377,18 @@
             "name": "host-single-Debug",
             "configurePreset": "host-single-Debug",
             "configuration": "Debug",
+            "inherits": "defaults"
+        },
+        {
+            "name": "qemu-cortex-m4",
+            "configurePreset": "qemu-cortex-m4",
+            "configuration": "RelWithDebInfo",
+            "inherits": "defaults"
+        },
+        {
+            "name": "qemu-cortex-m7",
+            "configurePreset": "qemu-cortex-m7",
+            "configuration": "RelWithDebInfo",
             "inherits": "defaults"
         }
     ]
