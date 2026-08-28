@@ -7,14 +7,14 @@ component: "foc"
 date: 2026-08-28
 ---
 
-| Field     | Value                        |
-|-----------|------------------------------|
-| Title     | QEMU SIL Cycle Measurement   |
-| Type      | theory                       |
-| Status    | approved                     |
-| Version   | 1.0.0                        |
-| Component | foc                          |
-| Date      | 2026-08-28                   |
+| Field     | Value                      |
+|-----------|----------------------------|
+| Title     | QEMU SIL Cycle Measurement |
+| Type      | theory                     |
+| Status    | approved                   |
+| Version   | 1.0.0                      |
+| Component | foc                        |
+| Date      | 2026-08-28                 |
 
 ## Overview
 
@@ -46,16 +46,63 @@ Three complementary measurement tiers are used to verify FOC cycle budgets:
 
 ## QEMU machine-model mapping
 
-| CMake preset      | QEMU machine  | Emulated core  | Toolchain                           |
-|-------------------|---------------|----------------|-------------------------------------|
-| `qemu-cortex-m4`  | `mps2-an386`  | Cortex-M4F     | `toolchain-arm-gcc-m4-fpv4-sp-d16`  |
-| `qemu-cortex-m7`  | `mps2-an500`  | Cortex-M7F     | `toolchain-arm-gcc-m7-fpv5-d16`     |
+| CMake preset     | QEMU machine | Emulated core | Toolchain                          |
+|------------------|--------------|---------------|------------------------------------|
+| `qemu-cortex-m4` | `mps2-an386` | Cortex-M4F    | `toolchain-arm-gcc-m4-fpv4-sp-d16` |
+| `qemu-cortex-m7` | `mps2-an500` | Cortex-M7F    | `toolchain-arm-gcc-m7-fpv5-d16`    |
+
+---
+
+## Mathematical Foundation
+
+### DWT CYCCNT model under TCG
+
+On real Cortex-M silicon the Data Watchpoint and Trace (DWT) `CYCCNT` register increments once per processor clock cycle. QEMU executes ARM ELFs through its Tiny Code Generator (TCG) backend, which translates ARM instruction blocks to the host ISA at runtime. Under TCG the CYCCNT model is:
+
+$$
+\text{CYCCNT}_\text{TCG}(I) = |I|
+$$
+
+where $|I|$ is the count of retired ARM instructions in the executed instruction stream $I$. Each ARM instruction advances CYCCNT by exactly **1**, independent of instruction latency, FPU pipeline depth, or memory access cost.
+
+### Regression gate formula
+
+Let $C_\text{base}$ be the CYCCNT from the target branch and $C_\text{PR}$ be the CYCCNT from the pull-request branch for the same benchmark workload. The CI regression gate flags a failure when:
+
+$$
+\frac{C_\text{PR} - C_\text{base}}{C_\text{base}} > \delta
+$$
+
+where $\delta$ is the regression threshold (default 5 %). This is a *relative* gate: it detects instruction-count growth, not absolute silicon timing.
+
+### Cross-core instruction-count delta
+
+For two targets $T_\text{M4}$ (Cortex-M4F, `mps2-an386`) and $T_\text{M7}$ (Cortex-M7F, `mps2-an500`) executing the same binary compiled for each core, the CYCCNT difference reflects ISA path differences:
+
+$$
+\Delta C = C_\text{M7} - C_\text{M4}
+$$
+
+A negative $\Delta C$ indicates the M7 toolchain generated fewer instructions (e.g. by using double-precision FPU paths or SIMD extensions unavailable on M4).
+
+---
+
+## Numerical Properties
+
+| Property              | Value / Condition                                                         |
+|-----------------------|---------------------------------------------------------------------------|
+| Resolution            | 1 count per retired ARM instruction                                       |
+| Counter width         | 32-bit, wraps at $2^{32}$                                                 |
+| Determinism           | 100 % — same binary + inputs always produces the same CYCCNT              |
+| Silicon fidelity      | None — does not model pipeline stalls, FPU latency, or cache miss penalty |
+| Regression sensitivity | ~1 % instruction-count change is detectable                              |
+| Absolute budget use   | Not valid — use Tier 1 (static) or Tier 3 (on-silicon) instead           |
 
 ---
 
 ## Critical caveat: CYCCNT is not cycle-accurate under QEMU
 
-QEMU's TCG (Tiny Code Generator) executes ARM instructions by translating them to host ISA blocks.
+QEMU's TCG executes ARM instructions by translating them to host ISA blocks.
 It does **not** model:
 
 - Pipeline stalls or forwarding
@@ -88,15 +135,15 @@ Cortex-M4.
 
 Seven hot-path gtest suites are linked with the QEMU runtime and executed under emulation:
 
-| Target                        | Tests                                       |
-|-------------------------------|---------------------------------------------|
-| `e_foc.foc.transforms_test`   | Clarke, Park, SVM                           |
-| `e_foc.foc.current_loop_test` | PID, deadbeat, sliding-mode current control |
-| `e_foc.foc.cascade_test`      | Torque, speed, position cascade             |
-| `e_foc.foc.math_test`         | Angle wrap, fast trigonometry               |
-| `e_foc.foc.speed_loop_test`   | PID, ADRC, LQI, two-DOF speed control       |
-| `e_foc.foc.position_loop_test`| PID, LQI, LQR, two-DOF position control     |
-| `e_foc.foc.selection_test`    | Controller selector                         |
+| Target                         | Tests                                       |
+|--------------------------------|---------------------------------------------|
+| `e_foc.foc.transforms_test`    | Clarke, Park, SVM                           |
+| `e_foc.foc.current_loop_test`  | PID, deadbeat, sliding-mode current control |
+| `e_foc.foc.cascade_test`       | Torque, speed, position cascade             |
+| `e_foc.foc.math_test`          | Angle wrap, fast trigonometry               |
+| `e_foc.foc.speed_loop_test`    | PID, ADRC, LQI, two-DOF speed control       |
+| `e_foc.foc.position_loop_test` | PID, LQI, LQR, two-DOF position control     |
+| `e_foc.foc.selection_test`     | Controller selector                         |
 
 ### Cycle benchmark harness (Phase 2)
 

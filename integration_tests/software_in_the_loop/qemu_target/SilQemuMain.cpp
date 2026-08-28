@@ -116,9 +116,14 @@ namespace
 
         struct NoOpLpi : foc::LowPriorityInterrupt
         {
-            void Trigger() override {}
-            void Register(const infra::Function<void()>&) override {}
-            void Unregister() override {}
+            void Trigger() override
+            {}
+
+            void Register(const infra::Function<void()>&) override
+            {}
+
+            void Unregister() override
+            {}
         } lowPriInterrupt;
 
         foc::TorqueCascade torque;
