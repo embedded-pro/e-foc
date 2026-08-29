@@ -18,7 +18,6 @@ target_link_libraries(e_foc.integration_tests.steps PUBLIC
 )
 
 add_library(e_foc.integration_tests.qemu_steps OBJECT
-    FocCycleBudgetSteps.cpp
     QemuCalibrationSteps.cpp
     QemuCanSteps.cpp
     QemuCycleBudgetSteps.cpp

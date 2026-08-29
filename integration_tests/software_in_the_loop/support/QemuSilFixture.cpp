@@ -71,23 +71,6 @@ namespace sil
         session.Stop();
     }
 
-    void QemuSilFixture::RunPerformanceBenchmark()
-    {
-        if (!available)
-            return;
-
-        session.SendLine("perf");
-        ReadUntilDone(session, cycleCounts);
-    }
-
-    uint32_t QemuSilFixture::CycleCount(const std::string& key) const
-    {
-        const auto it = cycleCounts.find(key);
-        if (it == cycleCounts.end())
-            return 0;
-        return it->second;
-    }
-
     bool QemuSilFixture::WaitForCanHeartbeat(std::chrono::milliseconds timeout)
     {
         if (!available)
