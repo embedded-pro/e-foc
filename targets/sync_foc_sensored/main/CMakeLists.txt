@@ -19,10 +19,10 @@ target_sources(e_foc.sync_foc_sensored.main PRIVATE
 
 if(TARGET_MCU_VENDOR STREQUAL "st")
     e_foc_st_target_linker_scripts(e_foc.sync_foc_sensored.main)
-    halst_target_default_init(e_foc.sync_foc_sensored.main)
+    halst_target_bringup(e_foc.sync_foc_sensored.main)
 elseif(TARGET_MCU_VENDOR STREQUAL "ti")
     e_foc_ti_target_linker_scripts(e_foc.sync_foc_sensored.main)
-    hal_ti_target_default_init(e_foc.sync_foc_sensored.main)
+    hal_ti_target_bringup(e_foc.sync_foc_sensored.main)
 elseif(E_FOC_TARGET_PLATFORM STREQUAL "qemu")
     e_foc_link_qemu_runtime(e_foc.sync_foc_sensored.main)
 endif()
