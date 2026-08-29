@@ -95,9 +95,13 @@ cmake --preset EK-TM4C1294XL && cmake --build --preset EK-TM4C1294XL-Debug  # em
 
 Presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1`, `NUCLEO-H563ZI`, `qemu-foc-sensored`.
 
+`qemu-foc-sensored` builds `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting. The resulting ELF is uploaded as a CI artifact for the Software-in-the-Loop Tests workflow.
+
 **CI — two-tier**: `ci.yml` builds all targets and uploads `e_foc`, `e_foc.qemu_sil_tests`, and `e_foc.sync_foc_sensored.qemu.elf` as artifacts. `software-in-the-loop-tests.yml` triggers via `workflow_run` on CI completion, downloads those artifacts, and runs behavioral tests — never recompiles. Do not add cmake build steps to the SIL workflow.
 
 **Embedded cmake**: call `halst_target_bringup(<target>)` for ST or `hal_ti_target_bringup(<target>)` for TI in `targets/*/main/CMakeLists.txt`. The `*_default_init` variants were removed.
+
+Authoritative cycle budget gate: `cortex-cycle-budget` static analysis (≤ 4500 inner / ≤ 20000 outer).
 
 ## Agent routing
 
