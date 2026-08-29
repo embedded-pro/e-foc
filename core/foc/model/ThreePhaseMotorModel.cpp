@@ -115,11 +115,9 @@ namespace foc
         bool justFinished = false;
         if (counter.has_value())
         {
-            if (--counter.value() == 0) // NOSONAR(S1066) - cannot merge: decrement side-effect must stay off the && RHS
-            {
-                running = false;
-                justFinished = true;
-            }
+            const std::size_t remaining = --counter.value();
+            justFinished = (remaining == 0);
+            running = !justFinished;
         }
 
         const auto iaNoise = foc::Ampere{ motorState.ia.Value() + currentNoise.config.biasAmpereA + SampleNoise() };
