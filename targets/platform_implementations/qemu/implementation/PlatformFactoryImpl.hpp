@@ -15,8 +15,8 @@
 #include "services/util/Terminal.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "targets/platform_implementations/qemu/implementation/ArrayEeprom.hpp"
-#include "targets/platform_implementations/qemu/implementation/QemuTimer.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuConstants.hpp"
+#include "targets/platform_implementations/qemu/implementation/QemuTimer.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingCanBusAdapter.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingSerial.hpp"
 #include <optional>
@@ -154,7 +154,10 @@ namespace application
         infra::Function<void()> onInitialized;
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         Cortex cortex;
-        QemuTimer focTimer{ 0x40000000u, 8, kQemuSystemClockHz, 20000u, [this]() { FocTimerIsr(); } };
+        QemuTimer focTimer{ 0x40000000u, 8, kQemuSystemClockHz, 20000u, [this]()
+            {
+                FocTimerIsr();
+            } };
         SemihostingSerial serial;
         TerminalAndTracerBlock terminalAndTracer{ serial };
         ArrayEeprom eeprom;

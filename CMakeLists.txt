@@ -94,7 +94,7 @@ if(NOT EMIL_BUILD_QEMU OR E_FOC_TARGET_PLATFORM STREQUAL "qemu")
     add_subdirectory(targets)
 endif()
 
-if (E_FOC_BUILD_TESTS OR (EMIL_BUILD_QEMU AND NOT E_FOC_TARGET_PLATFORM STREQUAL "qemu"))
+if ((E_FOC_BUILD_TESTS OR (EMIL_BUILD_QEMU AND NOT E_FOC_TARGET_PLATFORM STREQUAL "qemu")) AND UNIX)
     add_subdirectory(integration_tests)
 endif()
 

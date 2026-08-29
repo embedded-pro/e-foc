@@ -1,9 +1,8 @@
 #pragma once
 
 #include "core/platform_abstraction/CanBusAdapter.hpp"
-#include "targets/platform_implementations/qemu/implementation/SemihostingCan.hpp"
 #include "infra/util/Function.hpp"
-#include <optional>
+#include "targets/platform_implementations/qemu/implementation/SemihostingCan.hpp"
 
 namespace application
 {

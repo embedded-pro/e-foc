@@ -2,8 +2,8 @@
 
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
-#include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
+#include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include <QObject>
 #include <cstdint>
 

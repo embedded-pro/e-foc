@@ -138,7 +138,10 @@ namespace application
     {
         baseFrequency = freq;
         onPhaseCurrentsReady = onDone;
-        model.PhaseCurrentsReady(freq, [this](foc::PhaseCurrents currents) { lastCurrents = currents; });
+        model.PhaseCurrentsReady(freq, [this](foc::PhaseCurrents currents)
+            {
+                lastCurrents = currents;
+            });
     }
 
     OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
