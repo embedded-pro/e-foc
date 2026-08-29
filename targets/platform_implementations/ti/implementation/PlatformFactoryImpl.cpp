@@ -131,7 +131,7 @@ namespace application
         return pendSvLowPriorityInterrupt;
     }
 
-    PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::PerformanceTrackerImpl(hal::DataWatchPointAndTrace& dwt, hal::OutputPin& pin)
+    PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::PerformanceTrackerImpl(hal::cortex::DataWatchpointAndTrace& dwt, hal::OutputPin& pin)
         : dwt(dwt)
         , pin(pin)
     {}
@@ -145,7 +145,8 @@ namespace application
     uint32_t PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::ElapsedCycles()
     {
         pin.Set(false);
-        return dwt.Stop();
+        dwt.Stop();
+        return dwt.Cycles();
     }
 
     void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold)
