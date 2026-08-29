@@ -23,8 +23,8 @@ Implement code. Follow all constraints in AGENTS.md without exception.
 5. **Green** — implement minimum production code to pass tests, one file at a time
 6. **Hot-path** — add `#pragma GCC optimize` + `OPTIMIZE_FOR_SPEED` to all hot-path code
 7. **Refactor** — clean up while keeping all tests green
-8. **CMake** — update `CMakeLists.txt` if new files added
-9. **Docs** — update `documentation/` for every algorithm or procedure added/changed
+8. **CMake** — if modifying `CMakeLists.txt`, first read `.github/instructions/cmake.instructions.md`
+9. **Docs** — if modifying `documentation/`, first read `.github/instructions/documentation.instructions.md`; update for every algorithm or procedure added/changed
 10. **Verify** — `cmake --build --preset host-Debug` then `ctest --preset host`
 
 ## Do NOT
