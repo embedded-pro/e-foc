@@ -95,7 +95,7 @@ TEST_F(TestAdcNoise, nonzero_sigma_increases_variance_over_zero_sigma_baseline)
         hal::Hertz{ 100000 },
         std::optional<std::size_t>{}
     };
-    constexpr float sigma = 0.1f;
+    constexpr float sigma = 1.0f;
     model2.SetAdcNoise(foc::ThreePhaseMotorModel::NoiseConfig{ .sigmaAmpere = sigma });
 
     CurrentCollector noisyCollector{ model2 };

@@ -113,10 +113,13 @@ namespace foc
         Model(dutyPhases);
 
         bool justFinished = false;
-        if (counter.has_value() && --counter.value() == 0)
+        if (counter.has_value())
         {
-            running = false;
-            justFinished = true;
+            if (--counter.value() == 0)
+            {
+                running = false;
+                justFinished = true;
+            }
         }
 
         const auto iaNoise = foc::Ampere{ motorState.ia.Value() + currentNoise.config.biasAmpereA + SampleNoise() };
