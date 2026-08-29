@@ -223,7 +223,7 @@ namespace sil
         buf[pos] = '\0';
 
         char idBuf[16]{};
-        std::snprintf(idBuf, sizeof(idBuf), "%03lx", static_cast<unsigned long>(rawId));
+        std::snprintf(idBuf, sizeof(idBuf), "%08lx", static_cast<unsigned long>(rawId));
 
         return prefix + " " + idBuf + " " + buf;
     }
@@ -251,10 +251,7 @@ namespace sil
             return false;
         }
 
-        if (rawId > 0x7FFu)
-            return false;
-
-        const hal::Can::Id parsedId = hal::Can::Id::Create11BitId(rawId);
+        const hal::Can::Id parsedId = hal::Can::Id::Create29BitId(rawId);
         if (parsedId != expectedId)
             return false;
 

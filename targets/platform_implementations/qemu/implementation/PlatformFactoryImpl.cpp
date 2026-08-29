@@ -16,7 +16,8 @@ namespace application
               motorParams,
               foc::Volts{ 48.0f },
               hal::Hertz{ 20000 },
-              std::nullopt)
+              std::nullopt,
+              false)
     {
         cortex.systemTick.Start();
         services::SetGlobalTracerInstance(terminalAndTracer.tracer);

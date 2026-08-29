@@ -102,7 +102,8 @@
       },
       "cacheVariables": {
         "TARGET_MCU_VENDOR": "ti",
-        "E_FOC_TARGET_PLATFORM": "ti"
+        "E_FOC_TARGET_PLATFORM": "ti",
+        "EMIL_BUILD_CORTEX_M": "On"
       }
     },
     {

@@ -24,10 +24,11 @@ namespace foc
         }
     }
 
-    ThreePhaseMotorModel::ThreePhaseMotorModel(const Parameters& params, foc::Volts supplyVoltage, hal::Hertz pwmFrequency, std::optional<std::size_t> iterationLimit)
+    ThreePhaseMotorModel::ThreePhaseMotorModel(const Parameters& params, foc::Volts supplyVoltage, hal::Hertz pwmFrequency, std::optional<std::size_t> iterationLimit, bool selfDriveEnabled)
         : parameters(params)
         , baseFrequency(pwmFrequency)
         , powerSupplyVoltage(supplyVoltage)
+        , selfDriveEnabled(selfDriveEnabled)
         , maxIterations(iterationLimit)
     {
     }
@@ -199,7 +200,8 @@ namespace foc
                 observer.Started();
             });
 
-        EnableSelfDriving();
+        if (selfDriveEnabled)
+            EnableSelfDriving();
     }
 
     void ThreePhaseMotorModel::Stop()

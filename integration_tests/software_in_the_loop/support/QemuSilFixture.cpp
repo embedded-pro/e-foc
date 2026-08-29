@@ -6,6 +6,14 @@
 
 namespace
 {
+    hal::Can::Id MakeId(services::CanPriority priority, uint8_t category, uint8_t messageType, uint16_t nodeId)
+    {
+        return hal::Can::Id::Create29BitId(services::MakeCanId(priority, category, messageType, nodeId));
+    }
+}
+
+namespace
+{
     void ParseDwtLine(const std::string& line, std::map<std::string, uint32_t>& out)
     {
         // Format: "DWT key=value"
@@ -78,6 +86,72 @@ namespace sil
         if (it == cycleCounts.end())
             return 0;
         return it->second;
+    }
+
+    bool QemuSilFixture::WaitForCanHeartbeat(std::chrono::milliseconds timeout)
+    {
+        if (!available)
+            return false;
+
+        const hal::Can::Id heartbeatId = MakeId(services::CanPriority::heartbeat,
+            services::canSystemCategoryId, services::canHeartbeatMessageTypeId, kServerNodeId);
+        hal::Can::Message payload;
+        std::chrono::milliseconds elapsed;
+        return WaitForCanFrame(heartbeatId, payload, timeout, elapsed);
+    }
+
+    bool QemuSilFixture::SendCanCommand(uint8_t category, uint8_t messageType,
+        const hal::Can::Message& extra, std::chrono::milliseconds timeout)
+    {
+        if (!available)
+            return false;
+
+        const hal::Can::Id commandId = MakeId(services::CanPriority::command, category, messageType, kServerNodeId);
+        hal::Can::Message payload;
+        payload.push_back(nextSequence);
+        for (const uint8_t b : extra)
+        {
+            if (payload.full())
+                break;
+            payload.push_back(b);
+        }
+        if (!session.SendCanFrame(commandId, payload))
+            return false;
+
+        const hal::Can::Id ackId = MakeId(services::CanPriority::response,
+            services::canSystemCategoryId, services::canCommandAckMessageTypeId, kServerNodeId);
+        hal::Can::Message ackPayload;
+        std::chrono::milliseconds elapsed;
+        if (!WaitForCanFrame(ackId, ackPayload, timeout, elapsed))
+            return false;
+
+        ++nextSequence;
+        return ackPayload.size() >= 3 && ackPayload[2] == static_cast<uint8_t>(services::CanAckStatus::success);
+    }
+
+    bool QemuSilFixture::WaitForMotorState(can::FocMotorState expectedState, std::chrono::milliseconds timeout)
+    {
+        if (!available)
+            return false;
+
+        const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
+            can::focMotorCategoryId, can::focTelemetryStatusResponseId, kServerNodeId);
+
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (std::chrono::steady_clock::now() < deadline)
+        {
+            hal::Can::Message payload;
+            std::chrono::milliseconds elapsed;
+            const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
+            if (remaining <= std::chrono::milliseconds{ 0 })
+                break;
+            if (WaitForCanFrame(telemetryId, payload, remaining, elapsed) && !payload.empty())
+            {
+                if (static_cast<can::FocMotorState>(payload[0]) == expectedState)
+                    return true;
+            }
+        }
+        return false;
     }
 
     bool QemuSilFixture::SendCanFrame(hal::Can::Id id, const hal::Can::Message& message,

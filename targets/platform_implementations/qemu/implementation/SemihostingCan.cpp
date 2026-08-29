@@ -78,7 +78,7 @@ namespace
             msg.push_back(byte);
         }
 
-        id = hal::Can::Id::Create11BitId(rawId);
+        id = hal::Can::Id::Create29BitId(rawId);
         return true;
     }
 }

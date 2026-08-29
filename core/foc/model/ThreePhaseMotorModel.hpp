@@ -67,7 +67,7 @@ namespace foc
             float biasRadians{ 0.0f };
         };
 
-        ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency, std::optional<std::size_t> maxIterations);
+        ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency, std::optional<std::size_t> maxIterations, bool selfDriveEnabled = true);
 
         void SetLoad(foc::NewtonMeter load);
         void SetAdcNoise(const NoiseConfig& config);
@@ -153,6 +153,7 @@ namespace foc
 
         infra::Function<void(foc::PhaseCurrents)> onCurrentPhasesReady;
         bool running{ false };
+        const bool selfDriveEnabled;
         std::optional<foc::NewtonMeter> load;
         const std::optional<std::size_t> maxIterations;
         std::optional<std::size_t> counter;
