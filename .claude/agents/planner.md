@@ -31,8 +31,4 @@ Design and plan. Do NOT write or edit code.
 
 ## Validation before finalizing
 
-- No heap in embedded/runtime paths
-- No virtual dispatch in `Calculate()` hot path
-- Clarke/Park/SVM correctness; anti-windup present; decoupling where appropriate
-- All hardware injected via constructor, not global state
-- `documentation/` entry planned for every new/modified algorithm
+Apply the full AGENTS.md §Constraints checklist before presenting the plan.

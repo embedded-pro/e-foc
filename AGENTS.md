@@ -1,6 +1,6 @@
 # e-foc — Agent Rules (canonical)
 
-Single source of truth for **Claude, Copilot, and sub-agents**. `CLAUDE.md` and `.github/copilot-instructions.md` point here. Sub-agent definitions: `.claude/agents/`.
+Single source of truth for **Claude, Copilot, and sub-agents**. `CLAUDE.md` and `.github/copilot-instructions.md` point here. Sub-agent definitions: `.claude/agents/` (Claude) and `.github/agents/` (Copilot).
 
 FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints targeting embedded MCUs.
 
@@ -93,7 +93,45 @@ ctest --preset host                                         # run tests
 cmake --preset EK-TM4C1294XL && cmake --build --preset EK-TM4C1294XL-Debug  # embedded
 ```
 
-Presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1`, `NUCLEO-H563ZI`.
+Presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1`, `NUCLEO-H563ZI`, `qemu-foc-sensored`.
+
+**CI — two-tier**: `ci.yml` builds all targets and uploads `e_foc`, `e_foc.qemu_sil_tests`, and `e_foc.sync_foc_sensored.qemu.elf` as artifacts. `software-in-the-loop-tests.yml` triggers via `workflow_run` on CI completion, downloads those artifacts, and runs behavioral tests — never recompiles. Do not add cmake build steps to the SIL workflow.
+
+**Embedded cmake**: call `halst_target_bringup(<target>)` for ST or `hal_ti_target_bringup(<target>)` for TI in `targets/*/main/CMakeLists.txt`. The `*_default_init` variants were removed.
+
+## Agent routing
+
+- **orchestrator** — first stop for any non-trivial task; triages to specialists
+- **planner** — new FOC modes, architectural changes, multi-file changes, tasks needing upfront design
+- **executor** — bug fixes, small changes, tasks with a clear existing plan; follows TDD
+- **reviewer** — reviewing code or recent changes against project standards
+- **analyst** — investigation, audit, root-cause analysis, design exploration; read-only, no code changes
+
+## Constraints checklist
+
+Before finalizing any plan or implementation, verify:
+
+**Memory (embedded/runtime scope)**
+- [ ] No `new`/`delete`/`malloc`/`free`/`make_unique`/`make_shared`
+- [ ] No `std::vector`/`string`/`deque`/`list`/`map`/`set` — use bounded alternatives
+- [ ] No recursion; no `virtual ~D() = 0`
+
+**Real-time**
+- [ ] No virtual dispatch in `Calculate()` hot path
+- [ ] No blocking calls or heap reachable from `Calculate()`
+- [ ] `FastTrigonometry` used — not raw `sin`/`cos`
+- [ ] `#pragma GCC optimize("O3","fast-math")` present (guarded); `OPTIMIZE_FOR_SPEED` on hot-path methods
+
+**FOC theory**
+- [ ] Clarke: `Iα=(2/3)·(Ia−(Ib+Ic)/2)`, `Iβ=(Ib−Ic)/√3`; Park: `Id=Iα·cos(θ)+Iβ·sin(θ)`, `Iq=−Iα·sin(θ)+Iβ·cos(θ)`
+- [ ] `θe=θm·pole_pairs`; anti-windup on all PIDs; decoupling feedforward present
+- [ ] No reimplementation of `TransformsClarkePark`/`SpaceVectorModulation`
+- [ ] Unit-typed aliases used — not raw `float`
+
+**Design**
+- [ ] Hardware injected via constructor; no global state
+- [ ] `documentation/` updated before or alongside behavioral changes
+- [ ] New files added to `CMakeLists.txt`; tests added via `add_subdirectory(test)`
 
 ## Assistant behavior — be terse
 
