@@ -116,7 +116,7 @@ namespace foc
         struct CurrentNoiseState
         {
             NoiseConfig config{};
-            std::mt19937 engine{ std::random_device{}() }; // NOSONAR(cpp:S2245) - simulation noise, not security-sensitive
+            std::mt19937 engine{ std::random_device{}() };
             std::normal_distribution<float> distribution{ 0.0f, 1.0f };
             foc::Ampere iaLast{ 0.0f };
             foc::Ampere ibLast{ 0.0f };
@@ -132,7 +132,7 @@ namespace foc
         struct EncoderNoiseState
         {
             EncoderNoiseConfig config{};
-            std::mt19937 engine{ std::random_device{}() }; // NOSONAR(cpp:S2245) - simulation noise, not security-sensitive
+            std::mt19937 engine{ std::random_device{}() };
             std::normal_distribution<float> distribution{ 0.0f, 1.0f };
         };
 
