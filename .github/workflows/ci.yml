@@ -253,6 +253,7 @@ jobs:
             -- integration_tests/software_in_the_loop/features
       - name: Generate SIL test summary
         if: always()
+        shell: bash
         run: |
           if [[ ! -f sil-test-report.xml ]]; then
             {

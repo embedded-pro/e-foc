@@ -18,6 +18,8 @@ namespace sil
 
     bool QemuSilSession::Start(const std::string& elfPath)
     {
+        signal(SIGPIPE, SIG_IGN);
+
         int toChild[2];
         int toParent[2];
 
@@ -37,7 +39,7 @@ namespace sil
         if (pid == 0)
         {
             dup2(toChild[0], STDIN_FILENO);
-            dup2(toParent[1], STDOUT_FILENO);
+            dup2(toParent[1], STDERR_FILENO);
             close(toChild[0]);
             close(toChild[1]);
             close(toParent[0]);
