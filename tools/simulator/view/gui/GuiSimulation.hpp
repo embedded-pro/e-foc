@@ -1,11 +1,13 @@
 #pragma once
 
 #include "core/foc/interfaces/Execution.hpp"
+#include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include "tools/simulator/model/Model.hpp"
 #include "tools/simulator/view/gui/Gui.hpp"
 #include "tools/simulator/view/gui/ParametersPanel.hpp"
 #include <QTimer>
+
+using namespace foc;
 
 namespace simulator
 {

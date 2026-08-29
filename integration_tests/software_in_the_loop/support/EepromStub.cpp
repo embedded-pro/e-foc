@@ -1,7 +1,7 @@
 #include "integration_tests/software_in_the_loop/support/EepromStub.hpp"
 #include <algorithm>
 
-namespace integration
+namespace sil
 {
     EepromStub::EepromStub()
     {

@@ -1,7 +1,8 @@
 #pragma once
 
 #include "core/foc/interfaces/Units.hpp"
-#include "tools/simulator/model/Model.hpp"
+#include "core/foc/model/ThreePhaseMotorModel.hpp"
+using namespace foc;
 #include <QDoubleSpinBox>
 #include <QLabel>
 #include <QPushButton>
@@ -43,9 +44,9 @@ namespace simulator
         void UpdateLiveThermal(float tempCelsius, foc::Ohm rEff, foc::Henry lEff);
 
     signals:
-        void noiseConfigChanged(simulator::ThreePhaseMotorModel::NoiseConfig config);
-        void encoderNoiseConfigChanged(simulator::ThreePhaseMotorModel::EncoderNoiseConfig config);
-        void thermalConfigChanged(simulator::ThreePhaseMotorModel::ThermalConfig config);
+        void noiseConfigChanged(foc::ThreePhaseMotorModel::NoiseConfig config);
+        void encoderNoiseConfigChanged(foc::ThreePhaseMotorModel::EncoderNoiseConfig config);
+        void thermalConfigChanged(foc::ThreePhaseMotorModel::ThermalConfig config);
         void thermalResetRequested();
 
     private:

@@ -5,7 +5,7 @@
 #include "infra/util/ReallyAssert.hpp"
 #include <array>
 
-namespace integration
+namespace sil
 {
     class EepromStub
         : public hal::Eeprom

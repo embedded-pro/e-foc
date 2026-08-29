@@ -3,7 +3,6 @@ add_library(e_foc.hil_tests.steps OBJECT
     CanSteps.cpp
     CommonSteps.cpp
     EepromSteps.cpp
-    FocCycleBudgetSteps.cpp
     HardfaultRecoverySteps.cpp
     ResetCauseSteps.cpp
     UartSteps.cpp

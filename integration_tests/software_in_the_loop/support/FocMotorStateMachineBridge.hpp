@@ -4,7 +4,7 @@
 #include "core/state_machine/FocStateMachine.hpp"
 #include "infra/util/Function.hpp"
 
-namespace integration
+namespace sil
 {
     class FocMotorStateMachineBridge
         : public can::FocMotorCategoryServerObserver

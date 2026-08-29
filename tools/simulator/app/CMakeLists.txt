@@ -3,7 +3,7 @@ emil_build_for(e_foc.tool.simulator HOST All PREREQUISITE_BOOL E_FOC_BUILD_SIMUL
 
 target_link_libraries(e_foc.tool.simulator PUBLIC
     Qt6::Widgets
-    e_foc.tool.simulator.model
+    e_foc.foc.model
     e_foc.tool.simulator.view.gui
     e_foc.foc.instantiations
     e_foc.services.alignment

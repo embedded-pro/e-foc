@@ -6,6 +6,7 @@
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
+#include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/interfaces/Pwm.hpp"
@@ -76,16 +77,6 @@ namespace application
         void SetZero() override;
 
     private:
-        struct PendSvLowPriorityInterrupt
-            : public foc::LowPriorityInterrupt
-        {
-            void Trigger() override;
-            void Register(const infra::Function<void()>& handler) override;
-            void Unregister() override;
-
-            infra::Function<void()> onLowPriorityInterrupt;
-        };
-
         class SerialCommunicationStub
             : public hal::SerialCommunication
         {
@@ -220,7 +211,7 @@ namespace application
 
     private:
         infra::Function<void()> onInitialized;
-        PendSvLowPriorityInterrupt pendSvLowPriorityInterrupt;
+        FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         static constexpr uint32_t timerId = 1;
         GpioPinStub operationalPin;
         GpioPinStub warningPin;

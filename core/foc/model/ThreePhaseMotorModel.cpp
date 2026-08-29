@@ -1,4 +1,4 @@
-#include "tools/simulator/model/Model.hpp"
+#include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
@@ -6,7 +6,7 @@
 #include <cmath>
 #include <numbers>
 
-namespace simulator
+namespace foc
 {
     namespace
     {
@@ -24,10 +24,11 @@ namespace simulator
         }
     }
 
-    ThreePhaseMotorModel::ThreePhaseMotorModel(const Parameters& params, foc::Volts supplyVoltage, hal::Hertz pwmFrequency, std::optional<std::size_t> iterationLimit)
+    ThreePhaseMotorModel::ThreePhaseMotorModel(const Parameters& params, foc::Volts supplyVoltage, hal::Hertz pwmFrequency, std::optional<std::size_t> iterationLimit, bool selfDriveEnabled)
         : parameters(params)
         , baseFrequency(pwmFrequency)
         , powerSupplyVoltage(supplyVoltage)
+        , selfDriveEnabled(selfDriveEnabled)
         , maxIterations(iterationLimit)
     {
     }
@@ -113,10 +114,11 @@ namespace simulator
         Model(dutyPhases);
 
         bool justFinished = false;
-        if (counter.has_value() && --counter.value() == 0)
+        if (counter.has_value())
         {
-            running = false;
-            justFinished = true;
+            const std::size_t remaining = --counter.value();
+            justFinished = (remaining == 0);
+            running = !justFinished;
         }
 
         const auto iaNoise = foc::Ampere{ motorState.ia.Value() + currentNoise.config.biasAmpereA + SampleNoise() };
@@ -198,7 +200,8 @@ namespace simulator
                 observer.Started();
             });
 
-        EnableSelfDriving();
+        if (selfDriveEnabled)
+            EnableSelfDriving();
     }
 
     void ThreePhaseMotorModel::Stop()
@@ -295,28 +298,5 @@ namespace simulator
 
         motorState.theta_mech = foc::Radians{ WrapAngle(motorState.theta_mech.Value()) };
         motorState.theta = foc::Radians{ WrapAngle(motorState.theta.Value()) };
-    }
-
-    SimulationFinishedObserver::SimulationFinishedObserver(ThreePhaseMotorModel& model, const infra::Function<void()>& onFinished)
-        : ThreePhaseMotorModelObserver(model)
-        , onFinished(onFinished)
-    {
-    }
-
-    void SimulationFinishedObserver::Started()
-    {
-    }
-
-    void SimulationFinishedObserver::PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents /*currentPhases*/, foc::Radians /*theta*/, foc::RadiansPerSecond /*omegaMech*/)
-    {
-    }
-
-    void SimulationFinishedObserver::StatorVoltages(foc::ThreePhase phaseVoltages, foc::TwoPhase alphaBeta)
-    {
-    }
-
-    void SimulationFinishedObserver::Finished()
-    {
-        onFinished();
     }
 }

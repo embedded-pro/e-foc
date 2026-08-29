@@ -8,7 +8,7 @@
 #include "core/state_machine/FocStateMachine.hpp"
 #include <functional>
 
-namespace integration
+namespace sil
 {
     // StateMachineAccessor is populated by each fixture's GIVEN step and consumed
     // by generic step definitions (StateMachineSteps, CalibrationSteps, CanSteps).

@@ -10,17 +10,6 @@
 
 namespace
 {
-    infra::Function<void()>* pendSvHandlerCallback = nullptr;
-}
-
-extern "C" void PendSV_Handler()
-{
-    if (pendSvHandlerCallback != nullptr && *pendSvHandlerCallback)
-        (*pendSvHandlerCallback)();
-}
-
-namespace
-{
     static constexpr uint32_t sysctlRescExt = 0x00000001u;  // Bit 0: External reset pin
     static constexpr uint32_t sysctlRescBor = 0x00000004u;  // Bit 2: Brown-Out reset
     static constexpr uint32_t sysctlRescWdt0 = 0x00000008u; // Bit 3: Watchdog Timer 0
@@ -142,24 +131,7 @@ namespace application
         return pendSvLowPriorityInterrupt;
     }
 
-    void PlatformFactoryImpl::PendSvLowPriorityInterrupt::Trigger()
-    {
-        SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
-    }
-
-    void PlatformFactoryImpl::PendSvLowPriorityInterrupt::Register(const infra::Function<void()>& handler)
-    {
-        onLowPriorityInterrupt = handler;
-        pendSvHandlerCallback = &onLowPriorityInterrupt;
-    }
-
-    void PlatformFactoryImpl::PendSvLowPriorityInterrupt::Unregister()
-    {
-        pendSvHandlerCallback = nullptr;
-        onLowPriorityInterrupt = nullptr;
-    }
-
-    PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::PerformanceTrackerImpl(hal::DataWatchPointAndTrace& dwt, hal::OutputPin& pin)
+    PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::PerformanceTrackerImpl(hal::cortex::DataWatchpointAndTrace& dwt, hal::OutputPin& pin)
         : dwt(dwt)
         , pin(pin)
     {}
@@ -173,7 +145,8 @@ namespace application
     uint32_t PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::ElapsedCycles()
     {
         pin.Set(false);
-        return dwt.Stop();
+        dwt.Stop();
+        return dwt.Cycles();
     }
 
     void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold)

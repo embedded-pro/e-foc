@@ -6,10 +6,12 @@
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
+#include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
+#include "hal/cortex_m/DataWatchpointAndTrace.hpp"
+#include "hal/cortex_m/InterruptCortex.hpp"
+#include "hal/cortex_m/SystemTickTimerService.hpp"
 #include "hal/interfaces/Gpio.hpp"
-#include "hal_tiva/cortex/DataWatchpointAndTrace.hpp"
-#include "hal_tiva/cortex/SystemTickTimerService.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousAdc.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousPwm.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousQuadratureEncoder.hpp"
@@ -24,6 +26,8 @@
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
+
+extern "C" uint32_t SystemCoreClock;
 
 namespace application
 {
@@ -77,21 +81,11 @@ namespace application
         static constexpr float adcReferenceVoltage = 3.3f;
         static constexpr float adcResolution = 4096.0f;
 
-        struct PendSvLowPriorityInterrupt
-            : public foc::LowPriorityInterrupt
-        {
-            void Trigger() override;
-            void Register(const infra::Function<void()>& handler) override;
-            void Unregister() override;
-
-            infra::Function<void()> onLowPriorityInterrupt;
-        };
-
         struct Cortex
         {
             infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
-            hal::DataWatchPointAndTrace dataWatchPointAndTrace;
-            hal::cortex::SystemTickTimerService systemTick{ std::chrono::milliseconds(1) };
+            hal::cortex::DataWatchpointAndTrace dataWatchPointAndTrace;
+            hal::cortex::SystemTickTimerService systemTick{ SystemCoreClock, std::chrono::milliseconds(1) };
         };
 
         struct TerminalAndTracer
@@ -160,7 +154,7 @@ namespace application
                     hal::tiva::Pwm::Config::InterruptConfig::FaultConfig{ hal::tiva::Pwm::GeneratorIndex::generator2, uint8_t{ 0x00 }, uint8_t{ static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator0) | static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1) }, true, uint16_t{ 0 } },
                     hal::tiva::Pwm::Config::InterruptConfig::FaultConfig{ hal::tiva::Pwm::GeneratorIndex::generator3, uint8_t{ 0x00 }, uint8_t{ static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator0) | static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1) }, true, uint16_t{ 0 } },
                 } },
-                hal::InterruptPriority::Normal,
+                hal::cortex::InterruptPriority::normal,
             };
 
             hal::tiva::Pwm::Config pwmConfig{ false, false, controlConfig, clockDivisor, std::make_optional(deadTimeConfig), std::make_optional(interruptConfig) };
@@ -225,18 +219,18 @@ namespace application
             struct PerformanceTrackerImpl
                 : hal::PerformanceTracker
             {
-                explicit PerformanceTrackerImpl(hal::DataWatchPointAndTrace& dwt, hal::OutputPin& pin);
+                explicit PerformanceTrackerImpl(hal::cortex::DataWatchpointAndTrace& dwt, hal::OutputPin& pin);
                 void Start() override;
                 uint32_t ElapsedCycles() override;
 
-                hal::DataWatchPointAndTrace& dwt;
+                hal::cortex::DataWatchpointAndTrace& dwt;
                 hal::OutputPin& pin;
             } performanceTrackerImpl{ cortex.dataWatchPointAndTrace, performance };
         };
 
     private:
         infra::Function<void()> onInitialized;
-        PendSvLowPriorityInterrupt pendSvLowPriorityInterrupt;
+        FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         ResetCause resetCause{ ResetCause::powerUp };
         infra::BoundedString::WithStorage<1024> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };

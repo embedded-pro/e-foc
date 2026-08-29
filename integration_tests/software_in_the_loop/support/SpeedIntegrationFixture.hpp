@@ -26,7 +26,7 @@
 #include <gmock/gmock.h>
 #include <optional>
 
-namespace integration
+namespace sil
 {
     struct SpeedIntegrationFixture
         : infra::ClockFixture

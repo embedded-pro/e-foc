@@ -44,7 +44,6 @@ namespace simulator
 
         connect(controlPanel, &ControlPanel::statusChanged, scopesPanel, &ScopesPanel::SetMode);
 
-        // Left column: control + parameters in a scrollable container
         auto* leftContainer = QtOwned<QWidget>(this);
         auto* leftLayout = QtOwned<QVBoxLayout>(leftContainer);
         leftLayout->addWidget(controlPanel);
@@ -56,7 +55,6 @@ namespace simulator
         leftScroll->setWidgetResizable(true);
         leftScroll->setFrameShape(QFrame::NoFrame);
 
-        // Right column: scopes in a scrollable container (4 plots)
         auto* rightScroll = QtOwned<QScrollArea>(this);
         rightScroll->setWidget(scopesPanel);
         rightScroll->setWidgetResizable(true);

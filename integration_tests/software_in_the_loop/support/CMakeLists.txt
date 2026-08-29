@@ -15,6 +15,15 @@ add_library(e_foc.integration_tests.support OBJECT
     StateMachineAccessor.hpp
 )
 
+if(UNIX)
+    target_sources(e_foc.integration_tests.support PRIVATE
+        QemuSilFixture.cpp
+        QemuSilFixture.hpp
+        QemuSilSession.cpp
+        QemuSilSession.hpp
+    )
+endif()
+
 target_include_directories(e_foc.integration_tests.support PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../../..>"
 )
@@ -36,4 +45,9 @@ target_link_libraries(e_foc.integration_tests.support PUBLIC
     infra.util_test_helper
     GTest::gtest
     GTest::gmock
+)
+
+set(QEMU_SIL_ELF_DEFAULT "${CMAKE_SOURCE_DIR}/build/qemu-foc-sensored/targets/sync_foc_sensored/main/RelWithDebInfo/e_foc.sync_foc_sensored.main.elf")
+target_compile_definitions(e_foc.integration_tests.support PUBLIC
+    "QEMU_SIL_ELF_DEFAULT_PATH=\"${QEMU_SIL_ELF_DEFAULT}\""
 )

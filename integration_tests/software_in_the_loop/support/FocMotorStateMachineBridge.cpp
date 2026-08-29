@@ -1,6 +1,6 @@
 #include "integration_tests/software_in_the_loop/support/FocMotorStateMachineBridge.hpp"
 
-namespace integration
+namespace sil
 {
     FocMotorStateMachineBridge::FocMotorStateMachineBridge(can::FocMotorCategoryServer& server,
         state_machine::FocStateMachineBase& stateMachine)

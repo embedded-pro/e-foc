@@ -8,8 +8,8 @@
 #include "tools/simulator/app/Conversions.hpp"
 #include "tools/simulator/app/Defaults.hpp"
 #include "tools/simulator/app/RunController.hpp"
-#include "tools/simulator/model/Jk42bls01X038ed.hpp"
-#include "tools/simulator/model/Model.hpp"
+#include "motor_parameters/Jk42bls01X038ed.hpp"
+#include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "tools/simulator/view/gui/ControlPanel.hpp"
 #include "tools/simulator/view/gui/Gui.hpp"
 #include "tools/simulator/view/gui/GuiSimulation.hpp"
@@ -27,7 +27,7 @@ namespace simulator
 
         const auto baseFrequency = defaults::BaseFrequency();
         const auto vdc = foc::Volts{ defaults::powerSupplyVoltageVolts };
-        const auto& motorParams = JK42BLS01_X038ED::parameters;
+        const auto& motorParams = foc::JK42BLS01_X038ED::parameters;
 
         ThreePhaseMotorModel model{ motorParams, vdc, baseFrequency, std::optional<std::size_t>{} };
         model.SetLoad(foc::NewtonMeter{ defaults::loadTorqueNm });

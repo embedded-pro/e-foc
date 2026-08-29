@@ -7,7 +7,7 @@ target_include_directories(e_foc.tool.simulator.view.gui PUBLIC
 
 target_link_libraries(e_foc.tool.simulator.view.gui PUBLIC
     Qt6::Widgets
-    e_foc.tool.simulator.model
+    e_foc.foc.model
     e_foc.foc.interfaces
     e_foc.services.electrical_system_ident
     e_foc.services.mechanical_system_ident

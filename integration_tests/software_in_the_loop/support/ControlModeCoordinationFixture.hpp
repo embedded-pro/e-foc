@@ -29,7 +29,7 @@
 #include <gmock/gmock.h>
 #include <optional>
 
-namespace integration
+namespace sil
 {
     struct ControlModeCoordinationFixture
         : infra::ClockFixture

@@ -3,14 +3,13 @@
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
-#include "tools/simulator/model/Model.hpp"
+#include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "tools/simulator/view/gui/Gui.hpp"
 #include <QObject>
 #include <optional>
 
 namespace simulator
 {
-    // Wires alignment + electrical identification (common to all three controllers).
     template<typename ControllerT>
     void WireCommonCalibrations(Gui& gui, ControllerT& controller,
         services::MotorAlignmentImpl& alignment, services::ElectricalParametersIdentificationImpl& electricalIdent,

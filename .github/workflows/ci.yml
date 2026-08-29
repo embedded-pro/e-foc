@@ -25,7 +25,7 @@ jobs:
   host_build_test_ubuntu:
     name: Host Build & Test (ubuntu-latest)
     runs-on: ubuntu-latest
-    container: gabrielfrasantos/embedded-devcontainer-cpp:v7.2.0@sha256:e8a23c738637da0009ab5f9d73488c5e27e6309d4f577082368dacfab49d0cf5
+    container: gabrielfrasantos/embedded-devcontainer-cpp:v7.3.0@sha256:4f92e9c86dfc5a9688b6134944e7a40c9eb3c658022ea62dc9e57e4c3b056940
     steps:
       - name: Configure Git
         run: |
@@ -46,69 +46,15 @@ jobs:
           configurePreset: "host"
           buildPreset: "host-Debug-WithPackage"
           testPreset: "host"
-      - name: Run SIL integration tests
-        run: |
-          sil_test=$(find build/host -name "e_foc.integration_tests" -type f -executable -print -quit)
-          if [[ -z "$sil_test" ]]; then
-            echo "::error::SIL integration test executable not found"
-            exit 1
-          fi
-          $sil_test --format summary pretty junit:sil-test-report.xml -- integration_tests/software_in_the_loop/features
-      - name: Generate SIL test summary
-        if: always()
-        run: |
-          if [[ ! -f sil-test-report.xml ]]; then
-            {
-              echo "## SIL Integration Test Results"
-              echo ""
-              echo "_Report not generated — SIL test step did not produce output._"
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          {
-            echo "## SIL Integration Test Results"
-            echo ""
-            python3 -c "
-          import xml.etree.ElementTree as ET
-          tree = ET.parse('sil-test-report.xml')
-          root = tree.getroot()
-          suites = root.findall('.//testsuite') if root.tag == 'testsuites' else [root]
-          features = {}
-          for suite in suites:
-              for tc in suite.findall('testcase'):
-                  feature = tc.get('classname', 'Unknown')
-                  name = tc.get('name', 'Unknown')
-                  failed = tc.find('failure') is not None
-                  skipped = tc.find('skipped') is not None
-                  status = ':x:' if failed else ':zzz:' if skipped else ':white_check_mark:'
-                  features.setdefault(feature, []).append((name, status))
-          for feature, scenarios in features.items():
-              print(f'### {feature}')
-              print('| Scenario | Status |')
-              print('|---|---|')
-              for name, status in scenarios:
-                  print(f'| {name} | {status} |')
-              print()
-          "
-          } >> "$GITHUB_STEP_SUMMARY"
-      - uses: EnricoMi/publish-unit-test-result-action@d0a4676d0e0b938bc201470d88276b7c74c712b3 # v2.24.0
-        if: always()
-        with:
-          check_name: SIL Integration Test Results
-          comment_title: SIL Integration Test Results
-          files: sil-test-report.xml
-          report_individual_runs: true
-          report_suite_logs: info
-      - name: Upload SIL test report
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: sil-test-report
-          path: sil-test-report.xml
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: e_foc
           path: build/host/e_foc-*-Linux.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e_foc.qemu_sil_tests
+          path: build/host/integration_tests/software_in_the_loop/qemu_main/Debug/e_foc.qemu_sil_tests
           if-no-files-found: error
       - name: Upload test logs
         if: ${{ failure() }}
@@ -119,7 +65,7 @@ jobs:
   host_cross_windows:
     name: Host Cross-Compile (Linux → Windows)
     runs-on: ubuntu-latest
-    container: gabrielfrasantos/embedded-devcontainer-cpp:v7.2.0@sha256:e8a23c738637da0009ab5f9d73488c5e27e6309d4f577082368dacfab49d0cf5
+    container: gabrielfrasantos/embedded-devcontainer-cpp:v7.3.0@sha256:4f92e9c86dfc5a9688b6134944e7a40c9eb3c658022ea62dc9e57e4c3b056940
     steps:
       - name: Configure Git
         run: |
@@ -148,9 +94,10 @@ jobs:
   embedded_build:
     name: Embedded Build
     runs-on: ubuntu-latest
-    container: gabrielfrasantos/embedded-devcontainer-cpp:v7.2.0@sha256:e8a23c738637da0009ab5f9d73488c5e27e6309d4f577082368dacfab49d0cf5
+    container: gabrielfrasantos/embedded-devcontainer-cpp:v7.3.0@sha256:4f92e9c86dfc5a9688b6134944e7a40c9eb3c658022ea62dc9e57e4c3b056940
     needs: [host_build_test_ubuntu, host_cross_windows]
     strategy:
+      fail-fast: false
       matrix:
         configuration: ["RelWithDebInfo"]
         target:
@@ -163,7 +110,8 @@ jobs:
     steps:
       - name: Configure Git
         run: |
-          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN  }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
           git config --global --add safe.directory '*'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -243,3 +191,118 @@ jobs:
       - name: Memory analysis summary
         if: matrix.target == 'EK-TM4C1294XL'
         run: cat memory-analysis/combined_step_summary.md >> "$GITHUB_STEP_SUMMARY"
+  qemu_foc_sensored_build:
+    name: QEMU FOC Sensored Application Build
+    runs-on: ubuntu-latest
+    container: gabrielfrasantos/embedded-devcontainer-cpp:v7.3.0@sha256:4f92e9c86dfc5a9688b6134944e7a40c9eb3c658022ea62dc9e57e4c3b056940
+    steps:
+      - name: Configure Git
+        run: |
+          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git config --global --add safe.directory '*'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
+        with:
+          key: ${{ github.job }}-qemu-foc-sensored
+          max-size: 2G
+          save: ${{ github.ref == 'refs/heads/main' }}
+      - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
+        with:
+          configurePreset: qemu-foc-sensored
+          buildPreset: qemu-foc-sensored-RelWithDebInfo
+      - name: Upload QEMU FOC Sensored ELF
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e_foc.sync_foc_sensored.qemu.elf
+          path: build/qemu-foc-sensored/targets/sync_foc_sensored/main/RelWithDebInfo/e_foc.sync_foc_sensored.main.elf
+          if-no-files-found: error
+  software_in_the_loop_tests:
+    name: Software-in-the-Loop Tests
+    runs-on: ubuntu-latest
+    container: gabrielfrasantos/embedded-devcontainer-cpp:v7.3.0@sha256:4f92e9c86dfc5a9688b6134944e7a40c9eb3c658022ea62dc9e57e4c3b056940
+    needs: [host_build_test_ubuntu, qemu_foc_sensored_build]
+    steps:
+      - name: Configure Git
+        run: |
+          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git config --global --add safe.directory '*'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: e_foc.qemu_sil_tests
+          path: sil_runner/
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: e_foc.sync_foc_sensored.qemu.elf
+          path: qemu_elf/
+      - name: Run software-in-the-loop tests
+        env:
+          QEMU_SIL_ELF: ${{ github.workspace }}/qemu_elf/e_foc.sync_foc_sensored.main.elf
+        run: |
+          chmod +x sil_runner/e_foc.qemu_sil_tests
+          sil_runner/e_foc.qemu_sil_tests \
+            --format summary pretty junit:sil-test-report.xml \
+            -- integration_tests/software_in_the_loop/features
+      - name: Generate SIL test summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ ! -f sil-test-report.xml ]]; then
+            {
+              echo "## Software-in-the-Loop Test Results"
+              echo ""
+              echo "_Report not generated — test step did not produce output._"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "## Software-in-the-Loop Test Results"
+            echo ""
+            python3 -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('sil-test-report.xml')
+          root = tree.getroot()
+          suites = root.findall('.//testsuite') if root.tag == 'testsuites' else [root]
+          features = {}
+          for suite in suites:
+              for tc in suite.findall('testcase'):
+                  feature = tc.get('classname', 'Unknown')
+                  name = tc.get('name', 'Unknown')
+                  failed = tc.find('failure') is not None
+                  skipped = tc.find('skipped') is not None
+                  status = ':x:' if failed else ':zzz:' if skipped else ':white_check_mark:'
+                  features.setdefault(feature, []).append((name, status))
+          for feature, scenarios in features.items():
+              print(f'### {feature}')
+              print('| Scenario | Status |')
+              print('|---|---|')
+              for name, status in scenarios:
+                  print(f'| {name} | {status} |')
+              print()
+          "
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: EnricoMi/publish-unit-test-result-action@d0a4676d0e0b938bc201470d88276b7c74c712b3 # v2.24.0
+        if: always()
+        with:
+          check_name: Software-in-the-Loop Test Results
+          comment_title: Software-in-the-Loop Test Results
+          comment_mode: off
+          files: sil-test-report.xml
+          report_individual_runs: true
+          report_suite_logs: info
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sil-test-report
+          path: sil-test-report.xml
+          if-no-files-found: ignore
+

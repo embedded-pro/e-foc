@@ -4,7 +4,7 @@
 #include <gtest/gtest.h>
 
 using namespace testing;
-using namespace integration;
+using namespace sil;
 
 static void PopulateSpeedAccessor(StateMachineAccessor& accessor, SpeedIntegrationFixture& fixture)
 {

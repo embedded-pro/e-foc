@@ -4,7 +4,7 @@
 #include <gtest/gtest.h>
 
 using namespace testing;
-using namespace integration;
+using namespace sil;
 
 static void PopulatePositionAccessor(StateMachineAccessor& accessor, PositionIntegrationFixture& fixture)
 {

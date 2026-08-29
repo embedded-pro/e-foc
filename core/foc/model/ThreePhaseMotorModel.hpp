@@ -1,9 +1,8 @@
 #pragma once
 
-#ifndef Q_MOC_RUN
-#include "core/foc/transforms/TransformsClarkePark.hpp"
-#endif
+#include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "infra/util/Function.hpp"
 #include "infra/util/Observer.hpp"
@@ -11,7 +10,7 @@
 #include <optional>
 #include <random>
 
-namespace simulator
+namespace foc
 {
     class ThreePhaseMotorModel;
 
@@ -35,14 +34,14 @@ namespace simulator
     public:
         struct Parameters
         {
-            foc::Ohm R;       // Phase resistance [Ohm]
-            foc::Henry Ld;    // d-axis inductance [H]
-            foc::Henry Lq;    // q-axis inductance [H] (SPM: Ld ≈ Lq)
-            foc::Weber psi_f; // Permanent magnet flux linkage [Wb]
-            uint8_t p;        // Pole pairs
+            foc::Ohm R;
+            foc::Henry Ld;
+            foc::Henry Lq;
+            foc::Weber psi_f;
+            uint8_t p;
 
-            foc::KilogramMeterSquared J;       // Rotor inertia [kg·m²]
-            foc::NewtonMeterSecondPerRadian B; // Viscous friction coefficient [N·m·s/rad]
+            foc::KilogramMeterSquared J;
+            foc::NewtonMeterSecondPerRadian B;
         };
 
         struct NoiseConfig
@@ -56,10 +55,10 @@ namespace simulator
         struct ThermalConfig
         {
             float ambientCelsius{ 25.0f };
-            float thermalResistance{ 2.0f };   // °C/W
-            float thermalCapacitance{ 25.0f }; // J/°C
-            float copperTempCoeff{ 0.00393f }; // 1/°C
-            float ironInductanceCoeff{ 0.0f }; // 1/°C
+            float thermalResistance{ 2.0f };
+            float thermalCapacitance{ 25.0f };
+            float copperTempCoeff{ 0.00393f };
+            float ironInductanceCoeff{ 0.0f };
         };
 
         struct EncoderNoiseConfig
@@ -68,7 +67,7 @@ namespace simulator
             float biasRadians{ 0.0f };
         };
 
-        ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency, std::optional<std::size_t> maxIterations);
+        ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency, std::optional<std::size_t> maxIterations, bool selfDriveEnabled = true);
 
         void SetLoad(foc::NewtonMeter load);
         void SetAdcNoise(const NoiseConfig& config);
@@ -83,7 +82,6 @@ namespace simulator
 
         void EnableSelfDriving();
 
-        // Implementation of drivers::ThreePhaseInverter
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
         void Start() override;
@@ -91,7 +89,6 @@ namespace simulator
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
 
-        // Implementation of drivers::Encoder
         foc::Radians Read() override;
         void Set(foc::Radians value) override;
         void SetZero() override;
@@ -119,7 +116,7 @@ namespace simulator
         struct CurrentNoiseState
         {
             NoiseConfig config{};
-            std::mt19937 engine{ 0xc0ffeeU };
+            std::mt19937 engine{ std::random_device{}() };
             std::normal_distribution<float> distribution{ 0.0f, 1.0f };
             foc::Ampere iaLast{ 0.0f };
             foc::Ampere ibLast{ 0.0f };
@@ -135,7 +132,7 @@ namespace simulator
         struct EncoderNoiseState
         {
             EncoderNoiseConfig config{};
-            std::mt19937 engine{ 0xbaadf00dU };
+            std::mt19937 engine{ std::random_device{}() };
             std::normal_distribution<float> distribution{ 0.0f, 1.0f };
         };
 
@@ -156,6 +153,7 @@ namespace simulator
 
         infra::Function<void(foc::PhaseCurrents)> onCurrentPhasesReady;
         bool running{ false };
+        const bool selfDriveEnabled;
         std::optional<foc::NewtonMeter> load;
         const std::optional<std::size_t> maxIterations;
         std::optional<std::size_t> counter;
@@ -164,20 +162,5 @@ namespace simulator
         ThermalState thermal;
         EncoderNoiseState encoderNoise;
         SelfDriveState selfDrive;
-    };
-
-    class SimulationFinishedObserver
-        : public ThreePhaseMotorModelObserver
-    {
-    public:
-        SimulationFinishedObserver(ThreePhaseMotorModel& model, const infra::Function<void()>& onFinished);
-
-        void Started() override;
-        void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta, foc::RadiansPerSecond omegaMech) override;
-        void StatorVoltages(foc::ThreePhase phaseVoltages, foc::TwoPhase alphaBeta) override;
-        void Finished() override;
-
-    private:
-        infra::Function<void()> onFinished;
     };
 }

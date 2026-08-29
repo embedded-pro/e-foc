@@ -6,8 +6,8 @@
 #include "tools/simulator/app/CalibrationsWiring.hpp"
 #include "tools/simulator/app/Defaults.hpp"
 #include "tools/simulator/app/RunController.hpp"
-#include "tools/simulator/model/Jk42bls01X038ed.hpp"
-#include "tools/simulator/model/Model.hpp"
+#include "motor_parameters/Jk42bls01X038ed.hpp"
+#include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "tools/simulator/view/gui/ControlPanel.hpp"
 #include "tools/simulator/view/gui/Gui.hpp"
 #include "tools/simulator/view/gui/GuiSimulation.hpp"
@@ -25,17 +25,17 @@ namespace simulator
         const auto baseFrequency = defaults::BaseFrequency();
         const auto vdc = foc::Volts{ defaults::powerSupplyVoltageVolts };
 
-        ThreePhaseMotorModel model{ JK42BLS01_X038ED::parameters, vdc, baseFrequency, std::optional<std::size_t>{} };
+        ThreePhaseMotorModel model{ foc::JK42BLS01_X038ED::parameters, vdc, baseFrequency, std::optional<std::size_t>{} };
         model.SetLoad(foc::NewtonMeter{ defaults::loadTorqueNm });
 
         foc::FocTorqueController controller{ model, model };
         auto motorModel = foc::MotorModelParameters{};
-        motorModel.resistance = JK42BLS01_X038ED::parameters.R;
-        motorModel.inductance = foc::MilliHenry{ JK42BLS01_X038ED::parameters.Ld.Value() * 1000.0f };
-        motorModel.fluxLinkage = JK42BLS01_X038ED::parameters.psi_f;
+        motorModel.resistance = foc::JK42BLS01_X038ED::parameters.R;
+        motorModel.inductance = foc::MilliHenry{ foc::JK42BLS01_X038ED::parameters.Ld.Value() * 1000.0f };
+        motorModel.fluxLinkage = foc::JK42BLS01_X038ED::parameters.psi_f;
         motorModel.busVoltage = vdc;
         motorModel.samplingFrequency = baseFrequency;
-        motorModel.polePairs = JK42BLS01_X038ED::parameters.p;
+        motorModel.polePairs = foc::JK42BLS01_X038ED::parameters.p;
         controller.Configure(motorModel);
         controller.SetCurrentTunings(foc::CurrentLoopTunings{});
         controller.SetPoint(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
@@ -53,7 +53,7 @@ namespace simulator
         };
 
         GuiSimulation simulation{ model, controller, eventDispatcher,
-            JK42BLS01_X038ED::parameters, pidParameters, setpointConfig, vdc };
+            foc::JK42BLS01_X038ED::parameters, pidParameters, setpointConfig, vdc };
 
         services::MotorAlignmentImpl alignment{ model, model };
         services::ElectricalParametersIdentificationImpl electricalIdent{ model, model, vdc };
@@ -61,11 +61,11 @@ namespace simulator
         auto& gui = simulation.GetGui();
         gui.DisableMechanicalIdent();
 
-        OnlineElectricalRls electricalRls{ model, JK42BLS01_X038ED::parameters.p, baseFrequency };
+        OnlineElectricalRls electricalRls{ model, foc::JK42BLS01_X038ED::parameters.p, baseFrequency };
         QObject::connect(&electricalRls, &OnlineElectricalRls::electricalEstimatesChanged,
             &gui, &Gui::OnElectricalRlsUpdate);
 
-        WireCommonCalibrations(gui, controller, alignment, electricalIdent, JK42BLS01_X038ED::parameters);
+        WireCommonCalibrations(gui, controller, alignment, electricalIdent, foc::JK42BLS01_X038ED::parameters);
 
         QObject::connect(&gui, &Gui::setpointChanged, [&controller](int amps)
             {
