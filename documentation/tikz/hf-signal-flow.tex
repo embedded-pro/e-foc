@@ -1,0 +1,23 @@
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  node distance=0.55cm and 0cm,
+  block/.style={draw, rectangle, minimum width=5.8cm, minimum height=0.65cm,
+                align=center, font=\small, fill=blue!6},
+]
+\node[block] (inj) {Injection: $v[n] = V_{inj}\sin(\omega n T_s)$};
+\node[block, below=of inj] (inv) {Three-Phase Inverter};
+\node[block, below=of inv] (mtr) {Motor (RL plant, ZOH)};
+\node[block, below=of mtr] (gp)  {Goertzel.Push($i[n]$) --- streaming, $N$ samples};
+\node[block, below=of gp]  (gr)  {Goertzel.Result() $\to I_{complex}$};
+\node[block, below=of gr]  (dlc) {Rotate by $e^{+j\omega d T_s}$ (delay correction)};
+\node[block, below=of dlc] (zim) {$Z_{imag} = -V_{inj}(N/2)\,\mathrm{Re}(I)/|I|^2$};
+\node[block, below=of zim] (lph) {$L_{phase} = Z_{imag}/(\omega \cdot F_{terminal})$};
+\node[block, below=of lph] (fq)  {$\mathrm{fitQuality} = 2|I|^2/(N\,\Sigma i^2)$};
+\foreach \a/\b in {inj/inv, inv/mtr, mtr/gp, gp/gr, gr/dlc, dlc/zim, zim/lph, lph/fq}
+  \draw[arr] (\a) -- (\b);
+\end{tikzpicture}
+\caption{HF sinusoidal injection signal flow: injected voltage through inverter
+  and RL motor plant to Goertzel demodulation and final $L$\,/\,quality outputs.}
+\label{fig:hf-signal-flow}
+\end{figure}

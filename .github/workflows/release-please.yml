@@ -222,6 +222,8 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
+      - name: Install TikZ support
+        run: sudo apt-get install -y --no-install-recommends texlive-pictures texlive-latex-extra
       - name: Generate documentation PDFs and traceability matrix
         uses: embedded-pro/project-documentation@54fca1cb9925af16e53bd9d2640d1285560d295b # v0.2.0
         with:

@@ -21,8 +21,8 @@ date: YYYY-MM-DD
 > Python, CMake, shell, etc.) are allowed.** Use Mermaid diagrams to express behavior instead.
 > Prose descriptions of algorithms are encouraged; source-level details are not.
 >
-> **Diagrams**: All visuals must be either a Mermaid fenced code block (` ```mermaid `) or ASCII art inline
-> in the document. External image references (`![alt](path)`) are **not allowed**.
+> **Diagrams**: All visuals must be Mermaid (` ```mermaid `), TikZ via ` ```{=latex} ` raw blocks (source in
+> `documentation/tikz/`), or ASCII art. External image references (`![alt](path)`) are **not allowed**.
 
 ---
 

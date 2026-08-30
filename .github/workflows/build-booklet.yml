@@ -51,6 +51,7 @@ jobs:
             pandoc \
             texlive-xetex \
             texlive-latex-extra \
+            texlive-pictures \
             texlive-fonts-recommended \
             lmodern \
             fonts-dejavu-core \

@@ -1,0 +1,31 @@
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[scale=2.2,
+  axs/.style={-{Stealth[length=6pt]}, thick},
+  vec/.style={-{Stealth[length=6pt]}, very thick},
+  rot/.style={-{Stealth[length=6pt]}, thick, dashed},
+]
+% αβ stationary frame
+\draw[axs] (-0.2,0) -- (1.3,0) node[right] {$\alpha$};
+\draw[axs] (0,-0.2) -- (0,1.3) node[above] {$\beta$};
+% dq rotating frame (θe = 35°)
+\def\thetae{35}
+\draw[rot, RoyalBlue]
+  (0,0) -- ({1.1*cos(\thetae)},{1.1*sin(\thetae)}) node[right] {$d$};
+\draw[rot, RoyalBlue]
+  (0,0) -- ({-1.1*sin(\thetae)},{1.1*cos(\thetae)}) node[above] {$q$};
+% stator current vector (65°)
+\draw[vec, BrickRed]
+  (0,0) -- ({0.85*cos(65)},{0.85*sin(65)}) node[above right] {$\mathbf{I}_s$};
+% θe arc
+\draw[->, gray, thin] (0.35,0) arc[start angle=0, end angle=\thetae, radius=0.35];
+\node[font=\small, gray] at (0.42,0.12) {$\theta_e$};
+\node[font=\small, anchor=north east] at (0,0) {$O$};
+\node[font=\footnotesize, align=center, anchor=north]
+  at (0.5,-0.28) {$\alpha\beta$: stationary \quad $dq$: rotates at $\omega_e = p\,\omega_m$};
+\end{tikzpicture}
+\caption{FOC coordinate frames. The $dq$ frame rotates at electrical speed
+  $\omega_e = p\,\omega_m$. The Park transform decomposes $\mathbf{I}_s$ into
+  $i_d$ (flux axis) and $i_q$ (torque axis).}
+\label{fig:foc-coordinates}
+\end{figure}

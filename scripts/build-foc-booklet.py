@@ -299,7 +299,10 @@ def render_pdf(book_md):
         "--include-after-body", str(ASSETS / "back-cover.tex"),
         "-o", str(output),
     ]
-    return _run(command, output)
+    env = os.environ.copy()
+    tikz_dir = str(ROOT / "documentation" / "tikz")
+    env["TEXINPUTS"] = f'{tikz_dir}:{env.get("TEXINPUTS", "")}'
+    return _run(command, output, env=env)
 
 
 def _sidebar(chapters, current, pdf_available=True):
@@ -447,8 +450,8 @@ def _render_landing(chapters, pdf_available=True):
     return 0
 
 
-def _run(command, output, quiet=False):
-    result = subprocess.run(command, cwd=ROOT)
+def _run(command, output, quiet=False, env=None):
+    result = subprocess.run(command, cwd=ROOT, env=env)
     if result.returncode != 0:
         print(f"ERROR: pandoc failed for {output.name}", file=sys.stderr)
         return 1

@@ -10,3 +10,4 @@ output/
 cucumber.toml
 .megalinter_github_conf/
 documentation/audits/
+.claude/plans/

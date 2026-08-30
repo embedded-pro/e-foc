@@ -129,7 +129,7 @@
         "TARGET_MCU_FAMILY": "TM4C129",
         "TARGET_MCU": "tm4c1294ncpdt",
         "E_FOC_TARGET_BOARD": "EK-TM4C1294XL",
-        "E_FOC_MOTOR_BOARD": "FRDM-MC-LVPMSM"
+        "E_FOC_MOTOR_BOARD": "E-FOC-HARDWARE"
       }
     },
     {

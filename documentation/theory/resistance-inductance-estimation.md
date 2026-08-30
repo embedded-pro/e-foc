@@ -92,19 +92,10 @@ samples at 10 kHz. A 5-sample moving average and a single-sample crossing thresh
 such a narrow transient accurately. Inductance is therefore obtained by a separate frequency-domain
 method.
 
-#### DC Step Response — ASCII
+#### DC Step Response
 
-```text
-i_d (normalised: I_ss = 1.0)
-  │
-1.0├──────────────────────────────── I_ss = V_step / R_terminal (steady state)
-   │                    ──────────
-0.63├───────────────────/  ← 63.2% threshold (τ crossing, not used in v2)
-   │                  /
-   │                /
-0.0├────────────────
-   └────────────────────────────────
-       0      τ/T_s   5τ/T_s
+```{=latex}
+\input{dc-step-response.tex}
 ```
 
 ---
@@ -233,27 +224,10 @@ At 10 % injection ($V_{inj} = 2.4\,\text{V}$) this represents 20 % distortion; a
 **15 % of bus** to keep dead-time distortion below 15 % of the injected signal. The software model
 does not reproduce dead-time; simulation results will be optimistic relative to hardware.
 
-#### Signal Flow — ASCII
+#### Signal Flow
 
-```text
-injection   v[n] = V_inj · sin(ω·n·Ts)
-                │
-                ▼
-           ThreePhaseInverter  ──→  motor (RL plant, ZOH)
-                                        │
-                              i[n] ◄───
-                                        │
-                                     Goertzel.Push(i[n])   (streaming, N samples)
-                                        │
-                              Goertzel.Result() → I_complex
-                                        │
-                              rotate by e^{+j·ω·d·Ts}      (delay correction)
-                                        │
-                              Z_imag = −V_inj · (N/2) · Re(I) / |I|²
-                                        │
-                              L_phase = Z_imag / (ω · F_terminal)
-                                        │
-                              fitQuality = 2|I|² / (N · Σi²)
+```{=latex}
+\input{hf-signal-flow.tex}
 ```
 
 ---

@@ -207,20 +207,10 @@ Each step: apply i_d field, wait for rotor to settle, advance.
 Final step (360°=0°): rotor at θ_m_settled → θ_offset := θ_m_settled.
 ```
 
-### Settling Signal (ASCII representation)
+### Settling Signal
 
-```text
-  │
-1.0├──────────────────────────────── target (aligned position)
-   │          ╭──────╮
- 0.9│         ╱       ╲    ╭──────╮
-   │        ╱           ╲ ╱       ╲_______________
- 0.5│       ╱             ╳
-   │      ╱
- 0.0├─────╱
-   └──────────────────────────────────────────→ time
-          ↑            settlement window
-          step applied
+```{=latex}
+\input{alignment-settling.tex}
 ```
 
 ---

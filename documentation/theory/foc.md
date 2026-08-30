@@ -368,18 +368,8 @@ graph TD
 
 ### Coordinate System Relationships
 
-```text
-                 β
-                 ↑
-                 |    q (rotates)
-                 |   /
-     Is ●--------/--/----→ α
-        |       /  /
-        |      /  d (rotates at ωe)
-        |     / ↗
-        |    / θe
-        |   /
-        (αβ stationary, dq rotates at ωe = p·ωm)
+```{=latex}
+\input{foc-coordinates.tex}
 ```
 
 See also: `documentation/theory/images/foc_coordinates.svg` and `documentation/theory/images/svm_hexagon.svg`

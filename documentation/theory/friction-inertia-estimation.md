@@ -234,22 +234,8 @@ graph TD
 
 ### Effective Memory Window (Forgetting Factor)
 
-```text
-Sample weight w[k] = λ^(N-k)
-
-w │
-1.0│ ●
-   │  ●
-   │    ●
-0.5│       ●
-   │          ●
-   │               ●
-   │                    ●
-0.0└─────────────────────────────→ k (samples into past)
-   N   N-50  N-100  N-200  N-500
-            ↑
-       N_eff = 500 samples at λ=0.998
-       (data older than ~500 samples has weight < 0.37)
+```{=latex}
+\input{forgetting-factor.tex}
 ```
 
 ---
