@@ -156,7 +156,7 @@ namespace sil
                     capturedAlignmentCallback = cb;
                 }));
 
-        capturedRLCallback(std::optional<foc::Ohm>{ resistance }, std::optional<foc::MilliHenry>{ inductance });
+        capturedRLCallback(services::ElectricalParametersIdentification::ResistanceInductanceResult{ resistance, inductance, 1.0f });
         ExecuteAllActions();
     }
 

@@ -21,8 +21,6 @@ target_sources(e_foc.services.mechanical_system_ident PRIVATE
     MechanicalParametersIdentification.hpp
     MechanicalParametersIdentificationImpl.cpp
     MechanicalParametersIdentificationImpl.hpp
-    TerminalMechanicalParametersIdentification.cpp
-    TerminalMechanicalParametersIdentification.hpp
 )
 
 add_subdirectory(test)

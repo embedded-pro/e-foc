@@ -1,5 +1,7 @@
 #include "targets/hardware_test/components/Terminal.hpp"
 #include "core/foc/interfaces/Signals.hpp"
+#include "core/services/alignment/MotorAlignment.hpp"
+#include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "hal/interfaces/Pwm.hpp"
 #include "infra/stream/StringInputStream.hpp"
 #include "infra/stream/StringOutputStream.hpp"
@@ -78,6 +80,7 @@ namespace application
         : terminal{ terminal }
         , tracer{ hardware.Tracer() }
         , hardware{ hardware }
+        , identState{ hardware, hardware, hardware.PowerSupplyVoltage() }
         , performanceTimer{ hardware.PerformanceTimer() }
         , Vdc{ hardware.PowerSupplyVoltage() }
         , systemClock{ hardware.SystemClock() }
@@ -196,6 +199,18 @@ namespace application
             [this](const auto&)
             {
                 this->terminal.ProcessResult(ForceHardfault());
+            } });
+
+        terminal.AddCommand({ { "ident", "i", "Estimate R and L (DC step + HF sinusoidal injection). Ex: ident" },
+            [this](const auto&)
+            {
+                RunIdent();
+            } });
+
+        terminal.AddCommand({ { "align", "al", "Estimate encoder offset. Requires 'motor' set first. Ex: align" },
+            [this](const auto&)
+            {
+                RunAlign();
             } });
 
         hardware.SetEncoderResolution(4000);
@@ -588,10 +603,10 @@ namespace application
             return;
         }
 
-        eepromCurrentReadSize = *size;
-        eeprom.ReadBuffer(infra::ByteRange{ eepromBuffer.data(), eepromBuffer.data() + eepromCurrentReadSize }, *addr, [this]()
+        const auto readSize = static_cast<std::size_t>(*size);
+        eeprom.ReadBuffer(infra::ByteRange{ eepromBuffer.data(), eepromBuffer.data() + readSize }, *addr, [this, readSize]()
             {
-                for (uint32_t i = 0; i < this->eepromCurrentReadSize; ++i)
+                for (std::size_t i = 0; i < readSize; ++i)
                     this->tracer.Trace() << "  [" << i << "] = " << static_cast<uint32_t>(this->eepromBuffer[i]);
                 this->terminal.ProcessResult({ success });
             });
@@ -638,5 +653,70 @@ namespace application
         void (*nullFunc)() = nullptr;
         nullFunc(); // NOSONAR — intentional null dereference to trigger HardFault for error handler validation
         return { services::TerminalWithStorage::Status::success };
+    }
+
+    void TerminalInteractor::RunIdent()
+    {
+        if (identState.identRunning)
+        {
+            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "ident already running" });
+            return;
+        }
+        identState.identRunning = true;
+        tracer.Trace() << "ident: running R then L estimation...";
+
+        identState.electricalIdent.EstimateResistanceAndInductance({},
+            [this](services::ElectricalParametersIdentification::ResistanceInductanceResult result)
+            {
+                identState.identRunning = false;
+                if (!result.resistance.has_value())
+                {
+                    terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "ident: R estimation failed (zero current)" });
+                    return;
+                }
+                if (!result.inductance.has_value())
+                {
+                    terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "ident: L estimation failed" });
+                    return;
+                }
+                tracer.Trace() << "R: " << result.resistance->Value() << " ohm";
+                tracer.Trace() << "L: " << result.inductance->Value() << " mH";
+                tracer.Trace() << "fitQuality: " << result.fitQuality;
+                if (result.fitQuality < 0.5f)
+                {
+                    terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "ident: low fit quality — noisy signal, calibration rejected" });
+                    return;
+                }
+                terminal.ProcessResult({ services::TerminalWithStorage::Status::success });
+            });
+    }
+
+    void TerminalInteractor::RunAlign()
+    {
+        if (!polePairs.has_value() || polePairs.value() == 0)
+        {
+            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "align: set motor poles first (motor <poles>)" });
+            return;
+        }
+        if (identState.alignRunning)
+        {
+            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "align already running" });
+            return;
+        }
+        identState.alignRunning = true;
+        tracer.Trace() << "align: running...";
+
+        identState.alignment.ForceAlignment(polePairs.value(), {},
+            [this](std::optional<foc::Radians> offset)
+            {
+                identState.alignRunning = false;
+                if (!offset.has_value())
+                {
+                    terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "align: failed (insufficient rotor response)" });
+                    return;
+                }
+                tracer.Trace() << "encoder offset: " << offset->Value() << " rad";
+                terminal.ProcessResult({ services::TerminalWithStorage::Status::success });
+            });
     }
 }

@@ -2,7 +2,7 @@
 #include "core/platform_abstraction/test_doubles/CanBusAdapterMock.hpp"
 #include "hal/interfaces/test_doubles/EepromMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
-#include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
+#include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/stream/test/StreamMock.hpp"
 #include "infra/util/test_helper/MockHelpers.hpp"
 #include "services/tracer/Tracer.hpp"
@@ -87,7 +87,7 @@ namespace
 
     class TestHardwareTerminal
         : public testing::Test
-        , public infra::EventDispatcherWithWeakPtrFixture
+        , public infra::ClockFixture
     {
     public:
         TestHardwareTerminal()
@@ -125,7 +125,7 @@ namespace
                 EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
+        services::TerminalWithStorage::WithMaxSize<25> terminal{ terminalWithCommands, tracer };
 
         testing::StrictMock<PerformanceTrackerMock> performanceTrackerMock;
         testing::StrictMock<hal::CleanEepromMock> eepromMock;

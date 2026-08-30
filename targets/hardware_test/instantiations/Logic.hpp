@@ -13,7 +13,7 @@ namespace application
         explicit Logic(application::PlatformFactory& hardware);
 
     private:
-        services::TerminalWithBanner::WithMaxSize<20> terminalWithStorage;
+        services::TerminalWithBanner::WithMaxSize<25> terminalWithStorage;
         application::TerminalInteractor terminal;
         services::DebugLed debugLed;
     };
