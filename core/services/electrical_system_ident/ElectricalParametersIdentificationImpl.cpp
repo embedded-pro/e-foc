@@ -37,7 +37,10 @@ namespace services
 
         resistanceEstimator.Start(
             ResistanceEstimator::Config{ config.testVoltagePercent, config.settleTime, config.windingConfig },
-            [this](auto result) { OnResistanceDone(result); });
+            [this](auto result)
+            {
+                OnResistanceDone(result);
+            });
     }
 
     void ElectricalParametersIdentificationImpl::OnResistanceDone(ResistanceEstimator::Result result)
