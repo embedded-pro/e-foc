@@ -1892,3 +1892,207 @@ TEST_F(FocStateMachineTorqueAutoTest, apply_online_estimates_does_not_change_sta
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
+
+TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_in_ready_persists_and_returns_ok)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData&,
+                             infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    auto result = state_machine::CommandResult::rejected;
+    sm.CmdSetFluxLinkage(foc::Weber{ 0.05f }, [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::CommandResult::ok);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_with_zero_value_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    auto result = state_machine::CommandResult::ok;
+    sm.CmdSetFluxLinkage(foc::Weber{ 0.0f }, [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::CommandResult::rejected);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_with_negative_value_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    auto result = state_machine::CommandResult::ok;
+    sm.CmdSetFluxLinkage(foc::Weber{ -0.05f }, [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::CommandResult::rejected);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_from_idle_no_calibration_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    auto result = state_machine::CommandResult::ok;
+    sm.CmdSetFluxLinkage(foc::Weber{ 0.05f }, [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::CommandResult::rejected);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_from_enabled_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    sm.CmdEnable();
+    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+
+    auto result = state_machine::CommandResult::ok;
+    sm.CmdSetFluxLinkage(foc::Weber{ 0.05f }, [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::CommandResult::rejected);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_nvm_busy_returns_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData&,
+                             infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Busy);
+            }));
+
+    auto result = state_machine::CommandResult::ok;
+    sm.CmdSetFluxLinkage(foc::Weber{ 0.05f }, [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::CommandResult::rejected);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_nvm_write_failed_returns_nvmFailed)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData&,
+                             infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::WriteFailed);
+            }));
+
+    auto result = state_machine::CommandResult::ok;
+    sm.CmdSetFluxLinkage(foc::Weber{ 0.05f }, [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::CommandResult::nvmFailed);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, has_pending_async_work_true_during_nvm_boot_check)
+{
+    GivenFaultNotifierRegistered();
+    infra::Function<void(bool)> bootCb;
+    EXPECT_CALL(nvmMock, IsCalibrationValid(_))
+        .WillOnce(Invoke([&bootCb](infra::Function<void(bool)> onDone)
+            {
+                bootCb = onDone;
+            }));
+    auto sm = CreateStateMachine();
+
+    EXPECT_TRUE(sm.HasPendingAsyncWork());
+
+    bootCb(false);
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+}
+
+TEST_F(FocStateMachineTorqueCliTest, has_pending_async_work_false_in_ready_state)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+}
+
+TEST_F(FocStateMachineTorqueCliTest, register_ready_handler_called_when_state_enters_ready)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    ExpectCalibrationSequence();
+    auto sm = CreateStateMachine();
+
+    bool handlerCalled = false;
+    sm.RegisterReadyHandler([&handlerCalled]()
+        {
+            handlerCalled = true;
+        });
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    EXPECT_TRUE(handlerCalled);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_late_callback_when_no_pending_command_is_ignored)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    infra::Function<void(services::NvmStatus)> capturedCb;
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([&capturedCb](const services::CalibrationData&,
+                             infra::Function<void(services::NvmStatus)> onDone)
+            {
+                capturedCb = onDone;
+            }));
+
+    sm.CmdSetFluxLinkage(foc::Weber{ 0.05f }, [](state_machine::CommandResult) {});
+
+    // Fault clears the pending command
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    // Late NVM callback should be ignored (pendingCommandCallback is null)
+    capturedCb(services::NvmStatus::Ok);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}

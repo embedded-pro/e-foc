@@ -207,3 +207,71 @@ TEST_F(SinusoidalInductanceEstimatorTest, fitQuality_drops_for_unexpected_signal
 
     EXPECT_LT(result.fitQuality, 0.5f);
 }
+
+TEST_F(SinusoidalInductanceEstimatorTest, zero_injection_frequency_returns_empty_result_immediately)
+{
+    // samplesPerPeriod == 0 guard: injectionFrequency == 0 → onDone(Result{}) immediately
+    services::SinusoidalInductanceEstimator::Config config{};
+    config.injectionFrequency = hal::Hertz{ 0 };
+
+    services::SinusoidalInductanceEstimator::Result result{ foc::MilliHenry{ 99.0f }, 1.0f };
+
+    estimator.Start(config, [&result](auto r) { result = r; });
+
+    EXPECT_FALSE(result.inductance.has_value());
+    EXPECT_FLOAT_EQ(result.fitQuality, 0.0f);
+}
+
+TEST_F(SinusoidalInductanceEstimatorTest, negative_zimag_returns_nullopt_inductance_with_fit_quality)
+{
+    // zImag <= 0.0f branch: feed a signal that produces negative imaginary impedance.
+    // With the correction rotation, a negative-phase sinusoid (or reversed sign) produces zImag <= 0.
+    services::SinusoidalInductanceEstimator::Config config{
+        hal::Hertz{ 700 }, hal::Percent{ 15 }, 2, 5, 0, services::WindingConfiguration::Wye
+    };
+
+    const float fInj = static_cast<float>(config.injectionFrequency.Value());
+    const auto samplesPerPeriod = static_cast<std::size_t>(std::round(fs / fInj));
+    const auto totalSamples = (config.warmupPeriods + config.measurementPeriods) * samplesPerPeriod;
+
+    services::SinusoidalInductanceEstimator::Result result{};
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(totalSamples);
+    EXPECT_CALL(driverMock, Stop());
+
+    estimator.Start(config, [&result](auto r) { result = r; });
+
+    // Feed a cosine signal (90° phase-shifted from injection sine) so Goertzel gives Im > 0 but Re < 0,
+    // making zImag = -vTerm * N/2 * iRe / magSquared positive only when iRe < 0.
+    // To get zImag <= 0, feed iRe > 0, i.e. a cosine signal.
+    const float phaseInc = twoPi * fs / static_cast<float>(samplesPerPeriod) / fs;
+    float phase = 0.0f;
+    for (std::size_t k = 0; k < totalSamples; ++k)
+    {
+        driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+            foc::Ampere{ std::cos(phase) }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+        phase += phaseInc;
+    }
+
+    // zImag <= 0 → nullopt inductance but fitQuality is computed
+    EXPECT_FALSE(result.inductance.has_value());
+    EXPECT_GT(result.fitQuality, 0.0f);
+}
+
+TEST_F(SinusoidalInductanceEstimatorTest, delta_winding_recovers_inductance_correctly)
+{
+    // Delta winding configuration test with terminalFactor = 0.5
+    const float rTerminal = 0.75f;
+    const float lTerminalMH = 0.75f;
+
+    services::SinusoidalInductanceEstimator::Config config{
+        hal::Hertz{ 700 }, hal::Percent{ 15 }, 5, 20, 1, services::WindingConfiguration::Delta
+    };
+
+    auto [result, expectedL] = RunPlantSimulation(driverMock, estimator, config, rTerminal, lTerminalMH);
+
+    ASSERT_TRUE(result.inductance.has_value());
+    EXPECT_NEAR(result.inductance->Value(), expectedL, expectedL * 0.02f);
+}

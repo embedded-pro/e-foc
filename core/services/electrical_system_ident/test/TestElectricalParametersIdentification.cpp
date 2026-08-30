@@ -301,3 +301,137 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_wit
     ASSERT_TRUE(resultPolePairs.has_value());
     EXPECT_EQ(*resultPolePairs, expectedPolePairs);
 }
+
+TEST_F(ElectricalParametersIdentificationTest, estimate_rl_resistance_fails_calls_done_with_empty_result)
+{
+    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
+        hal::Percent{ 15 }, std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
+    };
+
+    bool doneCalled = false;
+    services::ElectricalParametersIdentification::ResistanceInductanceResult capturedResult{};
+
+    // First PhaseCurrentsReady: ResistanceEstimator start (no-op callback), second: settle-timer-triggered measurement
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return())
+        .WillOnce([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_));
+    EXPECT_CALL(driverMock, Stop());
+
+    identification.EstimateResistanceAndInductance(config, [&](auto result)
+        {
+            doneCalled = true;
+            capturedResult = result;
+        });
+
+    ForwardTime(std::chrono::milliseconds{ 100 });
+
+    // Feed zero current so steadyStateCurrent <= 0.0f → ResistanceEstimator returns nullopt
+    for (std::size_t i = 0; i < numberOfSamples; ++i)
+        driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+            foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    ASSERT_TRUE(doneCalled);
+    EXPECT_FALSE(capturedResult.resistance.has_value());
+    EXPECT_FALSE(capturedResult.inductance.has_value());
+}
+
+TEST_F(ElectricalParametersIdentificationTest, estimate_rl_resistance_succeeds_then_inductance_completes_with_result)
+{
+    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
+        .testVoltagePercent = hal::Percent{ 15 },
+        .settleTime = std::chrono::milliseconds{ 100 },
+        .windingConfig = services::WindingConfiguration::Wye,
+        .injectionFrequency = hal::Hertz{ 700 },
+        .injectionVoltagePercent = hal::Percent{ 15 },
+        .warmupPeriods = 2,
+        .measurementPeriods = 5,
+        .voltageToCurrentDelaySamples = 1
+    };
+
+    bool doneCalled = false;
+    services::ElectricalParametersIdentification::ResistanceInductanceResult capturedResult{};
+
+    // Resistance phase: first PhaseCurrentsReady (no-op), then after settle: second (measurement)
+    // Inductance phase: third PhaseCurrentsReady (for sinusoidal injection)
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return())
+        .WillOnce([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            })
+        .WillOnce([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_)).Times(::testing::AnyNumber());
+    EXPECT_CALL(driverMock, Stop()).Times(::testing::AnyNumber());
+
+    identification.EstimateResistanceAndInductance(config, [&](auto result)
+        {
+            doneCalled = true;
+            capturedResult = result;
+        });
+
+    ForwardTime(std::chrono::milliseconds{ 100 });
+
+    // Feed positive current to get a valid resistance measurement
+    for (std::size_t i = 0; i < numberOfSamples; ++i)
+        driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+            foc::Ampere{ 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    // Inductance phase: feed enough samples to complete (warmup + measurement periods * samplesPerPeriod)
+    const float fInj = static_cast<float>(config.injectionFrequency.Value());
+    const std::size_t samplesPerPeriod = static_cast<std::size_t>(std::round(10000.0f / fInj));
+    const std::size_t totalInductanceSamples = (config.warmupPeriods + config.measurementPeriods) * samplesPerPeriod;
+
+    for (std::size_t i = 0; i < totalInductanceSamples; ++i)
+        driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+            foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    ASSERT_TRUE(doneCalled);
+    EXPECT_TRUE(capturedResult.resistance.has_value());
+}
+
+TEST_F(ElectricalParametersIdentificationTest, estimate_rl_allows_second_call_after_first_completes)
+{
+    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
+        hal::Percent{ 15 }, std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
+    };
+
+    std::size_t callCount = 0;
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return())
+        .WillOnce([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            })
+        .WillOnce(::testing::Return());
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_)).Times(::testing::AnyNumber());
+    EXPECT_CALL(driverMock, Stop()).Times(::testing::AnyNumber());
+
+    // First estimation
+    identification.EstimateResistanceAndInductance(config, [&](auto)
+        {
+            ++callCount;
+        });
+    ForwardTime(std::chrono::milliseconds{ 100 });
+    for (std::size_t i = 0; i < numberOfSamples; ++i)
+        driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+            foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    ASSERT_EQ(callCount, 1u);
+
+    // Second call after first completed (rlRunning is now false)
+    bool secondCalled = false;
+    identification.EstimateResistanceAndInductance(config, [&](auto)
+        {
+            secondCalled = true;
+        });
+
+    EXPECT_FALSE(secondCalled);
+}
