@@ -52,16 +52,26 @@ namespace application
         bool IsAdcBufferPopulated() const;
         void RunFocSimulation(foc::PhaseCurrents input, foc::Radians angle);
 
+        struct IdentificationState
+        {
+            IdentificationState(drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder, foc::Volts vdc)
+                : electricalIdent{ driver, encoder, vdc }
+                , alignment{ driver, encoder }
+            {}
+
+            services::ElectricalParametersIdentificationImpl electricalIdent;
+            services::MotorAlignmentImpl alignment;
+            bool identRunning{ false };
+            bool alignRunning{ false };
+        };
+
     private:
         const infra::BoundedVector<infra::BoundedConstString>::WithMaxSize<5> acceptedAdcValues{ { "shortest", "shorter", "medium", "longer", "longest" } };
 
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
         application::PlatformFactory& hardware;
-        services::ElectricalParametersIdentificationImpl electricalIdent;
-        services::MotorAlignmentImpl alignment;
-        bool identRunning{ false };
-        bool alignRunning{ false };
+        IdentificationState identState;
         hal::Hertz currentPwmFrequency_{ 10000 };
         std::chrono::nanoseconds currentPwmDeadTime_{ 500 };
         PlatformFactory::SampleAndHold currentSah_{ PlatformFactory::SampleAndHold::shortest };
@@ -77,6 +87,5 @@ namespace application
         foc::SpeedCascade foc;
         hal::Eeprom& eeprom;
         std::array<uint8_t, 64> eepromBuffer{};
-        uint32_t eepromCurrentReadSize{ 0 };
     };
 }

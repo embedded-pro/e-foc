@@ -80,13 +80,12 @@ namespace application
         : terminal{ terminal }
         , tracer{ hardware.Tracer() }
         , hardware{ hardware }
+        , identState{ hardware, hardware, hardware.PowerSupplyVoltage() }
         , performanceTimer{ hardware.PerformanceTimer() }
         , Vdc{ hardware.PowerSupplyVoltage() }
         , systemClock{ hardware.SystemClock() }
         , foc{ hardware.MaxCurrentSupported(), hal::Hertz{ 1000 }, hardware.LowPriorityInterrupt() }
         , eeprom{ hardware.Eeprom() }
-        , electricalIdent{ hardware, hardware, hardware.PowerSupplyVoltage() }
-        , alignment{ hardware, hardware }
     {
         terminal.AddCommand({ { "enc", "e", "Read encoder. stop. Ex: enc" },
             [this](const auto&)
@@ -604,10 +603,10 @@ namespace application
             return;
         }
 
-        eepromCurrentReadSize = *size;
-        eeprom.ReadBuffer(infra::ByteRange{ eepromBuffer.data(), eepromBuffer.data() + eepromCurrentReadSize }, *addr, [this]()
+        const auto readSize = static_cast<std::size_t>(*size);
+        eeprom.ReadBuffer(infra::ByteRange{ eepromBuffer.data(), eepromBuffer.data() + readSize }, *addr, [this, readSize]()
             {
-                for (uint32_t i = 0; i < this->eepromCurrentReadSize; ++i)
+                for (std::size_t i = 0; i < readSize; ++i)
                     this->tracer.Trace() << "  [" << i << "] = " << static_cast<uint32_t>(this->eepromBuffer[i]);
                 this->terminal.ProcessResult({ success });
             });
@@ -658,18 +657,18 @@ namespace application
 
     void TerminalInteractor::RunIdent()
     {
-        if (identRunning)
+        if (identState.identRunning)
         {
             terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "ident already running" });
             return;
         }
-        identRunning = true;
+        identState.identRunning = true;
         tracer.Trace() << "ident: running R then L estimation...";
 
-        electricalIdent.EstimateResistanceAndInductance({},
+        identState.electricalIdent.EstimateResistanceAndInductance({},
             [this](services::ElectricalParametersIdentification::ResistanceInductanceResult result)
             {
-                identRunning = false;
+                identState.identRunning = false;
                 if (!result.resistance.has_value())
                 {
                     terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "ident: R estimation failed (zero current)" });
@@ -694,18 +693,18 @@ namespace application
             terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "align: set motor poles first (motor <poles>)" });
             return;
         }
-        if (alignRunning)
+        if (identState.alignRunning)
         {
             terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "align already running" });
             return;
         }
-        alignRunning = true;
+        identState.alignRunning = true;
         tracer.Trace() << "align: running...";
 
-        alignment.ForceAlignment(polePairs.value(), {},
+        identState.alignment.ForceAlignment(polePairs.value(), {},
             [this](std::optional<foc::Radians> offset)
             {
-                alignRunning = false;
+                identState.alignRunning = false;
                 if (!offset.has_value())
                 {
                     terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "align: failed (insufficient rotor response)" });

@@ -19,6 +19,7 @@ target_sources(e_foc.services.electrical_system_ident PRIVATE
     ElectricalParametersIdentificationImpl.cpp
     ElectricalParametersIdentificationImpl.hpp
     ElectricalParametersIdentification.hpp
+    NormalizedDutyCycles.hpp
     RealTimeResistanceAndInductanceEstimator.cpp
     RealTimeResistanceAndInductanceEstimator.hpp
     ResistanceEstimator.cpp

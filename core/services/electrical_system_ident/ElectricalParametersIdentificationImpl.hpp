@@ -7,6 +7,7 @@
 #include "core/services/electrical_system_ident/SinusoidalInductanceEstimator.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/AutoResetFunction.hpp"
+#include <numbers>
 
 namespace services
 {
@@ -20,13 +21,14 @@ namespace services
         void EstimateNumberOfPolePairs(const PolePairsConfig& config, const infra::Function<void(std::optional<std::size_t>)>& onDone) override;
 
     private:
+        void OnResistanceDone(ResistanceEstimator::Result result);
         void RunPolePairLogic();
         void ApplyNextElectricalAngle();
         void CalculatePolePairs();
 
-        static constexpr float twoPi = 2.0f * 3.14159265358979323846f;
+        static constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
         static constexpr std::size_t stepsPerRevolution = 12;
-        static constexpr float minRotationThreshold = 3.14159265358979323846f / 2.0f;
+        static constexpr float minRotationThreshold = std::numbers::pi_v<float> / 2.0f;
 
         drivers::ThreePhaseInverter& driver;
         drivers::Encoder& encoder;

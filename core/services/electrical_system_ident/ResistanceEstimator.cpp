@@ -78,7 +78,7 @@ namespace services
             return;
         }
 
-        const float appliedDuty = static_cast<float>(activeConfig.testVoltagePercent.Value() - neutralDuty);
+        const auto appliedDuty = static_cast<float>(activeConfig.testVoltagePercent.Value() - neutralDuty);
         const float terminalVoltage = appliedDuty * vdc.Value() / 100.0f;
         const float terminalFactor = activeConfig.windingConfig == WindingConfiguration::Delta
                                          ? deltaTerminalFactor

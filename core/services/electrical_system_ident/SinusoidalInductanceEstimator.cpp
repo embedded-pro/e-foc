@@ -3,6 +3,7 @@
 #endif
 
 #include "core/services/electrical_system_ident/SinusoidalInductanceEstimator.hpp"
+#include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
@@ -12,17 +13,6 @@ namespace
 {
     constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
     const hal::Hertz samplingFrequency{ 10000 };
-
-    foc::PhasePwmDutyCycles NormalizedDutyCycles(foc::ThreePhase voltages)
-    {
-        constexpr float offset = 50.0f;
-        constexpr float scale = 50.0f;
-        return foc::PhasePwmDutyCycles{
-            hal::Percent{ static_cast<uint8_t>(std::clamp(offset + voltages.a * scale, 0.0f, 100.0f)) },
-            hal::Percent{ static_cast<uint8_t>(std::clamp(offset + voltages.b * scale, 0.0f, 100.0f)) },
-            hal::Percent{ static_cast<uint8_t>(std::clamp(offset + voltages.c * scale, 0.0f, 100.0f)) }
-        };
-    }
 }
 
 namespace services
@@ -37,8 +27,8 @@ namespace services
         activeConfig = config;
         this->onDone = onDone;
 
-        const float fs = static_cast<float>(samplingFrequency.Value());
-        const float fInj = static_cast<float>(config.injectionFrequency.Value());
+        const auto fs = static_cast<float>(samplingFrequency.Value());
+        const auto fInj = static_cast<float>(config.injectionFrequency.Value());
 
         // Snap to an integer samples-per-period so the Goertzel bin and the injection are
         // at the same frequency; any mismatch causes spectral leakage that biases Im(Z).
@@ -73,7 +63,7 @@ namespace services
     void SinusoidalInductanceEstimator::OnCurrentSample(foc::PhaseCurrents currents)
     {
         const float vNorm = injectionAmplitude * math::Sin(injectionPhase);
-        driver.ThreePhasePwmOutput(NormalizedDutyCycles(
+        driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ vNorm, 0.0f }, 1.0f, 0.0f)));
 
         injectionPhase += phaseIncrement;
@@ -111,7 +101,7 @@ namespace services
         if (magSquared < 1e-20f)
             return Result{};
 
-        const float N = static_cast<float>(measurementSamples);
+        const auto N = static_cast<float>(measurementSamples);
         const float zImag = -vTerminalAmplitude * N / 2.0f * iRe / magSquared;
 
         const float fitQuality = (sumSquared > 0.0f)

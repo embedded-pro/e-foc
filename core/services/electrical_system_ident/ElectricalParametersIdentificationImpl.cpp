@@ -1,4 +1,5 @@
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
+#include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include <cmath>
 #include <numbers>
@@ -10,18 +11,6 @@ namespace
     constexpr float anglePerStep = twoPi / static_cast<float>(stepsPerRevolution);
     constexpr float minRotationThreshold = std::numbers::pi_v<float> / 2.0f;
     const hal::Hertz samplingFrequency{ 10000 };
-    const float samplingPeriod = 1.0f / static_cast<float>(10000);
-
-    foc::PhasePwmDutyCycles NormalizedDutyCycles(foc::ThreePhase voltages)
-    {
-        constexpr float offset = 50.0f;
-        constexpr float scale = 50.0f;
-        return foc::PhasePwmDutyCycles{
-            hal::Percent{ static_cast<uint8_t>(std::clamp(offset + voltages.a * scale, 0.0f, 100.0f)) },
-            hal::Percent{ static_cast<uint8_t>(std::clamp(offset + voltages.b * scale, 0.0f, 100.0f)) },
-            hal::Percent{ static_cast<uint8_t>(std::clamp(offset + voltages.c * scale, 0.0f, 100.0f)) }
-        };
-    }
 }
 
 namespace services
@@ -46,39 +35,36 @@ namespace services
         onResistanceAndInductanceDone = onDone;
         pendingResult = ResistanceInductanceResult{};
 
-        ResistanceEstimator::Config rConfig{
-            config.testVoltagePercent,
-            config.settleTime,
-            config.windingConfig
-        };
+        resistanceEstimator.Start(
+            ResistanceEstimator::Config{ config.testVoltagePercent, config.settleTime, config.windingConfig },
+            [this](auto result) { OnResistanceDone(result); });
+    }
 
-        resistanceEstimator.Start(rConfig, [this](ResistanceEstimator::Result rResult)
+    void ElectricalParametersIdentificationImpl::OnResistanceDone(ResistanceEstimator::Result result)
+    {
+        pendingResult.resistance = result.resistance;
+
+        if (!result.resistance.has_value())
+        {
+            rlRunning = false;
+            onResistanceAndInductanceDone(pendingResult);
+            return;
+        }
+
+        inductanceEstimator.Start(
+            SinusoidalInductanceEstimator::Config{
+                rlConfig.injectionFrequency,
+                rlConfig.injectionVoltagePercent,
+                rlConfig.warmupPeriods,
+                rlConfig.measurementPeriods,
+                rlConfig.voltageToCurrentDelaySamples,
+                rlConfig.windingConfig },
+            [this](SinusoidalInductanceEstimator::Result lResult)
             {
-                pendingResult.resistance = rResult.resistance;
-
-                if (!rResult.resistance.has_value())
-                {
-                    rlRunning = false;
-                    onResistanceAndInductanceDone(pendingResult);
-                    return;
-                }
-
-                SinusoidalInductanceEstimator::Config lConfig{
-                    rlConfig.injectionFrequency,
-                    rlConfig.injectionVoltagePercent,
-                    rlConfig.warmupPeriods,
-                    rlConfig.measurementPeriods,
-                    rlConfig.voltageToCurrentDelaySamples,
-                    rlConfig.windingConfig
-                };
-
-                inductanceEstimator.Start(lConfig, [this](SinusoidalInductanceEstimator::Result lResult)
-                    {
-                        pendingResult.inductance = lResult.inductance;
-                        pendingResult.fitQuality = lResult.fitQuality;
-                        rlRunning = false;
-                        onResistanceAndInductanceDone(pendingResult);
-                    });
+                pendingResult.inductance = lResult.inductance;
+                pendingResult.fitQuality = lResult.fitQuality;
+                rlRunning = false;
+                onResistanceAndInductanceDone(pendingResult);
             });
     }
 
@@ -104,7 +90,7 @@ namespace services
 
     void ElectricalParametersIdentificationImpl::ApplyNextElectricalAngle()
     {
-        const std::size_t totalSteps = polePairsConfig.electricalRevolutions * stepsPerRevolution;
+        const auto totalSteps = polePairsConfig.electricalRevolutions * stepsPerRevolution;
 
         if (currentSampleIndex < totalSteps)
             RunPolePairLogic();
@@ -117,7 +103,7 @@ namespace services
         const float electricalAngle = static_cast<float>(currentSampleIndex) * anglePerStep;
         const float voltage = static_cast<float>(polePairsConfig.testVoltagePercent.Value()) / 100.0f;
 
-        driver.ThreePhasePwmOutput(NormalizedDutyCycles(
+        driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, std::cos(electricalAngle), std::sin(electricalAngle))));
 
         settleTimer.Start(polePairsConfig.settleTimeBetweenSteps, [this]()
@@ -145,7 +131,7 @@ namespace services
 
         if (mechanicalRotation > minRotationThreshold)
         {
-            const float electricalRevolutions = static_cast<float>(polePairsConfig.electricalRevolutions);
+            const auto electricalRevolutions = static_cast<float>(polePairsConfig.electricalRevolutions);
             const float mechanicalRevolutions = mechanicalRotation / twoPi;
             onPolePairsDone(std::make_optional<std::size_t>(
                 static_cast<std::size_t>(std::round(electricalRevolutions / mechanicalRevolutions))));
