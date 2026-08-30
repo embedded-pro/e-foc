@@ -11,7 +11,7 @@ namespace services
     public:
         MOCK_METHOD(void, EstimateResistanceAndInductance,
             (const ResistanceAndInductanceConfig& config,
-                const infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)>& onDone),
+                const infra::Function<void(ResistanceInductanceResult)>& onDone),
             (override));
         MOCK_METHOD(void, EstimateNumberOfPolePairs,
             (const PolePairsConfig& config,

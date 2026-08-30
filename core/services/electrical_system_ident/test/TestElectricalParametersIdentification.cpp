@@ -46,199 +46,7 @@ namespace
     };
 }
 
-TEST_F(ElectricalParametersIdentificationTest, estimate_resistance_and_inductance_starts_with_neutral_duty_and_settles)
-{
-    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
-        hal::Percent{ 15 },
-        std::chrono::seconds{ 1 },
-        services::WindingConfiguration::Wye
-    };
 
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, ::testing::_));
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(foc::PhasePwmDutyCycles{
-                                hal::Percent{ 1 },
-                                hal::Percent{ 1 },
-                                hal::Percent{ 1 } })));
-
-    identification.EstimateResistanceAndInductance(config, [](auto, auto) {});
-}
-
-TEST_F(ElectricalParametersIdentificationTest, estimate_resistance_and_inductance_applies_test_voltage_after_settle_time)
-{
-    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
-        hal::Percent{ 20 },
-        std::chrono::milliseconds{ 100 },
-        services::WindingConfiguration::Wye
-    };
-
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_))
-        .Times(2)
-        .WillRepeatedly([this](auto, const auto& callback)
-            {
-                driverMock.StorePhaseCurrentsCallback(callback);
-            });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(foc::PhasePwmDutyCycles{
-                                hal::Percent{ 1 },
-                                hal::Percent{ 1 },
-                                hal::Percent{ 1 } })));
-
-    identification.EstimateResistanceAndInductance(config, [](auto, auto) {});
-
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(foc::PhasePwmDutyCycles{
-                                hal::Percent{ 20 },
-                                hal::Percent{ 1 },
-                                hal::Percent{ 1 } })));
-
-    ForwardTime(std::chrono::milliseconds{ 100 });
-}
-
-TEST_F(ElectricalParametersIdentificationTest, estimate_resistance_and_inductance_collects_current_samples_and_calculates_parameters)
-{
-    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
-        hal::Percent{ 15 },
-        std::chrono::milliseconds{ 50 },
-        services::WindingConfiguration::Wye
-    };
-
-    // The stimulus drives phase A against B and C held at the neutral duty, so the simulated circuit is
-    // the terminal one: R + R/2 for a wye motor. The service must report the per-phase values.
-    float testVoltage = 0.14f * vdc.Value();
-    float terminalResistance = 1.5f;
-    float terminalInductance = 0.002f;
-    float resistance = terminalResistance / 1.5f;
-    float inductance = terminalInductance / 1.5f;
-
-    std::optional<foc::Ohm> resultResistance;
-    std::optional<foc::MilliHenry> resultInductance;
-
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_))
-        .Times(2)
-        .WillRepeatedly([this](auto, const auto& callback)
-            {
-                driverMock.StorePhaseCurrentsCallback(callback);
-            });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_))
-        .Times(2);
-
-    identification.EstimateResistanceAndInductance(config, [&](auto r, auto l)
-        {
-            resultResistance = r;
-            resultInductance = l;
-        });
-
-    ForwardTime(std::chrono::milliseconds{ 50 });
-
-    EXPECT_CALL(driverMock, Stop());
-
-    for (std::size_t i = 0; i < numberOfSamples; ++i)
-    {
-        float time = static_cast<float>(i) * 0.0001f;
-        float current = SimulateRLModelCurrent(testVoltage, terminalResistance, terminalInductance, time);
-        driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
-            foc::Ampere{ current },
-            foc::Ampere{ 0.0f },
-            foc::Ampere{ 0.0f } });
-    }
-
-    ASSERT_TRUE(resultResistance.has_value());
-    ASSERT_TRUE(resultInductance.has_value());
-    EXPECT_NEAR(resultResistance->Value(), resistance, 0.1f);
-    EXPECT_NEAR(resultInductance->Value(), inductance * 1000.0f, 1.0f);
-}
-
-TEST_F(ElectricalParametersIdentificationTest, estimate_resistance_and_inductance_returns_nullopt_for_zero_current)
-{
-    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
-        hal::Percent{ 10 },
-        std::chrono::milliseconds{ 50 },
-        services::WindingConfiguration::Wye
-    };
-
-    std::optional<foc::Ohm> resultResistance;
-    std::optional<foc::MilliHenry> resultInductance;
-
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_))
-        .Times(2)
-        .WillRepeatedly([this](auto, const auto& callback)
-            {
-                driverMock.StorePhaseCurrentsCallback(callback);
-            });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_))
-        .Times(2);
-
-    identification.EstimateResistanceAndInductance(config, [&](auto r, auto l)
-        {
-            resultResistance = r;
-            resultInductance = l;
-        });
-
-    ForwardTime(std::chrono::milliseconds{ 50 });
-
-    EXPECT_CALL(driverMock, Stop());
-
-    for (std::size_t i = 0; i < numberOfSamples; ++i)
-    {
-        driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
-            foc::Ampere{ 0.0f },
-            foc::Ampere{ 0.0f },
-            foc::Ampere{ 0.0f } });
-    }
-
-    EXPECT_FALSE(resultResistance.has_value());
-    EXPECT_FALSE(resultInductance.has_value());
-}
-
-TEST_F(ElectricalParametersIdentificationTest, estimate_resistance_and_inductance_with_low_resistance_motor)
-{
-    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
-        hal::Percent{ 15 },
-        std::chrono::milliseconds{ 50 },
-        services::WindingConfiguration::Wye
-    };
-
-    float testVoltage = 0.14f * 24.0f;
-    float terminalResistance = 0.5f;
-    float terminalInductance = 0.001f;
-    float resistance = terminalResistance / 1.5f;
-    float inductance = terminalInductance / 1.5f;
-
-    std::optional<foc::Ohm> resultResistance;
-    std::optional<foc::MilliHenry> resultInductance;
-
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_))
-        .Times(2)
-        .WillRepeatedly([this](auto, const auto& callback)
-            {
-                driverMock.StorePhaseCurrentsCallback(callback);
-            });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_))
-        .Times(2);
-
-    identification.EstimateResistanceAndInductance(config, [&](auto r, auto l)
-        {
-            resultResistance = r;
-            resultInductance = l;
-        });
-
-    ForwardTime(std::chrono::milliseconds{ 50 });
-
-    EXPECT_CALL(driverMock, Stop());
-
-    for (std::size_t i = 0; i < numberOfSamples; ++i)
-    {
-        float time = static_cast<float>(i) * 0.0001f;
-        float current = SimulateRLModelCurrent(testVoltage, terminalResistance, terminalInductance, time);
-        driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
-            foc::Ampere{ current },
-            foc::Ampere{ 0.0f },
-            foc::Ampere{ 0.0f } });
-    }
-
-    ASSERT_TRUE(resultResistance.has_value());
-    ASSERT_TRUE(resultInductance.has_value());
-    EXPECT_NEAR(resultResistance->Value(), resistance, 0.15f);
-    EXPECT_NEAR(resultInductance->Value(), inductance * 1000.0f, 0.5f);
-}
 
 TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_initializes_encoder_and_applies_voltages)
 {
@@ -408,24 +216,27 @@ TEST_F(ElectricalParametersIdentificationTest, concurrent_rl_estimate_is_rejecte
         hal::Percent{ 15 }, std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
     };
 
-    struct RlResult { bool called = false; std::optional<foc::Ohm> r; std::optional<foc::MilliHenry> l; } second;
+    struct RlResult
+    {
+        bool called = false;
+        services::ElectricalParametersIdentification::ResistanceInductanceResult result{};
+    } second;
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_));
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_));
 
-    identification.EstimateResistanceAndInductance(config, [](auto, auto) {});
+    identification.EstimateResistanceAndInductance(config, [](services::ElectricalParametersIdentification::ResistanceInductanceResult) {});
 
     // Second call while first is in-flight must return immediately with nullopt
-    identification.EstimateResistanceAndInductance(config, [&second](auto r, auto l)
+    identification.EstimateResistanceAndInductance(config, [&second](services::ElectricalParametersIdentification::ResistanceInductanceResult r)
         {
             second.called = true;
-            second.r = r;
-            second.l = l;
+            second.result = r;
         });
 
     EXPECT_TRUE(second.called);
-    EXPECT_FALSE(second.r.has_value());
-    EXPECT_FALSE(second.l.has_value());
+    EXPECT_FALSE(second.result.resistance.has_value());
+    EXPECT_FALSE(second.result.inductance.has_value());
 }
 
 TEST_F(ElectricalParametersIdentificationTest, concurrent_pole_pairs_estimate_is_rejected_immediately)

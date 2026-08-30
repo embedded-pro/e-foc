@@ -185,17 +185,17 @@ namespace can
         pendingElectricalIdentDoneCallback = onDone;
 
         electricalIdent.EstimateResistanceAndInductance({},
-            [this](std::optional<foc::Ohm> r, std::optional<foc::MilliHenry> l)
+            [this](services::ElectricalParametersIdentification::ResistanceInductanceResult result)
             {
-                if (!r.has_value() || !l.has_value())
+                if (!result.resistance.has_value() || !result.inductance.has_value())
                 {
                     pendingElectricalIdentDoneCallback = nullptr;
                     server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::calibrationFailed);
                     return;
                 }
 
-                pendingElectricalR = r;
-                pendingElectricalL = l;
+                pendingElectricalR = result.resistance;
+                pendingElectricalL = result.inductance;
 
                 electricalIdent.EstimateNumberOfPolePairs({},
                     [this](std::optional<std::size_t> polePairs)

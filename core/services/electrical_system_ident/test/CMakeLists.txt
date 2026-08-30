@@ -5,6 +5,7 @@ emil_add_test(e_foc.services.electrical_system_ident_test)
 target_link_libraries(e_foc.services.electrical_system_ident_test PUBLIC
     gmock_main
     e_foc.services.electrical_system_ident
+    e_foc.foc.current_loop
     hal.interfaces_test_doubles
     infra.timer_test_helper
     infra.event_test_helper
@@ -13,6 +14,7 @@ target_link_libraries(e_foc.services.electrical_system_ident_test PUBLIC
 
 target_sources(e_foc.services.electrical_system_ident_test PRIVATE
     TestElectricalParametersIdentification.cpp
-    TestTerminalElectricalParametersIdentification.cpp
     TestRealTimeResistanceAndInductanceEstimator.cpp
+    TestResistanceEstimator.cpp
+    TestSinusoidalInductanceEstimator.cpp
 )

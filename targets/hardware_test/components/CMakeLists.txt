@@ -11,6 +11,8 @@ target_link_libraries(e_foc.hardware_test.components PUBLIC
     services.util
     services.tracer
     e_foc.foc.cascade
+    e_foc.services.electrical_system_ident
+    e_foc.services.alignment
 )
 
 target_sources(e_foc.hardware_test.components PRIVATE

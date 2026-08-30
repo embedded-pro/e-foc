@@ -1,5 +1,7 @@
 #include "targets/hardware_test/components/Terminal.hpp"
 #include "core/foc/interfaces/Signals.hpp"
+#include "core/services/alignment/MotorAlignment.hpp"
+#include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "hal/interfaces/Pwm.hpp"
 #include "infra/stream/StringInputStream.hpp"
 #include "infra/stream/StringOutputStream.hpp"
@@ -83,6 +85,8 @@ namespace application
         , systemClock{ hardware.SystemClock() }
         , foc{ hardware.MaxCurrentSupported(), hal::Hertz{ 1000 }, hardware.LowPriorityInterrupt() }
         , eeprom{ hardware.Eeprom() }
+        , electricalIdent{ hardware, hardware, hardware.PowerSupplyVoltage() }
+        , alignment{ hardware, hardware }
     {
         terminal.AddCommand({ { "enc", "e", "Read encoder. stop. Ex: enc" },
             [this](const auto&)
@@ -196,6 +200,18 @@ namespace application
             [this](const auto&)
             {
                 this->terminal.ProcessResult(ForceHardfault());
+            } });
+
+        terminal.AddCommand({ { "ident", "i", "Estimate R and L. Uses pole pairs set by 'motor'. Ex: ident" },
+            [this](const auto&)
+            {
+                RunIdent();
+            } });
+
+        terminal.AddCommand({ { "align", "al", "Estimate encoder offset. Requires 'motor' set first. Ex: align" },
+            [this](const auto&)
+            {
+                RunAlign();
             } });
 
         hardware.SetEncoderResolution(4000);
@@ -638,5 +654,65 @@ namespace application
         void (*nullFunc)() = nullptr;
         nullFunc(); // NOSONAR — intentional null dereference to trigger HardFault for error handler validation
         return { services::TerminalWithStorage::Status::success };
+    }
+
+    void TerminalInteractor::RunIdent()
+    {
+        if (identRunning)
+        {
+            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "ident already running" });
+            return;
+        }
+        identRunning = true;
+        tracer.Trace() << "ident: running R then L estimation...";
+
+        electricalIdent.EstimateResistanceAndInductance({},
+            [this](services::ElectricalParametersIdentification::ResistanceInductanceResult result)
+            {
+                identRunning = false;
+                if (!result.resistance.has_value())
+                {
+                    terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "ident: R estimation failed (zero current)" });
+                    return;
+                }
+                if (!result.inductance.has_value())
+                {
+                    terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "ident: L estimation failed" });
+                    return;
+                }
+                tracer.Trace() << "R: " << result.resistance->Value() << " ohm";
+                tracer.Trace() << "L: " << result.inductance->Value() << " mH";
+                tracer.Trace() << "fitQuality: " << result.fitQuality;
+                terminal.ProcessResult({ services::TerminalWithStorage::Status::success });
+            });
+    }
+
+    void TerminalInteractor::RunAlign()
+    {
+        if (!polePairs.has_value() || polePairs.value() == 0)
+        {
+            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "align: set motor poles first (motor <poles>)" });
+            return;
+        }
+        if (alignRunning)
+        {
+            terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "align already running" });
+            return;
+        }
+        alignRunning = true;
+        tracer.Trace() << "align: running...";
+
+        alignment.ForceAlignment(polePairs.value(), {},
+            [this](std::optional<foc::Radians> offset)
+            {
+                alignRunning = false;
+                if (!offset.has_value())
+                {
+                    terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "align: failed (insufficient rotor response)" });
+                    return;
+                }
+                tracer.Trace() << "encoder offset: " << offset->Value() << " rad";
+                terminal.ProcessResult({ services::TerminalWithStorage::Status::success });
+            });
     }
 }

@@ -2,9 +2,9 @@
 title: "Service: Electrical Parameters Identification"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: service-electrical-ident
-date: 2026-04-07
+date: 2026-08-30
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-04-07
 | Title     | Service: Electrical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.1.0                                         |
+| Version   | 0.2.0                                         |
 | Component | service-electrical-ident                      |
-| Date      | 2026-04-07                                    |
+| Date      | 2026-08-30                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -29,137 +29,168 @@ date: 2026-04-07
 ## Responsibilities
 
 **Is responsible for:**
-- Automatically measuring phase resistance (R), d-axis inductance (Ld), and q-axis inductance (Lq) without external instruments, using a DC voltage injection technique followed by a transient step response
-- Estimating the motor's number of pole pairs by rotating an open-loop voltage vector through multiple full electrical revolutions and comparing the total electrical angle swept with the total encoder mechanical angle swept
-- Protecting against heap allocation by using bounded containers for all internal buffers
-- Delivering results exactly once per initiated procedure via a completion callback containing typed physical quantities (Ohm, MilliHenry, or size_t)
-- Enforcing that the two procedures (resistance/inductance and pole pairs) cannot run concurrently
+- Measuring phase resistance ($R_s$) via DC voltage step using `ResistanceEstimator`
+- Measuring d-axis inductance ($L_s$) via HF sinusoidal injection using `SinusoidalInductanceEstimator`
+- Estimating the number of pole pairs by rotating an open-loop voltage vector and comparing electrical angle to mechanical encoder angle
+- Delivering a combined `ResistanceInductanceResult` — resistance, inductance, and fit quality — via a single completion callback once both sub-estimators finish
+- Enforcing that R/L identification and pole-pairs estimation cannot run concurrently
 - Stopping the inverter cleanly before invoking any completion callback
+- Rejecting calibration when `fitQuality < 0.5` (incoherent injection response)
 
 **Is NOT responsible for:**
-- Persisting the identified parameters — the caller decides what to do with the results
-- Encoder zero-offset calibration — that is performed by the Motor Alignment service
+- Persisting identified parameters — the caller decides what to do with results
+- Encoder zero-offset calibration — that is the Motor Alignment service
 - Performing any closed-loop current control — all voltage application is open-loop
 - Running concurrently with the normal FOC loop — the FOC loop must be stopped before either procedure begins
 
 ---
 
+## Architecture
+
+The R/L estimation is split across three cooperating components:
+
+```mermaid
+graph TD
+    A[ElectricalParametersIdentification interface] --> B[ElectricalParametersIdentificationImpl\norchestrator]
+    B --> C[ResistanceEstimator\nDC step → R]
+    B --> D[SinusoidalInductanceEstimator\nGoertzel injection → L]
+    B --> E[Pole-pairs sweep logic\nencoder-based]
+```
+
+`ResistanceEstimator` and `SinusoidalInductanceEstimator` are standalone components; the orchestrator
+calls them sequentially and assembles their results into a single `ResistanceInductanceResult`.
+Application code (hardware test terminal, etc.) may also call these components directly.
+
+---
+
 ## Component Details
 
-### Procedure 1 — Resistance and Inductance Estimation
+### ResistanceEstimator
 
-This procedure uses two distinct phases — a DC settle phase and a transient sampling phase — each triggered by ADC callbacks from the inverter without busy-waiting.
+Applies a DC differential voltage across phase A versus phases B and C held at neutral. A
+`TimerSingleShot` fires after the configured settle time to allow the current to reach steady state.
+A 5-sample moving-average filter (using a bounded deque of capacity 5) is applied in-flight to each
+ADC sample before it is pushed to the measurement buffer (bounded vector, capacity 123).
 
-#### Phase 1a: DC Settle and Resistance Measurement
-
-A known DC voltage is applied to the d-axis of the motor (q-axis voltage = 0, electrical angle = 0°) at a level configured by the caller. A `TimerSingleShot` fires after the configured settle time (default 2 s) to allow transients to decay and the phase current to reach its steady-state value.
-
-At the end of the settle period, the steady-state phase current is captured from the ADC. Because the motor is stationary and the current is DC, the only impedance in the circuit is the winding resistance:
-
-```text
-R = V_applied / I_steady_state
-```
-
-The result is stored internally. If the measured current is zero or below a noise floor, the procedure fails immediately and the callback is invoked with absent values.
-
-#### Phase 1b: Inductance Estimation via Transient Step Response
-
-Immediately after the DC settle phase, an additional voltage step is applied and the current transient is sampled. Each ADC callback appends one sample to an `infra::BoundedVector` (capacity 128). A 5-sample moving-average (using an `infra::BoundedDeque` of capacity 5) is applied in-flight to each incoming sample before storage, reducing high-frequency noise on the measurement.
-
-Once the buffer is full, the inductance is derived from the first-order step-response approximation:
-
-```text
-L = V_step × Δt / ΔI
-```
-
-where Δt is the total sampling interval and ΔI is the change in current over that interval. This single-time-constant model is accurate for unsaturated surface PMSM windings.
-
-For surface PMSM, Lq ≈ Ld, so both values are reported as the same measured inductance. For interior PMSM, the approximation introduces an error that must be accepted or corrected by the caller.
-
-```mermaid
-sequenceDiagram
-    participant Caller
-    participant Service
-    participant Inverter
-    participant Timer
-
-    Caller->>Service: EstimateResistanceAndInductance(config, onDone)
-    Service->>Inverter: apply Vd=test_voltage, Vq=0
-    Service->>Timer: start settle timer (2 s)
-    Timer-->>Service: settled
-    Service->>Inverter: read steady-state current → compute R
-    Service->>Inverter: apply voltage step, start sampling
-    loop 128 samples
-        Inverter-->>Service: ADC callback → filter → buffer
-    end
-    Service->>Inverter: stop
-    Service-->>Caller: onDone(R, L)
-```
-
-#### Error Conditions
-
-If the settle timer expires but the ADC current reading is below the noise floor, the procedure fails (both output values absent). If the sample buffer fills but the current change is too small to yield a sensible inductance (e.g., ΔI < noise floor), the inductance is reported absent while resistance may still be valid.
-
-### Procedure 2 — Pole Pairs Estimation
-
-This procedure determines the number of electrical pole pairs by sweeping a rotating open-loop voltage vector through a configurable number of full electrical revolutions and comparing the total electrical angle swept to the total mechanical angle measured by the encoder.
-
-#### Rotation Sweep
-
-Starting at electrical angle 0°, the service advances the voltage vector by a small angular increment each ADC callback. The step size and number of revolutions are derived from the caller-supplied configuration. After each step, the encoder is read and the mechanical displacement is accumulated.
-
-Over N full electrical revolutions, the total electrical angle advanced is 2π × N. The total mechanical angle swept by the encoder is measured by summing the (wrap-compensated) angular increments over all steps.
-
-The pole pairs are then:
-
-```text
-P = round( total_electrical_angle / total_mechanical_angle )
-```
-
-Rounding to the nearest integer provides the final integer result. If the computed ratio is outside a plausible range (e.g., below 1 or above a configurable maximum), the result is absent.
-
-#### Settlement Between Steps
-
-A configurable settle time can be inserted between incremental voltage steps to allow the rotor to follow the stator field before the next encoder sample is taken. This prevents accumulated leading error due to inertia.
-
-```mermaid
-flowchart TD
-    START["Start: θe = 0°, Δθm_total = 0"] --> STEP["Advance θe by Δθ\napply open-loop voltage"]
-    STEP --> SETTLE["Wait settle_time\n(TimerSingleShot)"]
-    SETTLE --> READ["Read encoder\naccumulate Δθm_total"]
-    READ --> CHECK{"All electrical\nrevolutions complete?"}
-    CHECK -->|No| STEP
-    CHECK -->|Yes| CALC["P = round(2πN / Δθm_total)"]
-    CALC --> VALID{"P in valid\nrange?"}
-    VALID -->|Yes| CB_OK["onDone(P)"]
-    VALID -->|No| CB_FAIL["onDone(nullopt)"]
-```
-
-### Internal Buffer Constraints
-
-All internal state is statically allocated:
-
-| Buffer                | Container              | Capacity    | Purpose                                                     |
-|-----------------------|------------------------|-------------|-------------------------------------------------------------|
-| Current samples       | `infra::BoundedVector` | 128 entries | Stores filtered current transient for inductance estimation |
-| Moving-average window | `infra::BoundedDeque`  | 5 entries   | Rolling window for in-flight noise reduction on ADC samples |
-
-No heap allocation is used. Buffers are members of the service object and are reused across repeated procedure invocations.
-
-### Concurrency Invariant
-
-The two procedures are independent state machines. Neither may be started while the other is in the Running state. An attempt to start one while the other is already Running causes the new request to be rejected (callback invoked immediately with absent values). The two state machines share no mutable state beyond the inverter and encoder references.
-
-### State Machine (Both Procedures)
+When the buffer is full, the steady-state current is read from the mean of the last 10 % of the
+buffer. Resistance is computed as $V_{step} / I_{ss}$ divided by the winding topology factor. If
+$I_{ss} \leq 0$, the result is absent.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
-    Idle --> Running : procedure initiated
-    Running --> Complete : all samples captured,\nresult computed
-    Running --> Failed : noise floor violation\nor timeout
-    Complete --> Idle : onDone fired
-    Failed --> Idle : onDone(nullopt) fired
+    Idle --> Settling : Start(config, onDone)
+    Settling --> Measuring : settle timer fires
+    Measuring --> Done : buffer full, I_ss > 0
+    Measuring --> Fault : I_ss ≤ 0
+    Done --> Idle : onDone({resistance}) fired
+    Fault --> Idle : onDone({nullopt}) fired
+```
+
+**Internal buffers:**
+
+| Buffer            | Capacity  | Purpose                                     |
+|-------------------|-----------|---------------------------------------------|
+| Moving-avg window | 5 samples | In-flight noise reduction on ADC input      |
+| Measurement store | 123 samples | Filtered step-response for steady-state read |
+
+---
+
+### SinusoidalInductanceEstimator
+
+Injects a sinusoidal voltage on the alpha axis only (beta = 0), keeping net electromagnetic torque
+at zero so the rotor remains stationary. The injection frequency is snapped to the nearest
+integer-samples-per-period to align exactly with the Goertzel analysis bin, eliminating spectral
+leakage.
+
+Two phases run consecutively:
+
+1. **Warmup** — voltage is injected but the Goertzel is not fed. Allows the current transient to
+   decay and the steady-state sinusoidal response to establish. Duration: `warmupPeriods` full
+   injection cycles.
+
+2. **Measurement** — the Goertzel accumulates `measurementPeriods` full cycles of current samples
+   (block size $N = N_{periods} \times N_{spp}$, bin $k = N_{periods}$). When `Ready()`, the
+   complex result is delay-corrected (rotation by $e^{+j\omega d T_s}$ to cancel the $d$-sample
+   ADC pipeline lag), then converted to $\text{Im}(Z)$ and finally to per-phase inductance.
+
+The coherence metric `fitQuality = 2|I_{Goertzel}|² / (N · \Sigma i²)` is computed simultaneously
+from the accumulated current power. It equals 1.0 for a pure sinusoid at $f_{inj}$ and falls toward
+zero with increasing noise or rotor motion.
+
+**Working memory (streaming — no sample buffer required):**
+
+| Variable       | Size    | Purpose                            |
+|----------------|---------|------------------------------------|
+| Goertzel state | 3 float | $s_1$, $s_2$, sample count        |
+| sumSquared     | 1 float | Accumulates $\Sigma i^2$ for fitQuality |
+| sampleCount    | 1 int   | Warmup/measurement gate            |
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Warmup : Start(config, onDone)
+    Warmup --> Measuring : warmupPeriods complete
+    Measuring --> Done : Goertzel ready, L > 0
+    Measuring --> Fault : L ≤ 0 or noise floor
+    Done --> Idle : onDone({inductance, fitQuality}) fired
+    Fault --> Idle : onDone({nullopt, fitQuality}) fired
+```
+
+---
+
+### ElectricalParametersIdentificationImpl (orchestrator)
+
+Sequences `ResistanceEstimator` then `SinusoidalInductanceEstimator` and assembles their results
+into a single `ResistanceInductanceResult`. If resistance estimation fails (absent result), the L
+stage is skipped and the combined callback fires immediately with an absent result. If the L stage
+yields `fitQuality < 0.5`, the orchestrator treats this as a fault and includes the low-quality
+result so the caller can make its own policy decision.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> DCSettle : EstimateResistanceAndInductance called
+    DCSettle --> DCMeasure : settle timer fires
+    DCMeasure --> SinWarmup : R computed, I_ss > 0
+    DCMeasure --> Fault : I_ss = 0
+    SinWarmup --> SinMeasure : warmupPeriods complete
+    SinMeasure --> Done : Goertzel ready
+    Done --> Idle : onDone(ResistanceInductanceResult) fired
+    Fault --> Idle : onDone(ResistanceInductanceResult{absent}) fired
+```
+
+**Concurrent-call invariant:** a second call to `EstimateResistanceAndInductance` while any of the
+five states above is active causes the new request to be rejected immediately (callback fires with an
+absent result). The pole-pairs procedure shares this guard: neither procedure may start while the
+other is active.
+
+---
+
+### Procedure 2 — Pole Pairs Estimation
+
+Starting at electrical angle 0°, the service advances the voltage vector by a small angular
+increment each settle-timer tick. After each step, the encoder is read and the mechanical
+displacement is accumulated. Over $N_{rev}$ full electrical revolutions:
+
+$$
+p = \text{round}(2\pi N_{rev} / \Delta\theta_{mech,total})
+$$
+
+If the total mechanical rotation is below $\pi/2$ (rotor not following the field), the result is
+absent.
+
+```mermaid
+flowchart TD
+    START["θe = 0°, Δθm = 0"] --> STEP["Advance θe by Δθe\napply open-loop voltage"]
+    STEP --> SETTLE["Wait settle_time\n(TimerSingleShot)"]
+    SETTLE --> READ["Read encoder\naccumulate Δθm"]
+    READ --> CHECK{"All electrical\nrevolutions complete?"}
+    CHECK -->|No| STEP
+    CHECK -->|Yes| CALC["p = round(2πN / Δθm)"]
+    CALC --> VALID{"Δθm > π/2?"}
+    VALID -->|Yes| CB_OK["onDone(p)"]
+    VALID -->|No| CB_FAIL["onDone(nullopt)"]
 ```
 
 ---
@@ -168,24 +199,37 @@ stateDiagram-v2
 
 ### Provided
 
-| Interface                                         | Purpose                                                                                           | Contract                                                                                                                                         |
-|---------------------------------------------------|---------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
-| `EstimateResistanceAndInductance(config, onDone)` | Runs the DC settle and transient-step procedure; delivers `(optional<Ohm>, optional<MilliHenry>)` | Rejected (immediate failure callback) if the pole-pairs procedure is already Running; inverter stopped before callback fires; fires exactly once |
-| `EstimateNumberOfPolePairs(config, onDone)`       | Sweeps an open-loop rotating vector and delivers `optional<size_t>` pole pairs                    | Rejected if the R/L procedure is already Running; inverter stopped before callback fires; fires exactly once                                     |
+| Interface                                         | Purpose                                                                                                                    | Contract                                                                                                              |
+|---------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| `EstimateResistanceAndInductance(config, onDone)` | Sequences DC-step R estimation then sinusoidal L estimation; delivers `ResistanceInductanceResult{resistance, inductance, fitQuality}` | Rejected (immediate empty callback) if pole-pairs procedure is already running; inverter stopped before callback fires; fires exactly once |
+| `EstimateNumberOfPolePairs(config, onDone)`       | Sweeps an open-loop rotating vector and delivers `optional<size_t>` pole pairs                                             | Rejected if R/L procedure is already running; inverter stopped before callback fires; fires exactly once              |
+
+### Result Type
+
+`ResistanceInductanceResult` carries:
+
+| Field        | Type                    | Absent when                  |
+|--------------|-------------------------|------------------------------|
+| `resistance` | `optional<Ohm>`         | DC step finds $I_{ss} = 0$   |
+| `inductance` | `optional<MilliHenry>`  | Goertzel yields $L \leq 0$   |
+| `fitQuality` | `float` in $[0, 1]$     | Always present; 0 on failure |
 
 ### Required
 
-| Interface                | Purpose                                                                                                      | Contract                                                         |
-|--------------------------|--------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------|
-| `ThreePhaseInverter`     | Open-loop voltage application during both procedures; source of ADC sampling callbacks                       | Must not be concurrently claimed by any other controller         |
-| `Encoder`                | Reads mechanical angle during pole-pairs sweep to compute accumulated displacement                           | Must be initialised before `EstimateNumberOfPolePairs` is called |
-| DC bus voltage (`Volts`) | Injected at construction; used to normalise applied voltage and interpret current readings in physical units | Must remain stable throughout any active procedure               |
+| Interface                | Purpose                                                        | Contract                                                 |
+|--------------------------|----------------------------------------------------------------|----------------------------------------------------------|
+| `ThreePhaseInverter`     | Voltage application and ADC sampling callbacks for both stages | Must not be concurrently claimed by any other controller |
+| `Encoder`                | Reads mechanical angle during pole-pairs sweep                 | Must be initialised before pole-pairs estimation begins  |
+| DC bus voltage (`Volts`) | Normalises applied voltage and interprets current in physical units | Must remain stable throughout any active procedure  |
 
 ---
 
 ## Online Resistance and Inductance Estimation
 
-In addition to the one-shot calibration procedures above, a continuous online estimator (`RealTimeResistanceAndInductanceEstimator`) runs alongside the closed-loop speed/position controller to track slow parameter drift.
+In addition to the one-shot calibration procedures above, a continuous online estimator
+(`RealTimeResistanceAndInductanceEstimator`) runs alongside the closed-loop speed/position
+controller to track slow parameter drift. See the state machine design document for when online
+estimates are applied.
 
 ### Model
 
@@ -193,22 +237,16 @@ The d-axis voltage equation for a non-salient PMSM is:
 
 $$V_d = R \cdot I_d + L \cdot \left(\frac{dI_d}{dt} - \omega_e \cdot I_q\right)$$
 
-The regressor vector is $\phi = [I_d,\ (dI_d/dt - \omega_e I_q)]^T$, and the parameter vector is $\theta = [R,\ L]^T$. The scalar output is $V_d$. An RLS algorithm with a forgetting factor of 0.998 updates $\theta$ each outer-loop period (1 kHz by default).
-
-**Non-saliency assumption:** The model equates $L_d = L_q = L$. For surface-mounted PMSM (SPMSM) this is accurate. For interior PMSM (IPMSM), separating $L_d$ and $L_q$ requires a 3-parameter model; this is a known limitation of the current design.
+The regressor vector is $\phi = [I_d,\ (dI_d/dt - \omega_e I_q)]^T$, and the parameter vector is
+$\theta = [R,\ L]^T$. An RLS algorithm with forgetting factor 0.998 updates $\theta$ each
+outer-loop period (1 kHz).
 
 ### Persistence-of-Excitation Gate
 
-The RLS update is skipped when the squared regressor norm $|\phi|^2$ falls below $10^{-6}$. This prevents the covariance matrix from growing unbounded when the motor is at standstill or when d-axis excitation is negligible.
+The RLS update is skipped when $|\phi|^2 < 10^{-6}$ to prevent covariance blow-up at standstill.
 
-### Seeding and Warm Start
+### Seeding
 
-When calibration data is loaded (from NVM or after a fresh calibration run), the online estimator is seeded with the identified values $(R_{cal}, L_d^{cal})$. This initialises the RLS coefficient vector to the calibration point rather than zero, avoiding a cold-start transient where estimates are physically meaningless.
-
-### Forgetting Factor
-
-The forgetting factor $\lambda = 0.998$ applies an exponential weight decay to past observations. Older measurements contribute less to the current estimate, allowing the estimator to track gradual parameter changes over the motor lifetime (winding resistance increases with temperature; inductance changes with saturation level).
-
-### Estimate Consumption
-
-Estimates are not applied automatically. The operator or application explicitly triggers a PID retune via `ApplyOnlineEstimates()` on the state machine. See the State Machine design document for details.
+When calibration data is loaded (from NVM or after fresh calibration), the online estimator is
+seeded with the identified values, avoiding a cold-start transient where estimates are physically
+meaningless.

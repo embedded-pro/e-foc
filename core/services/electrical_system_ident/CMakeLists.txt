@@ -11,6 +11,8 @@ target_link_libraries(e_foc.services.electrical_system_ident PUBLIC
     e_foc.foc.interfaces
     e_foc.foc.transforms
     numerical.estimators.online
+    numerical.analysis
+    numerical.math
 )
 
 target_sources(e_foc.services.electrical_system_ident PRIVATE
@@ -19,8 +21,10 @@ target_sources(e_foc.services.electrical_system_ident PRIVATE
     ElectricalParametersIdentification.hpp
     RealTimeResistanceAndInductanceEstimator.cpp
     RealTimeResistanceAndInductanceEstimator.hpp
-    TerminalElectricalParametersIdentification.cpp
-    TerminalElectricalParametersIdentification.hpp
+    ResistanceEstimator.cpp
+    ResistanceEstimator.hpp
+    SinusoidalInductanceEstimator.cpp
+    SinusoidalInductanceEstimator.hpp
 )
 
 add_subdirectory(test)

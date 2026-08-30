@@ -506,9 +506,9 @@ namespace
 
         EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
             .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
-                               infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)> done)
+                               infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
                 {
-                    done(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+                    done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
                 }));
         EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
             .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
@@ -532,9 +532,9 @@ namespace
 
         EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
             .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
-                               infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)> done)
+                               infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
                 {
-                    done(std::nullopt, std::nullopt);
+                    done(services::ElectricalParametersIdentification::ResistanceInductanceResult{});
                 }));
 
         ResetCaptures();
@@ -797,9 +797,9 @@ namespace
 
         EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
             .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
-                               infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)> done)
+                               infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
                 {
-                    done(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+                    done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
                 }));
         EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
             .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
@@ -819,10 +819,10 @@ namespace
     {
         ConstructFixture();
 
-        infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)> capturedCallback;
+        infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> capturedCallback;
         EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
             .WillOnce(Invoke([&capturedCallback](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
-                               infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)> done)
+                               infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
                 {
                     capturedCallback = done;
                 }));

@@ -736,7 +736,7 @@ namespace
     {
     public:
         infra::Function<void(std::optional<std::size_t>)> capturedPolePairsCb;
-        infra::Function<void(std::optional<foc::Ohm>, std::optional<foc::MilliHenry>)> capturedResistanceCb;
+        infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> capturedResistanceCb;
         infra::Function<void(std::optional<foc::Radians>)> capturedAlignmentCb;
         infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
             std::optional<foc::NewtonMeterSecondSquared>)>
@@ -781,7 +781,7 @@ namespace
         void CompleteCalibration_Torque()
         {
             capturedPolePairsCb(7);
-            capturedResistanceCb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+            capturedResistanceCb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
             capturedAlignmentCb(foc::Radians{ 0.0f });
             capturedNvmSaveCb(services::NvmStatus::Ok);
         }
@@ -789,7 +789,7 @@ namespace
         void CompleteCalibration_WithMechIdent()
         {
             capturedPolePairsCb(7);
-            capturedResistanceCb(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f });
+            capturedResistanceCb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
             capturedAlignmentCb(foc::Radians{ 0.0f });
             capturedMechIdentCb(foc::NewtonMeterSecondPerRadian{ 0.005f }, foc::NewtonMeterSecondSquared{ 0.01f });
             capturedNvmSaveCb(services::NvmStatus::Ok);

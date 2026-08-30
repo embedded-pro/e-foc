@@ -3,6 +3,8 @@
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
+#include "core/services/alignment/MotorAlignmentImpl.hpp"
+#include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "hal/interfaces/Eeprom.hpp"
 #include "hal/interfaces/Pwm.hpp"
 #include "infra/util/BoundedDeque.hpp"
@@ -39,6 +41,8 @@ namespace application
         StatusWithMessage GetResetCauseStatus();
         StatusWithMessage GetFaultStatus();
         StatusWithMessage ForceHardfault();
+        void RunIdent();
+        void RunAlign();
 
     private:
         static constexpr std::size_t averageSampleSize = 100;
@@ -54,6 +58,10 @@ namespace application
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
         application::PlatformFactory& hardware;
+        services::ElectricalParametersIdentificationImpl electricalIdent;
+        services::MotorAlignmentImpl alignment;
+        bool identRunning{ false };
+        bool alignRunning{ false };
         hal::Hertz currentPwmFrequency_{ 10000 };
         std::chrono::nanoseconds currentPwmDeadTime_{ 500 };
         PlatformFactory::SampleAndHold currentSah_{ PlatformFactory::SampleAndHold::shortest };
