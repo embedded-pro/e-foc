@@ -187,7 +187,7 @@ namespace can
         electricalIdent.EstimateResistanceAndInductance({},
             [this](services::ElectricalParametersIdentification::ResistanceInductanceResult result)
             {
-                if (!result.resistance.has_value() || !result.inductance.has_value())
+                if (!result.resistance.has_value() || !result.inductance.has_value() || result.fitQuality < 0.5f)
                 {
                     pendingElectricalIdentDoneCallback = nullptr;
                     server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::calibrationFailed);

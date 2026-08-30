@@ -32,7 +32,15 @@ namespace services
 
         // Snap to an integer samples-per-period so the Goertzel bin and the injection are
         // at the same frequency; any mismatch causes spectral leakage that biases Im(Z).
-        const auto samplesPerPeriod = static_cast<std::size_t>(std::round(fs / fInj));
+        const auto samplesPerPeriod = fInj > 0.0f
+            ? static_cast<std::size_t>(std::round(fs / fInj))
+            : std::size_t{ 0 };
+
+        if (samplesPerPeriod == 0)
+        {
+            onDone(Result{});
+            return;
+        }
         omega = twoPi * fs / static_cast<float>(samplesPerPeriod);
         phaseIncrement = omega / fs;
         injectionPhase = 0.0f;

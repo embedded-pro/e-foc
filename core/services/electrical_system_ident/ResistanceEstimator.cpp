@@ -5,13 +5,6 @@ namespace
 {
     const hal::Hertz samplingFrequency{ 10000 };
 
-    foc::PhasePwmDutyCycles NeutralDuties(uint8_t neutral)
-    {
-        return foc::PhasePwmDutyCycles{
-            hal::Percent{ neutral }, hal::Percent{ neutral }, hal::Percent{ neutral }
-        };
-    }
-
     float AverageAndRemoveFront(infra::BoundedDeque<float>& deque)
     {
         float sum = 0.0f;
@@ -25,7 +18,8 @@ namespace
     float GetSteadyStateCurrent(const infra::BoundedVector<float>& samples)
     {
         const auto lastQuarter = static_cast<std::size_t>(static_cast<float>(samples.size()) * 0.9f);
-        return std::accumulate(samples.begin() + lastQuarter, samples.end(), 0.0f) / static_cast<float>(samples.size() - lastQuarter);
+        return std::accumulate(samples.begin() + lastQuarter, samples.end(), 0.0f)
+               / static_cast<float>(samples.size() - lastQuarter);
     }
 }
 
@@ -43,8 +37,12 @@ namespace services
         currentSamples.clear();
         filteredSamples.clear();
 
+        // Apply test voltage immediately so the settle timer gives current time to reach V/R.
         driver.PhaseCurrentsReady(samplingFrequency, [](auto) {});
-        driver.ThreePhasePwmOutput(NeutralDuties(neutralDuty));
+        driver.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{
+            hal::Percent{ config.testVoltagePercent.Value() },
+            hal::Percent{ neutralDuty },
+            hal::Percent{ neutralDuty } });
 
         settleTimer.Start(config.settleTime, [this]()
             {
@@ -58,11 +56,6 @@ namespace services
                         if (filteredSamples.full())
                             OnMeasurementComplete();
                     });
-
-                driver.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{
-                    hal::Percent{ activeConfig.testVoltagePercent.Value() },
-                    hal::Percent{ neutralDuty },
-                    hal::Percent{ neutralDuty } });
             });
     }
 
@@ -81,8 +74,8 @@ namespace services
         const auto appliedDuty = static_cast<float>(activeConfig.testVoltagePercent.Value() - neutralDuty);
         const float terminalVoltage = appliedDuty * vdc.Value() / 100.0f;
         const float terminalFactor = activeConfig.windingConfig == WindingConfiguration::Delta
-                                         ? deltaTerminalFactor
-                                         : wyeTerminalFactor;
+            ? deltaTerminalFactor
+            : wyeTerminalFactor;
         const float phaseResistance = terminalVoltage / steadyStateCurrent / terminalFactor;
 
         filteredSamples.clear();

@@ -36,7 +36,7 @@ namespace simulator
                 electricalIdent.EstimateResistanceAndInductance(services::ElectricalParametersIdentification::ResistanceAndInductanceConfig{},
                     [&gui, &electricalIdent](services::ElectricalParametersIdentification::ResistanceInductanceResult result)
                     {
-                        if (result.resistance.has_value() && result.inductance.has_value())
+                        if (result.resistance.has_value() && result.inductance.has_value() && result.fitQuality >= 0.5f)
                             gui.SetState(state_machine::Calibrating{ state_machine::CalibrationStep::polePairs });
                         electricalIdent.EstimateNumberOfPolePairs(services::ElectricalParametersIdentification::PolePairsConfig{},
                             [&gui](std::optional<std::size_t> p)

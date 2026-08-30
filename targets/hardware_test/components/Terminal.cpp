@@ -201,7 +201,7 @@ namespace application
                 this->terminal.ProcessResult(ForceHardfault());
             } });
 
-        terminal.AddCommand({ { "ident", "i", "Estimate R and L. Uses pole pairs set by 'motor'. Ex: ident" },
+        terminal.AddCommand({ { "ident", "i", "Estimate R and L (DC step + HF sinusoidal injection). Ex: ident" },
             [this](const auto&)
             {
                 RunIdent();
@@ -682,6 +682,11 @@ namespace application
                 tracer.Trace() << "R: " << result.resistance->Value() << " ohm";
                 tracer.Trace() << "L: " << result.inductance->Value() << " mH";
                 tracer.Trace() << "fitQuality: " << result.fitQuality;
+                if (result.fitQuality < 0.5f)
+                {
+                    terminal.ProcessResult({ services::TerminalWithStorage::Status::error, "ident: low fit quality — noisy signal, calibration rejected" });
+                    return;
+                }
                 terminal.ProcessResult({ services::TerminalWithStorage::Status::success });
             });
     }

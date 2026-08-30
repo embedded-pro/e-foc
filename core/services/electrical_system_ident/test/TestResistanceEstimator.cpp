@@ -14,11 +14,6 @@ namespace
                arg.c.Value() == expected.c.Value();
     }
 
-    float SimulateStepCurrent(float voltage, float resistance, float inductance, float time)
-    {
-        return (voltage / resistance) * (1.0f - std::exp(-time * resistance / inductance));
-    }
-
     class ResistanceEstimatorTest
         : public ::testing::Test
         , public infra::ClockFixture
@@ -30,7 +25,7 @@ namespace
     };
 }
 
-TEST_F(ResistanceEstimatorTest, start_outputs_neutral_duty_and_registers_callback)
+TEST_F(ResistanceEstimatorTest, start_applies_test_voltage_and_registers_blank_callback)
 {
     services::ResistanceEstimator::Config config{
         hal::Percent{ 15 }, std::chrono::seconds{ 1 }, services::WindingConfiguration::Wye
@@ -38,12 +33,12 @@ TEST_F(ResistanceEstimatorTest, start_outputs_neutral_duty_and_registers_callbac
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, _));
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(foc::PhasePwmDutyCycles{
-                                hal::Percent{ 1 }, hal::Percent{ 1 }, hal::Percent{ 1 } })));
+                                hal::Percent{ 15 }, hal::Percent{ 1 }, hal::Percent{ 1 } })));
 
     estimator.Start(config, [](auto) {});
 }
 
-TEST_F(ResistanceEstimatorTest, applies_test_voltage_after_settle_time)
+TEST_F(ResistanceEstimatorTest, registers_sampling_callback_after_settle_time)
 {
     services::ResistanceEstimator::Config config{
         hal::Percent{ 20 }, std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
@@ -53,17 +48,13 @@ TEST_F(ResistanceEstimatorTest, applies_test_voltage_after_settle_time)
         .Times(2)
         .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(foc::PhasePwmDutyCycles{
-                                hal::Percent{ 1 }, hal::Percent{ 1 }, hal::Percent{ 1 } })));
-
-    estimator.Start(config, [](auto) {});
-
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(foc::PhasePwmDutyCycles{
                                 hal::Percent{ 20 }, hal::Percent{ 1 }, hal::Percent{ 1 } })));
 
+    estimator.Start(config, [](auto) {});
     ForwardTime(std::chrono::milliseconds{ 100 });
 }
 
-TEST_F(ResistanceEstimatorTest, recovers_resistance_from_step_response)
+TEST_F(ResistanceEstimatorTest, recovers_resistance_from_settled_current)
 {
     services::ResistanceEstimator::Config config{
         hal::Percent{ 15 }, std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
@@ -71,14 +62,14 @@ TEST_F(ResistanceEstimatorTest, recovers_resistance_from_step_response)
 
     const float testVoltage = 0.14f * vdc.Value();
     const float terminalR = 1.5f;
-    const float terminalL = 0.002f;
+    const float steadyStateCurrent = testVoltage / terminalR;
 
     services::ResistanceEstimator::Result result{};
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .Times(2)
         .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(2);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
 
     estimator.Start(config, [&result](auto r) { result = r; });
     ForwardTime(std::chrono::milliseconds{ 50 });
@@ -86,14 +77,11 @@ TEST_F(ResistanceEstimatorTest, recovers_resistance_from_step_response)
     EXPECT_CALL(driverMock, Stop());
 
     for (std::size_t i = 0; i < 127; ++i)
-    {
-        const float current = SimulateStepCurrent(testVoltage, terminalR, terminalL, static_cast<float>(i) * 0.0001f);
         driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
-            foc::Ampere{ current }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
-    }
+            foc::Ampere{ steadyStateCurrent }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
     ASSERT_TRUE(result.resistance.has_value());
-    EXPECT_NEAR(result.resistance->Value(), terminalR / 1.5f, 0.1f);
+    EXPECT_NEAR(result.resistance->Value(), terminalR / 1.5f, 0.01f);
 }
 
 TEST_F(ResistanceEstimatorTest, returns_no_resistance_for_zero_current)
@@ -107,7 +95,7 @@ TEST_F(ResistanceEstimatorTest, returns_no_resistance_for_zero_current)
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .Times(2)
         .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(2);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
 
     estimator.Start(config, [&result](auto r) { result = r; });
     ForwardTime(std::chrono::milliseconds{ 50 });
@@ -129,14 +117,14 @@ TEST_F(ResistanceEstimatorTest, recovers_resistance_for_low_resistance_motor)
 
     const float testVoltage = 0.14f * vdc.Value();
     const float terminalR = 0.5f;
-    const float terminalL = 0.001f;
+    const float steadyStateCurrent = testVoltage / terminalR;
 
     services::ResistanceEstimator::Result result{};
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .Times(2)
         .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(2);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
 
     estimator.Start(config, [&result](auto r) { result = r; });
     ForwardTime(std::chrono::milliseconds{ 50 });
@@ -144,12 +132,9 @@ TEST_F(ResistanceEstimatorTest, recovers_resistance_for_low_resistance_motor)
     EXPECT_CALL(driverMock, Stop());
 
     for (std::size_t i = 0; i < 127; ++i)
-    {
-        const float current = SimulateStepCurrent(testVoltage, terminalR, terminalL, static_cast<float>(i) * 0.0001f);
         driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
-            foc::Ampere{ current }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
-    }
+            foc::Ampere{ steadyStateCurrent }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
     ASSERT_TRUE(result.resistance.has_value());
-    EXPECT_NEAR(result.resistance->Value(), terminalR / 1.5f, 0.15f);
+    EXPECT_NEAR(result.resistance->Value(), terminalR / 1.5f, 0.01f);
 }
