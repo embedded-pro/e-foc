@@ -89,9 +89,9 @@ stateDiagram-v2
 
 **Internal buffers:**
 
-| Buffer            | Capacity  | Purpose                                     |
-|-------------------|-----------|---------------------------------------------|
-| Moving-avg window | 5 samples | In-flight noise reduction on ADC input      |
+| Buffer            | Capacity    | Purpose                                      |
+|-------------------|-------------|----------------------------------------------|
+| Moving-avg window | 5 samples   | In-flight noise reduction on ADC input       |
 | Measurement store | 123 samples | Filtered step-response for steady-state read |
 
 ---
@@ -120,11 +120,11 @@ zero with increasing noise or rotor motion.
 
 **Working memory (streaming — no sample buffer required):**
 
-| Variable       | Size    | Purpose                            |
-|----------------|---------|------------------------------------|
-| Goertzel state | 3 float | $s_1$, $s_2$, sample count        |
+| Variable       | Size    | Purpose                                 |
+|----------------|---------|-----------------------------------------|
+| Goertzel state | 3 float | $s_1$, $s_2$, sample count              |
 | sumSquared     | 1 float | Accumulates $\Sigma i^2$ for fitQuality |
-| sampleCount    | 1 int   | Warmup/measurement gate            |
+| sampleCount    | 1 int   | Warmup/measurement gate                 |
 
 ```mermaid
 stateDiagram-v2
@@ -199,28 +199,28 @@ flowchart TD
 
 ### Provided
 
-| Interface                                         | Purpose                                                                                                                    | Contract                                                                                                              |
-|---------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| Interface                                         | Purpose                                                                                                                                | Contract                                                                                                                                   |
+|---------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
 | `EstimateResistanceAndInductance(config, onDone)` | Sequences DC-step R estimation then sinusoidal L estimation; delivers `ResistanceInductanceResult{resistance, inductance, fitQuality}` | Rejected (immediate empty callback) if pole-pairs procedure is already running; inverter stopped before callback fires; fires exactly once |
-| `EstimateNumberOfPolePairs(config, onDone)`       | Sweeps an open-loop rotating vector and delivers `optional<size_t>` pole pairs                                             | Rejected if R/L procedure is already running; inverter stopped before callback fires; fires exactly once              |
+| `EstimateNumberOfPolePairs(config, onDone)`       | Sweeps an open-loop rotating vector and delivers `optional<size_t>` pole pairs                                                         | Rejected if R/L procedure is already running; inverter stopped before callback fires; fires exactly once                                   |
 
 ### Result Type
 
 `ResistanceInductanceResult` carries:
 
-| Field        | Type                    | Absent when                  |
-|--------------|-------------------------|------------------------------|
-| `resistance` | `optional<Ohm>`         | DC step finds $I_{ss} = 0$   |
-| `inductance` | `optional<MilliHenry>`  | Goertzel yields $L \leq 0$   |
-| `fitQuality` | `float` in $[0, 1]$     | Always present; 0 on failure |
+| Field        | Type                   | Absent when                  |
+|--------------|------------------------|------------------------------|
+| `resistance` | `optional<Ohm>`        | DC step finds $I_{ss} = 0$   |
+| `inductance` | `optional<MilliHenry>` | Goertzel yields $L \leq 0$   |
+| `fitQuality` | `float` in $[0, 1]$    | Always present; 0 on failure |
 
 ### Required
 
-| Interface                | Purpose                                                        | Contract                                                 |
-|--------------------------|----------------------------------------------------------------|----------------------------------------------------------|
-| `ThreePhaseInverter`     | Voltage application and ADC sampling callbacks for both stages | Must not be concurrently claimed by any other controller |
-| `Encoder`                | Reads mechanical angle during pole-pairs sweep                 | Must be initialised before pole-pairs estimation begins  |
-| DC bus voltage (`Volts`) | Normalises applied voltage and interprets current in physical units | Must remain stable throughout any active procedure  |
+| Interface                | Purpose                                                             | Contract                                                 |
+|--------------------------|---------------------------------------------------------------------|----------------------------------------------------------|
+| `ThreePhaseInverter`     | Voltage application and ADC sampling callbacks for both stages      | Must not be concurrently claimed by any other controller |
+| `Encoder`                | Reads mechanical angle during pole-pairs sweep                      | Must be initialised before pole-pairs estimation begins  |
+| DC bus voltage (`Volts`) | Normalises applied voltage and interprets current in physical units | Must remain stable throughout any active procedure       |
 
 ---
 

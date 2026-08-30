@@ -53,8 +53,8 @@ namespace services
         vTerminalAmplitude = injectionAmplitude * 0.75f * vdc.Value();
 
         terminalFactor = config.windingConfig == WindingConfiguration::Delta
-            ? deltaTerminalFactor
-            : wyeTerminalFactor;
+                             ? deltaTerminalFactor
+                             : wyeTerminalFactor;
 
         warmupSamples = config.warmupPeriods * samplesPerPeriod;
         measurementSamples = config.measurementPeriods * samplesPerPeriod;
@@ -101,8 +101,7 @@ namespace services
         auto I = goertzel->Result();
 
         // Rotate by +ω·d·Ts to cancel the d-sample ADC pipeline lag.
-        const float delayAngle = omega * static_cast<float>(activeConfig.voltageToCurrentDelaySamples)
-                                 / static_cast<float>(samplingFrequency.Value());
+        const float delayAngle = omega * static_cast<float>(activeConfig.voltageToCurrentDelaySamples) / static_cast<float>(samplingFrequency.Value());
         const float cosD = math::Cos(delayAngle);
         const float sinD = math::Sin(delayAngle);
         const float iRe = I.Real() * cosD - I.Imaginary() * sinD;
@@ -116,8 +115,8 @@ namespace services
         const float zImag = -vTerminalAmplitude * N / 2.0f * iRe / magSquared;
 
         const float fitQuality = (sumSquared > 0.0f)
-            ? std::clamp(2.0f * magSquared / (N * sumSquared), 0.0f, 1.0f)
-            : 0.0f;
+                                     ? std::clamp(2.0f * magSquared / (N * sumSquared), 0.0f, 1.0f)
+                                     : 0.0f;
 
         if (zImag <= 0.0f)
             return Result{ std::nullopt, fitQuality };

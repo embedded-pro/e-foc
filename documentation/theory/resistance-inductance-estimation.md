@@ -29,28 +29,28 @@ Two complementary offline identification methods are used, one for each paramete
 - **Resistance** — DC voltage step: steady-state V/I gives $R_s$ directly. Accurate for any motor.
 - **Inductance** — HF sinusoidal injection: synchronous demodulation of the current response at the injection frequency extracts Im(Z) and thus $L_s$. Suitable for low-resistance motors where the time-constant method fails.
 
-The reason two separate methods are needed is a fundamental signal-conditioning problem: for motors with low $R_s$ (e.g. the JK42BLS01 with $R_s = 0.073\,\Omega$, $L_s = 0.5\,\text{mH}$), the ratio $\omega L_s / R_s$ at any frequency that keeps the rotor stationary ($\geq 100\,\text{Hz}$) is between 21 and 86. This means resistance contributes only 1–5 % of the total current amplitude during AC excitation; any small phase error drowns the R signal entirely. The time-constant method (section 4 of version 1.0) likewise fails because the time constant $\tau = L_s/R_s = 0.5\,\text{ms}$ spans only 5 samples at 10 kHz — too few for accurate threshold detection. Each parameter is therefore extracted using the technique that makes it the dominant signal.
+The reason two separate methods are needed is a fundamental signal-conditioning problem: for motors with low $R_s$ (e.g. the JK42BLS01 with $R_s = 0.073\,\Omega$, $L_s = 0.5\,\text{mH}$), the ratio $\omega L_s / R_s$ at any frequency that keeps the rotor stationary ($\geq 100\,\text{Hz}$) is between 21 and 86. This means resistance contributes only 1–5 % of the total current amplitude during AC excitation; any small phase error drowns the R signal entirely. The time-constant method (section 4 of version 1.0) likewise fails because the time constant $\tau = L_s/R_s = 6.85\,\text{ms}$ spans 68.5 samples at 10 kHz — making threshold-based detection sensitive to filter delay and noise. Each parameter is therefore extracted using the technique that makes it the dominant signal.
 
 ---
 
 ## Prerequisites
 
-| Symbol         | Meaning                                                         | Unit    |
-|----------------|-----------------------------------------------------------------|---------|
-| $R_s$          | Stator resistance per phase                                     | Ω       |
-| $L_s$          | Stator inductance ($L_d$, assuming surface PMSM)                | H       |
-| $V_{step}$     | DC step terminal voltage                                        | V       |
-| $I_{ss}$       | Steady-state current after DC step                              | A       |
-| $f_{inj}$      | Sinusoidal injection frequency                                  | Hz      |
-| $\omega$       | Angular injection frequency = $2\pi f_{inj}$                   | rad/s   |
-| $V_{inj}$      | Terminal sinusoidal injection amplitude                         | V       |
-| $f_s$          | Sampling frequency (10 kHz)                                     | Hz      |
-| $T_s$          | Sampling period = $1/f_s$                                       | s       |
-| $N$            | Goertzel block length = $N_{periods} \times N_{spp}$           | samples |
-| $N_{spp}$      | Samples per injection period = $\text{round}(f_s / f_{inj})$   | samples |
-| $k$            | Goertzel bin index = $N_{periods}$                              | —       |
-| $d$            | ADC pipeline delay                                              | samples |
-| $a_d, b_d$     | ZOH coefficients: $a_d = e^{-R_s T_s/L_s}$, $b_d=(1-a_d)/R_s$ | —       |
+| Symbol     | Meaning                                                       | Unit    |
+|------------|---------------------------------------------------------------|---------|
+| $R_s$      | Stator resistance per phase                                   | Ω       |
+| $L_s$      | Stator inductance ($L_d$, assuming surface PMSM)              | H       |
+| $V_{step}$ | DC step terminal voltage                                      | V       |
+| $I_{ss}$   | Steady-state current after DC step                            | A       |
+| $f_{inj}$  | Sinusoidal injection frequency                                | Hz      |
+| $\omega$   | Angular injection frequency = $2\pi f_{inj}$                  | rad/s   |
+| $V_{inj}$  | Terminal sinusoidal injection amplitude                       | V       |
+| $f_s$      | Sampling frequency (10 kHz)                                   | Hz      |
+| $T_s$      | Sampling period = $1/f_s$                                     | s       |
+| $N$        | Goertzel block length = $N_{periods} \times N_{spp}$          | samples |
+| $N_{spp}$  | Samples per injection period = $\text{round}(f_s / f_{inj})$  | samples |
+| $k$        | Goertzel bin index = $N_{periods}$                            | —       |
+| $d$        | ADC pipeline delay                                            | samples |
+| $a_d, b_d$ | ZOH coefficients: $a_d = e^{-R_s T_s/L_s}$, $b_d=(1-a_d)/R_s$ | —       |
 
 ---
 
@@ -116,12 +116,12 @@ i_d (normalised: I_ss = 1.0)
 The inductance estimator must extract the amplitude and phase of the current response at exactly one
 known frequency. Several approaches were considered:
 
-| Approach | Why rejected |
-|---|---|
-| Full FFT | Computes all bins; requires an N-sample RAM buffer (280–2000 samples = 1–8 kB); no embedded heap |
+| Approach                                                               | Why rejected                                                                                                                               |
+|------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| Full FFT                                                               | Computes all bins; requires an N-sample RAM buffer (280–2000 samples = 1–8 kB); no embedded heap                                           |
 | Manual I/Q accumulation ($\Sigma i \cdot \sin$, $\Sigma i \cdot \cos$) | Equivalent mathematically, but requires running $\sin$ / $\cos$ generation at every ISR sample (two trig calls per sample in the hot path) |
-| Cross-correlation with stored reference | Requires storing the reference sinusoid — another N-sample buffer |
-| Lock-in amplifier (hardware) | Purely analog; not applicable in software |
+| Cross-correlation with stored reference                                | Requires storing the reference sinusoid — another N-sample buffer                                                                          |
+| Lock-in amplifier (hardware)                                           | Purely analog; not applicable in software                                                                                                  |
 
 The **Goertzel algorithm** is a two-pole recursive filter:
 
@@ -189,10 +189,10 @@ $$
 The fractional error in $L_s$ relative to the continuous-time value scales approximately as
 $R_s T_s / L_s$:
 
-| Motor                  | $R_s T_s / L_s$ | ZOH bias in $L_s$ |
-|------------------------|-----------------|-------------------|
-| JK42BLS01 (terminal)   | 0.015           | ≈ 0.7 %           |
-| Generic (R=0.5 Ω, L=0.5 mH terminal) | 0.10 | ≈ 5 % |
+| Motor                                | $R_s T_s / L_s$ | ZOH bias in $L_s$ |
+|--------------------------------------|-----------------|-------------------|
+| JK42BLS01 (terminal)                 | 0.015           | ≈ 0.7 %           |
+| Generic (R=0.5 Ω, L=0.5 mH terminal) | 0.10            | ≈ 5 %             |
 
 For the JK42BLS01 the bias is well within calibration tolerance. For higher-resistance motors the
 bias grows; in those cases a correction using the already-measured $R_s$ and $b_d$ can be applied
@@ -276,15 +276,15 @@ absent.
 
 ## Numerical Properties
 
-| Property               | DC Step (R)                               | HF Sinusoidal (L)                                      |
-|------------------------|-------------------------------------------|--------------------------------------------------------|
-| Sampling rate          | 10 kHz                                    | 10 kHz                                                 |
-| Excitation             | Differential DC step (testVoltagePercent) | Alpha-axis sine at $f_{inj}$ (default 700 Hz)         |
-| Working memory         | 5-sample deque + 123-sample buffer        | 3 floats (Goertzel state) + sumSquared + sampleCount   |
-| Settling required      | $\geq 5\tau$ before R is valid            | warmupPeriods full cycles (rotor transient decay)      |
-| Result quality gate    | $I_{ss} > 0$                              | fitQuality $\geq 0.5$                                  |
-| Min injection voltage  | —                                         | $\geq 15\%$ bus (dead-time floor on hardware)          |
-| ZOH bias in L          | —                                         | $\approx R_s T_s / L_s$ fractional underestimate      |
+| Property              | DC Step (R)                               | HF Sinusoidal (L)                                    |
+|-----------------------|-------------------------------------------|------------------------------------------------------|
+| Sampling rate         | 10 kHz                                    | 10 kHz                                               |
+| Excitation            | Differential DC step (testVoltagePercent) | Alpha-axis sine at $f_{inj}$ (default 700 Hz)        |
+| Working memory        | 5-sample deque + 123-sample buffer        | 3 floats (Goertzel state) + sumSquared + sampleCount |
+| Settling required     | $\geq 5\tau$ before R is valid            | warmupPeriods full cycles (rotor transient decay)    |
+| Result quality gate   | $I_{ss} > 0$                              | fitQuality $\geq 0.5$                                |
+| Min injection voltage | —                                         | $\geq 15\%$ bus (dead-time floor on hardware)        |
+| ZOH bias in L         | —                                         | $\approx R_s T_s / L_s$ fractional underestimate     |
 
 ---
 
