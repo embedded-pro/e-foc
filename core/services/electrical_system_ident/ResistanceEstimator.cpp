@@ -18,8 +18,7 @@ namespace
     float GetSteadyStateCurrent(const infra::BoundedVector<float>& samples)
     {
         const auto lastQuarter = static_cast<std::size_t>(static_cast<float>(samples.size()) * 0.9f);
-        return std::accumulate(samples.begin() + lastQuarter, samples.end(), 0.0f)
-               / static_cast<float>(samples.size() - lastQuarter);
+        return std::accumulate(samples.begin() + lastQuarter, samples.end(), 0.0f) / static_cast<float>(samples.size() - lastQuarter);
     }
 }
 
@@ -74,8 +73,8 @@ namespace services
         const auto appliedDuty = static_cast<float>(activeConfig.testVoltagePercent.Value() - neutralDuty);
         const float terminalVoltage = appliedDuty * vdc.Value() / 100.0f;
         const float terminalFactor = activeConfig.windingConfig == WindingConfiguration::Delta
-            ? deltaTerminalFactor
-            : wyeTerminalFactor;
+                                         ? deltaTerminalFactor
+                                         : wyeTerminalFactor;
         const float phaseResistance = terminalVoltage / steadyStateCurrent / terminalFactor;
 
         filteredSamples.clear();
