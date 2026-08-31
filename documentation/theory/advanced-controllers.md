@@ -60,6 +60,57 @@ graph TD
 
 ---
 
+## Mathematical Foundation
+
+All controllers derive from three plant models established in
+`documentation/theory/foc-plant-models.md`:
+
+| Plant                              | States                 | Input                   | Loop rate |
+|------------------------------------|------------------------|-------------------------|-----------|
+| PMSM current (per axis, decoupled) | $i_d$, $i_q$           | normalised voltage $v'$ | 20 kHz    |
+| Mechanical speed                   | $\omega_m$             | $i_q^*$                 | 1 kHz     |
+| Position (double integrator)       | $\theta_m$, $\omega_m$ | $i_q^*$                 | 1 kHz     |
+
+Full derivations, ZOH discretisation, and parameter sources are in
+`documentation/theory/foc-plant-models.md`. Per-algorithm design equations are in the
+individual chapters listed in *Algorithm Index* below.
+
+---
+
+## Numerical Properties
+
+Summary comparison across all loops — see each per-algorithm chapter for full detail.
+
+**Current loop** — 20 kHz ISR:
+
+| ID | Algorithm      | ISR cost  | Robustness    | Requires RLS  |
+|----|----------------|-----------|---------------|---------------|
+| —  | PI (baseline)  | ~6 MACs   | High (integral) | No          |
+| A1 | Decoupled PID  | ~10 MACs  | Low (model-dep.)| Partial     |
+| A2 | Deadbeat       | ~4 MACs   | Low (exact model)| Yes (tight)|
+| A3 | Sliding-mode   | ~12 MACs  | High (gain-bounded)| Partial  |
+
+**Speed loop** — 1 kHz handler:
+
+| ID | Algorithm      | Ops/cycle | Disturbance rejection | Requires RLS  |
+|----|----------------|-----------|-----------------------|---------------|
+| —  | PI (baseline)  | ~6 MACs   | Integral quality      | No            |
+| S1 | LQI            | 2 MACs    | Integral quality      | Yes (J, Bf)   |
+| S2 | ADRC           | 6 MACs    | Explicit cancellation | Yes (Kt, J)   |
+| S3 | Two-DOF        | ~8 MACs   | Integral quality      | No            |
+
+**Position loop** — 1 kHz handler:
+
+| ID | Algorithm      | Ops/cycle        | Steady-state error | Requires RLS  |
+|----|----------------|------------------|--------------------|---------------|
+| —  | P (baseline)   | 2 MACs           | Zero at rest       | No            |
+| P1 | LQR / LQI      | 4 MACs           | Zero (LQI)         | Yes (J, Bf)   |
+| P2 | Cascade P      | 2 MACs           | Speed-loop dep.    | No            |
+| P3 | Two-DOF        | ~8 MACs          | Configurable       | No            |
+| P4 | ILC            | 2 MACs + array   | Near-zero (learned)| No            |
+
+---
+
 ## Algorithm Index
 
 | Loop     | ID  | Algorithm                 | File                                                                     |
