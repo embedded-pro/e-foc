@@ -523,12 +523,9 @@ def render_site(chapters, skip_diagrams, pdf_available=True):
     tikz_img_src = TIKZ_DIR / "images"
     if tikz_img_src.is_dir():
         tikz_img_dest = SITE_DIR / "tikz-images"
-        if tikz_img_dest.exists():
-            shutil.rmtree(tikz_img_dest)
-        shutil.copytree(
-            tikz_img_src, tikz_img_dest,
-            ignore=shutil.ignore_patterns("*.stamp", ".gitkeep", ".gitignore"),
-        )
+        tikz_img_dest.mkdir(parents=True, exist_ok=True)
+        for svg in tikz_img_src.glob("*.svg"):
+            shutil.copyfile(svg, tikz_img_dest / svg.name)
 
     status = 0
     fragments = BUILD_DIR / "fragments"
