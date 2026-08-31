@@ -55,7 +55,8 @@ jobs:
             texlive-fonts-recommended \
             lmodern \
             fonts-dejavu-core \
-            librsvg2-bin
+            librsvg2-bin \
+            pdf2svg
 
       - name: Install diagram tooling
         run: npm install -g @mermaid-js/mermaid-cli
