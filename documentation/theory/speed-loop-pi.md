@@ -37,14 +37,14 @@ Operates exclusively in the **1 kHz outer handler**.
 
 ## Prerequisites
 
-| Symbol        | Meaning                                       | Unit       |
-|---------------|-----------------------------------------------|------------|
-| $J$           | Rotor moment of inertia                       | kg·m²      |
-| $B_f$         | Viscous friction coefficient                  | N·m·s/rad  |
-| $K_t$         | Torque constant $= \tfrac{3}{2} p \psi_f$     | N·m/A      |
-| $T_s^o$       | Outer loop sample period ($= 1$ ms)           | s          |
-| $\omega_{bw}$ | Desired closed-loop speed bandwidth           | rad/s      |
-| $I_{q,max}$   | Maximum $q$-axis current (hardware limit)     | A          |
+| Symbol        | Meaning                                   | Unit      |
+|---------------|-------------------------------------------|-----------|
+| $J$           | Rotor moment of inertia                   | kg·m²     |
+| $B_f$         | Viscous friction coefficient              | N·m·s/rad |
+| $K_t$         | Torque constant $= \tfrac{3}{2} p \psi_f$ | N·m/A     |
+| $T_s^o$       | Outer loop sample period ($= 1$ ms)       | s         |
+| $\omega_{bw}$ | Desired closed-loop speed bandwidth       | rad/s     |
+| $I_{q,max}$   | Maximum $q$-axis current (hardware limit) | A         |
 
 See `documentation/theory/foc-plant-models.md` for all base symbols and ZOH derivations.
 
@@ -118,14 +118,14 @@ is needed.
 
 ## Numerical Properties
 
-| Property                   | Value                                         |
-|----------------------------|-----------------------------------------------|
-| Ops per 1 kHz cycle        | ~6 MACs                                       |
-| Steady-state speed error   | Zero (integral action)                        |
-| Load disturbance rejection | Integral quality — bandwidth-limited          |
-| Tracking vs. stiffness     | Coupled (single DOF)                          |
-| Requires mechanical RLS    | No — datasheet $J$, $B_f$ sufficient          |
-| Tuning knobs               | 1 ($\omega_{bw}$)                             |
+| Property                   | Value                                |
+|----------------------------|--------------------------------------|
+| Ops per 1 kHz cycle        | ~6 MACs                              |
+| Steady-state speed error   | Zero (integral action)               |
+| Load disturbance rejection | Integral quality — bandwidth-limited |
+| Tracking vs. stiffness     | Coupled (single DOF)                 |
+| Requires mechanical RLS    | No — datasheet $J$, $B_f$ sufficient |
+| Tuning knobs               | 1 ($\omega_{bw}$)                    |
 
 ---
 

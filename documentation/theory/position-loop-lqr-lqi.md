@@ -7,14 +7,14 @@ component: "position-loop-lqr-lqi"
 date: 2026-08-31
 ---
 
-| Field     | Value                       |
-|-----------|-----------------------------|
+| Field     | Value                         |
+|-----------|-------------------------------|
 | Title     | Position Loop — P1: LQR / LQI |
-| Type      | theory                      |
-| Status    | draft                       |
-| Version   | 1.0.0                       |
-| Component | position-loop-lqr-lqi       |
-| Date      | 2026-08-31                  |
+| Type      | theory                        |
+| Status    | draft                         |
+| Version   | 1.0.0                         |
+| Component | position-loop-lqr-lqi         |
+| Date      | 2026-08-31                    |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -37,12 +37,12 @@ Operates exclusively in the **1 kHz outer handler**. Requires mechanical RLS con
 
 ## Prerequisites
 
-| Symbol              | Meaning                              | Unit           |
-|---------------------|--------------------------------------|----------------|
-| $A_d^p, B_d^p$      | Discrete position plant matrices     | —              |
-| $K_\theta, K_\omega$| LQR position and velocity gains      | A/rad, A·s/rad |
-| $Q, R$              | LQR weighting matrices               | —              |
-| $P$                 | DARE solution                        | —              |
+| Symbol               | Meaning                          | Unit           |
+|----------------------|----------------------------------|----------------|
+| $A_d^p, B_d^p$       | Discrete position plant matrices | —              |
+| $K_\theta, K_\omega$ | LQR position and velocity gains  | A/rad, A·s/rad |
+| $Q, R$               | LQR weighting matrices           | —              |
+| $P$                  | DARE solution                    | —              |
 
 See `documentation/theory/foc-plant-models.md` §3 for the position plant derivation.
 
@@ -111,13 +111,13 @@ graph LR
 
 ## Numerical Properties
 
-| Property                    | Value                                           |
-|-----------------------------|-------------------------------------------------|
-| Ops per 1 kHz cycle         | 4 MACs ($\mathbf{K} \cdot x$, 2-state)          |
-| Steady-state position error | Zero with LQI (integral augmentation)           |
-| Requires J, Bf              | Yes                                             |
-| DARE timing                 | Once at config time, < 2 µs at 120 MHz          |
-| Tuning knobs                | 3 ($q_\theta$, $q_\omega$, $R$)                 |
+| Property                    | Value                                  |
+|-----------------------------|----------------------------------------|
+| Ops per 1 kHz cycle         | 4 MACs ($\mathbf{K} \cdot x$, 2-state) |
+| Steady-state position error | Zero with LQI (integral augmentation)  |
+| Requires J, Bf              | Yes                                    |
+| DARE timing                 | Once at config time, < 2 µs at 120 MHz |
+| Tuning knobs                | 3 ($q_\theta$, $q_\omega$, $R$)        |
 
 ---
 

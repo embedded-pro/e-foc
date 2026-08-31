@@ -36,12 +36,12 @@ Operates exclusively in the **1 kHz outer handler**.
 
 ## Prerequisites
 
-| Symbol              | Meaning                                                  | Unit       |
-|---------------------|----------------------------------------------------------|------------|
-| $\omega_{bw}^p$     | Desired closed-loop position bandwidth                   | rad/s      |
-| $\omega_{bw}^s$     | Inner speed-loop closed-loop bandwidth                   | rad/s      |
-| $\omega_{m,max}$    | Maximum mechanical angular velocity (hardware limit)     | rad/s      |
-| $T_s^o$             | Outer loop sample period ($= 1$ ms)                      | s          |
+| Symbol           | Meaning                                              | Unit  |
+|------------------|------------------------------------------------------|-------|
+| $\omega_{bw}^p$  | Desired closed-loop position bandwidth               | rad/s |
+| $\omega_{bw}^s$  | Inner speed-loop closed-loop bandwidth               | rad/s |
+| $\omega_{m,max}$ | Maximum mechanical angular velocity (hardware limit) | rad/s |
+| $T_s^o$          | Outer loop sample period ($= 1$ ms)                  | s     |
 
 See `documentation/theory/foc-plant-models.md` §3 for the position plant derivation.
 
@@ -120,13 +120,13 @@ $$
 
 ## Numerical Properties
 
-| Property                    | Value                                           |
-|-----------------------------|-------------------------------------------------|
-| Ops per 1 kHz cycle         | 2 MACs (1 multiply + wrap + clamp)              |
-| Steady-state position error | Non-zero under constant velocity reference      |
-| Steady-state error at rest  | Zero (no steady velocity → no position error)   |
-| Requires J, Bf              | No                                              |
-| Tuning knobs                | 1 ($K_p = \omega_{bw}^p$)                       |
+| Property                    | Value                                         |
+|-----------------------------|-----------------------------------------------|
+| Ops per 1 kHz cycle         | 2 MACs (1 multiply + wrap + clamp)            |
+| Steady-state position error | Non-zero under constant velocity reference    |
+| Steady-state error at rest  | Zero (no steady velocity → no position error) |
+| Requires J, Bf              | No                                            |
+| Tuning knobs                | 1 ($K_p = \omega_{bw}^p$)                     |
 
 ---
 

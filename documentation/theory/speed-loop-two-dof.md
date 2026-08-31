@@ -7,14 +7,14 @@ component: "speed-loop-two-dof"
 date: 2026-08-31
 ---
 
-| Field     | Value                  |
-|-----------|------------------------|
+| Field     | Value                    |
+|-----------|--------------------------|
 | Title     | Speed Loop — S3: Two-DOF |
-| Type      | theory                 |
-| Status    | draft                  |
-| Version   | 1.0.0                  |
-| Component | speed-loop-two-dof     |
-| Date      | 2026-08-31             |
+| Type      | theory                   |
+| Status    | draft                    |
+| Version   | 1.0.0                    |
+| Component | speed-loop-two-dof       |
+| Date      | 2026-08-31               |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -37,11 +37,11 @@ Operates exclusively in the **1 kHz outer handler**. No mechanical RLS required.
 
 ## Prerequisites
 
-| Symbol             | Meaning                                  | Unit |
-|--------------------|------------------------------------------|------|
-| $A_d^o, B_d^o$     | Discrete speed plant matrices            | —    |
-| $\tau_{ff}$        | Two-DOF pre-filter time constant         | s    |
-| $K_p$, $K_i$       | PI feedback controller gains             | —    |
+| Symbol         | Meaning                          | Unit |
+|----------------|----------------------------------|------|
+| $A_d^o, B_d^o$ | Discrete speed plant matrices    | —    |
+| $\tau_{ff}$    | Two-DOF pre-filter time constant | s    |
+| $K_p$, $K_i$   | PI feedback controller gains     | —    |
 
 See `documentation/theory/foc-plant-models.md` §2 for the speed plant derivation.
 See `documentation/theory/speed-loop-pi.md` for PI gain design.
@@ -101,14 +101,14 @@ filter.
 
 ## Numerical Properties
 
-| Property                   | Value                                          |
-|----------------------------|------------------------------------------------|
-| Ops per 1 kHz cycle        | ~8 MACs (pre-filter + PI)                      |
-| Steady-state speed error   | Zero (PI integral action)                      |
-| Load disturbance rejection | PI quality                                     |
-| Tracking vs. stiffness     | Decoupled ($\tau_{ff}$ independent of PI gains)|
-| Requires mechanical RLS    | No                                             |
-| Tuning knobs               | 3 ($K_p$, $K_i$, $\tau_{ff}$)                 |
+| Property                   | Value                                           |
+|----------------------------|-------------------------------------------------|
+| Ops per 1 kHz cycle        | ~8 MACs (pre-filter + PI)                       |
+| Steady-state speed error   | Zero (PI integral action)                       |
+| Load disturbance rejection | PI quality                                      |
+| Tracking vs. stiffness     | Decoupled ($\tau_{ff}$ independent of PI gains) |
+| Requires mechanical RLS    | No                                              |
+| Tuning knobs               | 3 ($K_p$, $K_i$, $\tau_{ff}$)                   |
 
 ---
 

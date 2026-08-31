@@ -7,14 +7,14 @@ component: "speed-loop-adrc"
 date: 2026-08-31
 ---
 
-| Field     | Value               |
-|-----------|---------------------|
+| Field     | Value                 |
+|-----------|-----------------------|
 | Title     | Speed Loop — S2: ADRC |
-| Type      | theory              |
-| Status    | draft               |
-| Version   | 1.0.0               |
-| Component | speed-loop-adrc     |
-| Date      | 2026-08-31          |
+| Type      | theory                |
+| Status    | draft                 |
+| Version   | 1.0.0                 |
+| Component | speed-loop-adrc       |
+| Date      | 2026-08-31            |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -37,13 +37,13 @@ Operates exclusively in the **1 kHz outer handler**. Requires $K_t$ and $J$ from
 
 ## Prerequisites
 
-| Symbol             | Meaning                          | Unit  |
-|--------------------|----------------------------------|-------|
-| $A_d^o, B_d^o$     | Discrete speed plant matrices    | —     |
-| $\hat{x}, \hat{f}$ | Observer state estimates         | —     |
-| $\omega_o$         | ESO bandwidth                    | rad/s |
-| $\omega_c$         | Control bandwidth                | rad/s |
-| $b_0$              | ADRC plant gain $= K_t/J$        | —     |
+| Symbol             | Meaning                       | Unit  |
+|--------------------|-------------------------------|-------|
+| $A_d^o, B_d^o$     | Discrete speed plant matrices | —     |
+| $\hat{x}, \hat{f}$ | Observer state estimates      | —     |
+| $\omega_o$         | ESO bandwidth                 | rad/s |
+| $\omega_c$         | Control bandwidth             | rad/s |
+| $b_0$              | ADRC plant gain $= K_t/J$     | —     |
 
 See `documentation/theory/foc-plant-models.md` §2 for the speed plant derivation.
 

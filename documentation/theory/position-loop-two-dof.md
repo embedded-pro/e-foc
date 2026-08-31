@@ -7,14 +7,14 @@ component: "position-loop-two-dof"
 date: 2026-08-31
 ---
 
-| Field     | Value                        |
-|-----------|------------------------------|
-| Title     | Position Loop — P3: Two-DOF  |
-| Type      | theory                       |
-| Status    | draft                        |
-| Version   | 1.0.0                        |
-| Component | position-loop-two-dof        |
-| Date      | 2026-08-31                   |
+| Field     | Value                       |
+|-----------|-----------------------------|
+| Title     | Position Loop — P3: Two-DOF |
+| Type      | theory                      |
+| Status    | draft                       |
+| Version   | 1.0.0                       |
+| Component | position-loop-two-dof       |
+| Date      | 2026-08-31                  |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -37,10 +37,10 @@ Operates exclusively in the **1 kHz outer handler**. No parameter identification
 
 ## Prerequisites
 
-| Symbol        | Meaning                               | Unit |
-|---------------|---------------------------------------|------|
-| $\tau_{ff}$   | Two-DOF pre-filter time constant      | s    |
-| $A_d^p, B_d^p$| Discrete position plant matrices      | —    |
+| Symbol         | Meaning                          | Unit |
+|----------------|----------------------------------|------|
+| $\tau_{ff}$    | Two-DOF pre-filter time constant | s    |
+| $A_d^p, B_d^p$ | Discrete position plant matrices | —    |
 
 See `documentation/theory/foc-plant-models.md` §3 for the position plant derivation.
 See `documentation/theory/position-loop-cascade-p.md` for the Cascade P special case.

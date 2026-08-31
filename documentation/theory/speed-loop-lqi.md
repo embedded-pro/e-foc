@@ -7,14 +7,14 @@ component: "speed-loop-lqi"
 date: 2026-08-31
 ---
 
-| Field     | Value              |
-|-----------|--------------------|
+| Field     | Value                |
+|-----------|----------------------|
 | Title     | Speed Loop — S1: LQI |
-| Type      | theory             |
-| Status    | draft              |
-| Version   | 1.0.0              |
-| Component | speed-loop-lqi     |
-| Date      | 2026-08-31         |
+| Type      | theory               |
+| Status    | draft                |
+| Version   | 1.0.0                |
+| Component | speed-loop-lqi       |
+| Date      | 2026-08-31           |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -37,12 +37,12 @@ Operates exclusively in the **1 kHz outer handler**. Requires mechanical RLS con
 
 ## Prerequisites
 
-| Symbol             | Meaning                            | Unit  |
-|--------------------|------------------------------------|-------|
-| $A_d^o, B_d^o$     | Discrete speed plant matrices      | —     |
-| $Q, R$             | LQR weighting matrices             | —     |
-| $P$                | DARE solution (optimal cost-to-go) | —     |
-| $I_{q,max}$        | Maximum $q$-axis current           | A     |
+| Symbol         | Meaning                            | Unit |
+|----------------|------------------------------------|------|
+| $A_d^o, B_d^o$ | Discrete speed plant matrices      | —    |
+| $Q, R$         | LQR weighting matrices             | —    |
+| $P$            | DARE solution (optimal cost-to-go) | —    |
+| $I_{q,max}$    | Maximum $q$-axis current           | A    |
 
 See `documentation/theory/foc-plant-models.md` §2 for the speed plant derivation.
 
@@ -120,15 +120,15 @@ envelope.
 
 ## Numerical Properties
 
-| Property                   | Value                                          |
-|----------------------------|------------------------------------------------|
+| Property                   | Value                                           |
+|----------------------------|-------------------------------------------------|
 | Ops per 1 kHz cycle        | 2 MACs (dot product $\mathbf{K} \cdot x_{aug}$) |
-| Steady-state speed error   | Zero (integral augmentation)                  |
-| Load disturbance rejection | PI quality (integral-based)                   |
-| Tracking vs. stiffness     | Coupled (single DOF)                          |
-| DARE timing                | < 2 µs at 120 MHz, once at config time        |
-| Requires mechanical RLS    | Yes ($J$, $B_f$)                              |
-| Tuning knobs               | 3 ($q_\omega$, $q_I$, $R$)                    |
+| Steady-state speed error   | Zero (integral augmentation)                    |
+| Load disturbance rejection | PI quality (integral-based)                     |
+| Tracking vs. stiffness     | Coupled (single DOF)                            |
+| DARE timing                | < 2 µs at 120 MHz, once at config time          |
+| Requires mechanical RLS    | Yes ($J$, $B_f$)                                |
+| Tuning knobs               | 3 ($q_\omega$, $q_I$, $R$)                      |
 
 ---
 
