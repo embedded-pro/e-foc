@@ -251,7 +251,11 @@ def _render_tikz(tex_name, skip_diagrams):
     tikzpicture = content[start: end + len(end_tag)]
     wrapper = "\n".join([
         r"\documentclass[border=8pt,tikz]{standalone}",
-        r"\usetikzlibrary{arrows.meta,calc}",
+        r"\usepackage[dvipsnames]{xcolor}",
+        r"\usepackage{pgfplots}",
+        r"\pgfplotsset{compat=1.18}",
+        r"\usetikzlibrary{arrows.meta,calc,positioning}",
+        r"\tikzset{arr/.style={-{Stealth[length=5pt]},thick}}",
         r"\begin{document}",
         tikzpicture,
         r"\end{document}",
