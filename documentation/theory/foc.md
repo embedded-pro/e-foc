@@ -290,11 +290,15 @@ entries, so it is the interpolation rather than the table density that bounds th
 
 ### Complete FOC Loop
 
+![FOC complete loop block diagram](../tikz/images/foc-complete-loop.svg)
+
 ```{=latex}
 \input{foc-complete-loop.tex}
 ```
 
 ### Speed Control Cascade
+
+![Speed control cascade block diagram](../tikz/images/speed-loop.svg)
 
 ```{=latex}
 \input{speed-loop.tex}
@@ -302,11 +306,15 @@ entries, so it is the interpolation rather than the table density that bounds th
 
 ### Position Control Cascade
 
+![Position control cascade block diagram](../tikz/images/position-loop.svg)
+
 ```{=latex}
 \input{position-loop.tex}
 ```
 
 ### Coordinate System Relationships
+
+![FOC coordinate system relationships](../tikz/images/foc-coordinates.svg)
 
 ```{=latex}
 \input{foc-coordinates.tex}

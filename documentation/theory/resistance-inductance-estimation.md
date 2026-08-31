@@ -94,6 +94,8 @@ method.
 
 #### DC Step Response
 
+![DC step response signal flow](../tikz/images/dc-step-response.svg)
+
 ```{=latex}
 \input{dc-step-response.tex}
 ```
@@ -225,6 +227,8 @@ At 10 % injection ($V_{inj} = 2.4\,\text{V}$) this represents 20 % distortion; a
 does not reproduce dead-time; simulation results will be optimistic relative to hardware.
 
 #### Signal Flow
+
+![HF sinusoidal injection signal flow](../tikz/images/hf-signal-flow.svg)
 
 ```{=latex}
 \input{hf-signal-flow.tex}

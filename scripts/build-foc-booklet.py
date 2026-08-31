@@ -36,12 +36,14 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import date
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BOOKLET_DIR = ROOT / "documentation" / "booklet"
 INDEX = BOOKLET_DIR / "README.md"
 ASSETS = BOOKLET_DIR / "assets"
+TIKZ_DIR = ROOT / "documentation" / "tikz"
 
 BUILD_DIR = ROOT / "build" / "booklet"
 SITE_DIR = BUILD_DIR / "site"
@@ -59,6 +61,7 @@ FRONT_MATTER_TITLE_RE = re.compile(r'^title:\s+"?(.+?)"?\s*$', re.MULTILINE)
 HEADING_RE = re.compile(r"^(#{1,6})\s")
 IMAGE_RE = re.compile(r"(!\[[^\]]*\]\()([^)]+)(\))")
 MERMAID_RE = re.compile(r"```mermaid\n(.*?)```", re.DOTALL)
+TIKZ_INPUT_RE = re.compile(r"```\{=latex\}\n\\input\{([^}\n]+)\}\n```")
 PART_RE = re.compile(r"^##\s+(.+?)\s*$")
 
 DIAGRAM_FAILURES = []
@@ -187,6 +190,160 @@ def _render_mermaid(code, skip_diagrams):
     return svg_out
 
 
+def _resolve_tikz(tex_name):
+    """Return the resolved Path for a TikZ file name, or None if invalid.
+
+    Rejects absolute paths, path traversal (``..``), symlinks, and directories
+    so that a crafted Markdown ``\\input{}`` cannot escape TIKZ_DIR or trigger
+    unexpected behaviour (e.g. read_text() raising on a directory).
+    """
+    try:
+        candidate = (TIKZ_DIR / tex_name).resolve()
+    except (ValueError, OSError):
+        return None
+    if candidate.is_symlink() or not candidate.is_file():
+        return None
+    try:
+        candidate.relative_to(TIKZ_DIR.resolve())
+    except ValueError:
+        return None
+    return candidate
+
+
+def _render_tikz(tex_name, skip_diagrams):
+    """Compile a TikZ .tex snippet to SVG for HTML output.
+
+    Extracts the tikzpicture environment, wraps it in a standalone document,
+    compiles with xelatex, and converts the resulting PDF to SVG with pdf2svg.
+    Returns the SVG Path on success, None if tools are unavailable or compilation
+    fails (the caller omits the block silently so HTML still assembles).
+    """
+    if skip_diagrams:
+        return None
+
+    tex_path = _resolve_tikz(tex_name)
+    if tex_path is None:
+        print(f"WARNING: TikZ source not found or invalid: {tex_name}", file=sys.stderr)
+        return None
+
+    latex_engine = next(
+        (e for e in ("xelatex", "pdflatex", "lualatex") if _has_tool(e)), None
+    )
+    if latex_engine is None or not _has_tool("pdf2svg"):
+        return None
+
+    content = tex_path.read_text(encoding="utf-8")  # tex_path already validated by _resolve_tikz
+    digest = hashlib.sha1(content.encode("utf-8")).hexdigest()[:12]
+
+    DIAGRAMS_DIR.mkdir(parents=True, exist_ok=True)
+    svg_out = DIAGRAMS_DIR / f"tikz-{digest}.svg"
+    if svg_out.exists():
+        return svg_out
+
+    begin_tag = r"\begin{tikzpicture}"
+    end_tag = r"\end{tikzpicture}"
+    start = content.find(begin_tag)
+    end = content.rfind(end_tag)
+    if start == -1 or end == -1:
+        print(f"WARNING: no tikzpicture environment found in {tex_name}", file=sys.stderr)
+        return None
+
+    tikzpicture = content[start: end + len(end_tag)]
+    wrapper = "\n".join([
+        r"\documentclass[border=8pt,tikz]{standalone}",
+        r"\usepackage[dvipsnames]{xcolor}",
+        r"\usepackage{pgfplots}",
+        r"\pgfplotsset{compat=1.18}",
+        r"\usetikzlibrary{arrows.meta,calc,positioning}",
+        r"\tikzset{arr/.style={-{Stealth[length=5pt]},thick}}",
+        r"\begin{document}",
+        tikzpicture,
+        r"\end{document}",
+    ])
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir = pathlib.Path(tmpdir)
+        tex_file = tmpdir / "figure.tex"
+        tex_file.write_text(wrapper, encoding="utf-8")
+        pdf_file = tmpdir / "figure.pdf"
+
+        result = subprocess.run(
+            [
+                latex_engine,
+                "-interaction=nonstopmode",
+                "-halt-on-error",
+                f"-output-directory={tmpdir}",
+                str(tex_file),
+            ],
+            capture_output=True, text=True, cwd=tmpdir,
+        )
+        if result.returncode != 0 or not pdf_file.exists():
+            errors = [l for l in result.stdout.splitlines() if l.startswith("!")]
+            print(
+                f"WARNING: {latex_engine} failed for {tex_name}: "
+                f"{errors[0] if errors else 'see build log'}",
+                file=sys.stderr,
+            )
+            return None
+
+        conv = subprocess.run(
+            ["pdf2svg", str(pdf_file), str(svg_out)],
+            capture_output=True, text=True,
+        )
+        if conv.returncode != 0 or not svg_out.exists():
+            print(f"WARNING: pdf2svg failed for {tex_name}", file=sys.stderr)
+            return None
+
+    print(f"  tikz-{digest}.svg ({tex_name})")
+    return svg_out
+
+
+def _strip_tikz_svg_refs(text):
+    """Remove pre-committed SVG image refs that precede {=latex} blocks.
+
+    In the PDF path the TikZ source is rendered natively; the markdown image
+    reference must be removed so the figure does not appear twice.
+    """
+    lines = text.splitlines(keepends=True)
+    out = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        # Detect: ![any alt](…/tikz/images/….svg) on its own line
+        stripped = line.rstrip("\n")
+        if (
+            stripped.startswith("![")
+            and "/tikz/images/" in stripped
+            and stripped.endswith(")")
+        ):
+            # Drop this line and the blank line that follows it (if present)
+            if i + 1 < len(lines) and lines[i + 1].strip() == "":
+                i += 2
+                continue
+        out.append(line)
+        i += 1
+    return "".join(out)
+
+
+def _replace_tikz(text, skip_diagrams):
+    def replace(match):
+        tex_name = match.group(1)
+        if not tex_name.endswith(".tex"):
+            return match.group(0)
+        # Pre-committed SVG already present in the markdown — no runtime work needed
+        svg_name = pathlib.Path(tex_name).with_suffix(".svg").name
+        precommitted = TIKZ_DIR / "images" / svg_name
+        if precommitted.is_file() and not precommitted.is_symlink():
+            return ""
+        svg = _render_tikz(tex_name, skip_diagrams)
+        if svg is None:
+            return ""
+        alt = pathlib.Path(tex_name).stem.replace("-", " ").title()
+        return f"![{alt}]({svg})"
+
+    return TIKZ_INPUT_RE.sub(replace, text)
+
+
 def _diagram_alt(code):
     first = code.strip().splitlines()[0].strip().lower() if code.strip() else ""
     if "sequencediagram" in first:
@@ -245,6 +402,10 @@ def _rewrite_links(text, source, chapters, output):
 def _prepare(source, chapters, output, skip_diagrams):
     text = _strip_front_matter(source.read_text(encoding="utf-8"))
     text = _replace_diagrams(text, skip_diagrams)
+    if output == "html":
+        text = _replace_tikz(text, skip_diagrams)
+    elif output == "pdf":
+        text = _strip_tikz_svg_refs(text)
     text = _absolute_images(text, source)
     text = _rewrite_links(text, source, chapters, output)
     return text.strip() + "\n"

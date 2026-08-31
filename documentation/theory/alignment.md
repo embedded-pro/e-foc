@@ -209,6 +209,8 @@ Final step (360°=0°): rotor at θ_m_settled → θ_offset := θ_m_settled.
 
 ### Settling Signal
 
+![Alignment settling signal](../tikz/images/alignment-settling.svg)
+
 ```{=latex}
 \input{alignment-settling.tex}
 ```
