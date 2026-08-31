@@ -234,6 +234,8 @@ graph TD
 
 ### Effective Memory Window (Forgetting Factor)
 
+![RLS forgetting factor effective memory window](../tikz/images/forgetting-factor.svg)
+
 ```{=latex}
 \input{forgetting-factor.tex}
 ```

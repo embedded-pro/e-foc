@@ -190,6 +190,26 @@ def _render_mermaid(code, skip_diagrams):
     return svg_out
 
 
+def _resolve_tikz(tex_name):
+    """Return the resolved Path for a TikZ file name, or None if invalid.
+
+    Rejects absolute paths, path traversal (``..``), symlinks, and directories
+    so that a crafted Markdown ``\\input{}`` cannot escape TIKZ_DIR or trigger
+    unexpected behaviour (e.g. read_text() raising on a directory).
+    """
+    try:
+        candidate = (TIKZ_DIR / tex_name).resolve()
+    except (ValueError, OSError):
+        return None
+    if candidate.is_symlink() or not candidate.is_file():
+        return None
+    try:
+        candidate.relative_to(TIKZ_DIR.resolve())
+    except ValueError:
+        return None
+    return candidate
+
+
 def _render_tikz(tex_name, skip_diagrams):
     """Compile a TikZ .tex snippet to SVG for HTML output.
 
@@ -201,9 +221,9 @@ def _render_tikz(tex_name, skip_diagrams):
     if skip_diagrams:
         return None
 
-    tex_path = TIKZ_DIR / tex_name
-    if not tex_path.exists():
-        print(f"WARNING: TikZ source not found: {tex_name}", file=sys.stderr)
+    tex_path = _resolve_tikz(tex_name)
+    if tex_path is None:
+        print(f"WARNING: TikZ source not found or invalid: {tex_name}", file=sys.stderr)
         return None
 
     latex_engine = next(
@@ -212,7 +232,7 @@ def _render_tikz(tex_name, skip_diagrams):
     if latex_engine is None or not _has_tool("pdf2svg"):
         return None
 
-    content = tex_path.read_text(encoding="utf-8")
+    content = tex_path.read_text(encoding="utf-8")  # tex_path already validated by _resolve_tikz
     digest = hashlib.sha1(content.encode("utf-8")).hexdigest()[:12]
 
     DIAGRAMS_DIR.mkdir(parents=True, exist_ok=True)
@@ -274,11 +294,43 @@ def _render_tikz(tex_name, skip_diagrams):
     return svg_out
 
 
+def _strip_tikz_svg_refs(text):
+    """Remove pre-committed SVG image refs that precede {=latex} blocks.
+
+    In the PDF path the TikZ source is rendered natively; the markdown image
+    reference must be removed so the figure does not appear twice.
+    """
+    lines = text.splitlines(keepends=True)
+    out = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        # Detect: ![any alt](…/tikz/images/….svg) on its own line
+        stripped = line.rstrip("\n")
+        if (
+            stripped.startswith("![")
+            and "/tikz/images/" in stripped
+            and stripped.endswith(")")
+        ):
+            # Drop this line and the blank line that follows it (if present)
+            if i + 1 < len(lines) and lines[i + 1].strip() == "":
+                i += 2
+                continue
+        out.append(line)
+        i += 1
+    return "".join(out)
+
+
 def _replace_tikz(text, skip_diagrams):
     def replace(match):
         tex_name = match.group(1)
         if not tex_name.endswith(".tex"):
             return match.group(0)
+        # Pre-committed SVG already present in the markdown — no runtime work needed
+        svg_name = pathlib.Path(tex_name).with_suffix(".svg").name
+        precommitted = TIKZ_DIR / "images" / svg_name
+        if precommitted.is_file() and not precommitted.is_symlink():
+            return ""
         svg = _render_tikz(tex_name, skip_diagrams)
         if svg is None:
             return ""
@@ -348,6 +400,8 @@ def _prepare(source, chapters, output, skip_diagrams):
     text = _replace_diagrams(text, skip_diagrams)
     if output == "html":
         text = _replace_tikz(text, skip_diagrams)
+    elif output == "pdf":
+        text = _strip_tikz_svg_refs(text)
     text = _absolute_images(text, source)
     text = _rewrite_links(text, source, chapters, output)
     return text.strip() + "\n"
