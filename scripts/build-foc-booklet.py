@@ -520,6 +520,13 @@ def render_site(chapters, skip_diagrams, pdf_available=True):
             shutil.rmtree(dest)
         shutil.copytree(DIAGRAMS_DIR, dest)
 
+    tikz_img_src = TIKZ_DIR / "images"
+    if tikz_img_src.is_dir():
+        tikz_img_dest = SITE_DIR / "tikz-images"
+        tikz_img_dest.mkdir(parents=True, exist_ok=True)
+        for svg in tikz_img_src.glob("*.svg"):
+            shutil.copyfile(svg, tikz_img_dest / svg.name)
+
     status = 0
     fragments = BUILD_DIR / "fragments"
     fragments.mkdir(parents=True, exist_ok=True)
@@ -529,6 +536,11 @@ def render_site(chapters, skip_diagrams, pdf_available=True):
         markdown = re.sub(
             rf"!\[([^\]]*)\]\({re.escape(str(DIAGRAMS_DIR))}/",
             r"![\1](diagrams/",
+            markdown,
+        )
+        markdown = re.sub(
+            rf"!\[([^\]]*)\]\({re.escape(str(tikz_img_src))}/([^)]+)\)",
+            r"![\1](tikz-images/\2)",
             markdown,
         )
         markdown = re.sub(r"\A#\s+.+?\n", "", markdown, count=1)
