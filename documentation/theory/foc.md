@@ -327,43 +327,8 @@ entries, so it is the interpolation rather than the table density that bounds th
 
 ### Complete FOC Loop
 
-```mermaid
-graph TD
-    subgraph Sensors
-        ADC[ADC\ni_a, i_b] --> CK[Clarke\nTransform]
-        ENC[Encoder\nθ_m] --> ANG[θ_e = p·θ_m]
-    end
-
-    subgraph Current_Control["Current Control — dq frame (runs at 20 kHz)"]
-        CK -->|i_α, i_β| PK[Park\nTransform\nForward]
-        ANG -->|θ_e| PK
-        PK -->|i_d, i_q| ERR_D[Error\ni_d* − i_d]
-        PK -->|i_d, i_q| ERR_Q[Error\ni_q* − i_q]
-        ERR_D --> PID_D[PI\nd-axis]
-        ERR_Q --> PID_Q[PI\nq-axis]
-        PID_D -->|v_d| IPK[Inverse Park\nTransform]
-        PID_Q -->|v_q| IPK
-        ANG -->|θ_e| IPK
-    end
-
-    subgraph SVM_stage["Modulation"]
-        IPK -->|v_α, v_β| SVM[SVM\nCommon-Mode\nInjection]
-        SVM -->|d_A, d_B, d_C| PWM[PWM\nTimer\n20 kHz]
-        PWM --> INV[Inverter\n3-Phase]
-        INV -->|v_a, v_b, v_c| MTR[PMSM\nMotor]
-    end
-
-    subgraph Outer_Loops["Outer Loops (lower rate)"]
-        SPD_REF[ω* Speed\nReference] --> SPD_PID[Speed\nPI]
-        SPD_PID -->|i_q*| ERR_Q
-        POS_REF[θ* Position\nReference] --> POS_PID[Position\nP/PD]
-        POS_PID -->|ω*| SPD_PID
-    end
-
-    MTR -->|mechanical| ENC
-    style Current_Control fill:#eef4ff,stroke:#4488cc
-    style SVM_stage fill:#fff4ee,stroke:#cc8844
-    style Outer_Loops fill:#eeffee,stroke:#44cc44
+```{=latex}
+\input{foc-complete-loop.tex}
 ```
 
 ### Coordinate System Relationships

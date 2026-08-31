@@ -1,0 +1,101 @@
+\begin{figure}[p]
+\centering
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[
+  thick, >=Stealth,
+  block/.style={draw, rectangle, minimum width=1.6cm, minimum height=0.72cm,
+                align=center, font=\small, fill=white},
+  bigblock/.style={draw, rectangle, align=center, font=\small, fill=white},
+  sum/.style={draw, circle, minimum size=0.55cm, inner sep=0pt, fill=white},
+  motor/.style={draw, circle, minimum size=1.4cm, align=center, font=\small, fill=white},
+  lbl/.style={font=\scriptsize},
+  dot/.style={circle, fill=black, inner sep=1.5pt},
+]
+
+%% ── Positions ──────────────────────────────────────────────────────────────
+%%  q-axis row  : y =  2.0
+%%  centre row  : y =  0.0   (Inv Park, SVM, Inverter, Motor)
+%%  d-axis row  : y = -2.0
+%%  feedback row: y = -4.0   (Clarke, Park)
+%%  encoder     : y = -2.8
+
+\node[sum]   (Sq)  at (1.8,  2.0) {};
+\node[sum]   (Sd)  at (1.8, -2.0) {};
+\node[block] (PIq) at (3.9,  2.0) {PI\\$q$-axis};
+\node[block] (PId) at (3.9, -2.0) {PI\\$d$-axis};
+\node[bigblock, minimum width=1.8cm, minimum height=2.6cm]
+             (IPK) at (6.1,  0.0) {Inv.\\Park};
+\node[block] (SVM) at (8.2,  0.0) {SVM};
+\node[block] (INV) at (10.2, 0.0) {3-Ph.\\Inv.};
+\node[motor] (MTR) at (12.3, 0.0) {PMSM};
+\node[block] (ENC) at (12.3,-2.8) {Encoder};
+\node[block] (CLK) at (9.5, -4.0) {Clarke};
+\node[block] (PRK) at (6.8, -4.0) {Park};
+
+%% ── Reference inputs ────────────────────────────────────────────────────────
+\draw[->] (0.0,  2.0) node[left,lbl]{$i_q^*$}     -- (Sq.west);
+\draw[->] (0.0, -2.0) node[left,lbl]{$i_d^*\!=\!0$} -- (Sd.west);
+
+%% ── Summing junction signs ──────────────────────────────────────────────────
+\node[lbl] at ($(Sq)+( 0.17, 0.17)$) {$+$};
+\node[lbl] at ($(Sq)+( 0.00,-0.22)$) {$-$};
+\node[lbl] at ($(Sd)+( 0.17, 0.17)$) {$+$};
+\node[lbl] at ($(Sd)+( 0.00,-0.22)$) {$-$};
+
+%% ── q / d forward paths through PIs ────────────────────────────────────────
+\draw[->] (Sq.east) -- (PIq.west);
+\draw[->] (Sd.east) -- (PId.west);
+
+%% ── PI outputs to Inv Park ──────────────────────────────────────────────────
+%% v_q enters upper-left port, v_d enters lower-left port of IPK
+%% IPK.west = (6.1 - 0.9, 0) = (5.2, 0); upper port at (5.2, +0.55), lower at (5.2, -0.55)
+\draw[->] (PIq.east) -- ++(0.35,0) |-
+          node[pos=0.25,above,lbl]{$v_q$} ($(IPK.west)+(0, 0.55)$);
+\draw[->] (PId.east) -- ++(0.35,0) |-
+          node[pos=0.25,below,lbl]{$v_d$} ($(IPK.west)+(0,-0.55)$);
+
+%% ── Main forward path ───────────────────────────────────────────────────────
+\draw[->] (IPK.east) -- node[above,lbl]{$v_\alpha,v_\beta$} (SVM.west);
+\draw[->] (SVM.east) -- node[above,lbl]{$d_A,d_B,d_C$}      (INV.west);
+\draw[->] (INV.east) -- (MTR.west);
+
+%% ── Mechanical coupling to encoder ──────────────────────────────────────────
+\draw[->] (MTR.south) -- node[right,lbl]{shaft} (ENC.north);
+
+%% ── Phase current tap: between INV and MTR ──────────────────────────────────
+\coordinate (itap) at (11.2, 0.0);
+\node[dot]  at (itap) {};
+\draw[->] (itap) |- node[near start,right,lbl]{$i_a,i_b$} (CLK.north);
+
+%% ── Feedback transform chain: Clarke → Park ─────────────────────────────────
+\draw[->] (CLK.west) -- node[above,lbl]{$i_\alpha,i_\beta$} (PRK.east);
+
+%% ── Feedback column: Park → Sd and Sq ──────────────────────────────────────
+%% Outer column at x = 1.5; Sq.south = (1.8, 1.725); Sd.south = (1.8, -2.275)
+\draw    (PRK.west) -- (1.5,-4.0);     %% horizontal leg to column
+\draw    (1.5,-4.0) -- (1.5, 1.725);   %% vertical column
+%% i_d junction (at Sd.south height)
+\node[dot] at (1.5,-2.275) {};
+\draw[->] (1.5,-2.275) -- node[above,lbl]{$i_d$} (Sd.south);
+%% i_q (top of column)
+\draw[->] (1.5, 1.725) -- node[above,lbl]{$i_q$} (Sq.south);
+
+%% ── θ_e routing: Encoder → Park and Inv Park ────────────────────────────────
+\coordinate (theta_jn) at (7.2,-2.8);
+\node[dot]  at (theta_jn) {};
+\draw (ENC.west) -- (theta_jn);
+%% θ_e → Park (down then left)
+\draw[->] (theta_jn) |- node[pos=0.7,right,lbl]{$\theta_e$} (PRK.north);
+%% θ_e → Inv Park (left then up)
+\draw[->] (theta_jn) -| node[pos=0.2,above,lbl]{$\theta_e$} (IPK.south);
+
+\end{tikzpicture}%
+}
+\caption{Complete FOC current control loop.
+  Phase currents $i_a, i_b$ are decomposed into the rotating $dq$ frame via
+  Clarke and Park transforms. Two PI controllers regulate $i_d$ (flux) and
+  $i_q$ (torque) independently. Inverse Park and SVM synthesise the
+  three-phase PWM voltages. The electrical angle $\theta_e = p\,\theta_m$ is
+  derived from the encoder reading.}
+\label{fig:foc-complete-loop}
+\end{figure}
