@@ -1,0 +1,120 @@
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  >=Stealth,
+  thick,
+  block/.style={draw,rectangle,minimum width=2cm,minimum height=1.4cm,
+                align=center,font=\small,fill=white},
+  tblock/.style={draw,rectangle,minimum width=2cm,minimum height=2.4cm,
+                 align=center,font=\small,fill=white},
+  sum/.style={draw,circle,minimum size=0.6cm,inner sep=0pt,fill=white},
+  motor/.style={draw,circle,minimum size=2.6cm,align=center,font=\small,fill=white},
+  lbl/.style={font=\scriptsize},
+  dot/.style={circle,fill=black,inner sep=1.5pt}
+]
+
+% ─── FORWARD PATH ─────────────────────────────────────────────────────────────
+\node[sum] (Sq) at (0, 0.9) {};
+\node[sum] (Sd) at (0,-0.9) {};
+
+% Single controller block — algorithm selected at runtime
+% (e.g. PID, Deadbeat, Sliding-mode for current loop)
+\node[tblock] (CTL) at (2.2,0) {Controller\\$q,d$ axis};
+
+\node[tblock] (IPK) at (5.4,0) {Inverse\\Park};
+\node[block]  (SVM) at (8.6,0) {SVM};
+\node[block,minimum width=2.4cm] (INV) at (12.0,0) {Three-phase\\inverter};
+\node[motor]  (MTR) at (16.0,0) {Three-phase\\motor};
+
+% ─── FEEDBACK PATH ────────────────────────────────────────────────────────────
+\node[tblock] (PRK) at (8.8,-3.5) {Park};
+\node[block,minimum width=1.8cm] (CLK) at (12.0,-3.5) {Clarke};
+\node[block,minimum width=3.4cm] (CUR) at (16.0,-3.5) {Current\\measurement};
+\node[block,minimum width=1.8cm] (ENC) at (16.0,-6.0) {Encoder};
+\node[block,minimum width=1.4cm,minimum height=0.8cm] (POLE) at (13.0,-6.0) {$\times\,p$};
+
+% ─── REFERENCES ───────────────────────────────────────────────────────────────
+\draw[->] (-1.4, 0.9) node[left,lbl] {$i_q^{*}$}   -- (Sq.west);
+\draw[->] (-1.4,-0.9) node[left,lbl] {$i_d^{*}=0$} -- (Sd.west);
+
+\node[lbl] at ($(Sq)+(-0.32, 0.24)$) {$+$};
+\node[lbl] at ($(Sq)+( 0.28,-0.30)$) {$-$};
+\node[lbl] at ($(Sd)+(-0.32, 0.24)$) {$+$};
+\node[lbl] at ($(Sd)+( 0.28,-0.30)$) {$-$};
+
+\draw[->] (Sq.east) -- ($(CTL.west)+(0, 0.9)$);
+\draw[->] (Sd.east) -- ($(CTL.west)+(0,-0.9)$);
+
+% ─── CONTROLLER → INVERSE PARK ────────────────────────────────────────────────
+\draw[->] ($(CTL.east)+(0, 0.6)$) -- node[above,lbl] {$v_q^{*}$}
+          ($(IPK.west)+(0, 0.6)$);
+\draw[->] ($(CTL.east)+(0,-0.6)$) -- node[above,lbl] {$v_d^{*}$}
+          ($(IPK.west)+(0,-0.6)$);
+
+% ─── INVERSE PARK → SVM ───────────────────────────────────────────────────────
+\draw[->] ($(IPK.east)+(0, 0.55)$) -- node[above,lbl] {$v_{\alpha}^{*}$}
+          ($(SVM.west)+(0, 0.55)$);
+\draw[->] ($(IPK.east)+(0,-0.55)$) -- node[above,lbl] {$v_{\beta}^{*}$}
+          ($(SVM.west)+(0,-0.55)$);
+
+% ─── SVM → INVERTER ───────────────────────────────────────────────────────────
+\draw[->] ($(SVM.east)+(0, 0.55)$) -- node[above,lbl] {$d_A$} ($(INV.west)+(0, 0.55)$);
+\draw[->] ($(SVM.east)+(0, 0.00)$) -- node[above,lbl] {$d_B$} ($(INV.west)+(0, 0.00)$);
+\draw[->] ($(SVM.east)+(0,-0.55)$) -- node[above,lbl] {$d_C$} ($(INV.west)+(0,-0.55)$);
+
+% ─── INVERTER → MOTOR ─────────────────────────────────────────────────────────
+\draw[->] ($(INV.east)+(0, 0.55)$) -- node[above,lbl,pos=0.30] {$v_a$} (MTR.155);
+\draw[->] ($(INV.east)+(0, 0.00)$) -- node[above,lbl,pos=0.30] {$v_b$} (MTR.180);
+\draw[->] ($(INV.east)+(0,-0.55)$) -- node[above,lbl,pos=0.30] {$v_c$} (MTR.205);
+
+% ─── MOTOR PHASE CURRENTS ─────────────────────────────────────────────────────
+\draw[->] (MTR.234) -- node[left,lbl,pos=0.35] {$i_a$} (MTR.234 |- CUR.north);
+\draw[->] (MTR.270) -- node[left,lbl,pos=0.55] {$i_b$} (MTR.270 |- CUR.north);
+\draw[->] (MTR.306) -- node[left,lbl,pos=0.75] {$i_c$} (MTR.306 |- CUR.north);
+
+% ─── MEASUREMENT → CLARKE → PARK ─────────────────────────────────────────────
+\draw[->] ($(CUR.west)+(0, 0.3)$) -- node[above,lbl] {$i_a$} ($(CLK.east)+(0, 0.3)$);
+\draw[->] ($(CUR.west)+(0,-0.3)$) -- node[above,lbl] {$i_b$} ($(CLK.east)+(0,-0.3)$);
+
+\draw[->] ($(CLK.west)+(0, 0.3)$) -- node[above,lbl] {$i_{\alpha}$} ($(PRK.east)+(0, 0.3)$);
+\draw[->] ($(CLK.west)+(0,-0.3)$) -- node[above,lbl] {$i_{\beta}$}  ($(PRK.east)+(0,-0.3)$);
+
+% ─── PARK OUTPUTS → SUMMING NODES ────────────────────────────────────────────
+\draw[->] ($(PRK.west)+(0,0.6)$) -- node[above,lbl,pos=0.30] {$i_d$}
+          (0,-2.9) -- (Sd.south);
+
+\draw[->] ($(PRK.west)+(0,-0.6)$) -- node[above,lbl,pos=0.22] {$i_q$}
+          (-2.6,-4.1) -- (-2.6,0) -- (0,0) -- (Sq.south);
+
+% ─── POSITION FEEDBACK ────────────────────────────────────────────────────────
+\draw[->] (MTR.east) -- node[above,lbl] {shaft} (19.0,0)
+          -- (19.0,-6.0) -- (ENC.east);
+
+\draw[->] (ENC.west) -- node[above,lbl] {$\theta_m$} (POLE.east);
+
+\draw (POLE.west) -- node[above,lbl,pos=0.30] {$\theta_e$} (5.0,-6.0);
+\node[dot] at (8.8,-6.0) {};
+
+\draw[->] (8.8,-6.0) -- (PRK.south);
+\draw[->] (5.0,-6.0) -- (5.0,-1.2);
+
+% ─── SECTION LABELS ───────────────────────────────────────────────────────────
+\node[font=\small\bfseries] at (2.2, 2.0)  {Current control};
+\node[font=\small\bfseries] at (12.0, 2.2) {Power stage};
+\node[font=\small\bfseries] at (11.0,-5.2) {Feedback path};
+
+\end{tikzpicture}%
+}
+\caption{Classical field-oriented control (FOC) structure for a three-phase
+permanent magnet AC motor. The measured phase currents are transformed from the
+three-phase reference frame to the stationary $\alpha\beta$ frame using the
+Clarke transform and subsequently to the rotating $dq$ reference frame using the
+Park transform. The current controller regulates the $d$-axis and $q$-axis currents
+independently. The resulting voltage references are transformed back to the
+$\alpha\beta$ frame through the inverse Park transform and converted into
+three-phase PWM duty cycles using space vector modulation (SVM). The electrical
+angle is derived from the encoder measurement according to $\theta_e=p\,\theta_m$,
+where $p$ is the number of pole pairs.}
+\label{fig:foc-complete-loop}
+\end{figure}

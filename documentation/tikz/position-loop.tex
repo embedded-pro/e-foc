@@ -1,0 +1,97 @@
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  >=Stealth,
+  thick,
+  block/.style={draw,rectangle,minimum width=2cm,minimum height=1.4cm,
+                align=center,font=\small,fill=white},
+  tblock/.style={draw,rectangle,minimum width=2cm,minimum height=2.4cm,
+                 align=center,font=\small,fill=white},
+  sum/.style={draw,circle,minimum size=0.6cm,inner sep=0pt,fill=white},
+  motor/.style={draw,circle,minimum size=2.6cm,align=center,font=\small,fill=white},
+  lbl/.style={font=\scriptsize},
+  dot/.style={circle,fill=black,inner sep=1.5pt}
+]
+
+% ─── FORWARD PATH ─────────────────────────────────────────────────────────────
+\node[sum]   (St)   at (0,0.6)   {};
+\node[block] (CTLt) at (2.6,0.6) {Position\\controller};
+\node[sum]   (Sw)   at (5.4,0.6) {};
+\node[block] (CTLw) at (8.0,0.6) {Speed\\controller};
+
+\node[tblock,minimum width=3.0cm] (FOC) at (12.0,0) {Current FOC\\(inner loop)};
+\node[motor] (MTR) at (16.6,0) {Three-phase\\motor};
+
+% ─── FEEDBACK PATH ────────────────────────────────────────────────────────────
+\node[block,minimum width=3.4cm] (CUR) at (16.6,-3.5) {Current\\measurement};
+\node[block,minimum width=1.8cm] (ENC) at (16.6,-6.0) {Encoder};
+\node[block] (SPD) at (11.2,-6.0) {Speed\\estimator};
+
+% ─── REFERENCES ───────────────────────────────────────────────────────────────
+\draw[->] (-1.6, 0.6) node[left,lbl] {$\theta^{*}$} -- (St.west);
+
+\node[lbl] at ($(St)+(-0.32, 0.24)$) {$+$};
+\node[lbl] at ($(St)+( 0.28,-0.30)$) {$-$};
+\node[lbl] at ($(Sw)+(-0.32, 0.24)$) {$+$};
+\node[lbl] at ($(Sw)+( 0.28,-0.30)$) {$-$};
+
+\draw[->] (St.east) -- (CTLt.west);
+
+% ─── POSITION CONTROLLER → SPEED LOOP ────────────────────────────────────────
+\draw[->] (CTLt.east) -- node[above,lbl] {$\omega^{*}$} (Sw.west);
+\draw[->] (Sw.east) -- (CTLw.west);
+
+% ─── SPEED CONTROLLER → CURRENT LOOP ─────────────────────────────────────────
+\draw[->] (CTLw.east) -- node[above,lbl] {$i_q^{*}$} ($(FOC.west)+(0, 0.6)$);
+\draw[->] (8.9,-0.6) node[left,lbl] {$i_d^{*}=0$} -- ($(FOC.west)+(0,-0.6)$);
+
+% ─── CURRENT LOOP → MOTOR ─────────────────────────────────────────────────────
+\draw[->] ($(FOC.east)+(0, 0.55)$) -- node[above,lbl,pos=0.30] {$v_a$} (MTR.155);
+\draw[->] ($(FOC.east)+(0, 0.00)$) -- node[above,lbl,pos=0.30] {$v_b$} (MTR.180);
+\draw[->] ($(FOC.east)+(0,-0.55)$) -- node[above,lbl,pos=0.30] {$v_c$} (MTR.205);
+
+% ─── MOTOR PHASE CURRENTS ─────────────────────────────────────────────────────
+\draw[->] (MTR.234) -- node[left,lbl,pos=0.35] {$i_a$} (MTR.234 |- CUR.north);
+\draw[->] (MTR.270) -- node[left,lbl,pos=0.55] {$i_b$} (MTR.270 |- CUR.north);
+\draw[->] (MTR.306) -- node[left,lbl,pos=0.75] {$i_c$} (MTR.306 |- CUR.north);
+
+% ─── MEASUREMENT → CURRENT LOOP ──────────────────────────────────────────────
+\draw[->] ($(CUR.west)+(0, 0.3)$) -- node[above,lbl,pos=0.35] {$i_a$}
+          (12.9,-3.2) -- ($(FOC.south)+(0.9,0)$);
+\draw[->] ($(CUR.west)+(0,-0.3)$) -- node[above,lbl,pos=0.30] {$i_b$}
+          (11.1,-3.8) -- ($(FOC.south)+(-0.9,0)$);
+
+% ─── SHAFT → ENCODER ──────────────────────────────────────────────────────────
+\draw[->] (MTR.east) -- node[above,lbl] {shaft} (19.2,0)
+          -- (19.2,-6.0) -- (ENC.east);
+
+% ─── ENCODER → SPEED ESTIMATOR AND POSITION LOOP ─────────────────────────────
+\draw (ENC.west) -- node[above,lbl] {$\theta_m$} (13.8,-6.0);
+\node[dot] at (13.8,-6.0) {};
+
+\draw[->] (13.8,-6.0) -- (SPD.east);
+
+\draw[->] (13.8,-6.0) -- (13.8,-7.6) -- (0,-7.6)
+          -- node[right,lbl,pos=0.30] {$\theta_m$} (St.south);
+
+% ─── SPEED ESTIMATOR → SPEED SUMMING NODE ────────────────────────────────────
+\draw[->] (SPD.west) -- node[above,lbl,pos=0.30] {$\hat\omega$}
+          (5.4,-6.0) -- (Sw.south);
+
+% ─── SECTION LABELS ───────────────────────────────────────────────────────────
+\node[font=\small\bfseries] at (2.6,  2.0) {Position control};
+\node[font=\small\bfseries] at (8.0,  2.0) {Speed control};
+\node[font=\small\bfseries] at (12.0, 2.0) {Inner current loop};
+\node[font=\small\bfseries] at (7.6, -4.8) {Feedback path};
+
+\end{tikzpicture}%
+}
+\caption{Position control cascade. The position controller produces a speed reference
+$\omega^{*}$; the speed controller converts it to a $q$-axis current reference $i_q^{*}$
+for the inner current FOC loop of Fig.~\ref{fig:foc-complete-loop}. The mechanical angle
+$\theta_m$ from the encoder closes the position loop directly and also feeds the speed
+estimator, whose output $\hat\omega$ closes the speed loop. The active algorithm for each
+loop is selected at runtime.}
+\label{fig:position-loop}
+\end{figure}

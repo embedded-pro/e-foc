@@ -82,7 +82,7 @@ Documentation-first: update `documentation/` **before or alongside** behavioral 
 
 - `documentation/theory/` — FOC algorithm or motor model changes
 - `documentation/performance-optimization/README.md` — timing-critical changes
-- All visuals: Mermaid code blocks or ASCII art — no external image references
+- All visuals: Mermaid (flowcharts/state/sequence), TikZ `{=latex}` raw blocks (technical charts, signal flows, coordinate frames — source in `documentation/tikz/`), or ASCII art — no external image references
 - Templates: `documentation/templates/`
 
 ## Build

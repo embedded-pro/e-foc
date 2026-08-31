@@ -2,9 +2,9 @@
 title: "Advanced FOC Controllers — Index"
 type: theory
 status: draft
-version: 0.2.0
+version: 0.3.0
 component: "foc-controllers"
-date: 2026-08-10
+date: 2026-08-31
 ---
 
 | Field     | Value                            |
@@ -12,47 +12,23 @@ date: 2026-08-10
 | Title     | Advanced FOC Controllers — Index |
 | Type      | theory                           |
 | Status    | draft                            |
-| Version   | 0.2.0                            |
+| Version   | 0.3.0                            |
 | Component | foc-controllers                  |
-| Date      | 2026-08-10                       |
+| Date      | 2026-08-31                       |
 
 ---
 
 ## Overview
 
-This index covers the state-of-the-art controller algorithms available for the three nested FOC
-loops. Each loop has its own document. A shared plant-models document contains the mathematical
-foundations (dq plant, mechanical plant, position plant, discretization) referenced by all three.
+This index covers the controller algorithms available for the three nested FOC loops. Each loop
+exposes a runtime-selectable controller slot configured via CLI or CAN without a firmware rebuild.
+Per-algorithm chapters contain the full mathematical foundation and design equations.
 
-### Document Map
+The shared plant models (dq current, mechanical speed, position) and discretisation are in
+`documentation/theory/foc-plant-models.md`.
 
-| Document                                                       | Content                                                                 |
-|----------------------------------------------------------------|-------------------------------------------------------------------------|
-| [`foc-plant-models.md`](foc-plant-models.md)                   | PMSM current, speed, and position plant derivations; ZOH discretization |
-| [`current-loop-controllers.md`](current-loop-controllers.md)   | A1 Decoupled PID, A2 Deadbeat, A3 Sliding-mode                          |
-| [`speed-loop-controllers.md`](speed-loop-controllers.md)       | S1 LQI, S2 ADRC, S3 Two-DOF                                             |
-| [`position-loop-controllers.md`](position-loop-controllers.md) | P1 LQR/LQI, P2 Cascade P, P3 Two-DOF, P4 ILC, Friction compensation     |
-
-The runtime selection mechanism, heap-free storage, `std::visit` dispatch, state gating, CLI/CAN
-interface, and NVM persistence are described in `documentation/design/controller-selection.md`.
-
----
-
-## Mathematical Foundation
-
-All controllers in this booklet derive from three plant models established in
-`documentation/theory/foc-plant-models.md`:
-
-| Plant                              | States                 | Input                   | Loop rate |
-|------------------------------------|------------------------|-------------------------|-----------|
-| PMSM current (per axis, decoupled) | $i_d$, $i_q$           | normalised voltage $v'$ | 20 kHz    |
-| Mechanical speed                   | $\omega_m$             | $i_q^*$                 | 1 kHz     |
-| Position (double integrator)       | $\theta_m$, $\omega_m$ | $i_q^*$                 | 1 kHz     |
-
-The RLS estimators provide $R_s$, $L_s$, $J$, $B_f$ that populate the discrete matrices
-$A_d$, $B_d$ of each plant. Model-based controllers (LQR, LQI, Deadbeat, ADRC) are
-reconfigured from the latest RLS snapshot each time they are selected, so gains track the
-actual motor parameters without manual re-tuning.
+The runtime selection mechanism — heap-free variant storage, type-aware dispatch, state gating,
+NVM persistence, and CLI/CAN interface — is in `documentation/design/controller-selection.md`.
 
 ---
 
@@ -63,14 +39,14 @@ graph TD
     ENC(["Encoder θm"])
     ADC(["ADC ia, ib"])
     subgraph POS["Position loop — 1 kHz"]
-        PC["PID · Cascade P · LQR/LQI · Two-DOF · ILC"]
+        PC["P · Cascade P · LQR/LQI · Two-DOF · ILC"]
     end
     subgraph SPD["Speed loop — 1 kHz"]
-        SC["PID · LQI · ADRC · Two-DOF"]
+        SC["PI · LQI · ADRC · Two-DOF"]
         FC["+ Friction comp. Iq_ff"]
     end
     subgraph CUR["Current loop — 20 kHz ISR"]
-        CC["PID · Decoupled PID · Deadbeat · Sliding-mode"]
+        CC["PI · Decoupled PID · Deadbeat · Sliding-mode"]
         SVM["inv-Park → SVM → PWM → Motor"]
     end
     POS -->|"ω*"| SPD
@@ -84,41 +60,75 @@ graph TD
 
 ---
 
+## Mathematical Foundation
+
+All controllers derive from three plant models established in
+`documentation/theory/foc-plant-models.md`:
+
+| Plant                              | States                 | Input                   | Loop rate |
+|------------------------------------|------------------------|-------------------------|-----------|
+| PMSM current (per axis, decoupled) | $i_d$, $i_q$           | normalised voltage $v'$ | 20 kHz    |
+| Mechanical speed                   | $\omega_m$             | $i_q^*$                 | 1 kHz     |
+| Position (double integrator)       | $\theta_m$, $\omega_m$ | $i_q^*$                 | 1 kHz     |
+
+Full derivations, ZOH discretisation, and parameter sources are in
+`documentation/theory/foc-plant-models.md`. Per-algorithm design equations are in the
+individual chapters listed in *Algorithm Index* below.
+
+---
+
 ## Numerical Properties
 
-**Current loop** — 20 kHz ISR, valid only for this loop:
+Summary comparison across all loops — see each per-algorithm chapter for full detail.
 
-| ID | Name           | Key property                           | Requires           |
-|----|----------------|----------------------------------------|--------------------|
-| —  | PID (baseline) | Standard incremental PI                | —                  |
-| A1 | Decoupled PID  | Cross-coupling + back-EMF feedforward  | Rs, Ls, ψf         |
-| A2 | Deadbeat       | 1–2 sample settling; maximum stiffness | Rs, Ls (tight RLS) |
-| A3 | Sliding-mode   | Robust to Rs/Ls mismatch               | Rs, Ls             |
+**Current loop** — 20 kHz ISR:
 
-**Speed loop** — 1 kHz handler, valid only for this loop:
+| ID | Algorithm     | ISR cost | Robustness          | Requires RLS |
+|----|---------------|----------|---------------------|--------------|
+| —  | PI (baseline) | ~6 MACs  | High (integral)     | No           |
+| A1 | Decoupled PID | ~10 MACs | Low (model-dep.)    | Partial      |
+| A2 | Deadbeat      | ~4 MACs  | Low (exact model)   | Yes (tight)  |
+| A3 | Sliding-mode  | ~12 MACs | High (gain-bounded) | Partial      |
 
-| ID | Name           | Key property                           | Requires          |
-|----|----------------|----------------------------------------|-------------------|
-| —  | PID (baseline) | Standard incremental PI                | —                 |
-| S1 | LQI            | DARE-optimal gains from J, Bf          | J, Bf (mech. RLS) |
-| S2 | ADRC           | Explicit load-disturbance cancellation | Kt, J             |
-| S3 | Two-DOF        | Decoupled tracking / stiffness tuning  | —                 |
+**Speed loop** — 1 kHz handler:
 
-**Position loop** — 1 kHz handler, valid only for this loop:
+| ID | Algorithm     | Ops/cycle | Disturbance rejection | Requires RLS |
+|----|---------------|-----------|-----------------------|--------------|
+| —  | PI (baseline) | ~6 MACs   | Integral quality      | No           |
+| S1 | LQI           | 2 MACs    | Integral quality      | Yes (J, Bf)  |
+| S2 | ADRC          | 6 MACs    | Explicit cancellation | Yes (Kt, J)  |
+| S3 | Two-DOF       | ~8 MACs   | Integral quality      | No           |
 
-| ID | Name           | Key property                              | Requires          |
-|----|----------------|-------------------------------------------|-------------------|
-| —  | PID (baseline) | Standard incremental PD                   | —                 |
-| P1 | LQR / LQI      | DARE-optimal simultaneous θ, ω regulation | J, Bf (mech. RLS) |
-| P2 | Cascade P→PI   | Industry-standard; single Kv parameter    | —                 |
-| P3 | Two-DOF        | Decoupled tracking / stiffness            | —                 |
-| P4 | ILC            | Near-zero error on repetitive tasks       | Trial length N    |
+**Position loop** — 1 kHz handler:
 
-**Augmentation** — independent of loop algorithm selection:
+| ID | Algorithm    | Ops/cycle      | Steady-state error  | Requires RLS |
+|----|--------------|----------------|---------------------|--------------|
+| —  | P (baseline) | 2 MACs         | Zero at rest        | No           |
+| P1 | LQR / LQI    | 4 MACs         | Zero (LQI)          | Yes (J, Bf)  |
+| P2 | Cascade P    | 2 MACs         | Speed-loop dep.     | No           |
+| P3 | Two-DOF      | ~8 MACs        | Configurable        | No           |
+| P4 | ILC          | 2 MACs + array | Near-zero (learned) | No           |
 
-| Name                  | Applied to                     | Key property                                           | Requires                  |
-|-----------------------|--------------------------------|--------------------------------------------------------|---------------------------|
-| Friction compensation | Iq* (speed or position output) | Cancels Coulomb + Stribeck; eliminates hunting at rest | Friction ID (Tc, Ts, ωst) |
+---
+
+## Algorithm Index
+
+| Loop     | ID | Algorithm                   | File                                                           |
+|----------|----|-----------------------------|----------------------------------------------------------------|
+| Current  | —  | PI (baseline)               | [current-loop-pi.md](current-loop-pi.md)                       |
+| Current  | A1 | Decoupled PID + Feedforward | [current-loop-decoupled-pid.md](current-loop-decoupled-pid.md) |
+| Current  | A2 | Deadbeat                    | [current-loop-deadbeat.md](current-loop-deadbeat.md)           |
+| Current  | A3 | Sliding-Mode                | [current-loop-sliding-mode.md](current-loop-sliding-mode.md)   |
+| Speed    | —  | PI (baseline)               | [speed-loop-pi.md](speed-loop-pi.md)                           |
+| Speed    | S1 | LQI                         | [speed-loop-lqi.md](speed-loop-lqi.md)                         |
+| Speed    | S2 | ADRC                        | [speed-loop-adrc.md](speed-loop-adrc.md)                       |
+| Speed    | S3 | Two-DOF                     | [speed-loop-two-dof.md](speed-loop-two-dof.md)                 |
+| Position | —  | P (baseline)                | [position-loop-pid.md](position-loop-pid.md)                   |
+| Position | P1 | LQR / LQI                   | [position-loop-lqr-lqi.md](position-loop-lqr-lqi.md)           |
+| Position | P2 | Cascade P→PI                | [position-loop-cascade-p.md](position-loop-cascade-p.md)       |
+| Position | P3 | Two-DOF                     | [position-loop-two-dof.md](position-loop-two-dof.md)           |
+| Position | P4 | Iterative Learning Control  | [position-loop-ilc.md](position-loop-ilc.md)                   |
+| Any      | —  | Friction Compensation       | [position-loop-friction.md](position-loop-friction.md)         |
 
 ---
 
@@ -139,7 +149,7 @@ neither and are always available once the motor is calibrated.
 
 ## References
 
-Full reference lists are in each loop-specific document. Foundational references:
+Full reference lists are in each per-algorithm chapter. Foundational references:
 
 1. Krishnan, R. — *Permanent Magnet Synchronous and Brushless DC Motor Drives*, CRC Press, 2010.
 2. Åström, K.J. & Wittenmark, B. — *Computer-Controlled Systems*, 3rd ed., Prentice Hall, 1997.
