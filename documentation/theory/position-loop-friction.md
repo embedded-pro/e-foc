@@ -7,14 +7,14 @@ component: "position-loop-friction"
 date: 2026-08-31
 ---
 
-| Field     | Value                                          |
-|-----------|------------------------------------------------|
+| Field     | Value                                             |
+|-----------|---------------------------------------------------|
 | Title     | Position Loop — Friction Compensation Feedforward |
-| Type      | theory                                         |
-| Status    | draft                                          |
-| Version   | 1.0.0                                          |
-| Component | position-loop-friction                         |
-| Date      | 2026-08-31                                     |
+| Type      | theory                                            |
+| Status    | draft                                             |
+| Version   | 1.0.0                                             |
+| Component | position-loop-friction                            |
+| Date      | 2026-08-31                                        |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -37,13 +37,13 @@ fully eliminate.
 
 ## Prerequisites
 
-| Symbol                  | Meaning                                    | Unit  |
-|-------------------------|--------------------------------------------|-------|
-| $T_c$                   | Coulomb (kinetic) friction torque          | N·m   |
-| $T_s$                   | Static (breakaway) torque                  | N·m   |
-| $\omega_{st}$           | Stribeck velocity                          | rad/s |
-| $K_t$                   | Torque constant                            | N·m/A |
-| $\omega_{dead}$         | Dead-zone smoothing width                  | rad/s |
+| Symbol          | Meaning                           | Unit  |
+|-----------------|-----------------------------------|-------|
+| $T_c$           | Coulomb (kinetic) friction torque | N·m   |
+| $T_s$           | Static (breakaway) torque         | N·m   |
+| $\omega_{st}$   | Stribeck velocity                 | rad/s |
+| $K_t$           | Torque constant                   | N·m/A |
+| $\omega_{dead}$ | Dead-zone smoothing width         | rad/s |
 
 Parameters $T_c$, $T_s$, $\omega_{st}$ are identified by a dedicated friction sweep — separate from
 the mechanical RLS that estimates only the linear viscous coefficient $B_f$.
@@ -95,12 +95,12 @@ viscous coefficient $B_f$.
 
 ## Numerical Properties
 
-| Property        | Value                                             |
-|-----------------|---------------------------------------------------|
-| Applied to      | $i_q^*$ at speed or position controller output    |
-| Ops per cycle   | ~6 MACs + exp (fast approximation)                |
-| Storage         | Constant (3 parameters)                           |
-| Identification  | Dedicated friction sweep required                 |
+| Property       | Value                                          |
+|----------------|------------------------------------------------|
+| Applied to     | $i_q^*$ at speed or position controller output |
+| Ops per cycle  | ~6 MACs + exp (fast approximation)             |
+| Storage        | Constant (3 parameters)                        |
+| Identification | Dedicated friction sweep required              |
 
 ---
 

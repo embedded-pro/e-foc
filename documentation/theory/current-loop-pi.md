@@ -37,14 +37,14 @@ Operates exclusively in the **20 kHz FOC ISR**.
 
 ## Prerequisites
 
-| Symbol        | Meaning                                        | Unit       |
-|---------------|------------------------------------------------|------------|
-| $R_s$         | Stator resistance per phase                    | Ω          |
-| $L_s$         | Stator inductance ($L_d = L_q$)                | H          |
-| $V_{dc}$      | DC bus voltage (measured dynamically)          | V          |
-| $T_s^i$       | Current loop sample period ($= 50\ \mu$s)      | s          |
-| $\omega_{bw}$ | Desired closed-loop current bandwidth          | rad/s      |
-| $A_d^i, B_d^i$| Discrete RL plant matrices                     | —          |
+| Symbol         | Meaning                                   | Unit  |
+|----------------|-------------------------------------------|-------|
+| $R_s$          | Stator resistance per phase               | Ω     |
+| $L_s$          | Stator inductance ($L_d = L_q$)           | H     |
+| $V_{dc}$       | DC bus voltage (measured dynamically)     | V     |
+| $T_s^i$        | Current loop sample period ($= 50\ \mu$s) | s     |
+| $\omega_{bw}$  | Desired closed-loop current bandwidth     | rad/s |
+| $A_d^i, B_d^i$ | Discrete RL plant matrices                | —     |
 
 See `documentation/theory/foc-plant-models.md` for all base symbols and ZOH derivations.
 
@@ -150,14 +150,14 @@ driving the modulator into over-modulation over roughly three-quarters of the el
 
 ## Numerical Properties
 
-| Property                 | Value                                    |
-|--------------------------|------------------------------------------|
-| ISR cost                 | ~6 MACs (2 axes × 3 operations)          |
-| Settling time            | ~$1/\omega_{bw}$                         |
-| Robustness to Rs/Ls error| High — integral action corrects mismatch |
-| Requires RLS convergence | No — motor datasheet values sufficient   |
-| Requires $\psi_f$        | No                                       |
-| Tuning knobs             | 1 ($\omega_{bw}$) + 1 ($V_{dc}$ live)   |
+| Property                  | Value                                    |
+|---------------------------|------------------------------------------|
+| ISR cost                  | ~6 MACs (2 axes × 3 operations)          |
+| Settling time             | ~$1/\omega_{bw}$                         |
+| Robustness to Rs/Ls error | High — integral action corrects mismatch |
+| Requires RLS convergence  | No — motor datasheet values sufficient   |
+| Requires $\psi_f$         | No                                       |
+| Tuning knobs              | 1 ($\omega_{bw}$) + 1 ($V_{dc}$ live)    |
 
 ---
 

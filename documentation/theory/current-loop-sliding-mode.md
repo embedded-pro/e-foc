@@ -7,14 +7,14 @@ component: "current-loop-sliding-mode"
 date: 2026-08-31
 ---
 
-| Field     | Value                            |
-|-----------|----------------------------------|
-| Title     | Current Loop — A3: Sliding-Mode  |
-| Type      | theory                           |
-| Status    | draft                            |
-| Version   | 1.0.0                            |
-| Component | current-loop-sliding-mode        |
-| Date      | 2026-08-31                       |
+| Field     | Value                           |
+|-----------|---------------------------------|
+| Title     | Current Loop — A3: Sliding-Mode |
+| Type      | theory                          |
+| Status    | draft                           |
+| Version   | 1.0.0                           |
+| Component | current-loop-sliding-mode       |
+| Date      | 2026-08-31                      |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -38,11 +38,11 @@ used but the controller remains stable over a wide range of mismatch.
 
 ## Prerequisites
 
-| Symbol        | Meaning                                  | Unit |
-|---------------|------------------------------------------|------|
-| $A_d^i, B_d^i$| Discrete current plant matrices          | —    |
-| $\phi$        | Sliding-mode boundary layer width        | A    |
-| $K_{sw}$      | Sliding-mode switching gain              | A    |
+| Symbol         | Meaning                           | Unit |
+|----------------|-----------------------------------|------|
+| $A_d^i, B_d^i$ | Discrete current plant matrices   | —    |
+| $\phi$         | Sliding-mode boundary layer width | A    |
+| $K_{sw}$       | Sliding-mode switching gain       | A    |
 
 See `documentation/theory/foc-plant-models.md` for ZOH derivations.
 
@@ -150,14 +150,14 @@ A3 has no integral action, so it is unaffected by windup at the voltage limit.
 
 ## Numerical Properties
 
-| Property                 | Value                                             |
-|--------------------------|---------------------------------------------------|
-| ISR cost                 | ~12 MACs (equivalent + switching, 2 axes)         |
-| Settling time            | ~$1/\omega_{bw}$ (boundary-layer limited)         |
-| Robustness to Rs/Ls error| High — gain-bounded; covers ±50% $R_s$ drift      |
-| Requires $\psi_f$        | No                                                |
-| Requires RLS convergence | Partial — stable with datasheet values            |
-| Tuning knobs             | 2 ($K_{sw}$, $\phi$)                              |
+| Property                  | Value                                        |
+|---------------------------|----------------------------------------------|
+| ISR cost                  | ~12 MACs (equivalent + switching, 2 axes)    |
+| Settling time             | ~$1/\omega_{bw}$ (boundary-layer limited)    |
+| Robustness to Rs/Ls error | High — gain-bounded; covers ±50% $R_s$ drift |
+| Requires $\psi_f$         | No                                           |
+| Requires RLS convergence  | Partial — stable with datasheet values       |
+| Tuning knobs              | 2 ($K_{sw}$, $\phi$)                         |
 
 ---
 

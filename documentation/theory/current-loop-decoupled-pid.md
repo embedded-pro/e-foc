@@ -7,14 +7,14 @@ component: "current-loop-decoupled-pid"
 date: 2026-08-31
 ---
 
-| Field     | Value                                     |
-|-----------|-------------------------------------------|
+| Field     | Value                                          |
+|-----------|------------------------------------------------|
 | Title     | Current Loop — A1: Decoupled PID + Feedforward |
-| Type      | theory                                    |
-| Status    | draft                                     |
-| Version   | 1.0.0                                     |
-| Component | current-loop-decoupled-pid                |
-| Date      | 2026-08-31                                |
+| Type      | theory                                         |
+| Status    | draft                                          |
+| Version   | 1.0.0                                          |
+| Component | current-loop-decoupled-pid                     |
+| Date      | 2026-08-31                                     |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -38,14 +38,14 @@ and the motor constant $\psi_f$.
 
 ## Prerequisites
 
-| Symbol               | Meaning                                       | Unit       |
-|----------------------|-----------------------------------------------|------------|
-| $A_d^i, B_d^i$       | Discrete current plant matrices               | —          |
-| $v_d^{PI}, v_q^{PI}$ | PI controller outputs (decoupled axes)        | normalised |
-| $\omega_e$           | Electrical angular velocity                   | rad/s      |
-| $L_s$                | Stator inductance                             | H          |
-| $\psi_f$             | Permanent magnet flux linkage                 | Wb         |
-| $V_{dc}$             | DC bus voltage                                | V          |
+| Symbol               | Meaning                                | Unit       |
+|----------------------|----------------------------------------|------------|
+| $A_d^i, B_d^i$       | Discrete current plant matrices        | —          |
+| $v_d^{PI}, v_q^{PI}$ | PI controller outputs (decoupled axes) | normalised |
+| $\omega_e$           | Electrical angular velocity            | rad/s      |
+| $L_s$                | Stator inductance                      | H          |
+| $\psi_f$             | Permanent magnet flux linkage          | Wb         |
+| $V_{dc}$             | DC bus voltage                         | V          |
 
 See `documentation/theory/foc-plant-models.md` for all base symbols.
 See `documentation/theory/current-loop-pi.md` for the baseline PI design and gain normalisation.
@@ -140,14 +140,14 @@ and the interaction with integral anti-windup.
 
 ## Numerical Properties
 
-| Property                 | Value                                             |
-|--------------------------|---------------------------------------------------|
-| ISR cost                 | ~10 MACs (PI + feedforward additions)             |
-| Settling time            | ~$1/\omega_{bw}$                                  |
-| Robustness to Rs/Ls error| Low — feedforward is model-dependent              |
-| Requires $\psi_f$        | Yes (q-axis back-EMF cancellation)                |
-| Requires RLS convergence | Partial ($L_s$ for feedforward; $R_s$ for PI)     |
-| Tuning knobs             | 1 ($\omega_{bw}$)                                 |
+| Property                  | Value                                         |
+|---------------------------|-----------------------------------------------|
+| ISR cost                  | ~10 MACs (PI + feedforward additions)         |
+| Settling time             | ~$1/\omega_{bw}$                              |
+| Robustness to Rs/Ls error | Low — feedforward is model-dependent          |
+| Requires $\psi_f$         | Yes (q-axis back-EMF cancellation)            |
+| Requires RLS convergence  | Partial ($L_s$ for feedforward; $R_s$ for PI) |
+| Tuning knobs              | 1 ($\omega_{bw}$)                             |
 
 ---
 

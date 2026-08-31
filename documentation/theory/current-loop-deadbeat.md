@@ -38,12 +38,12 @@ $R_s$) and the A1 feedforward for decoupling at speed.
 
 ## Prerequisites
 
-| Symbol        | Meaning                                           | Unit       |
-|---------------|---------------------------------------------------|------------|
-| $A_d^i, B_d^i$| Discrete current plant matrices                   | —          |
-| $i^*$         | Current reference (d or q axis)                   | A          |
-| $i[k]$        | Measured current                                  | A          |
-| $V_{dc}$      | DC bus voltage                                    | V          |
+| Symbol         | Meaning                         | Unit |
+|----------------|---------------------------------|------|
+| $A_d^i, B_d^i$ | Discrete current plant matrices | —    |
+| $i^*$          | Current reference (d or q axis) | A    |
+| $i[k]$         | Measured current                | A    |
+| $V_{dc}$       | DC bus voltage                  | V    |
 
 See `documentation/theory/foc-plant-models.md` for ZOH derivations of $A_d^i$, $B_d^i$.
 See `documentation/theory/current-loop-decoupled-pid.md` for the A1 feedforward used alongside A2.
@@ -132,14 +132,14 @@ Deadbeat has no integral action, so it is unaffected by windup at the voltage li
 
 ## Numerical Properties
 
-| Property                 | Value                                             |
-|--------------------------|---------------------------------------------------|
-| ISR cost                 | ~4 MACs (cheapest advanced controller)            |
-| Settling time            | 1 sample (one-step); geometric (two-step)         |
-| Robustness to Rs/Ls error| Low — exact model required                        |
-| Requires $\psi_f$        | No (but A1 feedforward does)                      |
-| Requires RLS convergence | Yes — tight convergence required                  |
-| Tuning knobs             | 0 (variant choice only)                           |
+| Property                  | Value                                     |
+|---------------------------|-------------------------------------------|
+| ISR cost                  | ~4 MACs (cheapest advanced controller)    |
+| Settling time             | 1 sample (one-step); geometric (two-step) |
+| Robustness to Rs/Ls error | Low — exact model required                |
+| Requires $\psi_f$         | No (but A1 feedforward does)              |
+| Requires RLS convergence  | Yes — tight convergence required          |
+| Tuning knobs              | 0 (variant choice only)                   |
 
 ---
 

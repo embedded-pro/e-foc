@@ -17,7 +17,7 @@ The build script reads links from this file in order to assemble the book.
 | 10      | [Speed Loop — ADRC (S2)](speed-loop-adrc.md)                                | Extended State Observer; explicit disturbance cancellation         |
 | 11      | [Speed Loop — Two-DOF (S3)](speed-loop-two-dof.md)                          | Decoupled tracking and stiffness via reference pre-filter          |
 | 12      | [Position Loop — P (baseline)](position-loop-pid.md)                        | Pure-P controller; bandwidth = Kp; angle-error wrapping            |
-| 13      | [Position Loop — LQR/LQI (P1)](position-loop-lqr-lqi.md)                   | DARE-optimal simultaneous θ, ω regulation                          |
+| 13      | [Position Loop — LQR/LQI (P1)](position-loop-lqr-lqi.md)                    | DARE-optimal simultaneous θ, ω regulation                          |
 | 14      | [Position Loop — Cascade P (P2)](position-loop-cascade-p.md)                | Industry-standard Kv architecture; velocity feedforward            |
 | 15      | [Position Loop — Two-DOF (P3)](position-loop-two-dof.md)                    | Decoupled tracking and stiffness; angle-wrapping pre-filter        |
 | 16      | [Position Loop — ILC (P4)](position-loop-ilc.md)                            | Near-zero error on repetitive tasks after learning cycles          |

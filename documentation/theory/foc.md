@@ -332,13 +332,13 @@ See also: `documentation/theory/images/foc_coordinates.svg` and `documentation/t
 
 ### Sensitivity Analysis
 
-| Parameter          | Effect on Control Quality                                          |
-|--------------------|--------------------------------------------------------------------|
+| Parameter          | Effect on Control Quality                                                                                        |
+|--------------------|------------------------------------------------------------------------------------------------------------------|
 | $R_s$ error        | Current controller steady-state error (for non-integral controllers); compensated by integral term where present |
 | $L_s$ error        | Controller bandwidth deviation; no steady-state error for integral-action controllers                            |
-| $\theta_e$ error   | Cross-coupling between d and q axes; reduces torque at large error |
-| $V_{dc}$ variation | Affects gain normalisation; dynamic Vdc measurement recommended    |
-| ADC offset         | Bias on $i_d$, $i_q$; must be calibrated at startup                |
+| $\theta_e$ error   | Cross-coupling between d and q axes; reduces torque at large error                                               |
+| $V_{dc}$ variation | Affects gain normalisation; dynamic Vdc measurement recommended                                                  |
+| ADC offset         | Bias on $i_d$, $i_q$; must be calibrated at startup                                                              |
 
 ---
 

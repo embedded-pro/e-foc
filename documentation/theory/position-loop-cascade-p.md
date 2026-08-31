@@ -7,14 +7,14 @@ component: "position-loop-cascade-p"
 date: 2026-08-31
 ---
 
-| Field     | Value                        |
-|-----------|------------------------------|
+| Field     | Value                         |
+|-----------|-------------------------------|
 | Title     | Position Loop — P2: Cascade P |
-| Type      | theory                       |
-| Status    | draft                        |
-| Version   | 1.0.0                        |
-| Component | position-loop-cascade-p      |
-| Date      | 2026-08-31                   |
+| Type      | theory                        |
+| Status    | draft                         |
+| Version   | 1.0.0                         |
+| Component | position-loop-cascade-p       |
+| Date      | 2026-08-31                    |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -37,11 +37,11 @@ Operates exclusively in the **1 kHz outer handler**.
 
 ## Prerequisites
 
-| Symbol      | Meaning                                              | Unit          |
-|-------------|------------------------------------------------------|---------------|
-| $K_v$       | Velocity loop gain (position controller proportional gain) | rad/s per rad |
-| $K_{ff}$    | Velocity feedforward fraction                        | —             |
-| $\omega_{bw}^s$ | Inner speed-loop closed-loop bandwidth           | rad/s         |
+| Symbol          | Meaning                                                    | Unit          |
+|-----------------|------------------------------------------------------------|---------------|
+| $K_v$           | Velocity loop gain (position controller proportional gain) | rad/s per rad |
+| $K_{ff}$        | Velocity feedforward fraction                              | —             |
+| $\omega_{bw}^s$ | Inner speed-loop closed-loop bandwidth                     | rad/s         |
 
 See `documentation/theory/foc-plant-models.md` §3 for the position plant derivation.
 
@@ -109,13 +109,13 @@ when the velocity reference signal carries noise.
 
 ## Numerical Properties
 
-| Property                    | Value                                      |
-|-----------------------------|--------------------------------------------|
-| Ops per 1 kHz cycle         | 2 MACs                                     |
-| Steady-state position error | Speed-loop dependent; zero at rest         |
-| Industry prevalence         | Dominant in industrial servo               |
-| Requires J, Bf              | No                                         |
-| Tuning knobs                | 1–2 ($K_v$, optional $K_{ff}$)             |
+| Property                    | Value                              |
+|-----------------------------|------------------------------------|
+| Ops per 1 kHz cycle         | 2 MACs                             |
+| Steady-state position error | Speed-loop dependent; zero at rest |
+| Industry prevalence         | Dominant in industrial servo       |
+| Requires J, Bf              | No                                 |
+| Tuning knobs                | 1–2 ($K_v$, optional $K_{ff}$)     |
 
 ---
 

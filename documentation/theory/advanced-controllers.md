@@ -83,52 +83,52 @@ Summary comparison across all loops — see each per-algorithm chapter for full 
 
 **Current loop** — 20 kHz ISR:
 
-| ID | Algorithm      | ISR cost  | Robustness    | Requires RLS  |
-|----|----------------|-----------|---------------|---------------|
-| —  | PI (baseline)  | ~6 MACs   | High (integral) | No          |
-| A1 | Decoupled PID  | ~10 MACs  | Low (model-dep.)| Partial     |
-| A2 | Deadbeat       | ~4 MACs   | Low (exact model)| Yes (tight)|
-| A3 | Sliding-mode   | ~12 MACs  | High (gain-bounded)| Partial  |
+| ID | Algorithm     | ISR cost | Robustness          | Requires RLS |
+|----|---------------|----------|---------------------|--------------|
+| —  | PI (baseline) | ~6 MACs  | High (integral)     | No           |
+| A1 | Decoupled PID | ~10 MACs | Low (model-dep.)    | Partial      |
+| A2 | Deadbeat      | ~4 MACs  | Low (exact model)   | Yes (tight)  |
+| A3 | Sliding-mode  | ~12 MACs | High (gain-bounded) | Partial      |
 
 **Speed loop** — 1 kHz handler:
 
-| ID | Algorithm      | Ops/cycle | Disturbance rejection | Requires RLS  |
-|----|----------------|-----------|-----------------------|---------------|
-| —  | PI (baseline)  | ~6 MACs   | Integral quality      | No            |
-| S1 | LQI            | 2 MACs    | Integral quality      | Yes (J, Bf)   |
-| S2 | ADRC           | 6 MACs    | Explicit cancellation | Yes (Kt, J)   |
-| S3 | Two-DOF        | ~8 MACs   | Integral quality      | No            |
+| ID | Algorithm     | Ops/cycle | Disturbance rejection | Requires RLS |
+|----|---------------|-----------|-----------------------|--------------|
+| —  | PI (baseline) | ~6 MACs   | Integral quality      | No           |
+| S1 | LQI           | 2 MACs    | Integral quality      | Yes (J, Bf)  |
+| S2 | ADRC          | 6 MACs    | Explicit cancellation | Yes (Kt, J)  |
+| S3 | Two-DOF       | ~8 MACs   | Integral quality      | No           |
 
 **Position loop** — 1 kHz handler:
 
-| ID | Algorithm      | Ops/cycle        | Steady-state error | Requires RLS  |
-|----|----------------|------------------|--------------------|---------------|
-| —  | P (baseline)   | 2 MACs           | Zero at rest       | No            |
-| P1 | LQR / LQI      | 4 MACs           | Zero (LQI)         | Yes (J, Bf)   |
-| P2 | Cascade P      | 2 MACs           | Speed-loop dep.    | No            |
-| P3 | Two-DOF        | ~8 MACs          | Configurable       | No            |
-| P4 | ILC            | 2 MACs + array   | Near-zero (learned)| No            |
+| ID | Algorithm    | Ops/cycle      | Steady-state error  | Requires RLS |
+|----|--------------|----------------|---------------------|--------------|
+| —  | P (baseline) | 2 MACs         | Zero at rest        | No           |
+| P1 | LQR / LQI    | 4 MACs         | Zero (LQI)          | Yes (J, Bf)  |
+| P2 | Cascade P    | 2 MACs         | Speed-loop dep.     | No           |
+| P3 | Two-DOF      | ~8 MACs        | Configurable        | No           |
+| P4 | ILC          | 2 MACs + array | Near-zero (learned) | No           |
 
 ---
 
 ## Algorithm Index
 
-| Loop     | ID  | Algorithm                 | File                                                                     |
-|----------|-----|---------------------------|--------------------------------------------------------------------------|
-| Current  | —   | PI (baseline)             | [current-loop-pi.md](current-loop-pi.md)                                 |
-| Current  | A1  | Decoupled PID + Feedforward | [current-loop-decoupled-pid.md](current-loop-decoupled-pid.md)         |
-| Current  | A2  | Deadbeat                  | [current-loop-deadbeat.md](current-loop-deadbeat.md)                     |
-| Current  | A3  | Sliding-Mode              | [current-loop-sliding-mode.md](current-loop-sliding-mode.md)             |
-| Speed    | —   | PI (baseline)             | [speed-loop-pi.md](speed-loop-pi.md)                                     |
-| Speed    | S1  | LQI                       | [speed-loop-lqi.md](speed-loop-lqi.md)                                   |
-| Speed    | S2  | ADRC                      | [speed-loop-adrc.md](speed-loop-adrc.md)                                 |
-| Speed    | S3  | Two-DOF                   | [speed-loop-two-dof.md](speed-loop-two-dof.md)                           |
-| Position | —   | P (baseline)              | [position-loop-pid.md](position-loop-pid.md)                             |
-| Position | P1  | LQR / LQI                 | [position-loop-lqr-lqi.md](position-loop-lqr-lqi.md)                    |
-| Position | P2  | Cascade P→PI              | [position-loop-cascade-p.md](position-loop-cascade-p.md)                 |
-| Position | P3  | Two-DOF                   | [position-loop-two-dof.md](position-loop-two-dof.md)                     |
-| Position | P4  | Iterative Learning Control| [position-loop-ilc.md](position-loop-ilc.md)                             |
-| Any      | —   | Friction Compensation     | [position-loop-friction.md](position-loop-friction.md)                   |
+| Loop     | ID | Algorithm                   | File                                                           |
+|----------|----|-----------------------------|----------------------------------------------------------------|
+| Current  | —  | PI (baseline)               | [current-loop-pi.md](current-loop-pi.md)                       |
+| Current  | A1 | Decoupled PID + Feedforward | [current-loop-decoupled-pid.md](current-loop-decoupled-pid.md) |
+| Current  | A2 | Deadbeat                    | [current-loop-deadbeat.md](current-loop-deadbeat.md)           |
+| Current  | A3 | Sliding-Mode                | [current-loop-sliding-mode.md](current-loop-sliding-mode.md)   |
+| Speed    | —  | PI (baseline)               | [speed-loop-pi.md](speed-loop-pi.md)                           |
+| Speed    | S1 | LQI                         | [speed-loop-lqi.md](speed-loop-lqi.md)                         |
+| Speed    | S2 | ADRC                        | [speed-loop-adrc.md](speed-loop-adrc.md)                       |
+| Speed    | S3 | Two-DOF                     | [speed-loop-two-dof.md](speed-loop-two-dof.md)                 |
+| Position | —  | P (baseline)                | [position-loop-pid.md](position-loop-pid.md)                   |
+| Position | P1 | LQR / LQI                   | [position-loop-lqr-lqi.md](position-loop-lqr-lqi.md)           |
+| Position | P2 | Cascade P→PI                | [position-loop-cascade-p.md](position-loop-cascade-p.md)       |
+| Position | P3 | Two-DOF                     | [position-loop-two-dof.md](position-loop-two-dof.md)           |
+| Position | P4 | Iterative Learning Control  | [position-loop-ilc.md](position-loop-ilc.md)                   |
+| Any      | —  | Friction Compensation       | [position-loop-friction.md](position-loop-friction.md)         |
 
 ---
 

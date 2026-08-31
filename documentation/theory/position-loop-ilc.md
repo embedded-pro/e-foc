@@ -38,11 +38,11 @@ ILC does not replace the feedback controller — it augments any stable position
 
 ## Prerequisites
 
-| Symbol   | Meaning                               | Unit |
-|----------|---------------------------------------|------|
-| $Q$      | ILC robustness filter scalar          | —    |
-| $\ell$   | ILC learning gain                     | —    |
-| $N$      | Trial length in samples (fixed)       | —    |
+| Symbol | Meaning                         | Unit |
+|--------|---------------------------------|------|
+| $Q$    | ILC robustness filter scalar    | —    |
+| $\ell$ | ILC learning gain               | —    |
+| $N$    | Trial length in samples (fixed) | —    |
 
 See `documentation/theory/foc-plant-models.md` §3 for the position plant derivation.
 
@@ -96,14 +96,14 @@ is the nominal position plant. Guaranteed by $Q < 1$ and $\ell$ within its stabi
 
 ## Numerical Properties
 
-| Property                    | Value                                          |
-|-----------------------------|------------------------------------------------|
+| Property                    | Value                                         |
+|-----------------------------|-----------------------------------------------|
 | Ops per 1 kHz cycle         | 2 MACs + 1 array read                         |
 | Steady-state position error | Near-zero after learning cycles               |
 | Storage                     | $N \times$ `float` (bounded array, fixed $N$) |
 | Suitable for                | Periodic / repetitive references only         |
-| Requires J, Bf              | No                                             |
-| Tuning knobs                | 3 ($N$, $Q$, $\ell$)                           |
+| Requires J, Bf              | No                                            |
+| Tuning knobs                | 3 ($N$, $Q$, $\ell$)                          |
 
 ---
 
