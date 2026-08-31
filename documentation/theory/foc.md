@@ -27,7 +27,7 @@ In the rotating (dq) reference frame the three-phase stator currents reduce to t
 - $i_d$ — the flux-producing (direct) component, nominally zero for maximum torque per ampere (MTPA).
 - $i_q$ — the torque-producing (quadrature) component, directly proportional to electrical torque.
 
-Standard PI controllers can then regulate these DC quantities without phase lag caused by the AC coupling. The
+Current controllers in the rotating frame regulate these DC quantities without phase lag caused by the AC coupling. The
 inverse transforms and Space Vector Modulation (SVM) reconstruct the three-phase PWM duty cycles that drive the
 inverter.
 
@@ -182,7 +182,7 @@ $$
 v_d' = R_s i_d + L_s \frac{di_d}{dt}, \qquad v_q' = R_s i_q + L_s \frac{di_q}{dt}
 $$
 
-These are controlled by separate PI regulators.
+These are regulated by independent current controllers, one per dq axis.
 
 ### 5. Electrical Torque
 
@@ -196,47 +196,10 @@ Since $\psi_f$ and $p$ are motor constants, torque is directly proportional to $
 reference from an outer speed or position loop gives a torque-current-mode inner loop — the fundamental
 advantage of FOC over scalar control.
 
-### 6. PI Current Controller Design
+The dq-axis current regulators are interchangeable at runtime. Gain design and normalisation depend on
+the active algorithm — see the current loop controller chapters in `documentation/theory/`.
 
-Each PI controller regulates one dq-axis current channel (modelled as an RL system):
-
-$$
-G_{plant}(s) = \frac{1}{R_s + s L_s} = \frac{1/R_s}{1 + s \tau_e}, \qquad \tau_e = \frac{L_s}{R_s}
-$$
-
-The standard pole-zero cancellation design sets the PI zero at the plant pole:
-
-$$
-K_p = \frac{L_s \cdot \omega_{bw}}{1}, \qquad K_i = \frac{R_s \cdot \omega_{bw}}{1}
-$$
-
-where $\omega_{bw}$ is the desired current loop bandwidth in rad/s. Practical values for embedded PMSM drives
-are $\omega_{bw} \approx 2\pi \cdot (500\text{–}2000)\ \text{rad/s}$.
-
-### 7. PID Gain Normalisation
-
-The PI controllers operate in **normalised units** where 1.0 corresponds to the maximum SVM output voltage.
-The maximum phase voltage that SVM can deliver in the linear modulation region is:
-
-$$
-V_{max,phase} = \frac{V_{dc}}{\sqrt{3}}
-$$
-
-Physical gains (in V/A) must be scaled to normalised units before use:
-
-$$
-K_{p,norm} = K_{p,phys} \cdot \frac{\sqrt{3}}{V_{dc}} = \frac{K_{p,phys}}{V_{dc} \cdot \tfrac{1}{\sqrt{3}}}
-$$
-
-Similarly for $K_i$. The normalisation scale factor is:
-
-$$
-\text{scale} = \frac{1}{V_{dc} \cdot \tfrac{1}{\sqrt{3}}} = \frac{\sqrt{3}}{V_{dc}}
-$$
-
-This ensures that a PI output of 1.0 maps exactly to full bus utilisation through the SVM stage.
-
-### 8. Space Vector Modulation (SVM)
+### 6. Space Vector Modulation (SVM)
 
 SVM synthesises any reference voltage vector $\mathbf{V}_{ref} = V_\alpha + j V_\beta$ as a time-average of
 the eight inverter states. The three-phase half-bridge inverter produces 8 switching states:
@@ -331,6 +294,18 @@ entries, so it is the interpolation rather than the table density that bounds th
 \input{foc-complete-loop.tex}
 ```
 
+### Speed Control Cascade
+
+```{=latex}
+\input{speed-loop.tex}
+```
+
+### Position Control Cascade
+
+```{=latex}
+\input{position-loop.tex}
+```
+
 ### Coordinate System Relationships
 
 ```{=latex}
@@ -349,18 +324,18 @@ See also: `documentation/theory/images/foc_coordinates.svg` and `documentation/t
 | Transform latency   | < 20 CPU cycles (Clarke + Park combined)                                                       |
 | LUT angle error     | <= $\pi/512 \approx 0.35°$ truncated; $\approx 1.9\times10^{-5}$ interpolated                  |
 | SVM duty resolution | 1% per step — `PhasePwmDutyCycles` carries `hal::Percent` (`uint8_t`)                          |
-| PI output range     | Applied $v_{dq}$ limited to the unit circle $\lVert v \rVert \le 1$; anti-windup on that limit |
+| Controller output   | Applied $v_{dq}$ limited to the unit circle $\lVert v \rVert \le 1$; anti-windup on that limit |
 | Torque linearity    | $\tau_e \propto i_q$ within MTPA region                                                        |
 | Over-modulation     | Clamp-based saturation; duty cycles bounded to [0, 1]                                          |
-| Gain normalisation  | $K_{p,norm} = K_{p,phys} \cdot \sqrt{3}/V_{dc}$                                                |
+| Gain normalisation  | Physical V/A gains must be scaled by $\sqrt{3}/V_{dc}$ to match per-unit SVM output            |
 | LUT memory          | 512 × 4 bytes = 2048 bytes flash                                                               |
 
 ### Sensitivity Analysis
 
 | Parameter          | Effect on Control Quality                                          |
 |--------------------|--------------------------------------------------------------------|
-| $R_s$ error        | PI steady-state error in d/q current; compensated by integral term |
-| $L_s$ error        | PI bandwidth deviation; no steady-state error                      |
+| $R_s$ error        | Current controller steady-state error (for non-integral controllers); compensated by integral term where present |
+| $L_s$ error        | Controller bandwidth deviation; no steady-state error for integral-action controllers                            |
 | $\theta_e$ error   | Cross-coupling between d and q axes; reduces torque at large error |
 | $V_{dc}$ variation | Affects gain normalisation; dynamic Vdc measurement recommended    |
 | ADC offset         | Bias on $i_d$, $i_q$; must be calibrated at startup                |
@@ -372,25 +347,11 @@ See also: `documentation/theory/images/foc_coordinates.svg` and `documentation/t
 Motor parameters: $R_s = 1.2\ \Omega$, $L_s = 0.5\ \text{mH}$, $p = 4$, $\psi_f = 0.05\ \text{Wb}$,
 $V_{dc} = 24\ \text{V}$.
 
-**Step 1 — Gain normalisation:**
-
-$$\text{scale} = \frac{\sqrt{3}}{24} \approx 0.0722$$
-
-**Step 2 — PI bandwidth** at $\omega_{bw} = 2\pi \cdot 1000 = 6283\ \text{rad/s}$:
-
-$$K_p = L_s \cdot \omega_{bw} = 0.5 \times 10^{-3} \times 6283 \approx 3.14\ \text{V/A}$$
-$$K_i = R_s \cdot \omega_{bw} = 1.2 \times 6283 \approx 7540\ \text{V/(A·s)}$$
-
-**Step 3 — Normalised gains:**
-
-$$K_{p,norm} = 3.14 \times 0.0722 \approx 0.227$$
-$$K_{i,norm} = 7540 \times 0.0722 \approx 544.5\ \text{(per second)}$$
-
-**Step 4 — Torque at $i_q = 5\ \text{A}$:**
+**Step 1 — Torque at $i_q = 5\ \text{A}$:**
 
 $$\tau_e = \frac{3}{2} \times 4 \times 0.05 \times 5 = 1.5\ \text{N·m}$$
 
-**Step 5 — SVM for $V_\alpha = 8\ \text{V}$, $V_\beta = 5\ \text{V}$** ($V_{dc} = 24\ \text{V}$):
+**Step 2 — SVM for $V_\alpha = 8\ \text{V}$, $V_\beta = 5\ \text{V}$** ($V_{dc} = 24\ \text{V}$):
 
 The modulator takes per-unit voltages, where $1\ \text{pu} = V_{dc}/\sqrt{3} = 13.86\ \text{V}$. Since
 $|V_{ref}| = \sqrt{64+25} \approx 9.43\ \text{V} < 13.86\ \text{V}$, the reference lies inside the linear
@@ -403,21 +364,21 @@ $$d_A = \mathrm{clamp}\!\left(\frac{0.589}{\sqrt{3}} + 0.5,\ 0,\ 1\right) = 0.84
 
 ---
 
-## Controller Alternatives
+## Controller Slots
 
-The standard PI current and PI speed regulators described above are the baseline FOC controllers.
-The system supports runtime-selectable alternative controllers for each loop:
+Each of the three control loops exposes a runtime-selectable controller slot. The active algorithm
+is configured via CLI or CAN without a firmware rebuild, and persists across power cycles via NVM.
 
-- **Current loop**: Decoupled PID with cross-coupling feedforward; Deadbeat; Sliding-mode.
-  See `documentation/theory/current-loop-controllers.md`.
-- **Speed loop**: LQI state-feedback; ADRC; Two-DOF.
-  See `documentation/theory/speed-loop-controllers.md`.
-- **Position loop**: LQR/LQI; Cascade P→PI; Two-DOF; ILC. Friction compensation augmentation.
-  See `documentation/theory/position-loop-controllers.md`.
+- **Current loop** — regulates $i_d$ and $i_q$ at 20 kHz.
+- **Speed loop** — regulates $\omega$ at 1 kHz, produces $i_q^*$ for the current loop.
+- **Position loop** — regulates $\theta$ at 1 kHz, produces $\omega^*$ for the speed loop.
 
-Plant models (current, speed, position) and discretization are in
-`documentation/theory/foc-plant-models.md`. An index of all controllers with algorithm map and
-parameter sources is in `documentation/theory/advanced-controllers.md`.
+For design equations of each available algorithm, see the per-algorithm theory chapters.
+An index of all algorithms with the selection map and parameter sources is in
+`documentation/theory/advanced-controllers.md`.
+
+Plant models (current, speed, position) and discretisation are in
+`documentation/theory/foc-plant-models.md`.
 
 The runtime selection mechanism — heap-free variant storage, type-aware dispatch, state gating,
 NVM persistence, and CLI/CAN interface — is documented in `documentation/design/controller-selection.md`.
