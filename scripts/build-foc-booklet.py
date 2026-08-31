@@ -30,6 +30,7 @@ Exit codes:
 import argparse
 import hashlib
 import html
+import os
 import pathlib
 import re
 import shutil
@@ -301,7 +302,9 @@ def render_pdf(book_md):
     ]
     env = os.environ.copy()
     tikz_dir = str(ROOT / "documentation" / "tikz")
-    env["TEXINPUTS"] = f'{tikz_dir}:{env.get("TEXINPUTS", "")}'
+    base = env.get("TEXINPUTS", "")
+    # Trailing pathsep preserves TeX's default search path; os.pathsep for portability
+    env["TEXINPUTS"] = os.pathsep.join(filter(None, [tikz_dir, base])) + os.pathsep
     return _run(command, output, env=env)
 
 
