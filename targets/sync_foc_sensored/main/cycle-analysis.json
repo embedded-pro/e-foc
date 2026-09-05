@@ -1,8 +1,6 @@
 {
   "path_name": "ADC ISR -> FOC inner loop (Clarke/Park/current loop/SVM) -> PWM output",
-  "loop_rates_khz": [
-    20
-  ],
+  "loop_rates_khz": [20],
   "path_stages": [
     {
       "label": "ISR Entry (exception overhead)",

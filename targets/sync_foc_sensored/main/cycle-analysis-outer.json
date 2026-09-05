@@ -1,8 +1,6 @@
 {
   "path_name": "Low-priority interrupt -> position loop -> speed loop -> online estimators",
-  "loop_rates_khz": [
-    1
-  ],
+  "loop_rates_khz": [1],
   "path_stages": [
     {
       "label": "LPI Entry (exception overhead)",
