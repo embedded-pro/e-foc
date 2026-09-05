@@ -263,7 +263,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_WithCustomSamplingFrequency)
     EXPECT_FALSE(callbackCalled);
 }
 
-TEST_F(MotorAlignmentTest, ForceAlignment_StopsDriverBeforeCallback)
+TEST_F(MotorAlignmentTest, ForceAlignment_ZeroesTheEncoderWhileHeldThenStopsBeforeCallback)
 {
     services::MotorAlignmentImpl::AlignmentConfig config;
     config.settledCount = 2;
@@ -298,10 +298,10 @@ TEST_F(MotorAlignmentTest, ForceAlignment_StopsDriverBeforeCallback)
 
     EXPECT_CALL(encoderMock, Read())
         .WillOnce(Return(stablePosition));
-    EXPECT_CALL(driverMock, Stop()).Times(1);
     EXPECT_CALL(encoderMock, Read())
         .WillOnce(Return(stablePosition));
     EXPECT_CALL(encoderMock, SetZero()).Times(1);
+    EXPECT_CALL(driverMock, Stop()).Times(1);
     driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
     EXPECT_TRUE(callbackCalled);

@@ -82,10 +82,10 @@ namespace services
 
     void MotorAlignmentImpl::CalculateAlignmentOffset()
     {
-        driver.Stop();
         alignedPosition = encoder.Read();
-
         encoder.SetZero();
+
+        driver.Stop();
 
         if (onAlignmentDone)
             onAlignmentDone(std::make_optional<foc::Radians>(alignedPosition));

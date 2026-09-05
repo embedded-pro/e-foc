@@ -254,7 +254,7 @@ graph TD
 | Parameter vector size          | 3: $[J,\ B,\ \tau_0]^T$                                                               |
 | Covariance matrix              | $3\times 3$ symmetric positive definite                                               |
 | Forgetting factor              | $\lambda = 0.995$                                                                     |
-| Effective window               | $N_{eff} = 1/(1-\lambda) = 500$ samples                                               |
+| Effective window               | $N_{eff} = 1/(1-\lambda) = 200$ samples                                               |
 | Convergence check $\epsilon_e$ | $10^{-4}$ (innovation threshold)                                                      |
 | Convergence check $\epsilon_K$ | $10^{-2}$ (gain trace threshold)                                                      |
 | RLS per-step cost              | $O(n^2) = O(9)$ — 9 multiply-add ops for $n=3$                                        |
@@ -307,8 +307,8 @@ $N_{eff}$ samples.
 - **Assumes**: Motor torque constant $K_T$ is known a priori (from electrical identification).
 - **Assumes**: The mechanical system is linear in $J$, $B$, $\tau_0$ — nonlinear effects (e.g.
   position-dependent cogging, Stribeck friction) are not modelled.
-- **Does not handle**: Rapidly varying $J$ (e.g. moving load). The $N_{eff} = 500$ sample window
-  means changes faster than 500 ms update time are tracked with lag.
+- **Does not handle**: Rapidly varying $J$ (e.g. moving load). The $N_{eff} = 200$ sample window
+  means changes faster than 200 ms update time are tracked with lag.
 - **Does not handle**: Identification in the presence of external vibration or impact loads.
 
 ## References
