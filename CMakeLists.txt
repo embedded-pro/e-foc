@@ -107,15 +107,7 @@ function(e_foc_mark_includes_system directory)
     endforeach()
 endfunction()
 
-foreach(vendored IN ITEMS infra/embedded-infra-lib infra/can-lite infra/numerical-toolbox)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${vendored}/CMakeLists.txt")
-        e_foc_mark_includes_system("${CMAKE_CURRENT_SOURCE_DIR}/${vendored}")
-    endif()
-endforeach()
-
-if(DEFINED TARGET_MCU_VENDOR AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/infra/hal/${TARGET_MCU_VENDOR}/CMakeLists.txt")
-    e_foc_mark_includes_system("${CMAKE_CURRENT_SOURCE_DIR}/infra/hal/${TARGET_MCU_VENDOR}")
-endif()
+e_foc_mark_includes_system("${CMAKE_CURRENT_SOURCE_DIR}")
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra)
