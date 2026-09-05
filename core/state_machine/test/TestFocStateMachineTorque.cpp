@@ -522,6 +522,49 @@ TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_fault_with_valid_calibrati
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
+TEST_F(FocStateMachineTorqueCliTest, a_condition_that_keeps_re_faulting_is_refused_after_the_retry_limit)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(inverterMock, Stop()).Times(AnyNumber());
+
+    for (int attempt = 0; attempt != 3; ++attempt)
+    {
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+        EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::ok);
+    }
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+
+    EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::rejected);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, a_clean_enable_and_disable_cycle_resets_the_fault_retry_budget)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    EXPECT_CALL(inverterMock, Stop()).Times(AnyNumber());
+
+    for (int attempt = 0; attempt != 3; ++attempt)
+    {
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+        EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::ok);
+    }
+
+    sm.CmdEnable();
+    sm.CmdDisable();
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+
+    EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::ok);
+}
+
 TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_enabled_is_rejected)
 {
     GivenFaultNotifierRegistered();

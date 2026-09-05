@@ -115,6 +115,7 @@ class CanBusOverTcpServer:
         channel: str,
         bitrate: int,
         tcp_port: int,
+        bind_address: str = "127.0.0.1",
         tty_baudrate: int | None = None,
         bus_factory=None,
         server_factory=asyncio.start_server,
@@ -123,6 +124,7 @@ class CanBusOverTcpServer:
         self.channel = channel
         self.bitrate = bitrate
         self.tcp_port = tcp_port
+        self.bind_address = bind_address
         self.tty_baudrate = tty_baudrate
         self._bus_factory = bus_factory
         self._server_factory = server_factory
@@ -163,7 +165,7 @@ class CanBusOverTcpServer:
 
         try:
             self._server = await self._server_factory(
-                self._handle_client, "0.0.0.0", self.tcp_port
+                self._handle_client, self.bind_address, self.tcp_port
             )
         except OSError as exc:
             await self._close_bus()
@@ -176,7 +178,7 @@ class CanBusOverTcpServer:
             await self._close_bus()
             raise
 
-        logger.info("CAN TCP server listening on port %d", self.tcp_port)
+        logger.info("CAN TCP server listening on %s port %d", self.bind_address, self.tcp_port)
 
     async def stop(self) -> None:
         await self._close_writer(self._writer)

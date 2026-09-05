@@ -1,4 +1,5 @@
 #include "core/services/cli/TerminalTorque.hpp"
+#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/services/cli/TerminalHelper.hpp"
@@ -26,7 +27,7 @@ namespace services
         if (tokenizer.Size() != 1)
             return { services::TerminalWithStorage::Status::error, "invalid number of arguments." };
 
-        auto t = ParseInput(tokenizer.Token(0));
+        auto t = ParseInput(tokenizer.Token(0), -foc::CommandLimits::maxTorqueSetpoint, foc::CommandLimits::maxTorqueSetpoint);
         if (!t.has_value())
             return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
 

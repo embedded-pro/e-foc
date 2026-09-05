@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/can/FocMotorCategoryServer.hpp"
+#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
@@ -30,8 +31,8 @@ namespace can
             services::ConfigData configData,
             services::Tracer& tracer);
 
-        static constexpr float maxPositionSetpoint{ 6.2831853f };
-        static constexpr float maxSpeedSetpoint{ 1000.0f };
+        static constexpr float maxPositionSetpoint{ foc::CommandLimits::maxPositionSetpoint };
+        static constexpr float maxSpeedSetpoint{ foc::CommandLimits::maxSpeedSetpoint };
 
         void BroadcastFault(state_machine::FaultCode code);
 

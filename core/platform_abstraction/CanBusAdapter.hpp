@@ -14,6 +14,7 @@ namespace application
         : public hal::Can
     {
     public:
+        virtual ~CanBusAdapter() = default;
         enum class CanError : uint8_t
         {
             busOff,

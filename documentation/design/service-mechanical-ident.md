@@ -87,6 +87,10 @@ Angular velocity (ω) at each observation instant is obtained from two successiv
 
 where Δt is the sampling period and wrap-around compensation shifts the raw difference into the range (−π/Δt, +π/Δt) rad/s in exactly the same manner used by the speed control outer loop.
 
+Δt must be the period of the callback that produced the two samples. The observation callback is registered on `ThreePhaseInverter::PhaseCurrentsReady` at the inverter's **base** frequency, not at the speed-command frequency, so Δt is derived from `BaseFrequency()`. Deriving it from the outer-loop rate instead scales ω by the ratio of the two frequencies and α by its square — at 20 kHz against 1 kHz that is 20× on speed and 400× on inertia, and the inertia estimate becomes speed-loop PID gains.
+
+Each observation reads the encoder once. Reading it twice within a callback samples two different rotor positions and mixes them into a single difference.
+
 Angular acceleration (dω/dt) is obtained from two successive velocity estimates by a further finite difference:
 
 ```text
@@ -207,9 +211,15 @@ The regressor vector is $\phi = [1,\ \dot{\omega},\ \omega]^T$, and the paramete
 
 The torque constant $k_t$ must be provided before the estimator updates begin. In normal operation the state machine supplies $k_t$ from the calibration NVM record via `SetTorqueConstant()` during the `EnterEnabled` transition; updates run opportunistically while the FOC controller is active.
 
-### RLS Self-Gating at Standstill
+### Persistence of Excitation
 
-No explicit persistence-of-excitation gate is applied. When the motor is at standstill, $T_e \approx 0$, $\dot{\omega} \approx 0$, and $\omega \approx 0$, so the regressor norm is near zero, the prediction error is near zero, and the RLS update naturally produces negligible coefficient change. The estimator is therefore self-gating in the absence of excitation.
+At standstill the regressor degenerates to $\phi = [1,\ 0,\ 0]^T$: the constant intercept is excited but the inertia and friction directions are not. The coefficients barely move, but the covariance $P$ is **not** self-gating — an RLS update with a forgetting factor inflates $P$ by $\lambda^{-1}$ in every unexcited direction on every sample, so $P$ grows as $\lambda^{-n}$. At $\lambda = 0.995$ and 20 kHz that reaches roughly $5\times10^{21}$ after ten seconds of standstill, and the first sample of real excitation then produces an enormous coefficient jump.
+
+The estimator therefore applies an explicit gate: an observation updates the RLS only when $|\dot{\omega}|$ or $|\omega|$ exceeds a minimum. Unexcited observations are skipped entirely, so the covariance is frozen rather than inflated, and the previous coefficients are reported unchanged.
+
+### Plausibility Band
+
+A finiteness test alone admits values such as $10^{30}$. Before an estimate is published to `CurrentInertia()` / `CurrentFriction()` — and therefore before it can become PID gains — it must be finite and inside a physical band: inertia strictly positive and below an upper bound, friction non-negative and below an upper bound. An estimate outside the band is discarded and the last accepted pair is retained.
 
 ### Seeding and Warm Start
 

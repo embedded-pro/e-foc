@@ -1,4 +1,5 @@
 #include "core/services/cli/TerminalBase.hpp"
+#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/services/cli/TerminalHelper.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "numerical/controllers/interfaces/PidController.hpp"
@@ -29,7 +30,7 @@ namespace services
         if (tokenizer.Size() != 1)
             return { services::TerminalWithStorage::Status::error, "invalid number of arguments" };
 
-        auto bandwidth = ParseInput(tokenizer.Token(0));
+        auto bandwidth = ParseInput(tokenizer.Token(0), foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth);
         if (!bandwidth.has_value())
             return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
 

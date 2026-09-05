@@ -44,6 +44,7 @@ namespace application
         : public state_machine::FocStateMachineBase
     {
     public:
+        virtual ~FocStateMachineCommon() = default;
         const state_machine::State& CurrentState() const override;
         state_machine::FaultCode LastFaultCode() const override;
         bool HasPendingAsyncWork() const override;
@@ -126,6 +127,11 @@ namespace application
         services::CalibrationData calibrationData{};
         float pendingFluxLinkage{ 0.0f };
         bool bootCheckInFlight{ false };
+
+        static constexpr uint8_t maxConsecutiveFaultClears{ 3 };
+        bool faultLatched{ false };
+        uint8_t consecutiveFaultClears{ 0 };
+
         void OnCalibrationInvalidated(services::NvmStatus status);
 
         infra::AutoResetFunction<void(state_machine::CommandResult)> pendingCommandCallback;

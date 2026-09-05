@@ -11,6 +11,8 @@ namespace application
     class AdcPhaseCurrentMeasurement
     {
     public:
+        virtual ~AdcPhaseCurrentMeasurement() = default;
+
         virtual void Measure(const infra::Function<void(foc::Ampere phaseA, foc::Ampere phaseB, foc::Ampere phaseC)>& onDone) = 0;
         virtual void Stop() = 0;
     };
@@ -28,6 +30,8 @@ namespace application
         void Stop() override;
 
     private:
+        static constexpr std::size_t phaseCount{ 3 };
+
         Impl adc;
         float slope = 0.0f;
         float offset = 0.0f;
@@ -51,6 +55,9 @@ namespace application
         onMeasurementDone = onDone;
         adc.Measure([this](auto samples)
             {
+                if (samples.size() < phaseCount) [[unlikely]]
+                    return;
+
                 const float s = slope;
                 const float o = offset;
                 onMeasurementDone(

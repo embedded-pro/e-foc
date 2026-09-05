@@ -12,6 +12,8 @@ namespace foc
         float bd{ 0.0f };
 
         static CurrentPlantModel FromParameters(const MotorModelParameters& parameters);
+
+        bool IsUsable() const;
     };
 
     bool AreElectricalParametersValid(const MotorModelParameters& parameters);

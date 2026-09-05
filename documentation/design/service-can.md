@@ -109,7 +109,19 @@ A self-contained client object for use in host tools and SIL tests. Internally c
 
 Provides the same `Send*` API as `FocMotorCategoryClient` but hides the transport and protocol client, so callers only need a CAN bus reference and a node ID.
 
-### Part F — Tracing Decorators
+### Part F — `CanLivenessWatchdog`
+
+`CanProtocolServer` already tracks client liveness: it restarts a timer on every frame from the client and calls `Offline()` on its observers when `clientTimeout` elapses with no traffic. Nothing acted on that notification, so unplugging the bus mid-spin left the drive holding its last setpoint indefinitely.
+
+`CanLivenessWatchdog` is a `CanProtocolServerObserver` that closes the loop. On `Offline()` it checks whether the active state machine is in `Enabled`; if so it traces and issues `CmdEmergencyStop`, which stops the inverter. When the drive is not enabled the notification is ignored — a bus that goes quiet while the motor is stopped is not a hazard, and faulting there would obstruct commissioning.
+
+It is composed in the instantiation layer alongside the CAN bridge, so the bridge and category server stay free of lifecycle policy.
+
+### Part G — Fault Broadcast Priority
+
+`BroadcastFaultStatus` sends its frame at `CanPriority::emergency` (0) rather than through `SendTelemetry`, which uses `CanPriority::telemetry` (12). CAN arbitration is by identifier, and the priority field is the high bits of the identifier, so a telemetry-priority fault notification loses arbitration to routine telemetry on a busy bus — exactly when the bus is busiest and the notification matters most. The payload is unchanged.
+
+### Part H — Tracing Decorators
 
 All tracing is applied via `can-lite`'s decorator classes:
 

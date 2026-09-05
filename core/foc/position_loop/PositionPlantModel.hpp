@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/position_loop/PositionController.hpp"
 #include "core/foc/speed_loop/SpeedPlantModel.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
@@ -29,14 +30,11 @@ namespace foc
     ALWAYS_INLINE_HOT float WrappedPositionError(Radians reference, Radians measured)
     {
         constexpr float pi = std::numbers::pi_v<float>;
-        constexpr float twoPi = 2.0f * pi;
 
-        auto error = reference.Value() - measured.Value();
+        const auto error = reference.Value() - measured.Value();
 
-        if (error > pi)
-            error -= twoPi;
-        else if (error < -pi)
-            error += twoPi;
+        if (error > pi || error < -pi)
+            return detail::PositionWithWrapAround(error);
 
         return error;
     }

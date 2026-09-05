@@ -50,7 +50,7 @@ Required in every hot-path file:
 - **Park**: `Id = Iα·cos(θ) + Iβ·sin(θ)`, `Iq = −Iα·sin(θ) + Iβ·cos(θ)`
 - **Electrical angle**: `θe = θm · pole_pairs`
 - **Anti-windup**: all PID integrators must clamp or use back-calculation
-- **Decoupling**: ω·Ld·Iq feedforward on Vd; −ω·Lq·Id on Vq where appropriate
+- **Decoupling**: −ω·Lq·Iq feedforward on Vd; +ω·(Ld·Id + ψf) on Vq. The Vd term is negative and the Vq term positive — these cancel the coupling the plant adds, so getting the signs backwards doubles it
 - Reuse `TransformsClarkePark` and `SpaceVectorModulation` from `core/foc/transforms/` — do not reimplement
 - Unit types: `Ampere`, `Radians`, `Volts`, `RevPerMinute`, `PhasePwmDutyCycles`, `PhaseCurrents`
 
@@ -102,6 +102,10 @@ Presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1
 **Embedded cmake**: call `halst_target_bringup(<target>)` for ST or `hal_ti_target_bringup(<target>)` for TI in `targets/*/main/CMakeLists.txt`. The `*_default_init` variants were removed.
 
 Authoritative cycle budget gate: `cortex-cycle-budget` static analysis (≤ 4500 inner / ≤ 20000 outer).
+
+**Warnings**: the build enables `-Wall -Wextra`, and `CMAKE_COMPILE_WARNING_AS_ERROR` is on, so any warning in `core/`, `targets/`, `integration_tests/` or `tools/` fails the build. Vendored submodule include directories are marked SYSTEM in the top-level `CMakeLists.txt`, so third-party headers do not. Never silence a warning with a pragma — fix it, or drop the parameter name if it is genuinely unused.
+
+**Features**: `integration_tests/software_in_the_loop/features/` holds scenarios the in-process runner implements; `qemu_features/` holds those only the QEMU runner implements. A feature in the wrong directory reports as undefined steps and fails the suite. The `host` and `coverage` test presets run the `integration` label; only `hardware` is excluded.
 
 ## Agent routing
 

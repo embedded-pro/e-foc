@@ -1,4 +1,5 @@
 #include "core/services/cli/TerminalPosition.hpp"
+#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/services/cli/TerminalHelper.hpp"
 
 namespace services
@@ -33,7 +34,7 @@ namespace services
         if (tokenizer.Size() != 1)
             return { services::TerminalWithStorage::Status::error, "invalid number of arguments." };
 
-        auto bandwidth = ParseInput(tokenizer.Token(0));
+        auto bandwidth = ParseInput(tokenizer.Token(0), foc::CommandLimits::minBandwidth, foc::CommandLimits::maxSpeedBandwidth);
         if (!bandwidth.has_value())
             return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
 
@@ -50,7 +51,7 @@ namespace services
         if (tokenizer.Size() != 1)
             return { services::TerminalWithStorage::Status::error, "invalid number of arguments." };
 
-        auto bandwidth = ParseInput(tokenizer.Token(0));
+        auto bandwidth = ParseInput(tokenizer.Token(0), foc::CommandLimits::minBandwidth, foc::CommandLimits::maxPositionBandwidth);
         if (!bandwidth.has_value())
             return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
 
@@ -76,7 +77,7 @@ namespace services
         if (tokenizer.Size() != 1)
             return { services::TerminalWithStorage::Status::error, "invalid number of arguments." };
 
-        auto positionValue = ParseInput(tokenizer.Token(0));
+        auto positionValue = ParseInput(tokenizer.Token(0), -foc::CommandLimits::maxPositionSetpoint, foc::CommandLimits::maxPositionSetpoint);
         if (!positionValue.has_value())
             return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
 

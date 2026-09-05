@@ -1,3 +1,5 @@
+#pragma once
+
 #include "infra/stream/StringInputStream.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "numerical/controllers/interfaces/PidController.hpp"

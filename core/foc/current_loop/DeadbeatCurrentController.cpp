@@ -49,6 +49,10 @@ namespace foc
             return;
 
         const auto plant = CurrentPlantModel::FromParameters(parameters);
+
+        if (!plant.IsUsable())
+            return;
+
         const auto [reference, feedback] = twoStep ? ReferenceAndFeedbackGain<TwoStepDesign>(plant) : ReferenceAndFeedbackGain<OneStepDesign>(plant);
         const auto scale = NormalizationScale(parameters.busVoltage);
 

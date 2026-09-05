@@ -56,7 +56,7 @@ The state machine has five named states:
 | `Calibrating` | Calibration sequence in progress; motor is driven by identification services | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop with previously valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (any step fails or hardware fault) |
 | `Ready`       | Calibration data valid and applied; motor can be enabled at any time         | → `Enabled` (CmdEnable), → `Calibrating` (CmdCalibrate re-runs), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                                                           |
 | `Enabled`     | FOC controller active; motor under closed-loop control                       | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                 |
-| `Fault`       | Safe state; inverter stopped; fault code recorded                            | → `Idle` (CmdClearFault)                                                                                                                                                                              |
+| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                | → `Idle` (CmdClearFault, up to 3 consecutive times)                                                                                                                                                                              |
 
 ### State Diagram
 
@@ -148,6 +148,14 @@ After saving, calibration data is applied to the FOC controller (current PID gai
 ### Fault Safety
 
 Entering `Fault` always stops the inverter when the machine was in `Enabled` or `Calibrating` state. This ensures that any active PWM output (from normal operation or from identification test signals) is immediately cut, regardless of which state caused the fault.
+
+`EnterEnabled` commits the `Enabled` state **before** it starts the FOC controller, and re-checks the state afterwards. A fault raised in the window where current first flows would otherwise observe `Ready`, skip the stop, and then be overwritten by the pending assignment to `Enabled` — leaving an energised bridge on faulted hardware with the machine reporting `Enabled`. Because the state is committed first, such a fault stops the drive, and the re-check stops it again if the fault arrived while `Start()` was running. `CmdEnable` reports `abortedByFault` in that case.
+
+#### Fault Latching
+
+A fault is latched. `CmdEnable` is refused while the latch is set, so the only path out of `Fault` is an explicit `CmdClearFault`.
+
+Clearing is bounded. Each `CmdClearFault` increments a counter; once `maxConsecutiveFaultClears` (3) clears have happened without an intervening clean run, further clears are refused and a reset is required. The counter is reset by `CmdDisable` from `Enabled`, which is the only evidence the state machine has that the drive ran and was stopped deliberately rather than by the same condition re-tripping. Without this bound, a condition that is still asserted can be cleared and re-enabled indefinitely, re-energising faulted hardware on every cycle.
 
 The last fault code is preserved in `LastFaultCode()` and remains readable even after the fault is cleared via `CmdClearFault`. Before any fault has occurred it reads `FaultCode::none`, so a client can distinguish "no fault yet" from a real hardware fault.
 

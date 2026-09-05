@@ -16,7 +16,7 @@ namespace
                arg.c.Value() == expected.c.Value();
     }
 
-    float SimulateRLModelCurrent(float voltage, float resistance, float inductance, float time)
+    [[maybe_unused]] float SimulateRLModelCurrent(float voltage, float resistance, float inductance, float time)
     {
         auto tau = inductance / resistance;
 
@@ -46,8 +46,6 @@ namespace
     };
 }
 
-
-
 TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_initializes_encoder_and_applies_voltages)
 {
     services::ElectricalParametersIdentification::PolePairsConfig config{
@@ -76,7 +74,6 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_cal
     std::optional<std::size_t> resultPolePairs;
     constexpr std::size_t totalSteps = 5 * 12;
     constexpr std::size_t expectedPolePairs = 2;
-    float voltage = static_cast<float>(config.testVoltagePercent.Value()) * vdc.Value() / 100.0f;
 
     encoderStepIndex = 0;
     EXPECT_CALL(encoderMock, Read())

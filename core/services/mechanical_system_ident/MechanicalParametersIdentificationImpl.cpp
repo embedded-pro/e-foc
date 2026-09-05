@@ -1,5 +1,6 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include <cmath>
 #include <numbers>
@@ -16,7 +17,7 @@ namespace services
         : controller(controller)
         , driver(driver)
         , encoder(encoder)
-        , samplingPeriod(1.0f / static_cast<float>(controller.SpeedCommandFrequency().Value()))
+        , samplingPeriod(1.0f / static_cast<float>(driver.BaseFrequency().Value()))
     {
     }
 
@@ -57,7 +58,8 @@ namespace services
         auto mechanicalPos = encoder.Read().Value();
         auto electricalAngle = mechanicalPos * polePairs;
         auto rotatingFrame = transform.Forward(foc::ThreePhase{ currents.a.Value(), currents.b.Value(), currents.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
-        auto speed = (encoder.Read().Value() - previousPosition) / samplingPeriod;
+
+        auto speed = foc::detail::PositionWithWrapAround(mechanicalPos - previousPosition) / samplingPeriod;
         auto acceleration = (speed - previousSpeed) / samplingPeriod;
         MotorRLS::MakeRegressor(regressor, acceleration, speed);
 

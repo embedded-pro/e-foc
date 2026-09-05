@@ -3,6 +3,7 @@
 #endif
 
 #include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
+#include "core/foc/math/DutyConversion.hpp"
 
 namespace foc
 {
@@ -181,9 +182,7 @@ namespace foc
             lowPriorityInterrupt.Trigger();
         }
 
-        return PhasePwmDutyCycles{ hal::Percent(static_cast<uint8_t>(output.a * 100.0f + 0.5f)),
-            hal::Percent(static_cast<uint8_t>(output.b * 100.0f + 0.5f)),
-            hal::Percent(static_cast<uint8_t>(output.c * 100.0f + 0.5f)) };
+        return ToDutyCycles(output);
     }
 
     void CascadeWithSpeedLoop::SetSpeedReference(RadiansPerSecond reference)

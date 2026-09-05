@@ -25,6 +25,7 @@ namespace services
         void RunPolePairLogic();
         void ApplyNextElectricalAngle();
         void CalculatePolePairs();
+        void AbortPolePairs();
 
         static constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
         static constexpr std::size_t stepsPerRevolution = 12;

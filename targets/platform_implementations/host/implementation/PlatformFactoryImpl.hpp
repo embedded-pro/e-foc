@@ -187,7 +187,7 @@ namespace application
             : public hal::SynchronousAdc
         {
         public:
-            Samples Measure(std::size_t numberOfSamples) override
+            Samples Measure(std::size_t) override
             {
                 return Samples();
             }

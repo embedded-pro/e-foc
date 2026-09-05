@@ -34,12 +34,23 @@ namespace services
 
     private:
         using MotorRLS = estimators::RecursiveLeastSquares<float, 3>;
+
+        static constexpr float minimumAcceleration = 1.0f;
+        static constexpr float minimumSpeed = 0.5f;
+        static constexpr float minimumInertia = 1e-9f;
+        static constexpr float maximumInertia = 1.0f;
+        static constexpr float maximumFriction = 1.0f;
+
+        bool IsPersistentlyExciting(float acceleration, float speed) const;
+        static bool IsPlausible(float inertia, float friction);
+
         float samplingFrequency;
         std::optional<MotorRLS> rls;
         [[no_unique_address]] foc::ClarkePark transform;
         MotorRLS::InputMatrix regressor;
         math::Matrix<float, 1, 1> torque;
         foc::RadiansPerSecond previousSpeed{ 0.0f };
+        MotorRLS::EstimationMetrics lastMetrics{};
 
         foc::NewtonMeter torqueConstant{ 1.0f };
         foc::NewtonMeterSecondSquared currentInertia{ 0.0f };

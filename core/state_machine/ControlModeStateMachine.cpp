@@ -1,4 +1,5 @@
 #include "core/state_machine/ControlModeStateMachine.hpp"
+#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/services/cli/TerminalHelper.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "infra/util/Tokenizer.hpp"
@@ -13,7 +14,7 @@ namespace
     constexpr auto wrongModeMessage = "rejected: command does not apply to the active control mode.";
     constexpr auto wrongStateMessage = "rejected: setpoints are only accepted in Ready or Enabled.";
 
-    std::optional<CliStatusWithMessage> ParseSingleFloat(const infra::BoundedConstString& input, float& value)
+    std::optional<CliStatusWithMessage> ParseSingleFloat(const infra::BoundedConstString& input, float& value, float minValue, float maxValue)
     {
         infra::Tokenizer tokenizer(input, ' ');
 
@@ -23,6 +24,9 @@ namespace
         const auto parsed = services::ParseInput(tokenizer.Token(0));
         if (!parsed.has_value())
             return CliStatusWithMessage{ CliStatus::error, "invalid value. It should be a float." };
+
+        if (*parsed < minValue || *parsed > maxValue)
+            return CliStatusWithMessage{ CliStatus::error, "invalid value: out of range." };
 
         value = *parsed;
         return std::nullopt;
@@ -669,7 +673,7 @@ namespace state_machine
     ControlModeStateMachine::CliResult ControlModeStateMachine::SetTorqueSetpoint(const infra::BoundedConstString& input)
     {
         float value{ 0.0f };
-        if (auto error = ParseSingleFloat(input, value); error.has_value())
+        if (auto error = ParseSingleFloat(input, value, -foc::CommandLimits::maxTorqueSetpoint, foc::CommandLimits::maxTorqueSetpoint); error.has_value())
             return *error;
 
         if (auto rejection = RejectSetpoint(ControlMode::torque); rejection.has_value())
@@ -682,7 +686,7 @@ namespace state_machine
     ControlModeStateMachine::CliResult ControlModeStateMachine::SetSpeedSetpoint(const infra::BoundedConstString& input)
     {
         float value{ 0.0f };
-        if (auto error = ParseSingleFloat(input, value); error.has_value())
+        if (auto error = ParseSingleFloat(input, value, -foc::CommandLimits::maxSpeedSetpoint, foc::CommandLimits::maxSpeedSetpoint); error.has_value())
             return *error;
 
         if (auto rejection = RejectSetpoint(ControlMode::speed); rejection.has_value())
@@ -695,7 +699,7 @@ namespace state_machine
     ControlModeStateMachine::CliResult ControlModeStateMachine::SetPositionSetpoint(const infra::BoundedConstString& input)
     {
         float value{ 0.0f };
-        if (auto error = ParseSingleFloat(input, value); error.has_value())
+        if (auto error = ParseSingleFloat(input, value, -foc::CommandLimits::maxPositionSetpoint, foc::CommandLimits::maxPositionSetpoint); error.has_value())
             return *error;
 
         if (auto rejection = RejectSetpoint(ControlMode::position); rejection.has_value())
@@ -708,7 +712,7 @@ namespace state_machine
     ControlModeStateMachine::CliResult ControlModeStateMachine::SetCurrentBandwidth(const infra::BoundedConstString& input)
     {
         float value{ 0.0f };
-        if (auto error = ParseSingleFloat(input, value); error.has_value())
+        if (auto error = ParseSingleFloat(input, value, foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth); error.has_value())
             return *error;
 
         if (!TrySetCurrentBandwidth(value))
@@ -720,7 +724,7 @@ namespace state_machine
     ControlModeStateMachine::CliResult ControlModeStateMachine::SetSpeedBandwidth(const infra::BoundedConstString& input)
     {
         float value{ 0.0f };
-        if (auto error = ParseSingleFloat(input, value); error.has_value())
+        if (auto error = ParseSingleFloat(input, value, foc::CommandLimits::minBandwidth, foc::CommandLimits::maxSpeedBandwidth); error.has_value())
             return *error;
 
         if (!TrySetSpeedBandwidth(value))
@@ -732,7 +736,7 @@ namespace state_machine
     ControlModeStateMachine::CliResult ControlModeStateMachine::SetPositionBandwidth(const infra::BoundedConstString& input)
     {
         float value{ 0.0f };
-        if (auto error = ParseSingleFloat(input, value); error.has_value())
+        if (auto error = ParseSingleFloat(input, value, foc::CommandLimits::minBandwidth, foc::CommandLimits::maxPositionBandwidth); error.has_value())
             return *error;
 
         if (Active() != ControlMode::position)
@@ -748,7 +752,7 @@ namespace state_machine
     ControlModeStateMachine::CliResult ControlModeStateMachine::SetFluxLinkageFromCli(const infra::BoundedConstString& input)
     {
         float value{ 0.0f };
-        if (auto error = ParseSingleFloat(input, value); error.has_value())
+        if (auto error = ParseSingleFloat(input, value, 0.0f, foc::CommandLimits::maxFluxLinkage); error.has_value())
             return *error;
 
         // The persist completes asynchronously, so the state machine traces the outcome.

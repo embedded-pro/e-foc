@@ -1,4 +1,5 @@
 #include "core/foc/position_loop/PositionPlantModel.hpp"
+#include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
 
@@ -135,4 +136,18 @@ TEST_F(TestPositionPlantModel, half_a_turn_of_error_sits_exactly_on_the_boundary
 {
     EXPECT_NEAR(foc::WrappedPositionError(foc::Radians{ pi }, foc::Radians{ 0.0f }), pi, tolerance);
     EXPECT_NEAR(foc::WrappedPositionError(foc::Radians{ 0.0f }, foc::Radians{ pi }), -pi, tolerance);
+}
+
+TEST_F(TestPositionPlantModel, a_reference_several_turns_away_still_takes_the_shortest_path)
+{
+    EXPECT_NEAR(foc::WrappedPositionError(foc::Radians{ 10.0f }, foc::Radians{ 0.5f }), -3.0664f, 1e-3f);
+    EXPECT_NEAR(foc::WrappedPositionError(foc::Radians{ -10.0f }, foc::Radians{ -0.5f }), 3.0664f, 1e-3f);
+}
+
+TEST_F(TestPositionPlantModel, every_wrapped_error_lands_inside_half_a_turn)
+{
+    constexpr float step = 0.37f;
+
+    for (float reference = -40.0f; reference <= 40.0f; reference += step)
+        EXPECT_LE(std::abs(foc::WrappedPositionError(foc::Radians{ reference }, foc::Radians{ 0.0f })), pi + 1e-4f);
 }

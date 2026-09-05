@@ -38,7 +38,9 @@ namespace
             services::TerminalWithBanner::Banner banner{
                 .targetName = infra::BoundedConstString(targetName),
                 .vdc = foc::Volts{ vdc },
-                .systemClock = hal::Hertz{ systemClock }
+                .systemClock = hal::Hertz{ systemClock },
+                .resetCause = application::ResetCause{},
+                .faultStatus = infra::BoundedConstString{}
             };
             return banner;
         }

@@ -16,12 +16,14 @@ class SerialOverTcpServer:
         serial_port: str,
         baudrate: int,
         tcp_port: int,
+        bind_address: str = "127.0.0.1",
         serial_factory=serial.Serial,
         server_factory=asyncio.start_server,
     ):
         self.serial_port = serial_port
         self.baudrate = baudrate
         self.tcp_port = tcp_port
+        self.bind_address = bind_address
         self._serial_factory = serial_factory
         self._server_factory = server_factory
         self._serial: serial.Serial | None = None
@@ -48,7 +50,7 @@ class SerialOverTcpServer:
 
         try:
             self._server = await self._server_factory(
-                self._handle_client, "0.0.0.0", self.tcp_port
+                self._handle_client, self.bind_address, self.tcp_port
             )
         except OSError as exc:
             await self._close_serial()
@@ -61,7 +63,7 @@ class SerialOverTcpServer:
             await self._close_serial()
             raise
 
-        logger.info("Serial TCP server listening on port %d", self.tcp_port)
+        logger.info("Serial TCP server listening on %s port %d", self.bind_address, self.tcp_port)
 
     async def stop(self) -> None:
         await self._close_writer(self._writer)

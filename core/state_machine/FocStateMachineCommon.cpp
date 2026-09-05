@@ -69,10 +69,14 @@ namespace application
 
     state_machine::CommandResult FocStateMachineCommon::CmdEnable()
     {
-        if (!std::holds_alternative<state_machine::Ready>(currentState))
+        if (!std::holds_alternative<state_machine::Ready>(currentState) || faultLatched)
             return state_machine::CommandResult::rejected;
 
         EnterEnabled();
+
+        if (std::holds_alternative<state_machine::Fault>(currentState))
+            return state_machine::CommandResult::abortedByFault;
+
         return state_machine::CommandResult::ok;
     }
 
@@ -82,6 +86,7 @@ namespace application
             return state_machine::CommandResult::rejected;
 
         GetFocControl().Stop();
+        consecutiveFaultClears = 0;
         EnterReady(calibrationData);
         return state_machine::CommandResult::ok;
     }
@@ -91,6 +96,14 @@ namespace application
         if (!std::holds_alternative<state_machine::Fault>(currentState))
             return state_machine::CommandResult::rejected;
 
+        if (consecutiveFaultClears >= maxConsecutiveFaultClears)
+        {
+            tracer.Trace() << "[SM] Fault clear refused, retry limit reached; reset required";
+            return state_machine::CommandResult::rejected;
+        }
+
+        ++consecutiveFaultClears;
+        faultLatched = false;
         tracer.Trace() << "[SM] Fault cleared";
 
         if (HasValidCalibration())
@@ -204,8 +217,12 @@ namespace application
     {
         tracer.Trace() << "[SM] Entering Enabled";
         PrepareForEnabled();
-        GetFocControl().Start();
+
         currentState = state_machine::Enabled{};
+        GetFocControl().Start();
+
+        if (std::holds_alternative<state_machine::Fault>(currentState))
+            GetFocControl().Stop();
     }
 
     void FocStateMachineCommon::EnterFault(state_machine::FaultCode code)
@@ -218,6 +235,7 @@ namespace application
 
         lastFaultCode = code;
         currentState = state_machine::Fault{ code };
+        faultLatched = true;
         CompletePendingCommand(state_machine::CommandResult::abortedByFault);
     }
 
@@ -338,7 +356,6 @@ namespace application
                 else
                 {
                     auto data = std::get<state_machine::Calibrating>(currentState).pendingData;
-                    encoder.Set(foc::Radians{ std::bit_cast<float>(data.encoderZeroOffset) });
                     ApplyElectricalCalibration(data);
                     ApplyModeSpecificCalibration(data);
                     EnterReady(data);
@@ -383,7 +400,7 @@ namespace application
                             tracer.Trace() << "[SM] NVM load failed, starting in Idle";
                         else
                         {
-                            encoder.Set(foc::Radians{ std::bit_cast<float>(calibrationData.encoderZeroOffset) });
+                            tracer.Trace() << "[SM] Stored alignment not re-applied; re-run calibration to orient the field";
                             ApplyElectricalCalibration(calibrationData);
                             ApplyModeSpecificCalibration(calibrationData);
                             EnterReady(calibrationData);

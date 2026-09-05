@@ -240,7 +240,9 @@ THEN(R"(no CommandRejected frame shall be emitted)")
 {
     const auto& accessor = context.Get<StateMachineAccessor>();
     if (accessor.wasCommandAckSent())
+    {
         EXPECT_EQ(accessor.lastCommandAckStatus(), services::CanAckStatus::success);
+    }
 }
 
 THEN(R"(no NVM write shall occur)")

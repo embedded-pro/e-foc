@@ -33,6 +33,11 @@ namespace foc
             runner.Disable();
         }
 
+        void RegisterOnImplausibleCurrents(const infra::Function<void()>& onImplausible)
+        {
+            runner.RegisterOnImplausibleCurrents(onImplausible);
+        }
+
     private:
         Runner runner;
     };

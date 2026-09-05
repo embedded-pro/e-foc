@@ -164,3 +164,40 @@ TEST_F(TestPidCurrentController, sustained_saturation_does_not_wind_up_the_integ
     const auto reversed = controller.Compute({ { 0.0f, 0.0f }, { -50.0f, 0.0f }, 0.0f });
     EXPECT_NEAR(reversed.d, -1.0f, tolerance);
 }
+
+TEST_F(TestPidCurrentController, saturated_output_stays_on_the_modulation_circle)
+{
+    controller.Configure(ValidParameters());
+
+    for (int sample = 0; sample != 200; ++sample)
+        controller.Compute({ { 0.0f, 0.0f }, { 100.0f, 100.0f }, 0.0f });
+
+    auto output = controller.Compute({ { 0.0f, 0.0f }, { 100.0f, 100.0f }, 0.0f });
+
+    EXPECT_NEAR(std::sqrt(output.d * output.d + output.q * output.q), 1.0f, tolerance);
+}
+
+TEST_F(TestPidCurrentController, a_reference_reversal_after_saturation_recovers_within_one_sample)
+{
+    controller.Configure(ValidParameters());
+
+    for (int sample = 0; sample != 200; ++sample)
+        controller.Compute({ { 0.0f, 0.0f }, { 100.0f, 100.0f }, 0.0f });
+
+    auto output = controller.Compute({ { 0.0f, 0.0f }, { -100.0f, -100.0f }, 0.0f });
+
+    EXPECT_LT(output.d, 0.0f);
+    EXPECT_LT(output.q, 0.0f);
+}
+
+TEST_F(TestPidCurrentController, an_unreachable_reference_does_not_wind_the_integrator_past_the_circle)
+{
+    controller.Configure(ValidParameters());
+
+    for (int sample = 0; sample != 5000; ++sample)
+        controller.Compute({ { 0.0f, 0.0f }, { 1000.0f, 1000.0f }, 0.0f });
+
+    auto recovered = controller.Compute({ { 0.0f, 0.0f }, { 0.0f, 0.0f }, 0.0f });
+
+    EXPECT_LE(std::sqrt(recovered.d * recovered.d + recovered.q * recovered.q), 1.0f + tolerance);
+}

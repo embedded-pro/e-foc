@@ -7,11 +7,19 @@ namespace application
     __attribute__((section(".error_handling"), used)) PersistentFaultData persistentFaultData;
 }
 
+namespace
+{
+    constexpr uint32_t kMaxStackWordsScanned = 256u;
+}
+
 extern "C"
 {
     extern uint32_t _text;
     extern uint32_t _etext;
     extern uint32_t _estack;
+
+    __attribute__((weak)) void CutPowerStage(void)
+    {}
 
     __attribute__((naked)) void HardFault_Handler()
     {
@@ -28,6 +36,8 @@ extern "C"
     {
         using application::PersistentFaultData;
         using application::persistentFaultData;
+
+        CutPowerStage();
 
         // Invalidate while writing to prevent partially-written data being
         // read as valid on a watchdog timeout mid-write.
@@ -53,9 +63,14 @@ extern "C"
         const uint32_t textEnd = reinterpret_cast<uint32_t>(&_etext);
         const uint32_t* sp = stack + 8u; // skip 8-word exception frame
         const uint32_t* stackTop = &_estack;
+        const uint32_t* scanEnd = sp + kMaxStackWordsScanned;
+
+        if (scanEnd > stackTop)
+            scanEnd = stackTop;
+
         uint32_t count = 0u;
 
-        while (sp < stackTop && count < PersistentFaultData::kMaxStackTraceEntries)
+        while (sp < scanEnd && count < PersistentFaultData::kMaxStackTraceEntries)
         {
             // ARM THUMB return addresses have bit 0 set; mask it for range check
             const uint32_t addr = (*sp) & 0xFFFFFFFEu;

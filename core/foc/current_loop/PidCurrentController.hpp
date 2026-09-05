@@ -1,8 +1,8 @@
 #pragma once
 
+#include "core/foc/current_loop/AntiWindupPi.hpp"
 #include "core/foc/current_loop/CurrentController.hpp"
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
-#include "numerical/controllers/implementations/PidIncremental.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc
@@ -18,17 +18,30 @@ namespace foc
 
         OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context)
         {
-            dPid.SetPoint(context.reference.d);
-            qPid.SetPoint(context.reference.q);
+            const auto applied = LimitToModulationCircle(Propose(context));
 
-            return LimitToModulationCircle({ dPid.Process(context.measured.d), qPid.Process(context.measured.q) });
+            CommitRealized(applied);
+
+            return applied;
+        }
+
+        ALWAYS_INLINE_HOT RotatingFrame Propose(const CurrentControlContext& context)
+        {
+            return { dPi.Propose(context.reference.d, context.measured.d),
+                qPi.Propose(context.reference.q, context.measured.q) };
+        }
+
+        ALWAYS_INLINE_HOT void CommitRealized(const RotatingFrame& applied)
+        {
+            dPi.CommitRealized(applied.d);
+            qPi.CommitRealized(applied.q);
         }
 
     private:
         void ApplyGains();
 
-        controllers::PidIncrementalSynchronous<float> dPid{ { 0.0f, 0.0f, 0.0f }, { -1.0f, 1.0f } };
-        controllers::PidIncrementalSynchronous<float> qPid{ { 0.0f, 0.0f, 0.0f }, { -1.0f, 1.0f } };
+        AntiWindupPi dPi;
+        AntiWindupPi qPi;
         MotorModelParameters parameters{};
         float bandwidth{ CurrentLoopTunings{}.bandwidth };
     };

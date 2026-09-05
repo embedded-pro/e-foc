@@ -1,4 +1,5 @@
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
+#include "core/foc/math/FiniteGuard.hpp"
 #include "numerical/math/Math.hpp"
 #include <numbers>
 
@@ -42,6 +43,13 @@ namespace foc
         const auto ad = math::Exp(-resistance * samplePeriod / inductance);
 
         return { ad, (1.0f - ad) / resistance };
+    }
+
+    bool CurrentPlantModel::IsUsable() const
+    {
+        constexpr float minimumInputGain = 1e-9f;
+
+        return IsFiniteValue(ad) && IsFiniteValue(bd) && bd > minimumInputGain && ad >= 0.0f && ad < 1.0f;
     }
 
     void DecouplingFeedforward::Configure(const MotorModelParameters& parameters)

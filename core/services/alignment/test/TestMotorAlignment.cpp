@@ -45,7 +45,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ConfiguresCorrectPwmDutyCycles)
             });
 
     bool callbackCalled = false;
-    alignment.ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians> offset)
+    alignment.ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians>)
         {
             callbackCalled = true;
         });
@@ -105,6 +105,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ConvergesWhenPositionStable)
     EXPECT_CALL(encoderMock, Read())
         .WillOnce(Return(initialPosition));
     EXPECT_CALL(driverMock, Stop()).Times(2);
+    EXPECT_CALL(encoderMock, SetZero()).Times(1);
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .WillOnce([this](auto, const auto& onDone)
@@ -128,8 +129,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ConvergesWhenPositionStable)
         driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
     ASSERT_TRUE(result.has_value());
-    float expectedOffset = stablePosition.Value() * static_cast<float>(polePairs);
-    EXPECT_NEAR(result->Value(), expectedOffset, 0.01f);
+    EXPECT_NEAR(result->Value(), stablePosition.Value(), 0.01f);
 }
 
 TEST_F(MotorAlignmentTest, ForceAlignment_CalculatesCorrectOffsetForDifferentPolePairs)
@@ -146,6 +146,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_CalculatesCorrectOffsetForDifferentPol
         .Times(AtLeast(1))
         .WillRepeatedly(Return(mechanicalPosition));
     EXPECT_CALL(driverMock, Stop()).Times(2);
+    EXPECT_CALL(encoderMock, SetZero()).Times(1);
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .WillOnce([this](auto, const auto& onDone)
@@ -163,8 +164,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_CalculatesCorrectOffsetForDifferentPol
         driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
     ASSERT_TRUE(result.has_value());
-    float expectedOffset = mechanicalPosition.Value() * static_cast<float>(polePairs);
-    EXPECT_NEAR(result->Value(), expectedOffset, 0.001f);
+    EXPECT_NEAR(result->Value(), mechanicalPosition.Value(), 0.001f);
 }
 
 TEST_F(MotorAlignmentTest, ForceAlignment_ResetsCounterWhenPositionChanges)
@@ -179,6 +179,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ResetsCounterWhenPositionChanges)
     EXPECT_CALL(encoderMock, Read())
         .WillOnce(Return(foc::Radians{ 0.0f }));
     EXPECT_CALL(driverMock, Stop()).Times(2);
+    EXPECT_CALL(encoderMock, SetZero()).Times(1);
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .WillOnce([this](auto, const auto& onDone)
@@ -229,7 +230,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_WithCustomVoltagePercent)
             });
 
     bool callbackCalled = false;
-    alignment.ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians> offset)
+    alignment.ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians>)
         {
             callbackCalled = true;
         });
@@ -254,7 +255,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_WithCustomSamplingFrequency)
             });
 
     bool callbackCalled = false;
-    alignment.ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians> offset)
+    alignment.ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians>)
         {
             callbackCalled = true;
         });
@@ -280,7 +281,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_StopsDriverBeforeCallback)
             });
 
     bool callbackCalled = false;
-    alignment.ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians> offset)
+    alignment.ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians>)
         {
             callbackCalled = true;
         });
@@ -300,6 +301,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_StopsDriverBeforeCallback)
     EXPECT_CALL(driverMock, Stop()).Times(1);
     EXPECT_CALL(encoderMock, Read())
         .WillOnce(Return(stablePosition));
+    EXPECT_CALL(encoderMock, SetZero()).Times(1);
     driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
     EXPECT_TRUE(callbackCalled);
@@ -315,6 +317,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_WithZeroPosition)
         .Times(AtLeast(1))
         .WillRepeatedly(Return(foc::Radians{ 0.0f }));
     EXPECT_CALL(driverMock, Stop()).Times(2);
+    EXPECT_CALL(encoderMock, SetZero()).Times(1);
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .WillOnce([this](auto, const auto& onDone)

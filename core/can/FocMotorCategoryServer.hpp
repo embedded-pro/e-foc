@@ -18,6 +18,7 @@ namespace can
         : public infra::SingleObserver<FocMotorCategoryServerObserver, FocMotorCategoryServer>
     {
     public:
+        virtual ~FocMotorCategoryServerObserver() = default;
         using infra::SingleObserver<FocMotorCategoryServerObserver, FocMotorCategoryServer>::SingleObserver;
 
         virtual void OnStart(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;

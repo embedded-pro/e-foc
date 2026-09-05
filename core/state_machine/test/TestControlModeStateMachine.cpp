@@ -765,7 +765,7 @@ namespace
                     {
                         capturedNvmSaveCb = cb;
                     }));
-            EXPECT_CALL(encoderMock, Set(_)).Times(1);
+            EXPECT_CALL(encoderMock, Set(_)).Times(0);
         }
 
         void SetUpMechIdentCalibrationCaptures()

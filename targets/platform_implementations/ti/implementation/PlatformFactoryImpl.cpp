@@ -155,6 +155,7 @@ namespace application
         auto& impl = peripherals->adcForPhaseCurrentMeasurementImpl;
 
         auto& adcCfg = impl.adcConfig;
+        adcCfg.interruptPriority = InterruptPriorities::phaseCurrentAdc;
         adcCfg.sampleAndHold = impl.toSampleAndHold.at(static_cast<std::size_t>(sampleAndHold));
         if constexpr (Peripheral::hasFaultComparators)
             adcCfg.digitalComparators = infra::MakeRange(impl.digitalComparators);
@@ -226,6 +227,7 @@ namespace application
         hal::tiva::Can::Config canConfig;
         canConfig.timing = hal::tiva::Can::BitRate{ bitRate };
         canConfig.testMode = testMode;
+        canConfig.interruptPriority = InterruptPriorities::can;
 
         peripherals->canBus.reset();
         peripherals->canBus.emplace(

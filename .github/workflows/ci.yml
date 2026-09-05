@@ -243,6 +243,12 @@ jobs:
         with:
           name: e_foc.sync_foc_sensored.qemu.elf
           path: qemu_elf/
+      - name: Verify software-in-the-loop prerequisites
+        env:
+          QEMU_SIL_ELF: ${{ github.workspace }}/qemu_elf/e_foc.sync_foc_sensored.main.elf
+        run: |
+          command -v qemu-system-arm >/dev/null || { echo "::error::qemu-system-arm not found; SIL scenarios would skip silently"; exit 1; }
+          test -f "$QEMU_SIL_ELF" || { echo "::error::SIL ELF $QEMU_SIL_ELF missing; SIL scenarios would skip silently"; exit 1; }
       - name: Run software-in-the-loop tests
         env:
           QEMU_SIL_ELF: ${{ github.workspace }}/qemu_elf/e_foc.sync_foc_sensored.main.elf
@@ -250,7 +256,7 @@ jobs:
           chmod +x sil_runner/e_foc.qemu_sil_tests
           sil_runner/e_foc.qemu_sil_tests \
             --format summary pretty junit:sil-test-report.xml \
-            -- integration_tests/software_in_the_loop/features
+            -- integration_tests/software_in_the_loop/features integration_tests/software_in_the_loop/qemu_features
       - name: Generate SIL test summary
         if: always()
         shell: bash

@@ -88,6 +88,39 @@ if (DEFINED TARGET_MCU_VENDOR)
 endif()
 
 add_subdirectory(infra/numerical-toolbox)
+
+function(e_foc_mark_includes_system directory)
+    get_property(targets DIRECTORY "${directory}" PROPERTY BUILDSYSTEM_TARGETS)
+    foreach(target IN LISTS targets)
+        get_target_property(type ${target} TYPE)
+        if(NOT type STREQUAL "UTILITY")
+            get_target_property(includes ${target} INTERFACE_INCLUDE_DIRECTORIES)
+            if(includes)
+                set_target_properties(${target} PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${includes}")
+            endif()
+        endif()
+    endforeach()
+
+    get_property(children DIRECTORY "${directory}" PROPERTY SUBDIRECTORIES)
+    foreach(child IN LISTS children)
+        e_foc_mark_includes_system("${child}")
+    endforeach()
+endfunction()
+
+foreach(vendored IN ITEMS infra/embedded-infra-lib infra/can-lite infra/numerical-toolbox)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${vendored}/CMakeLists.txt")
+        e_foc_mark_includes_system("${CMAKE_CURRENT_SOURCE_DIR}/${vendored}")
+    endif()
+endforeach()
+
+if(DEFINED TARGET_MCU_VENDOR AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/infra/hal/${TARGET_MCU_VENDOR}/CMakeLists.txt")
+    e_foc_mark_includes_system("${CMAKE_CURRENT_SOURCE_DIR}/infra/hal/${TARGET_MCU_VENDOR}")
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-Wall -Wextra)
+endif()
+
 add_subdirectory(core)
 
 if(NOT EMIL_BUILD_QEMU OR E_FOC_TARGET_PLATFORM STREQUAL "qemu")

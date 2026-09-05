@@ -1,6 +1,8 @@
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
+#include "core/foc/math/FiniteGuard.hpp"
+#include <cmath>
 
 namespace services
 {
@@ -14,19 +16,39 @@ namespace services
     {
         auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle.Value()), foc::FastTrigonometry::Sine(electricalAngle.Value()));
         auto acceleration = (speed.Value() - previousSpeed.Value()) * samplingFrequency;
+
+        previousSpeed = speed;
+
+        if (!IsPersistentlyExciting(acceleration, speed.Value()))
+            return Result{
+                foc::NewtonMeterSecondSquared{ rls->Coefficients().at(1, 0) },
+                foc::NewtonMeterSecondPerRadian{ rls->Coefficients().at(2, 0) },
+                lastMetrics
+            };
+
         MotorRLS::MakeRegressor(regressor, acceleration, speed.Value());
 
         torque.at(0, 0) = rotatingFrame.q * targetTorque.Value();
 
-        auto metrics = rls->Update(regressor, torque);
-
-        previousSpeed = speed;
+        lastMetrics = rls->Update(regressor, torque);
 
         return Result{
             foc::NewtonMeterSecondSquared{ rls->Coefficients().at(1, 0) },
             foc::NewtonMeterSecondPerRadian{ rls->Coefficients().at(2, 0) },
-            metrics
+            lastMetrics
         };
+    }
+
+    bool RealTimeFrictionAndInertiaEstimator::IsPersistentlyExciting(float acceleration, float speed) const
+    {
+        return std::abs(acceleration) >= minimumAcceleration || std::abs(speed) >= minimumSpeed;
+    }
+
+    bool RealTimeFrictionAndInertiaEstimator::IsPlausible(float inertia, float friction)
+    {
+        return foc::IsFiniteValue(inertia) && foc::IsFiniteValue(friction) &&
+               inertia > minimumInertia && inertia < maximumInertia &&
+               friction >= 0.0f && friction < maximumFriction;
     }
 
     void RealTimeFrictionAndInertiaEstimator::Seed(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction)
@@ -62,6 +84,10 @@ namespace services
         foc::Radians electricalAngle)
     {
         auto result = Update(currentPhases, speed, electricalAngle, torqueConstant);
+
+        if (!IsPlausible(result.inertia.Value(), result.friction.Value()))
+            return;
+
         currentInertia = result.inertia;
         currentFriction = result.friction;
     }
