@@ -157,7 +157,13 @@ graph LR
 
 The `Runner` is the only component that interacts with the PAL inverter and encoder at interrupt time. It registers the ADC-sampling callback and drives the `Calculate()` dispatch into the active control-mode implementation.
 
-Before dispatching, the `Runner` checks the sample against Kirchhoff's current law. In a three-wire machine the phase currents sum to zero, so a residual well outside the measurement noise means a shunt, an amplifier or an ADC channel has failed, and every downstream transform is being fed a lie. A residual above `residualFloor + residualFraction · (|Ia| + |Ib| + |Ic|)`, or a non-finite sample, is tolerated for `implausibleSampleLimit` consecutive samples — the switching transient can briefly break the identity — after which the `Runner` disables the drive and invokes the callback registered through `RegisterOnImplausibleCurrents`. The check costs three absolute values and a comparison.
+Before dispatching, the `Runner` checks the sample against Kirchhoff's current law. In a three-wire machine
+the phase currents sum to zero, so a residual well outside the measurement noise means a shunt, an amplifier
+or an ADC channel has failed, and every downstream transform is being fed a lie. A residual above
+`residualFloor + residualFraction · (|Ia| + |Ib| + |Ic|)`, or a non-finite sample, is tolerated for
+`implausibleSampleLimit` consecutive samples — the switching transient can briefly break the identity — after
+which the `Runner` disables the drive and invokes the callback registered through
+`RegisterOnImplausibleCurrents`. The check costs three absolute values and a comparison.
 
 `Calculate()`'s modulator output passes through `foc::ToDutyCycles`, which substitutes the zero vector (three equal duties, and therefore no line-to-line voltage) for any non-finite component. The hot path is built with `-ffast-math`, which licenses the compiler to fold `std::isnan` to a constant, so the test is made on the float's exponent bits instead; see `foc::IsFiniteValue`.
 

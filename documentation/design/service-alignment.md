@@ -97,7 +97,12 @@ The encoder position at the moment of settlement declaration becomes the calibra
 
 The offset is in **mechanical** radians, which is the unit `Encoder::Set` and `Encoder::SetZero` consume. It is not scaled by pole pairs; scaling it would make it an electrical angle and misorient the field.
 
-The service applies the offset itself, by calling `Encoder::SetZero()` at the settled instant while the rotor is still held at electrical zero. It does not wait for the caller to re-apply the reported value, because the rotor drifts as soon as the bridge is released. The reported value is therefore a record of where the encoder read before it was zeroed, and the calibration record persisted to NVM is diagnostic: an incremental encoder loses its reference across a reset, so the state machine does not re-apply a stored alignment at boot and calibration must be re-run to orient the field.
+The service applies the offset itself, by calling `Encoder::SetZero()` at the settled instant while the rotor
+is still held at electrical zero. It does not wait for the caller to re-apply the reported value, because the
+rotor drifts as soon as the bridge is released. The reported value is therefore a record of where the encoder
+read before it was zeroed, and the calibration record persisted to NVM is diagnostic: an incremental encoder
+loses its reference across a reset, so the state machine does not re-apply a stored alignment at boot and
+calibration must be re-run to orient the field.
 
 ### State Machine
 

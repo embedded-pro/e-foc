@@ -41,7 +41,11 @@ date: 2026-04-13
 
 A naked assembly trampoline runs in HardFault exception context before any C function prologue executes. It determines whether the exception was entered from thread mode (using PSP as the stack pointer) or from handler mode (using MSP), then passes the correct stack frame pointer to the C-level capture routine.
 
-The capture routine's **first** action is to call `CutPowerStage()`. Everything after it — the register capture, the stack scan, the reset — takes time during which six gate drivers otherwise hold whatever state they had when the fault hit. `CutPowerStage()` is a weak, empty symbol so the handler links on every target; a target that can tristate its bridge from exception context overrides it to do so. Until a target provides that override the gate drivers still hold their state, so this is a hook, not yet a guarantee.
+The capture routine's **first** action is to call `CutPowerStage()`. Everything after it — the register
+capture, the stack scan, the reset — takes time during which six gate drivers otherwise hold whatever state
+they had when the fault hit. `CutPowerStage()` is a weak, empty symbol so the handler links on every target; a
+target that can tristate its bridge from exception context overrides it to do so. Until a target provides that
+override the gate drivers still hold their state, so this is a hook, not yet a guarantee.
 
 The capture routine then writes all eight words of the ARM exception stack frame (R0–R3, R12, LR, PC, xPSR) plus
 three Cortex-M fault status registers (CFSR, MMFAR, BFAR) into the persistent region. It also scans the stack
