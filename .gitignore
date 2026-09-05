@@ -11,3 +11,5 @@ cucumber.toml
 .megalinter_github_conf/
 documentation/audits/
 .claude/plans/
+__pycache__/
+*.py[cod]
