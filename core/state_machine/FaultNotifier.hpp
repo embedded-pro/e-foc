@@ -29,6 +29,7 @@ namespace state_machine
     {
     public:
         ~NoOpFaultNotifier() override;
+
         void Register(const infra::Function<void(FaultCode)>&) override
         {}
     };

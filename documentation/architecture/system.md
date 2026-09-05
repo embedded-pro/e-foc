@@ -137,13 +137,13 @@ On Cortex-M, equal priority means no preemption: a handler at the same level as 
 
 The TI target assigns priorities explicitly in `application::InterruptPriorities`:
 
-| Source                | Priority  | Rationale                                                                                          |
-|-----------------------|-----------|----------------------------------------------------------------------------------------------------|
-| Phase-current ADC     | `highest` | Carries the 20 kHz control deadline; must preempt everything else                                    |
-| PWM fault             | `highest` | Hardware overcurrent/overvoltage trip; nothing may delay the response                                |
-| CAN                   | `normal`  | Command and telemetry traffic; may be preempted by the control loop                                  |
-| UART                  | `low`     | Terminal and tracing; the least time-critical source on the board                                    |
-| PendSV (outer loop)   | `lowest`  | Set by `hal::cortex::LowPriorityInterrupt`; the 1 kHz outer loop must never preempt the current loop |
+| Source              | Priority  | Rationale                                                                                            |
+|---------------------|-----------|------------------------------------------------------------------------------------------------------|
+| Phase-current ADC   | `highest` | Carries the 20 kHz control deadline; must preempt everything else                                    |
+| PWM fault           | `highest` | Hardware overcurrent/overvoltage trip; nothing may delay the response                                |
+| CAN                 | `normal`  | Command and telemetry traffic; may be preempted by the control loop                                  |
+| UART                | `low`     | Terminal and tracing; the least time-critical source on the board                                    |
+| PendSV (outer loop) | `lowest`  | Set by `hal::cortex::LowPriorityInterrupt`; the 1 kHz outer loop must never preempt the current loop |
 
 The outer loop runs on PendSV at the lowest configurable priority. It carries a 20 000-cycle budget against the inner loop's 4 500, so running it above the current loop would insert up to a full outer-loop execution of duty-update jitter once per millisecond.
 

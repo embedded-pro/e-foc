@@ -3,12 +3,13 @@
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/math/FiniteGuard.hpp"
 #include <cmath>
+#include <optional>
 
 namespace services
 {
     RealTimeFrictionAndInertiaEstimator::RealTimeFrictionAndInertiaEstimator(float forgettingFactor, hal::Hertz samplingFrequency)
         : samplingFrequency(static_cast<float>(samplingFrequency.Value()))
-        , rls(MotorRLS{ 1000.0f, forgettingFactor })
+        , rls(std::in_place, 1000.0f, forgettingFactor)
     {
     }
 

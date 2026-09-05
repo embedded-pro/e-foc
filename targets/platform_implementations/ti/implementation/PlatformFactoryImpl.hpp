@@ -207,7 +207,7 @@ namespace application
 
         struct Peripherals
         {
-            Peripherals(){};
+            Peripherals() {};
 
             hal::OutputPin performance{ Pins::performance };
             Cortex cortex;

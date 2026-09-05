@@ -56,7 +56,7 @@ The state machine has five named states:
 | `Calibrating` | Calibration sequence in progress; motor is driven by identification services | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop with previously valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (any step fails or hardware fault) |
 | `Ready`       | Calibration data valid and applied; motor can be enabled at any time         | → `Enabled` (CmdEnable), → `Calibrating` (CmdCalibrate re-runs), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                                                           |
 | `Enabled`     | FOC controller active; motor under closed-loop control                       | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                 |
-| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                | → `Idle` (CmdClearFault, up to 3 consecutive times)                                                                                                                                                                              |
+| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                | → `Idle` (CmdClearFault, up to 3 consecutive times)                                                                                                                                                   |
 
 ### State Diagram
 

@@ -95,11 +95,11 @@ classDiagram
 Each setpoint command applies to exactly one control mode and is rejected with a mode-mismatch
 message in the others, and rejected when the lifecycle state does not accept setpoints.
 
-| Command        | Alias | Arguments     | Accepted range   | Mode     |
-|----------------|-------|---------------|------------------|----------|
-| `set_torque`   | `st`  | Iq (A)        | ±100             | Torque   |
-| `set_speed`    | `ss`  | omega (rad/s) | ±1000            | Speed    |
-| `set_position` | `sp`  | theta (rad)   | ±2π              | Position |
+| Command        | Alias | Arguments     | Accepted range | Mode     |
+|----------------|-------|---------------|----------------|----------|
+| `set_torque`   | `st`  | Iq (A)        | ±100           | Torque   |
+| `set_speed`    | `ss`  | omega (rad/s) | ±1000          | Speed    |
+| `set_position` | `sp`  | theta (rad)   | ±2π            | Position |
 
 Ranges come from `foc::CommandLimits`, the same constants the CAN command path validates against, so
 an operator cannot reach through the terminal a setpoint the bus would have refused. A value outside
