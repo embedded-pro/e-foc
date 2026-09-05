@@ -549,6 +549,7 @@ class TestBridgeServerStartup(unittest.IsolatedAsyncioTestCase):
             can_tcp_port=5001,
             can_tty_baudrate=115200,
             log_level="ERROR",
+            bind="127.0.0.1",
         )
 
         with mock.patch.object(bridge_server, "parse_args", return_value=args), \
@@ -592,6 +593,7 @@ class TestBridgeServerStartup(unittest.IsolatedAsyncioTestCase):
             can_tcp_port=5001,
             can_tty_baudrate=115200,
             log_level="ERROR",
+            bind="127.0.0.1",
         )
 
         with mock.patch.object(bridge_server, "parse_args", return_value=args), \
@@ -626,6 +628,7 @@ class TestBridgeServerStartup(unittest.IsolatedAsyncioTestCase):
             can_tcp_port=5001,
             can_tty_baudrate=115200,
             log_level="ERROR",
+            bind="127.0.0.1",
         )
 
         with mock.patch.object(bridge_server, "parse_args", return_value=args), \
@@ -658,6 +661,7 @@ class TestBridgeServerStartup(unittest.IsolatedAsyncioTestCase):
             can_tcp_port=5001,
             can_tty_baudrate=115200,
             log_level="ERROR",
+            bind="127.0.0.1",
         )
 
         with mock.patch.object(bridge_server, "parse_args", return_value=args), \
