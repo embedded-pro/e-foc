@@ -115,7 +115,6 @@ namespace application
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
         drivers::ThreePhaseInverter& inverter;
-        drivers::Encoder& encoder;
         foc::Volts vdc;
         services::NonVolatileMemory& nvm;
         services::ElectricalParametersIdentification& electricalIdent;

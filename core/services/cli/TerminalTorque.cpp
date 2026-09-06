@@ -22,18 +22,13 @@ namespace services
 
     TerminalFocTorqueInteractor::StatusWithMessage TerminalFocTorqueInteractor::SetTorque(const infra::BoundedConstString& input)
     {
-        infra::Tokenizer tokenizer(input, ' ');
+        float torqueValue = 0.0f;
+        auto parsed = ParseSingleBoundedArgument(input, -foc::CommandLimits::maxTorqueSetpoint, foc::CommandLimits::maxTorqueSetpoint, torqueValue);
 
-        if (tokenizer.Size() != 1)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments." };
+        if (!Succeeded(parsed))
+            return parsed;
 
-        auto t = ParseInput(tokenizer.Token(0), -foc::CommandLimits::maxTorqueSetpoint, foc::CommandLimits::maxTorqueSetpoint);
-        if (!t.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
-
-        foc::Ampere current(*t);
-
-        foc.SetPoint(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, current });
-        return TerminalFocTorqueInteractor::StatusWithMessage();
+        foc.SetPoint(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ torqueValue } });
+        return StatusWithMessage();
     }
 }

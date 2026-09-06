@@ -29,34 +29,19 @@ namespace services
 
     TerminalFocPositionInteractor::StatusWithMessage TerminalFocPositionInteractor::SetSpeedPid(const infra::BoundedConstString& input)
     {
-        infra::Tokenizer tokenizer(input, ' ');
-
-        if (tokenizer.Size() != 1)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments." };
-
-        auto bandwidth = ParseInput(tokenizer.Token(0), foc::CommandLimits::minBandwidth, foc::CommandLimits::maxSpeedBandwidth);
-        if (!bandwidth.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
-
-        auto tunings = foc::SpeedLoopTunings{};
-        tunings.bandwidth = *bandwidth;
-        foc.SetSpeedTunings(tunings);
-        return StatusWithMessage();
+        return ApplySpeedBandwidth(input, foc);
     }
 
     TerminalFocPositionInteractor::StatusWithMessage TerminalFocPositionInteractor::SetPositionPid(const infra::BoundedConstString& input)
     {
-        infra::Tokenizer tokenizer(input, ' ');
+        float bandwidth = 0.0f;
+        auto parsed = ParseSingleBoundedArgument(input, foc::CommandLimits::minBandwidth, foc::CommandLimits::maxPositionBandwidth, bandwidth);
 
-        if (tokenizer.Size() != 1)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments." };
-
-        auto bandwidth = ParseInput(tokenizer.Token(0), foc::CommandLimits::minBandwidth, foc::CommandLimits::maxPositionBandwidth);
-        if (!bandwidth.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
+        if (!Succeeded(parsed))
+            return parsed;
 
         auto tunings = foc::PositionLoopTunings{};
-        tunings.bandwidth = *bandwidth;
+        tunings.bandwidth = bandwidth;
 
         // Retuning redesigns the position law, which can be refused; never report that as applied
         switch (foc.SetPositionTunings(tunings))
@@ -72,16 +57,13 @@ namespace services
 
     TerminalFocPositionInteractor::StatusWithMessage TerminalFocPositionInteractor::SetPosition(const infra::BoundedConstString& input)
     {
-        infra::Tokenizer tokenizer(input, ' ');
+        float positionValue = 0.0f;
+        auto parsed = ParseSingleBoundedArgument(input, -foc::CommandLimits::maxPositionSetpoint, foc::CommandLimits::maxPositionSetpoint, positionValue);
 
-        if (tokenizer.Size() != 1)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments." };
+        if (!Succeeded(parsed))
+            return parsed;
 
-        auto positionValue = ParseInput(tokenizer.Token(0), -foc::CommandLimits::maxPositionSetpoint, foc::CommandLimits::maxPositionSetpoint);
-        if (!positionValue.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
-
-        foc.SetPoint(foc::Radians(*positionValue));
+        foc.SetPoint(foc::Radians(positionValue));
         return StatusWithMessage();
     }
 }

@@ -98,6 +98,28 @@ TEST_F(TerminalPositionTest, set_position_bandwidth)
     ExecuteAllActions();
 }
 
+TEST_F(TerminalPositionTest, set_position_bandwidth_refused_while_enabled)
+{
+    InvokeCommand("spbw 18.8", [this]()
+        {
+            EXPECT_CALL(focMock, SetPositionTunings(testing::_)).WillOnce(testing::Return(foc::SelectResult::busy));
+            ExpectError("rejected: motor is enabled.");
+        });
+
+    ExecuteAllActions();
+}
+
+TEST_F(TerminalPositionTest, set_position_bandwidth_refused_when_no_controller_fits)
+{
+    InvokeCommand("spbw 18.8", [this]()
+        {
+            EXPECT_CALL(focMock, SetPositionTunings(testing::_)).WillOnce(testing::Return(foc::SelectResult::invalidParameters));
+            ExpectError("rejected: no controller for this bandwidth.");
+        });
+
+    ExecuteAllActions();
+}
+
 TEST_F(TerminalPositionTest, set_position_bandwidth_invalid_argument_count)
 {
     InvokeCommand("set_position_bandwidth 18.8 1.0", [this]()

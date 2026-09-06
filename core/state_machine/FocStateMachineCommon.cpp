@@ -12,7 +12,6 @@ namespace application
         : terminal(terminalAndTracer.terminal)
         , tracer(terminalAndTracer.tracer)
         , inverter(hardware.inverter)
-        , encoder(hardware.encoder)
         , vdc(hardware.vdc)
         , nvm(nvm)
         , electricalIdent(calibServices.electricalIdent)
