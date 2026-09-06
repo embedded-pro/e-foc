@@ -5,8 +5,6 @@
 
 namespace services
 {
-    // Prints what the control loop and the CAN bus have been doing. #255 reports that every one of
-    // these numbers is computed or available somewhere and none of it is reachable from outside.
     class TerminalDiagnostics
     {
     public:

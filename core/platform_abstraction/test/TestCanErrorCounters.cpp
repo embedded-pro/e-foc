@@ -21,8 +21,6 @@ TEST_F(TestCanErrorCounters, a_fresh_set_of_counters_is_empty)
 
 TEST_F(TestCanErrorCounters, every_class_is_counted_not_just_bus_off)
 {
-    // The error callback mapped busOff to a fault and dropped the other eleven, which is the
-    // difference between a bus with marginal termination and one that is unplugged.
     counters.Record(CanError::busOff);
     counters.Record(CanError::stuffError);
     counters.Record(CanError::stuffError);

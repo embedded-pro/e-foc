@@ -246,8 +246,6 @@ namespace application
         ResetCause resetCause{ ResetCause::powerUp };
         CycleCounter cycleCounter;
         ControlLoopMetrics controlLoopMetrics;
-        // Set for the duration of one control interrupt. A second conversion arriving while it is
-        // set means the loop did not return in time, which no after-the-fact duration can show.
         volatile bool controlLoopEntered{ false };
         infra::BoundedString::WithStorage<1024> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };

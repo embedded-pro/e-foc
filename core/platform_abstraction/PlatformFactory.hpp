@@ -81,8 +81,6 @@ namespace application
 
         virtual void RegisterBoardProtection(const infra::Function<void(BoardProtectionReason)>& onProtection) = 0;
 
-        // Execution statistics for the control interrupt and a count of every CAN error class the
-        // adapter has reported. Both are accumulated where the events happen and read from here.
         virtual ControlLoopMetrics::Snapshot ControlLoopStatistics() const = 0;
         virtual const CanBusAdapter::ErrorCounters& CanStatistics() const = 0;
         virtual void ResetStatistics() = 0;

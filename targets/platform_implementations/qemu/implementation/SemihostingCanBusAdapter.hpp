@@ -14,7 +14,6 @@ namespace application
         void ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction) override;
         void SetOnError(const infra::Function<void(CanError)>& handler) override;
 
-        // Routes through RecordError so the semihosted bus reports into the same counters as a real one.
         void NotifyError(CanError error);
 
         void PollIncoming();

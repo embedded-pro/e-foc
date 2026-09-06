@@ -111,8 +111,6 @@ TEST_F(TestControlLoopMetrics, a_run_inside_the_budget_counts_neither)
 
 TEST_F(TestControlLoopMetrics, a_reentry_is_counted_separately_from_a_deadline_miss)
 {
-    // A duration can only show a miss after the fact. An interrupt arriving while the previous one
-    // has not returned is the same failure caught as it happens, and no duration reveals it.
     metrics.RecordReentry();
     metrics.RecordReentry();
 
@@ -142,8 +140,6 @@ TEST_F(TestControlLoopMetrics, reset_clears_the_run_but_keeps_the_budget)
 
 TEST_F(TestControlLoopMetrics, counters_keep_counting_well_past_a_16_bit_range)
 {
-    // At 20 kHz a 16-bit counter would wrap every three seconds. Reaching the 32-bit saturation the
-    // implementation carries takes six days, so this covers the width rather than the ceiling.
     application::ControlLoopMetrics counting;
     counting.Configure(1, 1);
 

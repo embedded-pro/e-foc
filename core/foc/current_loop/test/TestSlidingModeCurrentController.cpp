@@ -155,10 +155,6 @@ TEST_F(TestSlidingModeCurrentController, closed_loop_settles_on_a_non_zero_refer
 
 TEST_F(TestSlidingModeCurrentController, the_back_emf_is_fed_forward_rather_than_left_to_the_switching_term)
 {
-    // The sliding surface is designed on the decoupled RL plant, so the back-EMF is disturbance to
-    // it. context.electricalSpeed was carried into Compute and never read, which left the switching
-    // term to reject the whole of it - and it is nowhere near large enough. 1000 rad/s electrical
-    // is roughly 1360 rpm on a 7 pole-pair rotor, well inside the modulation circle on this bus.
     controller.Configure(ValidParameters());
 
     constexpr float electricalSpeed = 1000.0f;

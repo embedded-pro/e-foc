@@ -70,9 +70,6 @@ namespace foc
         lastSetPoint = LimitToCurrentEnvelope(setPoint);
     }
 
-    // The speed and position cascades bound the current reference their outer loop produces. Torque
-    // mode has no outer loop, so its reference arrives from the operator and nothing bounded it. The
-    // plant constraint is the magnitude of the current vector, not either axis on its own.
     IdAndIqPoint TorqueCascade::LimitToCurrentEnvelope(IdAndIqPoint setPoint) const
     {
         const auto d = setPoint.first.Value();

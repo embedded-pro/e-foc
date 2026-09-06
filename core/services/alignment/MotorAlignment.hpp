@@ -21,8 +21,6 @@ namespace services
             std::size_t maxSamples{ 500 };
             foc::Radians settledThreshold{ 0.001f };
             std::size_t settledCount{ 10 };
-            // maxSamples bounds the run only while samples keep arriving. Nothing else does, so a
-            // drive that never starts leaves the caller waiting on a completion that never comes.
             infra::Duration timeout{ std::chrono::seconds{ 2 } };
         };
 

@@ -466,8 +466,6 @@ TEST_F(MotorAlignmentTest, AReentrantForceAlignmentRejectsTheNewCallerRatherThan
             firstFired = true;
         });
 
-    // Returning silently here leaves the state machine waiting in Calibrating for a completion
-    // that will never arrive, with no step timeout behind it.
     bool secondFired = false;
     std::optional<foc::Radians> secondResult{ foc::Radians{ 1.0f } };
     alignment.ForceAlignment(7, config, [&](auto offset)
@@ -500,8 +498,6 @@ TEST_F(MotorAlignmentTest, ARunThatNeverReceivesASampleFailsOnTheStepTimeout)
             result = offset;
         });
 
-    // maxSamples bounds the run only while samples keep arriving. A drive that never started
-    // delivers none, so without the timer nothing ends the step.
     ForwardTime(std::chrono::milliseconds{ 501 });
 
     EXPECT_TRUE(fired);

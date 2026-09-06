@@ -34,9 +34,6 @@ namespace application
 
         static constexpr std::size_t errorClasses = static_cast<std::size_t>(CanError::other) + 1;
 
-        // The error callback maps busOff to a fault and drops the eleven other classes on the
-        // floor, which is the difference between a bus with marginal termination and one that is
-        // simply unplugged. Counters saturate rather than wrap, so a long run cannot look healthy.
         class ErrorCounters
         {
         public:
@@ -66,8 +63,6 @@ namespace application
         private:
             static constexpr uint32_t saturated = 0xFFFFFFFFu;
 
-            // An adapter reporting a class this build does not know counts as `other` rather than
-            // indexing past the end.
             static std::size_t IndexOf(CanError error)
             {
                 const auto index = static_cast<std::size_t>(error);
@@ -97,7 +92,6 @@ namespace application
         }
 
     protected:
-        // Every adapter routes its reports through here, so no path can report without counting.
         void RecordError(CanError error)
         {
             errorCounters.Record(error);

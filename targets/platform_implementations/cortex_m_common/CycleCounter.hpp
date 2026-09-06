@@ -4,14 +4,6 @@
 
 namespace application
 {
-    // A free-running read of the Cortex-M cycle counter, for measuring how long the control
-    // interrupt takes. hal::cortex::DataWatchpointAndTrace exposes the same counter as a
-    // start/stop stopwatch, which cannot serve two callers; this leaves it running and takes
-    // deltas, so any number of callers can measure independently.
-    //
-    // Deltas are wrap-safe: the counter is 32 bits and unsigned subtraction is modular, so a run
-    // that straddles the wrap still yields its true length. At 120 MHz the counter wraps about
-    // every 36 seconds, which no single interrupt approaches.
     class CycleCounter
     {
     public:

@@ -218,9 +218,6 @@ TEST_F(TestLqiPositionController, the_integral_state_removes_the_standing_error_
 
 TEST_F(TestLqiPositionController, an_inert_design_commands_zero_however_long_the_error_stands)
 {
-    // The saturation guard that unwinds the accumulation compares the limited command against the
-    // unlimited one, and with a zero gain matrix both are zero, so it never fires. What the loop
-    // must not do either way is command anything: the design has no actuator mapping at all.
     auto parameters = ValidParameters();
     parameters.inertia = foc::NewtonMeterSecondSquared{ 0.0f };
     controller.Configure(parameters);

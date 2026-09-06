@@ -54,8 +54,6 @@ namespace services
                        << " min=" << statistics.minimumCycles
                        << " avg=" << statistics.averageCycles
                        << " max=" << statistics.maximumCycles;
-        // Overruns spent the margin; deadline misses and re-entries mean the loop did not finish
-        // before the next conversion was due, which is the one that stops the drive being real-time.
         tracer.Trace() << "[LOOP] overruns=" << statistics.overruns
                        << " deadlineMisses=" << statistics.deadlineMisses
                        << " reentries=" << statistics.reentries;

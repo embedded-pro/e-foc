@@ -296,8 +296,6 @@ TEST_F(TestTorqueCascade, a_setpoint_inside_the_envelope_is_taken_unchanged)
 
 TEST_F(TestTorqueCascade, a_setpoint_outside_the_envelope_is_scaled_onto_it)
 {
-    // The speed and position cascades bound the reference their outer loop produces; torque mode
-    // takes it straight from the operator, so 1 kA would otherwise reach the current loop intact.
     focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 1000.0f } });
 
     foc::Radians huge{ 0.0f };
@@ -317,7 +315,6 @@ TEST_F(TestTorqueCascade, a_setpoint_outside_the_envelope_is_scaled_onto_it)
 
 TEST_F(TestTorqueCascade, the_envelope_bounds_the_current_vector_not_each_axis)
 {
-    // Id and Iq each within the limit can still ask for sqrt(2) times it together.
     focTorque->SetPoint({ testMaxCurrent, testMaxCurrent });
 
     foc::Radians diagonal{ 0.0f };

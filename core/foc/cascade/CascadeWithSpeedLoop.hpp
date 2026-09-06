@@ -18,8 +18,6 @@ namespace foc
 {
     namespace detail
     {
-        // The slot a triple-buffered writer may use: neither the slot last published nor the one the
-        // reader has claimed. When those coincide there are two free slots and either will do.
         constexpr uint8_t NextFreeSlot(uint8_t slotCount, uint8_t ready, uint8_t held)
         {
             return ready == held
@@ -37,22 +35,12 @@ namespace foc
         float normalizedVd{ 0.0f };
     };
 
-    // Triple-buffered hand-off from the 20 kHz interrupt to the low-priority handler. Two slots are
-    // not enough: the reader holds its reference across an estimator update, so a handler that
-    // overruns its 1 ms period sees two publishes wrap back onto the slot it is still reading. The
-    // third slot is what lets the writer always have somewhere to go that is neither the slot last
-    // published nor the slot the reader claimed.
-    //
-    // The writer is the ADC interrupt and the reader is PendSV, so the writer cannot be preempted by
-    // the reader; only the reader has to tolerate being interrupted mid-sequence.
     class EstimatorChannel
     {
     public:
         ALWAYS_INLINE_HOT void Publish(const EstimatorSnapshot& snapshot)
         {
             slots[writeSlot] = snapshot;
-            // `volatile` orders volatile accesses against each other and nothing else, so without
-            // this the 28-byte snapshot store may sink past the index publish below.
             std::atomic_signal_fence(std::memory_order_release);
             ready = writeSlot;
             writeSlot = NextFreeSlot();
@@ -64,7 +52,6 @@ namespace foc
         void UpdateElectrical(float electricalSpeed, float vdcInvScale);
 
     private:
-        // Claims the slot last published so the writer will not reuse it while it is being read.
         ALWAYS_INLINE_HOT const EstimatorSnapshot& Acquire()
         {
             held = ready;
@@ -72,8 +59,6 @@ namespace foc
             return slots[held];
         }
 
-        // Reading a stale `held` is safe: the reader can only move it to `ready`, which
-        // detail::NextFreeSlot never returns.
         ALWAYS_INLINE_HOT uint8_t NextFreeSlot() const
         {
             return detail::NextFreeSlot(slotCount, ready, held);
@@ -110,8 +95,6 @@ namespace foc
 
     private:
         float samplePeriod;
-        // Written by the 20 kHz interrupt, read by the low-priority handler. See the note on the
-        // hand-off variables in CascadeWithSpeedLoop.
         volatile float currentAngle{ 0.0f };
         float previousAngle{ 0.0f };
         bool previousAngleValid{ false };
@@ -160,12 +143,6 @@ namespace foc
         Ampere maxCurrent;
         hal::Hertz outerLoopFrequency;
         SpeedDifferentiator speedDifferentiator;
-        // Single 32-bit values handed between the 20 kHz interrupt and the low-priority handler, in
-        // both directions. On Cortex-M an aligned 32-bit access is indivisible, so no reader sees
-        // half a value; `volatile` is what stops the compiler caching them in a register across the
-        // loop. It orders nothing else, which is all these need: each carries no invariant with any
-        // other variable, and a reader that is one period behind simply uses the previous value.
-        // The sibling `enabled` flag was already qualified; these were not, with identical sharing.
         volatile float lastSpeedLoopOutput{ 0.0f };
         volatile float lastElectricalSpeed{ 0.0f };
         volatile float speedReference{ 0.0f };

@@ -154,9 +154,6 @@ namespace application
         using namespace std::chrono_literals;
         auto& impl = peripherals->adcForPhaseCurrentMeasurementImpl;
 
-        // The budget is the share of the control period the interrupt is allowed; the period is
-        // what it must fit inside. AGENTS.md fixes the budget at 4500 cycles of the 6000 a
-        // 20 kHz period gives at 120 MHz, so it is carried here as that same 75 percent.
         const auto periodCycles = baseFrequency.Value() == 0
                                       ? 0u
                                       : static_cast<uint32_t>(SystemCoreClock / baseFrequency.Value());
@@ -261,10 +258,6 @@ namespace application
             peripherals->asyncPwm->SetBaseFrequency(baseFrequency);
         else
             peripherals->syncPwm->SetBaseFrequency(baseFrequency);
-        // Measured here rather than around Calculate() so the figure covers the whole interrupt -
-        // dispatch, encoder read, control law and the PWM write - which is what the cycle budget
-        // models. The counter is free-running, so the delta stays correct across its own wrap, and
-        // the cost is two register reads plus the update.
         peripherals->phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
             {
                 if (controlLoopEntered)

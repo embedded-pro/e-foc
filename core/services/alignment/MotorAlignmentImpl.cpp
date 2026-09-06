@@ -24,8 +24,6 @@ namespace services
 
     void MotorAlignmentImpl::ForceAlignment(std::size_t polePairs, const AlignmentConfig& config, const infra::Function<void(std::optional<foc::Radians>)>& onDone)
     {
-        // Returning silently here drops the caller's completion: the state machine then waits in
-        // Calibrating for a callback that will never arrive, with no step timeout behind it.
         if (onAlignmentDone)
         {
             onDone(std::nullopt);
