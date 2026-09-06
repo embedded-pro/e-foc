@@ -48,7 +48,7 @@ namespace foc
         if (mechanical == nullptr)
             return;
 
-        const auto& snapshot = Ready();
+        const auto& snapshot = Acquire();
         mechanical->Update(
             snapshot.phaseCurrents,
             RadiansPerSecond{ mechanicalSpeed },
@@ -60,7 +60,7 @@ namespace foc
         if (electrical == nullptr)
             return;
 
-        const auto& snapshot = Ready();
+        const auto& snapshot = Acquire();
         electrical->Update(
             Volts{ snapshot.normalizedVd * vdcInvScale },
             Ampere{ snapshot.measuredId },
@@ -187,7 +187,7 @@ namespace foc
 
     void CascadeWithSpeedLoop::SetSpeedReference(RadiansPerSecond reference)
     {
-        speedReference = reference;
+        speedReference = reference.Value();
     }
 
     OPTIMIZE_FOR_SPEED
@@ -201,7 +201,7 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     void CascadeWithSpeedLoop::RunSpeedLoop(float mechanicalSpeed)
     {
-        lastSpeedLoopOutput = speedLoop.Compute(SpeedControlContext{ RadiansPerSecond{ mechanicalSpeed }, speedReference }).Value();
+        lastSpeedLoopOutput = speedLoop.Compute(SpeedControlContext{ RadiansPerSecond{ mechanicalSpeed }, RadiansPerSecond{ speedReference } }).Value();
     }
 
     OPTIMIZE_FOR_SPEED
