@@ -24,8 +24,13 @@ namespace services
 
     void MotorAlignmentImpl::ForceAlignment(std::size_t polePairs, const AlignmentConfig& config, const infra::Function<void(std::optional<foc::Radians>)>& onDone)
     {
+        // Returning silently here drops the caller's completion: the state machine then waits in
+        // Calibrating for a callback that will never arrive, with no step timeout behind it.
         if (onAlignmentDone)
+        {
+            onDone(std::nullopt);
             return;
+        }
 
         this->polePairs = polePairs;
         alignmentConfig = config;
@@ -33,6 +38,11 @@ namespace services
         currentSampleIndex = 0;
         consecutiveSettledSamples = 0;
         previousPosition = encoder.Read();
+
+        timeoutTimer.Start(config.timeout, [this]()
+            {
+                FailToConverge();
+            });
 
         ApplyAlignmentVoltage();
     }
@@ -85,6 +95,7 @@ namespace services
         alignedPosition = encoder.Read();
         encoder.SetZero();
 
+        timeoutTimer.Cancel();
         driver.Stop();
 
         if (onAlignmentDone)
@@ -93,6 +104,7 @@ namespace services
 
     void MotorAlignmentImpl::FailToConverge()
     {
+        timeoutTimer.Cancel();
         driver.Stop();
 
         if (onAlignmentDone)

@@ -6,6 +6,7 @@
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/DutyConversion.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
+#include "infra/util/ReallyAssert.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "numerical/math/Math.hpp"
 
@@ -14,6 +15,12 @@ namespace foc
     namespace
     {
         constexpr float speedFilterTimeConstant = 0.001f;
+    }
+
+    TorqueCascade::TorqueCascade(foc::Ampere maxCurrent)
+        : maxCurrent{ maxCurrent }
+    {
+        really_assert(maxCurrent.Value() > 0);
     }
 
     void TorqueCascade::Enable()
@@ -60,7 +67,25 @@ namespace foc
 
     void TorqueCascade::SetPoint(IdAndIqPoint setPoint)
     {
-        lastSetPoint = setPoint;
+        lastSetPoint = LimitToCurrentEnvelope(setPoint);
+    }
+
+    // The speed and position cascades bound the current reference their outer loop produces. Torque
+    // mode has no outer loop, so its reference arrives from the operator and nothing bounded it. The
+    // plant constraint is the magnitude of the current vector, not either axis on its own.
+    IdAndIqPoint TorqueCascade::LimitToCurrentEnvelope(IdAndIqPoint setPoint) const
+    {
+        const auto d = setPoint.first.Value();
+        const auto q = setPoint.second.Value();
+        const auto squaredMagnitude = d * d + q * q;
+        const auto limit = maxCurrent.Value();
+
+        if (squaredMagnitude <= limit * limit)
+            return setPoint;
+
+        const auto scale = limit / math::Sqrt(squaredMagnitude);
+
+        return { Ampere{ d * scale }, Ampere{ q * scale } };
     }
 
     void TorqueCascade::SetCurrentTunings(const CurrentLoopTunings& tunings)

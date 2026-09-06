@@ -9,6 +9,14 @@ namespace application
         : public PlatformFactory
     {
     public:
+        PlatformFactoryMock()
+        {
+            ON_CALL(*this, MaxCurrentSupported()).WillByDefault(testing::Return(foc::Ampere{ defaultMaxCurrent }));
+            EXPECT_CALL(*this, MaxCurrentSupported()).Times(testing::AnyNumber());
+        }
+
+        static constexpr float defaultMaxCurrent{ 10.0f };
+
         MOCK_METHOD(void, Run, (), (override));
         MOCK_METHOD(services::Tracer&, Tracer, (), (override));
         MOCK_METHOD(services::TerminalWithCommands&, Terminal, (), (override));

@@ -43,6 +43,16 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     PositionOutput LqiPositionController::Compute(const PositionControlContext& context)
     {
+        // An inert design has no actuator mapping - Construct leaves currentPerNormalizedInput at
+        // zero when the Riccati solve fails - so the command is zero whatever the state and the
+        // saturation guard below can never fire. #255 reads that as unbounded windup; it is not.
+        // The accumulation stops changing once it passes float's integer precision, around 1.5e8
+        // and hours away, and any design that could act on it resets it through OnDesignChanged.
+        // The early return is what makes a guard that cannot fire explicit rather than leaving the
+        // loop accumulating toward a gain that will never read it.
+        if (currentPerNormalizedInput == 0.0f)
+            return { PositionOutputKind::currentReference, 0.0f };
+
         const auto deviation = -WrappedPositionError(context.reference, context.measured);
         const auto scaledSpeed = context.measuredSpeed.Value() * samplePeriod;
 

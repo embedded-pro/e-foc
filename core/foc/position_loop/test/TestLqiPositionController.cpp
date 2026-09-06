@@ -215,3 +215,34 @@ TEST_F(TestLqiPositionController, the_integral_state_removes_the_standing_error_
 
     EXPECT_NEAR(SettledPosition(0.5f, 0.1f), 0.5f, 1e-3f);
 }
+
+TEST_F(TestLqiPositionController, an_inert_design_commands_zero_however_long_the_error_stands)
+{
+    // The saturation guard that unwinds the accumulation compares the limited command against the
+    // unlimited one, and with a zero gain matrix both are zero, so it never fires. What the loop
+    // must not do either way is command anything: the design has no actuator mapping at all.
+    auto parameters = ValidParameters();
+    parameters.inertia = foc::NewtonMeterSecondSquared{ 0.0f };
+    controller.Configure(parameters);
+
+    for (int sample = 0; sample != 200000; ++sample)
+    {
+        const auto command = Command(3.0f, 0.0f);
+        ASSERT_TRUE(std::isfinite(command)) << " at sample " << sample;
+        ASSERT_NEAR(command, 0.0f, tolerance) << " at sample " << sample;
+    }
+}
+
+TEST_F(TestLqiPositionController, a_design_installed_after_an_inert_run_starts_from_a_clear_integral_state)
+{
+    auto inert = ValidParameters();
+    inert.inertia = foc::NewtonMeterSecondSquared{ 0.0f };
+    controller.Configure(inert);
+
+    for (int sample = 0; sample != 200000; ++sample)
+        Command(3.0f, 0.0f);
+
+    controller.Configure(ValidParameters());
+
+    EXPECT_NEAR(Command(0.0f, 0.0f), 0.0f, tolerance);
+}

@@ -21,3 +21,17 @@
     The alignment procedure shall report the offset it measured as a mechanical angle,
     unscaled by the pole-pair count, so that a consumer converting it to an electrical
     angle does so exactly once.
+
+- id: REQ-CAL-006
+  title: A second alignment request is rejected rather than dropped
+  shall: >
+    When encoder alignment is asked to start while a run is already in flight, the service shall
+    report the new request as failed through its own completion rather than returning silently. A
+    dropped completion leaves the caller waiting for a result that will never arrive.
+
+- id: REQ-CAL-007
+  title: Encoder alignment is bounded in time, not only in samples
+  shall: >
+    Encoder alignment shall fail after a configurable timeout measured from the start of the run.
+    Its sample budget bounds the run only while phase-current samples keep arriving, so a drive
+    that never starts delivers none and nothing else ends the step.

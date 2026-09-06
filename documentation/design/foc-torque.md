@@ -107,6 +107,20 @@ stateDiagram-v2
     Enabled --> Disabled : Disable\n(returns zero duty, freezes PID state)
 ```
 
+### Current Envelope
+
+The speed and position cascades bound the current reference their outer loop produces. Torque mode
+has no outer loop — the reference arrives from the operator, over CAN or the CLI — so the cascade
+applies the bound itself, at `SetPoint`, before the reference reaches the current loop.
+
+The bound is on the **magnitude of the current vector**, not on either axis separately: the plant
+constraint is $\sqrt{I_d^2 + I_q^2} \le I_{max}$, and a per-axis clamp would admit $\sqrt 2$ times
+the limit on the diagonal. A setpoint outside the envelope is scaled onto it, preserving the
+commanded ratio between $I_d$ and $I_q$ rather than clipping one axis and rotating the vector.
+
+The envelope comes from the inverter's `MaxCurrentSupported()`, the same source the speed and
+position cascades take theirs from, so the three modes cannot disagree about the hardware limit.
+
 ### Pole-Pair Configuration
 
 The pole-pair count is an integer property that translates the mechanical rotor angle supplied by the encoder into the electrical angle required by the Park transform. It must be configured before the first `Calculate()` call. Changing it while enabled produces undefined control behaviour and must be avoided.
@@ -123,7 +137,7 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 | Enable            | Arms both PID controllers and resets their integrator state.                                                    | Safe to call repeatedly. PIDs start from a clean state each time. Last setpoints are preserved.                |
 | Disable           | Disarms both PID controllers and forces zero duty cycle output.                                                 | Safe to call from any context. `Calculate()` returns zero while disabled.                                      |
 | SetCurrentTunings | Provides the current loop closed-loop bandwidth.                                                                | Gains are derived from the motor model and normalised internally. Takes effect on the next `Calculate()` call. |
-| SetPoint          | Sets the (Id, Iq) current setpoint in Ampere.                                                                   | New setpoint is used on the next `Calculate()` invocation. Can be called while Enabled.                        |
+| SetPoint          | Sets the (Id, Iq) current setpoint in Ampere.                                                                   | Scaled onto the current envelope on the way in. New setpoint is used on the next `Calculate()` invocation. Can be called while Enabled. |
 | Calculate         | Executes the full 11-step FOC torque loop for one control cycle.                                                | Must be called at 20 kHz from ISR context. Returns `PhasePwmDutyCycles`. Must not block.                       |
 
 ### Required
@@ -160,6 +174,7 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 | Electrical angle wrapping       | Handled by the LUT normalisation within FastTrigonometry — no explicit modulo operation required in loop.             |
 | Gain derivation dependency      | Gain derivation requires the motor model — including the DC bus voltage — to be supplied through `Configure()` first. |
 | No flux weakening               | Id_setpoint ≠ 0 is structurally accepted but operational flux-weakening strategy is not yet defined.                  |
+| Current envelope                | Vector magnitude bounded to the inverter's `MaxCurrentSupported()` at `SetPoint`; it is not a regulator.              |
 | PID state at Enable             | Integrators are always zeroed on Enable, regardless of previous state.                                                |
 
 ---

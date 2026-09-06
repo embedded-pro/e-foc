@@ -320,12 +320,19 @@ time for gain normalisation.
 | Parameter                     |           PID            |      Decoupled PID       |         Deadbeat         |       Sliding-mode        |
 |-------------------------------|:------------------------:|:------------------------:|:------------------------:|:-------------------------:|
 | $R_s$, $L_s$ (electrical RLS) |         Required         |         Required         |     Required (tight)     |         Required          |
-| $\psi_f$ (datasheet)          |       Not required       |  Required — back-EMF FF  |       Not required       |       Not required        |
+| $\psi_f$ (datasheet)          |       Not required       |  Required — back-EMF FF  |       Not required       |  Required — back-EMF FF   |
 | $V_{dc}$                      | Required — normalisation | Required — normalisation | Required — normalisation | Required — normalisation  |
 | $I_{q,max}$                   |     For output clamp     |     For output clamp     |        For clamp         | For switching gain sizing |
 
-Deadbeat requires the tightest RLS convergence. Decoupled PID is the only current-loop algorithm
-that requires $\psi_f$ from the motor datasheet.
+Deadbeat requires the tightest RLS convergence.
+
+Sliding-mode applies the same decoupling feedforward as Decoupled PID, and for the same reason: its
+sliding surface is designed on the decoupled per-axis RL plant, so the cross-coupling and the
+back-EMF are disturbance to it. Sizing the switching gain to reject them outright is not viable —
+at 1000 rad/s electrical on a 0.01 Wb rotor the back-EMF alone is several times the authority the
+default gain commands, and raising the gain that far would put the boundary-layer ratio outside the
+range in which the error map contracts. Feeding them forward leaves the switching term the residue
+it is sized for.
 
 **Speed loop:**
 
@@ -363,7 +370,8 @@ derived from the bandwidth and the motor model, never supplied per axis.
 | Two-step variant | off           | Deadbeat           |
 
 The sliding-mode error map inside the boundary layer contracts only while the switching gain stays
-below the boundary layer, so the ratio of the two is bounded by design.
+below the boundary layer, so the ratio of the two is bounded by design. This is why the back-EMF is
+handled by feedforward rather than by a larger switching gain.
 
 **Speed loop:**
 

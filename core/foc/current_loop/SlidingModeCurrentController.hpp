@@ -18,8 +18,16 @@ namespace foc
 
         OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context)
         {
-            return LimitToModulationCircle({ ComputeAxis(context.measured.d, context.reference.d),
-                ComputeAxis(context.measured.q, context.reference.q) });
+            // The sliding surface is designed on the decoupled RL plant, which leaves the
+            // cross-coupling and the back-EMF as disturbance for the switching term to reject. At
+            // 5000 rpm the back-EMF alone is around 21 V against the 2.8 V the default switching
+            // gain commands, so the surface is never reached and the axis tracks nothing. Feeding
+            // them forward - the same component the decoupled PID uses - leaves the switching term
+            // the residue it is sized for, and is why context.electricalSpeed is carried at all.
+            const RotatingFrame proposed{ ComputeAxis(context.measured.d, context.reference.d),
+                ComputeAxis(context.measured.q, context.reference.q) };
+
+            return LimitToModulationCircle(decoupling.Apply(proposed, context));
         }
 
     private:
@@ -41,6 +49,7 @@ namespace foc
         float boundaryLayer{ CurrentLoopTunings{}.boundaryLayer };
         float normalizationScale{ 0.0f };
         float equilibriumGain{ 0.0f };
+        DecouplingFeedforward decoupling;
         ScalarSlidingMode slidingMode{ Inert() };
     };
 
