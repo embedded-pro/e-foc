@@ -92,8 +92,31 @@ The open-loop gain is then $K_p K_t / (Js)$, giving a first-order closed loop wi
 $\omega_{bw}$. Solving for gains:
 
 $$
-\boxed{K_p = \frac{J\, \omega_{bw}}{K_t}, \qquad K_i = \frac{B_f\, \omega_{bw}}{K_t}}
+K_p = \frac{J\, \omega_{bw}}{K_t}, \qquad K_i = \frac{B_f\, \omega_{bw}}{K_t}
 $$
+
+### What the implementation uses
+
+The derivation above is the textbook one; `PidSpeedController::ApplyGains` departs from it in two
+ways, and both matter when reading the code against this chapter.
+
+$$
+\boxed{K_p = \frac{2\, J\, \omega_{bw}}{K_t}, \qquad \frac{K_i}{K_p} = \max\!\left(\frac{B_f}{J},\ \frac{\omega_{bw}}{10}\right)}
+$$
+
+**The factor 2 on $K_p$** is not produced by the derivation, which places crossover at
+$\omega_{bw}$ exactly. It is an empirical margin carried by the implementation; this chapter
+records it rather than justifying it, because no derivation here yields it.
+
+**The integral zero is floored** at $\omega_{bw}/10$, so the pole-zero cancellation this section is
+named after happens only when $B_f/J$ is already the larger of the two. For the identified
+parameters of a small PMSM it is not — $B_f/J$ is typically well under $\omega_{bw}/10$ — so in
+practice the floor sets the zero and the plant pole is *not* cancelled. The floor exists so that
+$K_i$ stays non-zero when the mechanical identification returns $B_f = 0$, which would otherwise
+leave a pure proportional law with a standing error.
+
+Both gains are then divided by $I_{q,max}$ before they reach the PID, and its output is multiplied
+by $I_{q,max}$ again, so the controller works in normalised units and the scaling cancels.
 
 **Practical limit**: speed bandwidth must satisfy the cascade separation principle:
 $\omega_{bw}^s \leq \omega_{bw}^i / 10$, where $\omega_{bw}^i$ is the current-loop bandwidth.
@@ -106,6 +129,9 @@ The implementation uses the incremental PI to avoid initialisation issues:
 $$
 \Delta u[k] = K_p\,\bigl(e[k] - e[k-1]\bigr) + K_i\, T_s^o\, e[k]
 $$
+
+The $T_s^o$ factor is folded into the gain the implementation stores, so the `ki` in the code is the
+$K_i T_s^o$ of this expression, not the $K_i$ of the continuous design above.
 $$
 u[k] = \mathrm{clamp}\bigl(u[k-1] + \Delta u[k],\ -I_{q,max},\ I_{q,max}\bigr)
 $$

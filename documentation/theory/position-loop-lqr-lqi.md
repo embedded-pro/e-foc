@@ -82,9 +82,51 @@ $$
 u[k] = -K_\theta\,(\theta_m[k] - \theta_m^*[k]) - K_\omega\,(\omega_m[k] - \omega_m^*[k])
 $$
 
-**LQI extension**: Add an integral state $x_I[k+1] = x_I[k] + (\theta_m^*[k] - \theta_m[k])$ for
-zero steady-state error under constant load. Augmented gains $[K_\theta, K_\omega, K_I]$ computed
-from the same DARE structure extended to dimension 3.
+**LQI extension**: Add an integral state for zero steady-state error under constant load, and solve
+the same DARE structure extended to dimension 3.
+
+### What the LQI implementation actually solves
+
+The section above is the textbook formulation. The implemented LQI departs from it in four ways, and
+reading `LqiPositionController::Solve` against the formulation above will not work without them.
+
+**Time-scaled coordinates.** The state is
+$x = \bigl(x_I,\; e_\theta,\; \omega_m T_s^o\bigr)^{\!T}$ — speed is carried as *radians per
+sample*, not radians per second, and the integral accumulates the raw per-sample deviation. Scaling
+every state by $T_s^o$ this way removes $T_s^o$ from the plant matrices entirely:
+
+$$
+A = \begin{pmatrix} 1 & 1 & 0 \\ 0 & 1 & 1 \\ 0 & 0 & A_d^o \end{pmatrix},
+\qquad
+B = \begin{pmatrix} 0 \\ 0 \\ 1 \end{pmatrix}
+$$
+
+$B$ is unity, not $B_d^o$: the input is normalised, and the plant's actual input gain is carried
+outside the Riccati solve as `currentPerNormalizedInput`, which converts the optimal command back
+into Amperes. This is what keeps the solve numerically well conditioned across the range of
+inertias the mechanical identification returns.
+
+**The integral state is first, not last.** The order is $[x_I,\; e_\theta,\; \omega_m T_s^o]$, so
+the gain vector reads $[K_I,\; K_\theta,\; K_\omega]$ — the reverse of the
+$[K_\theta, K_\omega, K_I]$ ordering the augmentation above suggests.
+
+**The error sign.** $e_\theta = \theta_m - \theta_m^*$, the wrapped error negated, and the solver
+returns $u = -Kx$. The two together give the same law as the LQR section; taken separately, either
+one alone inverts the feedback.
+
+**Q is normalised, and R comes from the bandwidth.** The weights are ratios against the
+position-error weight rather than absolute penalties, and the input penalty is set from the desired
+bandwidth rather than from the current envelope:
+
+$$
+Q = \mathrm{diag}\!\left(\frac{q_I}{q_\theta},\; 1,\; \frac{q_\omega}{q_\theta}\right),
+\qquad
+R = \frac{1}{\left(\omega_{bw}^p T_s^o\right)^2}
+$$
+
+with $\omega_{bw}^p T_s^o$ clamped to $[10^{-3},\, 0.5]$ and each weight ratio clamped to
+$[10^{-3},\, 10^{3}]$, so no tuning input can make the solve ill-posed. The $R = 1/I_{q,max}^2$
+starting point given under **Tuning** below applies to the textbook formulation, not to this one.
 
 **Tuning**:
 - $q_\theta$: position error penalty. Increase to tighten position accuracy.
