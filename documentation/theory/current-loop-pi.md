@@ -105,25 +105,37 @@ the effective bandwidth changes with bus voltage.
 
 ### Incremental (Velocity) Form
 
-The implementation uses the incremental (velocity) PI form to avoid integrator initialisation issues
-and provide inherent clamping:
+The implementation uses the incremental (velocity) PI form to avoid integrator initialisation
+issues. Each axis proposes
 
 $$
 \Delta v'[k] = K_p \cdot \bigl(e[k] - e[k-1]\bigr) + K_i\, T_s^i\, e[k]
 $$
 $$
-v'[k] = \mathrm{clamp}\bigl(v'[k-1] + \Delta v'[k],\ -1,\ 1\bigr)
+\tilde{v}'[k] = v'[k-1] + \Delta v'[k]
 $$
 
-The per-axis clamp to $[-1,1]$ bounds the accumulated output. The modulation-circle constraint
-(see *Output Voltage Limit* below) is applied after both axes are computed.
+where $v'[k-1]$ is the value the actuator **actually applied** on the previous sample, not the
+value this axis proposed.
 
 ### Anti-Windup
 
-The incremental form provides inherent anti-windup: when the output clamps, the integrator
-accumulates only within the clamped envelope. The correction applied on the next unclamped sample
-exactly equals the residual between the unclamped demand and the clamp boundary. No separate
-back-calculation circuitry is required.
+The actuator constraint here is the modulation circle (see *Output Voltage Limit* below). It couples
+$d$ and $q$, so it cannot be expressed as the independent per-axis clamp a stock PID carries: a
+per-axis clamp to $[-1,1]$ never fires for a demand such as $v_d' = v_q' = 0.8$, yet that vector has
+magnitude $1.13$ and the circle limiter scales it down. Both integrators would then accumulate
+against a limit they cannot see.
+
+The loop therefore uses back-calculation against the realised output. Both axes propose, the circle
+limit is applied once to the resulting vector, and the applied components are committed back as
+$v'[k-1]$ for the next sample:
+
+$$
+v'[k] = \Pi\bigl(\tilde{v}'_d[k],\ \tilde{v}'_q[k]\bigr)
+$$
+
+where $\Pi$ is the projection onto the unit disc. When the demand is inside the circle the
+projection is the identity and the law reduces to the plain velocity form.
 
 ---
 

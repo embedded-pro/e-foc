@@ -93,8 +93,6 @@ namespace application
     {
         inline void Initialize()
         {
-            hal::tiva::systemClockDivider systemClockDivisor{ 2, 5 };
-            bool usesPll = true;
             hal::tiva::ConfigureClock(hal::tiva::crystalFrequency::_16_MHz, hal::tiva::oscillatorSource::main);
         }
     }

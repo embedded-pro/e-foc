@@ -61,7 +61,8 @@ namespace simulator
 
         const ParametersPanel::PidParameters pidParameters{
             .current = { defaults::currentKp, defaults::currentKi, defaults::currentKd },
-            .speed = ParametersPanel::LoopPid{ defaults::speedKp, defaults::speedKi, defaults::speedKd }
+            .speed = ParametersPanel::LoopPid{ defaults::speedKp, defaults::speedKi, defaults::speedKd },
+            .position = std::nullopt
         };
         const ControlPanel::SetpointConfig setpointConfig{
             .label = "Speed Setpoint:",

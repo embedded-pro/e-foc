@@ -1,8 +1,8 @@
 #pragma once
 
+#include "core/foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/util/Function.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include <optional>
 
 namespace services
@@ -10,6 +10,8 @@ namespace services
     class MotorAlignment
     {
     public:
+        virtual ~MotorAlignment() = default;
+
         struct AlignmentConfig
         {
             hal::Percent testVoltagePercent{ 20 };

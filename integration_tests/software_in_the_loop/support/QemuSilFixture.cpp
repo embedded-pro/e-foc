@@ -35,7 +35,7 @@ namespace
         {}
     }
 
-    void ReadUntilDone(sil::QemuSilSession& session, std::map<std::string, uint32_t>& counts)
+    [[maybe_unused]] void ReadUntilDone(sil::QemuSilSession& session, std::map<std::string, uint32_t>& counts)
     {
         const std::chrono::milliseconds lineTimeout{ 10000 };
         std::string line;

@@ -239,7 +239,7 @@ TEST_F(TestTransforms, clarke_park_small_values)
     auto dq = clarkePark->Forward(input, cos, sin);
     auto result = clarkePark->Inverse(dq, cos, sin);
 
-    auto IsErrorAcceptable = [rel_tolerance](float expected, float actual, const char* label) -> bool
+    auto IsErrorAcceptable = [rel_tolerance](float expected, float actual, const char*) -> bool
     {
         float abs_diff = std::abs(actual - expected);
         float abs_expected = std::abs(expected);

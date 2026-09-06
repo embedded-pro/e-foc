@@ -6,12 +6,15 @@ target_include_directories(e_foc.foc.math INTERFACE
 )
 
 target_link_libraries(e_foc.foc.math INTERFACE
+    e_foc.foc.interfaces
     numerical.math
 )
 
 target_sources(e_foc.foc.math INTERFACE
     AngleWrap.hpp
+    DutyConversion.hpp
     FastTrigonometry.hpp
+    FiniteGuard.hpp
 )
 
 add_subdirectory(test)

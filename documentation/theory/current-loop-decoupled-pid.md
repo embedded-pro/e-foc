@@ -136,6 +136,17 @@ $$
 See `documentation/theory/current-loop-pi.md` — *Output Voltage Limit* — for the full derivation
 and the interaction with integral anti-windup.
 
+The limit is applied **once**, to the sum of the PI output and the decoupling feedforward:
+
+$$
+v'[k] = \Pi\bigl(\tilde{v}'_{PI}[k] + v'_{ff}[k]\bigr)
+$$
+
+Limiting the PI output on its own first and the sum again afterwards reserves no headroom for the
+feedforward, so decoupling degrades exactly at the high speeds where the cross-coupling and back-EMF
+terms it cancels are largest. The share committed back to the PI's integrator is the applied vector
+minus the feedforward, so the feedforward is never integrated as if the loop had asked for it.
+
 ---
 
 ## Numerical Properties

@@ -9,6 +9,8 @@ namespace services
     class FrictionAndInertiaEstimator
     {
     public:
+        virtual ~FrictionAndInertiaEstimator() = default;
+
         struct Result
         {
             foc::NewtonMeterSecondSquared inertia;

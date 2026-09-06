@@ -1,0 +1,23 @@
+- id: REQ-CAL-001
+  title: Current injection aborts above the inverter limit
+  shall: >
+    Every calibration procedure that injects current into a stationary motor — encoder
+    alignment, pole-pairs estimation and resistance estimation — shall compare each
+    phase-current sample against the inverter's maximum supported current and, on the
+    first sample whose magnitude exceeds that limit in any phase and in either
+    direction, shall stop the inverter and report the procedure as failed.
+
+- id: REQ-CAL-002
+  title: Alignment zeroes the encoder while the rotor is held
+  shall: >
+    The alignment procedure shall read the settled rotor position and zero the encoder
+    while the alignment voltage is still applied, and shall stop the inverter only
+    afterwards, so that the recorded zero corresponds to the position the rotor was
+    held at rather than to one it may have drifted to.
+
+- id: REQ-CAL-003
+  title: Alignment reports a mechanical offset
+  shall: >
+    The alignment procedure shall report the offset it measured as a mechanical angle,
+    unscaled by the pole-pair count, so that a consumer converting it to an electrical
+    angle does so exactly once.

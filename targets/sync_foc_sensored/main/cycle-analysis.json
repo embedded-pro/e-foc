@@ -42,13 +42,19 @@
         "DeadbeatCurrentController::Compute",
         "SlidingModeCurrentController::Compute",
         "LimitToModulationCircle",
+        "ToDutyCycles",
+        "DecouplingFeedforward::Apply",
+        "PidCurrentController::CommitRealized",
+        "PidCurrentController::Propose",
+        "AntiWindupPi::CommitRealized",
+        "AntiWindupPi::Propose",
         "PidIncrementalBase.*::Process",
         "PidIncrementalBase.*::Clamp",
         "PidIncrementalSynchronous.*::Process",
         "PidIncrementalSynchronous.*::SetPoint",
         "PositionWithWrapAround",
         "LowPriorityInterrupt::Trigger",
-        "PendSvLowPriorityInterrupt::Trigger",
+        "FocLowPriorityInterruptAdapter::Trigger",
         "std::array<float.*>::operator\\[\\]",
         "std::clamp",
         "std::max<float>",
@@ -60,7 +66,10 @@
       "patterns": [
         "SynchronousPwm::Start.*Percent.*Percent.*Percent",
         "SynchronousPwm::SetComparator",
-        "SynchronousPwm::Sync"
+        "SynchronousPwm::Sync",
+        "hal::tiva::Pwm::Start",
+        "Pwm::Start.*Percent.*Percent.*Percent",
+        "PlatformFactoryImpl::ThreePhasePwmOutput"
       ]
     },
     {

@@ -25,6 +25,8 @@ target_sources(e_foc.can PRIVATE
     FocMotorCanBridge.cpp
     FocMotorCanClient.hpp
     FocMotorCanClient.cpp
+    CanLivenessWatchdog.hpp
+    CanLivenessWatchdog.cpp
 )
 
 add_subdirectory(test)

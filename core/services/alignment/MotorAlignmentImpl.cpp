@@ -1,4 +1,5 @@
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
+#include "core/services/InjectionCurrentLimit.hpp"
 #include <cmath>
 
 namespace
@@ -45,8 +46,14 @@ namespace services
         driver.ThreePhasePwmOutput(NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, std::cos(electricalAngle), std::sin(electricalAngle))));
 
-        driver.PhaseCurrentsReady(alignmentConfig.samplingFrequency, [this](auto)
+        driver.PhaseCurrentsReady(alignmentConfig.samplingFrequency, [this](auto currents)
             {
+                if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
+                {
+                    FailToConverge();
+                    return;
+                }
+
                 currentSampleIndex++;
 
                 if (currentSampleIndex >= alignmentConfig.maxSamples)
@@ -75,14 +82,13 @@ namespace services
 
     void MotorAlignmentImpl::CalculateAlignmentOffset()
     {
-        driver.Stop();
         alignedPosition = encoder.Read();
+        encoder.SetZero();
+
+        driver.Stop();
 
         if (onAlignmentDone)
-        {
-            auto offset = foc::Radians{ alignedPosition.Value() * static_cast<float>(polePairs) };
-            onAlignmentDone(std::make_optional<foc::Radians>(offset));
-        }
+            onAlignmentDone(std::make_optional<foc::Radians>(alignedPosition));
     }
 
     void MotorAlignmentImpl::FailToConverge()

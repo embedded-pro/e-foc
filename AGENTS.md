@@ -33,6 +33,11 @@ Use: `infra::BoundedVector<T>::WithMaxSize<N>`, `infra::BoundedString::WithStora
 
 Forbidden in hot path: virtual dispatch, heap, blocking calls, raw `sin`/`cos` — use `FastTrigonometry` from `core/foc/math/FastTrigonometry.hpp`.
 
+Also forbidden: per-sample validation. No plausibility check on the phase currents, no finiteness check on
+currents or duty cycles — see REQ-PERF-003. Sensor and power-stage failures are the hardware protection path's
+to catch. `foc::IsFiniteValue` exists for configuration-time and outer-loop checks only
+(`CurrentPlantModel::IsUsable`, the mechanical estimator's plausibility band); it is not for `Calculate()`.
+
 Required in every hot-path file:
 
 ```cpp
@@ -50,7 +55,7 @@ Required in every hot-path file:
 - **Park**: `Id = Iα·cos(θ) + Iβ·sin(θ)`, `Iq = −Iα·sin(θ) + Iβ·cos(θ)`
 - **Electrical angle**: `θe = θm · pole_pairs`
 - **Anti-windup**: all PID integrators must clamp or use back-calculation
-- **Decoupling**: ω·Ld·Iq feedforward on Vd; −ω·Lq·Id on Vq where appropriate
+- **Decoupling**: −ω·Lq·Iq feedforward on Vd; +ω·(Ld·Id + ψf) on Vq. The Vd term is negative and the Vq term positive — these cancel the coupling the plant adds, so getting the signs backwards doubles it
 - Reuse `TransformsClarkePark` and `SpaceVectorModulation` from `core/foc/transforms/` — do not reimplement
 - Unit types: `Ampere`, `Radians`, `Volts`, `RevPerMinute`, `PhasePwmDutyCycles`, `PhaseCurrents`
 
@@ -101,7 +106,31 @@ Presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1
 
 **Embedded cmake**: call `halst_target_bringup(<target>)` for ST or `hal_ti_target_bringup(<target>)` for TI in `targets/*/main/CMakeLists.txt`. The `*_default_init` variants were removed.
 
-Authoritative cycle budget gate: `cortex-cycle-budget` static analysis (≤ 4500 inner / ≤ 20000 outer).
+Authoritative cycle budget gate: `cortex-cycle-budget` static analysis (≤ 4500 inner / ≤ 20000 outer). It measures only the symbols its config whitelists, so adding a function to a hot path means adding it to `targets/sync_foc_sensored/main/cycle-analysis.json` (inner) or `cycle-analysis-outer.json` (outer) — an unlisted symbol is silently unmeasured, not flagged.
+
+**Warnings**: `cmake/CompilerWarnings.cmake` provides `e_foc_enable_project_warnings()`, which enables
+`-Wall -Wextra`; with `CMAKE_COMPILE_WARNING_AS_ERROR` on, any warning in `core/`, `targets/`,
+`integration_tests/` or `tools/` fails the build. Third-party include directories are marked SYSTEM by
+`e_foc_mark_includes_system` from `cmake/MarkIncludesSystem.cmake`, so warnings in headers we do not own
+cannot. That call marks every target that exists when it runs, which is why the **call** sits after the
+submodule and FetchContent additions and **before** `add_subdirectory(core)`: move it later and it would
+mark this project's own targets SYSTEM, silencing the warnings the flags exist to catch; move it earlier and
+FetchContent dependencies such as `cucumber_cpp` would be missed. Never silence a warning with a pragma —
+fix it, or drop the parameter name if it is genuinely unused.
+
+Neither belongs in `CMakePresets.json`. A preset condition is evaluated before configure, so it cannot
+branch on `CMAKE_CXX_COMPILER_ID`, and both guards are load-bearing — see below.
+
+`-Wmaybe-uninitialized` is off, for GNU only. SYSTEM marking does not help here: at `-O3` GCC inlines
+`infra::Function::operator()` into our translation units and reports the diagnostic against the caller,
+naming addresses like `((const infra::Function<...>*)this)[1319]` — an index into a single object, so the
+path it claims does not exist. Definite `-Wuninitialized` stays enabled and is the one that matters; it is
+what caught `RecursiveLeastSquares` copying an indeterminate `metrics` member. The GNU guard matters because
+Clang has no `-Wmaybe-uninitialized`: the `windows` preset builds with
+`toolchain-clang-x86_64-pc-windows-msvc.cmake`, where the flag would raise `-Wunknown-warning-option` and
+warnings-as-errors would fail the build.
+
+**Features**: `integration_tests/software_in_the_loop/features/` holds scenarios the in-process runner implements; `qemu_features/` holds those only the QEMU runner implements. A feature in the wrong directory reports as undefined steps and fails the suite. The `host` and `coverage` test presets run the `integration` label; only `hardware` is excluded.
 
 ## Agent routing
 

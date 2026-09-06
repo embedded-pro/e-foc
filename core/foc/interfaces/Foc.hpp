@@ -14,6 +14,8 @@ namespace foc
     class FocBase
     {
     public:
+        virtual ~FocBase() = default;
+
         virtual void Configure(const MotorModelParameters& parameters) = 0;
         virtual void Enable() = 0;
         virtual void Disable() = 0;
@@ -23,6 +25,8 @@ namespace foc
     class CurrentLoopTunable
     {
     public:
+        virtual ~CurrentLoopTunable() = default;
+
         virtual void SetCurrentTunings(const CurrentLoopTunings& tunings) = 0;
     };
 
@@ -30,6 +34,8 @@ namespace foc
     class CurrentLoopSelectable
     {
     public:
+        virtual ~CurrentLoopSelectable() = default;
+
         virtual SelectResult SelectCurrentAlgorithm(CurrentAlgorithm algorithm) = 0;
         virtual CurrentAlgorithm ActiveCurrentAlgorithm() const = 0;
     };
@@ -37,6 +43,8 @@ namespace foc
     class SpeedLoopSelectable
     {
     public:
+        virtual ~SpeedLoopSelectable() = default;
+
         virtual SelectResult SelectSpeedAlgorithm(SpeedAlgorithm algorithm) = 0;
         virtual SpeedAlgorithm ActiveSpeedAlgorithm() const = 0;
     };
@@ -44,6 +52,8 @@ namespace foc
     class SpeedLoopTunable
     {
     public:
+        virtual ~SpeedLoopTunable() = default;
+
         virtual void ConfigureMechanics(const MechanicalModelParameters& parameters) = 0;
         virtual void SetSpeedTunings(const SpeedLoopTunings& tunings) = 0;
     };
@@ -53,12 +63,16 @@ namespace foc
     class PositionLoopTunable
     {
     public:
+        virtual ~PositionLoopTunable() = default;
+
         virtual SelectResult SetPositionTunings(const PositionLoopTunings& tunings) = 0;
     };
 
     class PositionLoopSelectable
     {
     public:
+        virtual ~PositionLoopSelectable() = default;
+
         virtual SelectResult SelectPositionAlgorithm(PositionAlgorithm algorithm) = 0;
         virtual PositionAlgorithm ActivePositionAlgorithm() const = 0;
     };
@@ -69,12 +83,16 @@ namespace foc
         , public CurrentLoopSelectable
     {
     public:
+        virtual ~FocTorque() = default;
+
         virtual void SetPoint(IdAndIqPoint setPoint) = 0;
     };
 
     class FocOnlineEstimableBase
     {
     public:
+        virtual ~FocOnlineEstimableBase() = default;
+
         virtual void SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator) = 0;
         virtual void SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator) = 0;
     };
@@ -82,6 +100,8 @@ namespace foc
     class SpeedCommandable
     {
     public:
+        virtual ~SpeedCommandable() = default;
+
         virtual void EnableSpeedCommand() = 0;
         virtual void DisableSpeedCommand() = 0;
         virtual void CommandSpeed(RadiansPerSecond speed) = 0;
@@ -97,6 +117,8 @@ namespace foc
         , public FocOnlineEstimableBase
     {
     public:
+        virtual ~FocSpeed() = default;
+
         virtual void SetPoint(RadiansPerSecond setPoint) = 0;
         virtual hal::Hertz OuterLoopFrequency() const = 0;
     };
@@ -112,6 +134,8 @@ namespace foc
         , public FocOnlineEstimableBase
     {
     public:
+        virtual ~FocPosition() = default;
+
         virtual void SetPoint(Radians setPoint) = 0;
     };
 }

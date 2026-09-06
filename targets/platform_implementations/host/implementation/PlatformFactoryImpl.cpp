@@ -158,10 +158,10 @@ namespace application
         return eepromStub;
     }
 
-    void PlatformFactoryImpl::SerialCommunicationStub::SendData(infra::ConstByteRange data, infra::Function<void()> actionOnCompletion)
+    void PlatformFactoryImpl::SerialCommunicationStub::SendData(infra::ConstByteRange, infra::Function<void()>)
     {}
 
-    void PlatformFactoryImpl::SerialCommunicationStub::ReceiveData(infra::Function<void(infra::ConstByteRange data)> dataReceived)
+    void PlatformFactoryImpl::SerialCommunicationStub::ReceiveData(infra::Function<void(infra::ConstByteRange)>)
     {}
 
     bool PlatformFactoryImpl::GpioPinStub::Get() const
@@ -169,7 +169,7 @@ namespace application
         return false;
     }
 
-    void PlatformFactoryImpl::GpioPinStub::Set(bool value)
+    void PlatformFactoryImpl::GpioPinStub::Set(bool)
     {}
 
     bool PlatformFactoryImpl::GpioPinStub::GetOutputLatch() const
@@ -185,16 +185,16 @@ namespace application
         return false;
     }
 
-    void PlatformFactoryImpl::GpioPinStub::Config(hal::PinConfigType config)
+    void PlatformFactoryImpl::GpioPinStub::Config(hal::PinConfigType)
     {}
 
-    void PlatformFactoryImpl::GpioPinStub::Config(hal::PinConfigType config, bool startOutputState)
+    void PlatformFactoryImpl::GpioPinStub::Config(hal::PinConfigType, bool)
     {}
 
     void PlatformFactoryImpl::GpioPinStub::ResetConfig()
     {}
 
-    void PlatformFactoryImpl::GpioPinStub::EnableInterrupt(const infra::Function<void()>& action, hal::InterruptTrigger trigger, hal::InterruptType type)
+    void PlatformFactoryImpl::GpioPinStub::EnableInterrupt(const infra::Function<void()>&, hal::InterruptTrigger, hal::InterruptType)
     {}
 
     void PlatformFactoryImpl::GpioPinStub::DisableInterrupt()
@@ -209,7 +209,7 @@ namespace application
     {
     }
 
-    void PlatformFactoryImpl::ThreeChannelsPwmStub::SetBaseFrequency(hal::Hertz baseFrequency)
+    void PlatformFactoryImpl::ThreeChannelsPwmStub::SetBaseFrequency(hal::Hertz)
     {
     }
 
@@ -217,7 +217,7 @@ namespace application
     {
     }
 
-    void PlatformFactoryImpl::ThreeChannelsPwmStub::Start(hal::Percent dutyCycle1, hal::Percent dutyCycle2, hal::Percent dutyCycle3)
+    void PlatformFactoryImpl::ThreeChannelsPwmStub::Start(hal::Percent, hal::Percent, hal::Percent)
     {
     }
 

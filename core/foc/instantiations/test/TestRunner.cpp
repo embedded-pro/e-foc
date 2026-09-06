@@ -168,3 +168,21 @@ TEST_F(TestRunner, ACallbackBeforeEnableDoesNotDriveThePwm)
 
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
 }
+
+TEST_F(TestRunner, PhaseCurrentsAreDispatchedToTheControlLaw)
+{
+    foc::Runner runner{ inverterMock, encoderMock, focMock };
+
+    EXPECT_CALL(focMock, Enable());
+    EXPECT_CALL(inverterMock, Start());
+    runner.Enable();
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } }));
+    EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
+
+    inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
+
+    EXPECT_CALL(inverterMock, Stop());
+    EXPECT_CALL(focMock, Disable());
+}

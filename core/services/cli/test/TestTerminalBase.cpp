@@ -71,7 +71,7 @@ TEST_F(TerminalBaseTest, set_current_bandwidth_invalid_argument_count)
             ::testing::InSequence _;
 
             std::string header{ "ERROR: " };
-            std::string payload{ "invalid number of arguments" };
+            std::string payload{ "invalid number of arguments." };
             std::string newline{ "\r\n" };
 
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));

@@ -25,6 +25,14 @@ namespace drivers
         : public ThreePhaseInverter
     {
     public:
+        ThreePhaseInverterMock()
+        {
+            ON_CALL(*this, MaxCurrentSupported()).WillByDefault(testing::Return(foc::Ampere{ defaultMaxCurrent }));
+            EXPECT_CALL(*this, MaxCurrentSupported()).Times(testing::AnyNumber());
+        }
+
+        static constexpr float defaultMaxCurrent{ 10.0f };
+
         MOCK_METHOD(void, PhaseCurrentsReady, (hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents phaseCurrents)>& onDone), (override));
         MOCK_METHOD(void, ThreePhasePwmOutput, ((const foc::PhasePwmDutyCycles&)), (override));
         MOCK_METHOD(void, Start, (), (override));

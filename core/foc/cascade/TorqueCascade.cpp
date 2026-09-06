@@ -4,6 +4,7 @@
 
 #include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/foc/math/AngleWrap.hpp"
+#include "core/foc/math/DutyConversion.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "numerical/math/Math.hpp"
@@ -89,9 +90,7 @@ namespace foc
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ lastSetPoint.first.Value(), lastSetPoint.second.Value() }, MeasureElectricalSpeed(mechanicalAngle) });
         auto output = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
 
-        return PhasePwmDutyCycles{ hal::Percent(static_cast<uint8_t>(output.a * 100.0f + 0.5f)),
-            hal::Percent(static_cast<uint8_t>(output.b * 100.0f + 0.5f)),
-            hal::Percent(static_cast<uint8_t>(output.c * 100.0f + 0.5f)) };
+        return ToDutyCycles(output);
     }
 
     OPTIMIZE_FOR_SPEED

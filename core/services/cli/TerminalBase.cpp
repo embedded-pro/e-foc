@@ -1,4 +1,5 @@
 #include "core/services/cli/TerminalBase.hpp"
+#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/services/cli/TerminalHelper.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "numerical/controllers/interfaces/PidController.hpp"
@@ -24,18 +25,15 @@ namespace services
 
     TerminalFocBaseInteractor::StatusWithMessage TerminalFocBaseInteractor::SetFocPid(const infra::BoundedConstString& input)
     {
-        infra::Tokenizer tokenizer(input, ' ');
+        float bandwidth = 0.0f;
+        auto parsed = ParseSingleBoundedArgument(input, foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, bandwidth);
 
-        if (tokenizer.Size() != 1)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments" };
-
-        auto bandwidth = ParseInput(tokenizer.Token(0));
-        if (!bandwidth.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
+        if (!Succeeded(parsed))
+            return parsed;
 
         auto tunings = foc::CurrentLoopTunings{};
-        tunings.bandwidth = *bandwidth;
+        tunings.bandwidth = bandwidth;
         currentLoop.SetCurrentTunings(tunings);
-        return TerminalFocBaseInteractor::StatusWithMessage();
+        return StatusWithMessage();
     }
 }

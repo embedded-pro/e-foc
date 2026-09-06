@@ -41,7 +41,9 @@ namespace simulator
         controller.SetPoint(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
         const ParametersPanel::PidParameters pidParameters{
-            .current = { defaults::currentKp, defaults::currentKi, defaults::currentKd }
+            .current = { defaults::currentKp, defaults::currentKi, defaults::currentKd },
+            .speed = std::nullopt,
+            .position = std::nullopt
         };
         const ControlPanel::SetpointConfig setpointConfig{
             .label = "Current Setpoint:",

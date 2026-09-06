@@ -1,8 +1,8 @@
 #pragma once
 
+#include "core/foc/interfaces/Units.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/Function.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include <chrono>
 #include <optional>
 
@@ -11,6 +11,8 @@ namespace services
     class MechanicalParametersIdentification
     {
     public:
+        virtual ~MechanicalParametersIdentification() = default;
+
         struct IdentificationResult
         {
             foc::NewtonMeterSecondPerRadian friction;

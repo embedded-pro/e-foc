@@ -32,3 +32,18 @@
     A SetSpeedSetpoint, SetTorqueSetpoint, or SetPositionSetpoint CAN frame shall be
     forwarded to the active inner FOC state machine when the current active mode
     matches the type of setpoint command, and no CategoryError shall be emitted.
+
+- id: REQ-CM-006
+  title: Loss of the CAN client stops an enabled drive
+  shall: >
+    When the CAN protocol server reports that its client has gone offline while the
+    active state machine is in the Enabled state, the drive shall be stopped by way of
+    an emergency-stop command. When the client goes offline while the drive is not
+    enabled, the state machine shall be left unchanged.
+
+- id: REQ-CM-007
+  title: Fault status is broadcast at emergency priority
+  shall: >
+    A fault status broadcast shall be sent on the CAN transport at emergency priority,
+    so that it arbitrates ahead of the periodic telemetry traffic it would otherwise
+    queue behind.

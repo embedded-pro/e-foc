@@ -6,7 +6,6 @@
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
-#include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
 #include "hal/cortex_m/DataWatchpointAndTrace.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
@@ -26,12 +25,21 @@
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
+#include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 
 extern "C" uint32_t SystemCoreClock;
 
 namespace application
 {
     using namespace std::chrono_literals;
+
+    struct InterruptPriorities
+    {
+        static constexpr auto phaseCurrentAdc{ hal::cortex::InterruptPriority::highest };
+        static constexpr auto pwmFault{ hal::cortex::InterruptPriority::highest };
+        static constexpr auto can{ hal::cortex::InterruptPriority::normal };
+        static constexpr auto uart{ hal::cortex::InterruptPriority::low };
+    };
 
     class PlatformFactoryImpl
         : public PlatformFactory
@@ -91,7 +99,7 @@ namespace application
         struct TerminalAndTracer
         {
             hal::tiva::Dma dma{ infra::emptyFunction };
-            hal::tiva::UartWithDma::Config uartConfig{ true, true, hal::tiva::UartWithDma::Baudrate::_921000_bps, hal::tiva::UartWithDma::FlowControl::none, hal::tiva::UartWithDma::Parity::none, hal::tiva::UartWithDma::StopBits::one, hal::tiva::UartWithDma::NumberOfBytes::_8_bytes, std::nullopt };
+            hal::tiva::UartWithDma::Config uartConfig{ true, true, hal::tiva::UartWithDma::Baudrate::_921000_bps, hal::tiva::UartWithDma::FlowControl::none, hal::tiva::UartWithDma::Parity::none, hal::tiva::UartWithDma::StopBits::one, hal::tiva::UartWithDma::NumberOfBytes::_8_bytes, std::make_optional(InterruptPriorities::uart) };
             hal::tiva::UartWithDma::WithRxBuffer<256> uart{ Peripheral::UartIndex, Pins::uartTx, Pins::uartRx, dma, uartConfig };
             services::StreamWriterOnSerialCommunication::WithStorage<8192> streamWriterOnSerialCommunication{ uart };
             infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterOnSerialCommunication };
@@ -137,7 +145,7 @@ namespace application
                     hal::tiva::Adc::ComparatorCondition::highBand, hal::tiva::Adc::ComparatorMode::always },
             } };
 
-            hal::tiva::Adc::Config adcConfig{ false, 0, Peripheral::adcTrigger, hal::tiva::Adc::SampleAndHold::sampleAndHold8, std::make_optional(currentSensingOversampling), phaseDelay };
+            hal::tiva::Adc::Config adcConfig{ false, 0, Peripheral::adcTrigger, hal::tiva::Adc::SampleAndHold::sampleAndHold8, std::make_optional(currentSensingOversampling), phaseDelay, {} };
             std::array<hal::tiva::AnalogPin, 5> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC }, hal::tiva::AnalogPin{ Pins::currentTotal }, hal::tiva::AnalogPin{ Pins::powerSupplyVoltage } } };
         };
 
@@ -154,7 +162,7 @@ namespace application
                     hal::tiva::Pwm::Config::InterruptConfig::FaultConfig{ hal::tiva::Pwm::GeneratorIndex::generator2, uint8_t{ 0x00 }, uint8_t{ static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator0) | static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1) }, true, uint16_t{ 0 } },
                     hal::tiva::Pwm::Config::InterruptConfig::FaultConfig{ hal::tiva::Pwm::GeneratorIndex::generator3, uint8_t{ 0x00 }, uint8_t{ static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator0) | static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1) }, true, uint16_t{ 0 } },
                 } },
-                hal::cortex::InterruptPriority::normal,
+                InterruptPriorities::pwmFault,
             };
 
             hal::tiva::Pwm::Config pwmConfig{ false, false, controlConfig, clockDivisor, std::make_optional(deadTimeConfig), std::make_optional(interruptConfig) };

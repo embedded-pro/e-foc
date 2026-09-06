@@ -765,7 +765,7 @@ namespace
                     {
                         capturedNvmSaveCb = cb;
                     }));
-            EXPECT_CALL(encoderMock, Set(_)).Times(1);
+            EXPECT_CALL(encoderMock, Set(_)).Times(0);
         }
 
         void SetUpMechIdentCalibrationCaptures()
@@ -1440,6 +1440,48 @@ TEST_F(ControlModeStateMachineCliTest, SetSpeed_Rejects_NonNumeric_Argument_Befo
     GivenOuterLoopModeReady(state_machine::ControlMode::speed);
 
     EXPECT_THAT(OutputOf("ss abc"), HasSubstr("invalid value. It should be a float."));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetTorque_Rejects_A_Setpoint_Beyond_The_Command_Limit)
+{
+    GivenTorqueModeReady();
+
+    EXPECT_THAT(OutputOf("st 10000.0"), HasSubstr("out of range"));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetSpeed_Rejects_A_Setpoint_Beyond_The_Command_Limit)
+{
+    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
+
+    EXPECT_THAT(OutputOf("ss 100000.0"), HasSubstr("out of range"));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetPosition_Rejects_A_Setpoint_Beyond_One_Turn)
+{
+    GivenOuterLoopModeReady(state_machine::ControlMode::position);
+
+    EXPECT_THAT(OutputOf("sp 100.0"), HasSubstr("out of range"));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Rejects_A_Negative_Bandwidth)
+{
+    GivenTorqueModeReady();
+
+    EXPECT_THAT(OutputOf("scbw -5000.0"), HasSubstr("out of range"));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Rejects_Zero)
+{
+    GivenTorqueModeReady();
+
+    EXPECT_THAT(OutputOf("scbw 0.0"), HasSubstr("out of range"));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetSpeedBandwidth_Rejects_A_Negative_Bandwidth)
+{
+    GivenOuterLoopModeReady(state_machine::ControlMode::speed);
+
+    EXPECT_THAT(OutputOf("ssbw -1.0"), HasSubstr("out of range"));
 }
 
 TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Is_Accepted_In_Torque_Mode)

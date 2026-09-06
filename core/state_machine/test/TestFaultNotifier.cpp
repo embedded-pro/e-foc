@@ -92,10 +92,10 @@ TEST_F(TestFocStateMachineBase, apply_online_estimates_default_implementation_do
 
 TEST_F(TestFocStateMachineBase, state_variants_are_constructible)
 {
-    state_machine::Idle idle{};
+    [[maybe_unused]] state_machine::Idle idle{};
     state_machine::Calibrating calibrating{};
-    state_machine::Ready ready{};
-    state_machine::Enabled enabled{};
+    [[maybe_unused]] state_machine::Ready ready{};
+    [[maybe_unused]] state_machine::Enabled enabled{};
     state_machine::Fault fault{};
 
     EXPECT_EQ(calibrating.step, state_machine::CalibrationStep::polePairs);

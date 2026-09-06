@@ -41,10 +41,19 @@ date: 2026-04-13
 
 A naked assembly trampoline runs in HardFault exception context before any C function prologue executes. It determines whether the exception was entered from thread mode (using PSP as the stack pointer) or from handler mode (using MSP), then passes the correct stack frame pointer to the C-level capture routine.
 
-The capture routine writes all eight words of the ARM exception stack frame (R0–R3, R12, LR, PC, xPSR) plus
+The capture routine's **first** action is to call `CutPowerStage()`. Everything after it — the register
+capture, the stack scan, the reset — takes time during which six gate drivers otherwise hold whatever state
+they had when the fault hit. `CutPowerStage()` is a weak, empty symbol so the handler links on every target; a
+target that can tristate its bridge from exception context overrides it to do so. Until a target provides that
+override the gate drivers still hold their state, so this is a hook, not yet a guarantee.
+
+The capture routine then writes all eight words of the ARM exception stack frame (R0–R3, R12, LR, PC, xPSR) plus
 three Cortex-M fault status registers (CFSR, MMFAR, BFAR) into the persistent region. It also scans the stack
 above the exception frame and records any word whose value falls within the `.text` section as a probable
-return address — this constitutes the backtrace. A validity sentinel is written last; this is the atomic
+return address — this constitutes the backtrace. The scan is bounded to a fixed number of words, not run to
+`_estack`: on a bus or MPU fault the stack pointer itself may be the corrupt value, and dereferencing it can
+nest-fault into lockup, which leaves the motor energised indefinitely because the reset never happens. A
+validity sentinel is written last; this is the atomic
 commit point. If the MCU loses power or watchdog-resets mid-write, an incomplete capture is detected and
 discarded on the next boot.
 

@@ -131,6 +131,22 @@ The three control modes are available in the same binary and are selected at run
 - **Speed control** — outer loop on top of torque control: a PID regulates rotor angular velocity by commanding Id/Iq setpoints to the inner loop. The outer loop runs at a lower priority interrupt (typically 1 kHz) while the inner loop still runs at 20 kHz.
 - **Position control** — outermost cascade: a PID regulates rotor position by commanding a speed setpoint to the speed loop. Builds on speed control.
 
+#### Interrupt Priority Plan
+
+On Cortex-M, equal priority means no preemption: a handler at the same level as the FOC ISR cannot be interrupted by it, so the FOC loop's worst-case latency is the duration of the longest other handler at or above its level. Leaving every source at the default therefore leaves the 20 kHz deadline hostage to a CAN receive or a UART DMA completion.
+
+The TI target assigns priorities explicitly in `application::InterruptPriorities`:
+
+| Source              | Priority  | Rationale                                                                                            |
+|---------------------|-----------|------------------------------------------------------------------------------------------------------|
+| Phase-current ADC   | `highest` | Carries the 20 kHz control deadline; must preempt everything else                                    |
+| PWM fault           | `highest` | Hardware overcurrent/overvoltage trip; nothing may delay the response                                |
+| CAN                 | `normal`  | Command and telemetry traffic; may be preempted by the control loop                                  |
+| UART                | `low`     | Terminal and tracing; the least time-critical source on the board                                    |
+| PendSV (outer loop) | `lowest`  | Set by `hal::cortex::LowPriorityInterrupt`; the 1 kHz outer loop must never preempt the current loop |
+
+The outer loop runs on PendSV at the lowest configurable priority. It carries a 20 000-cycle budget against the inner loop's 4 500, so running it above the current loop would insert up to a full outer-loop execution of duty-update jitter once per millisecond.
+
 ```mermaid
 graph LR
     POS["Position Loop\n(optional)"] -->|speed setpoint| SPD["Speed Loop\n(optional)"]
@@ -140,6 +156,17 @@ graph LR
 ```
 
 The `Runner` is the only component that interacts with the PAL inverter and encoder at interrupt time. It registers the ADC-sampling callback and drives the `Calculate()` dispatch into the active control-mode implementation.
+
+The dispatch carries no validation of the sample. Nothing in the 20 kHz path inspects the phase currents for
+plausibility or for finiteness: at 4500 cycles a frame the budget is spent on the control law, and a failed
+shunt or ADC channel is the hardware's fault detection to catch, not the control loop's. `foc::ToDutyCycles`
+clamps each modulator output into [0, 1] and converts to percent, and does nothing else.
+
+`foc::IsFiniteValue` survives for the places where validation is affordable and worth having —
+`CurrentPlantModel::IsUsable` when the plant is configured, and the plausibility band the mechanical estimator
+applies before publishing. Both run outside the hot path. It exists because the hot path is built with
+`-ffast-math`, which licenses the compiler to fold `std::isnan` to a constant, so the test is made on the
+float's exponent bits instead.
 
 ### 2. Services
 

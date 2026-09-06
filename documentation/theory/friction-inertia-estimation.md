@@ -136,12 +136,17 @@ $$
 N_{eff} = \frac{1}{1 - \lambda}
 $$
 
-With $\lambda = 0.998$: $N_{eff} = 500$ samples. This allows the estimator to track slow parameter
-variations (e.g. bearing wear increasing $B$) without diverging from the current plant.
+With $\lambda = 0.995$ — the value `RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor`
+carries — $N_{eff} = 200$ samples. This allows the estimator to track slow parameter variations
+(e.g. bearing wear increasing $B$) without diverging from the current plant.
 
-**Trade-off**: smaller $\lambda$ → faster tracking, higher noise sensitivity. At $\lambda = 0.998$
-and 1 kHz update rate, the effective window is 500 ms — appropriate for slowly varying mechanical
+**Trade-off**: smaller $\lambda$ → faster tracking, higher noise sensitivity. At $\lambda = 0.995$
+and 1 kHz update rate, the effective window is 200 ms — appropriate for slowly varying mechanical
 parameters.
+
+A forgetting factor also inflates the covariance in any direction the regressor does not excite, by
+$\lambda^{-1}$ per update. Updates are therefore gated on excitation rather than run unconditionally;
+see `documentation/design/service-mechanical-ident.md` § *Persistence of Excitation*.
 
 ### 4. Torque and Kinematics Estimation
 
@@ -248,8 +253,8 @@ graph TD
 |--------------------------------|---------------------------------------------------------------------------------------|
 | Parameter vector size          | 3: $[J,\ B,\ \tau_0]^T$                                                               |
 | Covariance matrix              | $3\times 3$ symmetric positive definite                                               |
-| Forgetting factor              | $\lambda = 0.998$                                                                     |
-| Effective window               | $N_{eff} = 1/(1-\lambda) = 500$ samples                                               |
+| Forgetting factor              | $\lambda = 0.995$                                                                     |
+| Effective window               | $N_{eff} = 1/(1-\lambda) = 200$ samples                                               |
 | Convergence check $\epsilon_e$ | $10^{-4}$ (innovation threshold)                                                      |
 | Convergence check $\epsilon_K$ | $10^{-2}$ (gain trace threshold)                                                      |
 | RLS per-step cost              | $O(n^2) = O(9)$ — 9 multiply-add ops for $n=3$                                        |
@@ -302,8 +307,8 @@ $N_{eff}$ samples.
 - **Assumes**: Motor torque constant $K_T$ is known a priori (from electrical identification).
 - **Assumes**: The mechanical system is linear in $J$, $B$, $\tau_0$ — nonlinear effects (e.g.
   position-dependent cogging, Stribeck friction) are not modelled.
-- **Does not handle**: Rapidly varying $J$ (e.g. moving load). The $N_{eff} = 500$ sample window
-  means changes faster than 500 ms update time are tracked with lag.
+- **Does not handle**: Rapidly varying $J$ (e.g. moving load). The $N_{eff} = 200$ sample window
+  means changes faster than 200 ms update time are tracked with lag.
 - **Does not handle**: Identification in the presence of external vibration or impact loads.
 
 ## References

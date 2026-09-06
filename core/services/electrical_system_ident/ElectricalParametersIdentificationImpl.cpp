@@ -1,6 +1,7 @@
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
-#include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/services/InjectionCurrentLimit.hpp"
+#include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include <cmath>
 #include <numbers>
 
@@ -87,8 +88,26 @@ namespace services
         initialPosition = encoder.Read();
         previousPosition = initialPosition;
 
-        driver.PhaseCurrentsReady(samplingFrequency, [](auto) {});
+        driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
+            {
+                if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
+                    AbortPolePairs();
+            });
         ApplyNextElectricalAngle();
+    }
+
+    void ElectricalParametersIdentificationImpl::AbortPolePairs()
+    {
+        if (!polePairsRunning)
+            return;
+
+        settleTimer.Cancel();
+        driver.Stop();
+        driver.PhaseCurrentsReady(samplingFrequency, [](auto) {});
+        polePairsRunning = false;
+
+        if (onPolePairsDone)
+            onPolePairsDone(std::nullopt);
     }
 
     void ElectricalParametersIdentificationImpl::ApplyNextElectricalAngle()

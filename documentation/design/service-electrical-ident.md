@@ -65,6 +65,22 @@ Application code (hardware test terminal, etc.) may also call these components d
 
 ## Component Details
 
+### Open-Loop Injection Current Limit
+
+Every procedure in this service drives the bridge open-loop: a fixed duty is applied and held, with no
+current regulator in the path. The resulting current is set entirely by the applied voltage and the
+winding impedance, and a low-resistance motor reaches a large current within the settle time. The
+resistance test in particular holds a DC duty for seconds.
+
+Each procedure therefore registers a phase-current callback that checks every sample against
+`ThreePhaseInverter::MaxCurrentSupported()` and aborts immediately if any phase exceeds it — stopping
+the inverter, cancelling the step timer, unregistering the callback, and reporting failure through the
+procedure's normal failure path. Previously the pole-pairs and resistance procedures registered an
+empty callback and discarded the samples, leaving hardware comparators (present on some boards, absent
+on others) as the only backstop. `MotorAlignment` applies the same check.
+
+The limit is a per-sample abort, not regulation: it stops a runaway, it does not hold a setpoint.
+
 ### ResistanceEstimator
 
 Applies a DC differential voltage across phase A versus phases B and C held at neutral. A

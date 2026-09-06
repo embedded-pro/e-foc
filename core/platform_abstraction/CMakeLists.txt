@@ -26,4 +26,5 @@ target_sources(e_foc.platform_abstraction PRIVATE
     PlatformFactory.cpp
     QuadratureEncoderDecorator.hpp
 )
+add_subdirectory(test)
 add_subdirectory(test_doubles)

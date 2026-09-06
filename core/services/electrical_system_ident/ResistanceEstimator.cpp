@@ -1,4 +1,5 @@
 #include "core/services/electrical_system_ident/ResistanceEstimator.hpp"
+#include "core/services/InjectionCurrentLimit.hpp"
 #include <numeric>
 
 namespace
@@ -37,7 +38,11 @@ namespace services
         filteredSamples.clear();
 
         // Apply test voltage immediately so the settle timer gives current time to reach V/R.
-        driver.PhaseCurrentsReady(samplingFrequency, [](auto) {});
+        driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
+            {
+                if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
+                    Abort();
+            });
         driver.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{
             hal::Percent{ config.testVoltagePercent.Value() },
             hal::Percent{ neutralDuty },
@@ -47,6 +52,12 @@ namespace services
             {
                 driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
                     {
+                        if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
+                        {
+                            Abort();
+                            return;
+                        }
+
                         currentSamples.push_back(currents.a.Value());
 
                         if (currentSamples.full())
@@ -56,6 +67,16 @@ namespace services
                             OnMeasurementComplete();
                     });
             });
+    }
+
+    void ResistanceEstimator::Abort()
+    {
+        settleTimer.Cancel();
+        driver.Stop();
+        driver.PhaseCurrentsReady(samplingFrequency, [](auto) {});
+
+        if (onDone)
+            onDone(Result{});
     }
 
     void ResistanceEstimator::OnMeasurementComplete()

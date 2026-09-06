@@ -3,6 +3,7 @@
 #include "can-lite/server/CanProtocolServer.hpp"
 #include "can-lite/tracing/TracingCan.hpp"
 #include "can-lite/tracing/TracingCanProtocolServerObserver.hpp"
+#include "core/can/CanLivenessWatchdog.hpp"
 #include "core/can/FocMotorCanBridge.hpp"
 #include "core/can/FocMotorCategoryServer.hpp"
 #include "core/foc/cascade/PositionCascade.hpp"
@@ -56,5 +57,6 @@ namespace application
         std::optional<can::FocMotorCategoryServer> motorCanServer;
         std::optional<ControlMode> controlMode;
         std::optional<can::FocMotorCanBridge> canBridge;
+        std::optional<can::CanLivenessWatchdog> canLivenessWatchdog;
     };
 }

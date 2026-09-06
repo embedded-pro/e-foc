@@ -99,6 +99,13 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--bind",
+        default="127.0.0.1",
+        help="Address to listen on. Defaults to loopback; the bridge has no authentication or "
+        "transport security, so use 0.0.0.0 only on a trusted, isolated network (default: 127.0.0.1)",
+    )
+
+    parser.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -144,6 +151,7 @@ async def main() -> None:
                 serial_port=args.serial_port,
                 baudrate=args.serial_baudrate,
                 tcp_port=args.serial_tcp_port,
+                bind_address=args.bind,
             )
             await serial_srv.start()
             servers.append(serial_srv)
@@ -155,6 +163,7 @@ async def main() -> None:
                 bitrate=args.can_bitrate,
                 tcp_port=args.can_tcp_port,
                 tty_baudrate=args.can_tty_baudrate if args.can_interface == "slcan" else None,
+                bind_address=args.bind,
             )
             await can_srv.start()
             servers.append(can_srv)

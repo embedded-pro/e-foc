@@ -1,4 +1,5 @@
 #include "core/services/cli/TerminalSpeed.hpp"
+#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/services/cli/TerminalHelper.hpp"
 
 namespace services
@@ -22,33 +23,18 @@ namespace services
 
     TerminalFocSpeedInteractor::StatusWithMessage TerminalFocSpeedInteractor::SetSpeedPid(const infra::BoundedConstString& input)
     {
-        infra::Tokenizer tokenizer(input, ' ');
-
-        if (tokenizer.Size() != 1)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments." };
-
-        auto bandwidth = ParseInput(tokenizer.Token(0));
-        if (!bandwidth.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
-
-        auto tunings = foc::SpeedLoopTunings{};
-        tunings.bandwidth = *bandwidth;
-        foc.SetSpeedTunings(tunings);
-        return StatusWithMessage();
+        return ApplySpeedBandwidth(input, foc);
     }
 
     TerminalFocSpeedInteractor::StatusWithMessage TerminalFocSpeedInteractor::SetSpeed(const infra::BoundedConstString& input)
     {
-        infra::Tokenizer tokenizer(input, ' ');
+        float speedValue = 0.0f;
+        auto parsed = ParseSingleBoundedArgument(input, -foc::CommandLimits::maxSpeedSetpoint, foc::CommandLimits::maxSpeedSetpoint, speedValue);
 
-        if (tokenizer.Size() != 1)
-            return { services::TerminalWithStorage::Status::error, "invalid number of arguments." };
+        if (!Succeeded(parsed))
+            return parsed;
 
-        auto speedValue = ParseInput(tokenizer.Token(0));
-        if (!speedValue.has_value())
-            return { services::TerminalWithStorage::Status::error, "invalid value. It should be a float." };
-
-        foc.SetPoint(foc::RadiansPerSecond(*speedValue));
-        return TerminalFocSpeedInteractor::StatusWithMessage();
+        foc.SetPoint(foc::RadiansPerSecond(speedValue));
+        return StatusWithMessage();
     }
 }

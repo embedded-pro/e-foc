@@ -17,6 +17,8 @@ namespace hal
     class PerformanceTracker
     {
     public:
+        virtual ~PerformanceTracker() = default;
+
         virtual void Start() = 0;
         virtual uint32_t ElapsedCycles() = 0;
     };
@@ -40,6 +42,7 @@ namespace application
         , public drivers::Encoder
     {
     public:
+        virtual ~PlatformFactory() = default;
         enum class SampleAndHold
         {
             shortest,

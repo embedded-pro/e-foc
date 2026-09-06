@@ -32,6 +32,7 @@ namespace services
 
     private:
         void OnMeasurementComplete();
+        void Abort();
 
         static constexpr uint8_t neutralDuty = 1;
         static constexpr float wyeTerminalFactor = 1.5f;

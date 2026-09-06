@@ -31,6 +31,7 @@
         "PidIncrementalSynchronous.*::SetPoint",
         "OuterSamplePeriod",
         "WrappedPositionError",
+        "PositionWithWrapAround",
         "LimitToCurrentEnvelope"
       ]
     },
@@ -42,7 +43,10 @@
         "EstimatorChannel::UpdateMechanical",
         "RealTimeFrictionAndInertiaEstimator::Update",
         "ClarkePark::Forward",
-        "RecursiveLeastSquares<float, 3u>::Update"
+        "RecursiveLeastSquares<float, 3u>::Update",
+        "RealTimeFrictionAndInertiaEstimator::IsPersistentlyExciting",
+        "RealTimeFrictionAndInertiaEstimator::IsPlausible",
+        "IsFiniteValue"
       ]
     },
     {

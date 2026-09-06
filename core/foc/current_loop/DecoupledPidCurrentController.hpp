@@ -15,7 +15,13 @@ namespace foc
 
         OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context)
         {
-            return LimitToModulationCircle(decoupling.Apply(pid.Compute(context), context));
+            const auto proposed = pid.Propose(context);
+            const auto total = decoupling.Apply(proposed, context);
+            const auto applied = LimitToModulationCircle(total);
+
+            pid.CommitRealized({ proposed.d + (applied.d - total.d), proposed.q + (applied.q - total.q) });
+
+            return applied;
         }
 
     private:

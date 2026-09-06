@@ -95,11 +95,15 @@ classDiagram
 Each setpoint command applies to exactly one control mode and is rejected with a mode-mismatch
 message in the others, and rejected when the lifecycle state does not accept setpoints.
 
-| Command        | Alias | Arguments     | Mode     |
-|----------------|-------|---------------|----------|
-| `set_torque`   | `st`  | Iq (A)        | Torque   |
-| `set_speed`    | `ss`  | omega (rad/s) | Speed    |
-| `set_position` | `sp`  | theta (rad)   | Position |
+| Command        | Alias | Arguments     | Accepted range | Mode     |
+|----------------|-------|---------------|----------------|----------|
+| `set_torque`   | `st`  | Iq (A)        | ±100           | Torque   |
+| `set_speed`    | `ss`  | omega (rad/s) | ±1000          | Speed    |
+| `set_position` | `sp`  | theta (rad)   | ±2π            | Position |
+
+Ranges come from `foc::CommandLimits`, the same constants the CAN command path validates against, so
+an operator cannot reach through the terminal a setpoint the bus would have refused. A value outside
+the range is rejected with an out-of-range message and never reaches the control law.
 
 The torque command takes the q-axis current only. The d-axis reference is held at zero by the
 control law, so exposing it would let an operator command a flux reference the cascade immediately
@@ -107,14 +111,16 @@ overwrites.
 
 #### Bandwidths
 
-| Command                  | Alias  | Arguments         | Availability             |
-|--------------------------|--------|-------------------|--------------------------|
-| `set_current_bandwidth`  | `scbw` | bandwidth (rad/s) | All modes                |
-| `set_speed_bandwidth`    | `ssbw` | bandwidth (rad/s) | Speed and position modes |
-| `set_position_bandwidth` | `spbw` | bandwidth (rad/s) | Position mode            |
+| Command                  | Alias  | Arguments         | Accepted range | Availability             |
+|--------------------------|--------|-------------------|----------------|--------------------------|
+| `set_current_bandwidth`  | `scbw` | bandwidth (rad/s) | 1 … 20000      | All modes                |
+| `set_speed_bandwidth`    | `ssbw` | bandwidth (rad/s) | 1 … 2000       | Speed and position modes |
+| `set_position_bandwidth` | `spbw` | bandwidth (rad/s) | 1 … 500        | Position mode            |
 
 Retuning is refused while the motor is enabled, and refused when the active law cannot be redesigned
-for the requested bandwidth.
+for the requested bandwidth. Bandwidths are bounded below at 1 rad/s: a zero or negative bandwidth
+produces zero or sign-inverted gains, which inverts the sense of the loop's feedback on a motor that
+may be spinning.
 
 ### `TerminalWithBanner` — Decorator
 

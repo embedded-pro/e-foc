@@ -1,5 +1,6 @@
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include <gmock/gmock.h>
+#include <numbers>
 
 namespace
 {
@@ -101,4 +102,76 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, set_initial_estimate_seeds_rls_s
     // Assert: estimates remain near seeded values, not the zero-initialised RLS default.
     EXPECT_NEAR(estimator.CurrentInertia().Value(), 0.01f, 0.005f);
     EXPECT_NEAR(estimator.CurrentFriction().Value(), 0.005f, 0.003f);
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, standstill_observations_leave_the_coefficients_untouched)
+{
+    foc::NewtonMeter torque{ 0.1f };
+    const foc::PhaseCurrents idle{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
+    const foc::RadiansPerSecond stopped{ 0.0f };
+
+    auto first = estimator.Update(idle, stopped, angle, torque);
+
+    for (int sample = 0; sample != 500; ++sample)
+        estimator.Update(idle, stopped, angle, torque);
+
+    auto last = estimator.Update(idle, stopped, angle, torque);
+
+    EXPECT_FLOAT_EQ(last.inertia.Value(), first.inertia.Value());
+    EXPECT_FLOAT_EQ(last.friction.Value(), first.friction.Value());
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, an_excited_observation_carrying_torque_updates_the_coefficients)
+{
+    foc::NewtonMeter torque{ 0.1f };
+    const foc::PhaseCurrents idle{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
+    const foc::Radians quadratureAngle{ std::numbers::pi_v<float> / 2.0f };
+
+    auto before = estimator.Update(idle, foc::RadiansPerSecond{ 0.0f }, quadratureAngle, torque);
+    auto after = estimator.Update(currents, foc::RadiansPerSecond{ 50.0f }, quadratureAngle, torque);
+
+    EXPECT_NE(after.inertia.Value(), before.inertia.Value());
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_standstill_run_does_not_publish_new_online_estimates)
+{
+    estimator.SetTorqueConstant(foc::NewtonMeter{ 0.1f });
+    estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
+
+    const foc::PhaseCurrents idle{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
+
+    for (int sample = 0; sample != 2000; ++sample)
+        estimator.Update(idle, foc::RadiansPerSecond{ 0.0f }, angle);
+
+    EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 1.0e-4f);
+    EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_steady_speed_is_excitation_enough_to_keep_publishing)
+{
+    const foc::Radians quadratureAngle{ std::numbers::pi_v<float> / 2.0f };
+    const foc::PhaseCurrents driving{ foc::Ampere{ -1.0f }, foc::Ampere{ 0.5f }, foc::Ampere{ 0.5f } };
+
+    estimator.SetTorqueConstant(foc::NewtonMeter{ 0.1f });
+    estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
+
+    for (int sample = 0; sample != 200; ++sample)
+        estimator.Update(driving, speed, quadratureAngle);
+
+    EXPECT_NE(estimator.CurrentFriction().Value(), 1.0e-4f);
+    EXPECT_GE(estimator.CurrentFriction().Value(), 0.0f);
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, published_online_estimates_stay_inside_the_plausibility_band)
+{
+    estimator.SetTorqueConstant(foc::NewtonMeter{ 0.1f });
+    estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
+
+    for (int sample = 0; sample != 200; ++sample)
+        estimator.Update(currents, foc::RadiansPerSecond{ static_cast<float>(sample) * 13.0f }, angle);
+
+    EXPECT_GT(estimator.CurrentInertia().Value(), 0.0f);
+    EXPECT_LT(estimator.CurrentInertia().Value(), 1.0f);
+    EXPECT_GE(estimator.CurrentFriction().Value(), 0.0f);
+    EXPECT_LT(estimator.CurrentFriction().Value(), 1.0f);
 }

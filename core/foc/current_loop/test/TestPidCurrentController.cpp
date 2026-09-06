@@ -1,6 +1,7 @@
 #include "core/foc/current_loop/PidCurrentController.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
+#include <limits>
 #include <numbers>
 
 namespace
@@ -163,4 +164,73 @@ TEST_F(TestPidCurrentController, sustained_saturation_does_not_wind_up_the_integ
 
     const auto reversed = controller.Compute({ { 0.0f, 0.0f }, { -50.0f, 0.0f }, 0.0f });
     EXPECT_NEAR(reversed.d, -1.0f, tolerance);
+}
+
+TEST_F(TestPidCurrentController, saturated_output_stays_on_the_modulation_circle)
+{
+    controller.Configure(ValidParameters());
+
+    for (int sample = 0; sample != 200; ++sample)
+        controller.Compute({ { 0.0f, 0.0f }, { 100.0f, 100.0f }, 0.0f });
+
+    auto output = controller.Compute({ { 0.0f, 0.0f }, { 100.0f, 100.0f }, 0.0f });
+
+    EXPECT_NEAR(std::sqrt(output.d * output.d + output.q * output.q), 1.0f, tolerance);
+}
+
+TEST_F(TestPidCurrentController, a_reference_reversal_after_saturation_recovers_within_one_sample)
+{
+    controller.Configure(ValidParameters());
+
+    for (int sample = 0; sample != 200; ++sample)
+        controller.Compute({ { 0.0f, 0.0f }, { 100.0f, 100.0f }, 0.0f });
+
+    auto output = controller.Compute({ { 0.0f, 0.0f }, { -100.0f, -100.0f }, 0.0f });
+
+    EXPECT_LT(output.d, 0.0f);
+    EXPECT_LT(output.q, 0.0f);
+}
+
+TEST_F(TestPidCurrentController, an_unreachable_reference_does_not_wind_the_integrator_past_the_circle)
+{
+    controller.Configure(ValidParameters());
+
+    for (int sample = 0; sample != 5000; ++sample)
+        controller.Compute({ { 0.0f, 0.0f }, { 1000.0f, 1000.0f }, 0.0f });
+
+    auto recovered = controller.Compute({ { 0.0f, 0.0f }, { 0.0f, 0.0f }, 0.0f });
+
+    EXPECT_LE(std::sqrt(recovered.d * recovered.d + recovered.q * recovered.q), 1.0f + tolerance);
+}
+
+TEST_F(TestPidCurrentController, a_well_conditioned_plant_is_usable)
+{
+    const auto plant = foc::CurrentPlantModel::FromParameters(ValidParameters());
+
+    EXPECT_TRUE(plant.IsUsable());
+}
+
+TEST_F(TestPidCurrentController, an_inductance_far_above_the_sample_period_is_rejected)
+{
+    auto parameters = ValidParameters();
+    parameters.inductance = foc::MilliHenry{ 1.0e9f };
+
+    EXPECT_FALSE(foc::CurrentPlantModel::FromParameters(parameters).IsUsable());
+}
+
+TEST_F(TestPidCurrentController, a_default_constructed_plant_is_rejected)
+{
+    EXPECT_FALSE(foc::CurrentPlantModel{}.IsUsable());
+}
+
+TEST_F(TestPidCurrentController, a_plant_with_a_non_finite_gain_is_rejected)
+{
+    EXPECT_FALSE((foc::CurrentPlantModel{ std::numeric_limits<float>::quiet_NaN(), 0.5f }.IsUsable()));
+    EXPECT_FALSE((foc::CurrentPlantModel{ 0.5f, std::numeric_limits<float>::infinity() }.IsUsable()));
+}
+
+TEST_F(TestPidCurrentController, a_plant_whose_state_gain_leaves_the_unit_interval_is_rejected)
+{
+    EXPECT_FALSE((foc::CurrentPlantModel{ -0.1f, 0.5f }.IsUsable()));
+    EXPECT_FALSE((foc::CurrentPlantModel{ 1.0f, 0.5f }.IsUsable()));
 }

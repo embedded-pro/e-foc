@@ -45,6 +45,8 @@ endif()
 set_directory_properties(PROPERTY USE_FOLDERS ON)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/QemuHelpers.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/MarkIncludesSystem.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerWarnings.cmake")
 
 set(E_FOC_EXCLUDE_FROM_ALL "")
 
@@ -88,6 +90,10 @@ if (DEFINED TARGET_MCU_VENDOR)
 endif()
 
 add_subdirectory(infra/numerical-toolbox)
+
+e_foc_mark_includes_system("${CMAKE_CURRENT_SOURCE_DIR}")
+e_foc_enable_project_warnings()
+
 add_subdirectory(core)
 
 if(NOT EMIL_BUILD_QEMU OR E_FOC_TARGET_PLATFORM STREQUAL "qemu")

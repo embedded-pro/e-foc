@@ -91,8 +91,18 @@ Settlement detection is a simple sliding window state machine. At each sampling 
 3. If this difference is below `settledThreshold`, the consecutive-settlement counter is incremented; otherwise the counter is reset to zero.
 4. If the counter reaches `settledCount`, the rotor is declared settled.
 5. If the total sample count reaches `maxSamples` without settlement, a timeout is declared.
+6. If any phase current in a sample exceeds `ThreePhaseInverter::MaxCurrentSupported()`, the injection is aborted immediately and the timeout path is taken. Alignment drives an open-loop voltage with no current regulation, so this per-sample check is the only software limit on the resulting current.
 
 The encoder position at the moment of settlement declaration becomes the calibration offset. This offset represents the mechanical angle the rotor adopts when the electrical d-axis is at 0°; subtracting it from any subsequent encoder reading yields the corrected angle for the closed-loop FOC controller.
+
+The offset is in **mechanical** radians, which is the unit `Encoder::Set` and `Encoder::SetZero` consume. It is not scaled by pole pairs; scaling it would make it an electrical angle and misorient the field.
+
+The service applies the offset itself, by calling `Encoder::SetZero()` at the settled instant while the rotor
+is still held at electrical zero. It does not wait for the caller to re-apply the reported value, because the
+rotor drifts as soon as the bridge is released. The reported value is therefore a record of where the encoder
+read before it was zeroed, and the calibration record persisted to NVM is diagnostic: an incremental encoder
+loses its reference across a reset, so the state machine does not re-apply a stored alignment at boot and
+calibration must be re-run to orient the field.
 
 ### State Machine
 
@@ -114,7 +124,7 @@ While in the **Aligning** state, any further call to `ForceAlignment` is silentl
 
 The `onDone` callback accepts a single `std::optional<Radians>` argument:
 
-- `std::optional` with a value: alignment succeeded; the contained value is the encoder offset in radians.
+- `std::optional` with a value: alignment succeeded; the contained value is the encoder offset in mechanical radians, already applied to the encoder by the service.
 - Empty `std::optional`: alignment failed (timeout); the caller should not use any offset and may retry.
 
 The callback fires exactly once per `ForceAlignment` invocation. The callback is reset (using `infra::AutoResetFunction` semantics) after firing so that stale references cannot cause a second invocation.

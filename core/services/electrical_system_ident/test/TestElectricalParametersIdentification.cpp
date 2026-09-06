@@ -16,7 +16,7 @@ namespace
                arg.c.Value() == expected.c.Value();
     }
 
-    float SimulateRLModelCurrent(float voltage, float resistance, float inductance, float time)
+    [[maybe_unused]] float SimulateRLModelCurrent(float voltage, float resistance, float inductance, float time)
     {
         auto tau = inductance / resistance;
 
@@ -46,8 +46,6 @@ namespace
     };
 }
 
-
-
 TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_initializes_encoder_and_applies_voltages)
 {
     services::ElectricalParametersIdentification::PolePairsConfig config{
@@ -76,7 +74,6 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_cal
     std::optional<std::size_t> resultPolePairs;
     constexpr std::size_t totalSteps = 5 * 12;
     constexpr std::size_t expectedPolePairs = 2;
-    float voltage = static_cast<float>(config.testVoltagePercent.Value()) * vdc.Value() / 100.0f;
 
     encoderStepIndex = 0;
     EXPECT_CALL(encoderMock, Read())
@@ -102,6 +99,53 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_cal
 
     ASSERT_TRUE(resultPolePairs.has_value());
     EXPECT_EQ(*resultPolePairs, expectedPolePairs);
+}
+
+TEST_F(ElectricalParametersIdentificationTest, an_overcurrent_sample_aborts_the_pole_pairs_sweep)
+{
+    services::ElectricalParametersIdentification::PolePairsConfig config{
+        hal::Percent{ 20 },
+        5,
+        std::chrono::milliseconds{ 50 }
+    };
+
+    std::optional<std::size_t> resultPolePairs{ 7 };
+
+    EXPECT_CALL(encoderMock, Read())
+        .WillRepeatedly(Return(foc::Radians{ 0.0f }));
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            })
+        .WillOnce(Return());
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, Stop());
+
+    std::size_t doneCount = 0;
+    identification.EstimateNumberOfPolePairs(config, [&](auto result)
+        {
+            ++doneCount;
+            resultPolePairs = result;
+        });
+
+    driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+        foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent - 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    EXPECT_EQ(doneCount, 0u);
+
+    const foc::PhaseCurrents overLimit{
+        foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }
+    };
+
+    driverMock.TriggerPhaseCurrentsCallback(overLimit);
+    driverMock.TriggerPhaseCurrentsCallback(overLimit);
+
+    EXPECT_EQ(doneCount, 1u);
+    EXPECT_FALSE(resultPolePairs.has_value());
+
+    ForwardTime(std::chrono::milliseconds{ 50 });
 }
 
 TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_calculates_correct_pole_pairs_for_6_pole_motor)

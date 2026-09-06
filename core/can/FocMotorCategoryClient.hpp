@@ -19,6 +19,7 @@ namespace can
         : public infra::SingleObserver<FocMotorCategoryClientObserver, FocMotorCategoryClient>
     {
     public:
+        virtual ~FocMotorCategoryClientObserver() = default;
         using infra::SingleObserver<FocMotorCategoryClientObserver, FocMotorCategoryClient>::SingleObserver;
 
         virtual void OnSelectControlModeResponse(FocMotorMode activeMode) = 0;

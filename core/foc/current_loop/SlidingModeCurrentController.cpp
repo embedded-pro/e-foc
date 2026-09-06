@@ -38,7 +38,9 @@ namespace foc
 
     void SlidingModeCurrentController::Construct()
     {
-        if (!AreElectricalParametersValid(parameters) || boundaryLayer <= 0.0f)
+        const auto plant = CurrentPlantModel::FromParameters(parameters);
+
+        if (!AreElectricalParametersValid(parameters) || boundaryLayer <= 0.0f || !plant.IsUsable())
         {
             slidingMode = Inert();
             normalizationScale = 0.0f;
@@ -46,7 +48,6 @@ namespace foc
             return;
         }
 
-        const auto plant = CurrentPlantModel::FromParameters(parameters);
         normalizationScale = NormalizationScale(parameters.busVoltage);
         equilibriumGain = (1.0f - plant.ad) / plant.bd;
 
