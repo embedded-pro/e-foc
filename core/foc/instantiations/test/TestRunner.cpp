@@ -168,3 +168,104 @@ TEST_F(TestRunner, ACallbackBeforeEnableDoesNotDriveThePwm)
 
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
 }
+
+TEST_F(TestRunner, BalancedCurrentsAreDispatchedToTheControlLaw)
+{
+    foc::Runner runner{ inverterMock, encoderMock, focMock };
+
+    EXPECT_CALL(focMock, Enable());
+    EXPECT_CALL(inverterMock, Start());
+    runner.Enable();
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } }));
+    EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
+
+    inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
+
+    EXPECT_CALL(inverterMock, Stop());
+    EXPECT_CALL(focMock, Disable());
+}
+
+TEST_F(TestRunner, ASingleImplausibleSampleIsToleratedAsATransient)
+{
+    foc::Runner runner{ inverterMock, encoderMock, focMock };
+
+    EXPECT_CALL(focMock, Enable());
+    EXPECT_CALL(inverterMock, Start());
+    runner.Enable();
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } }));
+    EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
+
+    inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 5.0f }, foc::Ampere{ 5.0f }, foc::Ampere{ 5.0f } });
+
+    EXPECT_CALL(inverterMock, Stop());
+    EXPECT_CALL(focMock, Disable());
+}
+
+TEST_F(TestRunner, SustainedKirchhoffViolationDisablesTheDriveAndReports)
+{
+    foc::Runner runner{ inverterMock, encoderMock, focMock };
+
+    bool reported = false;
+    runner.RegisterOnImplausibleCurrents([&reported]()
+        {
+            reported = true;
+        });
+
+    EXPECT_CALL(focMock, Enable());
+    EXPECT_CALL(inverterMock, Start());
+    runner.Enable();
+
+    EXPECT_CALL(encoderMock, Read()).Times(testing::AnyNumber()).WillRepeatedly(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(focMock, Calculate(_, _)).Times(testing::AnyNumber()).WillRepeatedly(Return(foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } }));
+    EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_)).Times(testing::AnyNumber());
+    EXPECT_CALL(inverterMock, Stop());
+    EXPECT_CALL(focMock, Disable());
+
+    const foc::PhaseCurrents implausible{ foc::Ampere{ 5.0f }, foc::Ampere{ 5.0f }, foc::Ampere{ 5.0f } };
+    for (int sample = 0; sample != 12; ++sample)
+        inverterMock.TriggerPhaseCurrentsCallback(implausible);
+
+    EXPECT_TRUE(reported);
+
+    EXPECT_CALL(inverterMock, Stop());
+    EXPECT_CALL(focMock, Disable());
+}
+
+TEST_F(TestRunner, ABalancedSampleClearsTheImplausibleRun)
+{
+    foc::Runner runner{ inverterMock, encoderMock, focMock };
+
+    bool reported = false;
+    runner.RegisterOnImplausibleCurrents([&reported]()
+        {
+            reported = true;
+        });
+
+    EXPECT_CALL(focMock, Enable());
+    EXPECT_CALL(inverterMock, Start());
+    runner.Enable();
+
+    EXPECT_CALL(encoderMock, Read()).Times(testing::AnyNumber()).WillRepeatedly(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(focMock, Calculate(_, _)).Times(testing::AnyNumber()).WillRepeatedly(Return(foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } }));
+    EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_)).Times(testing::AnyNumber());
+
+    const foc::PhaseCurrents implausible{ foc::Ampere{ 5.0f }, foc::Ampere{ 5.0f }, foc::Ampere{ 5.0f } };
+    const foc::PhaseCurrents balanced{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } };
+
+    for (int cycle = 0; cycle != 4; ++cycle)
+    {
+        for (int sample = 0; sample != 6; ++sample)
+            inverterMock.TriggerPhaseCurrentsCallback(implausible);
+
+        inverterMock.TriggerPhaseCurrentsCallback(balanced);
+    }
+
+    EXPECT_FALSE(reported);
+
+    EXPECT_CALL(inverterMock, Stop());
+    EXPECT_CALL(focMock, Disable());
+}

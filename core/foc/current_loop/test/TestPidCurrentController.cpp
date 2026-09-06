@@ -201,3 +201,23 @@ TEST_F(TestPidCurrentController, an_unreachable_reference_does_not_wind_the_inte
 
     EXPECT_LE(std::sqrt(recovered.d * recovered.d + recovered.q * recovered.q), 1.0f + tolerance);
 }
+
+TEST_F(TestPidCurrentController, a_well_conditioned_plant_is_usable)
+{
+    const auto plant = foc::CurrentPlantModel::FromParameters(ValidParameters());
+
+    EXPECT_TRUE(plant.IsUsable());
+}
+
+TEST_F(TestPidCurrentController, an_inductance_far_above_the_sample_period_is_rejected)
+{
+    auto parameters = ValidParameters();
+    parameters.inductance = foc::MilliHenry{ 1.0e9f };
+
+    EXPECT_FALSE(foc::CurrentPlantModel::FromParameters(parameters).IsUsable());
+}
+
+TEST_F(TestPidCurrentController, a_default_constructed_plant_is_rejected)
+{
+    EXPECT_FALSE(foc::CurrentPlantModel{}.IsUsable());
+}

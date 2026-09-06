@@ -32,7 +32,7 @@ extern "C"
             "b    HardFault_Handler_C \n");
     }
 
-    void HardFault_Handler_C(const uint32_t* stack, uint32_t lrValue)
+    void HardFault_Handler_C(const uint32_t* stack, uint32_t)
     {
         using application::PersistentFaultData;
         using application::persistentFaultData;
