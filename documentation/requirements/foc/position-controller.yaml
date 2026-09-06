@@ -55,3 +55,12 @@
     enabled, and shall also be rejected when the active position law cannot be designed
     for the requested tunings. In either case the previously accepted tunings shall
     remain active.
+
+- id: REQ-POS-008
+  title: A position law with no actuator authority commands nothing and accumulates nothing
+  shall: >
+    When a state-feedback position law holds a design its solver could not produce, so that its
+    command is zero for every state, the controller shall command zero current and shall not
+    advance its integral state. The saturation guard that unwinds the integral compares the limited
+    command against the unlimited one, and with such a design the two are equal for every input, so
+    the guard cannot fire.

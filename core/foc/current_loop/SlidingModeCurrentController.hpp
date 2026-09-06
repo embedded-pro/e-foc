@@ -18,8 +18,10 @@ namespace foc
 
         OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context)
         {
-            return LimitToModulationCircle({ ComputeAxis(context.measured.d, context.reference.d),
-                ComputeAxis(context.measured.q, context.reference.q) });
+            const RotatingFrame proposed{ ComputeAxis(context.measured.d, context.reference.d),
+                ComputeAxis(context.measured.q, context.reference.q) };
+
+            return LimitToModulationCircle(decoupling.Apply(proposed, context));
         }
 
     private:
@@ -41,6 +43,7 @@ namespace foc
         float boundaryLayer{ CurrentLoopTunings{}.boundaryLayer };
         float normalizationScale{ 0.0f };
         float equilibriumGain{ 0.0f };
+        DecouplingFeedforward decoupling;
         ScalarSlidingMode slidingMode{ Inert() };
     };
 

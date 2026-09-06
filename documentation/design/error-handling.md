@@ -77,6 +77,33 @@ the reset cause unconditionally and surrounds fault data with visible delimiters
 
 ---
 
+### Control-loop and bus statistics
+
+Alongside the post-mortem fault record, the platform keeps two live sets of counters, both readable
+from the CLI (`loop_stats`, `can_stats`, `clear_stats`).
+
+**Control-interrupt execution.** The Cortex-M cycle counter is left free-running and read on entry
+to and exit from the control interrupt; the difference is one measured execution. Unsigned
+subtraction makes the measurement correct across the counter's own wrap, which at 120 MHz comes
+around every 36 seconds. The measurement spans the whole interrupt — dispatch, encoder read, control
+law and PWM write — because that is the graph the cycle budget is stated against, and it is taken in
+the platform layer for the same reason.
+
+From it the platform maintains the last, minimum, maximum and a filtered average duration, the
+execution count, and three failure counts: **overruns** (over the budget, margin gone, deadline
+still met), **deadline misses** (over the period itself), and **re-entries** (a conversion arriving
+while the previous interrupt had not returned — the same failure observed as it happens rather than
+inferred afterwards).
+
+**CAN errors.** Every error class the adapter reports is counted, not only the bus-off condition
+that raises a fault. Counting happens on the adapter base class, so no adapter's reporting path can
+omit it. This is what separates a bus with marginal termination from one that is unplugged.
+
+Both sets saturate rather than wrap. The cost on the control path is a pair of register reads and
+about two dozen inlined instructions, under one percent of the 20 kHz period.
+
+---
+
 ## Interfaces
 
 ### Provided

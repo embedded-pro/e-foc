@@ -28,7 +28,7 @@ namespace simulator
         ThreePhaseMotorModel model{ foc::JK42BLS01_X038ED::parameters, vdc, baseFrequency, std::optional<std::size_t>{} };
         model.SetLoad(foc::NewtonMeter{ defaults::loadTorqueNm });
 
-        foc::FocTorqueController controller{ model, model };
+        foc::FocTorqueController controller{ model, model, foc::Ampere{ defaults::maxCurrentAmps } };
         auto motorModel = foc::MotorModelParameters{};
         motorModel.resistance = foc::JK42BLS01_X038ED::parameters.R;
         motorModel.inductance = foc::MilliHenry{ foc::JK42BLS01_X038ED::parameters.Ld.Value() * 1000.0f };

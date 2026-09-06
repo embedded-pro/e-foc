@@ -154,6 +154,11 @@ namespace application
         using namespace std::chrono_literals;
         auto& impl = peripherals->adcForPhaseCurrentMeasurementImpl;
 
+        const auto periodCycles = baseFrequency.Value() == 0
+                                      ? 0u
+                                      : static_cast<uint32_t>(SystemCoreClock / baseFrequency.Value());
+        controlLoopMetrics.Configure(static_cast<uint32_t>(static_cast<uint64_t>(periodCycles) * 3u / 4u), periodCycles);
+
         auto& adcCfg = impl.adcConfig;
         adcCfg.interruptPriority = InterruptPriorities::phaseCurrentAdc;
         adcCfg.sampleAndHold = impl.toSampleAndHold.at(static_cast<std::size_t>(sampleAndHold));
@@ -255,7 +260,19 @@ namespace application
             peripherals->syncPwm->SetBaseFrequency(baseFrequency);
         peripherals->phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
             {
+                if (controlLoopEntered)
+                {
+                    controlLoopMetrics.RecordReentry();
+                    return;
+                }
+
+                controlLoopEntered = true;
+                const auto entryCycles = CycleCounter::Now();
+
                 onPhaseCurrentsReady(foc::PhaseCurrents{ a, b, c });
+
+                controlLoopMetrics.Record(CycleCounter::Now() - entryCycles);
+                controlLoopEntered = false;
             });
     }
 
@@ -326,5 +343,21 @@ namespace application
     infra::BoundedConstString PlatformFactoryImpl::FaultStatus() const
     {
         return faultStatusString;
+    }
+
+    ControlLoopMetrics::Snapshot PlatformFactoryImpl::ControlLoopStatistics() const
+    {
+        return controlLoopMetrics.Read();
+    }
+
+    const CanBusAdapter::ErrorCounters& PlatformFactoryImpl::CanStatistics() const
+    {
+        return const_cast<PlatformFactoryImpl*>(this)->CanBus().ErrorStatistics();
+    }
+
+    void PlatformFactoryImpl::ResetStatistics()
+    {
+        controlLoopMetrics.Reset();
+        CanBus().ResetErrorStatistics();
     }
 }

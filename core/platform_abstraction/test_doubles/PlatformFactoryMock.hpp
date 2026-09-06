@@ -9,6 +9,14 @@ namespace application
         : public PlatformFactory
     {
     public:
+        PlatformFactoryMock()
+        {
+            ON_CALL(*this, MaxCurrentSupported()).WillByDefault(testing::Return(foc::Ampere{ defaultMaxCurrent }));
+            EXPECT_CALL(*this, MaxCurrentSupported()).Times(testing::AnyNumber());
+        }
+
+        static constexpr float defaultMaxCurrent{ 10.0f };
+
         MOCK_METHOD(void, Run, (), (override));
         MOCK_METHOD(services::Tracer&, Tracer, (), (override));
         MOCK_METHOD(services::TerminalWithCommands&, Terminal, (), (override));
@@ -22,6 +30,9 @@ namespace application
         MOCK_METHOD(foc::Volts, PowerSupplyVoltage, (), (override));
         MOCK_METHOD(foc::LowPriorityInterrupt&, LowPriorityInterrupt, (), (override));
         MOCK_METHOD(hal::Eeprom&, Eeprom, (), (override));
+        MOCK_METHOD(application::ControlLoopMetrics::Snapshot, ControlLoopStatistics, (), (const, override));
+        MOCK_METHOD(const application::CanBusAdapter::ErrorCounters&, CanStatistics, (), (const, override));
+        MOCK_METHOD(void, ResetStatistics, (), (override));
         MOCK_METHOD(void, Reset, (), (override));
         MOCK_METHOD(application::ResetCause, GetResetCause, (), (const, override));
         MOCK_METHOD(infra::BoundedConstString, FaultStatus, (), (const, override));

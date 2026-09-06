@@ -12,9 +12,20 @@
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
+#include <atomic>
 
 namespace foc
 {
+    namespace detail
+    {
+        constexpr uint8_t NextFreeSlot(uint8_t slotCount, uint8_t ready, uint8_t held)
+        {
+            return ready == held
+                       ? static_cast<uint8_t>(ready == slotCount - 1u ? 0u : ready + 1u)
+                       : static_cast<uint8_t>(slotCount * (slotCount - 1u) / 2u - ready - held);
+        }
+    }
+
     struct EstimatorSnapshot
     {
         PhaseCurrents phaseCurrents{};
@@ -24,16 +35,15 @@ namespace foc
         float normalizedVd{ 0.0f };
     };
 
-    // Double-buffered hand-off from the 20 kHz ISR to the low-priority handler: Publish writes the
-    // slot the reader is not on and only then moves the index, so a snapshot can never be read torn.
     class EstimatorChannel
     {
     public:
         ALWAYS_INLINE_HOT void Publish(const EstimatorSnapshot& snapshot)
         {
-            const uint8_t writeSlot = 1u - ready;
             slots[writeSlot] = snapshot;
+            std::atomic_signal_fence(std::memory_order_release);
             ready = writeSlot;
+            writeSlot = NextFreeSlot();
         }
 
         void SetMechanical(OnlineMechanicalEstimator& estimator);
@@ -42,15 +52,26 @@ namespace foc
         void UpdateElectrical(float electricalSpeed, float vdcInvScale);
 
     private:
-        ALWAYS_INLINE_HOT const EstimatorSnapshot& Ready() const
+        ALWAYS_INLINE_HOT const EstimatorSnapshot& Acquire()
         {
-            return slots[ready];
+            held = ready;
+            std::atomic_signal_fence(std::memory_order_acquire);
+            return slots[held];
         }
+
+        ALWAYS_INLINE_HOT uint8_t NextFreeSlot() const
+        {
+            return detail::NextFreeSlot(slotCount, ready, held);
+        }
+
+        static constexpr uint8_t slotCount = 3;
 
         OnlineMechanicalEstimator* mechanical{ nullptr };
         OnlineElectricalEstimator* electrical{ nullptr };
-        std::array<EstimatorSnapshot, 2> slots{};
+        std::array<EstimatorSnapshot, slotCount> slots{};
+        uint8_t writeSlot{ 1 };
         volatile uint8_t ready{ 0 };
+        volatile uint8_t held{ 0 };
     };
 
     class SpeedDifferentiator
@@ -74,7 +95,7 @@ namespace foc
 
     private:
         float samplePeriod;
-        float currentAngle{ 0.0f };
+        volatile float currentAngle{ 0.0f };
         float previousAngle{ 0.0f };
         bool previousAngleValid{ false };
     };
@@ -122,9 +143,9 @@ namespace foc
         Ampere maxCurrent;
         hal::Hertz outerLoopFrequency;
         SpeedDifferentiator speedDifferentiator;
-        float lastSpeedLoopOutput{ 0.0f };
-        float lastElectricalSpeed{ 0.0f };
-        RadiansPerSecond speedReference{ 0.0f };
+        volatile float lastSpeedLoopOutput{ 0.0f };
+        volatile float lastElectricalSpeed{ 0.0f };
+        volatile float speedReference{ 0.0f };
         uint32_t prescaler;
         uint32_t triggerCounter{ 0 };
         float polePairs{ 0.0f };

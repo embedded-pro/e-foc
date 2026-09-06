@@ -132,8 +132,10 @@ The reference is first expanded to three phase voltages, `vA = Vα`, `vB = -Vα/
 
 The offset `vCommon = -(max(vA,vB,vC) + min(vA,vB,vC)) / 2` is added to all three phases. Because it is
 identical on every phase it cancels in every line-to-line voltage, so it changes no motor current while
-centring the waveform. This is what recovers the full 2/√3 linear range that classical SVM obtains from
-symmetric null-vector splitting.
+centring the waveform. This is what recovers the linear range that classical SVM obtains from symmetric
+null-vector splitting: a factor 2/√3 ≈ 1.155 more than sinusoidal PWM reaches on the same bus. In the
+per-unit convention used here — inputs relative to `V_dc/√3` — that extended range *is* the unit circle,
+which is why the modulation limiter clamps on |V| ≤ 1 rather than on 2/√3.
 
 **Duty cycle output:**
 
@@ -162,9 +164,18 @@ Direct hardware transcendental functions (`sin`, `cos`) introduce variable laten
 - 512 entries, each a 32-bit floating-point value
 - Stored in ROM (read-only, `constexpr`) at a 16-byte memory alignment boundary
 - Total ROM footprint: 512 × 4 bytes = 2 048 bytes (2 KB)
-- Covers exactly one full period; the angle is normalised to [0, 2π) before indexing
+- Covers exactly one full period
 
-**Cosine** is derived from the sine LUT by a quarter-period index offset — no separate cosine table is required.
+**Range handling**: the angle is *not* normalised to [0, 2π) before indexing. It is scaled by
+512/2π, truncated toward negative infinity, and the resulting index is masked with `size - 1`, so
+the wrap is a bitwise AND on the index rather than a modulo on the angle. This is why there is no
+`fmod` in the hot path. The consequence to know is the domain limit it leaves: the intermediate is
+an `int32_t`, so the result is meaningless for angles beyond roughly 2.6 × 10⁷ radians. Electrical
+angle reaches the transforms already wrapped, so this bound is not approached in the control loop.
+
+**Cosine** reuses the sine table — there is no separate cosine table — but it is *not* an index
+offset. It adds π/2 to the angle and performs the whole lookup again, so a cosine costs a full sine
+plus one addition, and evaluating both for the same angle does the range reduction twice.
 
 **Interpolation:** Linear interpolation between adjacent LUT entries provides accuracy sufficient for FOC applications; the quantisation error is below the noise floor of 12-bit ADC current sensing.
 

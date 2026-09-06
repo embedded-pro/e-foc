@@ -13,6 +13,7 @@
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "services/util/Terminal.hpp"
+#include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "targets/platform_implementations/qemu/implementation/ArrayEeprom.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuConstants.hpp"
@@ -28,7 +29,7 @@ namespace application
     {
     public:
         explicit PlatformFactoryImpl(const foc::ThreePhaseMotorModel::Parameters& motorParams,
-                                     const infra::Function<void()>& onInitialized);
+            const infra::Function<void()>& onInitialized);
 
         void ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold) override;
         void SetEncoderResolution(uint32_t resolution) override;
@@ -52,6 +53,9 @@ namespace application
         void Reset() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
+        ControlLoopMetrics::Snapshot ControlLoopStatistics() const override;
+        const CanBusAdapter::ErrorCounters& CanStatistics() const override;
+        void ResetStatistics() override;
 
         OPTIMIZE_FOR_SPEED void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone) override;
         OPTIMIZE_FOR_SPEED void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
@@ -152,6 +156,9 @@ namespace application
 
     private:
         infra::Function<void()> onInitialized;
+        CycleCounter cycleCounter;
+        ControlLoopMetrics controlLoopMetrics;
+        volatile bool controlLoopEntered{ false };
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         Cortex cortex;
         QemuTimer focTimer{ 0x40000000u, 8, kQemuSystemClockHz, 20000u, [this]()

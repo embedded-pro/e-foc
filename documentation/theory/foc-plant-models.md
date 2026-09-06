@@ -102,11 +102,18 @@ $$
 A_d^i = e^{-R_s T_s^i / L_s}, \qquad B_d^i = \frac{1 - A_d^i}{R_s}
 $$
 
+**This exact pair is what the implementation uses**, evaluated with a real exponential — not the
+Euler approximation below.
+
 For $R_s T_s^i / L_s \ll 1$ (typical: $< 0.1$), the Euler approximation is accurate:
 
 $$
 A_d^i \approx 1 - \frac{R_s T_s^i}{L_s}, \qquad B_d^i \approx \frac{T_s^i}{L_s}
 $$
+
+Note that $B_d^i$ must be taken from the same discretization as $A_d^i$. Pairing the exact
+$A_d^i = e^{-R_s T_s^i/L_s}$ with the Euler $B_d^i = T_s^i/L_s$ is not a ZOH model of anything; the
+matching exact input matrix is $(1 - A_d^i)/R_s$.
 
 The per-axis discrete plant:
 
@@ -134,11 +141,23 @@ $$
 
 This is a first-order plant (state: $\omega_m$, input: $i_q^*$, disturbance: $T_L/J$).
 
-ZOH discretization at $T_s^o$:
+Discretization at $T_s^o$. The exact ZOH pair is:
 
 $$
-A_d^o = e^{-B_f T_s^o / J} \approx 1 - \frac{B_f T_s^o}{J}, \qquad B_d^o = \frac{K_t T_s^o}{J}
+A_d^o = e^{-B_f T_s^o / J}, \qquad B_d^o = \frac{K_t}{B_f}\left(1 - A_d^o\right)
 $$
+
+**The implementation uses the forward-Euler pair instead:**
+
+$$
+\boxed{A_d^o = 1 - \frac{B_f T_s^o}{J}, \qquad B_d^o = \frac{K_t T_s^o}{J}}
+$$
+
+Both matrices come from the same approximation, which is the part that matters: the exact $A_d^o$
+paired with the Euler $B_d^o$ would be a model of no system at all. The Euler pair is valid while
+$B_f T_s^o / J \ll 1$, which holds comfortably at 1 kHz for the inertias and frictions the
+mechanical identification returns, and unlike the exact pair it stays defined for a frictionless
+load, where $K_t (1 - A_d^o) / B_f$ is $0/0$.
 
 $$
 \omega_m[k+1] = A_d^o \cdot \omega_m[k] + B_d^o \cdot u[k]
@@ -163,7 +182,7 @@ $$
 u
 $$
 
-ZOH-discretized at $T_s^o$:
+Discretized at $T_s^o$ with the same forward-Euler $A_d^o$ and $B_d^o$ as the speed plant:
 
 $$
 A_d^p =

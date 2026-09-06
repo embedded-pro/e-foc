@@ -43,6 +43,9 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     PositionOutput LqiPositionController::Compute(const PositionControlContext& context)
     {
+        if (currentPerNormalizedInput == 0.0f)
+            return { PositionOutputKind::currentReference, 0.0f };
+
         const auto deviation = -WrappedPositionError(context.reference, context.measured);
         const auto scaledSpeed = context.measuredSpeed.Value() * samplePeriod;
 

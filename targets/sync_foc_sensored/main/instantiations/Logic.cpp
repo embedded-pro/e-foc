@@ -8,6 +8,7 @@ namespace application
         , debugLed{ hardware.OperationalLed(), std::chrono::milliseconds(50), std::chrono::milliseconds(1950) }
         , vdc{ hardware.PowerSupplyVoltage() }
         , terminalWithStorage{ hardware.Terminal(), hardware.Tracer(), services::TerminalWithBanner::Banner{ "sync_foc_sensored", vdc, hardware.SystemClock(), hardware.GetResetCause(), hardware.FaultStatus() } }
+        , terminalDiagnostics{ terminalWithStorage, hardware }
         , calibrationRegion{ hardware.Eeprom(), calibrationRegionOffset, calibrationRegionSize }
         , configRegion{ hardware.Eeprom(), configRegionOffset, configRegionSize }
         , nvm{ calibrationRegion, configRegion }

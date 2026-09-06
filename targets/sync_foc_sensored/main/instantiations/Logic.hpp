@@ -11,6 +11,7 @@
 #include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
+#include "core/services/cli/TerminalDiagnostics.hpp"
 #include "core/services/cli/TerminalWithBanner.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
@@ -43,6 +44,7 @@ namespace application
         services::DebugLed debugLed;
         foc::Volts vdc;
         services::TerminalWithBanner::WithMaxSize<20> terminalWithStorage;
+        services::TerminalDiagnostics terminalDiagnostics;
         services::NvmEepromRegion calibrationRegion;
         services::NvmEepromRegion configRegion;
         services::NonVolatileMemoryImpl nvm;

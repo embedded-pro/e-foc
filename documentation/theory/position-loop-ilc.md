@@ -23,6 +23,13 @@ date: 2026-08-31
 
 ---
 
+> **Not implemented.** No such algorithm exists in the firmware: `foc::PositionAlgorithm` offers
+> `pid`, `cascadeP`, `lqr`, `lqi` and `twoDof`, and nothing else is selectable over CAN or the CLI.
+> This chapter is design groundwork for a law that has not been built, kept for the theory rather
+> than as a description of shipped behaviour. Read it as a proposal, not as a specification.
+
+---
+
 ## Overview
 
 P4 (ILC — Iterative Learning Control) is for repetitive servo tasks — pick-and-place, CNC passes,

@@ -3,6 +3,7 @@
 #include "hal/interfaces/Can.hpp"
 #include "infra/stream/OutputStream.hpp"
 #include "infra/util/Function.hpp"
+#include <array>
 #include <concepts>
 #include <cstdint>
 #include <type_traits>
@@ -31,54 +32,39 @@ namespace application
             other,
         };
 
+        static constexpr std::size_t errorClasses = static_cast<std::size_t>(CanError::other) + 1;
+
+        class ErrorCounters
+        {
+        public:
+            void Record(CanError error);
+            void Reset();
+            uint32_t Count(CanError error) const;
+            uint32_t Total() const;
+
+        private:
+            static constexpr uint32_t saturated = 0xFFFFFFFFu;
+
+            static std::size_t IndexOf(CanError error);
+            static uint32_t Increment(uint32_t counter);
+
+            std::array<uint32_t, errorClasses> counters{};
+            uint32_t total{ 0 };
+        };
+
         virtual void SetOnError(const infra::Function<void(CanError)>& handler) = 0;
 
-        friend infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, CanError error)
-        {
-            using enum CanError;
-            switch (error)
-            {
-                case busOff:
-                    stream << "bus off";
-                    break;
-                case errorPassive:
-                    stream << "error passive";
-                    break;
-                case errorWarning:
-                    stream << "error warning";
-                    break;
-                case messageLost:
-                    stream << "message lost";
-                    break;
-                case rxBufferOverflow:
-                    stream << "rx buffer overflow";
-                    break;
-                case ackError:
-                    stream << "ack error";
-                    break;
-                case stuffError:
-                    stream << "stuff error";
-                    break;
-                case formError:
-                    stream << "form error";
-                    break;
-                case crcError:
-                    stream << "crc error";
-                    break;
-                case bit0Error:
-                    stream << "bit0 error";
-                    break;
-                case bit1Error:
-                    stream << "bit1 error";
-                    break;
-                default:
-                    stream << "unknown";
-                    break;
-            }
+        const ErrorCounters& ErrorStatistics() const;
+        void ResetErrorStatistics();
 
-            return stream;
-        }
+    protected:
+        void RecordError(CanError error);
+
+    private:
+        ErrorCounters errorCounters;
     };
+
+    infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, CanBusAdapter::CanError error);
 
     template<std::derived_from<hal::Can> Impl>
     class CanBusAdapterImpl
@@ -96,7 +82,7 @@ namespace application
         void SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion) override;
         void ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction) override;
         void SetOnError(const infra::Function<void(CanError)>& handler) override;
-        void InvokeErrorHandler(CanError error) const;
+        void InvokeErrorHandler(CanError error);
 
     private:
         Impl can;
@@ -124,8 +110,10 @@ namespace application
     }
 
     template<std::derived_from<hal::Can> Impl>
-    void CanBusAdapterImpl<Impl>::InvokeErrorHandler(CanError error) const
+    void CanBusAdapterImpl<Impl>::InvokeErrorHandler(CanError error)
     {
+        RecordError(error);
+
         if (onError)
             onError(error);
     }

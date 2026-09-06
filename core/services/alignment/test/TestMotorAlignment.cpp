@@ -1,5 +1,6 @@
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
+#include "infra/timer/test_helper/ClockFixture.hpp"
 #include <array>
 #include <gmock/gmock.h>
 #include <optional>
@@ -17,6 +18,7 @@ namespace
 
     class MotorAlignmentTest
         : public ::testing::Test
+        , public infra::ClockFixture
     {
     public:
         StrictMock<drivers::ThreePhaseInverterMock> driverMock;
@@ -447,4 +449,88 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ContinuesWhileTheInjectedCurrentStaysW
     driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ withinLimit }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
     EXPECT_FALSE(called);
+}
+
+TEST_F(MotorAlignmentTest, AReentrantForceAlignmentRejectsTheNewCallerRatherThanDroppingIt)
+{
+    services::MotorAlignmentImpl::AlignmentConfig config;
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(driverMock, Stop());
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _));
+
+    bool firstFired = false;
+    alignment.ForceAlignment(7, config, [&firstFired](auto)
+        {
+            firstFired = true;
+        });
+
+    bool secondFired = false;
+    std::optional<foc::Radians> secondResult{ foc::Radians{ 1.0f } };
+    alignment.ForceAlignment(7, config, [&](auto offset)
+        {
+            secondFired = true;
+            secondResult = offset;
+        });
+
+    EXPECT_FALSE(firstFired);
+    EXPECT_TRUE(secondFired);
+    EXPECT_FALSE(secondResult.has_value());
+
+}
+
+TEST_F(MotorAlignmentTest, ARunThatNeverReceivesASampleFailsOnTheStepTimeout)
+{
+    services::MotorAlignmentImpl::AlignmentConfig config;
+    config.timeout = std::chrono::milliseconds{ 500 };
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(driverMock, Stop()).Times(2);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _));
+
+    bool fired = false;
+    std::optional<foc::Radians> result{ foc::Radians{ 1.0f } };
+    alignment.ForceAlignment(7, config, [&](auto offset)
+        {
+            fired = true;
+            result = offset;
+        });
+
+    ForwardTime(std::chrono::milliseconds{ 501 });
+
+    EXPECT_TRUE(fired);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST_F(MotorAlignmentTest, TheStepTimeoutDoesNotFireAfterASuccessfulAlignment)
+{
+    services::MotorAlignmentImpl::AlignmentConfig config;
+    config.timeout = std::chrono::milliseconds{ 500 };
+    config.settledCount = 1;
+    config.settledThreshold = foc::Radians{ 1.0f };
+
+    EXPECT_CALL(encoderMock, Read()).WillRepeatedly(Return(foc::Radians{ 0.25f }));
+    EXPECT_CALL(encoderMock, SetZero());
+    EXPECT_CALL(driverMock, Stop()).Times(2);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+
+    std::size_t fired = 0;
+    alignment.ForceAlignment(7, config, [&fired](auto)
+        {
+            ++fired;
+        });
+
+    driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    ASSERT_EQ(1u, fired);
+
+    ForwardTime(std::chrono::milliseconds{ 501 });
+
+    EXPECT_EQ(1u, fired);
 }

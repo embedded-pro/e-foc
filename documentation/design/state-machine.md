@@ -34,7 +34,7 @@ date: 2026-04-10
 - Orchestrating the sequential calibration chain: pole-pair identification → resistance and inductance estimation → alignment → (mechanical parameter identification for speed/position modes) → NVM persistence
 - On successful boot with valid NVM data, automatically loading calibration and transitioning to `Ready` without requiring user action
 - Registering lifecycle commands on the terminal in CLI-driven mode (`calibrate`, `enable`, `disable`, `clear_fault`, `clear_cal`)
-- Intercepting hardware fault notifications from the fault notifier and immediately transitioning to `Fault`, stopping the inverter if it was active
+- Intercepting hardware fault notifications from the fault notifier: stopping the inverter in the delivering context, then transitioning to `Fault` on the event dispatcher (see Fault Safety)
 
 **Is NOT responsible for:**
 - Executing FOC calculations — those remain the responsibility of the control-mode implementation (Torque, Speed, Position)
@@ -56,7 +56,7 @@ The state machine has five named states:
 | `Calibrating` | Calibration sequence in progress; motor is driven by identification services | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop with previously valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (any step fails or hardware fault) |
 | `Ready`       | Calibration data valid and applied; motor can be enabled at any time         | → `Enabled` (CmdEnable), → `Calibrating` (CmdCalibrate re-runs), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                                                           |
 | `Enabled`     | FOC controller active; motor under closed-loop control                       | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                 |
-| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                | → `Idle` (CmdClearFault, up to 3 consecutive times)                                                                                                                                                   |
+| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times                                                                               |
 
 ### State Diagram
 
@@ -83,7 +83,8 @@ stateDiagram-v2
     Enabled --> Idle : CmdEmergencyStop\n(no valid calibration)
     Enabled --> Fault : hardware fault
 
-    Fault --> Idle : CmdClearFault
+    Fault --> Ready : CmdClearFault\n(valid calibration held)
+    Fault --> Idle : CmdClearFault\n(no valid calibration)
 ```
 
 ### Emergency Stop
@@ -98,6 +99,10 @@ The resulting state depends on the state the command was issued from:
 | `Enabled` or `Calibrating` | `Idle`          | No valid calibration data is held, so the motor must be calibrated before enabling |
 | `Idle`, `Ready`            | unchanged       | The machine is already stopped; only the inverter stop is (re)issued               |
 | `Fault`                    | `Fault`         | The fault state is safe and must be cleared explicitly with `CmdClearFault`        |
+
+`CmdClearFault` returns to `Ready` when valid calibration is held and to `Idle` when it is not — it
+does not unconditionally return to `Idle`. Clearing releases the latch, so the following `CmdEnable`
+is accepted rather than refused.
 
 Calibration data is considered valid when the applied record holds a non-zero pole-pair count and a positive
 phase resistance. An aborted calibration run never commits its results — the in-progress values live in
@@ -242,9 +247,11 @@ The policy is enforced for all application targets at once: setting `E_FOC_AUTO_
 
 The calibration sequence extends with a mechanical identification step for speed and position control modes. This step estimates rotor inertia and viscous friction, then computes initial velocity-loop PID gains.
 
-For **speed mode**, the mechanical identification service can be automatically constructed if no external override is provided in `CalibrationServices`.
-
-For **position mode**, `MechanicalParametersIdentification` requires an explicit override supplied via `CalibrationServices.mechIdentOverride`. If no override is provided and position mode is active, the calibration sequence enters `Fault` with `calibrationFailed`. This is a configuration error that must be resolved before calibration can succeed.
+For **both speed and position mode**, the mechanical identification service is constructed by
+`OuterLoopStateMachine::ResolveMechIdent` when no external override is supplied in
+`CalibrationServices`. The two modes share that path; position mode does not require an override and
+does not fail calibration for the lack of one. An override is a test and integration seam, not a
+configuration requirement.
 
 ### Boot-Time NVM Check
 
@@ -378,19 +385,19 @@ sequenceDiagram
 
 ### Provided
 
-| Interface                | Purpose                                                                 | Contract                                                                                                                                                                                                                                                     |
-|--------------------------|-------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `FocStateMachineBase`    | Abstract lifecycle controller — state query and command dispatch        | Constructed once per application; all command methods are safe to call from any state (invalid transitions are silently ignored)                                                                                                                             |
-| `CurrentState()`         | Returns the current `State` variant for inspection                      | Returns a const reference; valid for the lifetime of the state machine                                                                                                                                                                                       |
-| `LastFaultCode()`        | Returns the most recent fault code                                      | Returns `FaultCode::none` until the first fault occurs; afterwards it retains the last fault code, also after the fault is cleared                                                                                                                           |
-| `CmdCalibrate()`         | Requests start of calibration                                           | Only effective from `Idle` or `Ready`; ignored from all other states                                                                                                                                                                                         |
-| `CmdEnable()`            | Requests enabling the FOC controller                                    | Only effective from `Ready`; ignored from all other states                                                                                                                                                                                                   |
-| `CmdDisable()`           | Requests disabling the FOC controller                                   | Only effective from `Enabled`; ignored from all other states                                                                                                                                                                                                 |
-| `CmdClearFault()`        | Clears the fault and returns to `Idle`                                  | Only effective from `Fault`; ignored from all other states                                                                                                                                                                                                   |
-| `CmdClearCalibration()`  | Invalidates NVM calibration and returns to `Idle`                       | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`.                                                                                                                            |
-| `CmdEmergencyStop()`     | Stops PWM immediately and leaves the active states                      | Accepted from every state and always returns `ok`. From `Enabled` or `Calibrating` it goes to `Ready` when calibration data is valid, otherwise to `Idle`. `Idle`, `Ready` and `Fault` are left unchanged. Aborts any pending command with `abortedByFault`. |
-| `HasPendingAsyncWork()`  | Reports whether a service callback capturing the machine is outstanding | True while a command callback is pending, the boot-time NVM check is in flight, or a calibration step is running. Used by `ControlModeStateMachine` to refuse destroying the machine.                                                                        |
-| `ApplyOnlineEstimates()` | Retunes speed and current PID gains from online estimators              | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only.                                                                                                         |
+| Interface                | Purpose                                                                                | Contract                                                                                                                                                                                                                                                     |
+|--------------------------|----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `FocStateMachineBase`    | Abstract lifecycle controller — state query and command dispatch                       | Constructed once per application; all command methods are safe to call from any state (invalid transitions are silently ignored)                                                                                                                             |
+| `CurrentState()`         | Returns the current `State` variant for inspection                                     | Returns a const reference; valid for the lifetime of the state machine                                                                                                                                                                                       |
+| `LastFaultCode()`        | Returns the most recent fault code                                                     | Returns `FaultCode::none` until the first fault occurs; afterwards it retains the last fault code, also after the fault is cleared                                                                                                                           |
+| `CmdCalibrate()`         | Requests start of calibration                                                          | Only effective from `Idle` or `Ready`; ignored from all other states                                                                                                                                                                                         |
+| `CmdEnable()`            | Requests enabling the FOC controller                                                   | Only effective from `Ready`; ignored from all other states                                                                                                                                                                                                   |
+| `CmdDisable()`           | Requests disabling the FOC controller                                                  | Only effective from `Enabled`; ignored from all other states                                                                                                                                                                                                 |
+| `CmdClearFault()`        | Clears the fault and returns to `Ready` if valid calibration is held, otherwise `Idle` | Only effective from `Fault`; ignored from all other states                                                                                                                                                                                                   |
+| `CmdClearCalibration()`  | Invalidates NVM calibration and returns to `Idle`                                      | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`.                                                                                                                            |
+| `CmdEmergencyStop()`     | Stops PWM immediately and leaves the active states                                     | Accepted from every state and always returns `ok`. From `Enabled` or `Calibrating` it goes to `Ready` when calibration data is valid, otherwise to `Idle`. `Idle`, `Ready` and `Fault` are left unchanged. Aborts any pending command with `abortedByFault`. |
+| `HasPendingAsyncWork()`  | Reports whether a service callback capturing the machine is outstanding                | True while a command callback is pending, the boot-time NVM check is in flight, or a calibration step is running. Used by `ControlModeStateMachine` to refuse destroying the machine.                                                                        |
+| `ApplyOnlineEstimates()` | Retunes speed and current PID gains from online estimators                             | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only.                                                                                                         |
 
 ### Required
 

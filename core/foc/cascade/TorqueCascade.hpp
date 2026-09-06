@@ -12,6 +12,8 @@ namespace foc
         : public FocTorque
     {
     public:
+        explicit TorqueCascade(foc::Ampere maxCurrent);
+
         void Configure(const MotorModelParameters& parameters) override;
         void SetPoint(IdAndIqPoint setPoint) override;
         void SetCurrentTunings(const CurrentLoopTunings& tunings) override;
@@ -25,11 +27,13 @@ namespace foc
 
     private:
         float MeasureElectricalSpeed(float mechanicalAngle);
+        IdAndIqPoint LimitToCurrentEnvelope(IdAndIqPoint setPoint) const;
 
         [[no_unique_address]] Park park;
         [[no_unique_address]] Clarke clarke;
         CurrentControllerSelector currentLoop;
         [[no_unique_address]] SpaceVectorModulation spaceVectorModulator;
+        Ampere maxCurrent;
         float polePairs{ 0.0f };
         volatile bool enabled{ false };
         IdAndIqPoint lastSetPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };

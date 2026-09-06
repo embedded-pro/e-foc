@@ -122,6 +122,28 @@ for the requested bandwidth. Bandwidths are bounded below at 1 rad/s: a zero or 
 produces zero or sign-inverted gains, which inverts the sense of the loop's feedback on a motor that
 may be spinning.
 
+### Diagnostics Commands
+
+Three commands expose what the control loop and the CAN bus have been doing. Each of these numbers
+was previously either computed and discarded or never gathered at all.
+
+| Command       | Alias | Reports                                                                                                               |
+|---------------|-------|-----------------------------------------------------------------------------------------------------------------------|
+| `loop_stats`  | `ls`  | Control-interrupt execution: sample count, budget, last/min/average/max cycles, overruns, deadline misses, re-entries |
+| `can_stats`   | `cs`  | CAN error counters, total and per class, printing only the classes that have occurred                                 |
+| `clear_stats` | `xs`  | Resets both sets of counters                                                                                          |
+
+**Overrun versus deadline miss.** The two are distinct and both are reported. An overrun means the
+interrupt exceeded the share of the period it is budgeted — the margin is gone, but the deadline was
+still met. A deadline miss means it exceeded the period itself: the next conversion was already due
+when it finished.
+
+**Re-entry** is the same failure caught as it happens rather than measured afterwards. A conversion
+arriving while the previous interrupt has not returned is recorded directly, which no measured
+duration can reveal.
+
+Counters saturate rather than wrap, so a long run cannot present itself as a healthy one.
+
 ### `TerminalWithBanner` — Decorator
 
 `TerminalWithBanner` wraps any `TerminalWithStorage` instance and intercepts the first connection event. On first connect, it prints a formatted welcome message containing:
