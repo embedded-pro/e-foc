@@ -133,7 +133,7 @@ namespace application
         const auto periodCycles = freq.Value() == 0
                                       ? 0u
                                       : static_cast<uint32_t>(kQemuSystemClockHz / freq.Value());
-        controlLoopMetrics.Configure(periodCycles / 4u * 3u, periodCycles);
+        controlLoopMetrics.Configure(static_cast<uint32_t>(static_cast<uint64_t>(periodCycles) * 3u / 4u), periodCycles);
     }
 
     void PlatformFactoryImpl::SetEncoderResolution(uint32_t)

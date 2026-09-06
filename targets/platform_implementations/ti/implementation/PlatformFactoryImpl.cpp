@@ -157,7 +157,7 @@ namespace application
         const auto periodCycles = baseFrequency.Value() == 0
                                       ? 0u
                                       : static_cast<uint32_t>(SystemCoreClock / baseFrequency.Value());
-        controlLoopMetrics.Configure(periodCycles / 4u * 3u, periodCycles);
+        controlLoopMetrics.Configure(static_cast<uint32_t>(static_cast<uint64_t>(periodCycles) * 3u / 4u), periodCycles);
 
         auto& adcCfg = impl.adcConfig;
         adcCfg.interruptPriority = InterruptPriorities::phaseCurrentAdc;

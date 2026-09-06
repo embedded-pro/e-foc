@@ -1,4 +1,5 @@
 #include "core/services/cli/TerminalDiagnostics.hpp"
+#include <array>
 
 namespace services
 {
