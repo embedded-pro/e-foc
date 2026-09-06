@@ -5,6 +5,7 @@ emil_add_test(e_foc.platform_abstraction_test)
 target_link_libraries(e_foc.platform_abstraction_test PUBLIC
     gmock_main
     e_foc.platform_abstraction
+    can_lite.test_util
 )
 
 target_sources(e_foc.platform_abstraction_test PRIVATE

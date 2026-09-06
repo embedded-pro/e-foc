@@ -1,5 +1,7 @@
+#include "can-lite/core/test/CanMock.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include <gtest/gtest.h>
+#include <optional>
 
 namespace
 {
@@ -50,4 +52,41 @@ TEST_F(TestCanErrorCounters, reset_clears_every_class)
     EXPECT_EQ(0u, counters.Total());
     EXPECT_EQ(0u, counters.Count(CanError::busOff));
     EXPECT_EQ(0u, counters.Count(CanError::ackError));
+}
+
+namespace
+{
+    class TestCanBusAdapterErrorRecording
+        : public ::testing::Test
+    {
+    public:
+        application::CanBusAdapterImpl<::testing::StrictMock<hal::CanMock>> adapter;
+        std::optional<CanError> reported;
+
+        TestCanBusAdapterErrorRecording()
+        {
+            adapter.SetOnError([this](CanError error)
+                {
+                    reported = error;
+                });
+        }
+    };
+}
+
+TEST_F(TestCanBusAdapterErrorRecording, an_error_is_counted_on_the_common_base_and_forwarded)
+{
+    adapter.InvokeErrorHandler(CanError::busOff);
+
+    EXPECT_EQ(1u, adapter.ErrorStatistics().Count(CanError::busOff));
+    EXPECT_EQ(1u, adapter.ErrorStatistics().Total());
+    ASSERT_TRUE(reported.has_value());
+    EXPECT_EQ(CanError::busOff, *reported);
+}
+
+TEST_F(TestCanBusAdapterErrorRecording, resetting_the_statistics_clears_what_the_adapter_recorded)
+{
+    adapter.InvokeErrorHandler(CanError::crcError);
+    adapter.ResetErrorStatistics();
+
+    EXPECT_EQ(0u, adapter.ErrorStatistics().Total());
 }

@@ -37,43 +37,16 @@ namespace application
         class ErrorCounters
         {
         public:
-            void Record(CanError error)
-            {
-                auto& counter = counters.at(IndexOf(error));
-                counter = Increment(counter);
-                total = Increment(total);
-            }
-
-            void Reset()
-            {
-                counters = std::array<uint32_t, errorClasses>{};
-                total = 0;
-            }
-
-            uint32_t Count(CanError error) const
-            {
-                return counters.at(IndexOf(error));
-            }
-
-            uint32_t Total() const
-            {
-                return total;
-            }
+            void Record(CanError error);
+            void Reset();
+            uint32_t Count(CanError error) const;
+            uint32_t Total() const;
 
         private:
             static constexpr uint32_t saturated = 0xFFFFFFFFu;
 
-            static std::size_t IndexOf(CanError error)
-            {
-                const auto index = static_cast<std::size_t>(error);
-
-                return index < errorClasses ? index : errorClasses - 1;
-            }
-
-            static uint32_t Increment(uint32_t counter)
-            {
-                return counter == saturated ? counter : counter + 1;
-            }
+            static std::size_t IndexOf(CanError error);
+            static uint32_t Increment(uint32_t counter);
 
             std::array<uint32_t, errorClasses> counters{};
             uint32_t total{ 0 };
@@ -81,72 +54,17 @@ namespace application
 
         virtual void SetOnError(const infra::Function<void(CanError)>& handler) = 0;
 
-        const ErrorCounters& ErrorStatistics() const
-        {
-            return errorCounters;
-        }
-
-        void ResetErrorStatistics()
-        {
-            errorCounters.Reset();
-        }
+        const ErrorCounters& ErrorStatistics() const;
+        void ResetErrorStatistics();
 
     protected:
-        void RecordError(CanError error)
-        {
-            errorCounters.Record(error);
-        }
+        void RecordError(CanError error);
 
     private:
         ErrorCounters errorCounters;
-
-    public:
-        friend infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, CanError error)
-        {
-            using enum CanError;
-            switch (error)
-            {
-                case busOff:
-                    stream << "bus off";
-                    break;
-                case errorPassive:
-                    stream << "error passive";
-                    break;
-                case errorWarning:
-                    stream << "error warning";
-                    break;
-                case messageLost:
-                    stream << "message lost";
-                    break;
-                case rxBufferOverflow:
-                    stream << "rx buffer overflow";
-                    break;
-                case ackError:
-                    stream << "ack error";
-                    break;
-                case stuffError:
-                    stream << "stuff error";
-                    break;
-                case formError:
-                    stream << "form error";
-                    break;
-                case crcError:
-                    stream << "crc error";
-                    break;
-                case bit0Error:
-                    stream << "bit0 error";
-                    break;
-                case bit1Error:
-                    stream << "bit1 error";
-                    break;
-                default:
-                    stream << "unknown";
-                    break;
-            }
-
-            return stream;
-        }
     };
+
+    infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, CanBusAdapter::CanError error);
 
     template<std::derived_from<hal::Can> Impl>
     class CanBusAdapterImpl

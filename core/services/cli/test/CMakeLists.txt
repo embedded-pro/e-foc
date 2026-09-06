@@ -5,6 +5,7 @@ emil_add_test(e_foc.services.cli_test)
 target_link_libraries(e_foc.services.cli_test PUBLIC
     gmock_main
     e_foc.services.cli
+    e_foc.platform_abstraction_mock
     hal.interfaces_test_doubles
     infra.timer_test_helper
     infra.event_test_helper
@@ -13,6 +14,7 @@ target_link_libraries(e_foc.services.cli_test PUBLIC
 
 target_sources(e_foc.services.cli_test PRIVATE
     TestTerminalBase.cpp
+    TestTerminalDiagnostics.cpp
     TestTerminalPosition.cpp
     TestTerminalSpeed.cpp
     TestTerminalTorque.cpp
