@@ -18,8 +18,10 @@ extern "C"
     extern uint32_t _etext;
     extern uint32_t _estack;
 
-    __attribute__((weak)) void CutPowerStage(void)
-    {}
+    // Defined per platform. Deliberately not weak: a weak fallback in this translation unit is
+    // the definition the linker settles on, because the archive member carrying the real one is
+    // never pulled in - which is how this hook came to be called on every fault and cut nothing.
+    void CutPowerStage(void);
 
     __attribute__((naked)) void HardFault_Handler()
     {

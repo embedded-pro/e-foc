@@ -3,6 +3,7 @@
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <optional>
 
 namespace
 {
@@ -39,7 +40,8 @@ namespace
 
 TEST_F(TestRunner, ConstructionRegistersPhaseCurrentsCallback)
 {
-    EXPECT_CALL(inverterMock, PhaseCurrentsReady(hal::Hertz{ 20000 }, _));
+    // Construction claims the slot; the destructor's Disable() releases it again.
+    EXPECT_CALL(inverterMock, PhaseCurrentsReady(hal::Hertz{ 20000 }, _)).Times(2);
 
     foc::Runner runner{ inverterMock, encoderMock, focMock };
 
@@ -77,13 +79,6 @@ TEST_F(TestRunner, DisableStopsInverterThenFoc)
 
 TEST_F(TestRunner, PhaseCurrentsCallbackReadsEncoderCalculatesFocAndOutputsPwm)
 {
-    EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _))
-        .Times(2)
-        .WillRepeatedly([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
-            {
-                inverterMock.StorePhaseCurrentsCallback(onDone);
-            });
-
     foc::Runner runner{ inverterMock, encoderMock, focMock };
 
     const foc::PhaseCurrents testCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } };
@@ -133,13 +128,6 @@ TEST_F(TestRunner, MultipleEnableDisableCyclesWork)
 
 TEST_F(TestRunner, ALateCallbackAfterDisableDoesNotDriveThePwm)
 {
-    EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _))
-        .Times(2)
-        .WillRepeatedly([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
-            {
-                inverterMock.StorePhaseCurrentsCallback(onDone);
-            });
-
     foc::Runner runner{ inverterMock, encoderMock, focMock };
 
     EXPECT_CALL(focMock, Enable());
@@ -155,12 +143,6 @@ TEST_F(TestRunner, ALateCallbackAfterDisableDoesNotDriveThePwm)
 
 TEST_F(TestRunner, ACallbackBeforeEnableDoesNotDriveThePwm)
 {
-    EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _))
-        .WillOnce([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
-            {
-                inverterMock.StorePhaseCurrentsCallback(onDone);
-            });
-
     foc::Runner runner{ inverterMock, encoderMock, focMock };
 
     EXPECT_CALL(inverterMock, Stop());
@@ -182,6 +164,83 @@ TEST_F(TestRunner, PhaseCurrentsAreDispatchedToTheControlLaw)
     EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
 
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
+
+    EXPECT_CALL(inverterMock, Stop());
+    EXPECT_CALL(focMock, Disable());
+}
+
+TEST_F(TestRunner, DisableReleasesThePhaseCurrentsSlot)
+{
+    foc::Runner runner{ inverterMock, encoderMock, focMock };
+
+    EXPECT_CALL(focMock, Enable());
+    EXPECT_CALL(inverterMock, Start());
+    runner.Enable();
+
+    EXPECT_CALL(inverterMock, Stop()).Times(2);
+    EXPECT_CALL(focMock, Disable()).Times(2);
+    runner.Disable();
+
+    // A callback left pointing here writes duty cycles on the next conversion, and
+    // ThreePhasePwmOutput re-arms the peripheral Stop() just disabled.
+    inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
+}
+
+TEST_F(TestRunner, RegisteredObserverSeesThePhaseCurrentsAfterTheDutiesAreWritten)
+{
+    foc::Runner runner{ inverterMock, encoderMock, focMock };
+
+    EXPECT_CALL(focMock, Enable());
+    EXPECT_CALL(inverterMock, Start());
+    runner.Enable();
+
+    bool dutiesWritten = false;
+    std::optional<foc::PhaseCurrents> observed;
+
+    runner.RegisterPhaseCurrentsObserver([&](const foc::PhaseCurrents& currents)
+        {
+            EXPECT_TRUE(dutiesWritten);
+            observed = currents;
+        });
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } }));
+    EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_)).WillOnce([&](const foc::PhasePwmDutyCycles&)
+        {
+            dutiesWritten = true;
+        });
+
+    inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
+
+    ASSERT_TRUE(observed.has_value());
+    EXPECT_FLOAT_EQ(1.0f, observed->a.Value());
+
+    EXPECT_CALL(inverterMock, Stop());
+    EXPECT_CALL(focMock, Disable());
+}
+
+TEST_F(TestRunner, UnregisteredObserverIsNotCalled)
+{
+    foc::Runner runner{ inverterMock, encoderMock, focMock };
+
+    EXPECT_CALL(focMock, Enable());
+    EXPECT_CALL(inverterMock, Start());
+    runner.Enable();
+
+    bool observed = false;
+    runner.RegisterPhaseCurrentsObserver([&](const foc::PhaseCurrents&)
+        {
+            observed = true;
+        });
+    runner.UnregisterPhaseCurrentsObserver();
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } }));
+    EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
+
+    inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
+
+    EXPECT_FALSE(observed);
 
     EXPECT_CALL(inverterMock, Stop());
     EXPECT_CALL(focMock, Disable());

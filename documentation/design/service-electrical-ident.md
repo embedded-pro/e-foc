@@ -74,12 +74,26 @@ resistance test in particular holds a DC duty for seconds.
 
 Each procedure therefore registers a phase-current callback that checks every sample against
 `ThreePhaseInverter::MaxCurrentSupported()` and aborts immediately if any phase exceeds it — stopping
-the inverter, cancelling the step timer, unregistering the callback, and reporting failure through the
-procedure's normal failure path. Previously the pole-pairs and resistance procedures registered an
+the inverter, cancelling the step timer, and reporting failure through the procedure's normal failure
+path. Previously the pole-pairs and resistance procedures registered an
 empty callback and discarded the samples, leaving hardware comparators (present on some boards, absent
 on others) as the only backstop. `MotorAlignment` applies the same check.
 
 The limit is a per-sample abort, not regulation: it stops a runaway, it does not hold a setpoint.
+
+### Ending a procedure
+
+A procedure that has finished, failed or been aborted does **not** reclaim the inverter's phase-current
+callback slot. Reassigning that slot from inside its own invocation destroys the closure being executed, and
+every one of these procedures fails from inside that callback. Instead each procedure is gated on its own
+pending completion, and a sample that arrives after the procedure ended is discarded before it reaches
+anything. This matters most for the inductance injection, whose callback writes duty cycles on every sample:
+ungated, it would re-arm the peripheral that the abort had just stopped.
+
+`Abort()` is the caller-facing form of the same shutdown. It stops injection, cancels the timers, and drops
+the pending completion **without invoking it** — the caller that aborted owns the outcome, so a fault raised
+by the state machine cannot be overwritten by the result of the procedure it interrupted. It covers whichever
+stage is live: resistance, inductance injection, or the pole-pairs sweep.
 
 ### ResistanceEstimator
 

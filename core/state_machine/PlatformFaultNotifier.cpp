@@ -30,6 +30,11 @@ namespace state_machine
             });
     }
 
+    void PlatformFaultNotifier::Unregister()
+    {
+        onFault = nullptr;
+    }
+
     void PlatformFaultNotifier::RegisterSecondary(const infra::Function<void(FaultCode)>& onFault)
     {
         this->onFaultSecondary = onFault;

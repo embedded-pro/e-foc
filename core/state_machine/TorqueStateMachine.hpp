@@ -15,6 +15,7 @@ namespace application
             const CalibrationServices& calibServices,
             state_machine::FaultNotifier& faultNotifier,
             state_machine::TransitionPolicy transitionPolicy);
+        ~TorqueStateMachine() override;
 
         foc::FocTorque& GetController();
         const foc::FocTorque& GetController() const;

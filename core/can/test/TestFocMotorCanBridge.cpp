@@ -132,14 +132,20 @@ namespace
         {
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .Times(AnyNumber())
-                .WillRepeatedly(Invoke([](infra::Function<void(bool)> done) { done(false); }));
+                .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)
+                    {
+                        done(false);
+                    }));
         }
 
         void GivenNvmHoldsValidCalibration()
         {
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .Times(AnyNumber())
-                .WillRepeatedly(Invoke([](infra::Function<void(bool)> done) { done(true); }));
+                .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)
+                    {
+                        done(true);
+                    }));
             EXPECT_CALL(nvmMock, LoadCalibration(_, _))
                 .Times(AnyNumber())
                 .WillRepeatedly(Invoke([](services::CalibrationData& data, infra::Function<void(services::NvmStatus)> done)
@@ -228,6 +234,15 @@ namespace
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<services::MechanicalParametersIdentificationMock> mechIdentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
+        // A fault, an emergency stop and the destructor each release the calibration services and
+        // the fault registration; the tests that assert on those set their own expectations.
+        infra::Execute setupTeardownExpectations{ [this]()
+            {
+                EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(mechIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
+            } };
 
         StrictMock<hal::CanMock> canMock;
         services::CanFrameTransport canTransport{ canMock, 1 };
@@ -506,13 +521,13 @@ namespace
 
         EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
             .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
-                               infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+                                 infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
                 {
                     done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
                 }));
         EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
             .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
-                               infra::Function<void(std::optional<std::size_t>)> done)
+                                 infra::Function<void(std::optional<std::size_t>)> done)
                 {
                     done(std::size_t{ 4 });
                 }));
@@ -532,7 +547,7 @@ namespace
 
         EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
             .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
-                               infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+                                 infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
                 {
                     done(services::ElectricalParametersIdentification::ResistanceInductanceResult{});
                 }));
@@ -550,9 +565,10 @@ namespace
 
         EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
             .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t,
-                               const services::MechanicalParametersIdentification::Config&,
-                               infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
-                                   std::optional<foc::NewtonMeterSecondSquared>)> done)
+                                 const services::MechanicalParametersIdentification::Config&,
+                                 infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
+                                     std::optional<foc::NewtonMeterSecondSquared>)>
+                                     done)
                 {
                     done(foc::NewtonMeterSecondPerRadian{ 0.001f }, foc::NewtonMeterSecondSquared{ 0.002f });
                 }));
@@ -797,13 +813,13 @@ namespace
 
         EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
             .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
-                               infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+                                 infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
                 {
                     done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
                 }));
         EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
             .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
-                               infra::Function<void(std::optional<std::size_t>)> done)
+                                 infra::Function<void(std::optional<std::size_t>)> done)
                 {
                     done(std::nullopt);
                 }));
@@ -822,7 +838,7 @@ namespace
         infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> capturedCallback;
         EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
             .WillOnce(Invoke([&capturedCallback](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
-                               infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+                                 infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
                 {
                     capturedCallback = done;
                 }));
@@ -843,9 +859,10 @@ namespace
         infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)> capturedCallback;
         EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
             .WillOnce(Invoke([&capturedCallback](const foc::NewtonMeter&, std::size_t,
-                               const services::MechanicalParametersIdentification::Config&,
-                               infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
-                                   std::optional<foc::NewtonMeterSecondSquared>)> done)
+                                 const services::MechanicalParametersIdentification::Config&,
+                                 infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
+                                     std::optional<foc::NewtonMeterSecondSquared>)>
+                                     done)
                 {
                     capturedCallback = done;
                 }));
@@ -887,11 +904,13 @@ namespace
                     capturedNvmCallback = done;
                 }));
 
-        motorServer->HandleMessage(can::focSetEncoderResolutionId, []{
-            hal::Can::Message d; d.resize(5, 0);
-            services::CanFrameCodec::WriteUInt32(d, 1, 4000);
-            return d;
-        }());
+        motorServer->HandleMessage(can::focSetEncoderResolutionId, []
+            {
+                hal::Can::Message d;
+                d.resize(5, 0);
+                services::CanFrameCodec::WriteUInt32(d, 1, 4000);
+                return d;
+            }());
 
         ResetCaptures();
         DispatchUInt32Command(can::focSetEncoderResolutionId, 8000);
@@ -997,11 +1016,13 @@ namespace
                     capturedNvmCallback = done;
                 }));
 
-        motorServer->HandleMessage(can::focConfigureTelemetryRateId, []{
-            hal::Can::Message d; d.resize(5, 0);
-            services::CanFrameCodec::WriteUInt32(d, 1, 100);
-            return d;
-        }());
+        motorServer->HandleMessage(can::focConfigureTelemetryRateId, []
+            {
+                hal::Can::Message d;
+                d.resize(5, 0);
+                services::CanFrameCodec::WriteUInt32(d, 1, 100);
+                return d;
+            }());
 
         ResetCaptures();
         DispatchUInt32Command(can::focConfigureTelemetryRateId, 200);
@@ -1047,7 +1068,10 @@ namespace
     {
         EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AtLeast(1));
         EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-            .WillRepeatedly(Invoke([](infra::Function<void(bool)> done) { done(false); }));
+            .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)
+                {
+                    done(false);
+                }));
 
         services::ConfigData config{};
         coordinator.emplace(
@@ -1074,9 +1098,10 @@ namespace
 
         EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
             .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t,
-                               const services::MechanicalParametersIdentification::Config&,
-                               infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
-                                   std::optional<foc::NewtonMeterSecondSquared>)> done)
+                                 const services::MechanicalParametersIdentification::Config&,
+                                 infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
+                                     std::optional<foc::NewtonMeterSecondSquared>)>
+                                     done)
                 {
                     done(std::nullopt, std::nullopt);
                 }));

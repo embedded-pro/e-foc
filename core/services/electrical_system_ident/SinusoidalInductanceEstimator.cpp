@@ -68,8 +68,23 @@ namespace services
             });
     }
 
+    void SinusoidalInductanceEstimator::Abort()
+    {
+        if (!onDone)
+            return;
+
+        driver.Stop();
+        onDone = nullptr;
+    }
+
     void SinusoidalInductanceEstimator::OnCurrentSample(foc::PhaseCurrents currents)
     {
+        // Gated on the pending completion rather than reclaiming the slot: this callback writes
+        // duty cycles on every sample, so an aborted run left ungated would re-arm the peripheral
+        // Stop() just disabled. Reclaiming the slot here would destroy the closure being executed.
+        if (!onDone)
+            return;
+
         const float vNorm = injectionAmplitude * math::Sin(injectionPhase);
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ vNorm, 0.0f }, 1.0f, 0.0f)));

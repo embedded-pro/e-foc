@@ -448,3 +448,37 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ContinuesWhileTheInjectedCurrentStaysW
 
     EXPECT_FALSE(called);
 }
+
+TEST_F(MotorAlignmentTest, AbortStopsTheDriverAndDropsTheCompletion)
+{
+    services::MotorAlignmentImpl::AlignmentConfig config;
+    bool fired = false;
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(driverMock, Stop());
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+
+    alignment.ForceAlignment(7, config, [&fired](auto)
+        {
+            fired = true;
+        });
+
+    EXPECT_CALL(driverMock, Stop());
+    alignment.Abort();
+
+    EXPECT_FALSE(fired);
+
+    // A sample arriving after the abort must reach nothing that could re-arm the bridge.
+    driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    EXPECT_FALSE(fired);
+}
+
+TEST_F(MotorAlignmentTest, AbortWithoutARunInFlightIsANoOp)
+{
+    alignment.Abort();
+}

@@ -48,5 +48,9 @@ namespace services
 
         virtual void EstimateResistanceAndInductance(const ResistanceAndInductanceConfig& config, const infra::Function<void(ResistanceInductanceResult)>& onDone) = 0;
         virtual void EstimateNumberOfPolePairs(const PolePairsConfig& config, const infra::Function<void(std::optional<std::size_t>)>& onDone) = 0;
+
+        // Stops injection and drops the pending completion without invoking it: the caller that
+        // aborts owns the outcome, and a fault must not be overwritten by a late calibration result.
+        virtual void Abort() = 0;
     };
 }

@@ -30,9 +30,12 @@ namespace services
 
         void Start(const Config& config, const infra::Function<void(Result)>& onDone);
 
+        // Stops injection and drops the pending completion without invoking it.
+        void Abort();
+
     private:
         void OnMeasurementComplete();
-        void Abort();
+        void FailMeasurement();
 
         static constexpr uint8_t neutralDuty = 1;
         static constexpr float wyeTerminalFactor = 1.5f;

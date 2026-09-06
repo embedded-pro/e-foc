@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
@@ -14,15 +15,19 @@ namespace services
         : public MechanicalParametersIdentification
     {
     public:
-        MechanicalParametersIdentificationImpl(foc::SpeedCommandable& controller, drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder);
+        MechanicalParametersIdentificationImpl(foc::SpeedCommandable& controller, foc::Controllable& drive, foc::PhaseCurrentsObservable& observable, drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder);
 
         void EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone) override;
+        void Abort() override;
 
     private:
-        void OnSamplingUpdate(foc::PhaseCurrents currentPhases, const foc::NewtonMeter& torqueConstant);
+        void OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant);
+        void ReleaseDrive();
+        void Complete(std::optional<foc::NewtonMeterSecondPerRadian> friction, std::optional<foc::NewtonMeterSecondSquared> inertia);
 
         foc::SpeedCommandable& controller;
-        drivers::ThreePhaseInverter& driver;
+        foc::Controllable& drive;
+        foc::PhaseCurrentsObservable& observable;
         drivers::Encoder& encoder;
 
         float samplingPeriod;
@@ -39,5 +44,6 @@ namespace services
         infra::TimerSingleShot timeoutTimer;
         MotorRLS::InputMatrix regressor;
         math::Matrix<float, 1, 1> torque;
+        volatile bool converged{ false };
     };
 }

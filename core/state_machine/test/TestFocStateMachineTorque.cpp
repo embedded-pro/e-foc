@@ -36,6 +36,14 @@ namespace
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
+        // A fault, an emergency stop and the destructor each release the calibration services and
+        // the fault registration; the tests that assert on those set their own expectations.
+        infra::Execute setupTeardownExpectations{ [this]()
+            {
+                EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
+            } };
 
         foc::Volts vdc{ 24.0f };
 
@@ -515,7 +523,9 @@ TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_fault_with_valid_calibrati
     GivenNvmValid();
     auto sm = CreateStateMachine();
 
-    EXPECT_CALL(inverterMock, Stop()).Times(1);
+    // Once from the interrupt path, which cuts the bridge without consulting the state, and once
+    // from the destructor.
+    EXPECT_CALL(inverterMock, Stop()).Times(2);
     faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
     sm.CmdClearFault();
 
@@ -958,6 +968,14 @@ namespace
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
+        // A fault, an emergency stop and the destructor each release the calibration services and
+        // the fault registration; the tests that assert on those set their own expectations.
+        infra::Execute setupTeardownExpectations{ [this]()
+            {
+                EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
+            } };
 
         foc::Volts vdc{ 24.0f };
 
@@ -2171,4 +2189,73 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_late_callback_when_no_pend
     // Late NVM callback should be ignored (pendingCommandCallback is null)
     capturedCb(services::NvmStatus::Ok);
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+namespace
+{
+    TEST_F(FocStateMachineTorqueCliTest, a_fault_during_calibration_aborts_the_identification_services)
+    {
+        GivenFaultNotifierRegistered();
+        GivenNvmInvalid();
+
+        EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _));
+
+        auto sm = CreateStateMachine();
+        sm.CmdCalibrate([](state_machine::CommandResult) {});
+        ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+        // A service left running keeps its timer and its phase-current callback, and the next tick
+        // writes duty cycles again - which re-arms the PWM the stop just disabled.
+        EXPECT_CALL(electricalIdentMock, Abort()).Times(AtLeast(1)).RetiresOnSaturation();
+        EXPECT_CALL(alignmentMock, Abort()).Times(AtLeast(1)).RetiresOnSaturation();
+
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+
+        ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    }
+
+    TEST_F(FocStateMachineTorqueCliTest, an_emergency_stop_during_calibration_aborts_the_identification_services)
+    {
+        GivenFaultNotifierRegistered();
+        GivenNvmInvalid();
+
+        EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _));
+
+        auto sm = CreateStateMachine();
+        sm.CmdCalibrate([](state_machine::CommandResult) {});
+        ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+        EXPECT_CALL(electricalIdentMock, Abort()).Times(AtLeast(1)).RetiresOnSaturation();
+        EXPECT_CALL(alignmentMock, Abort()).Times(AtLeast(1)).RetiresOnSaturation();
+
+        sm.CmdEmergencyStop();
+
+        EXPECT_FALSE(sm.HasPendingAsyncWork());
+    }
+
+    TEST_F(FocStateMachineTorqueCliTest, destruction_releases_the_fault_registration_and_the_services)
+    {
+        GivenFaultNotifierRegistered();
+        GivenNvmValid();
+
+        {
+            auto sm = CreateStateMachine();
+
+            // A mode switch destroys one state machine and constructs the next in the same variant,
+            // while the notifier and the services outlive both. A registration or a pending
+            // identification callback left behind here is invoked against freed storage.
+            EXPECT_CALL(electricalIdentMock, Abort()).Times(AtLeast(1)).RetiresOnSaturation();
+            EXPECT_CALL(alignmentMock, Abort()).Times(AtLeast(1)).RetiresOnSaturation();
+            EXPECT_CALL(faultNotifierMock, Unregister())
+                .Times(AtLeast(1))
+                .WillRepeatedly(Invoke([this]()
+                    {
+                        faultNotifierMock.ReleaseHandler();
+                    }))
+                .RetiresOnSaturation();
+        }
+
+        // Nothing is left to call into the destroyed state machine.
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    }
 }

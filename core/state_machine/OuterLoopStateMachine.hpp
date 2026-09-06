@@ -36,6 +36,7 @@ namespace application
         void PrepareForEnabled() override;
         void RegisterModeSpecificCli(services::TerminalWithStorage& terminal) override;
         void RunPostAlignmentStep() override;
+        void AbortModeSpecificServices() override;
 
         void RunMechanicalIdentStep();
 
@@ -43,6 +44,8 @@ namespace application
             const CalibrationServices& calibServices,
             std::optional<services::MechanicalParametersIdentificationImpl>& ownMechIdent,
             foc::SpeedCommandable& speedCommandable,
+            foc::Controllable& drive,
+            foc::PhaseCurrentsObservable& observable,
             drivers::ThreePhaseInverter& inverter,
             drivers::Encoder& encoder);
 

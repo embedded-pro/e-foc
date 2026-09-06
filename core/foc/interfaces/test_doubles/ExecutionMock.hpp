@@ -37,4 +37,44 @@ namespace foc
     private:
         infra::Function<void()> storedHandler;
     };
+
+    class ControllableMock
+        : public Controllable
+    {
+    public:
+        MOCK_METHOD(void, Start, (), (override));
+        MOCK_METHOD(void, Stop, (), (override));
+    };
+
+    class PhaseCurrentsObservableMock
+        : public PhaseCurrentsObservable
+    {
+    public:
+        MOCK_METHOD(void, RegisterPhaseCurrentsObserver, (const infra::Function<void(const PhaseCurrents& currentPhases)>& observer), (override));
+        MOCK_METHOD(void, UnregisterPhaseCurrentsObserver, (), (override));
+
+        void StoreObserver(const infra::Function<void(const PhaseCurrents& currentPhases)>& observer)
+        {
+            storedObserver = observer;
+        }
+
+        void ReleaseObserver()
+        {
+            storedObserver = nullptr;
+        }
+
+        void Publish(const PhaseCurrents& currentPhases)
+        {
+            if (storedObserver != nullptr)
+                storedObserver(currentPhases);
+        }
+
+        bool HasObserver() const
+        {
+            return storedObserver != nullptr;
+        }
+
+    private:
+        infra::Function<void(const PhaseCurrents& currentPhases)> storedObserver;
+    };
 }

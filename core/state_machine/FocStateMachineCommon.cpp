@@ -1,4 +1,5 @@
 #include "core/state_machine/FocStateMachineCommon.hpp"
+#include "infra/event/EventDispatcher.hpp"
 #include <bit>
 #include <numbers>
 
@@ -21,11 +22,43 @@ namespace application
 
     void FocStateMachineCommon::RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier)
     {
+        registeredFaultNotifier = &faultNotifier;
+
         faultNotifier.Register([this](state_machine::FaultCode code)
             {
-                EnterFault(code);
+                // This runs in the PWM fault interrupt. Cutting the bridge is the only part that
+                // cannot wait; the trace, the multi-word state write that the CLI and CAN read
+                // concurrently, and the non-volatile memory the completion reaches are none of them
+                // interrupt-safe, so the transition itself is handed to the dispatcher.
+                GetFocControl().Stop();
+
+                infra::EventDispatcher::Instance().Schedule([this, code]()
+                    {
+                        EnterFault(code);
+                    });
             });
     }
+
+    void FocStateMachineCommon::ReleaseExternalResources()
+    {
+        AbortCalibrationServices();
+
+        if (registeredFaultNotifier != nullptr)
+        {
+            registeredFaultNotifier->Unregister();
+            registeredFaultNotifier = nullptr;
+        }
+    }
+
+    void FocStateMachineCommon::AbortCalibrationServices()
+    {
+        electricalIdent.Abort();
+        motorAlignment.Abort();
+        AbortModeSpecificServices();
+    }
+
+    void FocStateMachineCommon::AbortModeSpecificServices()
+    {}
 
     void FocStateMachineCommon::RegisterCliIfNeeded(state_machine::TransitionPolicy transitionPolicy)
     {
@@ -162,6 +195,7 @@ namespace application
         const bool wasActive = std::holds_alternative<state_machine::Enabled>(currentState) ||
                                std::holds_alternative<state_machine::Calibrating>(currentState);
 
+        AbortCalibrationServices();
         CompletePendingCommand(state_machine::CommandResult::abortedByFault);
 
         if (std::holds_alternative<state_machine::Fault>(currentState))
@@ -228,13 +262,22 @@ namespace application
     {
         tracer.Trace() << "[SM] Entering Fault";
 
-        if (std::holds_alternative<state_machine::Enabled>(currentState) ||
-            std::holds_alternative<state_machine::Calibrating>(currentState))
-            GetFocControl().Stop();
+        const bool wasActive = std::holds_alternative<state_machine::Enabled>(currentState) ||
+                               std::holds_alternative<state_machine::Calibrating>(currentState);
 
+        // Committed before the stop so a fault raised inside it sees Fault rather than the state
+        // being left behind, and so a late calibration completion cannot find itself in Calibrating.
         lastFaultCode = code;
         currentState = state_machine::Fault{ code };
         faultLatched = true;
+
+        if (wasActive)
+            GetFocControl().Stop();
+
+        // Without this the identification service keeps its timer and its phase-current callback,
+        // and the next tick writes duty cycles again - which re-arms the PWM the stop just disabled.
+        AbortCalibrationServices();
+
         CompletePendingCommand(state_machine::CommandResult::abortedByFault);
     }
 

@@ -15,6 +15,7 @@ namespace foc
     class FocController
         : public FocImpl
         , public Controllable
+        , public PhaseCurrentsObservable
     {
     public:
         template<typename... Args>
@@ -31,6 +32,16 @@ namespace foc
         void Stop() override
         {
             runner.Disable();
+        }
+
+        void RegisterPhaseCurrentsObserver(const infra::Function<void(const PhaseCurrents& currentPhases)>& observer) override
+        {
+            runner.RegisterPhaseCurrentsObserver(observer);
+        }
+
+        void UnregisterPhaseCurrentsObserver() override
+        {
+            runner.UnregisterPhaseCurrentsObserver();
         }
 
     private:

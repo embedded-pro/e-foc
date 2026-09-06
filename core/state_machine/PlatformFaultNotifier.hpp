@@ -12,6 +12,7 @@ namespace state_machine
         explicit PlatformFaultNotifier(application::PlatformFactory& platform);
 
         void Register(const infra::Function<void(FaultCode)>& onFault) override;
+        void Unregister() override;
         void RegisterSecondary(const infra::Function<void(FaultCode)>& onFault);
 
     private:

@@ -22,5 +22,9 @@ namespace services
         };
 
         virtual void ForceAlignment(std::size_t polePairs, const AlignmentConfig& config, const infra::Function<void(std::optional<foc::Radians>)>& onDone) = 0;
+
+        // Stops the alignment voltage and drops the pending completion without invoking it: the
+        // caller that aborts owns the outcome, and a fault must not be overwritten by a late result.
+        virtual void Abort() = 0;
     };
 }

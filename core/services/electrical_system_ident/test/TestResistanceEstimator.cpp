@@ -47,7 +47,10 @@ TEST_F(ResistanceEstimatorTest, registers_sampling_callback_after_settle_time)
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .Times(2)
-        .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(foc::PhasePwmDutyCycles{
                                 hal::Percent{ 20 }, hal::Percent{ 1 }, hal::Percent{ 1 } })));
 
@@ -69,10 +72,16 @@ TEST_F(ResistanceEstimatorTest, recovers_resistance_from_settled_current)
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .Times(2)
-        .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
 
-    estimator.Start(config, [&result](auto r) { result = r; });
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
     ForwardTime(std::chrono::milliseconds{ 50 });
 
     EXPECT_CALL(driverMock, Stop());
@@ -95,10 +104,16 @@ TEST_F(ResistanceEstimatorTest, returns_no_resistance_for_zero_current)
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .Times(2)
-        .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
 
-    estimator.Start(config, [&result](auto r) { result = r; });
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
     ForwardTime(std::chrono::milliseconds{ 50 });
 
     EXPECT_CALL(driverMock, Stop());
@@ -118,12 +133,13 @@ TEST_F(ResistanceEstimatorTest, an_overcurrent_sample_while_settling_aborts_with
 
     std::optional<services::ResistanceEstimator::Result> result;
 
+    // The slot stays claimed - reassigning it from inside its own invocation destroys the closure
+    // being executed - and the run is gated on the pending completion instead.
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .WillOnce([this](auto, const auto& cb)
             {
                 driverMock.StorePhaseCurrentsCallback(cb);
-            })
-        .WillOnce(Return());
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
     EXPECT_CALL(driverMock, Stop());
 
@@ -169,13 +185,17 @@ TEST_F(ResistanceEstimatorTest, an_overcurrent_sample_while_measuring_aborts_wit
     ForwardTime(std::chrono::milliseconds{ 50 });
 
     EXPECT_CALL(driverMock, Stop());
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _));
 
     driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
         foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->resistance.has_value());
+
+    // A sample arriving after the abort must reach nothing: the estimator is done, and the
+    // measurement callback would otherwise keep filling the sample buffer.
+    driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+        foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 }
 
 TEST_F(ResistanceEstimatorTest, recovers_resistance_for_low_resistance_motor)
@@ -192,10 +212,16 @@ TEST_F(ResistanceEstimatorTest, recovers_resistance_for_low_resistance_motor)
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .Times(2)
-        .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
 
-    estimator.Start(config, [&result](auto r) { result = r; });
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
     ForwardTime(std::chrono::milliseconds{ 50 });
 
     EXPECT_CALL(driverMock, Stop());

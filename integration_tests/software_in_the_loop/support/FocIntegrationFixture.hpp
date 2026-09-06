@@ -85,6 +85,15 @@ namespace sil
         testing::StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         testing::StrictMock<services::MotorAlignmentMock> alignmentMock;
         testing::StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
+        // A fault, an emergency stop and the destructor each release the calibration services and
+        // the fault registration; the scenarios that assert on those set their own expectations.
+        infra::Execute setupTeardownExpectations{ [this]()
+            {
+                using namespace testing;
+                EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
+            } };
 
         std::optional<TorqueStateMachine> motorStateMachine;
 

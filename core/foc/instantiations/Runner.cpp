@@ -32,7 +32,24 @@ namespace foc
     {
         enabled = false;
         inverter.Stop();
+        // Releasing the slot is what keeps a stopped drive stopped: a callback left pointing here
+        // writes duty cycles on the next conversion, and ThreePhasePwmOutput re-arms the peripheral
+        // Stop() just disabled. Safe against the ADC interrupt because the only other context that
+        // reaches this - the PWM fault interrupt - shares its priority and so cannot preempt it.
+        ReleasePhaseCurrents();
         foc.Disable();
+    }
+
+    void Runner::RegisterPhaseCurrentsObserver(const infra::Function<void(const PhaseCurrents& currentPhases)>& observer)
+    {
+        phaseCurrentsObserver = observer;
+        observerRegistered = true;
+    }
+
+    void Runner::UnregisterPhaseCurrentsObserver()
+    {
+        observerRegistered = false;
+        phaseCurrentsObserver = nullptr;
     }
 
     void Runner::RegisterPhaseCurrents()
@@ -43,6 +60,11 @@ namespace foc
             });
     }
 
+    void Runner::ReleasePhaseCurrents()
+    {
+        inverter.PhaseCurrentsReady(inverter.BaseFrequency(), [](auto) {});
+    }
+
     OPTIMIZE_FOR_SPEED
     void Runner::OnPhaseCurrents(const PhaseCurrents& currentPhases)
     {
@@ -51,5 +73,8 @@ namespace foc
 
         auto position = encoder.Read();
         inverter.ThreePhasePwmOutput(foc.Calculate(currentPhases, position));
+
+        if (observerRegistered)
+            phaseCurrentsObserver(currentPhases);
     }
 }

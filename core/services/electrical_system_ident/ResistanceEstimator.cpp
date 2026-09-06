@@ -40,8 +40,11 @@ namespace services
         // Apply test voltage immediately so the settle timer gives current time to reach V/R.
         driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
             {
+                if (!this->onDone)
+                    return;
+
                 if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
-                    Abort();
+                    FailMeasurement();
             });
         driver.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{
             hal::Percent{ config.testVoltagePercent.Value() },
@@ -52,9 +55,15 @@ namespace services
             {
                 driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
                     {
+                        // Gated on the pending completion rather than reclaiming the slot:
+                        // reassigning it from inside its own invocation destroys the closure
+                        // being executed, and an aborted run must reach nothing further.
+                        if (!this->onDone)
+                            return;
+
                         if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
                         {
-                            Abort();
+                            FailMeasurement();
                             return;
                         }
 
@@ -71,9 +80,18 @@ namespace services
 
     void ResistanceEstimator::Abort()
     {
+        if (!onDone)
+            return;
+
         settleTimer.Cancel();
         driver.Stop();
-        driver.PhaseCurrentsReady(samplingFrequency, [](auto) {});
+        onDone = nullptr;
+    }
+
+    void ResistanceEstimator::FailMeasurement()
+    {
+        settleTimer.Cancel();
+        driver.Stop();
 
         if (onDone)
             onDone(Result{});

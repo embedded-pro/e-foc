@@ -44,6 +44,13 @@ namespace
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         StrictMock<services::MotorAlignmentMock> alignmentMock;
+        // A fault, an emergency stop and the destructor each release the calibration services and
+        // the fault registration; the tests that assert on those set their own expectations.
+        infra::Execute setupTeardownExpectations{ [this]()
+            {
+                EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
+            } };
 
         foc::Volts vdc{ 24.0f };
 
@@ -113,10 +120,32 @@ TEST_F(TestPlatformFaultNotifier, board_protection_from_enabled_stops_inverter_a
 
     EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
     platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+    ExecuteAllActions();
 
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
     EXPECT_EQ(std::get<state_machine::Fault>(sm.CurrentState()).code, state_machine::FaultCode::overcurrent);
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
+}
+
+TEST_F(TestPlatformFaultNotifier, board_protection_cuts_the_bridge_in_the_interrupt_and_defers_the_transition)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(platformFactory, Start()).Times(1);
+    sm.CmdEnable();
+
+    // The notifier's primary path runs in the PWM fault interrupt. The bridge has to be cut there;
+    // the trace, the multi-word state write and the non-volatile memory the completion reaches are
+    // none of them interrupt-safe, so the transition itself waits for the dispatcher.
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+
+    EXPECT_FALSE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    ExecuteAllActions();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
 TEST_F(TestPlatformFaultNotifier, over_voltage_maps_to_overvoltage_fault_code)
@@ -125,6 +154,7 @@ TEST_F(TestPlatformFaultNotifier, over_voltage_maps_to_overvoltage_fault_code)
     auto sm = CreateStateMachine();
 
     platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overVoltage);
+    ExecuteAllActions();
 
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overvoltage);
 }
@@ -135,6 +165,7 @@ TEST_F(TestPlatformFaultNotifier, over_temperature_maps_to_overtemperature_fault
     auto sm = CreateStateMachine();
 
     platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overTemperature);
+    ExecuteAllActions();
 
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overtemperature);
 }
@@ -159,6 +190,7 @@ TEST_F(TestPlatformFaultNotifier, can_bus_off_error_raises_hardware_fault)
 
     EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
     storedCanErrorHandler(application::CanBusAdapter::CanError::busOff);
+    ExecuteAllActions();
 
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
     EXPECT_EQ(std::get<state_machine::Fault>(sm.CurrentState()).code, state_machine::FaultCode::hardwareFault);
@@ -170,6 +202,7 @@ TEST_F(TestPlatformFaultNotifier, can_non_bus_off_error_does_not_raise_fault)
     auto sm = CreateStateMachine();
 
     storedCanErrorHandler(application::CanBusAdapter::CanError::messageLost);
+    ExecuteAllActions();
 
     EXPECT_FALSE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
@@ -189,6 +222,7 @@ TEST_F(TestPlatformFaultNotifier, unknown_board_protection_reason_maps_to_hardwa
 
     EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
     platformFactory.RaiseBoardProtection(static_cast<application::PlatformFactory::BoardProtectionReason>(99));
+    ExecuteAllActions();
 
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
     EXPECT_EQ(std::get<state_machine::Fault>(sm.CurrentState()).code, state_machine::FaultCode::hardwareFault);

@@ -54,6 +54,15 @@ namespace
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<services::MechanicalParametersIdentificationMock> mechIdentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
+        // A fault, an emergency stop and the destructor each release the calibration services and
+        // the fault registration; the tests that assert on those set their own expectations.
+        infra::Execute setupTeardownExpectations{ [this]()
+            {
+                EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(mechIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
+            } };
 
         infra::Execute setupHardwareExpectations{ [this]()
             {
