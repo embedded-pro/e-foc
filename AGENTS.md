@@ -108,20 +108,27 @@ Presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1
 
 Authoritative cycle budget gate: `cortex-cycle-budget` static analysis (≤ 4500 inner / ≤ 20000 outer). It measures only the symbols its config whitelists, so adding a function to a hot path means adding it to `targets/sync_foc_sensored/main/cycle-analysis.json` (inner) or `cycle-analysis-outer.json` (outer) — an unlisted symbol is silently unmeasured, not flagged.
 
-**Warnings**: the build enables `-Wall -Wextra`, and `CMAKE_COMPILE_WARNING_AS_ERROR` is on, so any warning in
-`core/`, `targets/`, `integration_tests/` or `tools/` fails the build. Third-party include directories are
-marked SYSTEM by `e_foc_mark_includes_system`, so warnings in headers we do not own cannot. That call marks
-every target that exists when it runs, which is why it sits after the submodule and FetchContent additions
-and **before** `add_subdirectory(core)`: move it later and it would mark this project's own targets SYSTEM,
-silencing the warnings the flags exist to catch; move it earlier and FetchContent dependencies such as
-`cucumber_cpp` would be missed. Never silence a warning with a pragma — fix it, or drop the parameter name
-if it is genuinely unused.
+**Warnings**: `cmake/CompilerWarnings.cmake` provides `e_foc_enable_project_warnings()`, which enables
+`-Wall -Wextra`; with `CMAKE_COMPILE_WARNING_AS_ERROR` on, any warning in `core/`, `targets/`,
+`integration_tests/` or `tools/` fails the build. Third-party include directories are marked SYSTEM by
+`e_foc_mark_includes_system` from `cmake/MarkIncludesSystem.cmake`, so warnings in headers we do not own
+cannot. That call marks every target that exists when it runs, which is why the **call** sits after the
+submodule and FetchContent additions and **before** `add_subdirectory(core)`: move it later and it would
+mark this project's own targets SYSTEM, silencing the warnings the flags exist to catch; move it earlier and
+FetchContent dependencies such as `cucumber_cpp` would be missed. Never silence a warning with a pragma —
+fix it, or drop the parameter name if it is genuinely unused.
 
-`-Wmaybe-uninitialized` is off. SYSTEM marking does not help here: at `-O3` GCC inlines
+Neither belongs in `CMakePresets.json`. A preset condition is evaluated before configure, so it cannot
+branch on `CMAKE_CXX_COMPILER_ID`, and both guards are load-bearing — see below.
+
+`-Wmaybe-uninitialized` is off, for GNU only. SYSTEM marking does not help here: at `-O3` GCC inlines
 `infra::Function::operator()` into our translation units and reports the diagnostic against the caller,
 naming addresses like `((const infra::Function<...>*)this)[1319]` — an index into a single object, so the
 path it claims does not exist. Definite `-Wuninitialized` stays enabled and is the one that matters; it is
-what caught `RecursiveLeastSquares` copying an indeterminate `metrics` member.
+what caught `RecursiveLeastSquares` copying an indeterminate `metrics` member. The GNU guard matters because
+Clang has no `-Wmaybe-uninitialized`: the `windows` preset builds with
+`toolchain-clang-x86_64-pc-windows-msvc.cmake`, where the flag would raise `-Wunknown-warning-option` and
+warnings-as-errors would fail the build.
 
 **Features**: `integration_tests/software_in_the_loop/features/` holds scenarios the in-process runner implements; `qemu_features/` holds those only the QEMU runner implements. A feature in the wrong directory reports as undefined steps and fails the suite. The `host` and `coverage` test presets run the `integration` label; only `hardware` is excluded.
 

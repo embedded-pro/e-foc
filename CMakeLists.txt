@@ -45,6 +45,8 @@ endif()
 set_directory_properties(PROPERTY USE_FOLDERS ON)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/QemuHelpers.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/MarkIncludesSystem.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerWarnings.cmake")
 
 set(E_FOC_EXCLUDE_FROM_ALL "")
 
@@ -89,33 +91,8 @@ endif()
 
 add_subdirectory(infra/numerical-toolbox)
 
-function(e_foc_mark_includes_system directory)
-    get_property(targets DIRECTORY "${directory}" PROPERTY BUILDSYSTEM_TARGETS)
-    foreach(target IN LISTS targets)
-        get_target_property(type ${target} TYPE)
-        if(NOT type STREQUAL "UTILITY")
-            get_target_property(includes ${target} INTERFACE_INCLUDE_DIRECTORIES)
-            if(includes)
-                set_target_properties(${target} PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${includes}")
-            endif()
-        endif()
-    endforeach()
-
-    get_property(children DIRECTORY "${directory}" PROPERTY SUBDIRECTORIES)
-    foreach(child IN LISTS children)
-        e_foc_mark_includes_system("${child}")
-    endforeach()
-endfunction()
-
 e_foc_mark_includes_system("${CMAKE_CURRENT_SOURCE_DIR}")
-
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    add_compile_options(-Wall -Wextra)
-endif()
-
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    add_compile_options(-Wno-maybe-uninitialized)
-endif()
+e_foc_enable_project_warnings()
 
 add_subdirectory(core)
 
