@@ -33,6 +33,11 @@ Use: `infra::BoundedVector<T>::WithMaxSize<N>`, `infra::BoundedString::WithStora
 
 Forbidden in hot path: virtual dispatch, heap, blocking calls, raw `sin`/`cos` — use `FastTrigonometry` from `core/foc/math/FastTrigonometry.hpp`.
 
+Also forbidden: per-sample validation. No plausibility check on the phase currents, no finiteness check on
+currents or duty cycles — see REQ-PERF-003. Sensor and power-stage failures are the hardware protection path's
+to catch. `foc::IsFiniteValue` exists for configuration-time and outer-loop checks only
+(`CurrentPlantModel::IsUsable`, the mechanical estimator's plausibility band); it is not for `Calculate()`.
+
 Required in every hot-path file:
 
 ```cpp

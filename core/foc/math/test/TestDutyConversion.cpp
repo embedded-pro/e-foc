@@ -5,8 +5,6 @@
 
 namespace
 {
-    constexpr uint8_t zeroVector = 50;
-
     struct Modulated
     {
         float a;
@@ -60,22 +58,4 @@ TEST_F(TestDutyConversion, an_output_beyond_the_range_is_clamped_rather_than_wra
     EXPECT_EQ(duties.a.Value(), 0);
     EXPECT_EQ(duties.b.Value(), 100);
     EXPECT_EQ(duties.c.Value(), 25);
-}
-
-TEST_F(TestDutyConversion, a_single_nan_phase_collapses_the_frame_to_the_zero_vector)
-{
-    const auto duties = foc::ToDutyCycles(Modulated{ Nan(), 0.9f, 0.1f });
-
-    EXPECT_EQ(duties.a.Value(), zeroVector);
-    EXPECT_EQ(duties.b.Value(), zeroVector);
-    EXPECT_EQ(duties.c.Value(), zeroVector);
-}
-
-TEST_F(TestDutyConversion, an_infinite_phase_collapses_the_frame_to_the_zero_vector)
-{
-    const auto duties = foc::ToDutyCycles(Modulated{ 0.2f, Inf(), 0.1f });
-
-    EXPECT_EQ(duties.a.Value(), zeroVector);
-    EXPECT_EQ(duties.b.Value(), zeroVector);
-    EXPECT_EQ(duties.c.Value(), zeroVector);
 }

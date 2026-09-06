@@ -12,9 +12,7 @@
         "Adc0Sequence.*Handler",
         "InterruptTable::Invoke",
         "ImmediateInterruptHandler::Invoke",
-        "Runner::OnPhaseCurrents",
-        "Runner::CurrentsArePlausible",
-        "IsFiniteValue"
+        "Runner::OnPhaseCurrents"
       ]
     },
     {
