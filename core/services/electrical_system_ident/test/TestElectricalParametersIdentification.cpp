@@ -101,6 +101,41 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_cal
     EXPECT_EQ(*resultPolePairs, expectedPolePairs);
 }
 
+TEST_F(ElectricalParametersIdentificationTest, an_overcurrent_sample_aborts_the_pole_pairs_sweep)
+{
+    services::ElectricalParametersIdentification::PolePairsConfig config{
+        hal::Percent{ 20 },
+        5,
+        std::chrono::milliseconds{ 50 }
+    };
+
+    std::optional<std::size_t> resultPolePairs{ 7 };
+
+    EXPECT_CALL(encoderMock, Read())
+        .WillRepeatedly(Return(foc::Radians{ 0.0f }));
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            })
+        .WillOnce(Return());
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, Stop());
+
+    identification.EstimateNumberOfPolePairs(config, [&](auto result)
+        {
+            resultPolePairs = result;
+        });
+
+    driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+        foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    EXPECT_FALSE(resultPolePairs.has_value());
+
+    ForwardTime(std::chrono::milliseconds{ 50 });
+}
+
 TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_calculates_correct_pole_pairs_for_6_pole_motor)
 {
     services::ElectricalParametersIdentification::PolePairsConfig config{

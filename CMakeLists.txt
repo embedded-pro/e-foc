@@ -113,6 +113,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra)
 endif()
 
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    add_compile_options(-Wno-maybe-uninitialized)
+endif()
+
 add_subdirectory(core)
 
 if(NOT EMIL_BUILD_QEMU OR E_FOC_TARGET_PLATFORM STREQUAL "qemu")

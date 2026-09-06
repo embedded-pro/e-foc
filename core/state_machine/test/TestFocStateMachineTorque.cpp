@@ -522,6 +522,39 @@ TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_fault_with_valid_calibrati
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
+TEST_F(FocStateMachineTorqueCliTest, a_fault_raised_while_starting_leaves_the_drive_in_fault_rather_than_enabled)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(inverterMock, Start())
+        .WillOnce(Invoke([this]()
+            {
+                faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+            }));
+
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::abortedByFault);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, a_latched_fault_refuses_a_new_enable_until_it_is_cleared)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(inverterMock, Start())
+        .WillOnce(Invoke([this]()
+            {
+                faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+            }));
+
+    sm.CmdEnable();
+
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
+}
+
 TEST_F(FocStateMachineTorqueCliTest, a_condition_that_keeps_re_faulting_is_refused_after_the_retry_limit)
 {
     GivenFaultNotifierRegistered();

@@ -112,6 +112,12 @@ silencing the warnings the flags exist to catch; move it earlier and FetchConten
 `cucumber_cpp` would be missed. Never silence a warning with a pragma — fix it, or drop the parameter name
 if it is genuinely unused.
 
+`-Wmaybe-uninitialized` is off. SYSTEM marking does not help here: at `-O3` GCC inlines
+`infra::Function::operator()` into our translation units and reports the diagnostic against the caller,
+naming addresses like `((const infra::Function<...>*)this)[1319]` — an index into a single object, so the
+path it claims does not exist. Definite `-Wuninitialized` stays enabled and is the one that matters; it is
+what caught `RecursiveLeastSquares` copying an indeterminate `metrics` member.
+
 **Features**: `integration_tests/software_in_the_loop/features/` holds scenarios the in-process runner implements; `qemu_features/` holds those only the QEMU runner implements. A feature in the wrong directory reports as undefined steps and fails the suite. The `host` and `coverage` test presets run the `integration` label; only `hardware` is excluded.
 
 ## Agent routing

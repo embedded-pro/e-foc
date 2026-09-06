@@ -2,6 +2,7 @@
 #include "core/services/electrical_system_ident/ResistanceEstimator.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include <gmock/gmock.h>
+#include <optional>
 
 namespace
 {
@@ -107,6 +108,69 @@ TEST_F(ResistanceEstimatorTest, returns_no_resistance_for_zero_current)
             foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
     EXPECT_FALSE(result.resistance.has_value());
+}
+
+TEST_F(ResistanceEstimatorTest, an_overcurrent_sample_while_settling_aborts_with_an_empty_result)
+{
+    services::ResistanceEstimator::Config config{
+        hal::Percent{ 15 }, std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
+    };
+
+    std::optional<services::ResistanceEstimator::Result> result;
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            })
+        .WillOnce(Return());
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, Stop());
+
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
+
+    driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+        foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->resistance.has_value());
+
+    ForwardTime(std::chrono::milliseconds{ 50 });
+}
+
+TEST_F(ResistanceEstimatorTest, an_overcurrent_sample_while_measuring_aborts_with_an_empty_result)
+{
+    services::ResistanceEstimator::Config config{
+        hal::Percent{ 15 }, std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
+    };
+
+    std::optional<services::ResistanceEstimator::Result> result;
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .Times(2)
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
+    ForwardTime(std::chrono::milliseconds{ 50 });
+
+    EXPECT_CALL(driverMock, Stop());
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _));
+
+    driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+        foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->resistance.has_value());
 }
 
 TEST_F(ResistanceEstimatorTest, recovers_resistance_for_low_resistance_motor)
