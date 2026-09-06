@@ -85,8 +85,6 @@ namespace sil
         testing::StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         testing::StrictMock<services::MotorAlignmentMock> alignmentMock;
         testing::StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
-        // A fault, an emergency stop and the destructor each release the calibration services and
-        // the fault registration; the scenarios that assert on those set their own expectations.
         infra::Execute setupTeardownExpectations{ [this]()
             {
                 using namespace testing;

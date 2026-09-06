@@ -101,8 +101,6 @@ namespace services
 
     void ElectricalParametersIdentificationImpl::Abort()
     {
-        // Injection is stopped by whichever stage is live; the completions are dropped rather than
-        // invoked, so a fault cannot be overwritten by the calibration result that follows it.
         resistanceEstimator.Abort();
         inductanceEstimator.Abort();
         rlRunning = false;

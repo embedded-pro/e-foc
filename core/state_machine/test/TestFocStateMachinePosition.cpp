@@ -38,8 +38,6 @@ namespace
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<services::MechanicalParametersIdentificationMock> mechIdentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
-        // A fault, an emergency stop and the destructor each release the calibration services and
-        // the fault registration; the tests that assert on those set their own expectations.
         infra::Execute setupTeardownExpectations{ [this]()
             {
                 EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
@@ -63,10 +61,10 @@ namespace
 
         void GivenFaultNotifierRegistered()
         {
-            EXPECT_CALL(faultNotifierMock, Register(_))
-                .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)
+            EXPECT_CALL(faultNotifierMock, Register(_, _))
+                .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& immediate, const infra::Function<void(state_machine::FaultCode)>& deferred)
                     {
-                        faultNotifierMock.StoreHandler(handler);
+                        faultNotifierMock.StoreHandler(immediate, deferred);
                     }));
         }
 
@@ -630,8 +628,6 @@ namespace
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<services::MechanicalParametersIdentificationMock> mechIdentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
-        // A fault, an emergency stop and the destructor each release the calibration services and
-        // the fault registration; the tests that assert on those set their own expectations.
         infra::Execute setupTeardownExpectations{ [this]()
             {
                 EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
@@ -655,10 +651,10 @@ namespace
 
         void GivenFaultNotifierRegistered()
         {
-            EXPECT_CALL(faultNotifierMock, Register(_))
-                .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)
+            EXPECT_CALL(faultNotifierMock, Register(_, _))
+                .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& immediate, const infra::Function<void(state_machine::FaultCode)>& deferred)
                     {
-                        faultNotifierMock.StoreHandler(handler);
+                        faultNotifierMock.StoreHandler(immediate, deferred);
                     }));
         }
 

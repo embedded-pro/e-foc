@@ -48,10 +48,6 @@ namespace services
 
         driver.PhaseCurrentsReady(alignmentConfig.samplingFrequency, [this](auto currents)
             {
-                // The slot is not reclaimed on the way out - reassigning it from inside its own
-                // invocation destroys the closure being executed - so the run is gated on the
-                // pending completion instead. An aborted run therefore reaches nothing that
-                // could write duty cycles and re-arm the peripheral Stop() just disabled.
                 if (!onAlignmentDone)
                     return;
 

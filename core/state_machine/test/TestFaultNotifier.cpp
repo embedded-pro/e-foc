@@ -73,6 +73,10 @@ TEST_F(TestFaultNotifier, no_op_fault_notifier_register_does_not_crash)
     notifier.Register([&called](state_machine::FaultCode)
         {
             called = true;
+        },
+        [&called](state_machine::FaultCode)
+        {
+            called = true;
         });
     EXPECT_FALSE(called);
 }
@@ -80,7 +84,7 @@ TEST_F(TestFaultNotifier, no_op_fault_notifier_register_does_not_crash)
 TEST_F(TestFaultNotifier, no_op_fault_notifier_register_accepts_empty_function)
 {
     state_machine::NoOpFaultNotifier notifier;
-    notifier.Register(infra::Function<void(state_machine::FaultCode)>{});
+    notifier.Register(infra::Function<void(state_machine::FaultCode)>{}, infra::Function<void(state_machine::FaultCode)>{});
 }
 
 TEST_F(TestFocStateMachineBase, apply_online_estimates_default_implementation_does_not_crash)

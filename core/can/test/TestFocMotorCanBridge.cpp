@@ -91,11 +91,11 @@ namespace
             EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
             EXPECT_CALL(lowPriorityInterruptMock, Register(_)).Times(AnyNumber());
             EXPECT_CALL(lowPriorityInterruptMock, Unregister()).Times(AnyNumber());
-            EXPECT_CALL(faultNotifierMock, Register(_))
+            EXPECT_CALL(faultNotifierMock, Register(_, _))
                 .Times(AnyNumber())
-                .WillRepeatedly(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)
+                .WillRepeatedly(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& immediate, const infra::Function<void(state_machine::FaultCode)>& deferred)
                     {
-                        faultNotifierMock.StoreHandler(handler);
+                        faultNotifierMock.StoreHandler(immediate, deferred);
                     }));
 
             EXPECT_CALL(canMock, SendData(_, _, _))
@@ -234,8 +234,6 @@ namespace
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<services::MechanicalParametersIdentificationMock> mechIdentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
-        // A fault, an emergency stop and the destructor each release the calibration services and
-        // the fault registration; the tests that assert on those set their own expectations.
         infra::Execute setupTeardownExpectations{ [this]()
             {
                 EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());

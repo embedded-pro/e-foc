@@ -1,4 +1,5 @@
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
+#include "targets/platform_implementations/error_handling_cortex_m/PowerStageCutOff.hpp"
 #include DEVICE_HEADER
 #include <cstdlib>
 
@@ -18,11 +19,6 @@ extern "C"
     extern uint32_t _etext;
     extern uint32_t _estack;
 
-    // Defined per platform. Deliberately not weak: a weak fallback in this translation unit is
-    // the definition the linker settles on, because the archive member carrying the real one is
-    // never pulled in - which is how this hook came to be called on every fault and cut nothing.
-    void CutPowerStage(void);
-
     __attribute__((naked)) void HardFault_Handler()
     {
         __asm volatile(
@@ -39,7 +35,7 @@ extern "C"
         using application::PersistentFaultData;
         using application::persistentFaultData;
 
-        CutPowerStage();
+        application::PowerStageCutOff::Cut();
 
         // Invalidate while writing to prevent partially-written data being
         // read as valid on a watchdog timeout mid-write.

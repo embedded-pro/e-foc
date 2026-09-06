@@ -24,10 +24,10 @@ namespace sil
 
     void PositionIntegrationFixture::ConstructWithInvalidNvm()
     {
-        EXPECT_CALL(faultNotifierMock, Register(_))
-            .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)
+        EXPECT_CALL(faultNotifierMock, Register(_, _))
+            .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& immediate, const infra::Function<void(state_machine::FaultCode)>& deferred)
                 {
-                    faultNotifierMock.StoreHandler(handler);
+                    faultNotifierMock.StoreHandler(immediate, deferred);
                 }));
 
         motorStateMachine.emplace(
@@ -52,10 +52,10 @@ namespace sil
         ExecuteAllActions();
         EXPECT_TRUE(saved);
 
-        EXPECT_CALL(faultNotifierMock, Register(_))
-            .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)
+        EXPECT_CALL(faultNotifierMock, Register(_, _))
+            .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& immediate, const infra::Function<void(state_machine::FaultCode)>& deferred)
                 {
-                    faultNotifierMock.StoreHandler(handler);
+                    faultNotifierMock.StoreHandler(immediate, deferred);
                 }));
 
         motorStateMachine.emplace(

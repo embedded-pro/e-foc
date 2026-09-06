@@ -40,7 +40,6 @@ namespace
 
 TEST_F(TestRunner, ConstructionRegistersPhaseCurrentsCallback)
 {
-    // Construction claims the slot; the destructor's Disable() releases it again.
     EXPECT_CALL(inverterMock, PhaseCurrentsReady(hal::Hertz{ 20000 }, _)).Times(2);
 
     foc::Runner runner{ inverterMock, encoderMock, focMock };
@@ -181,8 +180,6 @@ TEST_F(TestRunner, DisableReleasesThePhaseCurrentsSlot)
     EXPECT_CALL(focMock, Disable()).Times(2);
     runner.Disable();
 
-    // A callback left pointing here writes duty cycles on the next conversion, and
-    // ThreePhasePwmOutput re-arms the peripheral Stop() just disabled.
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
 }
 

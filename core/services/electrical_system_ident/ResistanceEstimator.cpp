@@ -55,9 +55,6 @@ namespace services
             {
                 driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
                     {
-                        // Gated on the pending completion rather than reclaiming the slot:
-                        // reassigning it from inside its own invocation destroys the closure
-                        // being executed, and an aborted run must reach nothing further.
                         if (!this->onDone)
                             return;
 

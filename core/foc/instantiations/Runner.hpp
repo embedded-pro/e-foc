@@ -33,8 +33,6 @@ namespace foc
         drivers::Encoder& encoder;
         FocBase& foc;
         infra::Function<void(const PhaseCurrents& currentPhases)> phaseCurrentsObserver;
-        // Tested instead of the Function itself: comparing one against nullptr is an out-of-line
-        // call, and this sits on the 20 kHz path where no observer is registered.
         volatile bool observerRegistered{ false };
         volatile bool enabled{ false };
     };

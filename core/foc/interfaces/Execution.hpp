@@ -24,9 +24,6 @@ namespace foc
         virtual void Stop() = 0;
     };
 
-    // Lets a calibration service watch the phase currents the control loop is already sampling,
-    // instead of taking ThreePhaseInverter::PhaseCurrentsReady away from it. The observer runs in
-    // the ADC interrupt after the duty cycles have been written, so it adds no jitter to the write.
     class PhaseCurrentsObservable
     {
     public:

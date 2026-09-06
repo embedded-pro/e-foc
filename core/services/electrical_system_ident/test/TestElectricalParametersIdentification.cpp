@@ -114,8 +114,6 @@ TEST_F(ElectricalParametersIdentificationTest, an_overcurrent_sample_aborts_the_
     EXPECT_CALL(encoderMock, Read())
         .WillRepeatedly(Return(foc::Radians{ 0.0f }));
 
-    // The slot stays claimed - reassigning it from inside its own invocation destroys the closure
-    // being executed - and the sweep is gated on polePairsRunning instead.
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .WillOnce([this](auto, const auto& cb)
             {
@@ -513,8 +511,6 @@ TEST_F(ElectricalParametersIdentificationTest, abort_stops_the_pole_pairs_sweep_
 
     EXPECT_FALSE(fired);
 
-    // Neither the settle timer nor a late sample may resume the sweep - each would drive
-    // ThreePhasePwmOutput again and re-arm the peripheral the abort just stopped.
     ForwardTime(std::chrono::milliseconds{ 500 });
     driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
     EXPECT_FALSE(fired);

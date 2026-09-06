@@ -32,10 +32,6 @@ namespace foc
     {
         enabled = false;
         inverter.Stop();
-        // Releasing the slot is what keeps a stopped drive stopped: a callback left pointing here
-        // writes duty cycles on the next conversion, and ThreePhasePwmOutput re-arms the peripheral
-        // Stop() just disabled. Safe against the ADC interrupt because the only other context that
-        // reaches this - the PWM fault interrupt - shares its priority and so cannot preempt it.
         ReleasePhaseCurrents();
         foc.Disable();
     }

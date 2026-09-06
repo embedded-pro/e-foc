@@ -1,5 +1,4 @@
 #include "core/state_machine/FocStateMachineCommon.hpp"
-#include "infra/event/EventDispatcher.hpp"
 #include <bit>
 #include <numbers>
 
@@ -24,18 +23,13 @@ namespace application
     {
         registeredFaultNotifier = &faultNotifier;
 
-        faultNotifier.Register([this](state_machine::FaultCode code)
+        faultNotifier.Register([this](state_machine::FaultCode)
             {
-                // This runs in the PWM fault interrupt. Cutting the bridge is the only part that
-                // cannot wait; the trace, the multi-word state write that the CLI and CAN read
-                // concurrently, and the non-volatile memory the completion reaches are none of them
-                // interrupt-safe, so the transition itself is handed to the dispatcher.
                 GetFocControl().Stop();
-
-                infra::EventDispatcher::Instance().Schedule([this, code]()
-                    {
-                        EnterFault(code);
-                    });
+            },
+            [this](state_machine::FaultCode code)
+            {
+                EnterFault(code);
             });
     }
 
@@ -265,8 +259,6 @@ namespace application
         const bool wasActive = std::holds_alternative<state_machine::Enabled>(currentState) ||
                                std::holds_alternative<state_machine::Calibrating>(currentState);
 
-        // Committed before the stop so a fault raised inside it sees Fault rather than the state
-        // being left behind, and so a late calibration completion cannot find itself in Calibrating.
         lastFaultCode = code;
         currentState = state_machine::Fault{ code };
         faultLatched = true;
@@ -274,8 +266,6 @@ namespace application
         if (wasActive)
             GetFocControl().Stop();
 
-        // Without this the identification service keeps its timer and its phase-current callback,
-        // and the next tick writes duty cycles again - which re-arms the PWM the stop just disabled.
         AbortCalibrationServices();
 
         CompletePendingCommand(state_machine::CommandResult::abortedByFault);

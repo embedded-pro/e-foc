@@ -133,8 +133,6 @@ TEST_F(ResistanceEstimatorTest, an_overcurrent_sample_while_settling_aborts_with
 
     std::optional<services::ResistanceEstimator::Result> result;
 
-    // The slot stays claimed - reassigning it from inside its own invocation destroys the closure
-    // being executed - and the run is gated on the pending completion instead.
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .WillOnce([this](auto, const auto& cb)
             {
@@ -192,8 +190,6 @@ TEST_F(ResistanceEstimatorTest, an_overcurrent_sample_while_measuring_aborts_wit
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->resistance.has_value());
 
-    // A sample arriving after the abort must reach nothing: the estimator is done, and the
-    // measurement callback would otherwise keep filling the sample buffer.
     driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
         foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 }

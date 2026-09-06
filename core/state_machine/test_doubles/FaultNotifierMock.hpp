@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/state_machine/FaultNotifier.hpp"
-#include "infra/event/EventDispatcher.hpp"
 #include <gmock/gmock.h>
 
 namespace state_machine
@@ -10,39 +9,37 @@ namespace state_machine
         : public FaultNotifier
     {
     public:
-        MOCK_METHOD(void, Register, (const infra::Function<void(FaultCode)>& onFault), (override));
+        MOCK_METHOD(void, Register, (const infra::Function<void(FaultCode)>& onImmediate, const infra::Function<void(FaultCode)>& onDeferred), (override));
         MOCK_METHOD(void, Unregister, (), (override));
 
-        void StoreHandler(const infra::Function<void(FaultCode)>& handler)
+        void StoreHandler(const infra::Function<void(FaultCode)>& immediate, const infra::Function<void(FaultCode)>& deferred)
         {
-            storedHandler = handler;
+            storedImmediate = immediate;
+            storedDeferred = deferred;
         }
 
-        // The platform notifier's primary path runs in the PWM fault interrupt and hands the
-        // transition to the dispatcher, so delivering a fault to a state machine means running
-        // the dispatcher too. TriggerFaultWithoutDispatch stops short of that, for the tests
-        // that assert on what does and does not happen inside the interrupt itself.
         void TriggerFault(FaultCode code)
         {
             TriggerFaultWithoutDispatch(code);
 
-            auto& dispatcher = infra::EventDispatcher::Instance();
-            while (!dispatcher.IsIdle())
-                dispatcher.ExecuteFirstAction();
+            if (storedDeferred)
+                storedDeferred(code);
         }
 
         void TriggerFaultWithoutDispatch(FaultCode code)
         {
-            if (storedHandler)
-                storedHandler(code);
+            if (storedImmediate)
+                storedImmediate(code);
         }
 
         void ReleaseHandler()
         {
-            storedHandler = nullptr;
+            storedImmediate = nullptr;
+            storedDeferred = nullptr;
         }
 
     private:
-        infra::Function<void(FaultCode)> storedHandler;
+        infra::Function<void(FaultCode)> storedImmediate;
+        infra::Function<void(FaultCode)> storedDeferred;
     };
 }

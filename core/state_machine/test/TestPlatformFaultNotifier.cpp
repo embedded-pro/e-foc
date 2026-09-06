@@ -44,8 +44,6 @@ namespace
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         StrictMock<services::MotorAlignmentMock> alignmentMock;
-        // A fault, an emergency stop and the destructor each release the calibration services and
-        // the fault registration; the tests that assert on those set their own expectations.
         infra::Execute setupTeardownExpectations{ [this]()
             {
                 EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
@@ -127,6 +125,48 @@ TEST_F(TestPlatformFaultNotifier, board_protection_from_enabled_stops_inverter_a
     EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
 }
 
+TEST_F(TestPlatformFaultNotifier, a_deferred_fault_is_dropped_once_the_handler_unregisters)
+{
+    bool immediate = false;
+    bool deferred = false;
+
+    faultNotifier.Register([&immediate](state_machine::FaultCode)
+        {
+            immediate = true;
+        },
+        [&deferred](state_machine::FaultCode)
+        {
+            deferred = true;
+        });
+
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+
+    EXPECT_TRUE(immediate);
+    EXPECT_FALSE(deferred);
+
+    faultNotifier.Unregister();
+    ExecuteAllActions();
+
+    EXPECT_FALSE(deferred);
+}
+
+TEST_F(TestPlatformFaultNotifier, a_fault_scheduled_before_the_state_machine_is_destroyed_is_dropped)
+{
+    GivenCalibrationInNvm();
+
+    {
+        auto sm = CreateStateMachine();
+
+        EXPECT_CALL(platformFactory, Start()).Times(1);
+        sm.CmdEnable();
+
+        EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+        platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+    }
+
+    ExecuteAllActions();
+}
+
 TEST_F(TestPlatformFaultNotifier, board_protection_cuts_the_bridge_in_the_interrupt_and_defers_the_transition)
 {
     GivenCalibrationInNvm();
@@ -135,9 +175,6 @@ TEST_F(TestPlatformFaultNotifier, board_protection_cuts_the_bridge_in_the_interr
     EXPECT_CALL(platformFactory, Start()).Times(1);
     sm.CmdEnable();
 
-    // The notifier's primary path runs in the PWM fault interrupt. The bridge has to be cut there;
-    // the trace, the multi-word state write and the non-volatile memory the completion reaches are
-    // none of them interrupt-safe, so the transition itself waits for the dispatcher.
     EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
     platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
 

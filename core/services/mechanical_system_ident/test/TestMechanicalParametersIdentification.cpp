@@ -35,6 +35,7 @@ namespace
                         observableMock.StoreObserver(observer);
                     }));
             EXPECT_CALL(driveMock, Start());
+            EXPECT_CALL(controllerMock, EnableSpeedCommand());
         }
 
         void ExpectDriveReleased(Cardinality times = Exactly(1))
@@ -84,8 +85,6 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_never_claims_th
     EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
     ExpectRunStarted();
     EXPECT_CALL(controllerMock, CommandSpeed(_));
-    // Taking PhaseCurrentsReady evicts the control loop, so nothing writes duty cycles, the rotor
-    // never turns and the regressor never carries the excitation the estimator needs.
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _)).Times(0);
 
     identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [](auto, auto) {});
@@ -180,7 +179,6 @@ TEST_F(MechanicalParametersIdentificationTest, abort_releases_the_drive_and_drop
     EXPECT_FALSE(fired);
     EXPECT_FALSE(observableMock.HasObserver());
 
-    // The timeout must not resurrect the run it was cancelled with.
     ForwardTime(std::chrono::seconds{ 10 });
     EXPECT_FALSE(fired);
 }
@@ -192,8 +190,6 @@ TEST_F(MechanicalParametersIdentificationTest, abort_without_a_run_in_flight_is_
 
 TEST_F(MechanicalParametersIdentificationTest, a_run_that_has_not_converged_keeps_the_drive_turning)
 {
-    // Stepped quadratic position ramp. A smooth n^2 ramp gives constant acceleration, which makes
-    // the acceleration regressor collinear with the constant term; repeating each step varies it.
     services::MechanicalParametersIdentification::Config config{
         foc::RadiansPerSecond{ 50.0f },
         0.998f,
@@ -232,14 +228,9 @@ TEST_F(MechanicalParametersIdentificationTest, a_run_that_has_not_converged_keep
     for (std::size_t i = 0; i != 2000 && !outcome.fired; ++i)
     {
         PublishCurrents();
-        // Convergence is handed to the dispatcher: reclaiming the observer inside its own
-        // invocation would destroy the closure being executed, and the completion reaches
-        // non-volatile memory through the state machine.
         ExecuteAllActions();
     }
 
-    // Whether this excitation satisfies the convergence gate is the estimator's business; what
-    // matters here is that either outcome leaves the drive in a coherent state.
     EXPECT_EQ(outcome.fired, !observableMock.HasObserver());
 
     if (!outcome.fired)

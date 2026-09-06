@@ -24,11 +24,11 @@ namespace sil
 
     void ControlModeCoordinationFixture::ConstructCoordinator(services::ConfigData data)
     {
-        EXPECT_CALL(faultNotifierMock, Register(_))
+        EXPECT_CALL(faultNotifierMock, Register(_, _))
             .Times(AnyNumber())
-            .WillRepeatedly(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)
+            .WillRepeatedly(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& immediate, const infra::Function<void(state_machine::FaultCode)>& deferred)
                 {
-                    faultNotifierMock.StoreHandler(handler);
+                    faultNotifierMock.StoreHandler(immediate, deferred);
                 }));
 
         bool saved = false;

@@ -79,9 +79,6 @@ namespace services
 
     void SinusoidalInductanceEstimator::OnCurrentSample(foc::PhaseCurrents currents)
     {
-        // Gated on the pending completion rather than reclaiming the slot: this callback writes
-        // duty cycles on every sample, so an aborted run left ungated would re-arm the peripheral
-        // Stop() just disabled. Reclaiming the slot here would destroy the closure being executed.
         if (!onDone)
             return;
 

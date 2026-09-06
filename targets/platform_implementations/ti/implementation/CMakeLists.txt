@@ -22,7 +22,6 @@ target_compile_definitions(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} P
 
 target_sources(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/../../error_handling_cortex_m/FaultHandler.cpp
-    CutPowerStage.cpp
     PlatformFactoryImpl.cpp
     PlatformFactoryImpl.hpp
 )

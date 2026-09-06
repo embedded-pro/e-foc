@@ -31,15 +31,13 @@ namespace services
 
         rls.emplace(1000.0f, config.forgettingFactor);
 
-        // Observe the currents the control loop samples rather than claiming the inverter's single
-        // callback slot: taking it leaves Runner::OnPhaseCurrents unreachable, so no duty cycles are
-        // ever written, the rotor never turns and the regressor carries no excitation to converge on.
         observable.RegisterPhaseCurrentsObserver([this, torqueConstant](const auto& currents)
             {
                 OnSamplingUpdate(currents, torqueConstant);
             });
 
         drive.Start();
+        controller.EnableSpeedCommand();
         controller.CommandSpeed(config.targetSpeed);
 
         timeoutTimer.Start(config.timeout, [this]()
@@ -97,9 +95,6 @@ namespace services
         if (MotorRLS::EvaluateConvergence(metrics, 1e-4f, 1e-2f) != estimators::State::converged)
             return;
 
-        // This runs in the ADC interrupt. Releasing the observer here would destroy the very
-        // infra::Function being executed, and the completion reaches non-volatile memory through
-        // the state machine, so both are handed to the dispatcher instead.
         converged = true;
         timeoutTimer.Cancel();
 

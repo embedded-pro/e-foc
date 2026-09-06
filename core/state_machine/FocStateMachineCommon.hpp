@@ -69,10 +69,6 @@ namespace application
 
         void RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier);
 
-        // Every leaf state machine calls this from its own destructor, while its cascade and its
-        // owned services are still alive. A mode switch destroys one state machine and constructs
-        // the next in the same variant, so a fault registration or an identification callback left
-        // behind here is invoked against freed storage.
         void ReleaseExternalResources();
         void AbortCalibrationServices();
         virtual void AbortModeSpecificServices();

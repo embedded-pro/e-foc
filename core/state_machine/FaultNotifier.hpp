@@ -21,10 +21,8 @@ namespace state_machine
     {
     public:
         virtual ~FaultNotifier();
-        virtual void Register(const infra::Function<void(FaultCode)>& onFault) = 0;
+        virtual void Register(const infra::Function<void(FaultCode)>& onImmediate, const infra::Function<void(FaultCode)>& onDeferred) = 0;
 
-        // A notifier outlives the state machines that register with it - a mode switch destroys one
-        // and constructs another - so a registration that is not released dangles into freed storage.
         virtual void Unregister() = 0;
     };
 
@@ -34,7 +32,7 @@ namespace state_machine
     public:
         ~NoOpFaultNotifier() override;
 
-        void Register(const infra::Function<void(FaultCode)>&) override
+        void Register(const infra::Function<void(FaultCode)>&, const infra::Function<void(FaultCode)>&) override
         {}
 
         void Unregister() override

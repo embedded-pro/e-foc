@@ -30,7 +30,6 @@ namespace services
 
         void Start(const Config& config, const infra::Function<void(Result)>& onDone);
 
-        // Stops injection and drops the pending completion without invoking it.
         void Abort();
 
     private:

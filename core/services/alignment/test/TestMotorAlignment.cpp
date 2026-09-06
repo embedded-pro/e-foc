@@ -473,7 +473,6 @@ TEST_F(MotorAlignmentTest, AbortStopsTheDriverAndDropsTheCompletion)
 
     EXPECT_FALSE(fired);
 
-    // A sample arriving after the abort must reach nothing that could re-arm the bridge.
     driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
     EXPECT_FALSE(fired);
 }
