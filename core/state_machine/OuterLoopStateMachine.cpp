@@ -89,17 +89,24 @@ namespace application
         RunMechanicalIdentStep();
     }
 
+    void OuterLoopStateMachine::AbortModeSpecificServices()
+    {
+        MechIdentImpl().Abort();
+    }
+
     services::MechanicalParametersIdentification& OuterLoopStateMachine::ResolveMechIdent(
         const CalibrationServices& calibServices,
         std::optional<services::MechanicalParametersIdentificationImpl>& ownMechIdent,
         foc::SpeedCommandable& speedCommandable,
+        foc::Controllable& drive,
+        foc::PhaseCurrentsObservable& observable,
         drivers::ThreePhaseInverter& inverter,
         drivers::Encoder& encoder)
     {
         if (calibServices.mechIdentOverride.has_value())
             return calibServices.mechIdentOverride->get();
 
-        ownMechIdent.emplace(speedCommandable, inverter, encoder);
+        ownMechIdent.emplace(speedCommandable, drive, observable, inverter, encoder);
         return *ownMechIdent;
     }
 

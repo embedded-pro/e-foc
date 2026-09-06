@@ -36,6 +36,12 @@ namespace
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
+        infra::Execute setupTeardownExpectations{ [this]()
+            {
+                EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
+            } };
 
         foc::Volts vdc{ 24.0f };
 
@@ -82,10 +88,10 @@ namespace
 
         void GivenFaultNotifierRegistered()
         {
-            EXPECT_CALL(faultNotifierMock, Register(_))
-                .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)
+            EXPECT_CALL(faultNotifierMock, Register(_, _))
+                .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& immediate, const infra::Function<void(state_machine::FaultCode)>& deferred)
                     {
-                        faultNotifierMock.StoreHandler(handler);
+                        faultNotifierMock.StoreHandler(immediate, deferred);
                     }));
         }
 
@@ -515,7 +521,7 @@ TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_fault_with_valid_calibrati
     GivenNvmValid();
     auto sm = CreateStateMachine();
 
-    EXPECT_CALL(inverterMock, Stop()).Times(1);
+    EXPECT_CALL(inverterMock, Stop()).Times(2);
     faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
     sm.CmdClearFault();
 
@@ -958,6 +964,12 @@ namespace
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
+        infra::Execute setupTeardownExpectations{ [this]()
+            {
+                EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
+            } };
 
         foc::Volts vdc{ 24.0f };
 
@@ -972,10 +984,10 @@ namespace
 
         void GivenFaultNotifierRegistered()
         {
-            EXPECT_CALL(faultNotifierMock, Register(_))
-                .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)
+            EXPECT_CALL(faultNotifierMock, Register(_, _))
+                .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& immediate, const infra::Function<void(state_machine::FaultCode)>& deferred)
                     {
-                        faultNotifierMock.StoreHandler(handler);
+                        faultNotifierMock.StoreHandler(immediate, deferred);
                     }));
         }
 
@@ -2171,4 +2183,67 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_late_callback_when_no_pend
     // Late NVM callback should be ignored (pendingCommandCallback is null)
     capturedCb(services::NvmStatus::Ok);
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+namespace
+{
+    TEST_F(FocStateMachineTorqueCliTest, a_fault_during_calibration_aborts_the_identification_services)
+    {
+        GivenFaultNotifierRegistered();
+        GivenNvmInvalid();
+
+        EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _));
+
+        auto sm = CreateStateMachine();
+        sm.CmdCalibrate([](state_machine::CommandResult) {});
+        ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+        EXPECT_CALL(electricalIdentMock, Abort()).Times(AtLeast(1)).RetiresOnSaturation();
+        EXPECT_CALL(alignmentMock, Abort()).Times(AtLeast(1)).RetiresOnSaturation();
+
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+
+        ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    }
+
+    TEST_F(FocStateMachineTorqueCliTest, an_emergency_stop_during_calibration_aborts_the_identification_services)
+    {
+        GivenFaultNotifierRegistered();
+        GivenNvmInvalid();
+
+        EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _));
+
+        auto sm = CreateStateMachine();
+        sm.CmdCalibrate([](state_machine::CommandResult) {});
+        ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+        EXPECT_CALL(electricalIdentMock, Abort()).Times(AtLeast(1)).RetiresOnSaturation();
+        EXPECT_CALL(alignmentMock, Abort()).Times(AtLeast(1)).RetiresOnSaturation();
+
+        sm.CmdEmergencyStop();
+
+        EXPECT_FALSE(sm.HasPendingAsyncWork());
+    }
+
+    TEST_F(FocStateMachineTorqueCliTest, destruction_releases_the_fault_registration_and_the_services)
+    {
+        GivenFaultNotifierRegistered();
+        GivenNvmValid();
+
+        {
+            auto sm = CreateStateMachine();
+
+            EXPECT_CALL(electricalIdentMock, Abort()).Times(AtLeast(1)).RetiresOnSaturation();
+            EXPECT_CALL(alignmentMock, Abort()).Times(AtLeast(1)).RetiresOnSaturation();
+            EXPECT_CALL(faultNotifierMock, Unregister())
+                .Times(AtLeast(1))
+                .WillRepeatedly(Invoke([this]()
+                    {
+                        faultNotifierMock.ReleaseHandler();
+                    }))
+                .RetiresOnSaturation();
+        }
+
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    }
 }

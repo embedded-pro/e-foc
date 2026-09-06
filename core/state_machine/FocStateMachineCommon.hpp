@@ -68,6 +68,10 @@ namespace application
             const CalibrationServices& calibServices);
 
         void RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier);
+
+        void ReleaseExternalResources();
+        void AbortCalibrationServices();
+        virtual void AbortModeSpecificServices();
         void RegisterCliIfNeeded(state_machine::TransitionPolicy transitionPolicy);
         void CheckNvmOnBoot();
 
@@ -114,6 +118,7 @@ namespace application
     private:
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
+        state_machine::FaultNotifier* registeredFaultNotifier{ nullptr };
         drivers::ThreePhaseInverter& inverter;
         foc::Volts vdc;
         services::NonVolatileMemory& nvm;

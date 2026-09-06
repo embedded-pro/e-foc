@@ -48,5 +48,7 @@ namespace services
 
         virtual void EstimateResistanceAndInductance(const ResistanceAndInductanceConfig& config, const infra::Function<void(ResistanceInductanceResult)>& onDone) = 0;
         virtual void EstimateNumberOfPolePairs(const PolePairsConfig& config, const infra::Function<void(std::optional<std::size_t>)>& onDone) = 0;
+
+        virtual void Abort() = 0;
     };
 }

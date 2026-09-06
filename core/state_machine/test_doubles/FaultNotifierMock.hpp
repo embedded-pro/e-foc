@@ -9,20 +9,37 @@ namespace state_machine
         : public FaultNotifier
     {
     public:
-        MOCK_METHOD(void, Register, (const infra::Function<void(FaultCode)>& onFault), (override));
+        MOCK_METHOD(void, Register, (const infra::Function<void(FaultCode)>& onImmediate, const infra::Function<void(FaultCode)>& onDeferred), (override));
+        MOCK_METHOD(void, Unregister, (), (override));
 
-        void StoreHandler(const infra::Function<void(FaultCode)>& handler)
+        void StoreHandler(const infra::Function<void(FaultCode)>& immediate, const infra::Function<void(FaultCode)>& deferred)
         {
-            storedHandler = handler;
+            storedImmediate = immediate;
+            storedDeferred = deferred;
         }
 
         void TriggerFault(FaultCode code)
         {
-            if (storedHandler)
-                storedHandler(code);
+            TriggerFaultWithoutDispatch(code);
+
+            if (storedDeferred)
+                storedDeferred(code);
+        }
+
+        void TriggerFaultWithoutDispatch(FaultCode code)
+        {
+            if (storedImmediate)
+                storedImmediate(code);
+        }
+
+        void ReleaseHandler()
+        {
+            storedImmediate = nullptr;
+            storedDeferred = nullptr;
         }
 
     private:
-        infra::Function<void(FaultCode)> storedHandler;
+        infra::Function<void(FaultCode)> storedImmediate;
+        infra::Function<void(FaultCode)> storedDeferred;
     };
 }

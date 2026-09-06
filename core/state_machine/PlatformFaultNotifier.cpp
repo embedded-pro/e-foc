@@ -1,4 +1,5 @@
 #include "core/state_machine/PlatformFaultNotifier.hpp"
+#include "infra/event/EventDispatcher.hpp"
 
 namespace state_machine
 {
@@ -7,27 +8,41 @@ namespace state_machine
     {
         platform.RegisterBoardProtection([this](application::PlatformFactory::BoardProtectionReason reason)
             {
-                const auto code = ToFaultCode(reason);
-                if (onFault != nullptr)
-                    onFault(code);
-                if (onFaultSecondary != nullptr)
-                    onFaultSecondary(code);
+                Notify(ToFaultCode(reason));
             });
     }
 
-    void PlatformFaultNotifier::Register(const infra::Function<void(FaultCode)>& onFault)
+    void PlatformFaultNotifier::Notify(FaultCode code)
     {
-        this->onFault = onFault;
+        if (onFaultImmediate != nullptr)
+            onFaultImmediate(code);
+
+        infra::EventDispatcher::Instance().Schedule([this, code]()
+            {
+                if (onFaultDeferred != nullptr)
+                    onFaultDeferred(code);
+            });
+
+        if (onFaultSecondary != nullptr)
+            onFaultSecondary(code);
+    }
+
+    void PlatformFaultNotifier::Register(const infra::Function<void(FaultCode)>& onImmediate, const infra::Function<void(FaultCode)>& onDeferred)
+    {
+        onFaultImmediate = onImmediate;
+        onFaultDeferred = onDeferred;
+
         platform.CanBus().SetOnError([this](application::CanBusAdapter::CanError error)
             {
                 if (error == application::CanBusAdapter::CanError::busOff)
-                {
-                    if (this->onFault != nullptr)
-                        this->onFault(FaultCode::hardwareFault);
-                    if (this->onFaultSecondary != nullptr)
-                        this->onFaultSecondary(FaultCode::hardwareFault);
-                }
+                    Notify(FaultCode::hardwareFault);
             });
+    }
+
+    void PlatformFaultNotifier::Unregister()
+    {
+        onFaultImmediate = nullptr;
+        onFaultDeferred = nullptr;
     }
 
     void PlatformFaultNotifier::RegisterSecondary(const infra::Function<void(FaultCode)>& onFault)

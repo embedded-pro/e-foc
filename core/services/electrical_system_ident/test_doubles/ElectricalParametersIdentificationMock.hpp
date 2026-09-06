@@ -17,5 +17,6 @@ namespace services
             (const PolePairsConfig& config,
                 const infra::Function<void(std::optional<std::size_t>)>& onDone),
             (override));
+        MOCK_METHOD(void, Abort, (), (override));
     };
 }
