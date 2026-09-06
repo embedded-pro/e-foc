@@ -147,6 +147,21 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_standstill_run_does_not_publis
     EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
 }
 
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_steady_speed_is_excitation_enough_to_keep_publishing)
+{
+    const foc::Radians quadratureAngle{ std::numbers::pi_v<float> / 2.0f };
+    const foc::PhaseCurrents driving{ foc::Ampere{ -1.0f }, foc::Ampere{ 0.5f }, foc::Ampere{ 0.5f } };
+
+    estimator.SetTorqueConstant(foc::NewtonMeter{ 0.1f });
+    estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
+
+    for (int sample = 0; sample != 200; ++sample)
+        estimator.Update(driving, speed, quadratureAngle);
+
+    EXPECT_NE(estimator.CurrentFriction().Value(), 1.0e-4f);
+    EXPECT_GE(estimator.CurrentFriction().Value(), 0.0f);
+}
+
 TEST_F(TestRealTimeFrictionAndInertiaEstimator, published_online_estimates_stay_inside_the_plausibility_band)
 {
     estimator.SetTorqueConstant(foc::NewtonMeter{ 0.1f });

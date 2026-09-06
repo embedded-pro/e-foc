@@ -108,3 +108,28 @@
     callback, namely a pending command callback, an in-flight boot-time
     non-volatile-memory check, or a running calibration step, so that the state
     machine is never destroyed while such a callback can still be invoked.
+
+- id: REQ-SM-017
+  title: A fault raised while enabling leaves the drive in Fault
+  shall: >
+    When a fault is raised while the state machine is starting the FOC controller in
+    response to an enable command, the state machine shall remain in the Fault state
+    rather than the Enabled state, shall stop the FOC controller, and shall report the
+    enable command as abortedByFault.
+
+- id: REQ-SM-018
+  title: Repeated fault clearance is refused
+  shall: >
+    The state machine shall refuse a clear-fault command once three consecutive
+    clear-fault commands have been accepted without an intervening successful enable
+    and disable cycle, so that a condition which re-faults immediately cannot be
+    cleared indefinitely. A completed disable command shall reset that count.
+
+- id: REQ-SM-019
+  title: A stored alignment offset is not re-applied to the encoder
+  shall: >
+    The state machine shall not write a stored encoder zero offset back to the encoder,
+    neither when loading calibration data at boot nor when completing a calibration
+    sequence. The offset a running encoder reports shall be established only by the
+    alignment step itself, so that an offset measured against a rotor position the
+    encoder no longer holds cannot orient the field.

@@ -123,14 +123,26 @@ TEST_F(ElectricalParametersIdentificationTest, an_overcurrent_sample_aborts_the_
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
     EXPECT_CALL(driverMock, Stop());
 
+    std::size_t doneCount = 0;
     identification.EstimateNumberOfPolePairs(config, [&](auto result)
         {
+            ++doneCount;
             resultPolePairs = result;
         });
 
     driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
-        foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+        foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent - 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
+    EXPECT_EQ(doneCount, 0u);
+
+    const foc::PhaseCurrents overLimit{
+        foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }
+    };
+
+    driverMock.TriggerPhaseCurrentsCallback(overLimit);
+    driverMock.TriggerPhaseCurrentsCallback(overLimit);
+
+    EXPECT_EQ(doneCount, 1u);
     EXPECT_FALSE(resultPolePairs.has_value());
 
     ForwardTime(std::chrono::milliseconds{ 50 });

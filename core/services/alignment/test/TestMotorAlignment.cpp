@@ -1,6 +1,8 @@
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
+#include <array>
 #include <gmock/gmock.h>
+#include <optional>
 
 namespace
 {
@@ -369,6 +371,52 @@ TEST_F(MotorAlignmentTest, ForceAlignment_AbortsWhenTheInjectedCurrentExceedsThe
 
     EXPECT_TRUE(called);
     EXPECT_FALSE(result.has_value());
+}
+
+TEST_F(MotorAlignmentTest, ForceAlignment_AbortsOnOvercurrentInAnyPhaseAndInEitherDirection)
+{
+    services::MotorAlignmentImpl::AlignmentConfig config;
+    config.testVoltagePercent = hal::Percent{ 20 };
+    config.maxSamples = 100;
+    config.settledThreshold = foc::Radians{ 0.001f };
+    config.settledCount = 5;
+    std::size_t polePairs = 7;
+
+    const auto overLimit = drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f;
+
+    const std::array<foc::PhaseCurrents, 2> offending{ {
+        { foc::Ampere{ 0.0f }, foc::Ampere{ overLimit }, foc::Ampere{ 0.0f } },
+        { foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ -overLimit } },
+    } };
+
+    for (const auto& currents : offending)
+    {
+        StrictMock<drivers::ThreePhaseInverterMock> driver;
+        StrictMock<drivers::EncoderMock> encoder;
+        services::MotorAlignmentImpl subject{ driver, encoder };
+
+        EXPECT_CALL(encoder, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+        EXPECT_CALL(driver, Stop()).Times(2);
+        EXPECT_CALL(driver, ThreePhasePwmOutput(_));
+        EXPECT_CALL(driver, PhaseCurrentsReady(_, _))
+            .WillOnce([&driver](auto, const auto& onDone)
+                {
+                    driver.StorePhaseCurrentsCallback(onDone);
+                });
+
+        std::optional<foc::Radians> result;
+        bool called = false;
+        subject.ForceAlignment(polePairs, config, [&result, &called](std::optional<foc::Radians> offset)
+            {
+                called = true;
+                result = offset;
+            });
+
+        driver.TriggerPhaseCurrentsCallback(currents);
+
+        EXPECT_TRUE(called);
+        EXPECT_FALSE(result.has_value());
+    }
 }
 
 TEST_F(MotorAlignmentTest, ForceAlignment_ContinuesWhileTheInjectedCurrentStaysWithinTheLimit)
