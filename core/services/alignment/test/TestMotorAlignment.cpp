@@ -337,3 +337,66 @@ TEST_F(MotorAlignmentTest, ForceAlignment_WithZeroPosition)
     ASSERT_TRUE(result.has_value());
     EXPECT_NEAR(result->Value(), 0.0f, 0.001f);
 }
+
+TEST_F(MotorAlignmentTest, ForceAlignment_AbortsWhenTheInjectedCurrentExceedsTheInverterLimit)
+{
+    services::MotorAlignmentImpl::AlignmentConfig config;
+    config.testVoltagePercent = hal::Percent{ 20 };
+    config.maxSamples = 100;
+    config.settledThreshold = foc::Radians{ 0.001f };
+    config.settledCount = 5;
+    std::size_t polePairs = 7;
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(driverMock, Stop()).Times(2);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& onDone)
+            {
+                driverMock.StorePhaseCurrentsCallback(onDone);
+            });
+
+    std::optional<foc::Radians> result;
+    bool called = false;
+    alignment.ForceAlignment(polePairs, config, [&result, &called](std::optional<foc::Radians> offset)
+        {
+            called = true;
+            result = offset;
+        });
+
+    const auto overLimit = drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f;
+    driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ overLimit }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    EXPECT_TRUE(called);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST_F(MotorAlignmentTest, ForceAlignment_ContinuesWhileTheInjectedCurrentStaysWithinTheLimit)
+{
+    services::MotorAlignmentImpl::AlignmentConfig config;
+    config.testVoltagePercent = hal::Percent{ 20 };
+    config.maxSamples = 100;
+    config.settledThreshold = foc::Radians{ 0.001f };
+    config.settledCount = 5;
+    std::size_t polePairs = 7;
+
+    EXPECT_CALL(encoderMock, Read()).Times(AtLeast(1)).WillRepeatedly(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(driverMock, Stop()).Times(1);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& onDone)
+            {
+                driverMock.StorePhaseCurrentsCallback(onDone);
+            });
+
+    bool called = false;
+    alignment.ForceAlignment(polePairs, config, [&called](std::optional<foc::Radians>)
+        {
+            called = true;
+        });
+
+    const auto withinLimit = drivers::ThreePhaseInverterMock::defaultMaxCurrent - 1.0f;
+    driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ withinLimit }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    EXPECT_FALSE(called);
+}
