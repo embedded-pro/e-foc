@@ -25,6 +25,7 @@
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
+#include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 
 extern "C" uint32_t SystemCoreClock;
@@ -71,6 +72,9 @@ namespace application
         void Reset() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
+        ControlLoopMetrics::Snapshot ControlLoopStatistics() const override;
+        const CanBusAdapter::ErrorCounters& CanStatistics() const override;
+        void ResetStatistics() override;
 
         // Implementation of drivers::ThreePhaseInverter
         OPTIMIZE_FOR_SPEED void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
@@ -207,7 +211,7 @@ namespace application
 
         struct Peripherals
         {
-            Peripherals() {};
+            Peripherals(){};
 
             hal::OutputPin performance{ Pins::performance };
             Cortex cortex;
@@ -240,6 +244,11 @@ namespace application
         infra::Function<void()> onInitialized;
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         ResetCause resetCause{ ResetCause::powerUp };
+        CycleCounter cycleCounter;
+        ControlLoopMetrics controlLoopMetrics;
+        // Set for the duration of one control interrupt. A second conversion arriving while it is
+        // set means the loop did not return in time, which no after-the-fact duration can show.
+        volatile bool controlLoopEntered{ false };
         infra::BoundedString::WithStorage<1024> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };

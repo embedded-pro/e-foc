@@ -30,6 +30,9 @@ namespace application
         MOCK_METHOD(foc::Volts, PowerSupplyVoltage, (), (override));
         MOCK_METHOD(foc::LowPriorityInterrupt&, LowPriorityInterrupt, (), (override));
         MOCK_METHOD(hal::Eeprom&, Eeprom, (), (override));
+        MOCK_METHOD(application::ControlLoopMetrics::Snapshot, ControlLoopStatistics, (), (const, override));
+        MOCK_METHOD(const application::CanBusAdapter::ErrorCounters&, CanStatistics, (), (const, override));
+        MOCK_METHOD(void, ResetStatistics, (), (override));
         MOCK_METHOD(void, Reset, (), (override));
         MOCK_METHOD(application::ResetCause, GetResetCause, (), (const, override));
         MOCK_METHOD(infra::BoundedConstString, FaultStatus, (), (const, override));

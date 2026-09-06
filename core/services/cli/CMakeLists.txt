@@ -16,6 +16,8 @@ target_link_libraries(e_foc.services.cli PUBLIC
 target_sources(e_foc.services.cli PRIVATE
     TerminalBase.cpp
     TerminalBase.hpp
+    TerminalDiagnostics.cpp
+    TerminalDiagnostics.hpp
     TerminalHelper.hpp
     TerminalPosition.cpp
     TerminalPosition.hpp

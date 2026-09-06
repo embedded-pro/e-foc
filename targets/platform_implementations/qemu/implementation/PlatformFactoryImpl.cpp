@@ -10,7 +10,7 @@
 namespace application
 {
     PlatformFactoryImpl::PlatformFactoryImpl(const foc::ThreePhaseMotorModel::Parameters& motorParams,
-                                             const infra::Function<void()>& onInit)
+        const infra::Function<void()>& onInit)
         : onInitialized(onInit)
         , model(
               motorParams,
@@ -110,9 +110,30 @@ namespace application
         return {};
     }
 
+    ControlLoopMetrics::Snapshot PlatformFactoryImpl::ControlLoopStatistics() const
+    {
+        return controlLoopMetrics.Read();
+    }
+
+    const CanBusAdapter::ErrorCounters& PlatformFactoryImpl::CanStatistics() const
+    {
+        return const_cast<PlatformFactoryImpl*>(this)->CanBus().ErrorStatistics();
+    }
+
+    void PlatformFactoryImpl::ResetStatistics()
+    {
+        controlLoopMetrics.Reset();
+        CanBus().ResetErrorStatistics();
+    }
+
     void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz freq, std::chrono::nanoseconds, SampleAndHold)
     {
         baseFrequency = freq;
+
+        const auto periodCycles = freq.Value() == 0
+                                      ? 0u
+                                      : static_cast<uint32_t>(kQemuSystemClockHz / freq.Value());
+        controlLoopMetrics.Configure(periodCycles / 4u * 3u, periodCycles);
     }
 
     void PlatformFactoryImpl::SetEncoderResolution(uint32_t)
@@ -124,9 +145,9 @@ namespace application
         {
             canBusAdapter.emplace();
             canPollTimer.Start(std::chrono::milliseconds(1), [this]()
-            {
-                canBusAdapter->PollIncoming();
-            });
+                {
+                    canBusAdapter->PollIncoming();
+                });
         }
     }
 
@@ -153,8 +174,23 @@ namespace application
     void PlatformFactoryImpl::FocTimerIsr()
     {
         model.StepForTest(lastDutyPhases);
-        if (onPhaseCurrentsReady)
-            onPhaseCurrentsReady(lastCurrents);
+
+        if (!onPhaseCurrentsReady)
+            return;
+
+        if (controlLoopEntered)
+        {
+            controlLoopMetrics.RecordReentry();
+            return;
+        }
+
+        controlLoopEntered = true;
+        const auto entryCycles = CycleCounter::Now();
+
+        onPhaseCurrentsReady(lastCurrents);
+
+        controlLoopMetrics.Record(CycleCounter::Now() - entryCycles);
+        controlLoopEntered = false;
     }
 
     void PlatformFactoryImpl::Start()

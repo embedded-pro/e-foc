@@ -2,8 +2,8 @@
 #include "core/platform_abstraction/test_doubles/CanBusAdapterMock.hpp"
 #include "hal/interfaces/test_doubles/EepromMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
-#include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/stream/test/StreamMock.hpp"
+#include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/test_helper/MockHelpers.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "targets/hardware_test/components/Terminal.hpp"
@@ -30,6 +30,9 @@ namespace
         MOCK_METHOD(foc::LowPriorityInterrupt&, LowPriorityInterrupt, (), (override));
         MOCK_METHOD(hal::Eeprom&, Eeprom, (), (override));
         MOCK_METHOD(void, RegisterBoardProtection, (const infra::Function<void(application::PlatformFactory::BoardProtectionReason)>&), (override));
+        MOCK_METHOD(application::ControlLoopMetrics::Snapshot, ControlLoopStatistics, (), (const, override));
+        MOCK_METHOD(const application::CanBusAdapter::ErrorCounters&, CanStatistics, (), (const, override));
+        MOCK_METHOD(void, ResetStatistics, (), (override));
         MOCK_METHOD(void, Reset, (), (override));
         MOCK_METHOD(application::ResetCause, GetResetCause, (), (const, override));
         MOCK_METHOD(infra::BoundedConstString, FaultStatus, (), (const, override));

@@ -24,3 +24,34 @@
     shunt, amplifier or ADC channel shall be the responsibility of the hardware
     protection path, not of the control loop. Conversion of the modulator output to
     duty cycles shall clamp each phase into the range [0, 1] and do nothing further.
+
+- id: REQ-PERF-004
+  title: The control interrupt measures its own execution time
+  shall: >
+    The platform shall measure the duration of every control-interrupt execution with the Cortex-M
+    cycle counter and shall maintain, without dynamic allocation, the last, minimum, maximum and a
+    filtered average of that duration, together with the count of executions. The measurement shall
+    span the whole interrupt — dispatch, encoder read, control law and PWM write — because that is
+    the graph the cycle budget is stated against.
+
+- id: REQ-PERF-005
+  title: Overruns and deadline misses are counted separately
+  shall: >
+    The platform shall count separately the executions that exceed the cycle budget and those that
+    exceed the control period. Exceeding the budget means the margin is spent while the deadline was
+    still met; exceeding the period means the next conversion was already due. Both counters shall
+    saturate rather than wrap, so a long run cannot be mistaken for a healthy one.
+
+- id: REQ-PERF-006
+  title: A control interrupt that re-enters is detected as it happens
+  shall: >
+    The platform shall count each control interrupt that arrives while the previous one has not
+    returned. A duration can only report a missed deadline after the fact; re-entry is the same
+    failure observed as it occurs, and no measured duration reveals it.
+
+- id: REQ-PERF-007
+  title: Every CAN error class is counted
+  shall: >
+    The CAN adapter shall count every error class it reports, not only the bus-off condition that
+    raises a fault. Counting shall happen on the common adapter base so that no reporting path can
+    omit it, and the counters shall be readable from the command line.

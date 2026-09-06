@@ -3,6 +3,7 @@
 #include "hal/interfaces/Can.hpp"
 #include "infra/stream/OutputStream.hpp"
 #include "infra/util/Function.hpp"
+#include <array>
 #include <concepts>
 #include <cstdint>
 #include <type_traits>
@@ -31,8 +32,81 @@ namespace application
             other,
         };
 
+        static constexpr std::size_t errorClasses = static_cast<std::size_t>(CanError::other) + 1;
+
+        // The error callback maps busOff to a fault and drops the eleven other classes on the
+        // floor, which is the difference between a bus with marginal termination and one that is
+        // simply unplugged. Counters saturate rather than wrap, so a long run cannot look healthy.
+        class ErrorCounters
+        {
+        public:
+            void Record(CanError error)
+            {
+                auto& counter = counters.at(IndexOf(error));
+                counter = Increment(counter);
+                total = Increment(total);
+            }
+
+            void Reset()
+            {
+                counters = std::array<uint32_t, errorClasses>{};
+                total = 0;
+            }
+
+            uint32_t Count(CanError error) const
+            {
+                return counters.at(IndexOf(error));
+            }
+
+            uint32_t Total() const
+            {
+                return total;
+            }
+
+        private:
+            static constexpr uint32_t saturated = 0xFFFFFFFFu;
+
+            // An adapter reporting a class this build does not know counts as `other` rather than
+            // indexing past the end.
+            static std::size_t IndexOf(CanError error)
+            {
+                const auto index = static_cast<std::size_t>(error);
+
+                return index < errorClasses ? index : errorClasses - 1;
+            }
+
+            static uint32_t Increment(uint32_t counter)
+            {
+                return counter == saturated ? counter : counter + 1;
+            }
+
+            std::array<uint32_t, errorClasses> counters{};
+            uint32_t total{ 0 };
+        };
+
         virtual void SetOnError(const infra::Function<void(CanError)>& handler) = 0;
 
+        const ErrorCounters& ErrorStatistics() const
+        {
+            return errorCounters;
+        }
+
+        void ResetErrorStatistics()
+        {
+            errorCounters.Reset();
+        }
+
+    protected:
+        // Every adapter routes its reports through here, so no path can report without counting.
+        void RecordError(CanError error)
+        {
+            errorCounters.Record(error);
+        }
+
+    private:
+        ErrorCounters errorCounters;
+
+    public:
         friend infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, CanError error)
         {
             using enum CanError;
@@ -96,7 +170,7 @@ namespace application
         void SendData(Id id, const Message& data, const infra::Function<void(bool success)>& actionOnCompletion) override;
         void ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction) override;
         void SetOnError(const infra::Function<void(CanError)>& handler) override;
-        void InvokeErrorHandler(CanError error) const;
+        void InvokeErrorHandler(CanError error);
 
     private:
         Impl can;
@@ -124,8 +198,10 @@ namespace application
     }
 
     template<std::derived_from<hal::Can> Impl>
-    void CanBusAdapterImpl<Impl>::InvokeErrorHandler(CanError error) const
+    void CanBusAdapterImpl<Impl>::InvokeErrorHandler(CanError error)
     {
+        RecordError(error);
+
         if (onError)
             onError(error);
     }

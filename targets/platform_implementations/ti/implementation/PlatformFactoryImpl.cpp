@@ -154,6 +154,14 @@ namespace application
         using namespace std::chrono_literals;
         auto& impl = peripherals->adcForPhaseCurrentMeasurementImpl;
 
+        // The budget is the share of the control period the interrupt is allowed; the period is
+        // what it must fit inside. AGENTS.md fixes the budget at 4500 cycles of the 6000 a
+        // 20 kHz period gives at 120 MHz, so it is carried here as that same 75 percent.
+        const auto periodCycles = baseFrequency.Value() == 0
+                                      ? 0u
+                                      : static_cast<uint32_t>(SystemCoreClock / baseFrequency.Value());
+        controlLoopMetrics.Configure(periodCycles / 4u * 3u, periodCycles);
+
         auto& adcCfg = impl.adcConfig;
         adcCfg.interruptPriority = InterruptPriorities::phaseCurrentAdc;
         adcCfg.sampleAndHold = impl.toSampleAndHold.at(static_cast<std::size_t>(sampleAndHold));
@@ -253,9 +261,25 @@ namespace application
             peripherals->asyncPwm->SetBaseFrequency(baseFrequency);
         else
             peripherals->syncPwm->SetBaseFrequency(baseFrequency);
+        // Measured here rather than around Calculate() so the figure covers the whole interrupt -
+        // dispatch, encoder read, control law and the PWM write - which is what the cycle budget
+        // models. The counter is free-running, so the delta stays correct across its own wrap, and
+        // the cost is two register reads plus the update.
         peripherals->phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
             {
+                if (controlLoopEntered)
+                {
+                    controlLoopMetrics.RecordReentry();
+                    return;
+                }
+
+                controlLoopEntered = true;
+                const auto entryCycles = CycleCounter::Now();
+
                 onPhaseCurrentsReady(foc::PhaseCurrents{ a, b, c });
+
+                controlLoopMetrics.Record(CycleCounter::Now() - entryCycles);
+                controlLoopEntered = false;
             });
     }
 
@@ -326,5 +350,21 @@ namespace application
     infra::BoundedConstString PlatformFactoryImpl::FaultStatus() const
     {
         return faultStatusString;
+    }
+
+    ControlLoopMetrics::Snapshot PlatformFactoryImpl::ControlLoopStatistics() const
+    {
+        return controlLoopMetrics.Read();
+    }
+
+    const CanBusAdapter::ErrorCounters& PlatformFactoryImpl::CanStatistics() const
+    {
+        return const_cast<PlatformFactoryImpl*>(this)->CanBus().ErrorStatistics();
+    }
+
+    void PlatformFactoryImpl::ResetStatistics()
+    {
+        controlLoopMetrics.Reset();
+        CanBus().ResetErrorStatistics();
     }
 }

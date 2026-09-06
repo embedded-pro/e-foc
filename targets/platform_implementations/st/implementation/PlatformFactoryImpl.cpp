@@ -305,4 +305,20 @@ namespace application
     {
         return faultStatusString;
     }
+
+    ControlLoopMetrics::Snapshot PlatformFactoryImpl::ControlLoopStatistics() const
+    {
+        return controlLoopMetrics.Read();
+    }
+
+    const CanBusAdapter::ErrorCounters& PlatformFactoryImpl::CanStatistics() const
+    {
+        return const_cast<PlatformFactoryImpl*>(this)->CanBus().ErrorStatistics();
+    }
+
+    void PlatformFactoryImpl::ResetStatistics()
+    {
+        controlLoopMetrics.Reset();
+        CanBus().ResetErrorStatistics();
+    }
 }

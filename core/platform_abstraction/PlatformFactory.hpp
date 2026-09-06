@@ -2,6 +2,7 @@
 
 #include "core/foc/interfaces/Execution.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
+#include "core/platform_abstraction/ControlLoopMetrics.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "hal/interfaces/Eeprom.hpp"
 #include "hal/interfaces/Gpio.hpp"
@@ -79,6 +80,12 @@ namespace application
         virtual hal::Eeprom& Eeprom() = 0;
 
         virtual void RegisterBoardProtection(const infra::Function<void(BoardProtectionReason)>& onProtection) = 0;
+
+        // Execution statistics for the control interrupt and a count of every CAN error class the
+        // adapter has reported. Both are accumulated where the events happen and read from here.
+        virtual ControlLoopMetrics::Snapshot ControlLoopStatistics() const = 0;
+        virtual const CanBusAdapter::ErrorCounters& CanStatistics() const = 0;
+        virtual void ResetStatistics() = 0;
 
         virtual void Reset() = 0;
         virtual ResetCause GetResetCause() const = 0;
