@@ -127,12 +127,12 @@ $$
 
 ## Numerical Properties
 
-| Property                    | Value                                         |
-|-----------------------------|-----------------------------------------------|
-| Ops per 1 kHz cycle         | 2 MACs (1 multiply + wrap + clamp)            |
+| Property                    | Value                                                                                     |
+|-----------------------------|-------------------------------------------------------------------------------------------|
+| Ops per 1 kHz cycle         | 2 MACs (1 multiply + wrap + clamp)                                                        |
 | Steady-state position error | Non-zero under constant velocity reference for the P design; removed by the integral term |
-| Steady-state error at rest  | Zero (no steady velocity → no position error) |
-| Requires J, Bf              | No                                            |
+| Steady-state error at rest  | Zero (no steady velocity → no position error)                                             |
+| Requires J, Bf              | No                                                                                        |
 | Tuning knobs                | 2 ($K_p = \omega_{bw}^p$, and the integral weight relative to the position-error weight)  |
 
 ---

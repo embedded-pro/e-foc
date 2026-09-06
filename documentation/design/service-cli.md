@@ -127,11 +127,11 @@ may be spinning.
 Three commands expose what the control loop and the CAN bus have been doing. Each of these numbers
 was previously either computed and discarded or never gathered at all.
 
-| Command        | Alias | Reports                                                                              |
-|----------------|-------|--------------------------------------------------------------------------------------|
-| `loop_stats`   | `ls`  | Control-interrupt execution: sample count, budget, last/min/average/max cycles, overruns, deadline misses, re-entries |
-| `can_stats`    | `cs`  | CAN error counters, total and per class, printing only the classes that have occurred |
-| `clear_stats`  | `xs`  | Resets both sets of counters                                                          |
+| Command       | Alias | Reports                                                                                                               |
+|---------------|-------|-----------------------------------------------------------------------------------------------------------------------|
+| `loop_stats`  | `ls`  | Control-interrupt execution: sample count, budget, last/min/average/max cycles, overruns, deadline misses, re-entries |
+| `can_stats`   | `cs`  | CAN error counters, total and per class, printing only the classes that have occurred                                 |
+| `clear_stats` | `xs`  | Resets both sets of counters                                                                                          |
 
 **Overrun versus deadline miss.** The two are distinct and both are reported. An overrun means the
 interrupt exceeded the share of the period it is budgeted — the margin is gone, but the deadline was
