@@ -43,9 +43,23 @@ A naked assembly trampoline runs in HardFault exception context before any C fun
 
 The capture routine's **first** action is to call `CutPowerStage()`. Everything after it — the register
 capture, the stack scan, the reset — takes time during which six gate drivers otherwise hold whatever state
-they had when the fault hit. `CutPowerStage()` is a weak, empty symbol so the handler links on every target; a
-target that can tristate its bridge from exception context overrides it to do so. Until a target provides that
-override the gate drivers still hold their state, so this is a hook, not yet a guarantee.
+they had when the fault hit.
+
+`CutPowerStage()` is declared by the handler and **defined by each platform**; it is deliberately not a weak
+fallback. A weak definition in the handler's own translation unit is the one the linker settles on, because the
+archive member carrying the real definition is never pulled in — nothing references a symbol only it defines.
+The result is a hook that is called on every fault and cuts nothing. Requiring the definition means a platform
+that forgets it fails to link.
+
+On TI, the definition clears `PWMENABLE` on each PWM module that `SYSCTL->PRPWM` reports as clocked, which
+drives every `pwmN` output low and so turns all six gate signals off. It is a handful of instructions with no
+loop and no dependency on driver state, and it touches no unclocked peripheral — a write to one would fault
+again, and a nested fault here is the lockup this call exists to prevent.
+
+On ST the definition is empty, and says so: that target does not drive a bridge yet — both
+`PinsAndPeripherals.hpp` are empty and the encoder reports a resolution of zero — so there is no timer instance
+to name. Cutting the stage there means clearing `TIM_BDTR_MOE` on whichever advanced-control timer the board
+wires to the gate drivers, and that belongs with the work that makes the target functional.
 
 The capture routine then writes all eight words of the ARM exception stack frame (R0–R3, R12, LR, PC, xPSR) plus
 three Cortex-M fault status registers (CFSR, MMFAR, BFAR) into the persistent region. It also scans the stack
@@ -158,6 +172,7 @@ sequenceDiagram
     CPU->>Asm: exception taken, stack frame pushed
     Asm->>Asm: test LR bit 2 — select MSP or PSP
     Asm->>C: branch with stack pointer + LR value
+    C->>C: CutPowerStage() — PWM outputs off before anything else
     C->>PFD: magic = 0  (invalidate)
     C->>PFD: write r0–psr from exception frame
     C->>PFD: write cfsr, mmfar, bfar from SCB

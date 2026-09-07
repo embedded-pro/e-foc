@@ -65,3 +65,13 @@
     command, the device shall reboot and the fault_status command on the
     subsequent boot shall return captured fault diagnostic data including
     at minimum the faulting PC address.
+
+- id: REQ-EH-007
+  title: The hard fault handler cuts the power stage first
+  shall: >
+    The Cortex-M hard fault handler shall disable the PWM outputs before it writes any
+    diagnostics or scans the stack, using a direct peripheral access that depends on no
+    driver state and touches no peripheral the system control block reports as unclocked.
+    Every platform that links the handler shall provide that definition; it shall not be
+    satisfied by a weak fallback, because the fallback is the definition the linker
+    settles on when the archive member carrying the real one is never pulled in.

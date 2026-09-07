@@ -22,5 +22,7 @@ namespace services
         };
 
         virtual void ForceAlignment(std::size_t polePairs, const AlignmentConfig& config, const infra::Function<void(std::optional<foc::Radians>)>& onDone) = 0;
+
+        virtual void Abort() = 0;
     };
 }

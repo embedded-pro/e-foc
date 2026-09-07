@@ -33,6 +33,8 @@ namespace services
 
         void Start(const Config& config, const infra::Function<void(Result)>& onDone);
 
+        void Abort();
+
     private:
         void OnCurrentSample(foc::PhaseCurrents currents);
         Result ComputeResult() const;

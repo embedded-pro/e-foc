@@ -1,4 +1,5 @@
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
+#include "targets/platform_implementations/error_handling_cortex_m/PowerStageCutOff.hpp"
 #include DEVICE_HEADER
 #include <cstdlib>
 
@@ -18,9 +19,6 @@ extern "C"
     extern uint32_t _etext;
     extern uint32_t _estack;
 
-    __attribute__((weak)) void CutPowerStage(void)
-    {}
-
     __attribute__((naked)) void HardFault_Handler()
     {
         __asm volatile(
@@ -37,7 +35,7 @@ extern "C"
         using application::PersistentFaultData;
         using application::persistentFaultData;
 
-        CutPowerStage();
+        application::PowerStageCutOff::Cut();
 
         // Invalidate while writing to prevent partially-written data being
         // read as valid on a watchdog timeout mid-write.

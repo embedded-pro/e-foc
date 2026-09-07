@@ -21,3 +21,21 @@
     The alignment procedure shall report the offset it measured as a mechanical angle,
     unscaled by the pole-pair count, so that a consumer converting it to an electrical
     angle does so exactly once.
+
+- id: REQ-CAL-004
+  title: Mechanical identification drives the motor through the control loop
+  shall: >
+    Mechanical identification shall obtain its phase-current samples by observing the
+    running control loop, and shall start and stop the drive through the controller it was
+    given. It shall not claim the inverter's phase-current callback for itself: that
+    callback is the control loop's only path to the PWM output, so claiming it leaves the
+    rotor stationary, the regressor without excitation, and the estimate unreachable.
+
+- id: REQ-CAL-005
+  title: An aborted calibration procedure drops its completion
+  shall: >
+    Every calibration procedure shall offer an abort that stops injection, cancels its
+    timers and discards its pending completion without invoking it, so that a caller that
+    aborts owns the outcome and a fault cannot be overwritten by the result of the
+    procedure it interrupted. A procedure that has been aborted or has completed shall
+    ignore any further phase-current sample it is handed.

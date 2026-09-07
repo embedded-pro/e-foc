@@ -54,6 +54,13 @@ namespace
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<services::MechanicalParametersIdentificationMock> mechIdentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
+        infra::Execute setupTeardownExpectations{ [this]()
+            {
+                EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(mechIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
+            } };
 
         infra::Execute setupHardwareExpectations{ [this]()
             {
@@ -64,11 +71,11 @@ namespace
                 EXPECT_CALL(inverterMock, Stop()).Times(AnyNumber());
                 EXPECT_CALL(lowPriorityInterruptMock, Register(_)).Times(AnyNumber());
                 EXPECT_CALL(lowPriorityInterruptMock, Unregister()).Times(AnyNumber());
-                EXPECT_CALL(faultNotifierMock, Register(_))
+                EXPECT_CALL(faultNotifierMock, Register(_, _))
                     .Times(AnyNumber())
-                    .WillRepeatedly(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)
+                    .WillRepeatedly(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& immediate, const infra::Function<void(state_machine::FaultCode)>& deferred)
                         {
-                            faultNotifierMock.StoreHandler(handler);
+                            faultNotifierMock.StoreHandler(immediate, deferred);
                         }));
             } };
 

@@ -30,6 +30,8 @@ date: 2026-04-07
 
 **Is responsible for:**
 - Estimating rotor moment of inertia (J) and viscous friction coefficient (B) while the motor runs in closed-loop speed control
+- Starting and stopping the drive for the duration of the procedure, and commanding the target speed that provides the excitation
+- Releasing the drive and discarding the pending completion when the caller aborts, so that a fault is not overwritten by the result of the procedure it interrupted
 - Computing instantaneous electromagnetic torque from the q-axis current and the caller-supplied torque constant
 - Estimating angular acceleration by finite-differencing successive speed measurements obtained from the encoder
 - Maintaining a real-time Recursive Least Squares (RLS) estimator that continuously refines the parameter vector [J, B, τ_friction] using each new observation
@@ -37,7 +39,7 @@ date: 2026-04-07
 - Delivering results through a single completion notification that reports friction and inertia using explicit physical units
 
 **Is NOT responsible for:**
-- Starting or configuring the speed control loop — an external speed-control function must already be active when the procedure begins
+- Configuring the speed control loop — the loop's tunings and algorithm selection are established before the procedure begins
 - Persisting the returned parameters — the caller decides what to do with them
 - Auto-tuning the speed controller — this service provides the plant parameters that a separate tuning step may consume
 - Measuring electrical parameters (R, L, pole pairs) — those are handled by the Electrical Parameters Identification service
@@ -73,7 +75,7 @@ At each sampling callback, the instantaneous electromagnetic torque is estimated
 τ_motor = Kt × Iq
 ```
 
-where `Kt` is the torque constant (N·m/A) provided by the caller. The q-axis current `Iq` is the measured value supplied by the `ThreePhaseInverter` ADC callback — the same current feedback path used by the FOC current controller.
+where `Kt` is the torque constant (N·m/A) provided by the caller. The q-axis current `Iq` is the measured value the control loop is already sampling — the same current feedback path used by the FOC current controller.
 
 The d-axis contribution to torque is zero for surface PMSM under the Id = 0 operating condition assumed during identification. For interior PMSM with reluctance torque, this approximation introduces a small systematic error in the torque estimate; the caller should account for this if Ld ≠ Lq.
 
@@ -87,11 +89,31 @@ Angular velocity (ω) at each observation instant is obtained from two successiv
 
 where Δt is the sampling period and wrap-around compensation shifts the raw difference into the range (−π/Δt, +π/Δt) rad/s in exactly the same manner used by the speed control outer loop.
 
-Δt must be the period of the callback that produced the two samples. The observation callback is registered on
-`ThreePhaseInverter::PhaseCurrentsReady` at the inverter's **base** frequency, not at the speed-command
-frequency, so Δt is derived from `BaseFrequency()`. Deriving it from the outer-loop rate instead scales ω by
-the ratio of the two frequencies and α by its square — at 20 kHz against 1 kHz that is 20× on speed and 400×
-on inertia, and the inertia estimate becomes speed-loop PID gains.
+Δt must be the period of the callback that produced the two samples. Observations arrive with the control
+loop's current samples, at the inverter's **base** frequency rather than the speed-command frequency, so Δt is
+derived from `BaseFrequency()`. Deriving it from the outer-loop rate instead scales ω by the ratio of the two
+frequencies and α by its square — at 20 kHz against 1 kHz that is 20× on speed and 400× on inertia, and the
+inertia estimate becomes speed-loop PID gains.
+
+### Obtaining the observations
+
+The inverter carries a **single** phase-current callback slot, and that slot is the control loop's only path to
+the PWM output. A procedure that claims it for itself evicts the control loop: no duty cycles are written, the
+inverter is never started, the rotor stays where it is, and the regressor carries no excitation for the
+estimator to converge on. The procedure then runs to its timeout and reports failure — on hardware only, since
+a test double that publishes samples on demand hides the whole effect.
+
+So this procedure does not claim the slot. It registers as an **observer** on the running control loop, which
+publishes the phase currents it has just used, after the duty cycles are written. Starting and stopping the
+drive is likewise done through the controller rather than by writing the inverter directly.
+
+Two consequences follow from the observer running in the ADC interrupt:
+
+- The procedure's completion is handed to the event dispatcher rather than invoked from the interrupt.
+  Releasing the observer from inside its own invocation would destroy the closure being executed, and the
+  completion reaches non-volatile memory through the state machine.
+- An abort takes effect immediately — the drive is stopped and the observer released — but the pending
+  completion is dropped rather than invoked. The caller that aborted owns the outcome.
 
 Each observation reads the encoder once. Reading it twice within a callback samples two different rotor positions and mixes them into a single difference.
 
@@ -143,16 +165,19 @@ The RLS state (θ and P) is held in a statically allocated object (`std::optiona
 ```mermaid
 flowchart TD
     START["EstimateFrictionAndInertia(Kt, polePairs, config, onDone)"] --> INIT["Initialise RLS\n(θ=0, P=αI)"]
-    INIT --> CMD_SPEED["FocSpeed::SetPoint(target_speed)"]
-    CMD_SPEED --> CB["ADC callback"]
+    INIT --> OBS["Register phase-current observer\non the running control loop"]
+    OBS --> DRIVE["Start drive"]
+    DRIVE --> CMD_SPEED["Command target speed"]
+    CMD_SPEED --> CB["Observer call\n(ADC interrupt)"]
     CB --> TAU["Estimate τ = Kt × Iq"]
     CB --> VEL["Estimate ω, dω/dt\nfrom encoder"]
     TAU --> RLS["RLS update step\n(φ=[dω/dt, ω, 1], y=τ)"]
     VEL --> RLS
     RLS --> TIMEOUT{"TimerSingleShot\nexpired?"}
     TIMEOUT -->|No| CB
-    TIMEOUT -->|Yes| REPORT["Read θ = [J, B, τ_fric]"]
-    REPORT --> CB2["onDone(B, J)"]
+    TIMEOUT -->|Yes| REL["Stop drive,\nrelease observer"]
+    REL --> REPORT["Read θ = [J, B, τ_fric]"]
+    REPORT --> CB2["onDone(B, J)\n(dispatcher context)"]
 ```
 
 ### Timeout and Result Delivery

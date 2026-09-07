@@ -48,6 +48,9 @@ namespace services
 
         driver.PhaseCurrentsReady(alignmentConfig.samplingFrequency, [this](auto currents)
             {
+                if (!onAlignmentDone)
+                    return;
+
                 if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
                 {
                     FailToConverge();
@@ -97,5 +100,14 @@ namespace services
 
         if (onAlignmentDone)
             onAlignmentDone(std::nullopt);
+    }
+
+    void MotorAlignmentImpl::Abort()
+    {
+        if (!onAlignmentDone)
+            return;
+
+        driver.Stop();
+        onAlignmentDone = nullptr;
     }
 }

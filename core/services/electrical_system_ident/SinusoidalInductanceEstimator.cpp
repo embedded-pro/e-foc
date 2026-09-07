@@ -68,8 +68,20 @@ namespace services
             });
     }
 
+    void SinusoidalInductanceEstimator::Abort()
+    {
+        if (!onDone)
+            return;
+
+        driver.Stop();
+        onDone = nullptr;
+    }
+
     void SinusoidalInductanceEstimator::OnCurrentSample(foc::PhaseCurrents currents)
     {
+        if (!onDone)
+            return;
+
         const float vNorm = injectionAmplitude * math::Sin(injectionPhase);
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ vNorm, 0.0f }, 1.0f, 0.0f)));

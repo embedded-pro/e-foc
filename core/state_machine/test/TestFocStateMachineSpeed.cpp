@@ -38,6 +38,13 @@ namespace
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<services::MechanicalParametersIdentificationMock> mechIdentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
+        infra::Execute setupTeardownExpectations{ [this]()
+            {
+                EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(mechIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
+            } };
 
         foc::Volts vdc{ 24.0f };
 
@@ -54,10 +61,10 @@ namespace
 
         void GivenFaultNotifierRegistered()
         {
-            EXPECT_CALL(faultNotifierMock, Register(_))
-                .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)
+            EXPECT_CALL(faultNotifierMock, Register(_, _))
+                .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& immediate, const infra::Function<void(state_machine::FaultCode)>& deferred)
                     {
-                        faultNotifierMock.StoreHandler(handler);
+                        faultNotifierMock.StoreHandler(immediate, deferred);
                     }));
         }
 
@@ -992,6 +999,13 @@ namespace
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<services::MechanicalParametersIdentificationMock> mechIdentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
+        infra::Execute setupTeardownExpectations{ [this]()
+            {
+                EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(mechIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
+            } };
 
         foc::Volts vdc{ 24.0f };
 
@@ -1008,10 +1022,10 @@ namespace
 
         void GivenFaultNotifierRegistered()
         {
-            EXPECT_CALL(faultNotifierMock, Register(_))
-                .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& handler)
+            EXPECT_CALL(faultNotifierMock, Register(_, _))
+                .WillOnce(Invoke([this](const infra::Function<void(state_machine::FaultCode)>& immediate, const infra::Function<void(state_machine::FaultCode)>& deferred)
                     {
-                        faultNotifierMock.StoreHandler(handler);
+                        faultNotifierMock.StoreHandler(immediate, deferred);
                     }));
         }
 

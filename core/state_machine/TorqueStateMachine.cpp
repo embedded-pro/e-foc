@@ -17,6 +17,11 @@ namespace application
         CheckNvmOnBoot();
     }
 
+    TorqueStateMachine::~TorqueStateMachine()
+    {
+        ReleaseExternalResources();
+    }
+
     foc::FocTorque& TorqueStateMachine::GetController()
     {
         return focController;

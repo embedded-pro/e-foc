@@ -14,6 +14,7 @@ namespace services
         MotorAlignmentImpl(drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder);
 
         void ForceAlignment(std::size_t polePairs, const AlignmentConfig& config, const infra::Function<void(std::optional<foc::Radians>)>& onDone) override;
+        void Abort() override;
 
     private:
         void ApplyAlignmentVoltage();

@@ -90,20 +90,38 @@ namespace services
 
         driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
             {
+                if (!polePairsRunning)
+                    return;
+
                 if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
-                    AbortPolePairs();
+                    FailPolePairs();
             });
         ApplyNextElectricalAngle();
     }
 
-    void ElectricalParametersIdentificationImpl::AbortPolePairs()
+    void ElectricalParametersIdentificationImpl::Abort()
+    {
+        resistanceEstimator.Abort();
+        inductanceEstimator.Abort();
+        rlRunning = false;
+        onResistanceAndInductanceDone = nullptr;
+
+        if (polePairsRunning)
+        {
+            settleTimer.Cancel();
+            driver.Stop();
+            polePairsRunning = false;
+            onPolePairsDone = nullptr;
+        }
+    }
+
+    void ElectricalParametersIdentificationImpl::FailPolePairs()
     {
         if (!polePairsRunning)
             return;
 
         settleTimer.Cancel();
         driver.Stop();
-        driver.PhaseCurrentsReady(samplingFrequency, [](auto) {});
         polePairsRunning = false;
 
         if (onPolePairsDone)
@@ -130,6 +148,9 @@ namespace services
 
         settleTimer.Start(polePairsConfig.settleTimeBetweenSteps, [this]()
             {
+                if (!polePairsRunning)
+                    return;
+
                 const auto currentPosition = encoder.Read();
                 auto delta = currentPosition.Value() - previousPosition.Value();
                 delta = delta - twoPi * std::floor((delta + std::numbers::pi_v<float>) / twoPi);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/interfaces/Signals.hpp"
 #include "infra/util/Function.hpp"
 
 namespace foc
@@ -21,5 +22,14 @@ namespace foc
 
         virtual void Start() = 0;
         virtual void Stop() = 0;
+    };
+
+    class PhaseCurrentsObservable
+    {
+    public:
+        virtual ~PhaseCurrentsObservable() = default;
+
+        virtual void RegisterPhaseCurrentsObserver(const infra::Function<void(const PhaseCurrents& currentPhases)>& observer) = 0;
+        virtual void UnregisterPhaseCurrentsObserver() = 0;
     };
 }

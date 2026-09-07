@@ -147,7 +147,23 @@ After saving, calibration data is applied to the FOC controller (current PID gai
 
 ### Fault Safety
 
-Entering `Fault` always stops the inverter when the machine was in `Enabled` or `Calibrating` state. This ensures that any active PWM output (from normal operation or from identification test signals) is immediately cut, regardless of which state caused the fault.
+Entering `Fault` commits the `Fault` state first, then stops the inverter if the machine was in `Enabled` or
+`Calibrating`, then aborts the calibration services. Committing the state first means a fault raised inside the
+stop sees `Fault` rather than the state it is leaving, and a calibration completion that arrives afterwards no
+longer finds itself in `Calibrating`.
+
+Stopping the inverter is not on its own enough to cut the PWM output. The identification services drive the
+bridge through their own timers and phase-current callbacks, and one left running writes duty cycles on its
+next tick — `ThreePhasePwmOutput` re-arms the peripheral that `Stop()` just disabled. So `EnterFault` and
+`CmdEmergencyStop` both call `Abort()` on the electrical identification, the alignment and (in speed and
+position modes) the mechanical identification. `Abort()` stops injection, cancels the service's timers, and
+drops the pending completion **without invoking it**: the state machine owns the outcome, and a late
+calibration result must not overwrite the fault that interrupted it. A service that has been aborted or has
+completed ignores any further phase-current sample it is handed, rather than reclaiming the inverter's
+callback slot — reassigning that slot from inside its own invocation would destroy the closure being executed.
+
+The `Runner` releases the inverter's phase-current callback in `Disable()` for the same reason: a callback left
+pointing at a stopped control loop is another path back to `ThreePhasePwmOutput`.
 
 `EnterEnabled` commits the `Enabled` state **before** it starts the FOC controller, and re-checks the state
 afterwards. A fault raised in the window where current first flows would otherwise observe `Ready`, skip the
@@ -168,6 +184,29 @@ condition that is still asserted can be cleared and re-enabled indefinitely, re-
 every cycle.
 
 The last fault code is preserved in `LastFaultCode()` and remains readable even after the fault is cleared via `CmdClearFault`. Before any fault has occurred it reads `FaultCode::none`, so a client can distinguish "no fault yet" from a real hardware fault.
+
+#### Faults raised in interrupt context
+
+`PlatformFaultNotifier`'s primary path runs in the PWM fault interrupt (board protection) or the CAN interrupt
+(bus-off). Neither is a context in which the transition itself can be taken: `EnterFault` traces, writes a
+multi-word `std::variant` that the CLI and the CAN bridge read concurrently, and completes a pending command
+that reaches non-volatile memory.
+
+The split is therefore: **cut the bridge in the interrupt, record the fault in the dispatcher.** The registered
+handler calls `Stop()` on the FOC controller synchronously — unconditionally, without consulting the state,
+because hardware saying "fault" outranks the state machine's belief about what it was doing — and then hands
+`EnterFault` to `infra::EventDispatcher`. The secondary handler, which broadcasts the fault over CAN, already
+worked this way.
+
+A consequence worth knowing when reading the code or the tests: between the interrupt and the dispatcher turn,
+the bridge is off but `CurrentState()` still reports the pre-fault state.
+
+#### Registration lifetime
+
+A `FaultNotifier` outlives the state machines that register with it — a control-mode switch destroys one state
+machine and constructs the next in the same `std::variant` — so each state machine releases its registration
+and aborts its calibration services in its destructor. Without that, the notifier's `infra::Function` and the
+services' pending callbacks both point into freed storage.
 
 Hardware protection events reach the state machine through `PlatformFaultNotifier`, the production `FaultNotifier`. It registers a callback with `PlatformFactory::RegisterBoardProtection()` during construction and translates each `BoardProtectionReason` into the matching `FaultCode`:
 
