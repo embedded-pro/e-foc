@@ -73,9 +73,7 @@ namespace application
         void Reset() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
-        ControlLoopMetrics::Snapshot ControlLoopStatistics() const override;
-        const CanBusAdapter::ErrorCounters& CanStatistics() const override;
-        void ResetStatistics() override;
+        PlatformDiagnostics& Diagnostics() override;
 
         // Implementation of drivers::ThreePhaseInverter
         OPTIMIZE_FOR_SPEED void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
@@ -247,6 +245,7 @@ namespace application
         ResetCause resetCause{ ResetCause::powerUp };
         CycleCounter cycleCounter;
         ControlLoopMetrics controlLoopMetrics;
+        PlatformDiagnostics diagnostics{ controlLoopMetrics };
         volatile bool controlLoopEntered{ false };
         infra::BoundedString::WithStorage<1024> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };

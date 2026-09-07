@@ -21,8 +21,9 @@ namespace services
         };
     }
 
-    TerminalDiagnostics::TerminalDiagnostics(services::TerminalWithStorage& terminal, application::PlatformFactory& platform)
-        : platform(platform)
+    TerminalDiagnostics::TerminalDiagnostics(services::TerminalWithStorage& terminal, application::PlatformDiagnostics& diagnostics, services::Tracer& tracer)
+        : diagnostics(diagnostics)
+        , tracer(tracer)
     {
         terminal.AddCommand({ { "loop_stats", "ls", "Print control loop execution statistics" },
             [this](const infra::BoundedConstString&)
@@ -39,14 +40,13 @@ namespace services
         terminal.AddCommand({ { "clear_stats", "xs", "Reset control loop and CAN statistics" },
             [this](const infra::BoundedConstString&)
             {
-                this->platform.ResetStatistics();
+                this->diagnostics.Reset();
             } });
     }
 
     void TerminalDiagnostics::PrintControlLoopStatistics()
     {
-        const auto statistics = platform.ControlLoopStatistics();
-        auto& tracer = platform.Tracer();
+        const auto statistics = diagnostics.ControlLoopStatistics();
 
         tracer.Trace() << "[LOOP] samples=" << statistics.samples
                        << " budget=" << statistics.budgetCycles << " cycles";
@@ -61,8 +61,7 @@ namespace services
 
     void TerminalDiagnostics::PrintCanStatistics()
     {
-        const auto& counters = platform.CanStatistics();
-        auto& tracer = platform.Tracer();
+        const auto& counters = diagnostics.CanStatistics();
 
         tracer.Trace() << "[CAN] total errors=" << counters.Total();
 

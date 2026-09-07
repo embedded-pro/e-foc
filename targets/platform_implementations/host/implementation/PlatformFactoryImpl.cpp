@@ -100,6 +100,7 @@ namespace application
     {
         canBus.reset();
         canBus.emplace();
+        diagnostics.AttachCanBus(*canBus);
     }
 
     CanBusAdapter& PlatformFactoryImpl::CanBus()
@@ -265,19 +266,8 @@ namespace application
         return faultStatusString;
     }
 
-    ControlLoopMetrics::Snapshot PlatformFactoryImpl::ControlLoopStatistics() const
+    PlatformDiagnostics& PlatformFactoryImpl::Diagnostics()
     {
-        return controlLoopMetrics.Read();
-    }
-
-    const CanBusAdapter::ErrorCounters& PlatformFactoryImpl::CanStatistics() const
-    {
-        return canBus->ErrorStatistics();
-    }
-
-    void PlatformFactoryImpl::ResetStatistics()
-    {
-        controlLoopMetrics.Reset();
-        CanBus().ResetErrorStatistics();
+        return diagnostics;
     }
 }

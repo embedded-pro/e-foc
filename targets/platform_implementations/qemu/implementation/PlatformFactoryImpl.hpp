@@ -53,9 +53,7 @@ namespace application
         void Reset() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
-        ControlLoopMetrics::Snapshot ControlLoopStatistics() const override;
-        const CanBusAdapter::ErrorCounters& CanStatistics() const override;
-        void ResetStatistics() override;
+        PlatformDiagnostics& Diagnostics() override;
 
         OPTIMIZE_FOR_SPEED void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone) override;
         OPTIMIZE_FOR_SPEED void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
@@ -158,6 +156,7 @@ namespace application
         infra::Function<void()> onInitialized;
         CycleCounter cycleCounter;
         ControlLoopMetrics controlLoopMetrics;
+        PlatformDiagnostics diagnostics{ controlLoopMetrics };
         volatile bool controlLoopEntered{ false };
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         Cortex cortex;

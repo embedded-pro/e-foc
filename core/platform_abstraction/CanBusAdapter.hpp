@@ -63,7 +63,54 @@ namespace application
     private:
         ErrorCounters errorCounters;
 
-        friend infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, CanError error);
+        friend infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, CanError error)
+        {
+            using enum CanError;
+            switch (error)
+            {
+                case busOff:
+                    stream << "bus off";
+                    break;
+                case errorPassive:
+                    stream << "error passive";
+                    break;
+                case errorWarning:
+                    stream << "error warning";
+                    break;
+                case messageLost:
+                    stream << "message lost";
+                    break;
+                case rxBufferOverflow:
+                    stream << "rx buffer overflow";
+                    break;
+                case ackError:
+                    stream << "ack error";
+                    break;
+                case stuffError:
+                    stream << "stuff error";
+                    break;
+                case formError:
+                    stream << "form error";
+                    break;
+                case crcError:
+                    stream << "crc error";
+                    break;
+                case bit0Error:
+                    stream << "bit0 error";
+                    break;
+                case bit1Error:
+                    stream << "bit1 error";
+                    break;
+                case other:
+                    stream << "other";
+                    break;
+                default:
+                    stream << "unknown";
+                    break;
+            }
+
+            return stream;
+        }
     };
 
     template<std::derived_from<hal::Can> Impl>

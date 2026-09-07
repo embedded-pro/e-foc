@@ -110,20 +110,9 @@ namespace application
         return {};
     }
 
-    ControlLoopMetrics::Snapshot PlatformFactoryImpl::ControlLoopStatistics() const
+    PlatformDiagnostics& PlatformFactoryImpl::Diagnostics()
     {
-        return controlLoopMetrics.Read();
-    }
-
-    const CanBusAdapter::ErrorCounters& PlatformFactoryImpl::CanStatistics() const
-    {
-        return canBusAdapter->ErrorStatistics();
-    }
-
-    void PlatformFactoryImpl::ResetStatistics()
-    {
-        controlLoopMetrics.Reset();
-        CanBus().ResetErrorStatistics();
+        return diagnostics;
     }
 
     void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz freq, std::chrono::nanoseconds, SampleAndHold)
@@ -144,6 +133,7 @@ namespace application
         if (!canBusAdapter)
         {
             canBusAdapter.emplace();
+            diagnostics.AttachCanBus(*canBusAdapter);
             canPollTimer.Start(std::chrono::milliseconds(1), [this]()
                 {
                     canBusAdapter->PollIncoming();

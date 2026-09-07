@@ -2,7 +2,7 @@
 
 #include "core/foc/interfaces/Execution.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
-#include "core/platform_abstraction/ControlLoopMetrics.hpp"
+#include "core/platform_abstraction/PlatformDiagnostics.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "hal/interfaces/Eeprom.hpp"
 #include "hal/interfaces/Gpio.hpp"
@@ -81,9 +81,7 @@ namespace application
 
         virtual void RegisterBoardProtection(const infra::Function<void(BoardProtectionReason)>& onProtection) = 0;
 
-        virtual ControlLoopMetrics::Snapshot ControlLoopStatistics() const = 0;
-        virtual const CanBusAdapter::ErrorCounters& CanStatistics() const = 0;
-        virtual void ResetStatistics() = 0;
+        virtual PlatformDiagnostics& Diagnostics() = 0;
 
         virtual void Reset() = 0;
         virtual ResetCause GetResetCause() const = 0;

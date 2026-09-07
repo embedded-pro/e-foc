@@ -5,7 +5,8 @@ emil_add_test(e_foc.services.cli_test)
 target_link_libraries(e_foc.services.cli_test PUBLIC
     gmock_main
     e_foc.services.cli
-    e_foc.platform_abstraction_mock
+    e_foc.platform_abstraction
+    can_lite.test_util
     hal.interfaces_test_doubles
     infra.timer_test_helper
     infra.event_test_helper

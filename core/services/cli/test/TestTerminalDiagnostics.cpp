@@ -1,4 +1,5 @@
-#include "core/platform_abstraction/test_doubles/PlatformFactoryMock.hpp"
+#include "can-lite/core/test/CanMock.hpp"
+#include "core/platform_abstraction/PlatformDiagnostics.hpp"
 #include "core/services/cli/TerminalDiagnostics.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
@@ -12,6 +13,9 @@ namespace
 {
     using CanError = application::CanBusAdapter::CanError;
 
+    constexpr uint32_t budget = 4500;
+    constexpr uint32_t period = 6000;
+
     class TerminalDiagnosticsTest
         : public ::testing::Test
         , public infra::EventDispatcherWithWeakPtrFixture
@@ -22,9 +26,16 @@ namespace
         ::testing::StrictMock<hal::SerialCommunicationMock> communication;
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
         services::TerminalWithStorage::WithMaxSize<10> terminal{ terminalWithCommands, tracer };
-        ::testing::StrictMock<application::PlatformFactoryMock> platform;
-        application::CanBusAdapter::ErrorCounters counters;
-        services::TerminalDiagnostics diagnostics{ terminal, platform };
+
+        application::ControlLoopMetrics metrics;
+        application::CanBusAdapterImpl<::testing::StrictMock<hal::CanMock>> canBus;
+        application::PlatformDiagnostics diagnostics{ metrics };
+        services::TerminalDiagnostics terminalDiagnostics{ terminal, diagnostics, tracer };
+
+        TerminalDiagnosticsTest()
+        {
+            metrics.Configure(budget, period);
+        }
 
         void InvokeCommand(const std::string& command)
         {
@@ -37,53 +48,44 @@ namespace
         {
             return { stream.Storage().begin(), stream.Storage().end() };
         }
-
-        void RecordError(CanError error)
-        {
-            counters.Record(error);
-        }
     };
 }
 
 TEST_F(TerminalDiagnosticsTest, loop_stats_reports_the_execution_statistics)
 {
-    application::ControlLoopMetrics::Snapshot snapshot{ 1234u, 2100u, 1800u, 4700u, 2050u, 4500u, 7u, 3u, 1u };
-
-    EXPECT_CALL(platform, ControlLoopStatistics()).WillOnce(::testing::Return(snapshot));
-    EXPECT_CALL(platform, Tracer()).WillOnce(::testing::ReturnRef(tracer));
+    metrics.Record(2100);
+    metrics.Record(4700);
+    metrics.Record(6100);
 
     InvokeCommand("loop_stats");
 
     const auto output = Output();
-    EXPECT_THAT(output, ::testing::HasSubstr("samples=1234"));
+    EXPECT_THAT(output, ::testing::HasSubstr("samples=3"));
     EXPECT_THAT(output, ::testing::HasSubstr("budget=4500"));
-    EXPECT_THAT(output, ::testing::HasSubstr("last=2100"));
-    EXPECT_THAT(output, ::testing::HasSubstr("min=1800"));
-    EXPECT_THAT(output, ::testing::HasSubstr("avg=2050"));
-    EXPECT_THAT(output, ::testing::HasSubstr("max=4700"));
-    EXPECT_THAT(output, ::testing::HasSubstr("overruns=7"));
-    EXPECT_THAT(output, ::testing::HasSubstr("deadlineMisses=3"));
-    EXPECT_THAT(output, ::testing::HasSubstr("reentries=1"));
+    EXPECT_THAT(output, ::testing::HasSubstr("last=6100"));
+    EXPECT_THAT(output, ::testing::HasSubstr("min=2100"));
+    EXPECT_THAT(output, ::testing::HasSubstr("max=6100"));
+    EXPECT_THAT(output, ::testing::HasSubstr("overruns=2"));
+    EXPECT_THAT(output, ::testing::HasSubstr("deadlineMisses=1"));
+    EXPECT_THAT(output, ::testing::HasSubstr("reentries=0"));
 }
 
-TEST_F(TerminalDiagnosticsTest, loop_stats_reports_zeroes_on_a_platform_that_does_not_measure)
+TEST_F(TerminalDiagnosticsTest, loop_stats_before_any_sample_reports_zeroes)
 {
-    EXPECT_CALL(platform, ControlLoopStatistics()).WillOnce(::testing::Return(application::ControlLoopMetrics::Snapshot{}));
-    EXPECT_CALL(platform, Tracer()).WillOnce(::testing::ReturnRef(tracer));
-
     InvokeCommand("ls");
 
-    EXPECT_THAT(Output(), ::testing::HasSubstr("samples=0"));
+    const auto output = Output();
+    EXPECT_THAT(output, ::testing::HasSubstr("samples=0"));
+    EXPECT_THAT(output, ::testing::HasSubstr("min=0"));
+    EXPECT_THAT(output, ::testing::HasSubstr("max=0"));
 }
 
 TEST_F(TerminalDiagnosticsTest, can_stats_prints_only_the_classes_that_have_occurred)
 {
-    RecordError(CanError::busOff);
-    RecordError(CanError::crcError);
-    RecordError(CanError::crcError);
-
-    EXPECT_CALL(platform, CanStatistics()).WillOnce(::testing::ReturnRef(counters));
-    EXPECT_CALL(platform, Tracer()).WillOnce(::testing::ReturnRef(tracer));
+    diagnostics.AttachCanBus(canBus);
+    canBus.InvokeErrorHandler(CanError::busOff);
+    canBus.InvokeErrorHandler(CanError::crcError);
+    canBus.InvokeErrorHandler(CanError::crcError);
 
     InvokeCommand("can_stats");
 
@@ -95,11 +97,8 @@ TEST_F(TerminalDiagnosticsTest, can_stats_prints_only_the_classes_that_have_occu
     EXPECT_THAT(output, ::testing::Not(::testing::HasSubstr("bit1 error")));
 }
 
-TEST_F(TerminalDiagnosticsTest, can_stats_on_a_quiet_bus_prints_the_total_and_nothing_else)
+TEST_F(TerminalDiagnosticsTest, can_stats_before_a_bus_is_configured_reports_a_quiet_bus)
 {
-    EXPECT_CALL(platform, CanStatistics()).WillOnce(::testing::ReturnRef(counters));
-    EXPECT_CALL(platform, Tracer()).WillOnce(::testing::ReturnRef(tracer));
-
     InvokeCommand("cs");
 
     const auto output = Output();
@@ -109,17 +108,29 @@ TEST_F(TerminalDiagnosticsTest, can_stats_on_a_quiet_bus_prints_the_total_and_no
 
 TEST_F(TerminalDiagnosticsTest, clear_stats_resets_both_sets_of_counters)
 {
-    EXPECT_CALL(platform, ResetStatistics());
+    diagnostics.AttachCanBus(canBus);
+    metrics.Record(2100);
+    canBus.InvokeErrorHandler(CanError::busOff);
 
     InvokeCommand("clear_stats");
+
+    EXPECT_EQ(0u, diagnostics.ControlLoopStatistics().samples);
+    EXPECT_EQ(0u, diagnostics.CanStatistics().Total());
+}
+
+TEST_F(TerminalDiagnosticsTest, clear_stats_without_a_bus_still_clears_the_loop_counters)
+{
+    metrics.Record(2100);
+
+    InvokeCommand("clear_stats");
+
+    EXPECT_EQ(0u, diagnostics.ControlLoopStatistics().samples);
 }
 
 TEST_F(TerminalDiagnosticsTest, an_unknown_class_is_reported_as_other_rather_than_indexing_past_the_end)
 {
-    RecordError(static_cast<CanError>(99));
-
-    EXPECT_CALL(platform, CanStatistics()).WillOnce(::testing::ReturnRef(counters));
-    EXPECT_CALL(platform, Tracer()).WillOnce(::testing::ReturnRef(tracer));
+    diagnostics.AttachCanBus(canBus);
+    canBus.InvokeErrorHandler(static_cast<CanError>(99));
 
     InvokeCommand("can_stats");
 

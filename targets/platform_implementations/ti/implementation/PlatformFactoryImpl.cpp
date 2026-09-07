@@ -251,6 +251,8 @@ namespace application
                 {
                     peripherals->canBus->InvokeErrorHandler(ToAdapterError(error));
                 }));
+
+        diagnostics.AttachCanBus(*peripherals->canBus);
     }
 
     CanBusAdapter& PlatformFactoryImpl::CanBus()
@@ -352,19 +354,8 @@ namespace application
         return faultStatusString;
     }
 
-    ControlLoopMetrics::Snapshot PlatformFactoryImpl::ControlLoopStatistics() const
+    PlatformDiagnostics& PlatformFactoryImpl::Diagnostics()
     {
-        return controlLoopMetrics.Read();
-    }
-
-    const CanBusAdapter::ErrorCounters& PlatformFactoryImpl::CanStatistics() const
-    {
-        return peripherals->canBus->ErrorStatistics();
-    }
-
-    void PlatformFactoryImpl::ResetStatistics()
-    {
-        controlLoopMetrics.Reset();
-        CanBus().ResetErrorStatistics();
+        return diagnostics;
     }
 }

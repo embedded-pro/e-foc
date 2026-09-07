@@ -25,6 +25,8 @@ target_sources(e_foc.platform_abstraction PRIVATE
     CanBusAdapter.cpp
     ControlLoopMetrics.hpp
     ControlLoopMetrics.cpp
+    PlatformDiagnostics.hpp
+    PlatformDiagnostics.cpp
     PlatformFactory.hpp
     PlatformFactory.cpp
     QuadratureEncoderDecorator.hpp
