@@ -2,6 +2,7 @@
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
+#include "targets/platform_implementations/error_handling_cortex_m/PowerStageCutOff.hpp"
 #include DEVICE_HEADER
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -151,14 +152,19 @@ namespace application
 
     void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold)
     {
-        using namespace std::chrono_literals;
-        auto& impl = peripherals->adcForPhaseCurrentMeasurementImpl;
-
         const auto periodCycles = baseFrequency.Value() == 0
                                       ? 0u
                                       : static_cast<uint32_t>(SystemCoreClock / baseFrequency.Value());
         controlLoopMetrics.Configure(static_cast<uint32_t>(static_cast<uint64_t>(periodCycles) * 3u / 4u), periodCycles);
 
+        ReconfigureAdc(sampleAndHold);
+        ReconfigurePwm(baseFrequency, deadTime);
+        pwmBaseFrequency = baseFrequency;
+    }
+
+    void PlatformFactoryImpl::ReconfigureAdc(SampleAndHold sampleAndHold)
+    {
+        auto& impl = peripherals->adcForPhaseCurrentMeasurementImpl;
         auto& adcCfg = impl.adcConfig;
         adcCfg.interruptPriority = InterruptPriorities::phaseCurrentAdc;
         adcCfg.sampleAndHold = impl.toSampleAndHold.at(static_cast<std::size_t>(sampleAndHold));
@@ -173,15 +179,20 @@ namespace application
             Peripheral::AdcSequencerIndex,
             impl.currentPhaseAnalogPins,
             adcCfg);
+    }
 
+    void PlatformFactoryImpl::ReconfigurePwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime)
+    {
         application::PowerStageCutOff::Unregister();
         peripherals->asyncPwm.reset();
         peripherals->syncPwm.reset();
-        if (Peripheral::hasFaultComparators)
+
+        if constexpr (Peripheral::hasFaultComparators)
         {
             auto& cfg = peripherals->asyncPwmConfig;
-            cfg.deadTimeConfig.fallInClockCycles = hal::tiva::Pwm::CalculateDeadTimeCycles(deadTime, cfg.clockDivisor);
-            cfg.deadTimeConfig.riseInClockCycles = hal::tiva::Pwm::CalculateDeadTimeCycles(deadTime, cfg.clockDivisor);
+            const auto deadTimeCycles = hal::tiva::Pwm::CalculateDeadTimeCycles(deadTime, cfg.clockDivisor);
+            cfg.deadTimeConfig.fallInClockCycles = deadTimeCycles;
+            cfg.deadTimeConfig.riseInClockCycles = deadTimeCycles;
             cfg.pwmConfig.deadTime = std::make_optional(cfg.deadTimeConfig);
 
             peripherals->asyncPwm.emplace(
@@ -199,30 +210,26 @@ namespace application
                     if (bits & static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1))
                         onFaultCallback(PlatformFactory::BoardProtectionReason::overVoltage);
                 });
+
+            peripherals->asyncPwm->SetBaseFrequency(baseFrequency);
+            application::PowerStageCutOff::Register(*peripherals->asyncPwm);
         }
         else
         {
             auto& cfg = peripherals->syncPwmConfig;
-            cfg.deadTimeConfig.fallInClockCycles = hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(deadTime, cfg.clockDivisor);
-            cfg.deadTimeConfig.riseInClockCycles = hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(deadTime, cfg.clockDivisor);
+            const auto deadTimeCycles = hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(deadTime, cfg.clockDivisor);
+            cfg.deadTimeConfig.fallInClockCycles = deadTimeCycles;
+            cfg.deadTimeConfig.riseInClockCycles = deadTimeCycles;
             cfg.pwmConfig.deadTime = std::make_optional(cfg.deadTimeConfig);
 
             peripherals->syncPwm.emplace(
                 Peripheral::PwmIndex,
                 infra::MakeRange(Peripheral::syncPwmPhases),
                 cfg.pwmConfig);
-        }
-        if (Peripheral::hasFaultComparators)
-        {
-            peripherals->asyncPwm->SetBaseFrequency(baseFrequency);
-            application::PowerStageCutOff::Register(*peripherals->asyncPwm);
-        }
-        else
-        {
+
             peripherals->syncPwm->SetBaseFrequency(baseFrequency);
             application::PowerStageCutOff::Register(*peripherals->syncPwm);
         }
-        pwmBaseFrequency = baseFrequency;
     }
 
     void PlatformFactoryImpl::SetEncoderResolution(uint32_t resolution)
@@ -263,10 +270,10 @@ namespace application
     OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
         onPhaseCurrentsReady = onDone;
-        if (Peripheral::hasFaultComparators)
-            peripherals->asyncPwm->SetBaseFrequency(baseFrequency);
-        else
-            peripherals->syncPwm->SetBaseFrequency(baseFrequency);
+        WithPwm([baseFrequency](auto& pwm)
+            {
+                pwm.SetBaseFrequency(baseFrequency);
+            });
         peripherals->phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
             {
                 if (controlLoopEntered)
@@ -278,7 +285,7 @@ namespace application
                 controlLoopEntered = true;
                 const auto entryCycles = CycleCounter::Now();
 
-                onPhaseCurrentsReady(foc::PhaseCurrents{ a, b, c });
+                onPhaseCurrentsReady(foc::PhaseCurrents{ c, a, b });
 
                 controlLoopMetrics.Record(CycleCounter::Now() - entryCycles);
                 controlLoopEntered = false;
@@ -287,26 +294,26 @@ namespace application
 
     OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        if (Peripheral::hasFaultComparators)
-            peripherals->asyncPwm->Start(dutyPhases.a, dutyPhases.b, dutyPhases.c);
-        else
-            peripherals->syncPwm->Start(dutyPhases.a, dutyPhases.b, dutyPhases.c);
+        WithPwm([&dutyPhases](auto& pwm)
+            {
+                pwm.Start(dutyPhases.a, dutyPhases.b, dutyPhases.c);
+            });
     }
 
     void PlatformFactoryImpl::Start()
     {
-        if (Peripheral::hasFaultComparators)
-            peripherals->asyncPwm->Start(hal::Percent{ 1 }, hal::Percent{ 1 }, hal::Percent{ 1 });
-        else
-            peripherals->syncPwm->Start(hal::Percent{ 1 }, hal::Percent{ 1 }, hal::Percent{ 1 });
+        WithPwm([](auto& pwm)
+            {
+                pwm.Start(hal::Percent{ 1 }, hal::Percent{ 1 }, hal::Percent{ 1 });
+            });
     }
 
     void PlatformFactoryImpl::Stop()
     {
-        if (Peripheral::hasFaultComparators)
-            peripherals->asyncPwm->Stop();
-        else
-            peripherals->syncPwm->Stop();
+        WithPwm([](auto& pwm)
+            {
+                pwm.Stop();
+            });
     }
 
     hal::Hertz PlatformFactoryImpl::BaseFrequency() const

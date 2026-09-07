@@ -66,6 +66,9 @@ namespace services
             {
                 OnCurrentSample(currents);
             });
+
+        driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
+            transforms.Inverse(foc::RotatingFrame{ 0.0f, 0.0f }, 1.0f, 0.0f)));
     }
 
     void SinusoidalInductanceEstimator::Abort()

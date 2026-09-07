@@ -27,7 +27,6 @@
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
-#include "targets/platform_implementations/error_handling_cortex_m/PowerStageCutOff.hpp"
 
 extern "C" uint32_t SystemCoreClock;
 
@@ -138,18 +137,16 @@ namespace application
             // do NOT appear in the FIFO, so AdcPhaseCurrentMeasurementImpl still receives
             // exactly 3 samples.  DCMP0/1 outputs connect to PWM FLTSRC1 bits 0/1 and
             // tristate all motor PWM outputs instantly when a threshold is exceeded.
-            static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 5> digitalComparators{ {
+            static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 4> digitalComparators{ {
                 {}, // step 0: currentPhaseA  → FIFO (noComparator)
                 {}, // step 1: currentPhaseB  → FIFO (noComparator)
                 {}, // step 2: currentPhaseC  → FIFO (noComparator)
                 { Peripheral::OvercurrentComparatorIndex, 0, Peripheral::overcurrentThresholdCounts,
                     hal::tiva::Adc::ComparatorCondition::highBand, hal::tiva::Adc::ComparatorMode::always },
-                { Peripheral::OvervoltageComparatorIndex, 0, Peripheral::overvoltageThresholdCounts,
-                    hal::tiva::Adc::ComparatorCondition::highBand, hal::tiva::Adc::ComparatorMode::always },
             } };
 
-            hal::tiva::Adc::Config adcConfig{ false, 0, Peripheral::adcTrigger, hal::tiva::Adc::SampleAndHold::sampleAndHold8, std::make_optional(currentSensingOversampling), phaseDelay, {} };
-            std::array<hal::tiva::AnalogPin, 5> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC }, hal::tiva::AnalogPin{ Pins::currentTotal }, hal::tiva::AnalogPin{ Pins::powerSupplyVoltage } } };
+            hal::tiva::Adc::Config adcConfig{ false, 0, Peripheral::adcTrigger, hal::tiva::Adc::SampleAndHold::sampleAndHold8, std::make_optional(currentSensingOversampling), phaseDelay, {}, hal::cortex::InterruptPriority::highest };
+            std::array<hal::tiva::AnalogPin, 4> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC }, hal::tiva::AnalogPin{ Pins::currentTotal } } };
         };
 
         struct AsyncPwmConfig
@@ -178,6 +175,9 @@ namespace application
             hal::tiva::SynchronousPwm::Config::DeadTime deadTimeConfig{ hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(1000ns, clockDivisor), hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(1000ns, clockDivisor) };
             hal::tiva::SynchronousPwm::Config pwmConfig{ false, false, controlConfig, clockDivisor, std::make_optional(deadTimeConfig) };
         };
+
+        void ReconfigureAdc(SampleAndHold sampleAndHold);
+        void ReconfigurePwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime);
 
         static CanBusAdapter::CanError ToAdapterError(hal::tiva::Can::Error error)
         {
@@ -210,7 +210,7 @@ namespace application
 
         struct Peripherals
         {
-            Peripherals() {};
+            Peripherals() = default;
 
             hal::OutputPin performance{ Pins::performance };
             Cortex cortex;
@@ -239,11 +239,20 @@ namespace application
             } performanceTrackerImpl{ cortex.dataWatchPointAndTrace, performance };
         };
 
+        template<typename Fn>
+        void WithPwm(Fn&& fn)
+        {
+            if constexpr (Peripheral::hasFaultComparators)
+                fn(*peripherals->asyncPwm);
+            else
+                fn(*peripherals->syncPwm);
+        }
+
     private:
         infra::Function<void()> onInitialized;
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         ResetCause resetCause{ ResetCause::powerUp };
-        CycleCounter cycleCounter;
+        [[no_unique_address]] CycleCounter cycleCounter;
         ControlLoopMetrics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
         volatile bool controlLoopEntered{ false };
