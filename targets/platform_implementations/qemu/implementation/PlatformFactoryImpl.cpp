@@ -19,7 +19,6 @@ namespace application
               std::nullopt,
               false)
     {
-        cortex.systemTick.Start();
         services::SetGlobalTracerInstance(terminalAndTracer.tracer);
         onInitialized();
         focTimer.Start();
