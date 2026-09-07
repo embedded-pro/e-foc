@@ -38,9 +38,9 @@ namespace application
                                 ? cycles << averagingShift
                                 : scaledAverage + cycles - (scaledAverage >> averagingShift);
 
-            if (budget != 0 && cycles > budget)
+            if (cycles > budget)
                 overrunCount = Increment(overrunCount);
-            if (period != 0 && cycles > period)
+            if (cycles > period)
                 deadlineMissCount = Increment(deadlineMissCount);
         }
 
@@ -62,8 +62,8 @@ namespace application
             return counter == saturated ? counter : counter + 1;
         }
 
-        uint32_t budget{ 0 };
-        uint32_t period{ 0 };
+        uint32_t budget{ saturated };
+        uint32_t period{ saturated };
         uint32_t samples{ 0 };
         uint32_t last{ 0 };
         uint32_t minimum{ saturated };

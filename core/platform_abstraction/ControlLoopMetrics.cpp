@@ -4,8 +4,8 @@ namespace application
 {
     void ControlLoopMetrics::Configure(uint32_t budgetCycles, uint32_t periodCycles)
     {
-        budget = budgetCycles;
-        period = periodCycles;
+        budget = budgetCycles == 0 ? saturated : budgetCycles;
+        period = periodCycles == 0 ? saturated : periodCycles;
         Reset();
     }
 
@@ -29,7 +29,7 @@ namespace application
             samples == 0 ? 0u : minimum,
             maximum,
             scaledAverage >> averagingShift,
-            budget,
+            budget == saturated ? 0u : budget,
             overrunCount,
             deadlineMissCount,
             reentryCount

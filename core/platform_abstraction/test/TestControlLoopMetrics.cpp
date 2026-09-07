@@ -29,6 +29,38 @@ TEST_F(TestControlLoopMetrics, an_unconfigured_channel_reports_nothing)
     EXPECT_EQ(0u, statistics.minimumCycles);
     EXPECT_EQ(0u, statistics.maximumCycles);
     EXPECT_EQ(0u, statistics.overruns);
+    EXPECT_EQ(0u, statistics.budgetCycles);
+}
+
+TEST_F(TestControlLoopMetrics, an_unconfigured_channel_measures_but_never_reports_an_overrun)
+{
+    application::ControlLoopMetrics fresh;
+
+    fresh.Record(0xFFFFFFFEu);
+
+    const auto statistics = fresh.Read();
+
+    EXPECT_EQ(1u, statistics.samples);
+    EXPECT_EQ(0xFFFFFFFEu, statistics.lastCycles);
+    EXPECT_EQ(0u, statistics.overruns);
+    EXPECT_EQ(0u, statistics.deadlineMisses);
+    EXPECT_EQ(0u, statistics.budgetCycles);
+}
+
+TEST_F(TestControlLoopMetrics, a_zero_budget_disables_the_thresholds_rather_than_tripping_them)
+{
+    application::ControlLoopMetrics disabled;
+    disabled.Configure(0, 0);
+
+    disabled.Record(1);
+    disabled.Record(0xFFFFFFFEu);
+
+    const auto statistics = disabled.Read();
+
+    EXPECT_EQ(2u, statistics.samples);
+    EXPECT_EQ(0u, statistics.overruns);
+    EXPECT_EQ(0u, statistics.deadlineMisses);
+    EXPECT_EQ(0u, statistics.budgetCycles);
 }
 
 TEST_F(TestControlLoopMetrics, the_first_sample_sets_every_extreme)
