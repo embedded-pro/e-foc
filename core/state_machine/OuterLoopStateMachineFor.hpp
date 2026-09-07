@@ -28,13 +28,18 @@ namespace application
             , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt, outerLoopArgs.outerLoopFrequency)
             , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
             , onlineElecEstimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
-            , resolvedMechIdent(ResolveMechIdent(calibServices, ownMechIdent, focController, hardware.inverter, hardware.encoder))
+            , resolvedMechIdent(ResolveMechIdent(calibServices, ownMechIdent, focController, focController, focController, hardware.inverter, hardware.encoder))
         {
             focController.SetOnlineMechanicalEstimator(onlineMechEstimator);
             focController.SetOnlineElectricalEstimator(onlineElecEstimator);
             RegisterFaultHandler(faultNotifier);
             RegisterCliIfNeeded(transitionPolicy);
             CheckNvmOnBoot();
+        }
+
+        ~OuterLoopStateMachineFor() override
+        {
+            ReleaseExternalResources();
         }
 
         ControlInterface& GetController()

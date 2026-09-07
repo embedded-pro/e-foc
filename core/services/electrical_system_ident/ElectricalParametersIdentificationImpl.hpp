@@ -19,13 +19,14 @@ namespace services
 
         void EstimateResistanceAndInductance(const ResistanceAndInductanceConfig& config, const infra::Function<void(ResistanceInductanceResult)>& onDone) override;
         void EstimateNumberOfPolePairs(const PolePairsConfig& config, const infra::Function<void(std::optional<std::size_t>)>& onDone) override;
+        void Abort() override;
 
     private:
         void OnResistanceDone(ResistanceEstimator::Result result);
         void RunPolePairLogic();
         void ApplyNextElectricalAngle();
         void CalculatePolePairs();
-        void AbortPolePairs();
+        void FailPolePairs();
 
         static constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
         static constexpr std::size_t stepsPerRevolution = 12;

@@ -118,8 +118,7 @@ TEST_F(ElectricalParametersIdentificationTest, an_overcurrent_sample_aborts_the_
         .WillOnce([this](auto, const auto& cb)
             {
                 driverMock.StorePhaseCurrentsCallback(cb);
-            })
-        .WillOnce(Return());
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
     EXPECT_CALL(driverMock, Stop());
 
@@ -289,7 +288,11 @@ TEST_F(ElectricalParametersIdentificationTest, concurrent_pole_pairs_estimate_is
         hal::Percent{ 20 }, 5, std::chrono::milliseconds{ 50 }
     };
 
-    struct PpResult { bool called = false; bool hasValue = true; } second;
+    struct PpResult
+    {
+        bool called = false;
+        bool hasValue = true;
+    } second;
 
     EXPECT_CALL(encoderMock, Read()).WillOnce(::testing::Return(foc::Radians{ 0.0f }));
     EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_));
@@ -478,4 +481,68 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_rl_allows_second_call_af
         });
 
     EXPECT_FALSE(secondCalled);
+}
+
+TEST_F(ElectricalParametersIdentificationTest, abort_stops_the_pole_pairs_sweep_and_drops_the_completion)
+{
+    services::ElectricalParametersIdentification::PolePairsConfig config{
+        hal::Percent{ 20 },
+        5,
+        std::chrono::milliseconds{ 50 }
+    };
+
+    bool fired = false;
+
+    EXPECT_CALL(encoderMock, Read()).WillRepeatedly(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+
+    identification.EstimateNumberOfPolePairs(config, [&fired](auto)
+        {
+            fired = true;
+        });
+
+    EXPECT_CALL(driverMock, Stop());
+    identification.Abort();
+
+    EXPECT_FALSE(fired);
+
+    ForwardTime(std::chrono::milliseconds{ 500 });
+    driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    EXPECT_FALSE(fired);
+}
+
+TEST_F(ElectricalParametersIdentificationTest, abort_stops_the_resistance_injection_and_drops_the_completion)
+{
+    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{};
+    bool fired = false;
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+
+    identification.EstimateResistanceAndInductance(config, [&fired](auto)
+        {
+            fired = true;
+        });
+
+    EXPECT_CALL(driverMock, Stop());
+    identification.Abort();
+
+    EXPECT_FALSE(fired);
+
+    ForwardTime(std::chrono::seconds{ 5 });
+    EXPECT_FALSE(fired);
+}
+
+TEST_F(ElectricalParametersIdentificationTest, abort_without_a_run_in_flight_is_a_no_op)
+{
+    identification.Abort();
 }

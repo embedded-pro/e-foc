@@ -21,11 +21,38 @@ namespace application
 
     void FocStateMachineCommon::RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier)
     {
-        faultNotifier.Register([this](state_machine::FaultCode code)
+        registeredFaultNotifier = &faultNotifier;
+
+        faultNotifier.Register([this](state_machine::FaultCode)
+            {
+                GetFocControl().Stop();
+            },
+            [this](state_machine::FaultCode code)
             {
                 EnterFault(code);
             });
     }
+
+    void FocStateMachineCommon::ReleaseExternalResources()
+    {
+        AbortCalibrationServices();
+
+        if (registeredFaultNotifier != nullptr)
+        {
+            registeredFaultNotifier->Unregister();
+            registeredFaultNotifier = nullptr;
+        }
+    }
+
+    void FocStateMachineCommon::AbortCalibrationServices()
+    {
+        electricalIdent.Abort();
+        motorAlignment.Abort();
+        AbortModeSpecificServices();
+    }
+
+    void FocStateMachineCommon::AbortModeSpecificServices()
+    {}
 
     void FocStateMachineCommon::RegisterCliIfNeeded(state_machine::TransitionPolicy transitionPolicy)
     {
@@ -162,6 +189,7 @@ namespace application
         const bool wasActive = std::holds_alternative<state_machine::Enabled>(currentState) ||
                                std::holds_alternative<state_machine::Calibrating>(currentState);
 
+        AbortCalibrationServices();
         CompletePendingCommand(state_machine::CommandResult::abortedByFault);
 
         if (std::holds_alternative<state_machine::Fault>(currentState))
@@ -228,13 +256,18 @@ namespace application
     {
         tracer.Trace() << "[SM] Entering Fault";
 
-        if (std::holds_alternative<state_machine::Enabled>(currentState) ||
-            std::holds_alternative<state_machine::Calibrating>(currentState))
-            GetFocControl().Stop();
+        const bool wasActive = std::holds_alternative<state_machine::Enabled>(currentState) ||
+                               std::holds_alternative<state_machine::Calibrating>(currentState);
 
         lastFaultCode = code;
         currentState = state_machine::Fault{ code };
         faultLatched = true;
+
+        if (wasActive)
+            GetFocControl().Stop();
+
+        AbortCalibrationServices();
+
         CompletePendingCommand(state_machine::CommandResult::abortedByFault);
     }
 

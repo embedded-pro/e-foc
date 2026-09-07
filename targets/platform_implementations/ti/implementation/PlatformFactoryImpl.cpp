@@ -174,6 +174,7 @@ namespace application
             impl.currentPhaseAnalogPins,
             adcCfg);
 
+        application::PowerStageCutOff::Unregister();
         peripherals->asyncPwm.reset();
         peripherals->syncPwm.reset();
         if (Peripheral::hasFaultComparators)
@@ -212,9 +213,15 @@ namespace application
                 cfg.pwmConfig);
         }
         if (Peripheral::hasFaultComparators)
+        {
             peripherals->asyncPwm->SetBaseFrequency(baseFrequency);
+            application::PowerStageCutOff::Register(*peripherals->asyncPwm);
+        }
         else
+        {
             peripherals->syncPwm->SetBaseFrequency(baseFrequency);
+            application::PowerStageCutOff::Register(*peripherals->syncPwm);
+        }
         pwmBaseFrequency = baseFrequency;
     }
 

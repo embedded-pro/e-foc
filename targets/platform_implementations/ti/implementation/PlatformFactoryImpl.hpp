@@ -27,6 +27,7 @@
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
+#include "targets/platform_implementations/error_handling_cortex_m/PowerStageCutOff.hpp"
 
 extern "C" uint32_t SystemCoreClock;
 

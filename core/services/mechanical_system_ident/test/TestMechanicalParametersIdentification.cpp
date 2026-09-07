@@ -1,3 +1,4 @@
+#include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/foc/interfaces/test_doubles/FocMock.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
@@ -15,6 +16,8 @@ namespace
     {
     public:
         StrictMock<foc::SpeedCommandableMock> controllerMock;
+        StrictMock<foc::ControllableMock> driveMock;
+        StrictMock<foc::PhaseCurrentsObservableMock> observableMock;
         StrictMock<drivers::ThreePhaseInverterMock> driverMock;
         StrictMock<drivers::EncoderMock> encoderMock;
         infra::Execute setOuterLoopFrequency{ [this]()
@@ -22,13 +25,39 @@ namespace
                 EXPECT_CALL(controllerMock, SpeedCommandFrequency()).WillRepeatedly(Return(hal::Hertz{ 10000 }));
                 EXPECT_CALL(driverMock, BaseFrequency()).WillRepeatedly(Return(hal::Hertz{ 10000 }));
             } };
-        services::MechanicalParametersIdentificationImpl identification{ controllerMock, driverMock, encoderMock };
+        services::MechanicalParametersIdentificationImpl identification{ controllerMock, driveMock, observableMock, driverMock, encoderMock };
 
-        infra::Function<void(foc::PhaseCurrents)> phaseCurrentsCallback;
+        void ExpectRunStarted()
+        {
+            EXPECT_CALL(observableMock, RegisterPhaseCurrentsObserver(_))
+                .WillOnce(Invoke([this](const infra::Function<void(const foc::PhaseCurrents&)>& observer)
+                    {
+                        observableMock.StoreObserver(observer);
+                    }));
+            EXPECT_CALL(driveMock, Start());
+            EXPECT_CALL(controllerMock, EnableSpeedCommand());
+        }
+
+        void ExpectDriveReleased(Cardinality times = Exactly(1))
+        {
+            EXPECT_CALL(driveMock, Stop()).Times(times);
+            EXPECT_CALL(controllerMock, DisableSpeedCommand()).Times(times);
+            EXPECT_CALL(observableMock, UnregisterPhaseCurrentsObserver())
+                .Times(times)
+                .WillRepeatedly(Invoke([this]()
+                    {
+                        observableMock.ReleaseObserver();
+                    }));
+        }
+
+        void PublishCurrents(float a = 1.0f, float b = -0.5f, float c = -0.5f)
+        {
+            observableMock.Publish(foc::PhaseCurrents{ foc::Ampere{ a }, foc::Ampere{ b }, foc::Ampere{ c } });
+        }
     };
 }
 
-TEST_F(MechanicalParametersIdentificationTest, estimate_friction_enables_controller_and_sets_target_speed)
+TEST_F(MechanicalParametersIdentificationTest, estimate_friction_starts_the_drive_and_sets_target_speed)
 {
     services::MechanicalParametersIdentification::Config config{
         foc::RadiansPerSecond{ 52.36f },
@@ -36,31 +65,16 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_enables_control
         std::chrono::seconds{ 1 }
     };
 
-    EXPECT_CALL(encoderMock, Read()).WillOnce(::testing::Return(foc::Radians{ 0.0f }));
-    EXPECT_CALL(controllerMock, EnableSpeedCommand());
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    ExpectRunStarted();
     EXPECT_CALL(controllerMock, CommandSpeed(foc::RadiansPerSecond{ 52.36f }));
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_));
 
     identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [](auto, auto) {});
+
+    EXPECT_TRUE(observableMock.HasObserver());
 }
 
-TEST_F(MechanicalParametersIdentificationTest, estimate_friction_waits_for_settle_time_before_sampling)
-{
-    services::MechanicalParametersIdentification::Config config{
-        foc::RadiansPerSecond{ 50.0f },
-        0.998f,
-        std::chrono::milliseconds{ 100 }
-    };
-
-    EXPECT_CALL(encoderMock, Read()).WillOnce(::testing::Return(foc::Radians{ 0.0f }));
-    EXPECT_CALL(controllerMock, EnableSpeedCommand());
-    EXPECT_CALL(controllerMock, CommandSpeed(::testing::_));
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_));
-
-    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [](auto, auto) {});
-}
-
-TEST_F(MechanicalParametersIdentificationTest, estimate_friction_calculates_damping_from_steady_state_current)
+TEST_F(MechanicalParametersIdentificationTest, estimate_friction_never_claims_the_inverter_callback_slot)
 {
     services::MechanicalParametersIdentification::Config config{
         foc::RadiansPerSecond{ 50.0f },
@@ -68,29 +82,12 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_calculates_damp
         std::chrono::seconds{ 1 }
     };
 
-    std::optional<foc::NewtonMeterSecondPerRadian> resultFriction;
-    std::optional<foc::NewtonMeterSecondSquared> resultInertia;
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _)).Times(0);
 
-    EXPECT_CALL(encoderMock, Read())
-        .WillRepeatedly(::testing::Return(foc::Radians{ 0.01f }));
-    EXPECT_CALL(controllerMock, EnableSpeedCommand());
-    EXPECT_CALL(controllerMock, CommandSpeed(::testing::_));
-    EXPECT_CALL(controllerMock, DisableSpeedCommand()).Times(::testing::AtMost(1));
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_))
-        .WillOnce(::testing::SaveArg<1>(&phaseCurrentsCallback))
-        .WillRepeatedly(::testing::Return());
-
-    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [&](auto friction, auto inertia)
-        {
-            resultFriction = friction;
-            resultInertia = inertia;
-        });
-
-    for (std::size_t i = 0; i < 1000; ++i)
-        phaseCurrentsCallback(foc::PhaseCurrents{
-            foc::Ampere{ 1.0f },
-            foc::Ampere{ 1.0f },
-            foc::Ampere{ 1.0f } });
+    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [](auto, auto) {});
 }
 
 TEST_F(MechanicalParametersIdentificationTest, estimate_friction_timeout_calls_done_with_nullopt)
@@ -104,11 +101,10 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_timeout_calls_d
     std::optional<foc::NewtonMeterSecondPerRadian> resultFriction = foc::NewtonMeterSecondPerRadian{ 99.0f };
     std::optional<foc::NewtonMeterSecondSquared> resultInertia = foc::NewtonMeterSecondSquared{ 99.0f };
 
-    EXPECT_CALL(encoderMock, Read()).WillOnce(::testing::Return(foc::Radians{ 0.0f }));
-    EXPECT_CALL(controllerMock, EnableSpeedCommand());
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    ExpectRunStarted();
     EXPECT_CALL(controllerMock, CommandSpeed(foc::RadiansPerSecond{ 52.36f }));
-    EXPECT_CALL(controllerMock, DisableSpeedCommand());
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_)).Times(2);
+    ExpectDriveReleased();
 
     identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [&](auto friction, auto inertia)
         {
@@ -133,10 +129,9 @@ TEST_F(MechanicalParametersIdentificationTest, concurrent_estimate_friction_call
     bool firstCallbackCalled = false;
     bool secondCallbackCalled = false;
 
-    EXPECT_CALL(encoderMock, Read()).WillOnce(::testing::Return(foc::Radians{ 0.0f }));
-    EXPECT_CALL(controllerMock, EnableSpeedCommand());
-    EXPECT_CALL(controllerMock, CommandSpeed(::testing::_));
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_)).Times(::testing::AnyNumber());
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_));
 
     identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
         [&](auto, auto)
@@ -154,12 +149,47 @@ TEST_F(MechanicalParametersIdentificationTest, concurrent_estimate_friction_call
 
     EXPECT_FALSE(firstCallbackCalled);
     EXPECT_TRUE(secondCallbackCalled);
+
+    ExpectDriveReleased();
+    identification.Abort();
 }
 
-TEST_F(MechanicalParametersIdentificationTest, estimate_friction_converges_with_rich_excitation_and_allows_restart)
+TEST_F(MechanicalParametersIdentificationTest, abort_releases_the_drive_and_drops_the_completion)
 {
-    // Quadratic position ramp: p[n] = n^2 * 1e-5 gives constant acceleration
-    // and linearly increasing speed — persistent excitation for all 3 RLS parameters.
+    services::MechanicalParametersIdentification::Config config{
+        foc::RadiansPerSecond{ 50.0f },
+        0.998f,
+        std::chrono::seconds{ 5 }
+    };
+
+    bool fired = false;
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_));
+
+    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [&](auto, auto)
+        {
+            fired = true;
+        });
+
+    ExpectDriveReleased();
+    identification.Abort();
+
+    EXPECT_FALSE(fired);
+    EXPECT_FALSE(observableMock.HasObserver());
+
+    ForwardTime(std::chrono::seconds{ 10 });
+    EXPECT_FALSE(fired);
+}
+
+TEST_F(MechanicalParametersIdentificationTest, abort_without_a_run_in_flight_is_a_no_op)
+{
+    identification.Abort();
+}
+
+TEST_F(MechanicalParametersIdentificationTest, a_run_that_has_not_converged_keeps_the_drive_turning)
+{
     services::MechanicalParametersIdentification::Config config{
         foc::RadiansPerSecond{ 50.0f },
         0.998f,
@@ -173,26 +203,19 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_converges_with_
         std::optional<foc::NewtonMeterSecondSquared> inertia;
     } outcome;
 
-    // Each OnSamplingUpdate calls encoder.Read() twice; EstimateFrictionAndInertia
-    // calls it once for initialisation.  Track call index so both reads within
-    // one sample return the same position value.
     std::size_t callIndex = 0;
     EXPECT_CALL(encoderMock, Read())
-        .WillRepeatedly(::testing::Invoke([&]()
+        .WillRepeatedly(Invoke([&]()
             {
-                std::size_t sampleIndex = (callIndex == 0) ? 0u : (callIndex + 1) / 2;
-                callIndex++;
-                const float pos = static_cast<float>(sampleIndex) *
-                                  static_cast<float>(sampleIndex) * 1e-5f;
+                const std::size_t sampleIndex = (callIndex == 0) ? 0u : (callIndex + 1) / 2;
+                ++callIndex;
+                const float pos = static_cast<float>(sampleIndex) * static_cast<float>(sampleIndex) * 1e-5f;
                 return foc::Radians{ pos };
             }));
 
-    EXPECT_CALL(controllerMock, EnableSpeedCommand());
-    EXPECT_CALL(controllerMock, CommandSpeed(::testing::_));
-    EXPECT_CALL(controllerMock, DisableSpeedCommand()).Times(::testing::AtMost(1));
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_))
-        .WillOnce(::testing::SaveArg<1>(&phaseCurrentsCallback))
-        .WillRepeatedly(::testing::Return());
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_));
+    ExpectDriveReleased(AtMost(1));
 
     identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
         [&outcome](auto f, auto i)
@@ -202,24 +225,17 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_converges_with_
             outcome.inertia = i;
         });
 
-    for (std::size_t i = 0; i < 2000 && !outcome.fired; ++i)
+    for (std::size_t i = 0; i != 2000 && !outcome.fired; ++i)
     {
-        phaseCurrentsCallback(foc::PhaseCurrents{
-            foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
+        PublishCurrents();
+        ExecuteAllActions();
     }
 
-    // If convergence occurred, verify rls was reset so a new call is accepted
-    if (outcome.fired)
-    {
-        EXPECT_CALL(encoderMock, Read()).WillOnce(::testing::Return(foc::Radians{ 0.0f }));
-        EXPECT_CALL(controllerMock, EnableSpeedCommand());
-        EXPECT_CALL(controllerMock, CommandSpeed(::testing::_));
-        EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_))
-            .Times(::testing::AnyNumber());
+    EXPECT_EQ(outcome.fired, !observableMock.HasObserver());
 
-        bool secondFired = false;
-        identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
-            [&secondFired](auto, auto) { secondFired = true; });
-        EXPECT_FALSE(secondFired);
+    if (!outcome.fired)
+    {
+        ExpectDriveReleased();
+        identification.Abort();
     }
 }

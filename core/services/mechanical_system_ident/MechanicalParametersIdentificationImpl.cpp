@@ -2,20 +2,14 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
-#include <cmath>
-#include <numbers>
-
-namespace
-{
-    constexpr float pi = std::numbers::pi_v<float>;
-    constexpr float twoPi = 2.0f * pi;
-}
+#include "infra/event/EventDispatcher.hpp"
 
 namespace services
 {
-    MechanicalParametersIdentificationImpl::MechanicalParametersIdentificationImpl(foc::SpeedCommandable& controller, drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder)
+    MechanicalParametersIdentificationImpl::MechanicalParametersIdentificationImpl(foc::SpeedCommandable& controller, foc::Controllable& drive, foc::PhaseCurrentsObservable& observable, drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder)
         : controller(controller)
-        , driver(driver)
+        , drive(drive)
+        , observable(observable)
         , encoder(encoder)
         , samplingPeriod(1.0f / static_cast<float>(driver.BaseFrequency().Value()))
     {
@@ -33,31 +27,59 @@ namespace services
         this->previousPosition = encoder.Read().Value();
         this->previousSpeed = 0.0f;
         this->polePairs = static_cast<float>(numberOfPolePairs);
+        this->converged = false;
 
         rls.emplace(1000.0f, config.forgettingFactor);
 
-        controller.EnableSpeedCommand();
-        controller.CommandSpeed(config.targetSpeed);
-
-        driver.PhaseCurrentsReady(driver.BaseFrequency(), [this, torqueConstant](auto currents)
+        observable.RegisterPhaseCurrentsObserver([this, torqueConstant](const auto& currents)
             {
                 OnSamplingUpdate(currents, torqueConstant);
             });
 
+        drive.Start();
+        controller.EnableSpeedCommand();
+        controller.CommandSpeed(config.targetSpeed);
+
         timeoutTimer.Start(config.timeout, [this]()
             {
-                driver.PhaseCurrentsReady(driver.BaseFrequency(), [](auto) {});
-                controller.DisableSpeedCommand();
+                ReleaseDrive();
                 rls.reset();
-                this->onDone(std::nullopt, std::nullopt);
+                Complete(std::nullopt, std::nullopt);
             });
     }
 
-    void MechanicalParametersIdentificationImpl::OnSamplingUpdate(foc::PhaseCurrents currents, const foc::NewtonMeter& torqueConstant)
+    void MechanicalParametersIdentificationImpl::Abort()
     {
+        if (!rls.has_value())
+            return;
+
+        timeoutTimer.Cancel();
+        ReleaseDrive();
+        rls.reset();
+        onDone = nullptr;
+    }
+
+    void MechanicalParametersIdentificationImpl::ReleaseDrive()
+    {
+        drive.Stop();
+        controller.DisableSpeedCommand();
+        observable.UnregisterPhaseCurrentsObserver();
+    }
+
+    void MechanicalParametersIdentificationImpl::Complete(std::optional<foc::NewtonMeterSecondPerRadian> friction, std::optional<foc::NewtonMeterSecondSquared> inertia)
+    {
+        if (onDone)
+            onDone(friction, inertia);
+    }
+
+    void MechanicalParametersIdentificationImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant)
+    {
+        if (converged || !rls.has_value())
+            return;
+
         auto mechanicalPos = encoder.Read().Value();
         auto electricalAngle = mechanicalPos * polePairs;
-        auto rotatingFrame = transform.Forward(foc::ThreePhase{ currents.a.Value(), currents.b.Value(), currents.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
+        auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
 
         auto speed = foc::detail::PositionWithWrapAround(mechanicalPos - previousPosition) / samplingPeriod;
         auto acceleration = (speed - previousSpeed) / samplingPeriod;
@@ -67,20 +89,27 @@ namespace services
 
         auto metrics = rls->Update(regressor, torque);
 
-        if (MotorRLS::EvaluateConvergence(metrics, 1e-4f, 1e-2f) == estimators::State::converged)
-        {
-            timeoutTimer.Cancel();
-            driver.PhaseCurrentsReady(driver.BaseFrequency(), [](auto) {});
-            controller.DisableSpeedCommand();
-
-            auto& theta = rls->Coefficients();
-            const auto friction = foc::NewtonMeterSecondPerRadian{ theta.at(2, 0) };
-            const auto inertia = foc::NewtonMeterSecondSquared{ theta.at(1, 0) };
-            rls.reset();
-            onDone(friction, inertia);
-        }
-
         previousPosition = mechanicalPos;
         previousSpeed = speed;
+
+        if (MotorRLS::EvaluateConvergence(metrics, 1e-4f, 1e-2f) != estimators::State::converged)
+            return;
+
+        converged = true;
+        timeoutTimer.Cancel();
+
+        infra::EventDispatcher::Instance().Schedule([this]()
+            {
+                if (!rls.has_value())
+                    return;
+
+                ReleaseDrive();
+
+                auto& theta = rls->Coefficients();
+                const auto friction = foc::NewtonMeterSecondPerRadian{ theta.at(2, 0) };
+                const auto inertia = foc::NewtonMeterSecondSquared{ theta.at(1, 0) };
+                rls.reset();
+                Complete(friction, inertia);
+            });
     }
 }

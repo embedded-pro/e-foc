@@ -1,4 +1,5 @@
 #include "core/foc/instantiations/LowPriorityInterruptImpl.hpp"
+#include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
@@ -6,12 +7,11 @@
 #include "foc/instantiations/FocController.hpp"
 #include "foc/interfaces/Units.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "motor_parameters/Jk42bls01X038ed.hpp"
 #include "tools/simulator/app/CalibrationsWiring.hpp"
 #include "tools/simulator/app/Conversions.hpp"
 #include "tools/simulator/app/Defaults.hpp"
 #include "tools/simulator/app/RunController.hpp"
-#include "motor_parameters/Jk42bls01X038ed.hpp"
-#include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "tools/simulator/view/gui/ControlPanel.hpp"
 #include "tools/simulator/view/gui/Gui.hpp"
 #include "tools/simulator/view/gui/GuiSimulation.hpp"
@@ -78,7 +78,7 @@ namespace simulator
 
         services::MotorAlignmentImpl alignment{ model, model };
         services::ElectricalParametersIdentificationImpl electricalIdent{ model, model, vdc };
-        services::MechanicalParametersIdentificationImpl mechanicalIdent{ controller, model, model };
+        services::MechanicalParametersIdentificationImpl mechanicalIdent{ controller, controller, controller, model, model };
         const foc::NewtonMeter torqueConstant{ 1.5f * static_cast<float>(motorParams.p) * motorParams.psi_f.Value() };
 
         auto& gui = simulation.GetGui();

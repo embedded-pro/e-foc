@@ -477,7 +477,6 @@ TEST_F(MotorAlignmentTest, AReentrantForceAlignmentRejectsTheNewCallerRatherThan
     EXPECT_FALSE(firstFired);
     EXPECT_TRUE(secondFired);
     EXPECT_FALSE(secondResult.has_value());
-
 }
 
 TEST_F(MotorAlignmentTest, ARunThatNeverReceivesASampleFailsOnTheStepTimeout)
@@ -533,4 +532,37 @@ TEST_F(MotorAlignmentTest, TheStepTimeoutDoesNotFireAfterASuccessfulAlignment)
     ForwardTime(std::chrono::milliseconds{ 501 });
 
     EXPECT_EQ(1u, fired);
+}
+
+TEST_F(MotorAlignmentTest, AbortStopsTheDriverAndDropsTheCompletion)
+{
+    services::MotorAlignmentImpl::AlignmentConfig config;
+    bool fired = false;
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(driverMock, Stop());
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+
+    alignment.ForceAlignment(7, config, [&fired](auto)
+        {
+            fired = true;
+        });
+
+    EXPECT_CALL(driverMock, Stop());
+    alignment.Abort();
+
+    EXPECT_FALSE(fired);
+
+    driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    EXPECT_FALSE(fired);
+}
+
+TEST_F(MotorAlignmentTest, AbortWithoutARunInFlightIsANoOp)
+{
+    alignment.Abort();
 }

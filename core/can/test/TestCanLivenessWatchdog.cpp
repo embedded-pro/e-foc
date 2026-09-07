@@ -54,6 +54,13 @@ namespace
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<services::MechanicalParametersIdentificationMock> mechIdentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
+        infra::Execute setupTeardownExpectations{ [this]()
+            {
+                EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(mechIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
+            } };
         StrictMock<hal::CanMock> canMock;
 
         infra::Execute setupHardwareExpectations{ [this]()
@@ -66,7 +73,7 @@ namespace
                 EXPECT_CALL(lowPriorityInterruptMock, Unregister()).Times(AnyNumber());
                 EXPECT_CALL(canMock, SendData(_, _, _)).Times(AnyNumber());
                 EXPECT_CALL(canMock, ReceiveData(_)).Times(AnyNumber());
-                EXPECT_CALL(faultNotifierMock, Register(_)).Times(AnyNumber());
+                EXPECT_CALL(faultNotifierMock, Register(_, _)).Times(AnyNumber());
                 EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                     .Times(AnyNumber())
                     .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)

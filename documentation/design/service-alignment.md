@@ -93,6 +93,15 @@ Settlement detection is a simple sliding window state machine. At each sampling 
 5. If the total sample count reaches `maxSamples` without settlement, a timeout is declared.
 6. If any phase current in a sample exceeds `ThreePhaseInverter::MaxCurrentSupported()`, the injection is aborted immediately and the timeout path is taken. Alignment drives an open-loop voltage with no current regulation, so this per-sample check is the only software limit on the resulting current.
 
+Sampling is gated on the pending completion rather than on the inverter's callback slot being reclaimed:
+reassigning that slot from inside its own invocation would destroy the closure being executed, and the
+over-current path fails from inside it. A sample arriving after the procedure ended is discarded before it
+reaches anything.
+
+`Abort()` is the caller-facing form of the same shutdown. It stops the alignment voltage and drops the pending
+completion **without invoking it**, so a fault raised by the state machine cannot be overwritten by an
+alignment result that arrives after it.
+
 The encoder position at the moment of settlement declaration becomes the calibration offset. This offset represents the mechanical angle the rotor adopts when the electrical d-axis is at 0°; subtracting it from any subsequent encoder reading yields the corrected angle for the closed-loop FOC controller.
 
 The offset is in **mechanical** radians, which is the unit `Encoder::Set` and `Encoder::SetZero` consume. It is not scaled by pole pairs; scaling it would make it an electrical angle and misorient the field.

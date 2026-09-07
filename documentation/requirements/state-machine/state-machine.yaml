@@ -133,3 +133,30 @@
     sequence. The offset a running encoder reports shall be established only by the
     alignment step itself, so that an offset measured against a rotor position the
     encoder no longer holds cannot orient the field.
+
+- id: REQ-SM-020
+  title: A fault releases the calibration services
+  shall: >
+    On entering the Fault state, and on an emergency stop, the state machine shall abort
+    every calibration service it owns — electrical identification, encoder alignment and
+    mechanical identification — so that no timer, phase-current callback or injection
+    sequence outlives the fault. A service left running would drive the PWM output on its
+    next tick, re-arming the peripheral the fault had just disabled.
+
+- id: REQ-SM-021
+  title: A fault raised in an interrupt cuts the bridge before it is recorded
+  shall: >
+    When a fault is delivered through the platform's board-protection or CAN bus-off path,
+    both of which run in interrupt context, the state machine shall stop the FOC controller
+    within that context and shall defer the state transition, its trace output and its
+    pending-command completion to the event dispatcher, so that no tracing, multi-word
+    state write or non-volatile-memory access is performed from an interrupt.
+
+- id: REQ-SM-022
+  title: A destroyed state machine leaves nothing registered
+  shall: >
+    On destruction, a state machine shall release its registration with the fault notifier
+    and abort its calibration services. The fault notifier and the calibration services
+    outlive the state machines that use them — a control-mode switch destroys one state
+    machine and constructs the next in its place — so a registration or a pending
+    identification callback left behind would be invoked against freed storage.

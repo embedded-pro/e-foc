@@ -13,5 +13,6 @@ namespace services
             (std::size_t polePairs, const AlignmentConfig& config,
                 const infra::Function<void(std::optional<foc::Radians>)>& onDone),
             (override));
+        MOCK_METHOD(void, Abort, (), (override));
     };
 }

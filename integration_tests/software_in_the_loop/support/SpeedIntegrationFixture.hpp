@@ -91,6 +91,14 @@ namespace sil
         testing::StrictMock<services::MechanicalParametersIdentificationMock> mechIdentMock;
         testing::StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         testing::StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
+        infra::Execute setupTeardownExpectations{ [this]()
+            {
+                using namespace testing;
+                EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(mechIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
+            } };
 
         std::optional<SpeedStateMachine> motorStateMachine;
 
