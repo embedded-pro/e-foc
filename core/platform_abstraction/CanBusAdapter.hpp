@@ -62,9 +62,9 @@ namespace application
 
     private:
         ErrorCounters errorCounters;
-    };
 
-    infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, CanBusAdapter::CanError error);
+        friend infra::TextOutputStream& operator<<(infra::TextOutputStream& stream, CanError error);
+    };
 
     template<std::derived_from<hal::Can> Impl>
     class CanBusAdapterImpl

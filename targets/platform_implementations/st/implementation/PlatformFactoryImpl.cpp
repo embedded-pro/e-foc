@@ -313,7 +313,7 @@ namespace application
 
     const CanBusAdapter::ErrorCounters& PlatformFactoryImpl::CanStatistics() const
     {
-        return const_cast<PlatformFactoryImpl*>(this)->CanBus().ErrorStatistics();
+        return canBus->ErrorStatistics();
     }
 
     void PlatformFactoryImpl::ResetStatistics()

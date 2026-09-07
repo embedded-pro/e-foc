@@ -20,9 +20,12 @@ namespace foc
     {
         constexpr uint8_t NextFreeSlot(uint8_t slotCount, uint8_t ready, uint8_t held)
         {
-            return ready == held
-                       ? static_cast<uint8_t>(ready == slotCount - 1u ? 0u : ready + 1u)
-                       : static_cast<uint8_t>(slotCount * (slotCount - 1u) / 2u - ready - held);
+            if (ready != held)
+                return static_cast<uint8_t>(slotCount * (slotCount - 1u) / 2u - ready - held);
+
+            const auto afterReady = ready == slotCount - 1u ? 0u : ready + 1u;
+
+            return static_cast<uint8_t>(afterReady);
         }
     }
 
@@ -41,7 +44,7 @@ namespace foc
         ALWAYS_INLINE_HOT void Publish(const EstimatorSnapshot& snapshot)
         {
             slots[writeSlot] = snapshot;
-            std::atomic_signal_fence(std::memory_order_release);
+            std::atomic_signal_fence(std::memory_order_seq_cst);
             ready = writeSlot;
             writeSlot = NextFreeSlot();
         }
@@ -55,7 +58,7 @@ namespace foc
         ALWAYS_INLINE_HOT const EstimatorSnapshot& Acquire()
         {
             held = ready;
-            std::atomic_signal_fence(std::memory_order_acquire);
+            std::atomic_signal_fence(std::memory_order_seq_cst);
             return slots[held];
         }
 

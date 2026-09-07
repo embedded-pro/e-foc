@@ -14,7 +14,6 @@ namespace services
         void PrintControlLoopStatistics();
         void PrintCanStatistics();
 
-        services::TerminalWithStorage& terminal;
         application::PlatformFactory& platform;
     };
 }

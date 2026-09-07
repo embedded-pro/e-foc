@@ -22,8 +22,7 @@ namespace services
     }
 
     TerminalDiagnostics::TerminalDiagnostics(services::TerminalWithStorage& terminal, application::PlatformFactory& platform)
-        : terminal(terminal)
-        , platform(platform)
+        : platform(platform)
     {
         terminal.AddCommand({ { "loop_stats", "ls", "Print control loop execution statistics" },
             [this](const infra::BoundedConstString&)
