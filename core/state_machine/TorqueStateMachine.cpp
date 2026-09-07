@@ -10,7 +10,7 @@ namespace application
         state_machine::FaultNotifier& faultNotifier,
         state_machine::TransitionPolicy transitionPolicy)
         : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices)
-        , focController(hardware.inverter, hardware.encoder)
+        , focController(hardware.inverter, hardware.encoder, hardware.inverter.MaxCurrentSupported())
     {
         RegisterFaultHandler(faultNotifier);
         RegisterCliIfNeeded(transitionPolicy);

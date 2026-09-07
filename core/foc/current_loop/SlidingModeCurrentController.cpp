@@ -45,8 +45,11 @@ namespace foc
             slidingMode = Inert();
             normalizationScale = 0.0f;
             equilibriumGain = 0.0f;
+            decoupling = DecouplingFeedforward{};
             return;
         }
+
+        decoupling.Configure(parameters);
 
         normalizationScale = NormalizationScale(parameters.busVoltage);
         equilibriumGain = (1.0f - plant.ad) / plant.bd;

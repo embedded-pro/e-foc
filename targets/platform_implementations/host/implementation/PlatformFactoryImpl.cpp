@@ -100,6 +100,7 @@ namespace application
     {
         canBus.reset();
         canBus.emplace();
+        diagnostics.AttachCanBus(*canBus);
     }
 
     CanBusAdapter& PlatformFactoryImpl::CanBus()
@@ -263,5 +264,10 @@ namespace application
     infra::BoundedConstString PlatformFactoryImpl::FaultStatus() const
     {
         return faultStatusString;
+    }
+
+    PlatformDiagnostics& PlatformFactoryImpl::Diagnostics()
+    {
+        return diagnostics;
     }
 }

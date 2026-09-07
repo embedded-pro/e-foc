@@ -22,6 +22,11 @@ target_link_libraries(e_foc.platform_abstraction PUBLIC
 target_sources(e_foc.platform_abstraction PRIVATE
     AdcPhaseCurrentMeasurement.hpp
     CanBusAdapter.hpp
+    CanBusAdapter.cpp
+    ControlLoopMetrics.hpp
+    ControlLoopMetrics.cpp
+    PlatformDiagnostics.hpp
+    PlatformDiagnostics.cpp
     PlatformFactory.hpp
     PlatformFactory.cpp
     QuadratureEncoderDecorator.hpp

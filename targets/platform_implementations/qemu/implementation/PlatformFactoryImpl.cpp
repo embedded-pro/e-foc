@@ -10,7 +10,7 @@
 namespace application
 {
     PlatformFactoryImpl::PlatformFactoryImpl(const foc::ThreePhaseMotorModel::Parameters& motorParams,
-                                             const infra::Function<void()>& onInit)
+        const infra::Function<void()>& onInit)
         : onInitialized(onInit)
         , model(
               motorParams,
@@ -110,9 +110,19 @@ namespace application
         return {};
     }
 
+    PlatformDiagnostics& PlatformFactoryImpl::Diagnostics()
+    {
+        return diagnostics;
+    }
+
     void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz freq, std::chrono::nanoseconds, SampleAndHold)
     {
         baseFrequency = freq;
+
+        const auto periodCycles = freq.Value() == 0
+                                      ? 0u
+                                      : static_cast<uint32_t>(kQemuSystemClockHz / freq.Value());
+        controlLoopMetrics.Configure(static_cast<uint32_t>(static_cast<uint64_t>(periodCycles) * 3u / 4u), periodCycles);
     }
 
     void PlatformFactoryImpl::SetEncoderResolution(uint32_t)
@@ -123,10 +133,11 @@ namespace application
         if (!canBusAdapter)
         {
             canBusAdapter.emplace();
+            diagnostics.AttachCanBus(*canBusAdapter);
             canPollTimer.Start(std::chrono::milliseconds(1), [this]()
-            {
-                canBusAdapter->PollIncoming();
-            });
+                {
+                    canBusAdapter->PollIncoming();
+                });
         }
     }
 
@@ -153,8 +164,23 @@ namespace application
     void PlatformFactoryImpl::FocTimerIsr()
     {
         model.StepForTest(lastDutyPhases);
-        if (onPhaseCurrentsReady)
-            onPhaseCurrentsReady(lastCurrents);
+
+        if (!onPhaseCurrentsReady)
+            return;
+
+        if (controlLoopEntered)
+        {
+            controlLoopMetrics.RecordReentry();
+            return;
+        }
+
+        controlLoopEntered = true;
+        const auto entryCycles = CycleCounter::Now();
+
+        onPhaseCurrentsReady(lastCurrents);
+
+        controlLoopMetrics.Record(CycleCounter::Now() - entryCycles);
+        controlLoopEntered = false;
     }
 
     void PlatformFactoryImpl::Start()

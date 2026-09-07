@@ -39,3 +39,17 @@
     aborts owns the outcome and a fault cannot be overwritten by the result of the
     procedure it interrupted. A procedure that has been aborted or has completed shall
     ignore any further phase-current sample it is handed.
+
+- id: REQ-CAL-006
+  title: A second alignment request is rejected rather than dropped
+  shall: >
+    When encoder alignment is asked to start while a run is already in flight, the service shall
+    report the new request as failed through its own completion rather than returning silently. A
+    dropped completion leaves the caller waiting for a result that will never arrive.
+
+- id: REQ-CAL-007
+  title: Encoder alignment is bounded in time, not only in samples
+  shall: >
+    Encoder alignment shall fail after a configurable timeout measured from the start of the run.
+    Its sample budget bounds the run only while phase-current samples keep arriving, so a drive
+    that never starts delivers none and nothing else ends the step.

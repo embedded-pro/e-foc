@@ -12,6 +12,7 @@ target_link_libraries(e_foc.foc.cascade_test PUBLIC
 )
 
 target_sources(e_foc.foc.cascade_test PRIVATE
+    TestEstimatorChannel.cpp
     TestPositionCascade.cpp
     TestSpeedCascade.cpp
     TestTorqueCascade.cpp

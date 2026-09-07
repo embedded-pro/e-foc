@@ -10,12 +10,13 @@ namespace
     constexpr float inductanceInHenry = 0.0005f;
     constexpr float samplePeriod = 1.0f / 20000.0f;
     constexpr float busVoltage = 24.0f;
+    constexpr float fluxLinkageInWeber = 0.01f;
     constexpr float switchingGain = foc::CurrentLoopTunings{}.switchingGain;
     constexpr float boundaryLayer = foc::CurrentLoopTunings{}.boundaryLayer;
 
     foc::MotorModelParameters ValidParameters()
     {
-        return { foc::Ohm{ resistance }, foc::MilliHenry{ 0.5f }, foc::Weber{ 0.01f }, foc::Volts{ busVoltage }, hal::Hertz{ 20000 } };
+        return { foc::Ohm{ resistance }, foc::MilliHenry{ 0.5f }, foc::Weber{ fluxLinkageInWeber }, foc::Volts{ busVoltage }, hal::Hertz{ 20000 } };
     }
 
     float Ad()
@@ -150,4 +151,33 @@ TEST_F(TestSlidingModeCurrentController, closed_loop_settles_on_a_non_zero_refer
     controller.SetTunings({ 6283.185307f, 0.2f, 0.5f, false });
 
     EXPECT_NEAR(SettledCurrent(1.0f), 1.0f, tolerance);
+}
+
+TEST_F(TestSlidingModeCurrentController, the_back_emf_is_fed_forward_rather_than_left_to_the_switching_term)
+{
+    controller.Configure(ValidParameters());
+
+    constexpr float electricalSpeed = 1000.0f;
+
+    const auto atStandstill = controller.Compute({ { 0.0f, 0.0f }, { 0.0f, 0.0f }, 0.0f });
+    const auto atSpeed = controller.Compute({ { 0.0f, 0.0f }, { 0.0f, 0.0f }, electricalSpeed });
+
+    const auto fedForward = atSpeed.q - atStandstill.q;
+    const auto expected = electricalSpeed * Normalized(fluxLinkageInWeber);
+
+    EXPECT_NEAR(expected, fedForward, tolerance);
+    EXPECT_GT(fedForward, 4.0f * Normalized(switchingGain / Bd()));
+}
+
+TEST_F(TestSlidingModeCurrentController, the_cross_coupling_term_follows_the_measured_d_axis_current)
+{
+    controller.Configure(ValidParameters());
+
+    constexpr float electricalSpeed = 500.0f;
+    constexpr float measuredD = 2.0f;
+
+    const auto withoutD = controller.Compute({ { 0.0f, 0.0f }, { 0.0f, 0.0f }, electricalSpeed });
+    const auto withD = controller.Compute({ { measuredD, 0.0f }, { measuredD, 0.0f }, electricalSpeed });
+
+    EXPECT_NEAR(electricalSpeed * inductanceInHenry * Normalized(1.0f) * measuredD, withD.q - withoutD.q, tolerance);
 }

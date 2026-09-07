@@ -17,6 +17,14 @@ namespace application
         onError = handler;
     }
 
+    void SemihostingCanBusAdapter::NotifyError(CanError error)
+    {
+        RecordError(error);
+
+        if (onError)
+            onError(error);
+    }
+
     void SemihostingCanBusAdapter::PollIncoming()
     {
         can.PollIncoming();

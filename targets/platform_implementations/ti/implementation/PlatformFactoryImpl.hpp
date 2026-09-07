@@ -25,6 +25,7 @@
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
+#include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PowerStageCutOff.hpp"
 
@@ -72,6 +73,7 @@ namespace application
         void Reset() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
+        PlatformDiagnostics& Diagnostics() override;
 
         // Implementation of drivers::ThreePhaseInverter
         OPTIMIZE_FOR_SPEED void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
@@ -241,6 +243,10 @@ namespace application
         infra::Function<void()> onInitialized;
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         ResetCause resetCause{ ResetCause::powerUp };
+        CycleCounter cycleCounter;
+        ControlLoopMetrics controlLoopMetrics;
+        PlatformDiagnostics diagnostics{ controlLoopMetrics };
+        volatile bool controlLoopEntered{ false };
         infra::BoundedString::WithStorage<1024> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };

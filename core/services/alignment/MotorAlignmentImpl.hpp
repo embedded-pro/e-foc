@@ -3,6 +3,7 @@
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/alignment/MotorAlignment.hpp"
+#include "infra/timer/Timer.hpp"
 #include "infra/util/AutoResetFunction.hpp"
 
 namespace services
@@ -35,5 +36,6 @@ namespace services
         foc::Radians previousPosition{ 0.0f };
         foc::Radians alignedPosition{ 0.0f };
         infra::AutoResetFunction<void(std::optional<foc::Radians>)> onAlignmentDone;
+        infra::TimerSingleShot timeoutTimer;
     };
 }

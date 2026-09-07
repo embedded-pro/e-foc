@@ -6,7 +6,6 @@
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
-#include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/interfaces/Pwm.hpp"
@@ -15,6 +14,7 @@
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
+#include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 
 namespace application
 {
@@ -48,6 +48,7 @@ namespace application
         void Reset() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
+        PlatformDiagnostics& Diagnostics() override;
 
         void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>& onProtection) override
         {
@@ -224,6 +225,8 @@ namespace application
         std::optional<CanBusAdapterImpl<CanStub>> canBus;
         EepromStub eepromStub;
         ResetCause resetCause{ ResetCause::powerUp };
+        ControlLoopMetrics controlLoopMetrics;
+        PlatformDiagnostics diagnostics{ controlLoopMetrics };
         infra::BoundedString::WithStorage<1024> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };

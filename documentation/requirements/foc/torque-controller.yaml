@@ -35,3 +35,11 @@
     space vector modulation, output) shall execute at a 20 kHz control rate and
     shall not exceed 4500 cycles at 120 MHz, which is 75 percent of the available
     CPU time per control period.
+
+- id: REQ-TRQ-006
+  title: The torque current reference is bounded by the inverter envelope
+  shall: >
+    The torque cascade shall bound each current setpoint it accepts to the inverter's maximum
+    supported current before that setpoint reaches the current loop. The bound shall apply to the
+    magnitude of the (Id, Iq) vector rather than to either axis on its own, and a setpoint outside
+    the envelope shall be scaled onto it so that the commanded ratio between the axes is preserved.

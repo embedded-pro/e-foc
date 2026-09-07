@@ -14,6 +14,8 @@ namespace application
         void ReceiveData(const infra::Function<void(Id id, const Message& data)>& receivedAction) override;
         void SetOnError(const infra::Function<void(CanError)>& handler) override;
 
+        void NotifyError(CanError error);
+
         void PollIncoming();
 
     private:

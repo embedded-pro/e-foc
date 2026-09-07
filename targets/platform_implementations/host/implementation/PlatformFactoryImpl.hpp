@@ -50,6 +50,7 @@ namespace application
         void Reset() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
+        PlatformDiagnostics& Diagnostics() override;
 
         // Implementation of hal::PerformanceTracker (Start also satisfies ThreePhaseInverter::Start — no-op on host)
         void Start() override;
@@ -246,6 +247,8 @@ namespace application
         std::optional<CanBusAdapterImpl<CanStub>> canBus;
         EepromStub eepromStub;
         ResetCause resetCause{ ResetCause::powerUp };
+        ControlLoopMetrics controlLoopMetrics;
+        PlatformDiagnostics diagnostics{ controlLoopMetrics };
         infra::BoundedString::WithStorage<1024> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };
