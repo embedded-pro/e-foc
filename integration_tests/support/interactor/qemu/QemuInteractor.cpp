@@ -19,7 +19,8 @@ namespace sil
     {
         lines.clear();
         lastLine.clear();
-        session.Start(elfPath);
+        if (!session.Start(elfPath))
+            fprintf(stderr, "[QEMU] failed to start %s\n", elfPath.c_str());
     }
 
     void QemuInteractor::AfterScenario()

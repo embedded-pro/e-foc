@@ -43,7 +43,7 @@ namespace application
         application::PlatformFactory& hardware;
         services::DebugLed debugLed;
         foc::Volts vdc;
-        services::TerminalWithBanner::WithMaxSize<20> terminalWithStorage;
+        services::TerminalWithBanner::WithMaxSize<32> terminalWithStorage;
         services::TerminalDiagnostics terminalDiagnostics;
         services::NvmEepromRegion calibrationRegion;
         services::NvmEepromRegion configRegion;

@@ -173,6 +173,12 @@ namespace sil
             if (!ReadLine(candidate, std::chrono::duration_cast<std::chrono::milliseconds>(remaining)))
                 return false;
 
+            if (candidate.find("ABORT") == 0)
+            {
+                fprintf(stderr, "[QEMU] firmware crash: %s\n", candidate.c_str());
+                return false;
+            }
+
             if (candidate.find(prefix) == 0)
             {
                 line = candidate;
