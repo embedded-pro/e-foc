@@ -256,7 +256,9 @@ jobs:
           chmod +x sil_runner/e_foc.integration_tests
           sil_runner/e_foc.integration_tests \
             --mode sil \
-            --format summary pretty junit:sil-test-report.xml \
+            --format summary \
+            --format pretty \
+            --format "junit:sil-test-report.xml" \
             integration_tests/features \
             -t "@sil"
       - name: Generate SIL test summary
