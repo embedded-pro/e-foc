@@ -39,6 +39,9 @@ namespace sil
         if (pid == 0)
         {
             dup2(toChild[0], STDIN_FILENO);
+            const int stdinFlags = fcntl(STDIN_FILENO, F_GETFL, 0);
+            if (stdinFlags >= 0)
+                fcntl(STDIN_FILENO, F_SETFL, stdinFlags | O_NONBLOCK);
             dup2(toParent[1], STDOUT_FILENO);
             dup2(toParent[1], STDERR_FILENO);
             close(toChild[0]);

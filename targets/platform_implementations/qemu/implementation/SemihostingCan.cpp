@@ -104,7 +104,7 @@ namespace sil
         hexData[pos] = '\0';
 
         const uint32_t rawId = id.Is11BitId() ? id.Get11BitId() : id.Get29BitId();
-        std::printf("CAN_TX %03lx %s\n", static_cast<unsigned long>(rawId), hexData);
+        std::printf("\nCAN_TX %03lx %s\n", static_cast<unsigned long>(rawId), hexData);
         std::fflush(stdout);
 
         if (onDone)

@@ -26,7 +26,7 @@ namespace application
 
     void PlatformFactoryImpl::Run()
     {
-        std::puts("READY");
+        std::puts("\nREADY");
         std::fflush(stdout);
 
         while (true)
