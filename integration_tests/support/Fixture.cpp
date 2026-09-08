@@ -83,8 +83,8 @@ namespace integration
             return false;
 
         ++nextSequence;
-        return ackPayload.size() >= 3
-            && ackPayload[2] == static_cast<uint8_t>(services::CanAckStatus::success);
+        return ackPayload.size() >= 3 &&
+               ackPayload[2] == static_cast<uint8_t>(services::CanAckStatus::success);
     }
 
     bool Fixture::WaitForMotorState(can::FocMotorState expectedState, std::chrono::milliseconds timeout)

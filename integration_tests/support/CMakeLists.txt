@@ -1,7 +1,6 @@
 add_subdirectory(interactor/interfaces)
 add_subdirectory(interactor/qemu)
 add_subdirectory(interactor/hardware)
-add_subdirectory(bridge_client)
 
 add_library(e_foc.integration_tests.support OBJECT
     Fixture.hpp

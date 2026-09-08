@@ -9,9 +9,11 @@ namespace sil
         : elfPath{ std::move(elfPath) }
     {}
 
-    void QemuInteractor::Setup() {}
+    void QemuInteractor::Setup()
+    {}
 
-    void QemuInteractor::Teardown() {}
+    void QemuInteractor::Teardown()
+    {}
 
     void QemuInteractor::BeforeScenario()
     {
@@ -87,7 +89,8 @@ namespace sil
         return std::chrono::milliseconds{ 0 };
     }
 
-    void QemuInteractor::ClearCanFrames() {}
+    void QemuInteractor::ClearCanFrames()
+    {}
 
     bool QemuInteractor::SendCanFrame(hal::Can::Id id, const hal::Can::Message& message,
         std::chrono::milliseconds)
