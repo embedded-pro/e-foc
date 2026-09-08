@@ -13,6 +13,7 @@ target_link_libraries(e_foc.integration_tests PRIVATE
     e_foc.integration_tests.steps
     e_foc.integration_tests.hooks
     e_foc.integration_tests.support
+    e_foc.integration_tests.interactor.interfaces
     e_foc.integration_tests.interactor.qemu
     e_foc.integration_tests.interactor.hardware
     cucumber_cpp.runner
@@ -24,5 +25,5 @@ target_compile_definitions(e_foc.integration_tests PRIVATE
 )
 
 add_test(NAME e_foc.integration_tests.sil
-    COMMAND e_foc.integration_tests --mode sil -- --tags @sil ${CMAKE_CURRENT_SOURCE_DIR}/../features)
+    COMMAND e_foc.integration_tests --mode sil ${CMAKE_CURRENT_SOURCE_DIR}/../features -t "@sil")
 set_tests_properties(e_foc.integration_tests.sil PROPERTIES LABELS integration)

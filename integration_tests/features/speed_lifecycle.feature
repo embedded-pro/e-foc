@@ -2,50 +2,43 @@ Feature: Speed Controller State Machine Lifecycle
   The speed controller state machine manages the motor lifecycle,
   supporting cascade velocity control from Idle through calibration to Enabled.
 
-  @REQ-SPD-001 @REQ-SM-001
-    @sil
+  @REQ-SPD-001 @REQ-SM-001 @sil
   Scenario: Speed motor starts in Idle state when no valid calibration data exists
     Given the speed motor system is initialised with no valid calibration data
     Then the state machine shall be in the Idle state
 
-  @REQ-SPD-001 @REQ-SM-010
-    @sil
+  @REQ-SPD-001 @REQ-SM-010 @sil
   Scenario: Speed motor boots directly to Ready state when valid calibration data exists
     Given the speed motor system is initialised with valid calibration data
     Then the state machine shall be in the Ready state
 
-  @REQ-SM-002
-    @sil
+  @REQ-SM-002 @sil
   Scenario: Calibrate command transitions speed controller from Idle to Calibrating
     Given the speed motor system is initialised with no valid calibration data
     When the calibrate command is issued
     Then the state machine shall be in the Calibrating state
 
-  @REQ-SM-006
-    @sil
+  @REQ-SM-006 @sil
   Scenario: Enable command transitions speed controller from Ready to Enabled
     Given the speed motor system is initialised with valid calibration data
     When the enable command is issued
     Then the state machine shall be in the Enabled state
 
-  @REQ-SM-007
-    @sil
+  @REQ-SM-007 @sil
   Scenario: Disable command transitions speed controller from Enabled to Ready
     Given the speed motor system is initialised with valid calibration data
     And the enable command is issued
     When the disable command is issued
     Then the state machine shall be in the Ready state
 
-  @REQ-SM-008
-    @sil
+  @REQ-SM-008 @sil
   Scenario: Hardware fault transitions speed controller to Fault state
     Given the speed motor system is initialised with valid calibration data
     And the enable command is issued
     When a hardware fault is raised by the platform
     Then the state machine shall be in the Fault state
 
-  @REQ-SM-009
-    @sil
+  @REQ-SM-009 @sil
   Scenario: Clear fault command transitions speed controller from Fault to Ready when calibrated
     Given the speed motor system is initialised with valid calibration data
     And the enable command is issued
@@ -54,13 +47,13 @@ Feature: Speed Controller State Machine Lifecycle
     Then the state machine shall be in the Ready state
 
   # Forbidden transitions — enable from wrong states
-    @sil
+  @sil
   Scenario: Enable command is rejected when speed motor is in Idle state
     Given the speed motor system is initialised with no valid calibration data
     When the enable command is issued
     Then the state machine shall be in the Idle state
 
-    @sil
+  @sil
   Scenario: Enable command is rejected when speed motor is in Fault state
     Given the speed motor system is initialised with valid calibration data
     And the enable command is issued
@@ -69,19 +62,19 @@ Feature: Speed Controller State Machine Lifecycle
     Then the state machine shall be in the Fault state
 
   # Forbidden transitions — disable from wrong states
-    @sil
+  @sil
   Scenario: Disable command is ignored when speed motor is in Ready state
     Given the speed motor system is initialised with valid calibration data
     When the disable command is issued
     Then the state machine shall be in the Ready state
 
-    @sil
+  @sil
   Scenario: Disable command is ignored when speed motor is in Idle state
     Given the speed motor system is initialised with no valid calibration data
     When the disable command is issued
     Then the state machine shall be in the Idle state
 
-    @sil
+  @sil
   Scenario: Disable command is ignored when speed motor is in Fault state
     Given the speed motor system is initialised with valid calibration data
     And the enable command is issued
@@ -90,14 +83,14 @@ Feature: Speed Controller State Machine Lifecycle
     Then the state machine shall be in the Fault state
 
   # Forbidden transitions — calibrate from wrong states
-    @sil
+  @sil
   Scenario: Calibrate command is rejected while speed motor is Enabled
     Given the speed motor system is initialised with valid calibration data
     And the enable command is issued
     When the calibrate command is issued
     Then the state machine shall be in the Enabled state
 
-    @sil
+  @sil
   Scenario: Calibrate command is rejected while speed motor is in Fault state
     Given the speed motor system is initialised with valid calibration data
     And the enable command is issued
@@ -106,19 +99,19 @@ Feature: Speed Controller State Machine Lifecycle
     Then the state machine shall be in the Fault state
 
   # Forbidden transitions — clear fault from wrong states
-    @sil
+  @sil
   Scenario: Clear fault command is ignored when speed motor is in Ready state
     Given the speed motor system is initialised with valid calibration data
     When the clear fault command is issued
     Then the state machine shall be in the Ready state
 
-    @sil
+  @sil
   Scenario: Clear fault command is ignored when speed motor is in Idle state
     Given the speed motor system is initialised with no valid calibration data
     When the clear fault command is issued
     Then the state machine shall be in the Idle state
 
-    @sil
+  @sil
   Scenario: Clear fault command is ignored when speed motor is Enabled
     Given the speed motor system is initialised with valid calibration data
     And the enable command is issued
@@ -126,7 +119,7 @@ Feature: Speed Controller State Machine Lifecycle
     Then the state machine shall be in the Enabled state
 
   # Async-callback race guard — REQ-SM-011
-    @sil
+  @sil
   Scenario: Clear-calibration NVM completion after Enable does not return speed motor to Idle
     Given the speed motor system is initialised with valid calibration data
     When a clear-calibration command is issued with deferred NVM completion
@@ -134,7 +127,7 @@ Feature: Speed Controller State Machine Lifecycle
     And the deferred NVM invalidation completes successfully
     Then the state machine shall be in the Enabled state
 
-    @sil
+  @sil
   Scenario: Clear-calibration NVM completion after Fault does not return speed motor to Idle
     Given the speed motor system is initialised with valid calibration data
     When a clear-calibration command is issued with deferred NVM completion

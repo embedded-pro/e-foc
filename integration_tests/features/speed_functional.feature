@@ -2,22 +2,19 @@ Feature: Speed Controller Functional API
   The speed controller exposes a typed API for setpoints and loop bandwidths.
   These scenarios verify requirement-level acceptance of each configuration call.
 
-  @REQ-SPD-002
-    @sil
+  @REQ-SPD-002 @sil
   Scenario: Speed controller accepts a velocity setpoint in radians per second
     Given the speed controller is initialised with default parameters
     When a velocity setpoint of 100 radians per second is commanded
     Then the commanded duty cycles follow the velocity setpoint
 
-  @REQ-SPD-003
-    @sil
+  @REQ-SPD-003 @sil
   Scenario: Speed controller applies the configured current loop bandwidth
     Given the speed controller is initialised with default parameters
     When a current loop bandwidth well below the baseline is configured
     Then the commanded duty cycles differ from those of the baseline bandwidth
 
-  @REQ-SPD-004
-    @sil
+  @REQ-SPD-004 @sil
   Scenario: Speed controller accepts an outer velocity loop bandwidth and reports its frequency
     Given the speed controller is initialised with default parameters
     When the speed loop bandwidth is configured
