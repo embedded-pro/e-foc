@@ -3,7 +3,7 @@
 
 namespace
 {
-    hal::Can::Id MakeCanId(services::CanPriority priority, uint8_t category, uint8_t messageType, uint16_t nodeId)
+    hal::Can::Id MakeId(services::CanPriority priority, uint8_t category, uint8_t messageType, uint16_t nodeId)
     {
         return hal::Can::Id::Create29BitId(services::MakeCanId(priority, category, messageType, nodeId));
     }
@@ -52,7 +52,7 @@ namespace integration
 
     bool Fixture::WaitForCanHeartbeat(std::chrono::milliseconds timeout)
     {
-        const hal::Can::Id heartbeatId = MakeCanId(services::CanPriority::heartbeat,
+        const hal::Can::Id heartbeatId = MakeId(services::CanPriority::heartbeat,
             services::canSystemCategoryId, services::canHeartbeatMessageTypeId, kServerNodeId);
         hal::Can::Message payload;
         std::chrono::milliseconds elapsed{ 0 };
@@ -62,7 +62,7 @@ namespace integration
     bool Fixture::SendCanCommand(uint8_t category, uint8_t messageType,
         const hal::Can::Message& extra, std::chrono::milliseconds timeout)
     {
-        const hal::Can::Id commandId = MakeCanId(services::CanPriority::command,
+        const hal::Can::Id commandId = MakeId(services::CanPriority::command,
             category, messageType, kServerNodeId);
         hal::Can::Message payload;
         payload.push_back(nextSequence);
@@ -75,7 +75,7 @@ namespace integration
         if (!interactor.SendCanFrame(commandId, payload, std::chrono::milliseconds{ 100 }))
             return false;
 
-        const hal::Can::Id ackId = MakeCanId(services::CanPriority::response,
+        const hal::Can::Id ackId = MakeId(services::CanPriority::response,
             services::canSystemCategoryId, services::canCommandAckMessageTypeId, kServerNodeId);
         hal::Can::Message ackPayload;
         std::chrono::milliseconds elapsed{ 0 };
@@ -89,7 +89,7 @@ namespace integration
 
     bool Fixture::WaitForMotorState(can::FocMotorState expectedState, std::chrono::milliseconds timeout)
     {
-        const hal::Can::Id telemetryId = MakeCanId(services::CanPriority::telemetry,
+        const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
             can::focMotorCategoryId, can::focTelemetryStatusResponseId, kServerNodeId);
 
         const auto deadline = std::chrono::steady_clock::now() + timeout;
