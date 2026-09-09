@@ -1,11 +1,14 @@
 #include "integration_tests/support/interactor/qemu/QemuSilSession.hpp"
 #include <chrono>
 #include <cstdio>
+#include <cstring>
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
 #include <string>
+#include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -20,56 +23,111 @@ namespace sil
     {
         signal(SIGPIPE, SIG_IGN);
 
-        int toChild[2];
-        int toParent[2];
+        const std::string pidStr  = std::to_string(getpid());
+        const std::string outPath = "/tmp/qemu_sil_out_" + pidStr + ".sock";
+        const std::string inPath  = "/tmp/qemu_sil_in_"  + pidStr + ".sock";
+        unlink(outPath.c_str());
+        unlink(inPath.c_str());
 
-        if (pipe(toChild) != 0 || pipe(toParent) != 0)
-            return false;
+        // out: semihosting output (CAN_TX, READY sentinel) — wait=on so QEMU blocks
+        // until the test connects and can observe firmware output from the start.
+        // in: serial/UART input (CAN_RX frames from test) — wait=off so QEMU starts
+        // immediately; the test connects after READY is received.
+        const std::string outChardevArg = "socket,id=out,path=" + outPath + ",server=on,wait=on";
+        const std::string inChardevArg  = "socket,id=in,path="  + inPath  + ",server=on,wait=off";
+        const std::string semihostingArg = "enable=on,chardev=out";
 
         pid = fork();
         if (pid < 0)
-        {
-            close(toChild[0]);
-            close(toChild[1]);
-            close(toParent[0]);
-            close(toParent[1]);
             return false;
-        }
 
         if (pid == 0)
         {
-            dup2(toChild[0], STDIN_FILENO);
-            const int stdinFlags = fcntl(STDIN_FILENO, F_GETFL, 0);
-            if (stdinFlags >= 0)
-                fcntl(STDIN_FILENO, F_SETFL, stdinFlags | O_NONBLOCK);
-            dup2(toParent[1], STDOUT_FILENO);
-            dup2(toParent[1], STDERR_FILENO);
-            close(toChild[0]);
-            close(toChild[1]);
-            close(toParent[0]);
-            close(toParent[1]);
+            const int devNull = open("/dev/null", O_RDWR);
+            if (devNull >= 0)
+            {
+                dup2(devNull, STDIN_FILENO);
+                dup2(devNull, STDOUT_FILENO);
+                dup2(devNull, STDERR_FILENO);
+                close(devNull);
+            }
 
             const char* const argv[] = {
                 "qemu-system-arm",
                 "-M", "mps2-an386",
                 "-nographic",
-                "-semihosting-config", "enable=on,target=native",
+                "-chardev", outChardevArg.c_str(),
+                "-chardev", inChardevArg.c_str(),
+                "-semihosting-config", semihostingArg.c_str(),
+                "-serial", "chardev:in",
                 "-kernel", elfPath.c_str(),
                 nullptr
             };
-
             execvp("qemu-system-arm", const_cast<char* const*>(argv));
             _exit(1);
         }
 
-        close(toChild[0]);
-        close(toParent[1]);
+        // Parent: connect to the output socket first (blocks until QEMU creates it)
+        for (int attempt = 0; attempt < 100; ++attempt)
+        {
+            usleep(100000);
 
-        stdinFd = toChild[1];
-        stdoutFd = toParent[0];
+            outSockFd = ::socket(AF_UNIX, SOCK_STREAM, 0);
+            if (outSockFd < 0)
+                continue;
+
+            struct sockaddr_un addr{};
+            addr.sun_family = AF_UNIX;
+            std::strncpy(addr.sun_path, outPath.c_str(), sizeof(addr.sun_path) - 1);
+
+            if (connect(outSockFd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == 0)
+                break;
+
+            close(outSockFd);
+            outSockFd = -1;
+        }
+        unlink(outPath.c_str());
+
+        if (outSockFd < 0)
+        {
+            kill(pid, SIGKILL);
+            waitpid(pid, nullptr, 0);
+            pid = -1;
+            return false;
+        }
 
         std::string ready;
         if (!WaitFor("READY", ready, std::chrono::milliseconds{ 10000 }))
+        {
+            Stop();
+            return false;
+        }
+
+        // Connect to the input socket (QEMU has started; "in" chardev was created with
+        // wait=off so the socket file exists but no client was required at startup).
+        for (int attempt = 0; attempt < 50; ++attempt)
+        {
+            inSockFd = ::socket(AF_UNIX, SOCK_STREAM, 0);
+            if (inSockFd < 0)
+            {
+                usleep(100000);
+                continue;
+            }
+
+            struct sockaddr_un addr{};
+            addr.sun_family = AF_UNIX;
+            std::strncpy(addr.sun_path, inPath.c_str(), sizeof(addr.sun_path) - 1);
+
+            if (connect(inSockFd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == 0)
+                break;
+
+            close(inSockFd);
+            inSockFd = -1;
+            usleep(100000);
+        }
+        unlink(inPath.c_str());
+
+        if (inSockFd < 0)
         {
             Stop();
             return false;
@@ -83,19 +141,16 @@ namespace sil
         if (pid < 0)
             return;
 
-        if (stdinFd >= 0)
+        if (outSockFd >= 0)
         {
-            const std::string quit = "quit\n";
-            const ssize_t ignored = write(stdinFd, quit.data(), quit.size());
-            (void)ignored;
-            close(stdinFd);
-            stdinFd = -1;
+            close(outSockFd);
+            outSockFd = -1;
         }
 
-        if (stdoutFd >= 0)
+        if (inSockFd >= 0)
         {
-            close(stdoutFd);
-            stdoutFd = -1;
+            close(inSockFd);
+            inSockFd = -1;
         }
 
         int status = 0;
@@ -118,17 +173,17 @@ namespace sil
 
     bool QemuSilSession::SendLine(const std::string& line)
     {
-        if (stdinFd < 0)
+        if (inSockFd < 0)
             return false;
 
         const std::string data = line + "\n";
-        const ssize_t written = write(stdinFd, data.data(), data.size());
+        const ssize_t written = write(inSockFd, data.data(), data.size());
         return written == static_cast<ssize_t>(data.size());
     }
 
     bool QemuSilSession::ReadLine(std::string& line, std::chrono::milliseconds timeout)
     {
-        if (stdoutFd < 0)
+        if (outSockFd < 0)
             return false;
 
         line.clear();
@@ -142,7 +197,7 @@ namespace sil
 
             const int ms = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(remaining).count());
 
-            pollfd pfd{ stdoutFd, POLLIN, 0 };
+            pollfd pfd{ outSockFd, POLLIN, 0 };
             const int ready = poll(&pfd, 1, ms);
             if (ready <= 0)
                 return false;
@@ -151,7 +206,7 @@ namespace sil
                 return false;
 
             char ch = '\0';
-            const ssize_t n = read(stdoutFd, &ch, 1);
+            const ssize_t n = read(outSockFd, &ch, 1);
             if (n <= 0)
                 return false;
 

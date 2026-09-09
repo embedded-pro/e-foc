@@ -89,19 +89,26 @@ namespace integration
 
     bool Fixture::WaitForMotorState(can::FocMotorState expectedState, std::chrono::milliseconds timeout)
     {
+        const hal::Can::Id requestId = MakeId(services::CanPriority::command,
+            can::focMotorCategoryId, can::focRequestTelemetryId, kServerNodeId);
         const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
             can::focMotorCategoryId, can::focTelemetryStatusResponseId, kServerNodeId);
 
         const auto deadline = std::chrono::steady_clock::now() + timeout;
         while (std::chrono::steady_clock::now() < deadline)
         {
+            hal::Can::Message request;
+            request.push_back(nextSequence++);
+            interactor.SendCanFrame(requestId, request, std::chrono::milliseconds{ 100 });
+
             hal::Can::Message payload;
             std::chrono::milliseconds elapsed{ 0 };
             const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
                 deadline - std::chrono::steady_clock::now());
             if (remaining <= std::chrono::milliseconds{ 0 })
                 break;
-            if (WaitForCanFrame(telemetryId, payload, remaining, elapsed) && !payload.empty())
+            if (WaitForCanFrame(telemetryId, payload, std::min(remaining, std::chrono::milliseconds{ 1000 }), elapsed)
+                && !payload.empty())
             {
                 if (static_cast<can::FocMotorState>(payload[0]) == expectedState)
                     return true;

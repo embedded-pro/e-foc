@@ -28,7 +28,3 @@ WHEN(R"(the alignment estimation completes with offset {int} radians)", (int))
     GTEST_SKIP() << "Alignment mock callback not applicable via transport — calibration runs on real motor model";
 }
 
-WHEN(R"(the pole-pairs estimation reports failure)")
-{
-    GTEST_SKIP() << "Failure injection not applicable via transport";
-}

@@ -18,6 +18,5 @@ namespace sil
 
     private:
         infra::Function<void(Id, const Message&)> receiveCallback;
-        bool nonBlockingSet{ false };
     };
 }

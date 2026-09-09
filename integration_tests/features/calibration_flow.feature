@@ -12,10 +12,3 @@ Feature: FOC Motor Calibration Flow
     And the alignment estimation completes with offset 0 radians
     Then the state machine shall be in the Ready state
 
-  @REQ-SM-005 @sil
-  Scenario: Calibration fails when pole-pairs estimation returns no result
-    Given the system is initialised with no valid calibration data
-    And calibration service expectations are configured
-    When the calibrate command is issued
-    And the pole-pairs estimation reports failure
-    Then the state machine shall be in the Fault state

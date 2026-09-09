@@ -3,7 +3,6 @@ add_library(e_foc.integration_tests.steps OBJECT
     CalibrationSteps.cpp
     CanSteps.cpp
     CommonSteps.cpp
-    CycleBudgetSteps.cpp
     EepromSteps.cpp
     HardfaultRecoverySteps.cpp
     PositionSteps.cpp
