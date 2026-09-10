@@ -576,6 +576,11 @@ namespace
                 {
                     done(std::size_t{ 4 });
                 }));
+        EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+            .WillOnce(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> done)
+                {
+                    done(services::NvmStatus::Ok);
+                }));
 
         ResetCaptures();
         Dispatch(can::focIdentifyElectricalId, {});
