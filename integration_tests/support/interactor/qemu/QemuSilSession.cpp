@@ -14,6 +14,14 @@
 #include <unistd.h>
 #include <vector>
 
+namespace
+{
+    bool SilVerbose()
+    {
+        return std::getenv("SIL_VERBOSE") != nullptr;
+    }
+}
+
 namespace sil
 {
     QemuSilSession::~QemuSilSession()
@@ -64,8 +72,6 @@ namespace sil
             dup2(pipefd[1], STDERR_FILENO);
             close(pipefd[1]);
 
-            // Use target=native semihosting so SYS_OPEN resolves on the host
-            // filesystem (required for SemihostingEeprom persistence).
             const bool gdbMode = (std::getenv("SIL_GDB") != nullptr);
             std::vector<const char*> argv = {
                 "qemu-system-arm",
@@ -95,6 +101,8 @@ namespace sil
         // Parent: close the write end of the pipe and save the read end.
         close(pipefd[1]);
         outPipeFd = pipefd[0];
+        readBufPos = 0;
+        readBufLen = 0;
 
         std::string ready;
         const auto readyTimeout = (std::getenv("SIL_GDB") != nullptr)
@@ -179,10 +187,28 @@ namespace sil
             return false;
 
         const std::string data = line + "\n";
-        if (std::getenv("SIL_VERBOSE") != nullptr)
-            fprintf(stderr, "[host->QEMU] %s\n", line.c_str());
+        if (SilVerbose())
+            std::fprintf(stderr, "[host->QEMU] %s\n", line.c_str());
         const ssize_t written = write(inSockFd, data.data(), data.size());
         return written == static_cast<ssize_t>(data.size());
+    }
+
+    bool QemuSilSession::FillReadBuffer(int timeoutMs)
+    {
+        pollfd pfd{ outPipeFd, POLLIN, 0 };
+        const int ready = poll(&pfd, 1, timeoutMs);
+        if (ready <= 0)
+            return false;
+        if ((pfd.revents & POLLHUP) != 0 && (pfd.revents & POLLIN) == 0)
+            return false;
+
+        const ssize_t n = read(outPipeFd, readBuf.data(), readBuf.size());
+        if (n <= 0)
+            return false;
+
+        readBufPos = 0;
+        readBufLen = static_cast<int>(n);
+        return true;
     }
 
     bool QemuSilSession::ReadLine(std::string& line, std::chrono::milliseconds timeout)
@@ -195,33 +221,27 @@ namespace sil
 
         while (true)
         {
+            // Drain buffered bytes first before calling poll/read.
+            while (readBufPos < readBufLen)
+            {
+                const char ch = readBuf[readBufPos++];
+                if (ch == '\n')
+                {
+                    if (SilVerbose())
+                        std::fprintf(stderr, "[QEMU->host] %s\n", line.c_str());
+                    return true;
+                }
+                line += ch;
+            }
+
             const auto remaining = deadline - std::chrono::steady_clock::now();
             if (remaining <= std::chrono::milliseconds{ 0 })
                 return false;
 
-            const int ms = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(remaining).count());
-
-            pollfd pfd{ outPipeFd, POLLIN, 0 };
-            const int ready = poll(&pfd, 1, ms);
-            if (ready <= 0)
+            const int ms = static_cast<int>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(remaining).count());
+            if (!FillReadBuffer(ms))
                 return false;
-
-            if ((pfd.revents & POLLHUP) != 0 && (pfd.revents & POLLIN) == 0)
-                return false;
-
-            char ch = '\0';
-            const ssize_t n = read(outPipeFd, &ch, 1);
-            if (n <= 0)
-                return false;
-
-            if (ch == '\n')
-            {
-                if (std::getenv("SIL_VERBOSE") != nullptr)
-                    fprintf(stderr, "[QEMU->host] %s\n", line.c_str());
-                return true;
-            }
-
-            line += ch;
         }
     }
 
@@ -241,7 +261,7 @@ namespace sil
 
             if (candidate.find("ABORT") == 0)
             {
-                fprintf(stderr, "[QEMU] firmware crash: %s\n", candidate.c_str());
+                std::fprintf(stderr, "[QEMU] firmware crash: %s\n", candidate.c_str());
                 return false;
             }
 
@@ -280,7 +300,7 @@ namespace sil
 
             if (line.find("ABORT") == 0)
             {
-                fprintf(stderr, "[QEMU] firmware crash in WaitForCanFrame: %s\n", line.c_str());
+                std::fprintf(stderr, "[QEMU] firmware crash: %s\n", line.c_str());
                 return false;
             }
 
@@ -335,10 +355,11 @@ namespace sil
         const hal::Can::Id parsedId = hal::Can::Id::Create29BitId(rawId);
         if (parsedId != expectedId)
         {
-            fprintf(stderr, "[CAN drop] parsed=%08lx expected=%08lx line=%s\n",
-                static_cast<unsigned long>(rawId),
-                static_cast<unsigned long>(expectedId.Is11BitId() ? expectedId.Get11BitId() : expectedId.Get29BitId()),
-                line.c_str());
+            if (SilVerbose())
+                std::fprintf(stderr, "[CAN drop] parsed=%08lx expected=%08lx line=%s\n",
+                    static_cast<unsigned long>(rawId),
+                    static_cast<unsigned long>(expectedId.Is11BitId() ? expectedId.Get11BitId() : expectedId.Get29BitId()),
+                    line.c_str());
             return false;
         }
 

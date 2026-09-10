@@ -1,5 +1,7 @@
 #include "integration_tests/support/Fixture.hpp"
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
 
 namespace
 {
@@ -125,10 +127,11 @@ namespace integration
             if (WaitForCanFrame(telemetryId, payload, std::min(remaining, std::chrono::milliseconds{ 1000 }), elapsed)
                 && !payload.empty())
             {
-                fprintf(stderr, "[Fixture] WaitForMotorState: got state=%d expected=%d elapsed=%ldms\n",
-                    static_cast<int>(payload[0]),
-                    static_cast<int>(expectedState),
-                    static_cast<long>(elapsed.count()));
+                if (std::getenv("SIL_VERBOSE") != nullptr)
+                    std::fprintf(stderr, "[Fixture] WaitForMotorState: got state=%d expected=%d elapsed=%ldms\n",
+                        static_cast<int>(payload[0]),
+                        static_cast<int>(expectedState),
+                        static_cast<long>(elapsed.count()));
                 if (static_cast<can::FocMotorState>(payload[0]) == expectedState)
                     return true;
             }

@@ -1,5 +1,6 @@
 #pragma once
 #include "hal/interfaces/Can.hpp"
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <string>
@@ -32,8 +33,16 @@ namespace sil
         static bool ParseCanFrame(const std::string& line, const std::string& prefix,
             hal::Can::Id expectedId, hal::Can::Message& out);
 
+        bool FillReadBuffer(int timeoutMs);
+
         pid_t pid{ -1 };
         int outPipeFd{ -1 };
         int inSockFd{ -1 };
+
+        // Buffered reader for outPipeFd — avoids one syscall per character.
+        static constexpr std::size_t kReadBufSize = 4096;
+        std::array<char, kReadBufSize> readBuf{};
+        int readBufPos{ 0 };
+        int readBufLen{ 0 };
     };
 }
