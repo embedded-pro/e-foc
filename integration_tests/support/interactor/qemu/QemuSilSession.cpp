@@ -3,7 +3,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <vector>
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
@@ -13,6 +12,7 @@
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <vector>
 
 namespace sil
 {
@@ -69,12 +69,17 @@ namespace sil
             const bool gdbMode = (std::getenv("SIL_GDB") != nullptr);
             std::vector<const char*> argv = {
                 "qemu-system-arm",
-                "-M", "mps2-an386",
+                "-M",
+                "mps2-an386",
                 "-nographic",
-                "-chardev", inChardevArg.c_str(),
-                "-semihosting-config", "enable=on",
-                "-serial", "chardev:in",
-                "-kernel", elfPath.c_str(),
+                "-chardev",
+                inChardevArg.c_str(),
+                "-semihosting-config",
+                "enable=on",
+                "-serial",
+                "chardev:in",
+                "-kernel",
+                elfPath.c_str(),
             };
             if (gdbMode)
             {

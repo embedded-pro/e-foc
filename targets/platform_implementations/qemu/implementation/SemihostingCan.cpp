@@ -20,9 +20,9 @@ namespace
         volatile uint32_t baudDiv;
     };
 
-    constexpr uint32_t rxFull  = 1u << 1;
-    constexpr uint32_t rxEn    = 1u << 1;
-    constexpr uint32_t txEn    = 1u << 0;
+    constexpr uint32_t rxFull = 1u << 1;
+    constexpr uint32_t rxEn = 1u << 1;
+    constexpr uint32_t txEn = 1u << 0;
     constexpr uintptr_t uart0Base = 0x40004000u;
 
     CmsdkUartRegs& Uart0()

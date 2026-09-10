@@ -1,7 +1,7 @@
 #include "integration_tests/support/interactor/qemu/QemuInteractor.hpp"
-#include <gtest/gtest.h>
 #include <algorithm>
 #include <chrono>
+#include <gtest/gtest.h>
 #include <utility>
 
 namespace sil

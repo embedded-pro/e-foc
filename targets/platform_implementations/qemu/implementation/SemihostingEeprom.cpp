@@ -5,15 +5,13 @@
 
 namespace
 {
-    // ARM IHI0031 semihosting operation codes for file I/O.
     constexpr uint32_t kSysOpen  = 0x01;
     constexpr uint32_t kSysClose = 0x02;
     constexpr uint32_t kSysWrite = 0x05;
     constexpr uint32_t kSysRead  = 0x06;
 
-    // SYS_OPEN mode constants (ARM IHI0031D Table 8-3).
-    constexpr uint32_t kOpenModeRb  = 1;  // "rb"  — read binary, existing file
-    constexpr uint32_t kOpenModeWb  = 5;  // "wb"  — write binary, create / truncate
+    constexpr uint32_t kOpenModeRb = 1;
+    constexpr uint32_t kOpenModeWb = 5;
 
     int FileOpen(const char* path, uint32_t mode)
     {
@@ -103,7 +101,7 @@ namespace application
     {
         const int handle = FileOpen(filePath, kOpenModeRb);
         if (handle < 0)
-            return;  // file absent — keep blank 0xFF storage
+            return;
 
         FileRead(handle, storage.data(), storageSize);
         FileClose(handle);

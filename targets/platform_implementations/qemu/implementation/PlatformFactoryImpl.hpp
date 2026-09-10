@@ -15,10 +15,10 @@
 #include "services/util/Terminal.hpp"
 #include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
-#include "targets/platform_implementations/qemu/implementation/SemihostingEeprom.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuConstants.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuTimer.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingCanBusAdapter.hpp"
+#include "targets/platform_implementations/qemu/implementation/SemihostingEeprom.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingSerial.hpp"
 #include <optional>
 

@@ -7,11 +7,6 @@
 
 namespace application
 {
-    // Persistent EEPROM backed by a binary file on the QEMU host filesystem via
-    // ARM semihosting file I/O (SYS_OPEN/SYS_WRITE/SYS_READ/SYS_CLOSE).
-    // All operations are synchronous and callbacks are invoked immediately,
-    // matching ArrayEeprom behaviour. The in-memory cache is flushed to disk on
-    // every write and erase so the file always reflects the current NVM state.
     class SemihostingEeprom
         : public hal::Eeprom
     {

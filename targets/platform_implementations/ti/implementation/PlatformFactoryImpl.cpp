@@ -285,7 +285,7 @@ namespace application
                 controlLoopEntered = true;
                 const auto entryCycles = CycleCounter::Now();
 
-                onPhaseCurrentsReady(foc::PhaseCurrents{ c, a, b });
+                onPhaseCurrentsReady(foc::PhaseCurrents{ a, b, c });
 
                 controlLoopMetrics.Record(CycleCounter::Now() - entryCycles);
                 controlLoopEntered = false;

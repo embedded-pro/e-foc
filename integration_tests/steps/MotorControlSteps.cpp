@@ -25,9 +25,9 @@ WHEN(R"(the motor is enabled)")
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focStartId))
         << "Enable (focStartId) command rejected";
     // Check if the motor immediately goes back to idle (fault/emergency stop)
-    const bool isIdle = fixture.WaitForMotorState(can::FocMotorState::idle, std::chrono::milliseconds{500});
+    const bool isIdle = fixture.WaitForMotorState(can::FocMotorState::idle, std::chrono::milliseconds{ 500 });
     EXPECT_FALSE(isIdle) << "Motor immediately returned to idle after enable (fault or emergency stop?)";
-    ASSERT_TRUE(fixture.WaitForMotorState(can::FocMotorState::running, std::chrono::seconds{5}))
+    ASSERT_TRUE(fixture.WaitForMotorState(can::FocMotorState::running, std::chrono::seconds{ 5 }))
         << "Motor did not reach running state after enable";
 }
 
