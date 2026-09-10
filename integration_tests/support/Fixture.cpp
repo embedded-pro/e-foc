@@ -128,8 +128,7 @@ namespace integration
                 deadline - std::chrono::steady_clock::now());
             if (remaining <= std::chrono::milliseconds{ 0 })
                 break;
-            if (WaitForCanFrame(telemetryId, payload, std::min(remaining, std::chrono::milliseconds{ 1000 }), elapsed)
-                && !payload.empty())
+            if (WaitForCanFrame(telemetryId, payload, std::min(remaining, std::chrono::milliseconds{ 1000 }), elapsed) && !payload.empty())
             {
                 if (std::getenv("SIL_VERBOSE") != nullptr)
                     std::fprintf(stderr, "[Fixture] WaitForMotorState: got state=%d expected=%d elapsed=%ldms\n",

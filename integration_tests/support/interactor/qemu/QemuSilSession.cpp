@@ -106,8 +106,8 @@ namespace sil
 
         std::string ready;
         const auto readyTimeout = (std::getenv("SIL_GDB") != nullptr)
-            ? std::chrono::milliseconds{ 300000 }
-            : std::chrono::milliseconds{ 10000 };
+                                      ? std::chrono::milliseconds{ 300000 }
+                                      : std::chrono::milliseconds{ 10000 };
         if (!WaitFor("READY", ready, readyTimeout))
         {
             Stop();

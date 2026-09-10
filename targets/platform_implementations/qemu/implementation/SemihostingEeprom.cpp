@@ -5,10 +5,10 @@
 
 namespace
 {
-    constexpr uint32_t kSysOpen  = 0x01;
+    constexpr uint32_t kSysOpen = 0x01;
     constexpr uint32_t kSysClose = 0x02;
     constexpr uint32_t kSysWrite = 0x05;
-    constexpr uint32_t kSysRead  = 0x06;
+    constexpr uint32_t kSysRead = 0x06;
 
     constexpr uint32_t kOpenModeRb = 1;
     constexpr uint32_t kOpenModeWb = 5;
