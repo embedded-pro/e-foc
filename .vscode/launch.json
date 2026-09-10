@@ -134,13 +134,13 @@
                 "--bridge-host",
                 "host.docker.internal",
                 "--serial-port",
-                "5000",
+                "${input:hilSerialPort}",
                 "--can-port",
-                "5001",
+                "${input:hilCanPort}",
                 "--gdb-exe",
                 "/usr/bin/gdb-multiarch",
                 "--gdb-target",
-                "host.docker.internal:2334",
+                "host.docker.internal:${input:hilGdbPort}",
                 "--firmware-elf",
                 "${workspaceFolder}/build/${input:boardType}/targets/hardware_test/main/${input:hilBuildType}/e_foc.hardware_test.main.elf",
                 "${workspaceFolder}/integration_tests/hardware_in_the_loop/features"
@@ -185,6 +185,24 @@
                 "MinSizeRel"
             ],
             "default": "Debug"
+        },
+        {
+            "id": "hilSerialPort",
+            "type": "promptString",
+            "description": "Hardware bridge serial port",
+            "default": "5000"
+        },
+        {
+            "id": "hilCanPort",
+            "type": "promptString",
+            "description": "Hardware bridge CAN port",
+            "default": "5001"
+        },
+        {
+            "id": "hilGdbPort",
+            "type": "promptString",
+            "description": "GDB server port on host.docker.internal",
+            "default": "2334"
         }
     ]
 }

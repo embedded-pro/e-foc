@@ -102,7 +102,23 @@ Presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1
 
 `qemu-foc-sensored` builds `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting. The resulting ELF is uploaded as a CI artifact for the Software-in-the-Loop Tests job.
 
-**CI — single workflow**: `ci.yml` builds all targets and uploads `e_foc`, `e_foc.qemu_sil_tests`, and `e_foc.sync_foc_sensored.qemu.elf` as artifacts. The `software_in_the_loop_tests` job runs in the same workflow with `needs: [host_build_test_ubuntu, qemu_foc_sensored_build]`, downloads those artifacts, and runs behavioral tests — never recompiles. Do not add cmake build steps to that job.
+**CI — single workflow**: `ci.yml` builds all targets and uploads `e_foc`, `e_foc.integration_tests`, and `e_foc.sync_foc_sensored.qemu.elf` as artifacts. The `software_in_the_loop_tests` job runs in the same workflow with `needs: [host_build_test_ubuntu, qemu_foc_sensored_build]`, downloads those artifacts, and runs behavioral tests — never recompiles. Do not add cmake build steps to that job.
+
+**Before pushing**: always verify locally before pushing — CI minutes and tokens are finite.
+
+```bash
+# 1. Full host build must succeed
+cmake --preset host && cmake --build build/host --config Debug -j$(nproc)
+
+# 2. Unit tests must pass (one pre-existing failure in electrical_system_ident is known)
+ctest --test-dir build/host -C Debug -E "e_foc.integration_tests" --output-on-failure
+
+# 3. SIL binary must link (QEMU firmware required for runtime correctness)
+cmake --preset qemu-foc-sensored && cmake --build build/qemu-foc-sensored --target e_foc.sync_foc_sensored.main -j$(nproc)
+QEMU_SIL_ELF=build/qemu-foc-sensored/targets/sync_foc_sensored/main/RelWithDebInfo/e_foc.sync_foc_sensored.main.elf \
+  build/host/integration_tests/main/Debug/e_foc.integration_tests \
+  --mode sil integration_tests/features/ -t "@sil"
+```
 
 **Embedded cmake**: call `halst_target_bringup(<target>)` for ST or `hal_ti_target_bringup(<target>)` for TI in `targets/*/main/CMakeLists.txt`. The `*_default_init` variants were removed.
 

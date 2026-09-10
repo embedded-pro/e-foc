@@ -27,7 +27,6 @@
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
-#include "targets/platform_implementations/error_handling_cortex_m/PowerStageCutOff.hpp"
 
 extern "C" uint32_t SystemCoreClock;
 
@@ -148,7 +147,7 @@ namespace application
                     hal::tiva::Adc::ComparatorCondition::highBand, hal::tiva::Adc::ComparatorMode::always },
             } };
 
-            hal::tiva::Adc::Config adcConfig{ false, 0, Peripheral::adcTrigger, hal::tiva::Adc::SampleAndHold::sampleAndHold8, std::make_optional(currentSensingOversampling), phaseDelay, {} };
+            hal::tiva::Adc::Config adcConfig{ false, 0, Peripheral::adcTrigger, hal::tiva::Adc::SampleAndHold::sampleAndHold8, std::make_optional(currentSensingOversampling), phaseDelay, {}, hal::cortex::InterruptPriority::highest };
             std::array<hal::tiva::AnalogPin, 5> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC }, hal::tiva::AnalogPin{ Pins::currentTotal }, hal::tiva::AnalogPin{ Pins::powerSupplyVoltage } } };
         };
 
@@ -178,6 +177,9 @@ namespace application
             hal::tiva::SynchronousPwm::Config::DeadTime deadTimeConfig{ hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(1000ns, clockDivisor), hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(1000ns, clockDivisor) };
             hal::tiva::SynchronousPwm::Config pwmConfig{ false, false, controlConfig, clockDivisor, std::make_optional(deadTimeConfig) };
         };
+
+        void ReconfigureAdc(SampleAndHold sampleAndHold);
+        void ReconfigurePwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime);
 
         static CanBusAdapter::CanError ToAdapterError(hal::tiva::Can::Error error)
         {
@@ -210,7 +212,7 @@ namespace application
 
         struct Peripherals
         {
-            Peripherals() {};
+            Peripherals() = default;
 
             hal::OutputPin performance{ Pins::performance };
             Cortex cortex;
@@ -239,11 +241,20 @@ namespace application
             } performanceTrackerImpl{ cortex.dataWatchPointAndTrace, performance };
         };
 
+        template<typename Fn>
+        void WithPwm(Fn&& fn)
+        {
+            if constexpr (Peripheral::hasFaultComparators)
+                fn(*peripherals->asyncPwm);
+            else
+                fn(*peripherals->syncPwm);
+        }
+
     private:
         infra::Function<void()> onInitialized;
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         ResetCause resetCause{ ResetCause::powerUp };
-        CycleCounter cycleCounter;
+        [[no_unique_address]] CycleCounter cycleCounter;
         ControlLoopMetrics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
         volatile bool controlLoopEntered{ false };

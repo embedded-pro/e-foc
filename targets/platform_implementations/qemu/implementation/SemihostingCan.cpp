@@ -3,14 +3,59 @@
 #endif
 
 #include "targets/platform_implementations/qemu/implementation/SemihostingCan.hpp"
-#include <cctype>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <fcntl.h>
-#include <unistd.h>
 
 namespace
 {
+    // CMSDK APB UART0 on MPS2-AN386 at 0x40004000.
+    // Registers: DATA (0x00), STATE (0x04: bit1=RX_FULL), CTRL (0x08: bit1=RX_EN)
+    struct CmsdkUartRegs
+    {
+        volatile uint32_t data;
+        volatile uint32_t state;
+        volatile uint32_t ctrl;
+        volatile uint32_t intStatus;
+        volatile uint32_t baudDiv;
+    };
+
+    constexpr uint32_t rxFull = 1u << 1;
+    constexpr uint32_t rxEn = 1u << 1;
+    constexpr uint32_t txEn = 1u << 0;
+    constexpr uintptr_t uart0Base = 0x40004000u;
+
+    CmsdkUartRegs& Uart0()
+    {
+        return *reinterpret_cast<CmsdkUartRegs*>(uart0Base);
+    }
+
+    constexpr std::size_t lineBufSize = 64;
+    char lineBuf[lineBufSize]{};
+    std::size_t lineBufPos = 0;
+
+    bool DrainUartIntoLine()
+    {
+        while ((Uart0().state & rxFull) != 0)
+        {
+            const char c = static_cast<char>(Uart0().data & 0xFFu);
+            if (c == '\n' || c == '\r')
+            {
+                if (lineBufPos > 0)
+                {
+                    lineBuf[lineBufPos] = '\0';
+                    lineBufPos = 0;
+                    return true;
+                }
+            }
+            else if (lineBufPos < lineBufSize - 1)
+            {
+                lineBuf[lineBufPos++] = c;
+            }
+        }
+        return false;
+    }
+
     constexpr int hexDigitValue(char c)
     {
         if (c >= '0' && c <= '9')
@@ -20,11 +65,6 @@ namespace
         if (c >= 'A' && c <= 'F')
             return c - 'A' + 10;
         return -1;
-    }
-
-    bool TryReadLine(char* buf, int size)
-    {
-        return std::fgets(buf, size, stdin) != nullptr;
     }
 
     bool ParseHexByte(const char* s, uint8_t& out)
@@ -87,9 +127,8 @@ namespace sil
 {
     SemihostingCan::SemihostingCan()
     {
-        const int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
-        if (flags >= 0 && fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK) == 0)
-            nonBlockingSet = true;
+        // Enable UART0 TX and RX so the hardware accepts incoming characters.
+        Uart0().ctrl = txEn | rxEn;
     }
 
     void SemihostingCan::SendData(Id id, const Message& data, const infra::Function<void(bool)>& onDone)
@@ -104,7 +143,7 @@ namespace sil
         hexData[pos] = '\0';
 
         const uint32_t rawId = id.Is11BitId() ? id.Get11BitId() : id.Get29BitId();
-        std::printf("CAN_TX %03lx %s\n", static_cast<unsigned long>(rawId), hexData);
+        std::printf("\nCAN_TX %03lx %s\n", static_cast<unsigned long>(rawId), hexData);
         std::fflush(stdout);
 
         if (onDone)
@@ -118,13 +157,12 @@ namespace sil
 
     void SemihostingCan::PollIncoming()
     {
-        char line[64]{};
-        if (!TryReadLine(line, static_cast<int>(sizeof(line))))
+        if (!DrainUartIntoLine())
             return;
 
         hal::Can::Id id{ hal::Can::Id::Create11BitId(0) };
         hal::Can::Message msg;
-        if (!ParseCanLine(line, id, msg))
+        if (!ParseCanLine(lineBuf, id, msg))
             return;
 
         if (receiveCallback)

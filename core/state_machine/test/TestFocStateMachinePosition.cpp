@@ -483,6 +483,18 @@ TEST_F(FocStateMachinePositionCliTest, clear_fault_from_fault_returns_to_idle)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
+TEST_F(FocStateMachinePositionCliTest, clear_fault_from_fault_with_valid_calibration_returns_to_ready)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithPositionGains();
+    auto sm = CreatePositionStateMachine();
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+    sm.CmdClearFault();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
 TEST_F(FocStateMachinePositionCliTest, clear_fault_from_non_fault_is_rejected)
 {
     GivenFaultNotifierRegistered();
@@ -990,6 +1002,18 @@ TEST_F(FocStateMachinePositionAutoTest, fault_and_clear_cycle)
     sm.CmdClearFault();
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachinePositionAutoTest, clear_fault_from_fault_with_valid_calibration_returns_to_ready)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithPositionGains();
+    auto sm = CreatePositionAutoStateMachine();
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+    sm.CmdClearFault();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachinePositionAutoTest, clear_cal_from_ready_returns_to_idle)

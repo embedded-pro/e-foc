@@ -200,21 +200,41 @@ namespace can
                 electricalIdent.EstimateNumberOfPolePairs({},
                     [this](std::optional<std::size_t> polePairs)
                     {
-                        auto callback = pendingElectricalIdentDoneCallback;
-                        pendingElectricalIdentDoneCallback = nullptr;
-
                         if (!polePairs.has_value())
                         {
                             pendingElectricalR.reset();
                             pendingElectricalL.reset();
+                            pendingElectricalIdentDoneCallback = nullptr;
                             server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::calibrationFailed);
                             return;
                         }
 
-                        server.BroadcastElectricalParams(*pendingElectricalR, *pendingElectricalL, *polePairs);
+                        services::CalibrationData data{};
+                        data.rPhase = pendingElectricalR->Value();
+                        data.lD = pendingElectricalL->Value();
+                        data.lQ = pendingElectricalL->Value();
+                        data.polePairs = static_cast<uint8_t>(*polePairs);
+                        data.fluxLinkage = controlMode.ActiveFluxLinkage().Value();
                         pendingElectricalR.reset();
                         pendingElectricalL.reset();
-                        callback();
+
+                        server.BroadcastElectricalParams(
+                            foc::Ohm{ data.rPhase },
+                            foc::MilliHenry{ data.lD },
+                            static_cast<std::size_t>(data.polePairs));
+
+                        controlMode.AcceptExternalCalibration(data,
+                            [this](state_machine::CommandResult result)
+                            {
+                                auto callback = pendingElectricalIdentDoneCallback;
+                                pendingElectricalIdentDoneCallback = nullptr;
+
+                                if (result == state_machine::CommandResult::ok)
+                                    callback();
+                                else
+                                    server.SendCategoryError(can::focIdentifyElectricalId,
+                                        state_machine::ToCategoryError(result));
+                            });
                     });
             });
     }

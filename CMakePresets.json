@@ -318,7 +318,7 @@
       },
       "filter": {
         "exclude": {
-          "label": "hardware"
+          "label": "hardware|integration"
         }
       }
     },

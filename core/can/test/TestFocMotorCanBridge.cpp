@@ -319,6 +319,53 @@ namespace
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
+    TEST_F(FocMotorCanBridgeTest, OnEmergencyStop_InEnabled_AcksSuccess)
+    {
+        ConstructFixtureInReady();
+        Dispatch(can::focStartId, {});
+        ResetCaptures();
+
+        Dispatch(can::focEmergencyStopId, {});
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnClearFault_InFault_AcksSuccess)
+    {
+        ConstructFixtureInReady();
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+        ResetCaptures();
+
+        Dispatch(can::focClearFaultId, {});
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnStop_InReady_AcksInvalidState)
+    {
+        ConstructFixtureInReady();
+        ResetCaptures();
+
+        Dispatch(can::focStopId, {});
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnStart_InFault_AcksInvalidState)
+    {
+        ConstructFixtureInReady();
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+        ResetCaptures();
+
+        Dispatch(can::focStartId, {});
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+    }
+
     TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_InTorqueMode_AcksSuccess)
     {
         ConstructFixture();
@@ -528,6 +575,11 @@ namespace
                                  infra::Function<void(std::optional<std::size_t>)> done)
                 {
                     done(std::size_t{ 4 });
+                }));
+        EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+            .WillOnce(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> done)
+                {
+                    done(services::NvmStatus::Ok);
                 }));
 
         ResetCaptures();
