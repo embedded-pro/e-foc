@@ -506,6 +506,21 @@ namespace application
         return EffectiveFluxLinkage(calibrationData);
     }
 
+    void FocStateMachineCommon::AcceptExternalCalibration(const services::CalibrationData& data,
+        const infra::Function<void(state_machine::CommandResult)>& onDone)
+    {
+        if (!state_machine::IsStopped(currentState) || HasPendingAsyncWork())
+        {
+            onDone(state_machine::CommandResult::rejected);
+            return;
+        }
+
+        pendingCommandCallback = onDone;
+        currentState = state_machine::Calibrating{};
+        std::get<state_machine::Calibrating>(currentState).pendingData = data;
+        OnCalibrationComplete();
+    }
+
     void FocStateMachineCommon::CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone)
     {
         if (fluxLinkage.Value() <= 0.0f || !state_machine::IsStopped(currentState) || HasPendingCommand() || !HasValidCalibration())

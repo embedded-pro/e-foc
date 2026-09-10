@@ -223,7 +223,7 @@ namespace foc
 
     foc::Ampere ThreePhaseMotorModel::MaxCurrentSupported() const
     {
-        return foc::Ampere{ 20.0f };
+        return parameters.maxSupportedCurrent;
     }
 
     foc::Radians ThreePhaseMotorModel::Read()

@@ -43,6 +43,8 @@ namespace foc
 
             foc::KilogramMeterSquared J;
             foc::NewtonMeterSecondPerRadian B;
+
+            foc::Ampere maxSupportedCurrent{ 20.0f };
         };
 
         struct NoiseConfig

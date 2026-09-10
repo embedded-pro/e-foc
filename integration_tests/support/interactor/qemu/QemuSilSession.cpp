@@ -1,7 +1,9 @@
 #include "integration_tests/support/interactor/qemu/QemuSilSession.hpp"
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <vector>
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
@@ -23,88 +25,83 @@ namespace sil
     {
         signal(SIGPIPE, SIG_IGN);
 
-        const std::string pidStr  = std::to_string(getpid());
-        const std::string outPath = "/tmp/qemu_sil_out_" + pidStr + ".sock";
-        const std::string inPath  = "/tmp/qemu_sil_in_"  + pidStr + ".sock";
-        unlink(outPath.c_str());
+        // Erase the NVM image so every scenario starts with blank calibration.
+        std::remove("/tmp/eeprom.bin");
+
+        const std::string pidStr = std::to_string(getpid());
+        const std::string inPath = "/tmp/qemu_sil_in_" + pidStr + ".sock";
         unlink(inPath.c_str());
 
-        // out: semihosting output (CAN_TX, READY sentinel) — wait=on so QEMU blocks
-        // until the test connects and can observe firmware output from the start.
-        // in: serial/UART input (CAN_RX frames from test) — wait=off so QEMU starts
-        // immediately; the test connects after READY is received.
-        const std::string outChardevArg = "socket,id=out,path=" + outPath + ",server=on,wait=on";
-        const std::string inChardevArg  = "socket,id=in,path="  + inPath  + ",server=on,wait=off";
-        const std::string semihostingArg = "enable=on,chardev=out";
+        // in: UNIX socket for serial0 (CMSDK UART) — CAN_RX frames from test.
+        // wait=off so QEMU starts immediately; the test connects after READY.
+        const std::string inChardevArg = "socket,id=in,path=" + inPath + ",server=on,wait=off";
+
+        // Pipe for QEMU stdout: firmware printf (semihosting target=native) goes
+        // here, giving us CAN_TX lines and the READY sentinel.
+        int pipefd[2];
+        if (pipe(pipefd) != 0)
+            return false;
 
         pid = fork();
         if (pid < 0)
+        {
+            close(pipefd[0]);
+            close(pipefd[1]);
             return false;
+        }
 
         if (pid == 0)
         {
+            // Child: wire QEMU's stdout/stderr → pipe write end, stdin → /dev/null.
+            close(pipefd[0]);
             const int devNull = open("/dev/null", O_RDWR);
             if (devNull >= 0)
             {
                 dup2(devNull, STDIN_FILENO);
-                dup2(devNull, STDOUT_FILENO);
-                dup2(devNull, STDERR_FILENO);
                 close(devNull);
             }
+            dup2(pipefd[1], STDOUT_FILENO);
+            dup2(pipefd[1], STDERR_FILENO);
+            close(pipefd[1]);
 
-            const char* const argv[] = {
+            // Use target=native semihosting so SYS_OPEN resolves on the host
+            // filesystem (required for SemihostingEeprom persistence).
+            const bool gdbMode = (std::getenv("SIL_GDB") != nullptr);
+            std::vector<const char*> argv = {
                 "qemu-system-arm",
                 "-M", "mps2-an386",
                 "-nographic",
-                "-chardev", outChardevArg.c_str(),
                 "-chardev", inChardevArg.c_str(),
-                "-semihosting-config", semihostingArg.c_str(),
+                "-semihosting-config", "enable=on",
                 "-serial", "chardev:in",
                 "-kernel", elfPath.c_str(),
-                nullptr
             };
-            execvp("qemu-system-arm", const_cast<char* const*>(argv));
+            if (gdbMode)
+            {
+                argv.push_back("-S");
+                argv.push_back("-gdb");
+                argv.push_back("tcp::1234");
+            }
+            argv.push_back(nullptr);
+            execvp("qemu-system-arm", const_cast<char* const*>(argv.data()));
             _exit(1);
         }
 
-        // Parent: connect to the output socket first (blocks until QEMU creates it)
-        for (int attempt = 0; attempt < 100; ++attempt)
-        {
-            usleep(100000);
-
-            outSockFd = ::socket(AF_UNIX, SOCK_STREAM, 0);
-            if (outSockFd < 0)
-                continue;
-
-            struct sockaddr_un addr{};
-            addr.sun_family = AF_UNIX;
-            std::strncpy(addr.sun_path, outPath.c_str(), sizeof(addr.sun_path) - 1);
-
-            if (connect(outSockFd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == 0)
-                break;
-
-            close(outSockFd);
-            outSockFd = -1;
-        }
-        unlink(outPath.c_str());
-
-        if (outSockFd < 0)
-        {
-            kill(pid, SIGKILL);
-            waitpid(pid, nullptr, 0);
-            pid = -1;
-            return false;
-        }
+        // Parent: close the write end of the pipe and save the read end.
+        close(pipefd[1]);
+        outPipeFd = pipefd[0];
 
         std::string ready;
-        if (!WaitFor("READY", ready, std::chrono::milliseconds{ 10000 }))
+        const auto readyTimeout = (std::getenv("SIL_GDB") != nullptr)
+            ? std::chrono::milliseconds{ 300000 }
+            : std::chrono::milliseconds{ 10000 };
+        if (!WaitFor("READY", ready, readyTimeout))
         {
             Stop();
             return false;
         }
 
-        // Connect to the input socket (QEMU has started; "in" chardev was created with
-        // wait=off so the socket file exists but no client was required at startup).
+        // Connect to the UART input socket (created by QEMU with wait=off).
         for (int attempt = 0; attempt < 50; ++attempt)
         {
             inSockFd = ::socket(AF_UNIX, SOCK_STREAM, 0);
@@ -141,10 +138,10 @@ namespace sil
         if (pid < 0)
             return;
 
-        if (outSockFd >= 0)
+        if (outPipeFd >= 0)
         {
-            close(outSockFd);
-            outSockFd = -1;
+            close(outPipeFd);
+            outPipeFd = -1;
         }
 
         if (inSockFd >= 0)
@@ -177,13 +174,15 @@ namespace sil
             return false;
 
         const std::string data = line + "\n";
+        if (std::getenv("SIL_VERBOSE") != nullptr)
+            fprintf(stderr, "[host->QEMU] %s\n", line.c_str());
         const ssize_t written = write(inSockFd, data.data(), data.size());
         return written == static_cast<ssize_t>(data.size());
     }
 
     bool QemuSilSession::ReadLine(std::string& line, std::chrono::milliseconds timeout)
     {
-        if (outSockFd < 0)
+        if (outPipeFd < 0)
             return false;
 
         line.clear();
@@ -197,7 +196,7 @@ namespace sil
 
             const int ms = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(remaining).count());
 
-            pollfd pfd{ outSockFd, POLLIN, 0 };
+            pollfd pfd{ outPipeFd, POLLIN, 0 };
             const int ready = poll(&pfd, 1, ms);
             if (ready <= 0)
                 return false;
@@ -206,12 +205,16 @@ namespace sil
                 return false;
 
             char ch = '\0';
-            const ssize_t n = read(outSockFd, &ch, 1);
+            const ssize_t n = read(outPipeFd, &ch, 1);
             if (n <= 0)
                 return false;
 
             if (ch == '\n')
+            {
+                if (std::getenv("SIL_VERBOSE") != nullptr)
+                    fprintf(stderr, "[QEMU->host] %s\n", line.c_str());
                 return true;
+            }
 
             line += ch;
         }
@@ -270,6 +273,12 @@ namespace sil
             if (!ReadLine(line, std::chrono::duration_cast<std::chrono::milliseconds>(remaining)))
                 return false;
 
+            if (line.find("ABORT") == 0)
+            {
+                fprintf(stderr, "[QEMU] firmware crash in WaitForCanFrame: %s\n", line.c_str());
+                return false;
+            }
+
             if (ParseCanFrame(line, "CAN_TX", expectedId, out))
                 return true;
         }
@@ -320,7 +329,13 @@ namespace sil
 
         const hal::Can::Id parsedId = hal::Can::Id::Create29BitId(rawId);
         if (parsedId != expectedId)
+        {
+            fprintf(stderr, "[CAN drop] parsed=%08lx expected=%08lx line=%s\n",
+                static_cast<unsigned long>(rawId),
+                static_cast<unsigned long>(expectedId.Is11BitId() ? expectedId.Get11BitId() : expectedId.Get29BitId()),
+                line.c_str());
             return false;
+        }
 
         const std::string dataStr = rest.substr(spacePos + 1);
         out.clear();

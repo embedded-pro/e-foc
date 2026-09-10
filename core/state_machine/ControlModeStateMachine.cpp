@@ -792,6 +792,12 @@ namespace state_machine
         ActiveCommon().CmdSetFluxLinkage(fluxLinkage, onDone);
     }
 
+    void ControlModeStateMachine::AcceptExternalCalibration(const services::CalibrationData& data,
+        const infra::Function<void(CommandResult)>& onDone)
+    {
+        ActiveCommon().AcceptExternalCalibration(data, onDone);
+    }
+
     foc::Weber ControlModeStateMachine::ActiveFluxLinkage() const
     {
         return ActiveCommon().ActiveFluxLinkage();

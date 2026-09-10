@@ -1,4 +1,5 @@
 #include "integration_tests/support/interactor/qemu/QemuInteractor.hpp"
+#include <gtest/gtest.h>
 #include <algorithm>
 #include <chrono>
 #include <utility>
@@ -20,7 +21,10 @@ namespace sil
         lines.clear();
         lastLine.clear();
         if (!session.Start(elfPath))
+        {
             fprintf(stderr, "[QEMU] failed to start %s\n", elfPath.c_str());
+            GTEST_FAIL() << "[QEMU] QEMU session failed to start";
+        }
     }
 
     void QemuInteractor::AfterScenario()

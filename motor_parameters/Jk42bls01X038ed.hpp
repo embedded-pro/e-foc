@@ -14,6 +14,8 @@ namespace foc
             .p = 4,
             .J = foc::KilogramMeterSquared{ 0.0000075f },
             .B = foc::NewtonMeterSecondPerRadian{ 0.00002f },
+            // R = 0.073 Ω drives ~62 A at default 15% test voltage; 200 A lets calibration complete in simulation.
+            .maxSupportedCurrent = foc::Ampere{ 200.0f },
         };
     };
 }

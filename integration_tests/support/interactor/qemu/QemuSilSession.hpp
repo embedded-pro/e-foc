@@ -33,7 +33,7 @@ namespace sil
             hal::Can::Id expectedId, hal::Can::Message& out);
 
         pid_t pid{ -1 };
-        int outSockFd{ -1 };
+        int outPipeFd{ -1 };
         int inSockFd{ -1 };
     };
 }

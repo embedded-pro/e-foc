@@ -1,13 +1,11 @@
 add_library(e_foc.integration_tests.steps OBJECT
     AdcSteps.cpp
-    CalibrationSteps.cpp
     CanSteps.cpp
     CommonSteps.cpp
     EepromSteps.cpp
     HardfaultRecoverySteps.cpp
-    PositionSteps.cpp
+    MotorControlSteps.cpp
     ResetCauseSteps.cpp
-    SpeedSteps.cpp
     StateMachineSteps.cpp
     UartSteps.cpp
 )

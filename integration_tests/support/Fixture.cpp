@@ -77,14 +77,29 @@ namespace integration
 
         const hal::Can::Id ackId = MakeId(services::CanPriority::response,
             services::canSystemCategoryId, services::canCommandAckMessageTypeId, kServerNodeId);
-        hal::Can::Message ackPayload;
-        std::chrono::milliseconds elapsed{ 0 };
-        if (!WaitForCanFrame(ackId, ackPayload, timeout, elapsed))
-            return false;
 
-        ++nextSequence;
-        return ackPayload.size() >= 3 &&
-               ackPayload[2] == static_cast<uint8_t>(services::CanAckStatus::success);
+        // Loop to skip stale ACKs left in the pipe from previous WaitForMotorState telemetry polls.
+        // The firmware ACK payload is [category, messageType, status, expectedSeq]; we must verify
+        // ackPayload[1] == messageType so we don't mistake a telemetry-request ACK for our command.
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (true)
+        {
+            const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+                deadline - std::chrono::steady_clock::now());
+            if (remaining <= std::chrono::milliseconds{ 0 })
+                return false;
+
+            hal::Can::Message ackPayload;
+            std::chrono::milliseconds elapsed{ 0 };
+            if (!WaitForCanFrame(ackId, ackPayload, remaining, elapsed))
+                return false;
+
+            if (ackPayload.size() < 3 || ackPayload[1] != messageType)
+                continue;
+
+            ++nextSequence;
+            return ackPayload[2] == static_cast<uint8_t>(services::CanAckStatus::success);
+        }
     }
 
     bool Fixture::WaitForMotorState(can::FocMotorState expectedState, std::chrono::milliseconds timeout)
@@ -110,11 +125,38 @@ namespace integration
             if (WaitForCanFrame(telemetryId, payload, std::min(remaining, std::chrono::milliseconds{ 1000 }), elapsed)
                 && !payload.empty())
             {
+                fprintf(stderr, "[Fixture] WaitForMotorState: got state=%d expected=%d elapsed=%ldms\n",
+                    static_cast<int>(payload[0]),
+                    static_cast<int>(expectedState),
+                    static_cast<long>(elapsed.count()));
                 if (static_cast<can::FocMotorState>(payload[0]) == expectedState)
                     return true;
             }
         }
         return false;
+    }
+
+    bool Fixture::SelectControlMode(can::FocMotorMode mode, std::chrono::milliseconds timeout)
+    {
+        hal::Can::Message payload;
+        payload.push_back(static_cast<uint8_t>(mode));
+        if (!SendCanCommand(can::focMotorCategoryId, can::focSelectControlModeId, payload, timeout))
+            return false;
+        return WaitForMotorState(can::FocMotorState::idle, timeout);
+    }
+
+    bool Fixture::EnableMotor(std::chrono::milliseconds timeout)
+    {
+        if (!SendCanCommand(can::focMotorCategoryId, can::focStartId, {}, timeout))
+            return false;
+        return WaitForMotorState(can::FocMotorState::running, timeout);
+    }
+
+    bool Fixture::DisableMotor(std::chrono::milliseconds timeout)
+    {
+        if (!SendCanCommand(can::focMotorCategoryId, can::focStopId, {}, timeout))
+            return false;
+        return WaitForMotorState(can::FocMotorState::idle, timeout);
     }
 
     bool Fixture::SendCanFrame(hal::Can::Id id, const hal::Can::Message& message,

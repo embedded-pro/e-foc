@@ -46,6 +46,8 @@ namespace state_machine
 
         void SetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(CommandResult)>& onDone);
         foc::Weber ActiveFluxLinkage() const;
+        void AcceptExternalCalibration(const services::CalibrationData& data,
+            const infra::Function<void(CommandResult)>& onDone);
 
         foc::SelectResult SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm);
         foc::SelectResult SelectSpeedAlgorithm(foc::SpeedAlgorithm algorithm);

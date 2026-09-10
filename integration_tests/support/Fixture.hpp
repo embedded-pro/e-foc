@@ -30,6 +30,12 @@ namespace integration
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
         bool WaitForMotorState(can::FocMotorState expectedState,
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
+        bool SelectControlMode(can::FocMotorMode mode,
+            std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
+        bool EnableMotor(
+            std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
+        bool DisableMotor(
+            std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
         bool SendCanFrame(hal::Can::Id id, const hal::Can::Message& message,
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 100 });
         bool WaitForCanFrame(hal::Can::Id expectedId, hal::Can::Message& outPayload,

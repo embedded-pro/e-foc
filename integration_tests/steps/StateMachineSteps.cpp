@@ -6,17 +6,29 @@
 
 using namespace integration;
 
-GIVEN(R"(the system is initialised with no valid calibration data)")
+GIVEN(R"(the {word} motor system is initialised with no valid calibration data)", (std::string))
 {
     auto& fixture = context.Get<Fixture>();
     ASSERT_TRUE(fixture.WaitForCanHeartbeat()) << "CAN stack not ready";
 }
 
+WHEN(R"(the {word} control mode is selected)", (std::string mode))
+{
+    auto& fixture = context.Get<Fixture>();
+    can::FocMotorMode motorMode = can::FocMotorMode::torque;
+    if (mode == "speed")
+        motorMode = can::FocMotorMode::speed;
+    else if (mode == "position")
+        motorMode = can::FocMotorMode::position;
+    ASSERT_TRUE(fixture.SelectControlMode(motorMode)) << "Control mode selection failed";
+}
+
 WHEN(R"(the calibrate command is issued)")
 {
     auto& fixture = context.Get<Fixture>();
-    fixture.SendCanCommand(can::focMotorCategoryId, can::focIdentifyElectricalId,
-        {}, std::chrono::seconds{ 30 });
+    ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focIdentifyElectricalId,
+        {}, std::chrono::seconds{ 60 }))
+        << "Calibrate command did not complete within 60s";
 }
 
 THEN(R"(the state machine shall be in the Ready state)")
