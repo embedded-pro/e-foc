@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <unistd.h>
 
 namespace
 {
@@ -111,9 +112,12 @@ namespace integration
         const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
             can::focMotorCategoryId, can::focTelemetryStatusResponseId, kServerNodeId);
 
+        static constexpr auto kMinPollInterval = std::chrono::milliseconds{ 20 };
+
         const auto deadline = std::chrono::steady_clock::now() + timeout;
         while (std::chrono::steady_clock::now() < deadline)
         {
+            const auto pollStart = std::chrono::steady_clock::now();
             hal::Can::Message request;
             request.push_back(nextSequence++);
             interactor.SendCanFrame(requestId, request, std::chrono::milliseconds{ 100 });
@@ -134,6 +138,15 @@ namespace integration
                         static_cast<long>(elapsed.count()));
                 if (static_cast<can::FocMotorState>(payload[0]) == expectedState)
                     return true;
+            }
+
+            const auto pollElapsed = std::chrono::steady_clock::now() - pollStart;
+            if (pollElapsed < kMinPollInterval)
+            {
+                const auto sleepMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    kMinPollInterval - pollElapsed);
+                if (sleepMs > std::chrono::milliseconds{ 0 })
+                    usleep(static_cast<useconds_t>(sleepMs.count() * 1000));
             }
         }
         return false;
