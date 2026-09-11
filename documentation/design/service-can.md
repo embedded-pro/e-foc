@@ -62,9 +62,9 @@ Physical-to-wire conversions use fixed-point scale factors:
 | Speed      | int16     | 1            | 300 rad/s → 300 wire    |
 | Position   | int16     | 100          | 3.14 rad → 314 wire     |
 | Voltage    | int16     | 10           | 24.0 V → 240 wire       |
-| PID gain   | int16     | 1            | passed through unscaled |
-| Resistance | int16     | 1000         | 0.5 Ω → 500 wire        |
-| Inductance | int16     | 1000         | 1.0 mH → 1000 wire      |
+| Bandwidth  | int16     | 1            | closed-loop bandwidth in rad/s |
+| Resistance | int16     | 1000         | 0.5 Ω → 500 wire               |
+| Inductance | int16     | 1000         | 1.0 mH → 1000 wire             |
 
 ### Part B — FocMotorCategoryServer
 
@@ -75,8 +75,8 @@ The observer interface provides callbacks for:
 - `OnSelectControlMode` — takes a `FocMotorMode` and a result callback.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` — take a typed unit quantity and a completion callback.
 - `OnSetPidCurrent`, `OnSetPidSpeed`, `OnSetPidPosition` — receive a bandwidth parameter parsed from the CAN frame and forward to the corresponding `TrySet*Bandwidth` on `ControlModeStateMachine`.
-- `OnIdentifyElectrical` — delegates to `ElectricalParametersIdentification`; on success broadcasts `focElectricalParamsResponseId` with resistance, inductance, and pole-pair count.
-- `OnIdentifyMechanical` — requires Ready state; delegates to `MechanicalParametersIdentification`; on success broadcasts `focMechanicalParamsResponseId` with friction and inertia.
+- `OnIdentifyElectrical` — calls `CmdReserveExternalCalibration()` before starting estimation; `invalidState` if rejected; on estimation success calls `CmdCompleteExternalCalibration()` and broadcasts `focElectricalParamsResponseId`.
+- `OnIdentifyMechanical` — calls `ActiveCalibrationData()` to obtain pole pairs and guard the state in one step; `invalidState` if not in `Ready`; on success broadcasts `focMechanicalParamsResponseId`.
 - `OnRequestTelemetry` — broadcasts current state and fault code via `focTelemetryStatusResponseId`.
 - `OnSetEncoderResolution`, `OnConfigureTelemetryRate` — validate payload, update and persist `ConfigData` via `NonVolatileMemory`.
 
@@ -97,8 +97,9 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
 - `OnSelectControlMode` → `Select(mode, onDone)`; the result callback sends the mode response or a category error.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` → validate mode and range, then delegate to `TrySet*` on the state machine.
 - PID bandwidth commands → `TrySet*Bandwidth(bandwidth)` on the state machine; `invalidPayload` if rejected.
-- Identification commands → delegate to the injected identification services; broadcast parameter response frames on success; `calibrationFailed` on estimation failure; `busy` if a prior identification is in progress.
-- `OnRequestTelemetry` → broadcast current state and fault code via `focTelemetryStatusResponseId`; always succeeds.
+- `OnIdentifyElectrical` → `CmdReserveExternalCalibration()` (state guard + `Calibrating` entry); run estimation; `CmdCompleteExternalCalibration(data, cb)` on success; `invalidState` / `calibrationFailed` / `busy` on failure.
+- `OnIdentifyMechanical` → `ActiveCalibrationData()` (state guard + pole-pairs extraction in one call); run estimation; broadcast on success; `invalidState` / `calibrationFailed` / `busy` on failure.
+- `OnRequestTelemetry` → broadcast current state and fault code via `focTelemetryStatusResponseId`; always succeeds. `ToCanMotorState` maps `Idle` to `FocMotorState::partialCalibration` instead of `idle` when `HasPartialCalibration()` reports a non-empty but incomplete NVM record (old-schema or interrupted external calibration).
 - `OnSetEncoderResolution` / `OnConfigureTelemetryRate` → persist to `NonVolatileMemory`; `persistenceFailed` on write error; `busy` if a prior NVM save is in flight.
 
 The bridge validates that the correct control mode is active before accepting a setpoint command. An out-of-range setpoint results in `invalidPayload`. A mode mismatch results in `categoryError/modeMismatch`.
@@ -214,7 +215,7 @@ sequenceDiagram
     BRG->>ACK: responseCallback(CanAckStatus::success)
 ```
 
-### Stub Command (applicationError path)
+### Bandwidth Rejection Path
 
 ```mermaid
 sequenceDiagram
@@ -223,9 +224,9 @@ sequenceDiagram
     participant BRG as FocMotorCanBridge
 
     CAN->>SRV: HandleMessage(focSetPidCurrentId, payload)
-    SRV->>BRG: OnSetPidCurrent(gains, callback)
-    BRG->>SRV: SendCategoryError(focSetPidCurrentId, applicationError)
-    SRV->>CAN: categoryError frame
+    SRV->>BRG: OnSetPidCurrent(bandwidth, successCallback)
+    BRG->>SRV: SendCommandAck(focSetPidCurrentId, invalidPayload)
+    SRV->>CAN: commandAck frame (invalidPayload)
 ```
 
 ---
@@ -270,8 +271,8 @@ graph LR
 
 ## Open Questions
 
-| # | Question                                                         | Resolution                                                                                   | Status   |
-|---|------------------------------------------------------------------|----------------------------------------------------------------------------------------------|----------|
-| 1 | Implement telemetry push (BroadcastFaultStatus, periodic status) | On-demand via `OnRequestTelemetry`; periodic timer deferred                                  | resolved |
-| 2 | PID gain commands                                                | Accepted: kp field mapped to loop bandwidth via `TrySet*Bandwidth`                           | resolved |
-| 3 | Mechanical identification via CAN                                | Delegated to injected `MechanicalParametersIdentification*`; nullable for targets lacking it | resolved |
+| # | Question                                                         | Resolution                                                                                                                   | Status   |
+|---|------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|----------|
+| 1 | Implement telemetry push (BroadcastFaultStatus, periodic status) | On-demand via `OnRequestTelemetry`; periodic timer deferred                                                                  | resolved |
+| 2 | PID bandwidth commands                                           | Accepted: single bandwidth value per command decoded by server, forwarded to `TrySet*Bandwidth` on `ControlModeStateMachine` | resolved |
+| 3 | Mechanical identification via CAN                                | Delegated to injected `MechanicalParametersIdentification*`; nullable for targets lacking it                                 | resolved |

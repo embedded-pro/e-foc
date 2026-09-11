@@ -48,6 +48,7 @@ namespace application
         const state_machine::State& CurrentState() const override;
         state_machine::FaultCode LastFaultCode() const override;
         bool HasPendingAsyncWork() const override;
+        bool HasPartialCalibration() const override;
 
         void CmdCalibrate(const infra::Function<void(state_machine::CommandResult)>& onDone) override;
         state_machine::CommandResult CmdEnable() override;
@@ -59,7 +60,8 @@ namespace application
         void CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone);
         foc::Weber ActiveFluxLinkage() const;
 
-        void AcceptExternalCalibration(const services::CalibrationData& data,
+        state_machine::CommandResult CmdReserveExternalCalibration();
+        void CmdCompleteExternalCalibration(const services::CalibrationData& data,
             const infra::Function<void(state_machine::CommandResult)>& onDone);
 
         void RegisterReadyHandler(const infra::Function<void()>& onReady);
@@ -84,6 +86,7 @@ namespace application
         virtual foc::CurrentLoopTunable& CurrentTunable() = 0;
 
         virtual void ApplyModeSpecificCalibration(const services::CalibrationData& data);
+        virtual bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const;
         virtual void PrepareForEnabled();
         virtual void RegisterModeSpecificCli(services::TerminalWithStorage& terminal);
 

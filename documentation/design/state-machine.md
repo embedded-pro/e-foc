@@ -104,10 +104,15 @@ The resulting state depends on the state the command was issued from:
 does not unconditionally return to `Idle`. Clearing releases the latch, so the following `CmdEnable`
 is accepted rather than refused.
 
-Calibration data is considered valid when the applied record holds a non-zero pole-pair count and a positive
-phase resistance. An aborted calibration run never commits its results — the in-progress values live in
-`Calibrating::pendingData` and are only copied out after the NVM save succeeds — so a previously valid
-calibration survives an emergency stop during a re-calibration and the machine returns to `Ready`.
+Calibration data is considered valid when the applied record's `stage` is `CalibrationStage::complete`, it
+holds a non-zero pole-pair count and a positive phase resistance, and the active mode's own requirements are
+met: torque mode adds no further requirement, while speed and position modes additionally require a finite,
+positive rotor inertia and a finite, non-negative viscous friction (`HasValidModeSpecificCalibration`,
+overridden by `OuterLoopStateMachine`). This mode-aware check is why a torque-only calibration record cannot
+silently be reused to reach `Ready` in speed or position mode. An aborted calibration run never commits its
+results — the in-progress values live in `Calibrating::pendingData` and are only copied out after the NVM
+save succeeds — so a previously valid calibration survives an emergency stop during a re-calibration and the
+machine returns to `Ready`.
 
 Dropping to `Idle` on every emergency stop would force a full recalibration after each safety intervention, which is why the transition is conditional on calibration validity rather than unconditional.
 
@@ -148,14 +153,30 @@ sequenceDiagram
 | 4. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth` |
 | 5. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                 |
 
-After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, encoder zero offset applied, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`.
+After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`. The encoder zero offset is not written back to the encoder at this point; it is established only by the alignment step itself during the calibration sequence.
+
+### External Calibration (CAN-driven)
+
+An external client (e.g. the CAN bridge) can supply pre-measured calibration data without running the internal identification chain. This uses a two-command protocol to ensure the FSM state is correct before any inverter interaction begins:
+
+1. **`CmdReserveExternalCalibration()`** — synchronous. Checks that the machine is in `Idle` or `Ready` with no pending async work, then transitions to `Calibrating` and returns `CommandResult::ok`. Returns `CommandResult::rejected` in any other state. The `Calibrating` state prevents a second request from being accepted concurrently.
+
+2. **`CmdCompleteExternalCalibration(data, onDone)`** — async. Called by the external client after its own estimation is finished. Stores `data` in the pending `Calibrating` slot and calls `OnCalibrationComplete()` to persist to NVM and transition to `Ready`. If a fault occurred between the two calls, `EnterFault` has already aborted the identification service (via `AbortCalibrationServices`) so this path is never reached; the client observes the failure through its own estimation callback.
+
+The two-command split ensures the FSM enters `Calibrating` before any open-loop PWM is applied, and that the state guard lives entirely inside the state machine rather than in the calling layer.
 
 ### Fault Safety
 
-Entering `Fault` commits the `Fault` state first, then stops the inverter if the machine was in `Enabled` or
-`Calibrating`, then aborts the calibration services. Committing the state first means a fault raised inside the
-stop sees `Fault` rather than the state it is leaving, and a calibration completion that arrives afterwards no
-longer finds itself in `Calibrating`.
+**Event-dispatcher path.** `EnterFault()` commits the `Fault` state first, then stops the inverter if the
+machine was in `Enabled` or `Calibrating`, then aborts the calibration services. Committing the state first
+means a fault raised inside the stop sees `Fault` rather than the state it is leaving, and a calibration
+completion that arrives afterwards no longer finds itself in `Calibrating`.
+
+**Interrupt path (board protection, CAN bus-off).** When a fault is delivered in interrupt context, the
+platform stops the FOC controller bridge immediately within that interrupt — before any state mutation or
+tracing. The `EnterFault()` call, its trace output and any pending-command completion are posted to the event
+dispatcher and execute on the next dispatcher turn. This ensures no multi-word state write, tracing call or
+non-volatile-memory access runs from an interrupt context (see REQ-SM-021).
 
 Stopping the inverter is not on its own enough to cut the PWM output. The identification services drive the
 bridge through their own timers and phase-current callbacks, and one left running writes duty cycles on its
@@ -436,6 +457,7 @@ sequenceDiagram
 | `CmdClearCalibration()`  | Invalidates NVM calibration and returns to `Idle`                                      | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`.                                                                                                                            |
 | `CmdEmergencyStop()`     | Stops PWM immediately and leaves the active states                                     | Accepted from every state and always returns `ok`. From `Enabled` or `Calibrating` it goes to `Ready` when calibration data is valid, otherwise to `Idle`. `Idle`, `Ready` and `Fault` are left unchanged. Aborts any pending command with `abortedByFault`. |
 | `HasPendingAsyncWork()`  | Reports whether a service callback capturing the machine is outstanding                | True while a command callback is pending, the boot-time NVM check is in flight, or a calibration step is running. Used by `ControlModeStateMachine` to refuse destroying the machine.                                                                        |
+| `HasPartialCalibration()`| Reports whether `Idle` holds a non-empty but incomplete NVM record                     | True only in `Idle`, when `stage != complete` but pole pairs or resistance are non-zero (an old-schema or interrupted record). Used by the CAN bridge to broadcast `FocMotorState::partialCalibration` instead of `idle`.                                    |
 | `ApplyOnlineEstimates()` | Retunes speed and current PID gains from online estimators                             | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only.                                                                                                         |
 
 ### Required
@@ -448,7 +470,7 @@ sequenceDiagram
 | `MechanicalParametersIdentification`       | Estimates rotor inertia and viscous friction (speed/position modes only)              | Operation is asynchronous; result is optional (nullopt = failure)                                                                     |
 | `FaultNotifier`                            | Delivers hardware fault notifications to the state machine                            | `Register()` must be called during construction; callback may fire at any time. Production implementation is `PlatformFaultNotifier`. |
 | `ThreePhaseInverter`                       | Used by the FOC controller to issue PWM and read phase currents                       | Stopped immediately on any fault from `Enabled` or `Calibrating` state                                                                |
-| `Encoder`                                  | Rotor position sensor; zero offset applied after alignment                            | `Set()` called during `ApplyCalibrationData` to configure the zero point                                                              |
+| `Encoder`                                  | Rotor position sensor; zero point established by the alignment step                   | Read-only from the state machine's perspective; `SetZero()` is called by `MotorAlignment` during calibration, never by the state machine itself                                                              |
 | `TerminalWithStorage`                      | Serial command interface for CLI-mode transition policy                               | Commands registered in constructor; terminal must outlive the state machine                                                           |
 | `Tracer`                                   | Debug trace output for lifecycle events                                               | All state transitions and calibration steps are traced                                                                                |
 | `RealTimeFrictionAndInertiaEstimator`      | Online RLS estimator for rotor inertia and viscous friction (speed/position only)     | Seeded from calibration data; torque constant set on `EnterEnabled`; updates run while FOC outer loop is active                       |
@@ -463,7 +485,7 @@ sequenceDiagram
 | `CalibrationData` | `polePairs`            | count (uint8)                  | 1–255    | Number of electrical pole pairs                                                                                         |
 | `CalibrationData` | `rPhase`               | Ohm (float)                    | > 0      | Phase resistance identified by electrical ident                                                                         |
 | `CalibrationData` | `lD` / `lQ`            | mH (float)                     | > 0      | D/Q inductances (set equal; anisotropy not estimated)                                                                   |
-| `CalibrationData` | `encoderZeroOffset`    | int32 (bit-cast float Radians) | any      | Quantised electrical angle at encoder zero; applied via `Encoder::Set()`                                                |
+| `CalibrationData` | `encoderZeroOffset`    | int32 (bit-cast float Radians) | any      | Mechanical angle at encoder zero when rotor settled during alignment; stored for reference only — not re-applied to the encoder at boot or after calibration (see REQ-SM-019) |
 | `CalibrationData` | `inertia`              | N·m·s² (float)                 | ≥ 0      | Rotor inertia; populated only for speed/position modes                                                                  |
 | `CalibrationData` | `frictionViscous`      | N·m·s/rad (float)              | ≥ 0      | Viscous friction coefficient; populated only for speed/position modes                                                   |
 | `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0      | Coulomb friction; currently 0 (not identified)                                                                          |

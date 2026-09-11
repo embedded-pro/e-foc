@@ -81,6 +81,13 @@ namespace application
         return HasPendingCommand() || bootCheckInFlight || std::holds_alternative<state_machine::Calibrating>(currentState);
     }
 
+    bool FocStateMachineCommon::HasPartialCalibration() const
+    {
+        return std::holds_alternative<state_machine::Idle>(currentState)
+            && calibrationData.stage != services::CalibrationStage::complete
+            && (calibrationData.polePairs != 0 || calibrationData.rPhase > 0.0f);
+    }
+
     void FocStateMachineCommon::CmdCalibrate(const infra::Function<void(state_machine::CommandResult)>& onDone)
     {
         if (!state_machine::IsStopped(currentState) || HasPendingCommand())
@@ -209,6 +216,11 @@ namespace application
     void FocStateMachineCommon::ApplyModeSpecificCalibration(const services::CalibrationData& /*data*/)
     {}
 
+    bool FocStateMachineCommon::HasValidModeSpecificCalibration(const services::CalibrationData& /*data*/) const
+    {
+        return true;
+    }
+
     void FocStateMachineCommon::PrepareForEnabled()
     {}
 
@@ -286,7 +298,8 @@ namespace application
     {
         return calibrationData.stage == services::CalibrationStage::complete
             && calibrationData.polePairs != 0
-            && calibrationData.rPhase > 0.0f;
+            && calibrationData.rPhase > 0.0f
+            && HasValidModeSpecificCalibration(calibrationData);
     }
 
     void FocStateMachineCommon::RunPolePairsStep()
@@ -511,17 +524,26 @@ namespace application
         return EffectiveFluxLinkage(calibrationData);
     }
 
-    void FocStateMachineCommon::AcceptExternalCalibration(const services::CalibrationData& data,
-        const infra::Function<void(state_machine::CommandResult)>& onDone)
+    state_machine::CommandResult FocStateMachineCommon::CmdReserveExternalCalibration()
     {
         if (!state_machine::IsStopped(currentState) || HasPendingAsyncWork())
+            return state_machine::CommandResult::rejected;
+
+        tracer.Trace() << "[SM] Entering Calibrating (external)";
+        currentState = state_machine::Calibrating{};
+        return state_machine::CommandResult::ok;
+    }
+
+    void FocStateMachineCommon::CmdCompleteExternalCalibration(const services::CalibrationData& data,
+        const infra::Function<void(state_machine::CommandResult)>& onDone)
+    {
+        if (!std::holds_alternative<state_machine::Calibrating>(currentState))
         {
             onDone(state_machine::CommandResult::rejected);
             return;
         }
 
         pendingCommandCallback = onDone;
-        currentState = state_machine::Calibrating{};
         std::get<state_machine::Calibrating>(currentState).pendingData = data;
         RunAlignmentStep();
     }

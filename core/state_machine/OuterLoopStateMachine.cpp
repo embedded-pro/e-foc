@@ -35,6 +35,12 @@ namespace application
         GetOnlineElecEstimator().SetInitialEstimate(foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD });
     }
 
+    bool OuterLoopStateMachine::HasValidModeSpecificCalibration(const services::CalibrationData& data) const
+    {
+        return std::isfinite(data.inertia) && data.inertia > 0.0f
+            && std::isfinite(data.frictionViscous) && data.frictionViscous >= 0.0f;
+    }
+
     void OuterLoopStateMachine::PrepareForEnabled()
     {
         GetOnlineMechEstimator().SetTorqueConstant(mechTorqueConstant);

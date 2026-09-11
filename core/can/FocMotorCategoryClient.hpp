@@ -46,14 +46,11 @@ namespace can
         bool SendSetSpeedSetpoint(uint16_t targetNodeId, foc::RadiansPerSecond value);
         bool SendSetPositionSetpoint(uint16_t targetNodeId, foc::Radians value);
 
-        bool SendSetCurrentIdPid(uint16_t targetNodeId, float kp, float ki, float kd);
-        bool SendSetCurrentIqPid(uint16_t targetNodeId, float kp, float ki, float kd);
-        bool SendSetSpeedPid(uint16_t targetNodeId, float kp, float ki, float kd);
-        bool SendSetPositionPid(uint16_t targetNodeId, float kp, float ki, float kd);
+        bool SendSetCurrentBandwidth(uint16_t targetNodeId, float bandwidth);
+        bool SendSetSpeedBandwidth(uint16_t targetNodeId, float bandwidth);
+        bool SendSetPositionBandwidth(uint16_t targetNodeId, float bandwidth);
 
     private:
-        bool SendSetCurrentPid(uint16_t targetNodeId, uint8_t axis, float kp, float ki, float kd);
-
         void HandleSelectControlModeResponse(const hal::Can::Message& data);
         void HandleCategoryError(const hal::Can::Message& data);
         void HandleTelemetryStatus(const hal::Can::Message& data);

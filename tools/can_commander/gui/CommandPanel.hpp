@@ -30,9 +30,9 @@ namespace tool
         void SetSpeedSetpointRequested(float speedRadPerSec);
         void SetPositionSetpointRequested(float positionRad);
 
-        void SetCurrentIdPidRequested(float kp, float ki, float kd);
-        void SetSpeedPidRequested(float kp, float ki, float kd);
-        void SetPositionPidRequested(float kp, float ki, float kd);
+        void SetCurrentBandwidthRequested(float bandwidth);
+        void SetSpeedBandwidthRequested(float bandwidth);
+        void SetPositionBandwidthRequested(float bandwidth);
 
         void RequestDataRequested();
 

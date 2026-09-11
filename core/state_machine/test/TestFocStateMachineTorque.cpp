@@ -276,8 +276,10 @@ TEST_F(FocStateMachineTorqueCliTest, accept_external_calibration_runs_alignment_
             }));
     EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
 
+    EXPECT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+
     state_machine::CommandResult callbackResult = state_machine::CommandResult::rejected;
-    sm.AcceptExternalCalibration(externalData, [&callbackResult](state_machine::CommandResult r)
+    sm.CmdCompleteExternalCalibration(externalData, [&callbackResult](state_machine::CommandResult r)
         {
             callbackResult = r;
         });
@@ -304,7 +306,8 @@ TEST_F(FocStateMachineTorqueCliTest, accept_external_calibration_cannot_enable_b
                 capturedAlignCallback = cb;
             }));
 
-    sm.AcceptExternalCalibration(externalData, [](state_machine::CommandResult) {});
+    EXPECT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+    sm.CmdCompleteExternalCalibration(externalData, [](state_machine::CommandResult) {});
 
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
     EXPECT_FALSE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));

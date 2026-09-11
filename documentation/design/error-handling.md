@@ -97,11 +97,12 @@ Alongside the post-mortem fault record, the platform keeps two live sets of coun
 from the CLI (`loop_stats`, `can_stats`, `clear_stats`).
 
 **Control-interrupt execution.** The Cortex-M cycle counter is left free-running and read on entry
-to and exit from the control interrupt; the difference is one measured execution. Unsigned
-subtraction makes the measurement correct across the counter's own wrap, which at 120 MHz comes
-around every 36 seconds. The measurement spans the whole interrupt — dispatch, encoder read, control
-law and PWM write — because that is the graph the cycle budget is stated against, and it is taken in
-the platform layer for the same reason.
+to and exit from the application callback that executes inside the control interrupt; the difference
+is one measured execution. Unsigned subtraction makes the measurement correct across the counter's
+own wrap, which at 120 MHz comes around every 36 seconds. The measured window covers encoder read,
+control law and PWM write — the work the cycle budget applies to. Hardware ISR entry/exit overhead
+is excluded; REQ-PERF-001 reserves 25% of the control period for that overhead. The measurement is
+taken in the platform layer so it is consistent across targets.
 
 From it the platform maintains the last, minimum, maximum and a filtered average duration, the
 execution count, and three failure counts: **overruns** (over the budget, margin gone, deadline

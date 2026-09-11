@@ -108,31 +108,24 @@ namespace tool
             SetBusy(false);
     }
 
-    void CanCommandClient::SendSetCurrentIdPid(float kp, float ki, float kd)
+    void CanCommandClient::SendSetCurrentBandwidth(float bandwidth)
     {
         SetBusy(true);
-        if (focClient.SetCurrentIdPid(kp, ki, kd))
+        if (focClient.SetCurrentBandwidth(bandwidth))
             SetBusy(false);
     }
 
-    void CanCommandClient::SendSetCurrentIqPid(float kp, float ki, float kd)
+    void CanCommandClient::SendSetSpeedBandwidth(float bandwidth)
     {
         SetBusy(true);
-        if (focClient.SetCurrentIqPid(kp, ki, kd))
+        if (focClient.SetSpeedBandwidth(bandwidth))
             SetBusy(false);
     }
 
-    void CanCommandClient::SendSetSpeedPid(float kp, float ki, float kd)
+    void CanCommandClient::SendSetPositionBandwidth(float bandwidth)
     {
         SetBusy(true);
-        if (focClient.SetSpeedPid(kp, ki, kd))
-            SetBusy(false);
-    }
-
-    void CanCommandClient::SendSetPositionPid(float kp, float ki, float kd)
-    {
-        SetBusy(true);
-        if (focClient.SetPositionPid(kp, ki, kd))
+        if (focClient.SetPositionBandwidth(bandwidth))
             SetBusy(false);
     }
 

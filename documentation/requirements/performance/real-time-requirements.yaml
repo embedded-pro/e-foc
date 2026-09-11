@@ -31,8 +31,11 @@
     The platform shall measure the duration of every control-interrupt execution with the Cortex-M
     cycle counter and shall maintain, without dynamic allocation, the last, minimum, maximum and a
     filtered average of that duration, together with the count of executions. The measurement shall
-    span the whole interrupt — dispatch, encoder read, control law and PWM write — because that is
-    the graph the cycle budget is stated against.
+    span the application callback — encoder read, control law and PWM write — that executes inside
+    the interrupt context. Hardware ISR entry/exit overhead and any platform-specific pre-processing
+    that is not part of the real-time control law (such as simulation model steps in QEMU) are
+    excluded from the measured window. REQ-PERF-001 accounts for this: the 4500-cycle budget covers
+    Calculate() with 25% headroom reserved for ISR entry/exit overhead outside the measured window.
 
 - id: REQ-PERF-005
   title: Overruns and deadline misses are counted separately

@@ -2,10 +2,11 @@
   title: Current injection aborts above the inverter limit
   shall: >
     Every calibration procedure that injects current into a stationary motor — encoder
-    alignment, pole-pairs estimation and resistance estimation — shall compare each
-    phase-current sample against the inverter's maximum supported current and, on the
-    first sample whose magnitude exceeds that limit in any phase and in either
-    direction, shall stop the inverter and report the procedure as failed.
+    alignment, pole-pairs estimation, resistance estimation and sinusoidal inductance
+    estimation — shall compare each phase-current sample against the inverter's
+    maximum supported current and, on the first sample whose magnitude exceeds that
+    limit in any phase and in either direction, shall stop the inverter and report the
+    procedure as failed.
 
 - id: REQ-CAL-002
   title: Alignment zeroes the encoder while the rotor is held

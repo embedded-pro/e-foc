@@ -128,6 +128,12 @@ namespace
             Construct();
         }
 
+        void ConstructFixtureInPartialCalibration()
+        {
+            GivenNvmHoldsPartialCalibration();
+            Construct();
+        }
+
         void GivenNvmAlwaysInvalid()
         {
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
@@ -155,7 +161,28 @@ namespace
                         data.rPhase = 0.5f;
                         data.lD = 1.0f;
                         data.lQ = 1.0f;
+                        data.inertia = 0.005f;
                         data.stage = services::CalibrationStage::complete;
+                        done(services::NvmStatus::Ok);
+                    }));
+        }
+
+        void GivenNvmHoldsPartialCalibration()
+        {
+            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
+                .Times(AnyNumber())
+                .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)
+                    {
+                        done(true);
+                    }));
+            EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+                .Times(AnyNumber())
+                .WillRepeatedly(Invoke([](services::CalibrationData& data, infra::Function<void(services::NvmStatus)> done)
+                    {
+                        data = services::CalibrationData{};
+                        data.polePairs = 4;
+                        data.rPhase = 0.5f;
+                        data.stage = services::CalibrationStage::none;
                         done(services::NvmStatus::Ok);
                     }));
         }
@@ -732,6 +759,21 @@ namespace
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     }
 
+    TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InPartialCalibration_BroadcastsPartialCalibrationStatus)
+    {
+        ConstructFixtureInPartialCalibration();
+        ResetCaptures();
+
+        Dispatch(can::focRequestTelemetryId, {});
+
+        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+        ASSERT_GE(lastSentData.size(), 2u);
+        EXPECT_EQ(lastSentData[0], static_cast<uint8_t>(can::FocMotorState::partialCalibration));
+        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::none));
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    }
+
     TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InEnabled_BroadcastsRunningStatus)
     {
         ConstructFixtureInReady();
@@ -973,6 +1015,32 @@ namespace
 
         EXPECT_TRUE(categoryErrorSent);
         EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_InEnabled_RejectsInvalidState)
+    {
+        ConstructFixtureInReady();
+        Dispatch(can::focStartId, {});
+        ResetCaptures();
+
+        Dispatch(can::focIdentifyElectricalId, {});
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+        EXPECT_FALSE(categoryErrorSent);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_InFault_RejectsInvalidState)
+    {
+        ConstructFixtureInReady();
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+        ResetCaptures();
+
+        Dispatch(can::focIdentifyElectricalId, {});
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+        EXPECT_FALSE(categoryErrorSent);
     }
 
     TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_WhilePending_ReturnsBusy)
