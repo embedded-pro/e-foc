@@ -491,7 +491,7 @@ graph TD
 | REQ-SM-006     | `state_machine_lifecycle.feature` — Motor enabled from Ready                                                      |
 | REQ-SM-007     | `state_machine_lifecycle.feature` — Motor disabled to Ready                                                       |
 | REQ-SM-008     | `state_machine_lifecycle.feature` — Fault on hardware fault                                                       |
-| REQ-SM-009     | `state_machine_lifecycle.feature` — Fault cleared to Idle                                                         |
+| REQ-SM-009     | `state_machine_lifecycle.feature` — Fault cleared to Ready (calibration held) or Idle                            |
 | REQ-SM-010     | `state_machine_lifecycle.feature` — Valid NVM boots to Ready                                                      |
 | REQ-SM-011     | `calibration_flow.feature` — calibration data saved to NVM                                                        |
 | REQ-INT-001    | `can_foc_motor.feature` — CAN Start enables motor                                                                 |

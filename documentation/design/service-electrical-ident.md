@@ -161,10 +161,13 @@ stateDiagram-v2
     [*] --> Idle
     Idle --> Warmup : Start(config, onDone)
     Warmup --> Measuring : warmupPeriods complete
+    Warmup --> Abort : phase current exceeds MaxCurrentSupported()
     Measuring --> Done : Goertzel ready, L > 0
     Measuring --> Fault : L ≤ 0 or noise floor
+    Measuring --> Abort : phase current exceeds MaxCurrentSupported()
     Done --> Idle : onDone({inductance, fitQuality}) fired
     Fault --> Idle : onDone({nullopt, fitQuality}) fired
+    Abort --> Idle : driver.Stop(), onDone({nullopt, 0}) fired
 ```
 
 ---

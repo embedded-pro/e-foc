@@ -16,7 +16,9 @@
   title: CAN ClearFault clears fault state
   shall: >
     When the FocMotorCategoryServer receives a ClearFault command (focClearFaultId),
-    the state machine shall transition from the Fault state to the Idle state.
+    the state machine shall transition from the Fault state to the Ready state if
+    valid calibration data is held, or to the Idle state if no valid calibration
+    data is available, consistent with REQ-SM-009.
 
 - id: REQ-INT-004
   title: CAN command routing through category server

@@ -260,6 +260,55 @@ TEST_F(SinusoidalInductanceEstimatorTest, negative_zimag_returns_nullopt_inducta
     EXPECT_GT(result.fitQuality, 0.0f);
 }
 
+TEST_F(SinusoidalInductanceEstimatorTest, overcurrent_on_first_sample_stops_driver_and_returns_empty_result)
+{
+    services::SinusoidalInductanceEstimator::Config config{
+        hal::Hertz{ 700 }, hal::Percent{ 15 }, 2, 5, 1, services::WindingConfiguration::Wye
+    };
+
+    services::SinusoidalInductanceEstimator::Result result{ foc::MilliHenry{ 99.0f }, 1.0f };
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+    EXPECT_CALL(driverMock, Stop());
+
+    estimator.Start(config, [&result](auto r) { result = r; });
+
+    driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+        foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f },
+        foc::Ampere{ 0.0f },
+        foc::Ampere{ 0.0f } });
+
+    EXPECT_FALSE(result.inductance.has_value());
+    EXPECT_FLOAT_EQ(result.fitQuality, 0.0f);
+}
+
+TEST_F(SinusoidalInductanceEstimatorTest, overcurrent_on_phase_b_also_aborts)
+{
+    services::SinusoidalInductanceEstimator::Config config{
+        hal::Hertz{ 700 }, hal::Percent{ 15 }, 2, 5, 1, services::WindingConfiguration::Wye
+    };
+
+    services::SinusoidalInductanceEstimator::Result result{ foc::MilliHenry{ 99.0f }, 1.0f };
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+    EXPECT_CALL(driverMock, Stop());
+
+    estimator.Start(config, [&result](auto r) { result = r; });
+
+    driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+        foc::Ampere{ 0.0f },
+        foc::Ampere{ -(drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f) },
+        foc::Ampere{ 0.0f } });
+
+    EXPECT_FALSE(result.inductance.has_value());
+
+    // No further PWM injection after abort
+    driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+        foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+}
+
 TEST_F(SinusoidalInductanceEstimatorTest, delta_winding_recovers_inductance_correctly)
 {
     // Delta winding configuration test with terminalFactor = 0.5

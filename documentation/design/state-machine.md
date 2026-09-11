@@ -152,10 +152,16 @@ After saving, calibration data is applied to the FOC controller (current PID gai
 
 ### Fault Safety
 
-Entering `Fault` commits the `Fault` state first, then stops the inverter if the machine was in `Enabled` or
-`Calibrating`, then aborts the calibration services. Committing the state first means a fault raised inside the
-stop sees `Fault` rather than the state it is leaving, and a calibration completion that arrives afterwards no
-longer finds itself in `Calibrating`.
+**Event-dispatcher path.** `EnterFault()` commits the `Fault` state first, then stops the inverter if the
+machine was in `Enabled` or `Calibrating`, then aborts the calibration services. Committing the state first
+means a fault raised inside the stop sees `Fault` rather than the state it is leaving, and a calibration
+completion that arrives afterwards no longer finds itself in `Calibrating`.
+
+**Interrupt path (board protection, CAN bus-off).** When a fault is delivered in interrupt context, the
+platform stops the FOC controller bridge immediately within that interrupt — before any state mutation or
+tracing. The `EnterFault()` call, its trace output and any pending-command completion are posted to the event
+dispatcher and execute on the next dispatcher turn. This ensures no multi-word state write, tracing call or
+non-volatile-memory access runs from an interrupt context (see REQ-SM-021).
 
 Stopping the inverter is not on its own enough to cut the PWM output. The identification services drive the
 bridge through their own timers and phase-current callbacks, and one left running writes duty cycles on its

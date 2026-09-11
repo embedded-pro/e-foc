@@ -173,7 +173,7 @@ The `FocStateMachine` registers additional commands on the same `TerminalWithSto
 | `calibrate`   | `cal` | Runs the full calibration sequence (pole pairs → R/L → alignment → mechanical ident for speed modes) |
 | `enable`      | `en`  | Enables the FOC controller (only allowed from `Ready` state)                                         |
 | `disable`     | `dis` | Disables the FOC controller and returns to `Ready`                                                   |
-| `clear_fault` | `cf`  | Clears the active fault and returns to `Idle`                                                        |
+| `clear_fault` | `cf`  | Clears the active fault and returns to `Ready` (if calibration data is held) or `Idle`              |
 | `clear_cal`   | `cc`  | Invalidates NVM calibration data and returns to `Idle`                                               |
 
 ### Response Model — `StatusWithMessage`

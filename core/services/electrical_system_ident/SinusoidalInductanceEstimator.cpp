@@ -3,8 +3,8 @@
 #endif
 
 #include "core/services/electrical_system_ident/SinusoidalInductanceEstimator.hpp"
-#include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "core/services/InjectionCurrentLimit.hpp"
+#include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
