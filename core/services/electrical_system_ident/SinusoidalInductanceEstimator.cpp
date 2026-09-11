@@ -4,6 +4,7 @@
 
 #include "core/services/electrical_system_ident/SinusoidalInductanceEstimator.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
+#include "core/services/InjectionCurrentLimit.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
@@ -81,6 +82,13 @@ namespace services
     {
         if (!onDone)
             return;
+
+        if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
+        {
+            driver.Stop();
+            onDone(Result{});
+            return;
+        }
 
         const float vNorm = injectionAmplitude * math::Sin(injectionPhase);
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(

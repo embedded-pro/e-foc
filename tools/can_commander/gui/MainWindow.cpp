@@ -105,19 +105,19 @@ namespace tool
                 timeoutTimer.start(2000);
             });
 
-        connect(commandPanel, &CommandPanel::SetCurrentIdPidRequested, [this](float kp, float ki, float kd)
+        connect(commandPanel, &CommandPanel::SetCurrentBandwidthRequested, [this](float bandwidth)
             {
-                client.SendSetCurrentIdPid(kp, ki, kd);
+                client.SendSetCurrentBandwidth(bandwidth);
                 timeoutTimer.start(2000);
             });
-        connect(commandPanel, &CommandPanel::SetSpeedPidRequested, [this](float kp, float ki, float kd)
+        connect(commandPanel, &CommandPanel::SetSpeedBandwidthRequested, [this](float bandwidth)
             {
-                client.SendSetSpeedPid(kp, ki, kd);
+                client.SendSetSpeedBandwidth(bandwidth);
                 timeoutTimer.start(2000);
             });
-        connect(commandPanel, &CommandPanel::SetPositionPidRequested, [this](float kp, float ki, float kd)
+        connect(commandPanel, &CommandPanel::SetPositionBandwidthRequested, [this](float bandwidth)
             {
-                client.SendSetPositionPid(kp, ki, kd);
+                client.SendSetPositionBandwidth(bandwidth);
                 timeoutTimer.start(2000);
             });
 

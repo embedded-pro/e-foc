@@ -223,8 +223,8 @@ sequenceDiagram
     participant BRG as FocMotorCanBridge
 
     CAN->>SRV: HandleMessage(focSetPidCurrentId, payload)
-    SRV->>BRG: OnSetPidCurrent(gains, callback)
-    BRG->>SRV: SendCategoryError(focSetPidCurrentId, applicationError)
+    SRV->>BRG: OnSetPidCurrent(bandwidth, callback)
+    BRG->>SRV: SendCategoryError(focSetPidCurrentId, invalidPayload)
     SRV->>CAN: categoryError frame
 ```
 

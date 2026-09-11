@@ -50,24 +50,19 @@ namespace can
         return categoryClient.SendSetPositionSetpoint(nodeId, value);
     }
 
-    bool FocMotorCanClient::SetCurrentIdPid(float kp, float ki, float kd)
+    bool FocMotorCanClient::SetCurrentBandwidth(float bandwidth)
     {
-        return categoryClient.SendSetCurrentIdPid(nodeId, kp, ki, kd);
+        return categoryClient.SendSetCurrentBandwidth(nodeId, bandwidth);
     }
 
-    bool FocMotorCanClient::SetCurrentIqPid(float kp, float ki, float kd)
+    bool FocMotorCanClient::SetSpeedBandwidth(float bandwidth)
     {
-        return categoryClient.SendSetCurrentIqPid(nodeId, kp, ki, kd);
+        return categoryClient.SendSetSpeedBandwidth(nodeId, bandwidth);
     }
 
-    bool FocMotorCanClient::SetSpeedPid(float kp, float ki, float kd)
+    bool FocMotorCanClient::SetPositionBandwidth(float bandwidth)
     {
-        return categoryClient.SendSetSpeedPid(nodeId, kp, ki, kd);
-    }
-
-    bool FocMotorCanClient::SetPositionPid(float kp, float ki, float kd)
-    {
-        return categoryClient.SendSetPositionPid(nodeId, kp, ki, kd);
+        return categoryClient.SendSetPositionBandwidth(nodeId, bandwidth);
     }
 
     services::CanProtocolClient& FocMotorCanClient::ProtocolClient()

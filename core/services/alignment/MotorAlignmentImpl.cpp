@@ -117,6 +117,7 @@ namespace services
         if (!onAlignmentDone)
             return;
 
+        timeoutTimer.Cancel();
         driver.Stop();
         onAlignmentDone = nullptr;
     }

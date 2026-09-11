@@ -205,29 +205,23 @@ namespace
         EXPECT_FALSE(client.IsBusy());
     }
 
-    // ---------- PID setters ----------
+    // ---------- Bandwidth setters ----------
 
-    TEST_F(TestCanCommandClient, send_set_current_id_pid_clears_busy)
+    TEST_F(TestCanCommandClient, send_set_current_bandwidth_clears_busy)
     {
-        client.SendSetCurrentIdPid(1.0f, 0.1f, 0.01f);
+        client.SendSetCurrentBandwidth(500.0f);
         EXPECT_FALSE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClient, send_set_current_iq_pid_clears_busy)
+    TEST_F(TestCanCommandClient, send_set_speed_bandwidth_clears_busy)
     {
-        client.SendSetCurrentIqPid(1.0f, 0.1f, 0.01f);
+        client.SendSetSpeedBandwidth(188.5f);
         EXPECT_FALSE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClient, send_set_speed_pid_clears_busy)
+    TEST_F(TestCanCommandClient, send_set_position_bandwidth_clears_busy)
     {
-        client.SendSetSpeedPid(1.0f, 0.1f, 0.01f);
-        EXPECT_FALSE(client.IsBusy());
-    }
-
-    TEST_F(TestCanCommandClient, send_set_position_pid_clears_busy)
-    {
-        client.SendSetPositionPid(1.0f, 0.1f, 0.01f);
+        client.SendSetPositionBandwidth(18.8f);
         EXPECT_FALSE(client.IsBusy());
     }
 
@@ -600,27 +594,21 @@ namespace
         EXPECT_FALSE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClientAdapterFails, send_set_current_id_pid_clears_busy_even_when_adapter_reports_failure)
+    TEST_F(TestCanCommandClientAdapterFails, send_set_current_bandwidth_clears_busy_even_when_adapter_reports_failure)
     {
-        client.SendSetCurrentIdPid(1.0f, 0.1f, 0.01f);
+        client.SendSetCurrentBandwidth(500.0f);
         EXPECT_FALSE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClientAdapterFails, send_set_current_iq_pid_clears_busy_even_when_adapter_reports_failure)
+    TEST_F(TestCanCommandClientAdapterFails, send_set_speed_bandwidth_clears_busy_even_when_adapter_reports_failure)
     {
-        client.SendSetCurrentIqPid(1.0f, 0.1f, 0.01f);
+        client.SendSetSpeedBandwidth(188.5f);
         EXPECT_FALSE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClientAdapterFails, send_set_speed_pid_clears_busy_even_when_adapter_reports_failure)
+    TEST_F(TestCanCommandClientAdapterFails, send_set_position_bandwidth_clears_busy_even_when_adapter_reports_failure)
     {
-        client.SendSetSpeedPid(1.0f, 0.1f, 0.01f);
-        EXPECT_FALSE(client.IsBusy());
-    }
-
-    TEST_F(TestCanCommandClientAdapterFails, send_set_position_pid_clears_busy_even_when_adapter_reports_failure)
-    {
-        client.SendSetPositionPid(1.0f, 0.1f, 0.01f);
+        client.SendSetPositionBandwidth(18.8f);
         EXPECT_FALSE(client.IsBusy());
     }
 }

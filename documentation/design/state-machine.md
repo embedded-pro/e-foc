@@ -148,7 +148,7 @@ sequenceDiagram
 | 4. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth` |
 | 5. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                 |
 
-After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, encoder zero offset applied, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`.
+After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`. The encoder zero offset is not written back to the encoder at this point; it is established only by the alignment step itself during the calibration sequence.
 
 ### Fault Safety
 
@@ -448,7 +448,7 @@ sequenceDiagram
 | `MechanicalParametersIdentification`       | Estimates rotor inertia and viscous friction (speed/position modes only)              | Operation is asynchronous; result is optional (nullopt = failure)                                                                     |
 | `FaultNotifier`                            | Delivers hardware fault notifications to the state machine                            | `Register()` must be called during construction; callback may fire at any time. Production implementation is `PlatformFaultNotifier`. |
 | `ThreePhaseInverter`                       | Used by the FOC controller to issue PWM and read phase currents                       | Stopped immediately on any fault from `Enabled` or `Calibrating` state                                                                |
-| `Encoder`                                  | Rotor position sensor; zero offset applied after alignment                            | `Set()` called during `ApplyCalibrationData` to configure the zero point                                                              |
+| `Encoder`                                  | Rotor position sensor; zero point established by the alignment step                   | Read-only from the state machine's perspective; `SetZero()` is called by `MotorAlignment` during calibration, never by the state machine itself                                                              |
 | `TerminalWithStorage`                      | Serial command interface for CLI-mode transition policy                               | Commands registered in constructor; terminal must outlive the state machine                                                           |
 | `Tracer`                                   | Debug trace output for lifecycle events                                               | All state transitions and calibration steps are traced                                                                                |
 | `RealTimeFrictionAndInertiaEstimator`      | Online RLS estimator for rotor inertia and viscous friction (speed/position only)     | Seeded from calibration data; torque constant set on `EnterEnabled`; updates run while FOC outer loop is active                       |
@@ -463,7 +463,7 @@ sequenceDiagram
 | `CalibrationData` | `polePairs`            | count (uint8)                  | 1–255    | Number of electrical pole pairs                                                                                         |
 | `CalibrationData` | `rPhase`               | Ohm (float)                    | > 0      | Phase resistance identified by electrical ident                                                                         |
 | `CalibrationData` | `lD` / `lQ`            | mH (float)                     | > 0      | D/Q inductances (set equal; anisotropy not estimated)                                                                   |
-| `CalibrationData` | `encoderZeroOffset`    | int32 (bit-cast float Radians) | any      | Quantised electrical angle at encoder zero; applied via `Encoder::Set()`                                                |
+| `CalibrationData` | `encoderZeroOffset`    | int32 (bit-cast float Radians) | any      | Mechanical angle at encoder zero when rotor settled during alignment; stored for reference only — not re-applied to the encoder at boot or after calibration (see REQ-SM-019) |
 | `CalibrationData` | `inertia`              | N·m·s² (float)                 | ≥ 0      | Rotor inertia; populated only for speed/position modes                                                                  |
 | `CalibrationData` | `frictionViscous`      | N·m·s/rad (float)              | ≥ 0      | Viscous friction coefficient; populated only for speed/position modes                                                   |
 | `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0      | Coulomb friction; currently 0 (not identified)                                                                          |
