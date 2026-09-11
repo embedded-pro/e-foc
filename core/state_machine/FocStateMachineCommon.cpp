@@ -506,17 +506,26 @@ namespace application
         return EffectiveFluxLinkage(calibrationData);
     }
 
-    void FocStateMachineCommon::AcceptExternalCalibration(const services::CalibrationData& data,
-        const infra::Function<void(state_machine::CommandResult)>& onDone)
+    state_machine::CommandResult FocStateMachineCommon::CmdReserveExternalCalibration()
     {
         if (!state_machine::IsStopped(currentState) || HasPendingAsyncWork())
+            return state_machine::CommandResult::rejected;
+
+        tracer.Trace() << "[SM] Entering Calibrating (external)";
+        currentState = state_machine::Calibrating{};
+        return state_machine::CommandResult::ok;
+    }
+
+    void FocStateMachineCommon::CmdCompleteExternalCalibration(const services::CalibrationData& data,
+        const infra::Function<void(state_machine::CommandResult)>& onDone)
+    {
+        if (!std::holds_alternative<state_machine::Calibrating>(currentState))
         {
             onDone(state_machine::CommandResult::rejected);
             return;
         }
 
         pendingCommandCallback = onDone;
-        currentState = state_machine::Calibrating{};
         std::get<state_machine::Calibrating>(currentState).pendingData = data;
         OnCalibrationComplete();
     }
