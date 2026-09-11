@@ -85,6 +85,9 @@ namespace
             data.lD = 1.0f;
             data.lQ = 1.0f;
             data.speedLoopBandwidth = 50.0f;
+            data.inertia = 0.005f;
+            data.frictionViscous = 0.0f;
+            data.stage = services::CalibrationStage::complete;
 
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
@@ -687,6 +690,9 @@ namespace
             data.lD = 1.0f;
             data.lQ = 1.0f;
             data.speedLoopBandwidth = 50.0f;
+            data.inertia = 0.005f;
+            data.frictionViscous = 0.0f;
+            data.stage = services::CalibrationStage::complete;
 
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .WillOnce(Invoke([](infra::Function<void(bool)> onDone)

@@ -89,6 +89,7 @@ namespace
                             data.rPhase = 0.5f;
                             data.lD = 1.0f;
                             data.lQ = 1.0f;
+                            data.stage = services::CalibrationStage::complete;
                             done(services::NvmStatus::Ok);
                         }));
             } };

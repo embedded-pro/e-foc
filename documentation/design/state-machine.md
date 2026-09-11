@@ -104,10 +104,15 @@ The resulting state depends on the state the command was issued from:
 does not unconditionally return to `Idle`. Clearing releases the latch, so the following `CmdEnable`
 is accepted rather than refused.
 
-Calibration data is considered valid when the applied record holds a non-zero pole-pair count and a positive
-phase resistance. An aborted calibration run never commits its results — the in-progress values live in
-`Calibrating::pendingData` and are only copied out after the NVM save succeeds — so a previously valid
-calibration survives an emergency stop during a re-calibration and the machine returns to `Ready`.
+Calibration data is considered valid when the applied record's `stage` is `CalibrationStage::complete`, it
+holds a non-zero pole-pair count and a positive phase resistance, and the active mode's own requirements are
+met: torque mode adds no further requirement, while speed and position modes additionally require a finite,
+positive rotor inertia and a finite, non-negative viscous friction (`HasValidModeSpecificCalibration`,
+overridden by `OuterLoopStateMachine`). This mode-aware check is why a torque-only calibration record cannot
+silently be reused to reach `Ready` in speed or position mode. An aborted calibration run never commits its
+results — the in-progress values live in `Calibrating::pendingData` and are only copied out after the NVM
+save succeeds — so a previously valid calibration survives an emergency stop during a re-calibration and the
+machine returns to `Ready`.
 
 Dropping to `Idle` on every emergency stop would force a full recalibration after each safety intervention, which is why the transition is conditional on calibration validity rather than unconditional.
 
@@ -156,9 +161,11 @@ An external client (e.g. the CAN bridge) can supply pre-measured calibration dat
 
 1. **`CmdReserveExternalCalibration()`** — synchronous. Checks that the machine is in `Idle` or `Ready` with no pending async work, then transitions to `Calibrating` and returns `CommandResult::ok`. Returns `CommandResult::rejected` in any other state. The `Calibrating` state prevents a second request from being accepted concurrently.
 
-2. **`CmdCompleteExternalCalibration(data, onDone)`** — async. Called by the external client after its own estimation is finished. Stores `data` in the pending `Calibrating` slot and calls `OnCalibrationComplete()` to persist to NVM and transition to `Ready`. If a fault occurred between the two calls, `EnterFault` has already aborted the identification service (via `AbortCalibrationServices`) so this path is never reached; the client observes the failure through its own estimation callback.
+2. **`CmdCompleteExternalCalibration(data, onDone)`** — async. Called by the external client after its own estimation is finished. Stores `data` in the pending `Calibrating` slot and runs the alignment step, so an externally supplied record still gets a live rotor frame before it can be used. If a fault occurred between the two calls, `EnterFault` has already aborted the identification service (via `AbortCalibrationServices`) so this path is never reached; the client observes the failure through its own estimation callback.
 
 The two-command split ensures the FSM enters `Calibrating` before any open-loop PWM is applied, and that the state guard lives entirely inside the state machine rather than in the calling layer.
+
+The external path stops after alignment; it does not chain into mechanical identification. `OnIdentifyElectrical` and `OnIdentifyMechanical` are separate CAN commands (REQ-INT-011), so the electrical command must not drive the mechanical estimator. `OnCalibrationComplete()` therefore stamps `stage = complete` only when the record satisfies `HasValidModeSpecificCalibration()` for the active mode. Torque mode is satisfied by electrical parameters plus alignment and transitions to `Ready`. Speed and position still lack inertia and friction, so their record is persisted with `stage = none` and the machine returns to `Idle` holding a partial record, reported over CAN as `FocMotorState::partialCalibration`. Completing those modes requires the internal `CmdCalibrate` chain, which runs mechanical identification.
 
 ### Fault Safety
 
@@ -452,6 +459,7 @@ sequenceDiagram
 | `CmdClearCalibration()`  | Invalidates NVM calibration and returns to `Idle`                                      | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`.                                                                                                                            |
 | `CmdEmergencyStop()`     | Stops PWM immediately and leaves the active states                                     | Accepted from every state and always returns `ok`. From `Enabled` or `Calibrating` it goes to `Ready` when calibration data is valid, otherwise to `Idle`. `Idle`, `Ready` and `Fault` are left unchanged. Aborts any pending command with `abortedByFault`. |
 | `HasPendingAsyncWork()`  | Reports whether a service callback capturing the machine is outstanding                | True while a command callback is pending, the boot-time NVM check is in flight, or a calibration step is running. Used by `ControlModeStateMachine` to refuse destroying the machine.                                                                        |
+| `HasPartialCalibration()`| Reports whether `Idle` holds a non-empty but incomplete NVM record                     | True only in `Idle`, when `stage != complete` but pole pairs or resistance are non-zero (an old-schema or interrupted record). Used by the CAN bridge to broadcast `FocMotorState::partialCalibration` instead of `idle`.                                    |
 | `ApplyOnlineEstimates()` | Retunes speed and current PID gains from online estimators                             | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only.                                                                                                         |
 
 ### Required

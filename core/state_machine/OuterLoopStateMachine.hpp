@@ -33,6 +33,7 @@ namespace application
             const CalibrationServices& calibServices);
 
         void ApplyModeSpecificCalibration(const services::CalibrationData& data) override;
+        bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const override;
         void PrepareForEnabled() override;
         void RegisterModeSpecificCli(services::TerminalWithStorage& terminal) override;
         void RunPostAlignmentStep() override;

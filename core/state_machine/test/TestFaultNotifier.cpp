@@ -35,6 +35,11 @@ namespace
             return false;
         }
 
+        bool HasPartialCalibration() const override
+        {
+            return false;
+        }
+
         void CmdCalibrate(const infra::Function<void(state_machine::CommandResult)>&) override
         {}
 

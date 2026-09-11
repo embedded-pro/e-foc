@@ -375,6 +375,7 @@ namespace
             data.rPhase = 0.5f;
             data.lD = 1.0f;
             data.lQ = 1.0f;
+            data.stage = services::CalibrationStage::complete;
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .Times(AnyNumber())
                 .WillRepeatedly(Invoke([](infra::Function<void(bool)> onDone)
@@ -399,6 +400,7 @@ namespace
             data.rPhase = 0.5f;
             data.lD = 1.0f;
             data.lQ = 1.0f;
+            data.stage = services::CalibrationStage::complete;
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
                     {
@@ -484,6 +486,7 @@ TEST_F(ControlModeStateMachineExtTest, PersistedFluxLinkageOverridesTheConfigure
     stored.lD = 1.0f;
     stored.lQ = 1.0f;
     stored.fluxLinkage = 0.02f;
+    stored.stage = services::CalibrationStage::complete;
 
     EXPECT_CALL(nvmMock, IsCalibrationValid(_))
         .WillOnce(Invoke([](infra::Function<void(bool)> onDone)

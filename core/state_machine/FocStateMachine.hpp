@@ -23,6 +23,7 @@ namespace state_machine
     {
         CalibrationStep step{ CalibrationStep::polePairs };
         services::CalibrationData pendingData{};
+        bool external{ false };
     };
 
     struct Ready
@@ -62,6 +63,7 @@ namespace state_machine
         virtual FaultCode LastFaultCode() const = 0;
 
         virtual bool HasPendingAsyncWork() const = 0;
+        virtual bool HasPartialCalibration() const = 0;
 
         virtual void CmdCalibrate(const infra::Function<void(CommandResult)>& onDone) = 0;
         virtual CommandResult CmdEnable() = 0;
