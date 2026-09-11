@@ -141,6 +141,40 @@ namespace
         client.HandleMessage(services::canCategoryErrorResponseMessageTypeId, msg);
     }
 
+    TEST_F(FocMotorCategoryClientTest, SendSetCurrentBandwidth_EncodesCorrectCommandAndValue)
+    {
+        client.SendSetCurrentBandwidth(1, 500.0f);
+        EXPECT_EQ(lastSentMsgType, can::focSetPidCurrentId);
+        ASSERT_GE(lastSentMsg.size(), 3u);
+        const auto wireVal = services::CanFrameCodec::ReadInt16(lastSentMsg, 1);
+        EXPECT_NEAR(static_cast<float>(wireVal) / can::focPidScale, 500.0f, 1.0f);
+    }
+
+    TEST_F(FocMotorCategoryClientTest, SendSetSpeedBandwidth_EncodesCorrectCommandAndValue)
+    {
+        client.SendSetSpeedBandwidth(1, 188.5f);
+        EXPECT_EQ(lastSentMsgType, can::focSetPidSpeedId);
+        ASSERT_GE(lastSentMsg.size(), 3u);
+        const auto wireVal = services::CanFrameCodec::ReadInt16(lastSentMsg, 1);
+        EXPECT_NEAR(static_cast<float>(wireVal) / can::focPidScale, 188.5f, 1.0f);
+    }
+
+    TEST_F(FocMotorCategoryClientTest, SendSetPositionBandwidth_EncodesCorrectCommandAndValue)
+    {
+        client.SendSetPositionBandwidth(1, 18.8f);
+        EXPECT_EQ(lastSentMsgType, can::focSetPidPositionId);
+        ASSERT_GE(lastSentMsg.size(), 3u);
+        const auto wireVal = services::CanFrameCodec::ReadInt16(lastSentMsg, 1);
+        EXPECT_NEAR(static_cast<float>(wireVal) / can::focPidScale, 18.8f, 1.0f);
+    }
+
+    TEST_F(FocMotorCategoryClientTest, SendSetCurrentBandwidth_PayloadIsExactlyOneFixed16Field)
+    {
+        client.SendSetCurrentBandwidth(1, 300.0f);
+        // Payload: [seq(1)] [bandwidth fixed16(2)] = 3 bytes total; no extra kp/ki/kd fields.
+        EXPECT_EQ(lastSentMsg.size(), 3u);
+    }
+
     // REQ-INT-010 — client routes ACK/NACK; sequence byte is prepended
     TEST_F(FocMotorCategoryClientTest, SendStart_PrependSequenceByte)
     {

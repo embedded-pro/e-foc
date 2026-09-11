@@ -48,14 +48,21 @@
   title: Fault transition on hardware fault
   shall: >
     From any non-Fault state, when a hardware fault event is raised via the
-    FaultNotifier, the state machine shall immediately transition to the Fault
-    state.
+    FaultNotifier, the state machine shall stop the FOC controller immediately
+    within the faulting context and shall record the Fault state. When the fault
+    is delivered from an interrupt context, the bridge stop shall occur within
+    that interrupt and the state transition, trace output and any pending-command
+    completion shall be deferred to the event dispatcher, consistent with
+    REQ-SM-021.
 
 - id: REQ-SM-009
-  title: Fault clearance transitions to Idle
+  title: Fault clearance transitions to Ready or Idle
   shall: >
     From the Fault state, when a clear-fault command is issued, the state machine
-    shall transition to the Idle state.
+    shall transition to the Ready state if valid calibration data is held, or to
+    the Idle state if no valid calibration data is available. This preserves a
+    completed calibration across a fault cycle so that a subsequent enable command
+    is accepted without recalibration, consistent with REQ-SM-014.
 
 - id: REQ-SM-010
   title: Valid NVM on boot transitions to Ready

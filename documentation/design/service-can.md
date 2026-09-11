@@ -62,9 +62,9 @@ Physical-to-wire conversions use fixed-point scale factors:
 | Speed      | int16     | 1            | 300 rad/s → 300 wire    |
 | Position   | int16     | 100          | 3.14 rad → 314 wire     |
 | Voltage    | int16     | 10           | 24.0 V → 240 wire       |
-| PID gain   | int16     | 1            | passed through unscaled |
-| Resistance | int16     | 1000         | 0.5 Ω → 500 wire        |
-| Inductance | int16     | 1000         | 1.0 mH → 1000 wire      |
+| Bandwidth  | int16     | 1            | closed-loop bandwidth in rad/s |
+| Resistance | int16     | 1000         | 0.5 Ω → 500 wire               |
+| Inductance | int16     | 1000         | 1.0 mH → 1000 wire             |
 
 ### Part B — FocMotorCategoryServer
 
@@ -215,7 +215,7 @@ sequenceDiagram
     BRG->>ACK: responseCallback(CanAckStatus::success)
 ```
 
-### Stub Command (applicationError path)
+### Bandwidth Rejection Path
 
 ```mermaid
 sequenceDiagram
@@ -224,9 +224,9 @@ sequenceDiagram
     participant BRG as FocMotorCanBridge
 
     CAN->>SRV: HandleMessage(focSetPidCurrentId, payload)
-    SRV->>BRG: OnSetPidCurrent(gains, callback)
-    BRG->>SRV: SendCategoryError(focSetPidCurrentId, applicationError)
-    SRV->>CAN: categoryError frame
+    SRV->>BRG: OnSetPidCurrent(bandwidth, successCallback)
+    BRG->>SRV: SendCommandAck(focSetPidCurrentId, invalidPayload)
+    SRV->>CAN: commandAck frame (invalidPayload)
 ```
 
 ---
@@ -271,8 +271,8 @@ graph LR
 
 ## Open Questions
 
-| # | Question                                                         | Resolution                                                                                   | Status   |
-|---|------------------------------------------------------------------|----------------------------------------------------------------------------------------------|----------|
-| 1 | Implement telemetry push (BroadcastFaultStatus, periodic status) | On-demand via `OnRequestTelemetry`; periodic timer deferred                                  | resolved |
-| 2 | PID gain commands                                                | Accepted: kp field mapped to loop bandwidth via `TrySet*Bandwidth`                           | resolved |
-| 3 | Mechanical identification via CAN                                | Delegated to injected `MechanicalParametersIdentification*`; nullable for targets lacking it | resolved |
+| # | Question                                                         | Resolution                                                                                                                   | Status   |
+|---|------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|----------|
+| 1 | Implement telemetry push (BroadcastFaultStatus, periodic status) | On-demand via `OnRequestTelemetry`; periodic timer deferred                                                                  | resolved |
+| 2 | PID bandwidth commands                                           | Accepted: single bandwidth value per command decoded by server, forwarded to `TrySet*Bandwidth` on `ControlModeStateMachine` | resolved |
+| 3 | Mechanical identification via CAN                                | Delegated to injected `MechanicalParametersIdentification*`; nullable for targets lacking it                                 | resolved |

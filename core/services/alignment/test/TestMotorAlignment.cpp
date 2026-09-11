@@ -566,3 +566,25 @@ TEST_F(MotorAlignmentTest, AbortWithoutARunInFlightIsANoOp)
 {
     alignment.Abort();
 }
+
+TEST_F(MotorAlignmentTest, AbortCancelsTimeoutSoCallbackDoesNotFireAfterTimeout)
+{
+    services::MotorAlignmentImpl::AlignmentConfig config;
+    config.timeout = std::chrono::milliseconds{ 500 };
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(driverMock, Stop()).Times(2);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+
+    bool fired = false;
+    alignment.ForceAlignment(7, config, [&fired](auto) { fired = true; });
+
+    alignment.Abort();
+    EXPECT_FALSE(fired);
+
+    ForwardTime(std::chrono::milliseconds{ 501 });
+
+    EXPECT_FALSE(fired);
+}

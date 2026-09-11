@@ -239,7 +239,7 @@ does not reproduce dead-time; simulation results will be optimistic relative to 
 ### 4. Pole Pair Estimation
 
 The number of electrical cycles per mechanical revolution equals the number of pole pairs $p$.
-During the multi-step alignment sweep, the motor is driven through exactly $N_{rev}$ electrical
+During the pole-pair electrical-angle sweep, the motor is driven through exactly $N_{rev}$ electrical
 revolutions over $12 \cdot N_{rev}$ steps. The total mechanical angle $\Delta\theta_{mech}$
 is accumulated from the encoder. The pole pairs are:
 

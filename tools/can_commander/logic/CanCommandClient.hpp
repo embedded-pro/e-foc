@@ -77,10 +77,9 @@ namespace tool
         void SendSetSpeedSetpoint(float speedRadPerSec);
         void SendSetPositionSetpoint(float positionRad);
 
-        void SendSetCurrentIdPid(float kp, float ki, float kd);
-        void SendSetCurrentIqPid(float kp, float ki, float kd);
-        void SendSetSpeedPid(float kp, float ki, float kd);
-        void SendSetPositionPid(float kp, float ki, float kd);
+        void SendSetCurrentBandwidth(float bandwidth);
+        void SendSetSpeedBandwidth(float bandwidth);
+        void SendSetPositionBandwidth(float bandwidth);
 
         void RequestData() const;
         void HandleTimeout();
