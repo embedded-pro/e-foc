@@ -57,7 +57,7 @@ namespace can
 
     private:
         static FocFaultCode ToCanFaultCode(state_machine::FaultCode code);
-        static FocMotorState ToCanMotorState(const state_machine::State& state);
+        static FocMotorState ToCanMotorState(const state_machine::State& state, bool hasPartialCalibration);
 
         void ReportCommandOutcome(uint8_t commandId, state_machine::CommandResult result,
             const infra::Function<void(services::CanAckStatus)>& onDone);

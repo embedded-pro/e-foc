@@ -122,6 +122,12 @@ namespace
             Construct();
         }
 
+        void ConstructFixtureInPartialCalibration()
+        {
+            GivenNvmHoldsPartialCalibration();
+            Construct();
+        }
+
         void GivenNvmAlwaysInvalid()
         {
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
@@ -149,6 +155,35 @@ namespace
                         data.rPhase = 0.5f;
                         data.lD = 1.0f;
                         data.lQ = 1.0f;
+                        data.inertia = 0.005f;
+                        data.stage = services::CalibrationStage::complete;
+                        done(services::NvmStatus::Ok);
+                    }));
+            EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+                .Times(AnyNumber())
+                .WillRepeatedly(Invoke([](const services::CalibrationData&,
+                                          infra::Function<void(services::NvmStatus)> done)
+                    {
+                        done(services::NvmStatus::Ok);
+                    }));
+        }
+
+        void GivenNvmHoldsPartialCalibration()
+        {
+            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
+                .Times(AnyNumber())
+                .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)
+                    {
+                        done(true);
+                    }));
+            EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+                .Times(AnyNumber())
+                .WillRepeatedly(Invoke([](services::CalibrationData& data, infra::Function<void(services::NvmStatus)> done)
+                    {
+                        data = services::CalibrationData{};
+                        data.polePairs = 4;
+                        data.rPhase = 0.5f;
+                        data.stage = services::CalibrationStage::none;
                         done(services::NvmStatus::Ok);
                     }));
             EXPECT_CALL(nvmMock, SaveCalibration(_, _))
@@ -597,11 +632,19 @@ namespace
                 {
                     done(std::size_t{ 4 });
                 }));
-        EXPECT_CALL(nvmMock, SaveCalibration(_, _))
-            .WillOnce(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> done)
+        EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+            .WillOnce(Invoke([](std::size_t, const auto&,
+                                 infra::Function<void(std::optional<foc::Radians>)> done)
                 {
+                    done(foc::Radians{ 0.0f });
+                }));
+        EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+            .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> done)
+                {
+                    EXPECT_EQ(data.stage, services::CalibrationStage::complete);
                     done(services::NvmStatus::Ok);
                 }));
+        EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
 
         ResetCaptures();
         Dispatch(can::focIdentifyElectricalId, {});
@@ -610,6 +653,70 @@ namespace
         ASSERT_TRUE(ackSpy.last.has_value());
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
         EXPECT_FALSE(categoryErrorSent);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_AlignmentFails_SendsCalibrationFailed)
+    {
+        ConstructFixture();
+
+        EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+            .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
+                                 infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+                {
+                    done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
+                }));
+        EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+            .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
+                                 infra::Function<void(std::optional<std::size_t>)> done)
+                {
+                    done(std::size_t{ 4 });
+                }));
+        EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+            .WillOnce(Invoke([](std::size_t, const auto&,
+                                 infra::Function<void(std::optional<foc::Radians>)> done)
+                {
+                    done(std::nullopt);
+                }));
+
+        ResetCaptures();
+        Dispatch(can::focIdentifyElectricalId, {});
+
+        EXPECT_TRUE(categoryErrorSent);
+        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_CannotEnableBeforeAlignment)
+    {
+        ConstructFixture();
+
+        infra::Function<void(std::optional<foc::Radians>)> capturedAlignCallback;
+        EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+            .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
+                                 infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+                {
+                    done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
+                }));
+        EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+            .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
+                                 infra::Function<void(std::optional<std::size_t>)> done)
+                {
+                    done(std::size_t{ 4 });
+                }));
+        EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+            .WillOnce(Invoke([&capturedAlignCallback](std::size_t, const auto&,
+                                 infra::Function<void(std::optional<foc::Radians>)> done)
+                {
+                    capturedAlignCallback = done;
+                }));
+
+        motorServer->HandleMessage(can::focIdentifyElectricalId, {});
+        ExecuteAllActions();
+
+        ResetCaptures();
+        Dispatch(can::focStartId, {});
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
     }
 
     TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_FailedResistance_SendsCalibrationFailed)
@@ -675,6 +782,21 @@ namespace
         EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
         ASSERT_GE(lastSentData.size(), 2u);
         EXPECT_EQ(lastSentData[0], static_cast<uint8_t>(can::FocMotorState::idle));
+        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::none));
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InPartialCalibration_BroadcastsPartialCalibrationStatus)
+    {
+        ConstructFixtureInPartialCalibration();
+        ResetCaptures();
+
+        Dispatch(can::focRequestTelemetryId, {});
+
+        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+        ASSERT_GE(lastSentData.size(), 2u);
+        EXPECT_EQ(lastSentData[0], static_cast<uint8_t>(can::FocMotorState::partialCalibration));
         EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::none));
         ASSERT_TRUE(ackSpy.last.has_value());
         EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);

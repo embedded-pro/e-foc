@@ -48,6 +48,7 @@ namespace application
         const state_machine::State& CurrentState() const override;
         state_machine::FaultCode LastFaultCode() const override;
         bool HasPendingAsyncWork() const override;
+        bool HasPartialCalibration() const override;
 
         void CmdCalibrate(const infra::Function<void(state_machine::CommandResult)>& onDone) override;
         state_machine::CommandResult CmdEnable() override;
@@ -87,11 +88,13 @@ namespace application
         virtual foc::CurrentLoopTunable& CurrentTunable() = 0;
 
         virtual void ApplyModeSpecificCalibration(const services::CalibrationData& data);
+        virtual bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const;
         virtual void PrepareForEnabled();
         virtual void RegisterModeSpecificCli(services::TerminalWithStorage& terminal);
 
         void EnterCalibrating();
         void EnterReady(const services::CalibrationData& data);
+        void EnterIdleWithPartialCalibration(const services::CalibrationData& data);
         void EnterEnabled();
         void EnterFault(state_machine::FaultCode code);
 

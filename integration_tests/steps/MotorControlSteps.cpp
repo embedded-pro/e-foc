@@ -67,3 +67,11 @@ THEN(R"(the state machine shall be in the running state)")
     ASSERT_TRUE(fixture.WaitForMotorState(can::FocMotorState::running))
         << "Motor is not in running state over CAN telemetry";
 }
+
+THEN(R"(the motor shall refuse to enable)")
+{
+    auto& fixture = context.Get<Fixture>();
+    fixture.SendCanCommand(can::focMotorCategoryId, can::focStartId);
+    ASSERT_FALSE(fixture.WaitForMotorState(can::FocMotorState::running, std::chrono::seconds{ 2 }))
+        << "Motor reached running state without a complete calibration";
+}

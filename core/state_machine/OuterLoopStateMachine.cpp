@@ -1,4 +1,5 @@
 #include "core/state_machine/OuterLoopStateMachine.hpp"
+#include "core/foc/math/FiniteGuard.hpp"
 #include <cmath>
 
 namespace application
@@ -33,6 +34,11 @@ namespace application
 
         GetOnlineMechEstimator().SetInitialEstimate(foc::NewtonMeterSecondSquared{ data.inertia }, foc::NewtonMeterSecondPerRadian{ data.frictionViscous });
         GetOnlineElecEstimator().SetInitialEstimate(foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD });
+    }
+
+    bool OuterLoopStateMachine::HasValidModeSpecificCalibration(const services::CalibrationData& data) const
+    {
+        return foc::IsFiniteValue(data.inertia) && data.inertia > 0.0f && foc::IsFiniteValue(data.frictionViscous) && data.frictionViscous >= 0.0f;
     }
 
     void OuterLoopStateMachine::PrepareForEnabled()

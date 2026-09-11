@@ -49,7 +49,7 @@ namespace can
         }
     }
 
-    FocMotorState FocMotorCanBridge::ToCanMotorState(const state_machine::State& state)
+    FocMotorState FocMotorCanBridge::ToCanMotorState(const state_machine::State& state, bool hasPartialCalibration)
     {
         if (std::holds_alternative<state_machine::Fault>(state))
             return FocMotorState::fault;
@@ -57,6 +57,8 @@ namespace can
             return FocMotorState::calibrating;
         if (std::holds_alternative<state_machine::Enabled>(state))
             return FocMotorState::running;
+        if (hasPartialCalibration)
+            return FocMotorState::partialCalibration;
         return FocMotorState::idle;
     }
 
@@ -316,7 +318,7 @@ namespace can
                                    ? ToCanFaultCode(controlMode.ActiveStateMachine().LastFaultCode())
                                    : FocFaultCode::none;
 
-        server.BroadcastTelemetryStatus(ToCanMotorState(state), faultCode);
+        server.BroadcastTelemetryStatus(ToCanMotorState(state, controlMode.ActiveStateMachine().HasPartialCalibration()), faultCode);
         onDone();
     }
 
