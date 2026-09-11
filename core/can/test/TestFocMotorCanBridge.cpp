@@ -902,6 +902,32 @@ namespace
         EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
     }
 
+    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_InEnabled_RejectsInvalidState)
+    {
+        ConstructFixtureInReady();
+        Dispatch(can::focStartId, {});
+        ResetCaptures();
+
+        Dispatch(can::focIdentifyElectricalId, {});
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+        EXPECT_FALSE(categoryErrorSent);
+    }
+
+    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_InFault_RejectsInvalidState)
+    {
+        ConstructFixtureInReady();
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+        ResetCaptures();
+
+        Dispatch(can::focIdentifyElectricalId, {});
+
+        ASSERT_TRUE(ackSpy.last.has_value());
+        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+        EXPECT_FALSE(categoryErrorSent);
+    }
+
     TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_WhilePending_ReturnsBusy)
     {
         ConstructFixtureInReady();

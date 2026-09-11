@@ -75,7 +75,7 @@ The observer interface provides callbacks for:
 - `OnSelectControlMode` — takes a `FocMotorMode` and a result callback.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` — take a typed unit quantity and a completion callback.
 - `OnSetPidCurrent`, `OnSetPidSpeed`, `OnSetPidPosition` — receive a bandwidth parameter parsed from the CAN frame and forward to the corresponding `TrySet*Bandwidth` on `ControlModeStateMachine`.
-- `OnIdentifyElectrical` — delegates to `ElectricalParametersIdentification`; on success broadcasts `focElectricalParamsResponseId` with resistance, inductance, and pole-pair count.
+- `OnIdentifyElectrical` — requires `Idle` or `Ready` state with no pending async work; delegates to `ElectricalParametersIdentification`; on success broadcasts `focElectricalParamsResponseId` with resistance, inductance, and pole-pair count; `invalidState` if the lifecycle check fails.
 - `OnIdentifyMechanical` — requires Ready state; delegates to `MechanicalParametersIdentification`; on success broadcasts `focMechanicalParamsResponseId` with friction and inertia.
 - `OnRequestTelemetry` — broadcasts current state and fault code via `focTelemetryStatusResponseId`.
 - `OnSetEncoderResolution`, `OnConfigureTelemetryRate` — validate payload, update and persist `ConfigData` via `NonVolatileMemory`.
@@ -97,7 +97,7 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
 - `OnSelectControlMode` → `Select(mode, onDone)`; the result callback sends the mode response or a category error.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` → validate mode and range, then delegate to `TrySet*` on the state machine.
 - PID bandwidth commands → `TrySet*Bandwidth(bandwidth)` on the state machine; `invalidPayload` if rejected.
-- Identification commands → delegate to the injected identification services; broadcast parameter response frames on success; `calibrationFailed` on estimation failure; `busy` if a prior identification is in progress.
+- Identification commands → validate lifecycle state before starting (`invalidState` if not `Idle`/`Ready` or async work pending); delegate to the injected identification services; broadcast parameter response frames on success; `calibrationFailed` on estimation failure; `busy` if a prior identification is in progress.
 - `OnRequestTelemetry` → broadcast current state and fault code via `focTelemetryStatusResponseId`; always succeeds.
 - `OnSetEncoderResolution` / `OnConfigureTelemetryRate` → persist to `NonVolatileMemory`; `persistenceFailed` on write error; `busy` if a prior NVM save is in flight.
 

@@ -182,6 +182,13 @@ namespace can
             return;
         }
 
+        const auto& smState = controlMode.ActiveStateMachine().CurrentState();
+        if (!state_machine::IsStopped(smState) || controlMode.ActiveStateMachine().HasPendingAsyncWork())
+        {
+            server.SendCommandAck(can::focIdentifyElectricalId, services::CanAckStatus::invalidState);
+            return;
+        }
+
         pendingElectricalIdentDoneCallback = onDone;
 
         electricalIdent.EstimateResistanceAndInductance({},
