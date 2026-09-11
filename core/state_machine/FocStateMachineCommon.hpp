@@ -92,6 +92,7 @@ namespace application
 
         void EnterCalibrating();
         void EnterReady(const services::CalibrationData& data);
+        void EnterIdleWithPartialCalibration(const services::CalibrationData& data);
         void EnterEnabled();
         void EnterFault(state_machine::FaultCode code);
 

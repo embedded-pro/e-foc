@@ -161,9 +161,11 @@ An external client (e.g. the CAN bridge) can supply pre-measured calibration dat
 
 1. **`CmdReserveExternalCalibration()`** — synchronous. Checks that the machine is in `Idle` or `Ready` with no pending async work, then transitions to `Calibrating` and returns `CommandResult::ok`. Returns `CommandResult::rejected` in any other state. The `Calibrating` state prevents a second request from being accepted concurrently.
 
-2. **`CmdCompleteExternalCalibration(data, onDone)`** — async. Called by the external client after its own estimation is finished. Stores `data` in the pending `Calibrating` slot and calls `OnCalibrationComplete()` to persist to NVM and transition to `Ready`. If a fault occurred between the two calls, `EnterFault` has already aborted the identification service (via `AbortCalibrationServices`) so this path is never reached; the client observes the failure through its own estimation callback.
+2. **`CmdCompleteExternalCalibration(data, onDone)`** — async. Called by the external client after its own estimation is finished. Stores `data` in the pending `Calibrating` slot and runs the alignment step, so an externally supplied record still gets a live rotor frame before it can be used. If a fault occurred between the two calls, `EnterFault` has already aborted the identification service (via `AbortCalibrationServices`) so this path is never reached; the client observes the failure through its own estimation callback.
 
 The two-command split ensures the FSM enters `Calibrating` before any open-loop PWM is applied, and that the state guard lives entirely inside the state machine rather than in the calling layer.
+
+The external path stops after alignment; it does not chain into mechanical identification. `OnIdentifyElectrical` and `OnIdentifyMechanical` are separate CAN commands (REQ-INT-011), so the electrical command must not drive the mechanical estimator. `OnCalibrationComplete()` therefore stamps `stage = complete` only when the record satisfies `HasValidModeSpecificCalibration()` for the active mode. Torque mode is satisfied by electrical parameters plus alignment and transitions to `Ready`. Speed and position still lack inertia and friction, so their record is persisted with `stage = none` and the machine returns to `Idle` holding a partial record, reported over CAN as `FocMotorState::partialCalibration`. Completing those modes requires the internal `CmdCalibrate` chain, which runs mechanical identification.
 
 ### Fault Safety
 

@@ -23,6 +23,7 @@ namespace state_machine
     {
         CalibrationStep step{ CalibrationStep::polePairs };
         services::CalibrationData pendingData{};
+        bool external{ false };
     };
 
     struct Ready

@@ -38,6 +38,13 @@ THEN(R"(the state machine shall be in the Ready state)")
         << "Motor state is not idle/ready over CAN telemetry";
 }
 
+THEN(R"(the state machine shall report incomplete calibration)")
+{
+    auto& fixture = context.Get<Fixture>();
+    ASSERT_TRUE(fixture.WaitForMotorState(can::FocMotorState::partialCalibration))
+        << "Motor state is not partialCalibration over CAN telemetry";
+}
+
 THEN(R"(the state machine shall be in the Fault state)")
 {
     auto& fixture = context.Get<Fixture>();
