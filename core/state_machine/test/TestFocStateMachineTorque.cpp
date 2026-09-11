@@ -70,6 +70,7 @@ namespace
             data.rPhase = 0.5f;
             data.lD = 1.0f;
             data.lQ = 1.0f;
+            data.stage = services::CalibrationStage::complete;
 
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
@@ -220,6 +221,93 @@ TEST_F(FocStateMachineTorqueCliTest, nvm_load_failure_on_boot_remains_in_idle)
     auto sm = CreateStateMachine();
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, nvm_incomplete_stage_on_boot_remains_in_idle)
+{
+    GivenFaultNotifierRegistered();
+    services::CalibrationData incompleteData{};
+    incompleteData.polePairs = 7;
+    incompleteData.rPhase = 0.5f;
+    incompleteData.lD = 1.0f;
+    incompleteData.lQ = 1.0f;
+
+    EXPECT_CALL(nvmMock, IsCalibrationValid(_))
+        .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
+            {
+                onDone(true);
+            }));
+    EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+        .WillOnce(Invoke([incompleteData](services::CalibrationData& out,
+                             infra::Function<void(services::NvmStatus)> onDone)
+            {
+                out = incompleteData;
+                onDone(services::NvmStatus::Ok);
+            }));
+    auto sm = CreateStateMachine();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, accept_external_calibration_runs_alignment_before_entering_ready)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    services::CalibrationData externalData{};
+    externalData.polePairs = 4;
+    externalData.rPhase = 0.5f;
+    externalData.lD = 1.0f;
+    externalData.lQ = 1.0f;
+
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&,
+                             infra::Function<void(std::optional<foc::Radians>)> cb)
+            {
+                cb(foc::Radians{ 0.0f });
+            }));
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData& data,
+                             infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_EQ(data.stage, services::CalibrationStage::complete);
+                onDone(services::NvmStatus::Ok);
+            }));
+    EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+
+    state_machine::CommandResult callbackResult = state_machine::CommandResult::rejected;
+    sm.AcceptExternalCalibration(externalData, [&callbackResult](state_machine::CommandResult r)
+        {
+            callbackResult = r;
+        });
+
+    EXPECT_EQ(callbackResult, state_machine::CommandResult::ok);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, accept_external_calibration_cannot_enable_before_alignment_completes)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    services::CalibrationData externalData{};
+    externalData.polePairs = 4;
+    externalData.rPhase = 0.5f;
+
+    infra::Function<void(std::optional<foc::Radians>)> capturedAlignCallback;
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([&capturedAlignCallback](std::size_t, const auto&,
+                             infra::Function<void(std::optional<foc::Radians>)> cb)
+            {
+                capturedAlignCallback = cb;
+            }));
+
+    sm.AcceptExternalCalibration(externalData, [](state_machine::CommandResult) {});
+
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
+    EXPECT_FALSE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineTorqueCliTest, calibrate_from_idle_runs_full_sequence_and_reaches_ready)
@@ -1007,6 +1095,7 @@ namespace
             data.rPhase = 0.5f;
             data.lD = 1.0f;
             data.lQ = 1.0f;
+            data.stage = services::CalibrationStage::complete;
 
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .WillOnce(Invoke([](infra::Function<void(bool)> onDone)

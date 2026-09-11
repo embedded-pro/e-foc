@@ -85,6 +85,7 @@ namespace
             data.lD = 1.0f;
             data.lQ = 1.0f;
             data.speedLoopBandwidth = 50.0f;
+            data.stage = services::CalibrationStage::complete;
 
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
@@ -232,6 +233,7 @@ namespace
             data.speedLoopBandwidth = 50.0f;
             data.inertia = 0.01f;
             data.frictionViscous = 0.005f;
+            data.stage = services::CalibrationStage::complete;
 
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
@@ -256,6 +258,7 @@ namespace
             data.lD = 1.0f;
             data.lQ = 1.0f;
             data.speedLoopBandwidth = 50.0f;
+            data.stage = services::CalibrationStage::complete;
 
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
@@ -1058,6 +1061,7 @@ namespace
             data.lD = 1.0f;
             data.lQ = 1.0f;
             data.speedLoopBandwidth = 50.0f;
+            data.stage = services::CalibrationStage::complete;
 
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
@@ -2051,19 +2055,14 @@ TEST_F(FocStateMachineSpeedCliTest, apply_mechanical_estimates_applies_when_phys
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_skips_electrical_when_zero_resistance)
+TEST_F(FocStateMachineSpeedCliTest, nvm_zero_resistance_fails_validation_and_stays_in_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithZeroResistance();
     auto sm = CreateSpeedStateMachine();
 
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    sm.CmdEnable();
-    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-
-    sm.ApplyOnlineEstimates();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
 }
 
 TEST_F(FocStateMachineSpeedAutoTest, apply_online_estimates_does_not_change_state_when_enabled)

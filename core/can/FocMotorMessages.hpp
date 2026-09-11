@@ -44,7 +44,8 @@ namespace can
         idle = 0,
         running = 1,
         fault = 2,
-        calibrating = 3
+        calibrating = 3,
+        partialCalibration = 4
     };
 
     enum class FocFaultCode : uint8_t

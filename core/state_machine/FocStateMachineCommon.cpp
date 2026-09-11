@@ -284,7 +284,9 @@ namespace application
 
     bool FocStateMachineCommon::HasValidCalibration() const
     {
-        return calibrationData.polePairs != 0 && calibrationData.rPhase > 0.0f;
+        return calibrationData.stage == services::CalibrationStage::complete
+            && calibrationData.polePairs != 0
+            && calibrationData.rPhase > 0.0f;
     }
 
     void FocStateMachineCommon::RunPolePairsStep()
@@ -372,6 +374,7 @@ namespace application
         if (!std::holds_alternative<state_machine::Calibrating>(currentState))
             return;
 
+        std::get<state_machine::Calibrating>(currentState).pendingData.stage = services::CalibrationStage::complete;
         auto pendingData = std::get<state_machine::Calibrating>(currentState).pendingData;
 
         nvm.SaveCalibration(pendingData,
@@ -430,6 +433,8 @@ namespace application
 
                         if (status != services::NvmStatus::Ok)
                             tracer.Trace() << "[SM] NVM load failed, starting in Idle";
+                        else if (!HasValidCalibration())
+                            tracer.Trace() << "[SM] NVM data incomplete, starting in Idle";
                         else
                         {
                             tracer.Trace() << "[SM] Stored alignment not re-applied; re-run calibration to orient the field";
@@ -518,7 +523,7 @@ namespace application
         pendingCommandCallback = onDone;
         currentState = state_machine::Calibrating{};
         std::get<state_machine::Calibrating>(currentState).pendingData = data;
-        OnCalibrationComplete();
+        RunAlignmentStep();
     }
 
     void FocStateMachineCommon::CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone)

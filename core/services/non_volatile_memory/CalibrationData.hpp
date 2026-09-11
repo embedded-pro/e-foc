@@ -1,13 +1,18 @@
 #pragma once
 
-#include <array>
 #include <cstdint>
 
 namespace services
 {
+    enum class CalibrationStage : uint8_t
+    {
+        none = 0,
+        complete = 1
+    };
+
     // All 4-byte fields precede the byte-sized fields to avoid implicit compiler padding.
-    // 'reserved' is explicit padding to keep sizeof(CalibrationData) a multiple of 4 and
-    // ensure the full struct is a deterministic, padding-free storage schema.
+    // 'reserved1' keeps sizeof(CalibrationData) a multiple of 4 and
+    // ensures the full struct is a deterministic, padding-free storage schema.
     struct CalibrationData
     {
         float rPhase = 0.0f;
@@ -25,7 +30,8 @@ namespace services
         float speedLoopBandwidth = 0.0f;
         uint8_t encoderDirection = 0;
         uint8_t polePairs = 0;
-        std::array<uint8_t, 2> reserved = {};
+        CalibrationStage stage = CalibrationStage::none;
+        uint8_t reserved1 = 0;
     };
 
     static_assert(sizeof(CalibrationData) == 56, "CalibrationData layout must be free of implicit padding");
