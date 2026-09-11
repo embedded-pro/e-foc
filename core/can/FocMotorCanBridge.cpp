@@ -182,8 +182,7 @@ namespace can
             return;
         }
 
-        const auto& smState = controlMode.ActiveStateMachine().CurrentState();
-        if (!state_machine::IsStopped(smState) || controlMode.ActiveStateMachine().HasPendingAsyncWork())
+        if (controlMode.CmdReserveExternalCalibration() != state_machine::CommandResult::ok)
         {
             server.SendCommandAck(can::focIdentifyElectricalId, services::CanAckStatus::invalidState);
             return;
@@ -230,7 +229,7 @@ namespace can
                             foc::MilliHenry{ data.lD },
                             static_cast<std::size_t>(data.polePairs));
 
-                        controlMode.AcceptExternalCalibration(data,
+                        controlMode.CmdCompleteExternalCalibration(data,
                             [this](state_machine::CommandResult result)
                             {
                                 auto callback = pendingElectricalIdentDoneCallback;
@@ -260,20 +259,18 @@ namespace can
             return;
         }
 
-        const auto& state = controlMode.ActiveStateMachine().CurrentState();
-        const auto* ready = std::get_if<state_machine::Ready>(&state);
-        if (ready == nullptr)
+        const auto cal = controlMode.ActiveCalibrationData();
+        if (!cal.has_value())
         {
             server.SendCommandAck(can::focIdentifyMechanicalId, services::CanAckStatus::invalidState);
             return;
         }
 
-        const auto& cal = ready->loadedData;
         pendingMechIdentDoneCallback = onDone;
 
         mechIdent->EstimateFrictionAndInertia(
             mechTorqueConstant,
-            static_cast<std::size_t>(cal.polePairs),
+            static_cast<std::size_t>(cal->polePairs),
             {},
             [this](std::optional<foc::NewtonMeterSecondPerRadian> friction,
                 std::optional<foc::NewtonMeterSecondSquared> inertia)

@@ -59,7 +59,8 @@ namespace application
         void CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone);
         foc::Weber ActiveFluxLinkage() const;
 
-        void AcceptExternalCalibration(const services::CalibrationData& data,
+        state_machine::CommandResult CmdReserveExternalCalibration();
+        void CmdCompleteExternalCalibration(const services::CalibrationData& data,
             const infra::Function<void(state_machine::CommandResult)>& onDone);
 
         void RegisterReadyHandler(const infra::Function<void()>& onReady);

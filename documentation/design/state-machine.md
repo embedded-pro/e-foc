@@ -150,6 +150,16 @@ sequenceDiagram
 
 After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, encoder zero offset applied, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`.
 
+### External Calibration (CAN-driven)
+
+An external client (e.g. the CAN bridge) can supply pre-measured calibration data without running the internal identification chain. This uses a two-command protocol to ensure the FSM state is correct before any inverter interaction begins:
+
+1. **`CmdReserveExternalCalibration()`** — synchronous. Checks that the machine is in `Idle` or `Ready` with no pending async work, then transitions to `Calibrating` and returns `CommandResult::ok`. Returns `CommandResult::rejected` in any other state. The `Calibrating` state prevents a second request from being accepted concurrently.
+
+2. **`CmdCompleteExternalCalibration(data, onDone)`** — async. Called by the external client after its own estimation is finished. Stores `data` in the pending `Calibrating` slot and calls `OnCalibrationComplete()` to persist to NVM and transition to `Ready`. If a fault occurred between the two calls, `EnterFault` has already aborted the identification service (via `AbortCalibrationServices`) so this path is never reached; the client observes the failure through its own estimation callback.
+
+The two-command split ensures the FSM enters `Calibrating` before any open-loop PWM is applied, and that the state guard lives entirely inside the state machine rather than in the calling layer.
+
 ### Fault Safety
 
 Entering `Fault` commits the `Fault` state first, then stops the inverter if the machine was in `Enabled` or
