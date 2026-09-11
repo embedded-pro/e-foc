@@ -585,6 +585,7 @@ namespace application
         }
 
         pendingCommandCallback = onDone;
+        rotorReferenceValid_ = false;
         currentState = state_machine::Calibrating{};
         auto& calibrating = std::get<state_machine::Calibrating>(currentState);
         calibrating.pendingData = calibrationData;

@@ -33,6 +33,7 @@ namespace can
         virtual void OnSetPidCurrent(float bandwidth, const infra::Function<void()>& onDone) = 0;
         virtual void OnSetPidSpeed(float bandwidth, const infra::Function<void()>& onDone) = 0;
         virtual void OnSetPidPosition(float bandwidth, const infra::Function<void()>& onDone) = 0;
+        virtual void OnAlign(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
         virtual void OnIdentifyElectrical(const infra::Function<void()>& onDone) = 0;
         virtual void OnIdentifyMechanical(const infra::Function<void()>& onDone) = 0;
         virtual void OnRequestTelemetry(const infra::Function<void()>& onDone) = 0;
@@ -71,6 +72,7 @@ namespace can
         void HandleSetPidCurrent(const hal::Can::Message& data);
         void HandleSetPidSpeed(const hal::Can::Message& data);
         void HandleSetPidPosition(const hal::Can::Message& data);
+        void HandleAlign(const hal::Can::Message& data);
         void HandleIdentifyElectrical(const hal::Can::Message& data);
         void HandleIdentifyMechanical(const hal::Can::Message& data);
         void HandleRequestTelemetry(const hal::Can::Message& data);
@@ -89,6 +91,7 @@ namespace can
         services::CanMessageHandler<FocMotorCategoryServer> setPidCurrent{ focSetPidCurrentId, *this, &FocMotorCategoryServer::HandleSetPidCurrent };
         services::CanMessageHandler<FocMotorCategoryServer> setPidSpeed{ focSetPidSpeedId, *this, &FocMotorCategoryServer::HandleSetPidSpeed };
         services::CanMessageHandler<FocMotorCategoryServer> setPidPosition{ focSetPidPositionId, *this, &FocMotorCategoryServer::HandleSetPidPosition };
+        services::CanMessageHandler<FocMotorCategoryServer> align{ focAlignId, *this, &FocMotorCategoryServer::HandleAlign };
         services::CanMessageHandler<FocMotorCategoryServer> identifyElectrical{ focIdentifyElectricalId, *this, &FocMotorCategoryServer::HandleIdentifyElectrical };
         services::CanMessageHandler<FocMotorCategoryServer> identifyMechanical{ focIdentifyMechanicalId, *this, &FocMotorCategoryServer::HandleIdentifyMechanical };
         services::CanMessageHandler<FocMotorCategoryServer> requestTelemetry{ focRequestTelemetryId, *this, &FocMotorCategoryServer::HandleRequestTelemetry };

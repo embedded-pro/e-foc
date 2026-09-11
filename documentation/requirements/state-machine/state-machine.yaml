@@ -65,11 +65,13 @@
     is accepted without recalibration, consistent with REQ-SM-014.
 
 - id: REQ-SM-010
-  title: Valid NVM on boot transitions to Ready
+  title: Valid NVM on boot restores electrical parameters without enabling
   shall: >
     On power-on, if valid calibration data exists in non-volatile storage, the
-    state machine shall load that data and transition directly to the Ready state,
-    bypassing the Calibrating state.
+    state machine shall load and apply the electrical parameters (resistance,
+    inductance, pole pairs) but shall remain in the Idle state. The motor shall
+    not be enabled until a live alignment re-establishes the rotor reference,
+    because the encoder zero-offset is volatile and is lost on every reset.
 
 - id: REQ-SM-011
   title: Calibration data persistence

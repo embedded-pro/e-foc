@@ -221,6 +221,138 @@ TEST_F(FocStateMachineTorqueCliTest, nvm_valid_on_boot_remains_in_idle_pending_a
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
+TEST_F(FocStateMachineTorqueCliTest, enable_from_boot_with_valid_nvm_is_rejected_without_alignment)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, realign_from_idle_sets_rotor_reference_valid_in_ready)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&,
+                             const infra::Function<void(std::optional<foc::Radians>)>& cb)
+            {
+                cb(foc::Radians{ 0.0f });
+            }));
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData&,
+                             infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            }));
+    sm.CmdReAlign([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, enable_succeeds_after_realign)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::ok);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, realign_alignment_failure_enters_fault)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&,
+                             const infra::Function<void(std::optional<foc::Radians>)>& cb)
+            {
+                cb(std::nullopt);
+            }));
+    sm.CmdReAlign([](state_machine::CommandResult) {});
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, realign_nvm_failure_enters_fault)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&,
+                             const infra::Function<void(std::optional<foc::Radians>)>& cb)
+            {
+                cb(foc::Radians{ 0.0f });
+            }));
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData&,
+                             infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::WriteFailed);
+            }));
+    sm.CmdReAlign([](state_machine::CommandResult) {});
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, realign_clears_stale_rotor_reference_before_starting)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+    ASSERT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
+
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&,
+                             const infra::Function<void(std::optional<foc::Radians>)>& cb)
+            {
+                cb(std::nullopt);
+            }));
+    sm.CmdReAlign([](state_machine::CommandResult) {});
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, rotor_reference_preserved_after_disable_and_re_enable)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(inverterMock, Start()).Times(2);
+    sm.CmdEnable();
+    sm.CmdDisable();
+    ASSERT_TRUE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::ok);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, realign_from_idle_without_valid_calibration_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    auto result = state_machine::CommandResult::ok;
+    sm.CmdReAlign([&result](state_machine::CommandResult r) { result = r; });
+
+    EXPECT_EQ(result, state_machine::CommandResult::rejected);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
 TEST_F(FocStateMachineTorqueCliTest, nvm_load_failure_on_boot_remains_in_idle)
 {
     GivenFaultNotifierRegistered();

@@ -803,6 +803,11 @@ namespace state_machine
         ActiveCommon().CmdCompleteExternalCalibration(data, onDone);
     }
 
+    void ControlModeStateMachine::CmdReAlign(const infra::Function<void(CommandResult)>& onDone)
+    {
+        ActiveCommon().CmdReAlign(onDone);
+    }
+
     std::optional<services::CalibrationData> ControlModeStateMachine::ActiveCalibrationData() const
     {
         const auto& state = ActiveStateMachine().CurrentState();

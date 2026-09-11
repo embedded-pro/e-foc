@@ -44,7 +44,7 @@ namespace
             } };
 
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
+        services::TerminalWithStorage::WithMaxSize<22> terminal{ terminalWithCommands, tracer };
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
@@ -91,6 +91,13 @@ namespace
                             data.lQ = 1.0f;
                             done(services::NvmStatus::Ok);
                         }));
+                EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+                    .Times(AnyNumber())
+                    .WillRepeatedly(Invoke([](const services::CalibrationData&,
+                                              const infra::Function<void(services::NvmStatus)>& done)
+                        {
+                            done(services::NvmStatus::Ok);
+                        }));
             } };
 
         std::optional<services::CanProtocolServer> server;
@@ -118,6 +125,17 @@ namespace
             ExecuteAllActions();
         }
 
+        void AlignAfterConstruct()
+        {
+            EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+                .WillOnce(Invoke([](std::size_t, const auto&,
+                                     const infra::Function<void(std::optional<foc::Radians>)>& cb)
+                    {
+                        cb(foc::Radians{ 0.0f });
+                    }));
+            controlMode->CmdReAlign([](state_machine::CommandResult) {});
+        }
+
         bool IsEnabled() const
         {
             return std::holds_alternative<state_machine::Enabled>(controlMode->ActiveStateMachine().CurrentState());
@@ -139,6 +157,7 @@ TEST_F(CanLivenessWatchdogTest, LosingTheClientWhileStoppedLeavesTheStateMachine
 TEST_F(CanLivenessWatchdogTest, LosingTheClientWhileEnabledStopsTheDrive)
 {
     Construct();
+    AlignAfterConstruct();
 
     ASSERT_EQ(controlMode->ActiveStateMachine().CmdEnable(), state_machine::CommandResult::ok);
     ASSERT_TRUE(IsEnabled());
@@ -151,6 +170,7 @@ TEST_F(CanLivenessWatchdogTest, LosingTheClientWhileEnabledStopsTheDrive)
 TEST_F(CanLivenessWatchdogTest, RegainingTheClientDoesNotDisturbTheStateMachine)
 {
     Construct();
+    AlignAfterConstruct();
 
     ASSERT_EQ(controlMode->ActiveStateMachine().CmdEnable(), state_machine::CommandResult::ok);
 

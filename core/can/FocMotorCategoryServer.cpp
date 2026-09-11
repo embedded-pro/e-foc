@@ -9,7 +9,7 @@ namespace can
         AddMessageTypes(start, stop, clearFault, emergencyStop, selectControlMode,
             setTorqueSetpoint, setSpeedSetpoint, setPositionSetpoint,
             setPidCurrent, setPidSpeed, setPidPosition,
-            identifyElectrical, identifyMechanical, requestTelemetry,
+            align, identifyElectrical, identifyMechanical, requestTelemetry,
             setEncoderResolution, queryMotorType, configureTelemetryRate);
     }
 
@@ -223,6 +223,17 @@ namespace can
                 observer.OnSetPidPosition(bandwidth, [this]()
                     {
                         SendCommandAck(focSetPidPositionId, services::CanAckStatus::success);
+                    });
+            });
+    }
+
+    void FocMotorCategoryServer::HandleAlign(const hal::Can::Message&)
+    {
+        NotifyObservers([this](auto& observer)
+            {
+                observer.OnAlign([this](services::CanAckStatus status)
+                    {
+                        SendCommandAck(focAlignId, status);
                     });
             });
     }

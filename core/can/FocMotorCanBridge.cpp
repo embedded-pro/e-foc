@@ -174,6 +174,26 @@ namespace can
         onDone();
     }
 
+    void FocMotorCanBridge::OnAlign(const infra::Function<void(services::CanAckStatus)>& onDone)
+    {
+        if (pendingAlignDoneCallback != nullptr)
+        {
+            server.SendCategoryError(can::focAlignId, FocMotorCategoryError::busy);
+            return;
+        }
+
+        pendingAlignDoneCallback = onDone;
+        controlMode.CmdReAlign([this](state_machine::CommandResult result)
+            {
+                auto callback = pendingAlignDoneCallback;
+                pendingAlignDoneCallback = nullptr;
+                if (result == state_machine::CommandResult::ok)
+                    callback(services::CanAckStatus::success);
+                else
+                    server.SendCategoryError(can::focAlignId, state_machine::ToCategoryError(result));
+            });
+    }
+
     void FocMotorCanBridge::OnIdentifyElectrical(const infra::Function<void()>& onDone)
     {
         if (pendingElectricalIdentDoneCallback != nullptr)

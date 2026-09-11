@@ -49,6 +49,7 @@ namespace state_machine
         CommandResult CmdReserveExternalCalibration();
         void CmdCompleteExternalCalibration(const services::CalibrationData& data,
             const infra::Function<void(CommandResult)>& onDone);
+        void CmdReAlign(const infra::Function<void(CommandResult)>& onDone);
         std::optional<services::CalibrationData> ActiveCalibrationData() const;
 
         foc::SelectResult SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm);
