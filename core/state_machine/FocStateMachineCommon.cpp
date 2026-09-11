@@ -59,7 +59,7 @@ namespace application
         if (transitionPolicy != state_machine::TransitionPolicy::Cli)
             return;
 
-        RegisterLifecycleCliCommands(terminal, [this]() -> state_machine::FocStateMachineBase&
+        RegisterLifecycleCliCommands(terminal, [this]() -> FocStateMachineCommon&
             {
                 return *this;
             });
@@ -97,6 +97,12 @@ namespace application
     {
         if (!std::holds_alternative<state_machine::Ready>(currentState) || faultLatched)
             return state_machine::CommandResult::rejected;
+
+        if (!std::get<state_machine::Ready>(currentState).rotorReferenceValid)
+        {
+            tracer.Trace() << "[SM] Enable rejected: rotor reference not established; run alignment";
+            return state_machine::CommandResult::rejected;
+        }
 
         EnterEnabled();
 
@@ -175,6 +181,7 @@ namespace application
         {
             tracer.Trace() << "[SM] Calibration invalidated in NVM";
             calibrationData = services::CalibrationData{};
+            rotorReferenceValid_ = false;
             currentState = state_machine::Idle{};
             CompletePendingCommand(state_machine::CommandResult::ok);
         }
@@ -234,7 +241,7 @@ namespace application
     {
         tracer.Trace() << "[SM] Entering Ready";
         calibrationData = data;
-        currentState = state_machine::Ready{ data };
+        currentState = state_machine::Ready{ data, rotorReferenceValid_ };
 
         if (readyHandler != nullptr)
             readyHandler();
@@ -362,6 +369,7 @@ namespace application
                 {
                     auto& cal = std::get<state_machine::Calibrating>(currentState);
                     cal.pendingData.encoderZeroOffset = std::bit_cast<int32_t>(angle->Value());
+                    rotorReferenceValid_ = true;
                     RunPostAlignmentStep();
                 }
             });
@@ -432,10 +440,9 @@ namespace application
                             tracer.Trace() << "[SM] NVM load failed, starting in Idle";
                         else
                         {
-                            tracer.Trace() << "[SM] Stored alignment not re-applied; re-run calibration to orient the field";
+                            tracer.Trace() << "[SM] Electrical parameters restored; run alignment before enabling";
                             ApplyElectricalCalibration(calibrationData);
                             ApplyModeSpecificCalibration(calibrationData);
-                            EnterReady(calibrationData);
                         }
                     });
             });
@@ -567,5 +574,41 @@ namespace application
     const services::CalibrationData& FocStateMachineCommon::GetCalibration() const
     {
         return calibrationData;
+    }
+
+    void FocStateMachineCommon::CmdReAlign(const infra::Function<void(state_machine::CommandResult)>& onDone)
+    {
+        if (!state_machine::IsStopped(currentState) || HasPendingCommand() || !HasValidCalibration())
+        {
+            onDone(state_machine::CommandResult::rejected);
+            return;
+        }
+
+        pendingCommandCallback = onDone;
+        currentState = state_machine::Calibrating{};
+        auto& calibrating = std::get<state_machine::Calibrating>(currentState);
+        calibrating.pendingData = calibrationData;
+        calibrating.step = state_machine::CalibrationStep::alignment;
+        const auto polePairs = static_cast<std::size_t>(calibrating.pendingData.polePairs);
+
+        motorAlignment.ForceAlignment(polePairs, {},
+            [this](std::optional<foc::Radians> angle)
+            {
+                if (!IsCalibrating(state_machine::CalibrationStep::alignment))
+                    return;
+
+                if (!angle)
+                {
+                    CompletePendingCommand(state_machine::CommandResult::calibrationFailed);
+                    EnterFault(state_machine::FaultCode::calibrationFailed);
+                }
+                else
+                {
+                    auto& cal = std::get<state_machine::Calibrating>(currentState);
+                    cal.pendingData.encoderZeroOffset = std::bit_cast<int32_t>(angle->Value());
+                    rotorReferenceValid_ = true;
+                    OnCalibrationComplete();
+                }
+            });
     }
 }

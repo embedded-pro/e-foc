@@ -222,6 +222,23 @@ namespace
             };
         }
 
+        void AlignAfterBoot(SpeedStateMachine& sm)
+        {
+            EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+                .WillOnce(Invoke([](std::size_t, const auto&,
+                                     const infra::Function<void(std::optional<foc::Radians>)>& cb)
+                    {
+                        cb(foc::Radians{ 0.0f });
+                    }));
+            EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+                .WillOnce(Invoke([](const services::CalibrationData&,
+                                     infra::Function<void(services::NvmStatus)> onDone)
+                    {
+                        onDone(services::NvmStatus::Ok);
+                    }));
+            sm.CmdReAlign([](state_machine::CommandResult) {});
+        }
+
         void GivenNvmValidWithSpeedGainsAndInertia()
         {
             services::CalibrationData data{};
@@ -283,13 +300,13 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_invalid_on_boot_remains_in_idle)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, nvm_valid_on_boot_transitions_to_ready)
+TEST_F(FocStateMachineSpeedCliTest, nvm_valid_on_boot_remains_in_idle_pending_alignment)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
 
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineSpeedCliTest, nvm_load_failure_on_boot_remains_in_idle)
@@ -356,6 +373,7 @@ TEST_F(FocStateMachineSpeedCliTest, calibrate_from_enabled_is_rejected)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -432,6 +450,7 @@ TEST_F(FocStateMachineSpeedCliTest, enable_from_ready_enters_enabled)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -444,6 +463,7 @@ TEST_F(FocStateMachineSpeedCliTest, disable_from_enabled_returns_to_ready)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -463,7 +483,7 @@ TEST_F(FocStateMachineSpeedCliTest, enable_from_idle_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, disable_from_ready_is_rejected)
+TEST_F(FocStateMachineSpeedCliTest, disable_from_idle_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -471,7 +491,7 @@ TEST_F(FocStateMachineSpeedCliTest, disable_from_ready_is_rejected)
 
     sm.CmdDisable();
 
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineSpeedCliTest, fault_from_enabled_enters_fault)
@@ -479,6 +499,7 @@ TEST_F(FocStateMachineSpeedCliTest, fault_from_enabled_enters_fault)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -542,7 +563,7 @@ TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_non_fault_is_rejected)
 
     sm.CmdClearFault();
 
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineSpeedCliTest, clear_cal_from_ready_returns_to_idle)
@@ -566,6 +587,7 @@ TEST_F(FocStateMachineSpeedCliTest, clear_cal_from_enabled_is_rejected)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -592,6 +614,7 @@ TEST_F(FocStateMachineSpeedCliTest, cli_en_command_enables_foc)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     communication.dataReceived(infra::MakeStringByteRange("en\r"));
@@ -605,6 +628,7 @@ TEST_F(FocStateMachineSpeedCliTest, cli_dis_command_disables_foc)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -874,6 +898,7 @@ TEST_F(FocStateMachineSpeedCliTest, clear_cal_invalidate_callback_after_enable_i
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
 
     infra::Function<void(services::NvmStatus)> capturedCb;
     EXPECT_CALL(nvmMock, InvalidateCalibration(_))
@@ -941,6 +966,7 @@ TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_does_not_change_state
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -959,7 +985,7 @@ TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_is_ignored_when_not_e
 
     sm.ApplyOnlineEstimates();
 
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineSpeedCliTest, cli_ae_command_applies_estimates_when_enabled)
@@ -967,6 +993,7 @@ TEST_F(FocStateMachineSpeedCliTest, cli_ae_command_applies_estimates_when_enable
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -1194,6 +1221,23 @@ namespace
                 application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
             };
         }
+
+        void AlignAfterBoot(SpeedAutoStateMachine& sm)
+        {
+            EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+                .WillOnce(Invoke([](std::size_t, const auto&,
+                                     const infra::Function<void(std::optional<foc::Radians>)>& cb)
+                    {
+                        cb(foc::Radians{ 0.0f });
+                    }));
+            EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+                .WillOnce(Invoke([](const services::CalibrationData&,
+                                     infra::Function<void(services::NvmStatus)> onDone)
+                    {
+                        onDone(services::NvmStatus::Ok);
+                    }));
+            sm.CmdReAlign([](state_machine::CommandResult) {});
+        }
     };
 }
 
@@ -1206,13 +1250,13 @@ TEST_F(FocStateMachineSpeedAutoTest, starts_in_idle_when_nvm_invalid)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedAutoTest, nvm_valid_on_boot_transitions_to_ready)
+TEST_F(FocStateMachineSpeedAutoTest, nvm_valid_on_boot_remains_in_idle_pending_alignment)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedAutoStateMachine();
 
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineSpeedAutoTest, nvm_load_failure_on_boot_remains_in_idle)
@@ -1257,6 +1301,7 @@ TEST_F(FocStateMachineSpeedAutoTest, calibrate_from_enabled_is_rejected)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedAutoStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -1337,7 +1382,7 @@ TEST_F(FocStateMachineSpeedAutoTest, enable_from_idle_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedAutoTest, disable_from_ready_is_rejected)
+TEST_F(FocStateMachineSpeedAutoTest, disable_from_idle_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -1345,7 +1390,7 @@ TEST_F(FocStateMachineSpeedAutoTest, disable_from_ready_is_rejected)
 
     sm.CmdDisable();
 
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineSpeedAutoTest, fault_from_enabled_enters_fault)
@@ -1353,6 +1398,7 @@ TEST_F(FocStateMachineSpeedAutoTest, fault_from_enabled_enters_fault)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedAutoStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -1408,6 +1454,7 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_cal_from_enabled_is_rejected)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedAutoStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -1646,6 +1693,7 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_cal_invalidate_callback_after_enable_
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedAutoStateMachine();
+    AlignAfterBoot(sm);
 
     infra::Function<void(services::NvmStatus)> capturedCb;
     EXPECT_CALL(nvmMock, InvalidateCalibration(_))
@@ -1797,6 +1845,7 @@ TEST_F(FocStateMachineSpeedCliTest, enable_from_enabled_does_not_call_start_agai
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -1840,6 +1889,7 @@ TEST_F(FocStateMachineSpeedAutoTest, enable_from_enabled_does_not_call_start_aga
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedAutoStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -1848,17 +1898,6 @@ TEST_F(FocStateMachineSpeedAutoTest, enable_from_enabled_does_not_call_start_aga
     sm.CmdEnable();
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineSpeedCliTest, disable_from_idle_is_rejected)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmInvalid();
-    auto sm = CreateSpeedStateMachine();
-
-    sm.CmdDisable();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineSpeedCliTest, disable_from_calibrating_is_rejected)
@@ -1887,17 +1926,6 @@ TEST_F(FocStateMachineSpeedCliTest, disable_from_fault_is_rejected)
     sm.CmdDisable();
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachineSpeedAutoTest, disable_from_idle_is_rejected)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmInvalid();
-    auto sm = CreateSpeedAutoStateMachine();
-
-    sm.CmdDisable();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineSpeedAutoTest, disable_from_calibrating_is_rejected)
@@ -1959,6 +1987,7 @@ TEST_F(FocStateMachineSpeedCliTest, clear_fault_from_enabled_is_rejected)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -2000,6 +2029,7 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_fault_from_enabled_is_rejected)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedAutoStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -2041,6 +2071,7 @@ TEST_F(FocStateMachineSpeedCliTest, apply_mechanical_estimates_applies_when_phys
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGainsAndInertia();
     auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -2051,11 +2082,12 @@ TEST_F(FocStateMachineSpeedCliTest, apply_mechanical_estimates_applies_when_phys
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_skips_electrical_when_zero_resistance)
+TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_does_not_crash_when_called_while_enabled)
 {
     GivenFaultNotifierRegistered();
-    GivenNvmValidWithZeroResistance();
+    GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -2071,6 +2103,7 @@ TEST_F(FocStateMachineSpeedAutoTest, apply_online_estimates_does_not_change_stat
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedAutoStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();

@@ -105,6 +105,23 @@ namespace
                 state_machine::TransitionPolicy::Cli
             };
         }
+
+        void AlignAfterBoot(application::TorqueStateMachine& sm)
+        {
+            EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+                .WillOnce(Invoke([](std::size_t, const auto&,
+                                     const infra::Function<void(std::optional<foc::Radians>)>& cb)
+                    {
+                        cb(foc::Radians{ 0.0f });
+                    }));
+            EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+                .WillOnce(Invoke([](const services::CalibrationData&,
+                                     const infra::Function<void(services::NvmStatus)>& onDone)
+                    {
+                        onDone(services::NvmStatus::Ok);
+                    }));
+            sm.CmdReAlign([](state_machine::CommandResult) {});
+        }
     };
 }
 
@@ -112,6 +129,7 @@ TEST_F(TestPlatformFaultNotifier, board_protection_from_enabled_stops_inverter_a
 {
     GivenCalibrationInNvm();
     auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(platformFactory, Start()).Times(1);
     sm.CmdEnable();
@@ -156,6 +174,7 @@ TEST_F(TestPlatformFaultNotifier, a_fault_scheduled_before_the_state_machine_is_
 
     {
         auto sm = CreateStateMachine();
+        AlignAfterBoot(sm);
 
         EXPECT_CALL(platformFactory, Start()).Times(1);
         sm.CmdEnable();
@@ -171,6 +190,7 @@ TEST_F(TestPlatformFaultNotifier, board_protection_cuts_the_bridge_in_the_interr
 {
     GivenCalibrationInNvm();
     auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(platformFactory, Start()).Times(1);
     sm.CmdEnable();

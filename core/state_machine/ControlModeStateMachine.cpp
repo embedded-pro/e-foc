@@ -536,9 +536,9 @@ namespace state_machine
         auto& terminal = terminalAndTracer.terminal;
 
         application::RegisterLifecycleCliCommands(terminal,
-            [this]() -> FocStateMachineBase&
+            [this]() -> application::FocStateMachineCommon&
             {
-                return ActiveStateMachine();
+                return ActiveCommon();
             });
 
         terminal.AddCommand({ { "apply_estimates", "ae", "Apply online estimates to PID gains" },

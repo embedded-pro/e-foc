@@ -221,6 +221,23 @@ namespace
                 application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
             };
         }
+
+        void AlignAfterBoot(PositionStateMachine& sm)
+        {
+            EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+                .WillOnce(Invoke([](std::size_t, const auto&,
+                                     const infra::Function<void(std::optional<foc::Radians>)>& cb)
+                    {
+                        cb(foc::Radians{ 0.0f });
+                    }));
+            EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+                .WillOnce(Invoke([](const services::CalibrationData&,
+                                     infra::Function<void(services::NvmStatus)> onDone)
+                    {
+                        onDone(services::NvmStatus::Ok);
+                    }));
+            sm.CmdReAlign([](state_machine::CommandResult) {});
+        }
     };
 }
 
@@ -233,13 +250,13 @@ TEST_F(FocStateMachinePositionCliTest, nvm_invalid_on_boot_remains_in_idle)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachinePositionCliTest, nvm_valid_on_boot_transitions_to_ready)
+TEST_F(FocStateMachinePositionCliTest, nvm_valid_on_boot_remains_in_idle_pending_alignment)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionStateMachine();
 
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachinePositionCliTest, nvm_load_failure_on_boot_remains_in_idle)
@@ -306,6 +323,7 @@ TEST_F(FocStateMachinePositionCliTest, calibrate_from_enabled_is_rejected)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -404,6 +422,7 @@ TEST_F(FocStateMachinePositionCliTest, enable_disable_cycle)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -424,7 +443,7 @@ TEST_F(FocStateMachinePositionCliTest, enable_from_idle_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachinePositionCliTest, disable_from_ready_is_rejected)
+TEST_F(FocStateMachinePositionCliTest, disable_from_idle_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
@@ -432,7 +451,7 @@ TEST_F(FocStateMachinePositionCliTest, disable_from_ready_is_rejected)
 
     sm.CmdDisable();
 
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachinePositionCliTest, fault_from_enabled_enters_fault)
@@ -440,6 +459,7 @@ TEST_F(FocStateMachinePositionCliTest, fault_from_enabled_enters_fault)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -503,7 +523,7 @@ TEST_F(FocStateMachinePositionCliTest, clear_fault_from_non_fault_is_rejected)
 
     sm.CmdClearFault();
 
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachinePositionCliTest, clear_cal_from_ready_returns_to_idle)
@@ -527,6 +547,7 @@ TEST_F(FocStateMachinePositionCliTest, clear_cal_from_enabled_is_rejected)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -553,6 +574,7 @@ TEST_F(FocStateMachinePositionCliTest, cli_en_command_enables_foc)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     communication.dataReceived(infra::MakeStringByteRange("en\r"));
@@ -566,6 +588,7 @@ TEST_F(FocStateMachinePositionCliTest, cli_dis_command_disables_foc)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -823,6 +846,23 @@ namespace
                 application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
             };
         }
+
+        void AlignAfterBoot(PositionAutoStateMachine& sm)
+        {
+            EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+                .WillOnce(Invoke([](std::size_t, const auto&,
+                                     const infra::Function<void(std::optional<foc::Radians>)>& cb)
+                    {
+                        cb(foc::Radians{ 0.0f });
+                    }));
+            EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+                .WillOnce(Invoke([](const services::CalibrationData&,
+                                     infra::Function<void(services::NvmStatus)> onDone)
+                    {
+                        onDone(services::NvmStatus::Ok);
+                    }));
+            sm.CmdReAlign([](state_machine::CommandResult) {});
+        }
     };
 }
 
@@ -835,13 +875,13 @@ TEST_F(FocStateMachinePositionAutoTest, starts_in_idle_when_nvm_invalid)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachinePositionAutoTest, nvm_valid_on_boot_transitions_to_ready)
+TEST_F(FocStateMachinePositionAutoTest, nvm_valid_on_boot_remains_in_idle_pending_alignment)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionAutoStateMachine();
 
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachinePositionAutoTest, nvm_load_failure_on_boot_remains_in_idle)
@@ -886,6 +926,7 @@ TEST_F(FocStateMachinePositionAutoTest, calibrate_from_enabled_is_rejected)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionAutoStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -966,7 +1007,7 @@ TEST_F(FocStateMachinePositionAutoTest, enable_from_idle_is_rejected)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachinePositionAutoTest, disable_from_ready_is_rejected)
+TEST_F(FocStateMachinePositionAutoTest, disable_from_idle_is_rejected)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
@@ -974,7 +1015,7 @@ TEST_F(FocStateMachinePositionAutoTest, disable_from_ready_is_rejected)
 
     sm.CmdDisable();
 
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachinePositionAutoTest, fault_from_enabled_enters_fault)
@@ -982,6 +1023,7 @@ TEST_F(FocStateMachinePositionAutoTest, fault_from_enabled_enters_fault)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionAutoStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -1037,6 +1079,7 @@ TEST_F(FocStateMachinePositionAutoTest, clear_cal_from_enabled_is_rejected)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionAutoStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -1134,6 +1177,7 @@ TEST_F(FocStateMachinePositionCliTest, enable_from_enabled_does_not_call_start_a
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -1177,6 +1221,7 @@ TEST_F(FocStateMachinePositionAutoTest, enable_from_enabled_does_not_call_start_
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionAutoStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -1185,17 +1230,6 @@ TEST_F(FocStateMachinePositionAutoTest, enable_from_enabled_does_not_call_start_
     sm.CmdEnable();
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachinePositionCliTest, disable_from_idle_is_rejected)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmInvalid();
-    auto sm = CreatePositionStateMachine();
-
-    sm.CmdDisable();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachinePositionCliTest, disable_from_calibrating_is_rejected)
@@ -1224,17 +1258,6 @@ TEST_F(FocStateMachinePositionCliTest, disable_from_fault_is_rejected)
     sm.CmdDisable();
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
-}
-
-TEST_F(FocStateMachinePositionAutoTest, disable_from_idle_is_rejected)
-{
-    GivenFaultNotifierRegistered();
-    GivenNvmInvalid();
-    auto sm = CreatePositionAutoStateMachine();
-
-    sm.CmdDisable();
-
-    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachinePositionAutoTest, disable_from_calibrating_is_rejected)
@@ -1296,6 +1319,7 @@ TEST_F(FocStateMachinePositionCliTest, clear_fault_from_enabled_is_rejected)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -1337,6 +1361,7 @@ TEST_F(FocStateMachinePositionAutoTest, clear_fault_from_enabled_is_rejected)
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionAutoStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -1603,6 +1628,7 @@ TEST_F(FocStateMachinePositionCliTest, clear_cal_invalidate_callback_after_enabl
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionStateMachine();
+    AlignAfterBoot(sm);
 
     infra::Function<void(services::NvmStatus)> capturedCb;
     EXPECT_CALL(nvmMock, InvalidateCalibration(_))
@@ -1916,6 +1942,7 @@ TEST_F(FocStateMachinePositionAutoTest, clear_cal_invalidate_callback_after_enab
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionAutoStateMachine();
+    AlignAfterBoot(sm);
 
     infra::Function<void(services::NvmStatus)> capturedCb;
     EXPECT_CALL(nvmMock, InvalidateCalibration(_))
@@ -1983,6 +2010,7 @@ TEST_F(FocStateMachinePositionCliTest, apply_online_estimates_does_not_change_st
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();
@@ -2001,7 +2029,7 @@ TEST_F(FocStateMachinePositionCliTest, apply_online_estimates_is_ignored_when_no
 
     sm.ApplyOnlineEstimates();
 
-    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachinePositionAutoTest, apply_online_estimates_does_not_change_state_when_enabled)
@@ -2009,6 +2037,7 @@ TEST_F(FocStateMachinePositionAutoTest, apply_online_estimates_does_not_change_s
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
     auto sm = CreatePositionAutoStateMachine();
+    AlignAfterBoot(sm);
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     sm.CmdEnable();

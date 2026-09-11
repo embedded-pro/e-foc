@@ -28,6 +28,7 @@ namespace state_machine
     struct Ready
     {
         services::CalibrationData loadedData{};
+        bool rotorReferenceValid{ false };
     };
 
     struct Enabled

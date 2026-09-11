@@ -44,7 +44,7 @@ namespace
                 EXPECT_CALL(communication, SendDataMock(_)).Times(AnyNumber());
             } };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ communication, tracer };
-        services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
+        services::TerminalWithStorage::WithMaxSize<22> terminal{ terminalWithCommands, tracer };
 
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
@@ -414,6 +414,23 @@ namespace
             EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
         }
 
+        void AlignAfterBoot()
+        {
+            EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+                .WillOnce(Invoke([](std::size_t, const auto&,
+                                     const infra::Function<void(std::optional<foc::Radians>)>& cb)
+                    {
+                        cb(foc::Radians{ 0.0f });
+                    }));
+            EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+                .WillOnce(Invoke([](const services::CalibrationData&,
+                                     infra::Function<void(services::NvmStatus)> onDone)
+                    {
+                        onDone(services::NvmStatus::Ok);
+                    }));
+            InvokeCliCommand("aln");
+        }
+
         void InvokeCliCommand(const char* shortName)
         {
             std::string cmd{ shortName };
@@ -608,6 +625,7 @@ TEST_F(ControlModeStateMachineExtTest, Select_Returns_Busy_When_Motor_Is_Enabled
 {
     GivenNvmValid();
     ConstructSubject();
+    AlignAfterBoot();
 
     EXPECT_CALL(inverterMock, Start()).Times(1);
     subject->ActiveStateMachine().CmdEnable();
@@ -1275,6 +1293,7 @@ TEST_F(ControlModeStateMachineExtTest, PersistedAlgorithmOutsideEnumRangeIsCorre
     services::ConfigData config{};
     config.currentAlgorithm = 200;
     ConstructSubjectWithConfig(config);
+    AlignAfterBoot();
 
     uint8_t persisted{ 200 };
     EXPECT_CALL(nvmMock, SaveConfig(_, _))

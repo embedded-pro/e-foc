@@ -59,6 +59,8 @@ namespace application
         void CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone);
         foc::Weber ActiveFluxLinkage() const;
 
+        void CmdReAlign(const infra::Function<void(state_machine::CommandResult)>& onDone);
+
         state_machine::CommandResult CmdReserveExternalCalibration();
         void CmdCompleteExternalCalibration(const services::CalibrationData& data,
             const infra::Function<void(state_machine::CommandResult)>& onDone);
@@ -135,6 +137,7 @@ namespace application
         services::CalibrationData calibrationData{};
         float pendingFluxLinkage{ 0.0f };
         bool bootCheckInFlight{ false };
+        bool rotorReferenceValid_{ false };
 
         static constexpr uint8_t maxConsecutiveFaultClears{ 3 };
         bool faultLatched{ false };
@@ -155,6 +158,12 @@ namespace application
             [getActiveSm](const infra::BoundedConstString&)
             {
                 getActiveSm().CmdCalibrate([](state_machine::CommandResult) {});
+            } });
+
+        terminal.AddCommand({ { "align", "aln", "Re-establish rotor reference without full recalibration" },
+            [getActiveSm](const infra::BoundedConstString&)
+            {
+                getActiveSm().CmdReAlign([](state_machine::CommandResult) {});
             } });
 
         terminal.AddCommand({ { "enable", "en", "Enable FOC controller" },
