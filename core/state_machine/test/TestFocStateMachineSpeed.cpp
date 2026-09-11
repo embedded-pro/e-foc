@@ -1,5 +1,6 @@
 #include "TestFocStateMachineHelper.hpp"
 #include "core/foc/cascade/SpeedCascade.hpp"
+#include <limits>
 
 namespace
 {
@@ -275,6 +276,61 @@ namespace
                         onDone(services::NvmStatus::Ok);
                     }));
             EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+        }
+
+        void GivenNvmValidWithMechanics(float inertia, float frictionViscous)
+        {
+            services::CalibrationData data{};
+            data.polePairs = 4;
+            data.rPhase = 0.5f;
+            data.lD = 1.0f;
+            data.lQ = 1.0f;
+            data.speedLoopBandwidth = 50.0f;
+            data.inertia = inertia;
+            data.frictionViscous = frictionViscous;
+            data.stage = services::CalibrationStage::complete;
+
+            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
+                .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
+                    {
+                        onDone(true);
+                    }));
+            EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+                .WillOnce(Invoke([data](services::CalibrationData& out,
+                                     infra::Function<void(services::NvmStatus)> onDone)
+                    {
+                        out = data;
+                        onDone(services::NvmStatus::Ok);
+                    }));
+            EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+        }
+
+        void ExpectExternalCalibrationPersistsStage(services::CalibrationStage expected)
+        {
+            EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+                .WillOnce(Invoke([](std::size_t, const auto&,
+                                     const infra::Function<void(std::optional<foc::Radians>)>& cb)
+                    {
+                        cb(foc::Radians{ 0.0f });
+                    }));
+            EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+                .WillOnce(Invoke([expected](const services::CalibrationData& data,
+                                     infra::Function<void(services::NvmStatus)> onDone)
+                    {
+                        EXPECT_EQ(data.stage, expected);
+                        onDone(services::NvmStatus::Ok);
+                    }));
+            EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+        }
+
+        static services::CalibrationData ElectricalOnlyData()
+        {
+            services::CalibrationData data{};
+            data.polePairs = 4;
+            data.rPhase = 0.5f;
+            data.lD = 1.0f;
+            data.lQ = 1.0f;
+            return data;
         }
     };
 }
@@ -2067,6 +2123,104 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_zero_resistance_fails_validation_and_sta
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
+}
+
+TEST_F(FocStateMachineSpeedCliTest, nvm_zero_inertia_fails_validation_and_stays_in_idle)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithMechanics(0.0f, 0.01f);
+    auto sm = CreateSpeedStateMachine();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
+}
+
+TEST_F(FocStateMachineSpeedCliTest, nvm_non_finite_inertia_fails_validation_and_stays_in_idle)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithMechanics(std::numeric_limits<float>::quiet_NaN(), 0.01f);
+    auto sm = CreateSpeedStateMachine();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
+}
+
+TEST_F(FocStateMachineSpeedCliTest, nvm_negative_friction_fails_validation_and_stays_in_idle)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithMechanics(0.005f, -0.01f);
+    auto sm = CreateSpeedStateMachine();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
+}
+
+TEST_F(FocStateMachineSpeedCliTest, nvm_non_finite_friction_fails_validation_and_stays_in_idle)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithMechanics(0.005f, std::numeric_limits<float>::infinity());
+    auto sm = CreateSpeedStateMachine();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
+}
+
+TEST_F(FocStateMachineSpeedCliTest, nvm_zero_friction_is_valid_and_transitions_to_ready)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithMechanics(0.005f, 0.0f);
+    auto sm = CreateSpeedStateMachine();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineSpeedCliTest, external_calibration_without_mechanics_stays_idle_with_partial_record)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateSpeedStateMachine();
+
+    ExpectExternalCalibrationPersistsStage(services::CalibrationStage::none);
+
+    EXPECT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+
+    auto result = state_machine::CommandResult::rejected;
+    sm.CmdCompleteExternalCalibration(ElectricalOnlyData(), [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::CommandResult::ok);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    EXPECT_TRUE(sm.HasPartialCalibration());
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
+}
+
+TEST_F(FocStateMachineSpeedCliTest, complete_external_calibration_without_reserve_is_rejected)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateSpeedStateMachine();
+
+    auto result = state_machine::CommandResult::ok;
+    sm.CmdCompleteExternalCalibration(ElectricalOnlyData(), [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::CommandResult::rejected);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    EXPECT_FALSE(sm.HasPartialCalibration());
+}
+
+TEST_F(FocStateMachineSpeedCliTest, reserve_external_calibration_is_rejected_while_calibrating)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateSpeedStateMachine();
+
+    EXPECT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+    EXPECT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::rejected);
 }
 
 TEST_F(FocStateMachineSpeedAutoTest, apply_online_estimates_does_not_change_state_when_enabled)

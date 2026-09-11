@@ -96,6 +96,30 @@ namespace
                     }));
         }
 
+        void GivenNvmHolds(uint8_t polePairs, float rPhase, services::CalibrationStage stage)
+        {
+            services::CalibrationData data{};
+            data.polePairs = polePairs;
+            data.rPhase = rPhase;
+            data.lD = 1.0f;
+            data.lQ = 1.0f;
+            data.stage = stage;
+
+            EXPECT_CALL(nvmMock, IsCalibrationValid(_))
+                .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
+                    {
+                        onDone(true);
+                    }));
+            EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+                .WillOnce(Invoke([data](services::CalibrationData& out,
+                                     infra::Function<void(services::NvmStatus)> onDone)
+                    {
+                        out = data;
+                        onDone(services::NvmStatus::Ok);
+                    }));
+            EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+        }
+
         void ExpectCalibrationSequence(bool polePairsOk = true,
             bool resistanceOk = true,
             bool alignmentOk = true,
@@ -221,6 +245,37 @@ TEST_F(FocStateMachineTorqueCliTest, nvm_load_failure_on_boot_remains_in_idle)
     auto sm = CreateStateMachine();
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, nvm_complete_stage_without_pole_pairs_remains_in_idle)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmHolds(0, 0.5f, services::CalibrationStage::complete);
+    auto sm = CreateStateMachine();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    EXPECT_FALSE(sm.HasPartialCalibration());
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, incomplete_record_without_pole_pairs_still_reports_partial_calibration)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmHolds(0, 0.5f, services::CalibrationStage::none);
+    auto sm = CreateStateMachine();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    EXPECT_TRUE(sm.HasPartialCalibration());
+}
+
+TEST_F(FocStateMachineTorqueCliTest, empty_record_on_boot_is_not_reported_as_partial_calibration)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmHolds(0, 0.0f, services::CalibrationStage::none);
+    auto sm = CreateStateMachine();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    EXPECT_FALSE(sm.HasPartialCalibration());
 }
 
 TEST_F(FocStateMachineTorqueCliTest, nvm_incomplete_stage_on_boot_remains_in_idle)
