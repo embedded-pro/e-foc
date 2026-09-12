@@ -23,49 +23,68 @@ namespace services
         , vdc(vdc)
     {}
 
+    SinusoidalInductanceEstimator::~SinusoidalInductanceEstimator()
+    {
+        noSampleTimer.Cancel();
+        if (onDone)
+            driver.Stop();
+    }
+
     void SinusoidalInductanceEstimator::Start(const Config& config, const infra::Function<void(Result)>& onDone)
     {
         activeConfig = config;
         this->onDone = onDone;
 
-        const auto fs = static_cast<float>(samplingFrequency.Value());
-        const auto fInj = static_cast<float>(config.injectionFrequency.Value());
+        if (!InitializeParameters())
+        {
+            this->onDone(Result{});
+            return;
+        }
 
-        // Snap to an integer samples-per-period so the Goertzel bin and the injection are
-        // at the same frequency; any mismatch causes spectral leakage that biases Im(Z).
+        BeginInjection();
+    }
+
+    bool SinusoidalInductanceEstimator::InitializeParameters()
+    {
+        const auto fs = static_cast<float>(samplingFrequency.Value());
+        const auto fInj = static_cast<float>(activeConfig.injectionFrequency.Value());
         const auto samplesPerPeriod = fInj > 0.0f
                                           ? static_cast<std::size_t>(std::round(fs / fInj))
                                           : std::size_t{ 0 };
 
         if (samplesPerPeriod == 0)
-        {
-            onDone(Result{});
-            return;
-        }
+            return false;
+
         omega = twoPi * fs / static_cast<float>(samplesPerPeriod);
         phaseIncrement = omega / fs;
         injectionPhase = 0.0f;
-
-        // Clarke inverse of {v, 0} gives ThreePhase{v, -v/2, -v/2}; after NormalizedDutyCycles
-        // the terminal A-to-BC amplitude is v * 0.75 * Vdc.
-        injectionAmplitude = static_cast<float>(config.injectionVoltagePercent.Value()) / 100.0f;
+        injectionAmplitude = static_cast<float>(activeConfig.injectionVoltagePercent.Value()) / 100.0f;
         vTerminalAmplitude = injectionAmplitude * 0.75f * vdc.Value();
-
-        terminalFactor = config.windingConfig == WindingConfiguration::Delta
+        terminalFactor = activeConfig.windingConfig == WindingConfiguration::Delta
                              ? deltaTerminalFactor
                              : wyeTerminalFactor;
-
-        warmupSamples = config.warmupPeriods * samplesPerPeriod;
-        measurementSamples = config.measurementPeriods * samplesPerPeriod;
-
+        warmupSamples = activeConfig.warmupPeriods * samplesPerPeriod;
+        measurementSamples = activeConfig.measurementPeriods * samplesPerPeriod;
         sampleCount = 0;
         sumSquared = 0.0f;
+        goertzel.emplace(activeConfig.measurementPeriods, measurementSamples);
 
-        goertzel.emplace(config.measurementPeriods, measurementSamples);
+        return true;
+    }
 
+    void SinusoidalInductanceEstimator::BeginInjection()
+    {
         driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
             {
                 OnCurrentSample(currents);
+            });
+
+        driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
+            transforms.Inverse(foc::RotatingFrame{ 0.0f, 0.0f }, 1.0f, 0.0f)));
+
+        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
+            {
+                FailMeasurement();
             });
     }
 
@@ -74,21 +93,24 @@ namespace services
         if (!onDone)
             return;
 
+        noSampleTimer.Cancel();
         driver.Stop();
         onDone = nullptr;
     }
 
-    void SinusoidalInductanceEstimator::OnCurrentSample(foc::PhaseCurrents currents)
+    void SinusoidalInductanceEstimator::FailMeasurement()
     {
-        if (!onDone)
-            return;
-
-        if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
-        {
-            driver.Stop();
+        driver.Stop();
+        if (onDone)
             onDone(Result{});
-            return;
-        }
+    }
+
+    void SinusoidalInductanceEstimator::AdvanceInjection()
+    {
+        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
+            {
+                FailMeasurement();
+            });
 
         const float vNorm = injectionAmplitude * math::Sin(injectionPhase);
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
@@ -99,6 +121,22 @@ namespace services
             injectionPhase -= twoPi;
 
         ++sampleCount;
+    }
+
+    void SinusoidalInductanceEstimator::OnCurrentSample(foc::PhaseCurrents currents)
+    {
+        if (!onDone)
+            return;
+
+        if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
+        {
+            noSampleTimer.Cancel();
+            driver.Stop();
+            onDone(Result{});
+            return;
+        }
+
+        AdvanceInjection();
 
         if (sampleCount <= warmupSamples)
             return;
@@ -109,6 +147,7 @@ namespace services
 
         if (goertzel->Ready())
         {
+            noSampleTimer.Cancel();
             driver.Stop();
             onDone(ComputeResult());
         }
@@ -118,7 +157,6 @@ namespace services
     {
         auto I = goertzel->Result();
 
-        // Rotate by +ω·d·Ts to cancel the d-sample ADC pipeline lag.
         const float delayAngle = omega * static_cast<float>(activeConfig.voltageToCurrentDelaySamples) / static_cast<float>(samplingFrequency.Value());
         const float cosD = math::Cos(delayAngle);
         const float sinD = math::Sin(delayAngle);

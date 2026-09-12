@@ -19,6 +19,7 @@ namespace services
             hal::Percent testVoltagePercent{ 15 };
             infra::Duration settleTime{ std::chrono::seconds{ 2 } };
             WindingConfiguration windingConfig{ WindingConfiguration::Wye };
+            infra::Duration noSampleTimeout{ std::chrono::milliseconds{ 100 } };
         };
 
         struct Result
@@ -27,12 +28,16 @@ namespace services
         };
 
         ResistanceEstimator(drivers::ThreePhaseInverter& driver, foc::Volts vdc);
+        ~ResistanceEstimator();
 
         void Start(const Config& config, const infra::Function<void(Result)>& onDone);
 
         void Abort();
 
     private:
+        void StartSettlePhase();
+        void StartMeasurementPhase();
+        void OnMeasurementSample(foc::PhaseCurrents currents);
         void OnMeasurementComplete();
         void FailMeasurement();
 
@@ -50,5 +55,6 @@ namespace services
         infra::BoundedDeque<float>::WithMaxSize<averageFilterSize> currentSamples;
         infra::BoundedVector<float>::WithMaxSize<steadyStateSamplesSize> filteredSamples;
         infra::TimerSingleShot settleTimer;
+        infra::TimerSingleShot noSampleTimer;
     };
 }

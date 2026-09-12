@@ -30,49 +30,88 @@ namespace services
         , vdc(vdc)
     {}
 
+    ResistanceEstimator::~ResistanceEstimator()
+    {
+        settleTimer.Cancel();
+        noSampleTimer.Cancel();
+        if (onDone)
+            driver.Stop();
+    }
+
     void ResistanceEstimator::Start(const Config& config, const infra::Function<void(Result)>& onDone)
     {
         activeConfig = config;
         this->onDone = onDone;
         currentSamples.clear();
         filteredSamples.clear();
+        StartSettlePhase();
+    }
 
-        // Apply test voltage immediately so the settle timer gives current time to reach V/R.
+    void ResistanceEstimator::StartSettlePhase()
+    {
         driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
             {
                 if (!this->onDone)
                     return;
 
+                noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
+                    {
+                        FailMeasurement();
+                    });
+
                 if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
                     FailMeasurement();
             });
         driver.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{
-            hal::Percent{ config.testVoltagePercent.Value() },
+            hal::Percent{ activeConfig.testVoltagePercent.Value() },
             hal::Percent{ neutralDuty },
             hal::Percent{ neutralDuty } });
 
-        settleTimer.Start(config.settleTime, [this]()
+        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
             {
-                driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
-                    {
-                        if (!this->onDone)
-                            return;
-
-                        if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
-                        {
-                            FailMeasurement();
-                            return;
-                        }
-
-                        currentSamples.push_back(currents.a.Value());
-
-                        if (currentSamples.full())
-                            filteredSamples.push_back(AverageAndRemoveFront(currentSamples));
-
-                        if (filteredSamples.full())
-                            OnMeasurementComplete();
-                    });
+                FailMeasurement();
             });
+        settleTimer.Start(activeConfig.settleTime, [this]()
+            {
+                StartMeasurementPhase();
+            });
+    }
+
+    void ResistanceEstimator::StartMeasurementPhase()
+    {
+        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
+            {
+                FailMeasurement();
+            });
+        driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
+            {
+                OnMeasurementSample(currents);
+            });
+    }
+
+    void ResistanceEstimator::OnMeasurementSample(foc::PhaseCurrents currents)
+    {
+        if (!onDone)
+            return;
+
+        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
+            {
+                FailMeasurement();
+            });
+
+        if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
+        {
+            FailMeasurement();
+            return;
+        }
+
+        currentSamples.push_back(currents.a.Value());
+
+        if (currentSamples.full())
+            filteredSamples.push_back(AverageAndRemoveFront(currentSamples));
+
+        if (filteredSamples.full())
+            OnMeasurementComplete();
     }
 
     void ResistanceEstimator::Abort()
@@ -81,6 +120,7 @@ namespace services
             return;
 
         settleTimer.Cancel();
+        noSampleTimer.Cancel();
         driver.Stop();
         onDone = nullptr;
     }
@@ -88,6 +128,7 @@ namespace services
     void ResistanceEstimator::FailMeasurement()
     {
         settleTimer.Cancel();
+        noSampleTimer.Cancel();
         driver.Stop();
 
         if (onDone)
@@ -96,6 +137,7 @@ namespace services
 
     void ResistanceEstimator::OnMeasurementComplete()
     {
+        noSampleTimer.Cancel();
         driver.Stop();
 
         const float steadyStateCurrent = GetSteadyStateCurrent(filteredSamples);
