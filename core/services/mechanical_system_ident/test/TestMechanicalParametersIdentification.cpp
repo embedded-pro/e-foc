@@ -3,6 +3,7 @@
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
+#include "infra/util/WithSharedAccess.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
 
@@ -15,6 +16,8 @@ namespace
         , public infra::ClockFixture
     {
     public:
+        void TearDown() override { ExecuteAllActions(); }
+
         StrictMock<foc::SpeedCommandableMock> controllerMock;
         StrictMock<foc::ControllableMock> driveMock;
         StrictMock<foc::PhaseCurrentsObservableMock> observableMock;
@@ -25,7 +28,7 @@ namespace
                 EXPECT_CALL(controllerMock, SpeedCommandFrequency()).WillRepeatedly(Return(hal::Hertz{ 10000 }));
                 EXPECT_CALL(driverMock, BaseFrequency()).WillRepeatedly(Return(hal::Hertz{ 10000 }));
             } };
-        services::MechanicalParametersIdentificationImpl identification{ controllerMock, driveMock, observableMock, driverMock, encoderMock };
+        infra::WithSharedAccess<services::MechanicalParametersIdentificationImpl> identification{ controllerMock, driveMock, observableMock, driverMock, encoderMock };
 
         void ExpectRunStarted()
         {
@@ -69,7 +72,7 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_starts_the_driv
     ExpectRunStarted();
     EXPECT_CALL(controllerMock, CommandSpeed(foc::RadiansPerSecond{ 52.36f }));
 
-    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [](auto, auto) {});
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [](auto, auto) {});
 
     EXPECT_TRUE(observableMock.HasObserver());
 }
@@ -87,7 +90,7 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_never_claims_th
     EXPECT_CALL(controllerMock, CommandSpeed(_));
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _)).Times(0);
 
-    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [](auto, auto) {});
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [](auto, auto) {});
 }
 
 TEST_F(MechanicalParametersIdentificationTest, estimate_friction_timeout_calls_done_with_nullopt)
@@ -106,7 +109,7 @@ TEST_F(MechanicalParametersIdentificationTest, estimate_friction_timeout_calls_d
     EXPECT_CALL(controllerMock, CommandSpeed(foc::RadiansPerSecond{ 52.36f }));
     ExpectDriveReleased();
 
-    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [&](auto friction, auto inertia)
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [&](auto friction, auto inertia)
         {
             resultFriction = friction;
             resultInertia = inertia;
@@ -133,13 +136,13 @@ TEST_F(MechanicalParametersIdentificationTest, concurrent_estimate_friction_call
     ExpectRunStarted();
     EXPECT_CALL(controllerMock, CommandSpeed(_));
 
-    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
         [&](auto, auto)
         {
             firstCallbackCalled = true;
         });
 
-    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
         [&](auto friction, auto inertia)
         {
             secondCallbackCalled = true;
@@ -151,7 +154,7 @@ TEST_F(MechanicalParametersIdentificationTest, concurrent_estimate_friction_call
     EXPECT_TRUE(secondCallbackCalled);
 
     ExpectDriveReleased();
-    identification.Abort();
+    identification->Abort();
 }
 
 TEST_F(MechanicalParametersIdentificationTest, abort_releases_the_drive_and_drops_the_completion)
@@ -168,13 +171,13 @@ TEST_F(MechanicalParametersIdentificationTest, abort_releases_the_drive_and_drop
     ExpectRunStarted();
     EXPECT_CALL(controllerMock, CommandSpeed(_));
 
-    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [&](auto, auto)
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [&](auto, auto)
         {
             fired = true;
         });
 
     ExpectDriveReleased();
-    identification.Abort();
+    identification->Abort();
 
     EXPECT_FALSE(fired);
     EXPECT_FALSE(observableMock.HasObserver());
@@ -185,7 +188,7 @@ TEST_F(MechanicalParametersIdentificationTest, abort_releases_the_drive_and_drop
 
 TEST_F(MechanicalParametersIdentificationTest, abort_without_a_run_in_flight_is_a_no_op)
 {
-    identification.Abort();
+    identification->Abort();
 }
 
 TEST_F(MechanicalParametersIdentificationTest, a_run_that_has_not_converged_keeps_the_drive_turning)
@@ -217,7 +220,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_run_that_has_not_converged_keep
     EXPECT_CALL(controllerMock, CommandSpeed(_));
     ExpectDriveReleased(AtMost(1));
 
-    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config,
         [&outcome](auto f, auto i)
         {
             outcome.fired = true;
@@ -236,6 +239,6 @@ TEST_F(MechanicalParametersIdentificationTest, a_run_that_has_not_converged_keep
     if (!outcome.fired)
     {
         ExpectDriveReleased();
-        identification.Abort();
+        identification->Abort();
     }
 }

@@ -4,6 +4,7 @@
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/non_volatile_memory/test_doubles/NonVolatileMemoryMock.hpp"
 #include "core/state_machine/PlatformFaultNotifier.hpp"
+#include "infra/util/WithSharedAccess.hpp"
 #include "core/state_machine/TorqueStateMachine.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
@@ -20,6 +21,11 @@ namespace
         , public infra::EventDispatcherWithWeakPtrFixture
     {
     public:
+        void TearDown() override
+        {
+            ExecuteAllActions();
+        }
+
         StrictMock<infra::StreamWriterMock> streamWriterMock;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriterMock };
         services::TracerToStream tracer{ stream };
@@ -71,7 +77,7 @@ namespace
                 EXPECT_CALL(platformFactory, SetZero()).Times(AnyNumber());
             } };
 
-        state_machine::PlatformFaultNotifier faultNotifier{ platformFactory };
+        infra::WithSharedAccess<state_machine::PlatformFaultNotifier> faultNotifier{ platformFactory };
 
         void GivenCalibrationInNvm()
         {
@@ -102,7 +108,7 @@ namespace
                 application::MotorHardware{ platformFactory, platformFactory, vdc },
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock },
-                faultNotifier,
+                *faultNotifier,
                 state_machine::TransitionPolicy::Cli
             };
         }
@@ -149,7 +155,7 @@ TEST_F(TestPlatformFaultNotifier, a_deferred_fault_is_dropped_once_the_handler_u
     bool immediate = false;
     bool deferred = false;
 
-    faultNotifier.Register([&immediate](state_machine::FaultCode)
+    faultNotifier->Register([&immediate](state_machine::FaultCode)
         {
             immediate = true;
         },
@@ -163,7 +169,7 @@ TEST_F(TestPlatformFaultNotifier, a_deferred_fault_is_dropped_once_the_handler_u
     EXPECT_TRUE(immediate);
     EXPECT_FALSE(deferred);
 
-    faultNotifier.Unregister();
+    faultNotifier->Unregister();
     ExecuteAllActions();
 
     EXPECT_FALSE(deferred);

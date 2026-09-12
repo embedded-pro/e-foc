@@ -6,6 +6,7 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include "core/state_machine/FocStateMachineCommon.hpp"
+#include "infra/util/WithSharedAccess.hpp"
 #include <optional>
 
 namespace application
@@ -43,7 +44,7 @@ namespace application
 
         static services::MechanicalParametersIdentification& ResolveMechIdent(
             const CalibrationServices& calibServices,
-            std::optional<services::MechanicalParametersIdentificationImpl>& ownMechIdent,
+            std::optional<infra::WithSharedAccess<services::MechanicalParametersIdentificationImpl>>& ownMechIdent,
             foc::SpeedCommandable& speedCommandable,
             foc::Controllable& drive,
             foc::PhaseCurrentsObservable& observable,
@@ -52,6 +53,7 @@ namespace application
 
         virtual foc::SpeedLoopTunable& SpeedTunable() = 0;
         virtual services::MechanicalParametersIdentification& MechIdentImpl() = 0;
+        virtual const services::MechanicalParametersIdentification& MechIdentImpl() const = 0;
         virtual services::RealTimeFrictionAndInertiaEstimator& GetOnlineMechEstimator() = 0;
         virtual services::RealTimeResistanceAndInductanceEstimator& GetOnlineElecEstimator() = 0;
 

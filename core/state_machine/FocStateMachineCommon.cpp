@@ -78,7 +78,7 @@ namespace application
 
     bool FocStateMachineCommon::HasPendingAsyncWork() const
     {
-        return HasPendingCommand() || bootCheckInFlight || std::holds_alternative<state_machine::Calibrating>(currentState);
+        return HasPendingCommand() || bootCheckInFlight || std::holds_alternative<state_machine::Calibrating>(currentState) || electricalIdent.IsRunning();
     }
 
     bool FocStateMachineCommon::HasPartialCalibration() const
