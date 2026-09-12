@@ -53,10 +53,19 @@ namespace services
 
         settleTimer.Start(config.settleTime, [this]()
             {
+                noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
+                    {
+                        FailMeasurement();
+                    });
                 driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
                     {
                         if (!this->onDone)
                             return;
+
+                        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
+                            {
+                                FailMeasurement();
+                            });
 
                         if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
                         {
@@ -81,6 +90,7 @@ namespace services
             return;
 
         settleTimer.Cancel();
+        noSampleTimer.Cancel();
         driver.Stop();
         onDone = nullptr;
     }
@@ -88,6 +98,7 @@ namespace services
     void ResistanceEstimator::FailMeasurement()
     {
         settleTimer.Cancel();
+        noSampleTimer.Cancel();
         driver.Stop();
 
         if (onDone)
@@ -96,6 +107,7 @@ namespace services
 
     void ResistanceEstimator::OnMeasurementComplete()
     {
+        noSampleTimer.Cancel();
         driver.Stop();
 
         const float steadyStateCurrent = GetSteadyStateCurrent(filteredSamples);

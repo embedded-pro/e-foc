@@ -229,3 +229,55 @@ TEST_F(ResistanceEstimatorTest, recovers_resistance_for_low_resistance_motor)
     ASSERT_TRUE(result.resistance.has_value());
     EXPECT_NEAR(result.resistance->Value(), terminalR / 1.5f, 0.01f);
 }
+
+TEST_F(ResistanceEstimatorTest, no_sample_timeout_aborts_if_no_adc_callback_after_settle)
+{
+    services::ResistanceEstimator::Config config{
+        hal::Percent{ 15 }, std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye,
+        std::chrono::milliseconds{ 100 }
+    };
+
+    std::optional<services::ResistanceEstimator::Result> result;
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .Times(2)
+        .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, Stop());
+
+    estimator.Start(config, [&result](auto r) { result = r; });
+    ForwardTime(config.settleTime);
+
+    ForwardTime(config.noSampleTimeout + std::chrono::milliseconds{ 1 });
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->resistance.has_value());
+}
+
+TEST_F(ResistanceEstimatorTest, no_sample_timeout_resets_per_sample_and_fires_when_samples_stop)
+{
+    services::ResistanceEstimator::Config config{
+        hal::Percent{ 15 }, std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye,
+        std::chrono::milliseconds{ 100 }
+    };
+
+    std::optional<services::ResistanceEstimator::Result> result;
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .Times(2)
+        .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, Stop());
+
+    estimator.Start(config, [&result](auto r) { result = r; });
+    ForwardTime(config.settleTime);
+
+    for (std::size_t i = 0; i < 5; ++i)
+        driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+            foc::Ampere{ 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    ForwardTime(config.noSampleTimeout + std::chrono::milliseconds{ 1 });
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->resistance.has_value());
+}

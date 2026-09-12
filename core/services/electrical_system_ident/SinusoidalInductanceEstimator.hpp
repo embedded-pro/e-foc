@@ -4,6 +4,7 @@
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
+#include "infra/timer/Timer.hpp"
 #include "infra/util/AutoResetFunction.hpp"
 #include "numerical/analysis/GoertzelAlgorithm.hpp"
 #include <optional>
@@ -21,6 +22,7 @@ namespace services
             std::size_t measurementPeriods{ 20 };
             std::size_t voltageToCurrentDelaySamples{ 1 };
             WindingConfiguration windingConfig{ WindingConfiguration::Wye };
+            infra::Duration noSampleTimeout{ std::chrono::milliseconds{ 100 } };
         };
 
         struct Result
@@ -37,6 +39,7 @@ namespace services
 
     private:
         void OnCurrentSample(foc::PhaseCurrents currents);
+        void FailMeasurement();
         Result ComputeResult() const;
 
         static constexpr float wyeTerminalFactor = 1.5f;
@@ -48,6 +51,7 @@ namespace services
 
         Config activeConfig;
         infra::AutoResetFunction<void(Result)> onDone;
+        infra::TimerSingleShot noSampleTimer;
 
         float injectionPhase{ 0.0f };
         float phaseIncrement{ 0.0f };
