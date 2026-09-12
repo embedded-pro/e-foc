@@ -32,6 +32,7 @@ namespace services
         };
 
         SinusoidalInductanceEstimator(drivers::ThreePhaseInverter& driver, foc::Volts vdc);
+        ~SinusoidalInductanceEstimator();
 
         void Start(const Config& config, const infra::Function<void(Result)>& onDone);
 

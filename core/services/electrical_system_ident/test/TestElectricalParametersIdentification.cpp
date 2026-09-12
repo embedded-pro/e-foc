@@ -267,6 +267,7 @@ TEST_F(ElectricalParametersIdentificationTest, concurrent_rl_estimate_is_rejecte
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_));
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_));
+    EXPECT_CALL(driverMock, Stop());
 
     identification.EstimateResistanceAndInductance(config, [](services::ElectricalParametersIdentification::ResistanceInductanceResult) {});
 

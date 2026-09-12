@@ -28,6 +28,7 @@ namespace services
         };
 
         ResistanceEstimator(drivers::ThreePhaseInverter& driver, foc::Volts vdc);
+        ~ResistanceEstimator();
 
         void Start(const Config& config, const infra::Function<void(Result)>& onDone);
 

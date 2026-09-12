@@ -90,10 +90,14 @@ pending completion, and a sample that arrives after the procedure ended is disca
 anything. This matters most for the inductance injection, whose callback writes duty cycles on every sample:
 ungated, it would re-arm the peripheral that the abort had just stopped.
 
-`Abort()` is the caller-facing form of the same shutdown. It stops injection, cancels the timers, and drops
-the pending completion **without invoking it** — the caller that aborted owns the outcome, so a fault raised
-by the state machine cannot be overwritten by the result of the procedure it interrupted. It covers whichever
-stage is live: resistance, inductance injection, or the pole-pairs sweep.
+`Abort()` is the caller-facing form of the same shutdown. It stops injection, cancels all timers (including
+the no-sample watchdog), and drops the pending completion **without invoking it** — the caller that aborted
+owns the outcome, so a fault raised by the state machine cannot be overwritten by the result of the
+procedure it interrupted. It covers whichever stage is live: resistance, inductance injection, or the
+pole-pairs sweep.
+
+Every estimator is also RAII-safe: if destroyed while active, the destructor cancels all timers and stops
+the driver without invoking the completion callback.
 
 ### ResistanceEstimator
 
@@ -106,13 +110,26 @@ When the buffer is full, the steady-state current is read from the mean of the l
 buffer. Resistance is computed as $V_{step} / I_{ss}$ divided by the winding topology factor. If
 $I_{ss} \leq 0$, the result is absent.
 
+**No-sample watchdog:** a second `TimerSingleShot` is armed immediately after the DC duty is applied
+and resets on every ADC callback (during both settle and measurement phases). Default bound: 100 ms
+(`Config::noSampleTimeout`). If the ADC produces no callback within that window — whether at startup
+or after samples stop mid-measurement — the watchdog fires `FailMeasurement()`, stopping the driver
+and delivering an absent result. This ensures ADC loss does not leave the motor energised
+indefinitely regardless of the configured settle time.
+
+**RAII cleanup:** the destructor cancels all timers and stops the driver if the estimator is
+destroyed while a measurement is active, so callers do not need to call `Abort()` explicitly before
+releasing the object.
+
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
     Idle --> Settling : Start(config, onDone)
     Settling --> Measuring : settle timer fires
+    Settling --> Fault : no-sample watchdog fires (no ADC in 100 ms)
     Measuring --> Done : buffer full, I_ss > 0
     Measuring --> Fault : I_ss ≤ 0
+    Measuring --> Fault : no-sample watchdog fires
     Done --> Idle : onDone({resistance}) fired
     Fault --> Idle : onDone({nullopt}) fired
 ```
@@ -156,18 +173,32 @@ zero with increasing noise or rotor motion.
 | sumSquared     | 1 float | Accumulates $\Sigma i^2$ for fitQuality |
 | sampleCount    | 1 int   | Warmup/measurement gate                 |
 
+**PWM bootstrap:** the ADC on TI targets is triggered by the PWM peripheral. Because the resistance
+estimator stops PWM on completion, the inductance estimator writes a zero-voltage vector immediately
+after registering the ADC callback to restart the PWM-triggered ADC chain before the first sample
+is expected.
+
+**No-sample watchdog:** a `TimerSingleShot` is armed when injection begins and resets on every ADC
+callback. Default bound: 100 ms (`Config::noSampleTimeout`). Loss of ADC samples — whether the
+bootstrap never triggers or samples stop mid-measurement — causes the watchdog to fire
+`FailMeasurement()`, stopping the driver and delivering an absent result within the documented bound.
+
+**RAII cleanup:** the destructor cancels the watchdog timer and stops the driver if the estimator is
+destroyed while a measurement is active.
+
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
-    Idle --> Warmup : Start(config, onDone)
+    Idle --> Warmup : Start(config, onDone)\nPWM bootstrap written
     Warmup --> Measuring : warmupPeriods complete
-    Warmup --> Abort : phase current exceeds MaxCurrentSupported()
+    Warmup --> Fault : phase current exceeds MaxCurrentSupported()
+    Warmup --> Fault : no-sample watchdog fires (no ADC in 100 ms)
     Measuring --> Done : Goertzel ready, L > 0
     Measuring --> Fault : L ≤ 0 or noise floor
-    Measuring --> Abort : phase current exceeds MaxCurrentSupported()
+    Measuring --> Fault : phase current exceeds MaxCurrentSupported()
+    Measuring --> Fault : no-sample watchdog fires
     Done --> Idle : onDone({inductance, fitQuality}) fired
-    Fault --> Idle : onDone({nullopt, fitQuality}) fired
-    Abort --> Idle : driver.Stop(), onDone({nullopt, 0}) fired
+    Fault --> Idle : driver.Stop(), onDone({nullopt, 0}) fired
 ```
 
 ---

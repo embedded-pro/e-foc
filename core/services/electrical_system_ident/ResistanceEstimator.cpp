@@ -30,6 +30,14 @@ namespace services
         , vdc(vdc)
     {}
 
+    ResistanceEstimator::~ResistanceEstimator()
+    {
+        settleTimer.Cancel();
+        noSampleTimer.Cancel();
+        if (onDone)
+            driver.Stop();
+    }
+
     void ResistanceEstimator::Start(const Config& config, const infra::Function<void(Result)>& onDone)
     {
         activeConfig = config;
@@ -46,6 +54,11 @@ namespace services
                 if (!this->onDone)
                     return;
 
+                noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
+                    {
+                        FailMeasurement();
+                    });
+
                 if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
                     FailMeasurement();
             });
@@ -54,6 +67,10 @@ namespace services
             hal::Percent{ neutralDuty },
             hal::Percent{ neutralDuty } });
 
+        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
+            {
+                FailMeasurement();
+            });
         settleTimer.Start(activeConfig.settleTime, [this]()
             {
                 StartMeasurementPhase();

@@ -23,6 +23,13 @@ namespace services
         , vdc(vdc)
     {}
 
+    SinusoidalInductanceEstimator::~SinusoidalInductanceEstimator()
+    {
+        noSampleTimer.Cancel();
+        if (onDone)
+            driver.Stop();
+    }
+
     void SinusoidalInductanceEstimator::Start(const Config& config, const infra::Function<void(Result)>& onDone)
     {
         activeConfig = config;
@@ -30,7 +37,7 @@ namespace services
 
         if (!InitializeParameters())
         {
-            onDone(Result{});
+            this->onDone(Result{});
             return;
         }
 

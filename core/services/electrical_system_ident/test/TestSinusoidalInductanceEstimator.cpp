@@ -102,8 +102,9 @@ TEST_F(SinusoidalInductanceEstimatorTest, start_registers_phase_current_callback
 {
     services::SinusoidalInductanceEstimator::Config config{};
 
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
     EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, _));
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
+    EXPECT_CALL(driverMock, Stop());
 
     estimator.Start(config, [](auto) {});
 }
@@ -373,4 +374,19 @@ TEST_F(SinusoidalInductanceEstimatorTest, no_sample_timeout_resets_per_sample_an
 
     EXPECT_FALSE(result.inductance.has_value());
     EXPECT_FLOAT_EQ(result.fitQuality, 0.0f);
+}
+
+TEST_F(SinusoidalInductanceEstimatorTest, destructor_stops_driver_when_destroyed_while_active)
+{
+    services::SinusoidalInductanceEstimator::Config config{};
+
+    StrictMock<drivers::ThreePhaseInverterMock> localMock;
+    EXPECT_CALL(localMock, PhaseCurrentsReady(_, _));
+    EXPECT_CALL(localMock, ThreePhasePwmOutput(_)).Times(1);
+    EXPECT_CALL(localMock, Stop());
+
+    {
+        services::SinusoidalInductanceEstimator local{ localMock, foc::Volts{ 24.0f } };
+        local.Start(config, [](auto) {});
+    }
 }
