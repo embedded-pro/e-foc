@@ -17,6 +17,5 @@ namespace services
                     std::optional<foc::NewtonMeterSecondSquared>)>& onDone),
             (override));
         MOCK_METHOD(void, Abort, (), (override));
-        MOCK_METHOD(bool, HasPendingDispatch, (), (const, override));
     };
 }

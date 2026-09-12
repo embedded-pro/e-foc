@@ -2,7 +2,7 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
-#include "infra/event/EventDispatcher.hpp"
+#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 
 namespace services
 {
@@ -59,11 +59,6 @@ namespace services
         onDone = nullptr;
     }
 
-    bool MechanicalParametersIdentificationImpl::HasPendingDispatch() const
-    {
-        return pendingDispatch;
-    }
-
     void MechanicalParametersIdentificationImpl::ReleaseDrive()
     {
         drive.Stop();
@@ -102,21 +97,21 @@ namespace services
 
         converged = true;
         timeoutTimer.Cancel();
-        pendingDispatch = true;
 
-        infra::EventDispatcher::Instance().Schedule([this]()
+        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
+            [](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
             {
-                pendingDispatch = false;
-                if (!rls.has_value())
+                if (!self->rls.has_value())
                     return;
 
-                ReleaseDrive();
+                self->ReleaseDrive();
 
-                auto& theta = rls->Coefficients();
+                auto& theta = self->rls->Coefficients();
                 const auto friction = foc::NewtonMeterSecondPerRadian{ theta.at(2, 0) };
                 const auto inertia = foc::NewtonMeterSecondSquared{ theta.at(1, 0) };
-                rls.reset();
-                Complete(friction, inertia);
-            });
+                self->rls.reset();
+                self->Complete(friction, inertia);
+            },
+            WeakFromThis());
     }
 }

@@ -97,7 +97,7 @@ namespace application
         Cascade focController;
         services::RealTimeFrictionAndInertiaEstimator onlineMechEstimator;
         services::RealTimeResistanceAndInductanceEstimator onlineElecEstimator;
-        std::optional<services::MechanicalParametersIdentificationImpl> ownMechIdent;
+        std::optional<infra::WithSharedAccess<services::MechanicalParametersIdentificationImpl>> ownMechIdent;
         std::reference_wrapper<services::MechanicalParametersIdentification> resolvedMechIdent;
     };
 }

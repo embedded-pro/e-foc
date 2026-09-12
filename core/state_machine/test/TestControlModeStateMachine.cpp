@@ -59,7 +59,7 @@ namespace
                 EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
                 EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
                 EXPECT_CALL(mechIdentMock, Abort()).Times(AnyNumber());
-                EXPECT_CALL(mechIdentMock, HasPendingDispatch()).WillRepeatedly(Return(false));
+                EXPECT_CALL(electricalIdentMock, IsRunning()).WillRepeatedly(Return(false));
                 EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
             } };
 

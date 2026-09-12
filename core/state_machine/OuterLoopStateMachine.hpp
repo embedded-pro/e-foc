@@ -6,6 +6,7 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include "core/state_machine/FocStateMachineCommon.hpp"
+#include "infra/util/WithSharedAccess.hpp"
 #include <optional>
 
 namespace application
@@ -32,7 +33,6 @@ namespace application
             services::NonVolatileMemory& nvm,
             const CalibrationServices& calibServices);
 
-        bool HasPendingAsyncWork() const override;
         void ApplyModeSpecificCalibration(const services::CalibrationData& data) override;
         bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const override;
         void PrepareForEnabled() override;
@@ -44,7 +44,7 @@ namespace application
 
         static services::MechanicalParametersIdentification& ResolveMechIdent(
             const CalibrationServices& calibServices,
-            std::optional<services::MechanicalParametersIdentificationImpl>& ownMechIdent,
+            std::optional<infra::WithSharedAccess<services::MechanicalParametersIdentificationImpl>>& ownMechIdent,
             foc::SpeedCommandable& speedCommandable,
             foc::Controllable& drive,
             foc::PhaseCurrentsObservable& observable,

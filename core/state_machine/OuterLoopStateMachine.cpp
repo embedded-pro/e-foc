@@ -95,11 +95,6 @@ namespace application
         RunMechanicalIdentStep();
     }
 
-    bool OuterLoopStateMachine::HasPendingAsyncWork() const
-    {
-        return FocStateMachineCommon::HasPendingAsyncWork() || MechIdentImpl().HasPendingDispatch();
-    }
-
     void OuterLoopStateMachine::AbortModeSpecificServices()
     {
         MechIdentImpl().Abort();
@@ -107,7 +102,7 @@ namespace application
 
     services::MechanicalParametersIdentification& OuterLoopStateMachine::ResolveMechIdent(
         const CalibrationServices& calibServices,
-        std::optional<services::MechanicalParametersIdentificationImpl>& ownMechIdent,
+        std::optional<infra::WithSharedAccess<services::MechanicalParametersIdentificationImpl>>& ownMechIdent,
         foc::SpeedCommandable& speedCommandable,
         foc::Controllable& drive,
         foc::PhaseCurrentsObservable& observable,
@@ -118,7 +113,7 @@ namespace application
             return calibServices.mechIdentOverride->get();
 
         ownMechIdent.emplace(speedCommandable, drive, observable, inverter, encoder);
-        return *ownMechIdent;
+        return **ownMechIdent;
     }
 
     void OuterLoopStateMachine::RunMechanicalIdentStep()

@@ -36,7 +36,7 @@ namespace application
                     MotorHardware{ this->hardware, this->hardware, vdc },
                     nvm,
                     CalibrationServices{ .electricalIdent = electricalIdent, .motorAlignment = motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb } },
-                    platformFaultNotifier,
+                    *platformFaultNotifier,
                     configData,
                     ControlMode::OuterLoopArgs{
                         this->hardware.MaxCurrentSupported(),
@@ -44,7 +44,7 @@ namespace application
                         this->hardware.LowPriorityInterrupt() });
                 canBridge.emplace(*motorCanServer, *controlMode, this->hardware, electricalIdent, nullptr, foc::NewtonMeter{ motorTorqueConstantNm }, nvm, configData, this->hardware.Tracer());
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
-                platformFaultNotifier.RegisterSecondary([this](state_machine::FaultCode code)
+                platformFaultNotifier->RegisterSecondary([this](state_machine::FaultCode code)
                     {
                         infra::EventDispatcher::Instance().Schedule([this, code]()
                             {

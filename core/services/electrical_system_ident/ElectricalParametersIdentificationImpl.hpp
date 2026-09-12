@@ -19,6 +19,7 @@ namespace services
 
         void EstimateResistanceAndInductance(const ResistanceAndInductanceConfig& config, const infra::Function<void(ResistanceInductanceResult)>& onDone) override;
         void EstimateNumberOfPolePairs(const PolePairsConfig& config, const infra::Function<void(std::optional<std::size_t>)>& onDone) override;
+        bool IsRunning() const override;
         void Abort() override;
 
     private:
