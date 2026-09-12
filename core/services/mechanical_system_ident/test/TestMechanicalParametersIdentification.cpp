@@ -188,6 +188,32 @@ TEST_F(MechanicalParametersIdentificationTest, abort_without_a_run_in_flight_is_
     identification.Abort();
 }
 
+TEST_F(MechanicalParametersIdentificationTest, has_pending_dispatch_is_false_when_idle)
+{
+    EXPECT_FALSE(identification.HasPendingDispatch());
+}
+
+TEST_F(MechanicalParametersIdentificationTest, has_pending_dispatch_is_false_during_active_run_before_convergence)
+{
+    services::MechanicalParametersIdentification::Config config{
+        foc::RadiansPerSecond{ 50.0f },
+        0.998f,
+        std::chrono::seconds{ 5 }
+    };
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_));
+
+    identification.EstimateFrictionAndInertia(foc::NewtonMeter{ 0.1f }, 7, config, [](auto, auto) {});
+
+    EXPECT_FALSE(identification.HasPendingDispatch());
+
+    ExpectDriveReleased();
+    identification.Abort();
+}
+
+
 TEST_F(MechanicalParametersIdentificationTest, a_run_that_has_not_converged_keeps_the_drive_turning)
 {
     services::MechanicalParametersIdentification::Config config{

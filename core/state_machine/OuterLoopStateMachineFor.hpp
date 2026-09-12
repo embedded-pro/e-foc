@@ -88,6 +88,11 @@ namespace application
             return resolvedMechIdent.get();
         }
 
+        const services::MechanicalParametersIdentification& MechIdentImpl() const override
+        {
+            return resolvedMechIdent.get();
+        }
+
     private:
         Cascade focController;
         services::RealTimeFrictionAndInertiaEstimator onlineMechEstimator;

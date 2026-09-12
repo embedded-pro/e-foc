@@ -19,6 +19,7 @@ namespace services
 
         void EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone) override;
         void Abort() override;
+        bool HasPendingDispatch() const override;
 
     private:
         void OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant);
@@ -45,5 +46,6 @@ namespace services
         MotorRLS::InputMatrix regressor;
         math::Matrix<float, 1, 1> torque;
         volatile bool converged{ false };
+        bool pendingDispatch{ false };
     };
 }

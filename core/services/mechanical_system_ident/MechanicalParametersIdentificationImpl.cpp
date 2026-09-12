@@ -59,6 +59,11 @@ namespace services
         onDone = nullptr;
     }
 
+    bool MechanicalParametersIdentificationImpl::HasPendingDispatch() const
+    {
+        return pendingDispatch;
+    }
+
     void MechanicalParametersIdentificationImpl::ReleaseDrive()
     {
         drive.Stop();
@@ -97,9 +102,11 @@ namespace services
 
         converged = true;
         timeoutTimer.Cancel();
+        pendingDispatch = true;
 
         infra::EventDispatcher::Instance().Schedule([this]()
             {
+                pendingDispatch = false;
                 if (!rls.has_value())
                     return;
 

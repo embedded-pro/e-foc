@@ -32,6 +32,7 @@ namespace application
             services::NonVolatileMemory& nvm,
             const CalibrationServices& calibServices);
 
+        bool HasPendingAsyncWork() const override;
         void ApplyModeSpecificCalibration(const services::CalibrationData& data) override;
         bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const override;
         void PrepareForEnabled() override;
@@ -52,6 +53,7 @@ namespace application
 
         virtual foc::SpeedLoopTunable& SpeedTunable() = 0;
         virtual services::MechanicalParametersIdentification& MechIdentImpl() = 0;
+        virtual const services::MechanicalParametersIdentification& MechIdentImpl() const = 0;
         virtual services::RealTimeFrictionAndInertiaEstimator& GetOnlineMechEstimator() = 0;
         virtual services::RealTimeResistanceAndInductanceEstimator& GetOnlineElecEstimator() = 0;
 
