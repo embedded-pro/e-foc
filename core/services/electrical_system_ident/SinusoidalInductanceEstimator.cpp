@@ -63,16 +63,13 @@ namespace services
 
         goertzel.emplace(config.measurementPeriods, measurementSamples);
 
-        // Bootstrap: write a zero-voltage vector so the PWM-triggered ADC fires and delivers
-        // the first sample to OnCurrentSample. Without this, the TI PWM module is stopped after
-        // resistance measurement and the callback never fires.
-        driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
-            transforms.Inverse(foc::RotatingFrame{ 0.0f, 0.0f }, 1.0f, 0.0f)));
-
         driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
             {
                 OnCurrentSample(currents);
             });
+
+        driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
+            transforms.Inverse(foc::RotatingFrame{ 0.0f, 0.0f }, 1.0f, 0.0f)));
 
         noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
             {
