@@ -94,9 +94,11 @@ namespace application
 
         void EnterCalibrating();
         void EnterReady(const services::CalibrationData& data);
+        void EnterReadyOrIdle();
         void EnterIdleWithPartialCalibration(const services::CalibrationData& data);
         void EnterEnabled();
         void EnterFault(state_machine::FaultCode code);
+        bool WasActive() const;
 
         void CompletePendingCommand(state_machine::CommandResult result);
         bool HasPendingCommand() const;
@@ -105,7 +107,9 @@ namespace application
         void RunPolePairsStep();
         void RunResistanceAndInductanceStep();
         void RunAlignmentStep();
+        void FailCalibrationStep();
         void OnCalibrationComplete();
+        void OnCalibrationSaved(services::NvmStatus status);
 
         bool IsCalibrating(state_machine::CalibrationStep expected) const;
 
@@ -147,6 +151,9 @@ namespace application
         uint8_t consecutiveFaultClears{ 0 };
 
         void OnCalibrationInvalidated(services::NvmStatus status);
+        void OnBootValidityChecked(bool valid);
+        void OnBootCalibrationLoaded(services::NvmStatus status);
+        void OnFluxLinkageSaved(services::NvmStatus status);
 
         infra::AutoResetFunction<void(state_machine::CommandResult)> pendingCommandCallback;
         infra::Function<void()> readyHandler;
