@@ -60,6 +60,8 @@ namespace application
         void CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone);
         foc::Weber ActiveFluxLinkage() const;
 
+        void CmdReAlign(const infra::Function<void(state_machine::CommandResult)>& onDone);
+
         state_machine::CommandResult CmdReserveExternalCalibration();
         void CmdCompleteExternalCalibration(const services::CalibrationData& data,
             const infra::Function<void(state_machine::CommandResult)>& onDone);
@@ -92,9 +94,11 @@ namespace application
 
         void EnterCalibrating();
         void EnterReady(const services::CalibrationData& data);
+        void EnterReadyOrIdle();
         void EnterIdleWithPartialCalibration(const services::CalibrationData& data);
         void EnterEnabled();
         void EnterFault(state_machine::FaultCode code);
+        bool WasActive() const;
 
         void CompletePendingCommand(state_machine::CommandResult result);
         bool HasPendingCommand() const;
@@ -103,7 +107,9 @@ namespace application
         void RunPolePairsStep();
         void RunResistanceAndInductanceStep();
         void RunAlignmentStep();
+        void FailCalibrationStep();
         void OnCalibrationComplete();
+        void OnCalibrationSaved(services::NvmStatus status);
 
         bool IsCalibrating(state_machine::CalibrationStep expected) const;
 
@@ -138,12 +144,16 @@ namespace application
         services::CalibrationData calibrationData{};
         float pendingFluxLinkage{ 0.0f };
         bool bootCheckInFlight{ false };
+        bool rotorReferenceValid_{ false };
 
         static constexpr uint8_t maxConsecutiveFaultClears{ 3 };
         bool faultLatched{ false };
         uint8_t consecutiveFaultClears{ 0 };
 
         void OnCalibrationInvalidated(services::NvmStatus status);
+        void OnBootValidityChecked(bool valid);
+        void OnBootCalibrationLoaded(services::NvmStatus status);
+        void OnFluxLinkageSaved(services::NvmStatus status);
 
         infra::AutoResetFunction<void(state_machine::CommandResult)> pendingCommandCallback;
         infra::Function<void()> readyHandler;
@@ -158,6 +168,12 @@ namespace application
             [getActiveSm](const infra::BoundedConstString&)
             {
                 getActiveSm().CmdCalibrate([](state_machine::CommandResult) {});
+            } });
+
+        terminal.AddCommand({ { "align", "aln", "Re-establish rotor reference without full recalibration" },
+            [getActiveSm](const infra::BoundedConstString&)
+            {
+                getActiveSm().CmdReAlign([](state_machine::CommandResult) {});
             } });
 
         terminal.AddCommand({ { "enable", "en", "Enable FOC controller" },

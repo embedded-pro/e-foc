@@ -32,8 +32,8 @@ date: 2026-04-10
 - Owning the complete motor lifecycle: `Idle → Calibrating → Ready ⇄ Enabled`, and `Fault` as an escape state reachable from any active state
 - Enforcing all transition guards so that the FOC controller can only be enabled after a successful calibration, and calibration can only be started from `Idle` or `Ready`
 - Orchestrating the sequential calibration chain: pole-pair identification → resistance and inductance estimation → alignment → (mechanical parameter identification for speed/position modes) → NVM persistence
-- On successful boot with valid NVM data, automatically loading calibration and transitioning to `Ready` without requiring user action
-- Registering lifecycle commands on the terminal in CLI-driven mode (`calibrate`, `enable`, `disable`, `clear_fault`, `clear_cal`)
+- On successful boot with valid NVM data, loading electrical parameters (R, L, pole pairs) and remaining in `Idle` until a live alignment re-establishes the rotor reference; the motor cannot be enabled until `CmdReAlign()` or `CmdCalibrate()` succeeds
+- Registering lifecycle commands on the terminal in CLI-driven mode (`calibrate`, `align`, `enable`, `disable`, `clear_fault`, `clear_cal`)
 - Intercepting hardware fault notifications from the fault notifier: stopping the inverter in the delivering context, then transitioning to `Fault` on the event dispatcher (see Fault Safety)
 
 **Is NOT responsible for:**
@@ -50,13 +50,13 @@ date: 2026-04-10
 
 The state machine has five named states:
 
-| State         | Motor condition                                                              | Allowed transitions                                                                                                                                                                                   |
-|---------------|------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Idle`        | No calibration data; motor cannot be enabled                                 | → `Calibrating` (CmdCalibrate), → `Ready` (valid NVM on boot), → `Fault` (hardware fault)                                                                                                             |
-| `Calibrating` | Calibration sequence in progress; motor is driven by identification services | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop with previously valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (any step fails or hardware fault) |
-| `Ready`       | Calibration data valid and applied; motor can be enabled at any time         | → `Enabled` (CmdEnable), → `Calibrating` (CmdCalibrate re-runs), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                                                           |
-| `Enabled`     | FOC controller active; motor under closed-loop control                       | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                 |
-| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times                                                                               |
+| State         | Motor condition                                                                                                       | Allowed transitions                                                                                                                                                                                   |
+|---------------|-----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled | → `Calibrating` (CmdCalibrate or CmdReAlign with loaded parameters), → `Fault` (hardware fault)                                                                                                       |
+| `Calibrating` | Calibration sequence in progress; motor is driven by identification services                                          | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop with previously valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (any step fails or hardware fault) |
+| `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true), → `Calibrating` (CmdCalibrate re-runs), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                  |
+| `Enabled`     | FOC controller active; motor under closed-loop control                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                 |
+| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times                                                                               |
 
 ### State Diagram
 
@@ -64,8 +64,7 @@ The state machine has five named states:
 stateDiagram-v2
     [*] --> Idle
 
-    Idle --> Calibrating : CmdCalibrate
-    Idle --> Ready : valid NVM on boot
+    Idle --> Calibrating : CmdCalibrate\nor CmdReAlign (if R/L loaded)
     Idle --> Fault : hardware fault
 
     Calibrating --> Ready : sequence complete\n+ NVM saved
@@ -317,7 +316,18 @@ configuration requirement.
 
 ### Boot-Time NVM Check
 
-On construction, the state machine asynchronously checks whether valid calibration data exists in NVM. If data is found and loads successfully, calibration is applied and the machine transitions directly to `Ready` — no user action required. If the check fails or the data is absent, the machine starts in `Idle`.
+On construction, the state machine asynchronously checks whether valid calibration data exists in NVM. If data is found and loads successfully, the electrical parameters (R, L, pole pairs, current-loop bandwidth) are applied to the FOC controller, but the machine **remains in `Idle`** — the rotor-reference (encoder zero offset) is RAM-only and is lost on every reset, so it must be re-established by a live alignment before the motor can be enabled. If the check fails or the data is absent, the machine starts in `Idle` with no parameters applied.
+
+### Alignment-Only Recovery
+
+`CmdReAlign()` re-establishes the rotor reference without re-running the full identification chain. It requires the machine to be in `Idle` or `Ready` with valid electrical calibration already loaded (non-zero pole pairs and positive phase resistance). The procedure:
+
+1. Enters `Calibrating` at the alignment sub-step, copying the stored electrical parameters into `pendingData`.
+2. Calls the Motor Alignment service using the stored pole pairs.
+3. On success: marks `rotorReferenceValid`, saves the updated offset to NVM via `OnCalibrationComplete`, applies mode-specific calibration from the stored parameters, and transitions to `Ready`.
+4. On failure: enters `Fault` with code `calibrationFailed`.
+
+The CLI command is `align` (short form `aln`). Because `OnCalibrationComplete` is used, the speed and position loop parameters are also re-applied from the stored calibration, so mechanical identification does not need to be re-run after an alignment-only recovery.
 
 ### Online Parameter Estimation (Speed/Position Modes)
 
@@ -452,8 +462,9 @@ sequenceDiagram
 | `FocStateMachineBase`    | Abstract lifecycle controller — state query and command dispatch                       | Constructed once per application; all command methods are safe to call from any state (invalid transitions are silently ignored)                                                                                                                             |
 | `CurrentState()`         | Returns the current `State` variant for inspection                                     | Returns a const reference; valid for the lifetime of the state machine                                                                                                                                                                                       |
 | `LastFaultCode()`        | Returns the most recent fault code                                                     | Returns `FaultCode::none` until the first fault occurs; afterwards it retains the last fault code, also after the fault is cleared                                                                                                                           |
-| `CmdCalibrate()`         | Requests start of calibration                                                          | Only effective from `Idle` or `Ready`; ignored from all other states                                                                                                                                                                                         |
-| `CmdEnable()`            | Requests enabling the FOC controller                                                   | Only effective from `Ready`; ignored from all other states                                                                                                                                                                                                   |
+| `CmdCalibrate()`         | Requests start of full calibration sequence                                            | Only effective from `Idle` or `Ready`; ignored from all other states                                                                                                                                                                                         |
+| `CmdReAlign()`           | Re-establishes the rotor reference without re-running R/L or mechanical identification | Only effective from `Idle` or `Ready` with valid electrical calibration loaded; enters `Calibrating` (alignment sub-step only), then `Ready` with `rotorReferenceValid` on success, or `Fault` on failure                                                    |
+| `CmdEnable()`            | Requests enabling the FOC controller                                                   | Only effective from `Ready` when `rotorReferenceValid` is true; rejected when the rotor reference has not been established since the last reset                                                                                                              |
 | `CmdDisable()`           | Requests disabling the FOC controller                                                  | Only effective from `Enabled`; ignored from all other states                                                                                                                                                                                                 |
 | `CmdClearFault()`        | Clears the fault and returns to `Ready` if valid calibration is held, otherwise `Idle` | Only effective from `Fault`; ignored from all other states                                                                                                                                                                                                   |
 | `CmdClearCalibration()`  | Invalidates NVM calibration and returns to `Idle`                                      | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`.                                                                                                                            |

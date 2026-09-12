@@ -75,7 +75,7 @@ namespace
         infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterMock };
         services::TracerToStream tracer{ tracerStream };
         services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<128, 5> terminalWithCommands{ serialCommunicationMock, tracer };
-        services::TerminalWithStorage::WithMaxSize<20> terminal{ terminalWithCommands, tracer };
+        services::TerminalWithStorage::WithMaxSize<22> terminal{ terminalWithCommands, tracer };
 
         FocMotorCanBridgeTest()
         {
@@ -122,12 +122,6 @@ namespace
             Construct();
         }
 
-        void ConstructFixtureInReady()
-        {
-            GivenNvmHoldsValidCalibration();
-            Construct();
-        }
-
         void ConstructFixtureInPartialCalibration()
         {
             GivenNvmHoldsPartialCalibration();
@@ -165,6 +159,13 @@ namespace
                         data.stage = services::CalibrationStage::complete;
                         done(services::NvmStatus::Ok);
                     }));
+            EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+                .Times(AnyNumber())
+                .WillRepeatedly(Invoke([](const services::CalibrationData&,
+                                          infra::Function<void(services::NvmStatus)> done)
+                    {
+                        done(services::NvmStatus::Ok);
+                    }));
         }
 
         void GivenNvmHoldsPartialCalibration()
@@ -185,6 +186,31 @@ namespace
                         data.stage = services::CalibrationStage::none;
                         done(services::NvmStatus::Ok);
                     }));
+            EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+                .Times(AnyNumber())
+                .WillRepeatedly(Invoke([](const services::CalibrationData&,
+                                          infra::Function<void(services::NvmStatus)> done)
+                    {
+                        done(services::NvmStatus::Ok);
+                    }));
+        }
+
+        void AlignAfterBoot()
+        {
+            EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+                .WillOnce(Invoke([](std::size_t, const auto&,
+                                     const infra::Function<void(std::optional<foc::Radians>)>& cb)
+                    {
+                        cb(foc::Radians{ 0.0f });
+                    }));
+            Dispatch(can::focAlignId, {});
+        }
+
+        void ConstructFixtureInReady()
+        {
+            GivenNvmHoldsValidCalibration();
+            Construct();
+            AlignAfterBoot();
         }
 
         void Construct()
@@ -471,6 +497,7 @@ namespace
     {
         ConstructFixtureInReady();
         GivenModeSelected(can::FocMotorMode::speed);
+        AlignAfterBoot();
         ResetCaptures();
 
         DispatchSetpoint(can::focSetSpeedSetpointId, 100);
@@ -484,6 +511,7 @@ namespace
     {
         ConstructFixtureInReady();
         GivenModeSelected(can::FocMotorMode::position);
+        AlignAfterBoot();
         ResetCaptures();
 
         DispatchSetpoint(can::focSetPositionSetpointId, 100);

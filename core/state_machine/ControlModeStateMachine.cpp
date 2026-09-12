@@ -536,9 +536,9 @@ namespace state_machine
         auto& terminal = terminalAndTracer.terminal;
 
         application::RegisterLifecycleCliCommands(terminal,
-            [this]() -> FocStateMachineBase&
+            [this]() -> application::FocStateMachineCommon&
             {
-                return ActiveStateMachine();
+                return ActiveCommon();
             });
 
         terminal.AddCommand({ { "apply_estimates", "ae", "Apply online estimates to PID gains" },
@@ -801,6 +801,11 @@ namespace state_machine
         const infra::Function<void(CommandResult)>& onDone)
     {
         ActiveCommon().CmdCompleteExternalCalibration(data, onDone);
+    }
+
+    void ControlModeStateMachine::CmdReAlign(const infra::Function<void(CommandResult)>& onDone)
+    {
+        ActiveCommon().CmdReAlign(onDone);
     }
 
     std::optional<services::CalibrationData> ControlModeStateMachine::ActiveCalibrationData() const

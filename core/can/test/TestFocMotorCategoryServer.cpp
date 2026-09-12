@@ -49,6 +49,7 @@ namespace
         MOCK_METHOD(void, OnSetPidCurrent, (float, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnSetPidSpeed, (float, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnSetPidPosition, (float, (const infra::Function<void()>&)), (override));
+        MOCK_METHOD(void, OnAlign, ((const infra::Function<void(services::CanAckStatus)>&)), (override));
         MOCK_METHOD(void, OnIdentifyElectrical, (const infra::Function<void()>&), (override));
         MOCK_METHOD(void, OnIdentifyMechanical, (const infra::Function<void()>&), (override));
         MOCK_METHOD(void, OnRequestTelemetry, (const infra::Function<void()>&), (override));

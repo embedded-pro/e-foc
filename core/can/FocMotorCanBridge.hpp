@@ -48,6 +48,7 @@ namespace can
         void OnSetPidCurrent(float bandwidth, const infra::Function<void()>& onDone) override;
         void OnSetPidSpeed(float bandwidth, const infra::Function<void()>& onDone) override;
         void OnSetPidPosition(float bandwidth, const infra::Function<void()>& onDone) override;
+        void OnAlign(const infra::Function<void(services::CanAckStatus)>& onDone) override;
         void OnIdentifyElectrical(const infra::Function<void()>& onDone) override;
         void OnIdentifyMechanical(const infra::Function<void()>& onDone) override;
         void OnRequestTelemetry(const infra::Function<void()>& onDone) override;
@@ -74,6 +75,7 @@ namespace can
         services::ConfigData configData;
 
         infra::Function<void(FocMotorMode)> pendingSelectCallback;
+        infra::Function<void(services::CanAckStatus)> pendingAlignDoneCallback;
         infra::Function<void()> pendingElectricalIdentDoneCallback;
         infra::Function<void()> pendingMechIdentDoneCallback;
         infra::Function<void()> pendingNvmDoneCallback;
