@@ -38,6 +38,9 @@ namespace services
         void Abort();
 
     private:
+        bool InitializeParameters();
+        void BeginInjection();
+        void AdvanceInjection();
         void OnCurrentSample(foc::PhaseCurrents currents);
         void FailMeasurement();
         Result ComputeResult() const;

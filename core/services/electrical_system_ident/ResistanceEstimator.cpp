@@ -36,8 +36,11 @@ namespace services
         this->onDone = onDone;
         currentSamples.clear();
         filteredSamples.clear();
+        StartSettlePhase();
+    }
 
-        // Apply test voltage immediately so the settle timer gives current time to reach V/R.
+    void ResistanceEstimator::StartSettlePhase()
+    {
         driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
             {
                 if (!this->onDone)
@@ -47,41 +50,51 @@ namespace services
                     FailMeasurement();
             });
         driver.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{
-            hal::Percent{ config.testVoltagePercent.Value() },
+            hal::Percent{ activeConfig.testVoltagePercent.Value() },
             hal::Percent{ neutralDuty },
             hal::Percent{ neutralDuty } });
 
-        settleTimer.Start(config.settleTime, [this]()
+        settleTimer.Start(activeConfig.settleTime, [this]()
             {
-                noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
-                    {
-                        FailMeasurement();
-                    });
-                driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
-                    {
-                        if (!this->onDone)
-                            return;
-
-                        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
-                            {
-                                FailMeasurement();
-                            });
-
-                        if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
-                        {
-                            FailMeasurement();
-                            return;
-                        }
-
-                        currentSamples.push_back(currents.a.Value());
-
-                        if (currentSamples.full())
-                            filteredSamples.push_back(AverageAndRemoveFront(currentSamples));
-
-                        if (filteredSamples.full())
-                            OnMeasurementComplete();
-                    });
+                StartMeasurementPhase();
             });
+    }
+
+    void ResistanceEstimator::StartMeasurementPhase()
+    {
+        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
+            {
+                FailMeasurement();
+            });
+        driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
+            {
+                OnMeasurementSample(currents);
+            });
+    }
+
+    void ResistanceEstimator::OnMeasurementSample(foc::PhaseCurrents currents)
+    {
+        if (!onDone)
+            return;
+
+        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
+            {
+                FailMeasurement();
+            });
+
+        if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
+        {
+            FailMeasurement();
+            return;
+        }
+
+        currentSamples.push_back(currents.a.Value());
+
+        if (currentSamples.full())
+            filteredSamples.push_back(AverageAndRemoveFront(currentSamples));
+
+        if (filteredSamples.full())
+            OnMeasurementComplete();
     }
 
     void ResistanceEstimator::Abort()

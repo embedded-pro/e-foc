@@ -34,6 +34,9 @@ namespace services
         void Abort();
 
     private:
+        void StartSettlePhase();
+        void StartMeasurementPhase();
+        void OnMeasurementSample(foc::PhaseCurrents currents);
         void OnMeasurementComplete();
         void FailMeasurement();
 
