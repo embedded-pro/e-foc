@@ -56,11 +56,11 @@ End with: total C/W/S counts + **APPROVE** or **REQUEST CHANGES**.
 - New FOC implementations satisfy all pure virtuals of `FocBase`/`FocTorque`/`FocSpeed`/`FocPosition`
 - Hardware injected via constructor; hardware ports from `interfaces/Drivers.hpp`
 
-**Async callback lifetime safety** (see `documentation/design/async-callback-lifetime.md`):
-- Any class that calls `EventDispatcherWithWeakPtr::Instance().Schedule([this]...)` (plain void() overload) on a non-static object is a CRITICAL defect; it must use `Schedule(action, WeakFromThis())` instead
-- Any class that uses `WeakFromThis()` must inherit `infra::EnableSharedFromThis<T>` and be constructed via `infra::WithSharedAccess<T>` at every construction site (not as a bare member or local variable)
-- Any new identification or async service that bypasses the FSM `Calibrating` state must expose `IsRunning() const` and have it included in the relevant `HasPendingAsyncWork()` override
-- Test fixtures holding `WithSharedAccess`-wrapped members must call `ExecuteAllActions()` in `TearDown()`, and all `StrictMock` service mocks must have `EXPECT_CALL(..., IsRunning()).WillRepeatedly(Return(false))` in the teardown setup block
+**Async callback lifetime safety** (AGENTS.md §"Async callback lifetime safety", design: `documentation/design/async-callback-lifetime.md`):
+- Raw `[this]` capture in `EventDispatcherWithWeakPtr::Instance().Schedule(…)` on a non-static object → CRITICAL
+- `WeakFromThis()` used but class does not inherit `EnableSharedFromThis<T>`, or construction site is not `WithSharedAccess<T>` → CRITICAL
+- New async service bypasses `Calibrating` state without `IsRunning()` wired into `HasPendingAsyncWork()` → CRITICAL
+- Test fixture with `WithSharedAccess` member missing `TearDown()` drain or `StrictMock` missing `IsRunning()` expectation → WARNING
 
 **Documentation**:
 - Behavioral change with no matching `documentation/` update = CRITICAL
