@@ -12,8 +12,8 @@ namespace foc
     public:
         static constexpr CurrentAlgorithm algorithm{ CurrentAlgorithm::slidingMode };
 
-        void Configure(const MotorModelParameters& motorParameters);
-        void SetTunings(const CurrentLoopTunings& tunings);
+        bool Configure(const MotorModelParameters& motorParameters);
+        bool SetTunings(const CurrentLoopTunings& tunings);
         void Reset() const;
 
         OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context)
@@ -28,7 +28,7 @@ namespace foc
         using ScalarSlidingMode = robust_control::SlidingModeControl<float, 1, 1>;
 
         static ScalarSlidingMode Inert();
-        void Construct();
+        bool Construct();
 
         OPTIMIZE_FOR_SPEED float ComputeAxis(float measured, float reference)
         {

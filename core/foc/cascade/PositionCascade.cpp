@@ -16,14 +16,17 @@ namespace foc
             });
     }
 
-    void PositionCascade::Configure(const MotorModelParameters& parameters)
+    bool PositionCascade::Configure(const MotorModelParameters& parameters)
     {
-        ConfigureImpl(parameters);
+        return ConfigureImpl(parameters);
     }
 
-    void PositionCascade::ConfigureMechanics(const MechanicalModelParameters& parameters)
+    bool PositionCascade::ConfigureMechanics(const MechanicalModelParameters& parameters)
     {
-        positionLoop.Configure(ConfigureMechanicsImpl(parameters));
+        auto withLimits = parameters;
+        const bool speedOk = ConfigureMechanicsImpl(withLimits);
+        const bool positionOk = positionLoop.Configure(withLimits);
+        return speedOk && positionOk;
     }
 
     void PositionCascade::SetPoint(Radians point)

@@ -11,14 +11,14 @@ namespace foc
     public:
         static constexpr SpeedAlgorithm algorithm{ SpeedAlgorithm::pid };
 
-        void Configure(const MechanicalModelParameters& motorParameters);
-        void SetTunings(const SpeedLoopTunings& tunings);
+        bool Configure(const MechanicalModelParameters& motorParameters);
+        bool SetTunings(const SpeedLoopTunings& tunings);
         void Reset();
 
         OPTIMIZE_FOR_SPEED foc::Ampere Compute(const SpeedControlContext& context);
 
     private:
-        void ApplyGains();
+        bool ApplyGains();
 
         controllers::PidIncrementalSynchronous<float> speedPid{ { 0.0f, 0.0f, 0.0f }, { -1.0f, 1.0f } };
         MechanicalModelParameters parameters{};

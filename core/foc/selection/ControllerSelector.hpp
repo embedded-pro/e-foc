@@ -40,16 +40,16 @@ namespace foc
             return activeAlgorithm;
         }
 
-        void Configure(const Parameters& motorParameters)
+        bool Configure(const Parameters& motorParameters)
         {
             parameters = motorParameters;
-            ApplyConfiguration();
+            return ApplyConfiguration();
         }
 
-        void SetTunings(const Tunings& controllerTunings)
+        bool SetTunings(const Tunings& controllerTunings)
         {
             tunings = controllerTunings;
-            ApplyConfiguration();
+            return ApplyConfiguration();
         }
 
         SelectResult TrySetTunings(const Tunings& controllerTunings)
@@ -83,12 +83,13 @@ namespace foc
     private:
         using Storage = std::variant<Controllers...>;
 
-        void ApplyConfiguration()
+        bool ApplyConfiguration()
         {
-            std::visit([this](auto& controller)
+            return std::visit([this](auto& controller)
                 {
-                    controller.Configure(parameters);
-                    controller.SetTunings(tunings);
+                    const bool configOk = controller.Configure(parameters);
+                    const bool tuningsOk = controller.SetTunings(tunings);
+                    return configOk && tuningsOk;
                 },
                 active);
         }

@@ -1,6 +1,9 @@
 #pragma once
 
+#include "numerical/controllers/implementations/PidIncremental.hpp"
+#include "numerical/controllers/interfaces/PidController.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
+#include <limits>
 
 namespace foc
 {
@@ -9,35 +12,29 @@ namespace foc
     public:
         void SetTunings(float proportional, float integral)
         {
-            kp = proportional;
-            ki = integral;
+            pid.SetTunings({ proportional, integral, 0.0f });
         }
 
         void Reset()
         {
-            previousOutput = 0.0f;
-            previousError = 0.0f;
+            pid.Reset();
         }
 
         ALWAYS_INLINE_HOT float Propose(float reference, float measured)
         {
-            const auto error = reference - measured;
-            const auto output = previousOutput + (kp + ki) * error - kp * previousError;
-
-            previousError = error;
-
-            return output;
+            pid.SetPoint(reference);
+            return pid.Process(measured);
         }
 
         ALWAYS_INLINE_HOT void CommitRealized(float applied)
         {
-            previousOutput = applied;
+            pid.SetPreviousOutput(applied);
         }
 
     private:
-        float kp{ 0.0f };
-        float ki{ 0.0f };
-        float previousOutput{ 0.0f };
-        float previousError{ 0.0f };
+        controllers::PidIncrementalSynchronous<float> pid{
+            { 0.0f, 0.0f, 0.0f },
+            { -std::numeric_limits<float>::max(), std::numeric_limits<float>::max() }
+        };
     };
 }

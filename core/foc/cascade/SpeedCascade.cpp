@@ -16,14 +16,15 @@ namespace foc
             });
     }
 
-    void SpeedCascade::Configure(const MotorModelParameters& parameters)
+    bool SpeedCascade::Configure(const MotorModelParameters& parameters)
     {
-        ConfigureImpl(parameters);
+        return ConfigureImpl(parameters);
     }
 
-    void SpeedCascade::ConfigureMechanics(const MechanicalModelParameters& parameters)
+    bool SpeedCascade::ConfigureMechanics(const MechanicalModelParameters& parameters)
     {
-        ConfigureMechanicsImpl(parameters);
+        auto withLimits = parameters;
+        return ConfigureMechanicsImpl(withLimits);
     }
 
     void SpeedCascade::SetPoint(RadiansPerSecond point)

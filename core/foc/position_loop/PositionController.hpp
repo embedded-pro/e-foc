@@ -27,8 +27,8 @@ namespace foc
         const PositionLoopTunings& tunings,
         const PositionControlContext& context) {
         { T::algorithm } -> std::convertible_to<PositionAlgorithm>;
-        { controller.Configure(parameters) } -> std::same_as<void>;
-        { controller.SetTunings(tunings) } -> std::same_as<void>;
+        { controller.Configure(parameters) } -> std::same_as<bool>;
+        { controller.SetTunings(tunings) } -> std::same_as<bool>;
         { controller.Reset() } -> std::same_as<void>;
         { controller.Compute(context) } -> std::same_as<PositionOutput>;
     };

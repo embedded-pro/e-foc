@@ -22,17 +22,18 @@ namespace
 
 namespace foc
 {
-    void DeadbeatCurrentController::Configure(const MotorModelParameters& motorParameters)
+    bool DeadbeatCurrentController::Configure(const MotorModelParameters& motorParameters)
     {
         parameters = motorParameters;
-        decoupling.Configure(motorParameters);
-        ApplyGains();
+        const bool gainsOk = ApplyGains();
+        const bool decouplingOk = decoupling.Configure(motorParameters);
+        return gainsOk && decouplingOk;
     }
 
-    void DeadbeatCurrentController::SetTunings(const CurrentLoopTunings& tunings)
+    bool DeadbeatCurrentController::SetTunings(const CurrentLoopTunings& tunings)
     {
         twoStep = tunings.twoStepDeadbeat;
-        ApplyGains();
+        return ApplyGains();
     }
 
     void DeadbeatCurrentController::Reset() const
@@ -40,23 +41,24 @@ namespace foc
         // Deadbeat control is a memoryless plant inversion; there is no state to clear
     }
 
-    void DeadbeatCurrentController::ApplyGains()
+    bool DeadbeatCurrentController::ApplyGains()
     {
         referenceGain = 0.0f;
         feedbackGain = 0.0f;
 
         if (!AreElectricalParametersValid(parameters))
-            return;
+            return false;
 
         const auto plant = CurrentPlantModel::FromParameters(parameters);
 
         if (!plant.IsUsable())
-            return;
+            return false;
 
         const auto [reference, feedback] = twoStep ? ReferenceAndFeedbackGain<TwoStepDesign>(plant) : ReferenceAndFeedbackGain<OneStepDesign>(plant);
         const auto scale = NormalizationScale(parameters.busVoltage);
 
         referenceGain = reference * scale;
         feedbackGain = feedback * scale;
+        return true;
     }
 }

@@ -11,8 +11,8 @@ namespace foc
     public:
         static constexpr SpeedAlgorithm algorithm{ SpeedAlgorithm::lqi };
 
-        void Configure(const MechanicalModelParameters& motorParameters);
-        void SetTunings(const SpeedLoopTunings& tunings);
+        bool Configure(const MechanicalModelParameters& motorParameters);
+        bool SetTunings(const SpeedLoopTunings& tunings);
         void Reset();
 
         OPTIMIZE_FOR_SPEED foc::Ampere Compute(const SpeedControlContext& context);
@@ -21,7 +21,7 @@ namespace foc
         using SpeedLqi = controllers::IntegralStateFeedbackLqi<float, 1, 1, 1>;
 
         static SpeedLqi Inert();
-        void Construct();
+        bool Construct();
 
         MechanicalModelParameters parameters{};
         float speedErrorWeight{ SpeedLoopTunings{}.speedErrorWeight };

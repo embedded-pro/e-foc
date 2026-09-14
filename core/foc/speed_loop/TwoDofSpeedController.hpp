@@ -10,8 +10,8 @@ namespace foc
     public:
         static constexpr SpeedAlgorithm algorithm{ SpeedAlgorithm::twoDof };
 
-        void Configure(const MechanicalModelParameters& motorParameters);
-        void SetTunings(const SpeedLoopTunings& tunings);
+        bool Configure(const MechanicalModelParameters& motorParameters);
+        bool SetTunings(const SpeedLoopTunings& tunings);
         void Reset();
 
         OPTIMIZE_FOR_SPEED foc::Ampere Compute(const SpeedControlContext& context);

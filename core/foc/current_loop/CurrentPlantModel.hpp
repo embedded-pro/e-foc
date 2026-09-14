@@ -24,7 +24,7 @@ namespace foc
     class DecouplingFeedforward
     {
     public:
-        void Configure(const MotorModelParameters& parameters);
+        bool Configure(const MotorModelParameters& parameters);
 
         ALWAYS_INLINE_HOT foc::RotatingFrame Apply(const foc::RotatingFrame& voltages, const CurrentControlContext& context) const
         {

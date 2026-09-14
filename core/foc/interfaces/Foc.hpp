@@ -16,7 +16,7 @@ namespace foc
     public:
         virtual ~FocBase() = default;
 
-        virtual void Configure(const MotorModelParameters& parameters) = 0;
+        virtual bool Configure(const MotorModelParameters& parameters) = 0;
         virtual void Enable() = 0;
         virtual void Disable() = 0;
         virtual PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) = 0;
@@ -53,7 +53,7 @@ namespace foc
     public:
         virtual ~SpeedLoopTunable() = default;
 
-        virtual void ConfigureMechanics(const MechanicalModelParameters& parameters) = 0;
+        virtual bool ConfigureMechanics(const MechanicalModelParameters& parameters) = 0;
         virtual void SetSpeedTunings(const SpeedLoopTunings& tunings) = 0;
     };
 

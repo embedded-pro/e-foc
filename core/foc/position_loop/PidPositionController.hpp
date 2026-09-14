@@ -12,15 +12,15 @@ namespace foc
     public:
         static constexpr PositionAlgorithm algorithm{ PositionAlgorithm::pid };
 
-        void Configure(const MechanicalModelParameters& motorParameters);
-        void SetTunings(const PositionLoopTunings& tunings);
+        bool Configure(const MechanicalModelParameters& motorParameters);
+        bool SetTunings(const PositionLoopTunings& tunings);
         void Reset();
 
         OPTIMIZE_FOR_SPEED PositionOutput Compute(const PositionControlContext& context);
 
     private:
         float SpeedEnvelope() const;
-        void ApplyGains();
+        bool ApplyGains();
 
         static constexpr float maximumErrorInRadians{ std::numbers::pi_v<float> };
 

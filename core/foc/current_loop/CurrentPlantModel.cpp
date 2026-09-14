@@ -52,16 +52,17 @@ namespace foc
         return IsFiniteValue(ad) && IsFiniteValue(bd) && bd > minimumInputGain && ad >= 0.0f && ad < 1.0f;
     }
 
-    void DecouplingFeedforward::Configure(const MotorModelParameters& parameters)
+    bool DecouplingFeedforward::Configure(const MotorModelParameters& parameters)
     {
         couplingScale = 0.0f;
         backEmfScale = 0.0f;
 
         if (!AreElectricalParametersValid(parameters))
-            return;
+            return false;
 
         const auto scale = NormalizationScale(parameters.busVoltage);
         couplingScale = InductanceInHenry(parameters.inductance) * scale;
         backEmfScale = parameters.fluxLinkage.Value() * scale;
+        return true;
     }
 }

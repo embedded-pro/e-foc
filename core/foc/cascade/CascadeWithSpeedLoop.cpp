@@ -81,20 +81,18 @@ namespace foc
         lowPriorityInterrupt.Unregister();
     }
 
-    void CascadeWithSpeedLoop::ConfigureImpl(const MotorModelParameters& parameters)
+    bool CascadeWithSpeedLoop::ConfigureImpl(const MotorModelParameters& parameters)
     {
         polePairs = static_cast<float>(parameters.polePairs);
         vdcInvScale = std::numbers::inv_sqrt3_v<float> * parameters.busVoltage.Value();
-        currentLoop.Configure(parameters);
+        return currentLoop.Configure(parameters);
     }
 
-    MechanicalModelParameters CascadeWithSpeedLoop::ConfigureMechanicsImpl(const MechanicalModelParameters& parameters)
+    bool CascadeWithSpeedLoop::ConfigureMechanicsImpl(MechanicalModelParameters& parameters)
     {
-        auto withLimits = parameters;
-        withLimits.maxCurrent = maxCurrent;
-        withLimits.samplingFrequency = outerLoopFrequency;
-        speedLoop.Configure(withLimits);
-        return withLimits;
+        parameters.maxCurrent = maxCurrent;
+        parameters.samplingFrequency = outerLoopFrequency;
+        return speedLoop.Configure(parameters);
     }
 
     void CascadeWithSpeedLoop::SetCurrentTuningsImpl(const CurrentLoopTunings& tunings)

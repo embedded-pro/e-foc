@@ -7,15 +7,16 @@
 
 namespace foc
 {
-    void DecoupledPidCurrentController::Configure(const MotorModelParameters& motorParameters)
+    bool DecoupledPidCurrentController::Configure(const MotorModelParameters& motorParameters)
     {
-        pid.Configure(motorParameters);
-        decoupling.Configure(motorParameters);
+        const bool pidOk = pid.Configure(motorParameters);
+        const bool decouplingOk = decoupling.Configure(motorParameters);
+        return pidOk && decouplingOk;
     }
 
-    void DecoupledPidCurrentController::SetTunings(const CurrentLoopTunings& tunings)
+    bool DecoupledPidCurrentController::SetTunings(const CurrentLoopTunings& tunings)
     {
-        pid.SetTunings(tunings);
+        return pid.SetTunings(tunings);
     }
 
     void DecoupledPidCurrentController::Reset()
