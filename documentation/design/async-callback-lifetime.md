@@ -198,6 +198,25 @@ sequenceDiagram
 
 ---
 
+## Interfaces
+
+### Provided
+
+| Interface | Purpose | Contract |
+|-----------|---------|----------|
+| `infra::WithSharedAccess<T>` | Wraps a stack-allocated `T` so that `WeakPtr<T>` obtained via `WeakFromThis()` expires when the wrapper is destroyed | `T` must inherit `infra::EnableSharedFromThis<T>`; all `WeakPtr` instances derived from the object must be released before the wrapper is destroyed |
+| `IsRunning() const` | Exposed by each identification service; reports whether an estimation sweep is currently active | Returns `true` from the first call to the start method until either the estimation completes, the done callback fires, or `Abort()` is called |
+
+### Required
+
+| Interface | Purpose | Contract |
+|-----------|---------|----------|
+| `infra::EventDispatcherWithWeakPtr` | Defers a closure and discards it if the associated `WeakPtr` has expired by execution time | Must be the globally active dispatcher; the WeakPtr overload of `Schedule()` must be used — the plain `void()` overload does not check the pointer |
+| `infra::EnableSharedFromThis<T>` | Provides `WeakFromThis()` on the service class | The service must be constructed via `infra::WithSharedAccess<T>`; calling `WeakFromThis()` on a bare instance returns a null pointer and closures are always discarded |
+| `HasPendingAsyncWork()` | Checked by `ControlModeStateMachine::Select()` before switching modes | Must return `true` while any identification service is running or any async command is outstanding; the FSM subclass that owns the service is responsible for including `service.IsRunning()` in its override |
+
+---
+
 ## Constraints & Limitations
 
 | Constraint | Description |
