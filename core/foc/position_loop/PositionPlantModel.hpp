@@ -1,8 +1,8 @@
 #pragma once
 
 #include "core/foc/interfaces/MotorModel.hpp"
-#include "core/foc/math/AngleWrap.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
+#include <cmath>
 #include <numbers>
 
 namespace foc
@@ -20,13 +20,7 @@ namespace foc
 
     ALWAYS_INLINE_HOT float WrappedPositionError(Radians reference, Radians measured)
     {
-        constexpr float pi = std::numbers::pi_v<float>;
-
-        const auto error = reference.Value() - measured.Value();
-
-        if (error > pi || error < -pi)
-            return detail::PositionWithWrapAround(error);
-
-        return error;
+        constexpr float two_pi = 2.0f * std::numbers::pi_v<float>;
+        return std::remainder(reference.Value() - measured.Value(), two_pi);
     }
 }
