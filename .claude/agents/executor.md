@@ -27,6 +27,19 @@ Implement code. Follow all constraints in AGENTS.md without exception.
 9. **Docs** — if modifying `documentation/`, first read `.github/instructions/documentation.instructions.md`; update for every algorithm or procedure added/changed
 10. **Verify** — `cmake --build --preset host-Debug` then `ctest --preset host`
 
+## Async Callback Lifetime Safety
+
+Any service that calls `EventDispatcherWithWeakPtr::Instance().Schedule(...)` and whose lifetime is controlled by an FSM variant **must** follow this pattern (see `documentation/design/async-callback-lifetime.md`):
+
+1. **Inherit `infra::EnableSharedFromThis<T>`** on the service class.
+2. **Schedule via WeakPtr** — use `Schedule([](const SharedPtr<T>& self){ ... }, WeakFromThis())`, not `Schedule([this](){ ... })`.
+3. **Wrap at construction** — every construction site must use `infra::WithSharedAccess<T>` instead of `T` directly.
+4. **Expose `IsRunning() const`** on the service's interface; implement it to return `true` while the service holds active estimation state.
+5. **Extend `HasPendingAsyncWork()`** — every `FocStateMachine` subclass that introduces a new service with `IsRunning()` must OR it into its `HasPendingAsyncWork()` override.
+6. **Test fixtures**: any fixture holding a `WithSharedAccess`-wrapped member must drain the dispatcher in `TearDown()` (`ExecuteAllActions()`) and expect `IsRunning()` on all `StrictMock` service mocks.
+
+Static objects (application-level composites that are never destroyed) are exempt from rules 1–3.
+
 ## Do NOT
 
 - Add features beyond what was requested
