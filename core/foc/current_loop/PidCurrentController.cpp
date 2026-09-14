@@ -7,16 +7,16 @@
 
 namespace foc
 {
-    void PidCurrentController::Configure(const MotorModelParameters& motorParameters)
+    bool PidCurrentController::Configure(const MotorModelParameters& motorParameters)
     {
         parameters = motorParameters;
-        ApplyGains();
+        return ApplyGains();
     }
 
-    void PidCurrentController::SetTunings(const CurrentLoopTunings& tunings)
+    bool PidCurrentController::SetTunings(const CurrentLoopTunings& tunings)
     {
         bandwidth = tunings.bandwidth;
-        ApplyGains();
+        return ApplyGains();
     }
 
     void PidCurrentController::Reset()
@@ -25,13 +25,13 @@ namespace foc
         qPi.Reset();
     }
 
-    void PidCurrentController::ApplyGains()
+    bool PidCurrentController::ApplyGains()
     {
         if (!AreElectricalParametersValid(parameters))
         {
             dPi.SetTunings(0.0f, 0.0f);
             qPi.SetTunings(0.0f, 0.0f);
-            return;
+            return false;
         }
 
         const auto scale = NormalizationScale(parameters.busVoltage);
@@ -40,5 +40,6 @@ namespace foc
 
         dPi.SetTunings(kp, ki);
         qPi.SetTunings(kp, ki);
+        return true;
     }
 }

@@ -9,16 +9,16 @@
 
 namespace foc
 {
-    void PidPositionController::Configure(const MechanicalModelParameters& motorParameters)
+    bool PidPositionController::Configure(const MechanicalModelParameters& motorParameters)
     {
         samplingFrequency = motorParameters.samplingFrequency;
-        ApplyGains();
+        return ApplyGains();
     }
 
-    void PidPositionController::SetTunings(const PositionLoopTunings& controllerTunings)
+    bool PidPositionController::SetTunings(const PositionLoopTunings& controllerTunings)
     {
         tunings = controllerTunings;
-        ApplyGains();
+        return ApplyGains();
     }
 
     void PidPositionController::Reset()
@@ -39,14 +39,15 @@ namespace foc
         return tunings.bandwidth * maximumErrorInRadians;
     }
 
-    void PidPositionController::ApplyGains()
+    bool PidPositionController::ApplyGains()
     {
         if (samplingFrequency.Value() == 0)
-            return;
+            return false;
 
         const auto kp = 1.0f / maximumErrorInRadians;
         const auto ki = kp * WeightRatio(tunings.integralWeight, tunings.positionErrorWeight) * OuterSamplePeriod(samplingFrequency) * tunings.bandwidth;
 
         positionPid.SetTunings({ kp, ki, 0.0f });
+        return true;
     }
 }

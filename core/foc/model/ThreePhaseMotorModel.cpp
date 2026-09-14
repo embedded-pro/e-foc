@@ -1,9 +1,9 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include <cmath>
 #include <numbers>
 
 namespace foc
@@ -15,13 +15,6 @@ namespace foc
         constexpr float percentToFraction = 100.0f;
         constexpr float torqueConstant = 1.5f;
 
-        float WrapAngle(float angle)
-        {
-            auto result = std::fmod(angle, two_pi);
-            if (result < 0.0f)
-                result += two_pi;
-            return result;
-        }
     }
 
     ThreePhaseMotorModel::ThreePhaseMotorModel(const Parameters& params, foc::Volts supplyVoltage, hal::Hertz pwmFrequency, std::optional<std::size_t> iterationLimit, bool selfDriveEnabled)
@@ -231,7 +224,7 @@ namespace foc
     foc::Radians ThreePhaseMotorModel::Read()
     {
         const float noise = encoderNoise.config.sigmaRadians * encoderNoise.distribution(encoderNoise.engine);
-        return foc::Radians{ WrapAngle(motorState.theta_mech.Value() + encoderNoise.config.biasRadians + noise) };
+        return foc::Radians{ detail::PositionWithWrapAround(motorState.theta_mech.Value() + encoderNoise.config.biasRadians + noise) };
     }
 
     void ThreePhaseMotorModel::Set(foc::Radians value)
@@ -298,7 +291,7 @@ namespace foc
         motorState.theta_mech += foc::Radians{ motorState.omega_mech.Value() * dt };
         motorState.theta += foc::Radians{ motorState.omega.Value() * dt };
 
-        motorState.theta_mech = foc::Radians{ WrapAngle(motorState.theta_mech.Value()) };
-        motorState.theta = foc::Radians{ WrapAngle(motorState.theta.Value()) };
+        motorState.theta_mech = foc::Radians{ detail::PositionWithWrapAround(motorState.theta_mech.Value()) };
+        motorState.theta = foc::Radians{ detail::PositionWithWrapAround(motorState.theta.Value()) };
     }
 }

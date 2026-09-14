@@ -21,8 +21,8 @@ namespace foc
         const CurrentLoopTunings& tunings,
         const CurrentControlContext& context) {
         { T::algorithm } -> std::convertible_to<CurrentAlgorithm>;
-        { controller.Configure(parameters) } -> std::same_as<void>;
-        { controller.SetTunings(tunings) } -> std::same_as<void>;
+        { controller.Configure(parameters) } -> std::same_as<bool>;
+        { controller.SetTunings(tunings) } -> std::same_as<bool>;
         { controller.Reset() } -> std::same_as<void>;
         { controller.Compute(context) } -> std::same_as<RotatingFrame>;
     };

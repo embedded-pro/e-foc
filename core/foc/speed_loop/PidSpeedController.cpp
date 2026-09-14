@@ -7,16 +7,16 @@
 
 namespace foc
 {
-    void PidSpeedController::Configure(const MechanicalModelParameters& motorParameters)
+    bool PidSpeedController::Configure(const MechanicalModelParameters& motorParameters)
     {
         parameters = motorParameters;
-        ApplyGains();
+        return ApplyGains();
     }
 
-    void PidSpeedController::SetTunings(const SpeedLoopTunings& tunings)
+    bool PidSpeedController::SetTunings(const SpeedLoopTunings& tunings)
     {
         bandwidth = tunings.bandwidth;
-        ApplyGains();
+        return ApplyGains();
     }
 
     void PidSpeedController::Reset()
@@ -32,10 +32,10 @@ namespace foc
         return LimitToCurrentEnvelope(speedPid.Process(context.measured.Value()) * parameters.maxCurrent.Value(), parameters.maxCurrent);
     }
 
-    void PidSpeedController::ApplyGains()
+    bool PidSpeedController::ApplyGains()
     {
         if (!AreMechanicalParametersValid(parameters))
-            return;
+            return false;
 
         const auto inertia = parameters.inertia.Value();
         const auto scale = 1.0f / parameters.maxCurrent.Value();
@@ -44,5 +44,6 @@ namespace foc
         const auto ki = kp * integralZero * OuterSamplePeriod(parameters.samplingFrequency);
 
         speedPid.SetTunings({ kp * scale, ki * scale, 0.0f });
+        return true;
     }
 }

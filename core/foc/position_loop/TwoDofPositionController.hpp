@@ -11,8 +11,8 @@ namespace foc
     public:
         static constexpr PositionAlgorithm algorithm{ PositionAlgorithm::twoDof };
 
-        void Configure(const MechanicalModelParameters& motorParameters);
-        void SetTunings(const PositionLoopTunings& tunings);
+        bool Configure(const MechanicalModelParameters& motorParameters);
+        bool SetTunings(const PositionLoopTunings& tunings);
         void Reset();
 
         OPTIMIZE_FOR_SPEED PositionOutput Compute(const PositionControlContext& context)
@@ -28,9 +28,6 @@ namespace foc
 
         OPTIMIZE_FOR_SPEED Radians ShapedReference(const PositionControlContext& context)
         {
-            if (!filterActive)
-                return context.reference;
-
             if (!seeded)
             {
                 shapedReference = context.measured.Value();
@@ -47,7 +44,6 @@ namespace foc
         float referenceTimeConstant{ PositionLoopTunings{}.referenceTimeConstant };
         float alpha{ 1.0f };
         float shapedReference{ 0.0f };
-        bool filterActive{ false };
         bool seeded{ false };
     };
 

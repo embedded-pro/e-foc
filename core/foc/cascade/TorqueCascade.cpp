@@ -27,7 +27,7 @@ namespace foc
     {
         currentLoop.Reset();
         enabled = true;
-        electricalSpeed = 0.0f;
+        speedFilter.Reset();
         previousAngleValid = false;
         SetPoint(lastSetPoint);
     }
@@ -50,17 +50,15 @@ namespace foc
         return currentLoop.Active();
     }
 
-    void TorqueCascade::Configure(const MotorModelParameters& parameters)
+    bool TorqueCascade::Configure(const MotorModelParameters& parameters)
     {
         polePairs = static_cast<float>(parameters.polePairs);
-        currentLoop.Configure(parameters);
+        const bool ok = currentLoop.Configure(parameters);
 
         const auto samplingFrequency = static_cast<float>(parameters.samplingFrequency.Value());
-        if (samplingFrequency <= 0.0f)
-            return;
-
         electricalSpeedScale = polePairs * samplingFrequency;
-        speedFilterAlpha = 1.0f - math::Exp(-1.0f / (speedFilterTimeConstant * samplingFrequency));
+        speedFilter.SetAlpha(1.0f - math::Exp(-1.0f / (speedFilterTimeConstant * samplingFrequency)));
+        return ok;
     }
 
     void TorqueCascade::SetPoint(IdAndIqPoint setPoint)
@@ -125,8 +123,6 @@ namespace foc
 
         const auto sampled = detail::PositionWithWrapAround(mechanicalAngle - previousMechanicalAngle) * electricalSpeedScale;
         previousMechanicalAngle = mechanicalAngle;
-        electricalSpeed += speedFilterAlpha * (sampled - electricalSpeed);
-
-        return electricalSpeed;
+        return speedFilter.Filter(sampled);
     }
 }

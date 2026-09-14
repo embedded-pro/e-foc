@@ -8,18 +8,20 @@
 
 namespace foc
 {
-    void TwoDofSpeedController::Configure(const MechanicalModelParameters& motorParameters)
+    bool TwoDofSpeedController::Configure(const MechanicalModelParameters& motorParameters)
     {
-        feedback.Configure(motorParameters);
+        const bool ok = feedback.Configure(motorParameters);
         samplingFrequency = motorParameters.samplingFrequency;
         ApplyReferenceFilter();
+        return ok;
     }
 
-    void TwoDofSpeedController::SetTunings(const SpeedLoopTunings& tunings)
+    bool TwoDofSpeedController::SetTunings(const SpeedLoopTunings& tunings)
     {
-        feedback.SetTunings(tunings);
+        const bool ok = feedback.SetTunings(tunings);
         referenceTimeConstant = tunings.referenceTimeConstant;
         ApplyReferenceFilter();
+        return ok;
     }
 
     void TwoDofSpeedController::Reset()

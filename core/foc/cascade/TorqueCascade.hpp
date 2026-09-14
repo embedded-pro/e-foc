@@ -5,6 +5,7 @@
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
+#include "numerical/filters/passive/ExponentialMovingAverage.hpp"
 
 namespace foc
 {
@@ -14,7 +15,7 @@ namespace foc
     public:
         explicit TorqueCascade(foc::Ampere maxCurrent);
 
-        void Configure(const MotorModelParameters& parameters) override;
+        bool Configure(const MotorModelParameters& parameters) override;
         void SetPoint(IdAndIqPoint setPoint) override;
         void SetCurrentTunings(const CurrentLoopTunings& tunings) override;
         SelectResult SelectCurrentAlgorithm(CurrentAlgorithm algorithm) override;
@@ -39,9 +40,8 @@ namespace foc
         IdAndIqPoint lastSetPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
 
         float electricalSpeedScale{ 0.0f };
-        float speedFilterAlpha{ 1.0f };
+        filters::passive::ExponentialMovingAverage<float> speedFilter{ 1.0f };
         float previousMechanicalAngle{ 0.0f };
-        float electricalSpeed{ 0.0f };
         bool previousAngleValid{ false };
     };
 }

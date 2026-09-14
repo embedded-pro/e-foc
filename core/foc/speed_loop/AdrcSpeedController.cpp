@@ -14,17 +14,17 @@ namespace
 
 namespace foc
 {
-    void AdrcSpeedController::Configure(const MechanicalModelParameters& motorParameters)
+    bool AdrcSpeedController::Configure(const MechanicalModelParameters& motorParameters)
     {
         parameters = motorParameters;
-        Construct();
+        return Construct();
     }
 
-    void AdrcSpeedController::SetTunings(const SpeedLoopTunings& tunings)
+    bool AdrcSpeedController::SetTunings(const SpeedLoopTunings& tunings)
     {
         bandwidth = tunings.bandwidth;
         observerBandwidthRatio = tunings.observerBandwidthRatio;
-        Construct();
+        return Construct();
     }
 
     void AdrcSpeedController::Reset()
@@ -48,17 +48,18 @@ namespace foc
         return { 0.0f, 0.0f, 1.0f, 1.0f };
     }
 
-    void AdrcSpeedController::Construct()
+    bool AdrcSpeedController::Construct()
     {
         if (!AreMechanicalParametersValid(parameters) || observerBandwidthRatio <= 0.0f || bandwidth <= 0.0f)
         {
             adrc = Inert();
-            return;
+            return false;
         }
 
         const auto samplePeriod = OuterSamplePeriod(parameters.samplingFrequency);
         const auto observerBandwidth = std::min(observerBandwidthRatio * bandwidth, maxObserverBandwidthPerSample / samplePeriod);
 
         adrc = SpeedAdrc{ observerBandwidth, bandwidth, PlantInputGain(parameters), samplePeriod };
+        return true;
     }
 }

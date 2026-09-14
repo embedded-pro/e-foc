@@ -11,8 +11,8 @@ namespace foc
     public:
         static constexpr PositionAlgorithm algorithm{ PositionAlgorithm::cascadeP };
 
-        void Configure(const MechanicalModelParameters& motorParameters) const;
-        void SetTunings(const PositionLoopTunings& tunings);
+        bool Configure(const MechanicalModelParameters& motorParameters) const;
+        bool SetTunings(const PositionLoopTunings& tunings);
         void Reset() const;
 
         OPTIMIZE_FOR_SPEED PositionOutput Compute(const PositionControlContext& context) const

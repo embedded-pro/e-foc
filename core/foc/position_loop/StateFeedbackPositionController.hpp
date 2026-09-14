@@ -18,23 +18,23 @@ namespace foc
             return Derived::Solve(parameters, tunings).has_value();
         }
 
-        void Configure(const MechanicalModelParameters& motorParameters)
+        bool Configure(const MechanicalModelParameters& motorParameters)
         {
             parameters = motorParameters;
-            Construct();
+            return Construct();
         }
 
-        void SetTunings(const PositionLoopTunings& controllerTunings)
+        bool SetTunings(const PositionLoopTunings& controllerTunings)
         {
             tunings = controllerTunings;
-            Construct();
+            return Construct();
         }
 
     protected:
         void OnDesignChanged()
         {}
 
-        void Construct()
+        bool Construct()
         {
             auto solved = Derived::Solve(parameters, tunings);
 
@@ -42,6 +42,8 @@ namespace foc
             currentPerNormalizedInput = solved ? PositionPlantModel::FromParameters(parameters).currentPerNormalizedInput : 0.0f;
             samplePeriod = solved ? OuterSamplePeriod(parameters.samplingFrequency) : 0.0f;
             static_cast<Derived*>(this)->OnDesignChanged();
+
+            return solved.has_value();
         }
 
         MechanicalModelParameters parameters{};

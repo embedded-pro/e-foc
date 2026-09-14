@@ -7,17 +7,17 @@
 
 namespace foc
 {
-    void SlidingModeCurrentController::Configure(const MotorModelParameters& motorParameters)
+    bool SlidingModeCurrentController::Configure(const MotorModelParameters& motorParameters)
     {
         parameters = motorParameters;
-        Construct();
+        return Construct();
     }
 
-    void SlidingModeCurrentController::SetTunings(const CurrentLoopTunings& tunings)
+    bool SlidingModeCurrentController::SetTunings(const CurrentLoopTunings& tunings)
     {
         switchingGain = tunings.switchingGain;
         boundaryLayer = tunings.boundaryLayer;
-        Construct();
+        return Construct();
     }
 
     void SlidingModeCurrentController::Reset() const
@@ -34,7 +34,7 @@ namespace foc
         return { plant, ScalarSlidingMode::SurfaceMatrix{ 1.0f }, ScalarSlidingMode::InputVector{ 0.0f }, 1.0f };
     }
 
-    void SlidingModeCurrentController::Construct()
+    bool SlidingModeCurrentController::Construct()
     {
         const auto plant = CurrentPlantModel::FromParameters(parameters);
 
@@ -44,7 +44,7 @@ namespace foc
             normalizationScale = 0.0f;
             equilibriumGain = 0.0f;
             decoupling = DecouplingFeedforward{};
-            return;
+            return false;
         }
 
         decoupling.Configure(parameters);
@@ -59,5 +59,6 @@ namespace foc
         const auto inputVector = ScalarSlidingMode::InputVector{ switchingGain };
 
         slidingMode = ScalarSlidingMode{ plantNew, surfaceMatrix, inputVector, boundaryLayer };
+        return true;
     }
 }

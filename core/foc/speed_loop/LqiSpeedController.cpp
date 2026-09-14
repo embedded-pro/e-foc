@@ -14,17 +14,17 @@ namespace
 
 namespace foc
 {
-    void LqiSpeedController::Configure(const MechanicalModelParameters& motorParameters)
+    bool LqiSpeedController::Configure(const MechanicalModelParameters& motorParameters)
     {
         parameters = motorParameters;
-        Construct();
+        return Construct();
     }
 
-    void LqiSpeedController::SetTunings(const SpeedLoopTunings& tunings)
+    bool LqiSpeedController::SetTunings(const SpeedLoopTunings& tunings)
     {
         speedErrorWeight = tunings.speedErrorWeight;
         integralWeight = tunings.integralWeight;
-        Construct();
+        return Construct();
     }
 
     void LqiSpeedController::Reset()
@@ -43,8 +43,10 @@ namespace foc
 
         if (math::Abs(control) > 1.0f)
         {
-            const SpeedLqi::OutputVector mirrored{ 2.0f * context.measured.Value() - context.reference.Value() };
-            lqi.ComputeControl(state, mirrored, measured);
+            // Back-calculation anti-windup: feeding the negated error winds the
+            // LQI integrator back toward zero when the output saturates.
+            const SpeedLqi::OutputVector antiWindup{ 2.0f * context.measured.Value() - context.reference.Value() };
+            lqi.ComputeControl(state, antiWindup, measured);
         }
 
         return LimitToCurrentEnvelope(control * parameters.maxCurrent.Value(), parameters.maxCurrent);
@@ -55,12 +57,12 @@ namespace foc
         return { SpeedLqi::GainStateMatrix{ 0.0f }, SpeedLqi::GainIntegralMatrix{ 0.0f }, 1.0f };
     }
 
-    void LqiSpeedController::Construct()
+    bool LqiSpeedController::Construct()
     {
         if (!AreMechanicalParametersValid(parameters))
         {
             lqi = Inert();
-            return;
+            return false;
         }
 
         const auto plant = SpeedPlantModel::FromParameters(parameters);
@@ -75,5 +77,6 @@ namespace foc
         const auto inputMatrix = SpeedPlant::InputMatrix{ plant.bd * parameters.maxCurrent.Value() };
         const auto model = SpeedPlant::WithFullStateOutput(stateMatrix, inputMatrix);
         lqi = SpeedLqi{ model, stateWeight, inputWeight, 1.0f };
+        return true;
     }
 }

@@ -13,8 +13,8 @@ namespace foc
     public:
         explicit SpeedCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency = hal::Hertz{ 1000 });
 
-        void Configure(const MotorModelParameters& parameters) override;
-        void ConfigureMechanics(const MechanicalModelParameters& parameters) override;
+        bool Configure(const MotorModelParameters& parameters) override;
+        bool ConfigureMechanics(const MechanicalModelParameters& parameters) override;
         void SetPoint(RadiansPerSecond point) override;
         void SetCurrentTunings(const CurrentLoopTunings& tunings) override;
         void SetSpeedTunings(const SpeedLoopTunings& tunings) override;

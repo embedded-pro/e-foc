@@ -9,8 +9,8 @@ namespace foc
     public:
         static constexpr CurrentAlgorithm algorithm{ CurrentAlgorithm::decoupledPid };
 
-        void Configure(const MotorModelParameters& motorParameters);
-        void SetTunings(const CurrentLoopTunings& tunings);
+        bool Configure(const MotorModelParameters& motorParameters);
+        bool SetTunings(const CurrentLoopTunings& tunings);
         void Reset();
 
         OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context)
