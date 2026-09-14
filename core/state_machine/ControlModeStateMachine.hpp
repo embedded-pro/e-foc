@@ -74,8 +74,6 @@ namespace state_machine
         application::OuterLoopStateMachine* ActiveOuterLoop();
 
     private:
-        using CliResult = services::TerminalWithStorage::StatusWithMessage;
-
         void Activate(ControlMode mode);
         void AttachAlgorithmRestore(application::FocStateMachineCommon& stateMachine);
         foc::CurrentLoopSelectable* CurrentSelectable();
@@ -85,18 +83,7 @@ namespace state_machine
         const foc::SpeedLoopSelectable* SpeedSelectable() const;
         const foc::PositionLoopSelectable* PositionSelectable() const;
         void RegisterCliCommands();
-        void RegisterSetpointCliCommands(services::TerminalWithStorage& terminal);
-        void RegisterBandwidthCliCommands(services::TerminalWithStorage& terminal);
         TuningResult CheckRedesignPreconditions() const;
-        std::optional<CliResult> RejectSetpoint(ControlMode requiredMode) const;
-        CliResult SetTorqueSetpoint(const infra::BoundedConstString& input);
-        CliResult SetSpeedSetpoint(const infra::BoundedConstString& input);
-        CliResult SetPositionSetpoint(const infra::BoundedConstString& input);
-        CliResult SetCurrentBandwidth(const infra::BoundedConstString& input);
-        CliResult SetSpeedBandwidth(const infra::BoundedConstString& input);
-        CliResult SetPositionBandwidth(const infra::BoundedConstString& input);
-        CliResult SetFluxLinkageFromCli(const infra::BoundedConstString& input);
-        void TraceSelectResult(foc::SelectResult result) const;
         void OnSaveConfigDone(services::NvmStatus status);
 
         const application::TerminalAndTracer terminalAndTracer;

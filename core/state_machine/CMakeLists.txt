@@ -26,6 +26,8 @@ target_sources(e_foc.state_machine PRIVATE
     CalibrationOrchestrator.hpp
     CalibrationOrchestrator.cpp
     ControlMode.hpp
+    ControlModeCliCommands.hpp
+    ControlModeCliCommands.cpp
     ControlModeStateMachine.hpp
     ControlModeStateMachine.cpp
     FaultNotifier.hpp
