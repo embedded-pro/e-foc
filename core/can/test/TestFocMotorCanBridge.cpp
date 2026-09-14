@@ -7,6 +7,7 @@
 #include "core/can/FocMotorCanBridge.hpp"
 #include "core/can/FocMotorCategoryServer.hpp"
 #include "core/can/FocMotorMessages.hpp"
+#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
@@ -1337,5 +1338,42 @@ TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_ZeroBandwidth_RejectsInvalidPayloa
 
     DispatchSetpoint(can::focSetPidCurrentId, 0);
 
-    EXPECT_TRUE(ackSpy.last.has_value());
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_NegativeBandwidth_RejectsInvalidPayload)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::torque);
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPidCurrentId, -500);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPidSpeed_BandwidthAboveTheSharedLimit_RejectsInvalidPayload)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::speed);
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPidSpeedId, static_cast<int16_t>(foc::CommandLimits::maxSpeedBandwidth) + 1);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_WhileEnabled_RejectsInvalidState)
+{
+    ConstructFixtureInReady();
+    Dispatch(can::focStartId, {});
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPidCurrentId, 1000);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
 }

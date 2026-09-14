@@ -1,6 +1,19 @@
 #include "core/state_machine/FocStateMachineCommon.hpp"
+#include "core/foc/math/ParameterValidation.hpp"
 #include <bit>
 #include <numbers>
+
+namespace
+{
+    // Positivity is the pre-existing completeness contract; finiteness is added because +inf passes every `> 0` test
+    bool HasFiniteElectricalCalibration(const services::CalibrationData& data)
+    {
+        return foc::IsFinitePositive(data.rPhase) &&
+               foc::IsFiniteValue(data.lD) &&
+               foc::IsFiniteValue(data.fluxLinkage) &&
+               foc::IsFiniteValue(data.currentLoopBandwidth);
+    }
+}
 
 namespace application
 {
@@ -312,7 +325,10 @@ namespace application
 
     bool FocStateMachineCommon::HasValidCalibration() const
     {
-        return calibrationData.stage == services::CalibrationStage::complete && calibrationData.polePairs != 0 && calibrationData.rPhase > 0.0f && HasValidModeSpecificCalibration(calibrationData);
+        return calibrationData.stage == services::CalibrationStage::complete &&
+               calibrationData.polePairs != 0 &&
+               HasFiniteElectricalCalibration(calibrationData) &&
+               HasValidModeSpecificCalibration(calibrationData);
     }
 
     void FocStateMachineCommon::RunPolePairsStep()
@@ -531,7 +547,7 @@ namespace application
     foc::CurrentLoopTunings FocStateMachineCommon::CurrentTuningsFor(float bandwidth) const
     {
         auto tunings = foc::CurrentLoopTunings{};
-        tunings.bandwidth = bandwidth > 0.0f ? bandwidth : DefaultCurrentLoopBandwidth();
+        tunings.bandwidth = foc::IsAcceptableCurrentBandwidth(bandwidth) ? bandwidth : DefaultCurrentLoopBandwidth();
         return tunings;
     }
 
@@ -555,7 +571,7 @@ namespace application
 
     foc::Weber FocStateMachineCommon::EffectiveFluxLinkage(const services::CalibrationData& data) const
     {
-        return data.fluxLinkage > 0.0f ? foc::Weber{ data.fluxLinkage } : configuredFluxLinkage;
+        return foc::IsFinitePositive(data.fluxLinkage) ? foc::Weber{ data.fluxLinkage } : configuredFluxLinkage;
     }
 
     foc::Weber FocStateMachineCommon::ActiveFluxLinkage() const
@@ -579,6 +595,13 @@ namespace application
     {
         if (!std::holds_alternative<state_machine::Calibrating>(currentState))
         {
+            onDone(state_machine::CommandResult::rejected);
+            return;
+        }
+
+        if (!HasFiniteElectricalCalibration(data))
+        {
+            tracer.Trace() << "[SM] External calibration rejected: implausible electrical data";
             onDone(state_machine::CommandResult::rejected);
             return;
         }

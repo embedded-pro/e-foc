@@ -79,6 +79,14 @@ When a region is read back, the following checks are applied in order:
 
 Only if all three checks pass is the data considered valid and `NvmStatus::Ok` reported.
 
+These three checks establish that the record is *intact*, not that its values are *usable*: a record whose CRC
+matches can still hold a non-finite float. `FocStateMachineCommon::HasValidCalibration()` therefore applies a
+plausibility gate on top, requiring the electrical fields to be finite (and the phase resistance positive)
+before the restored calibration can carry the drive to `Ready`. The same gate runs on externally supplied
+calibration in `CmdCompleteExternalCalibration`, so a value that arrives over CAN cannot be persisted either.
+Positive infinity passes every `> 0` test, which is why finiteness is checked explicitly rather than inferred
+from a range comparison.
+
 ### Write Sequence
 
 Every write operation follows a three-step sequence to protect against partial writes (e.g., due to unexpected power loss after the erase but before the write completes). Each step is driven by an asynchronous callback from the `NvmRegion` abstraction; no step blocks:

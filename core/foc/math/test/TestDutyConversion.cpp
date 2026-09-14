@@ -59,3 +59,22 @@ TEST_F(TestDutyConversion, an_output_beyond_the_range_is_clamped_rather_than_wra
     EXPECT_EQ(duties.b.Value(), 100);
     EXPECT_EQ(duties.c.Value(), 25);
 }
+
+// Holds only where NaN survives; the embedded build drops this branch under -ffinite-math-only
+TEST_F(TestDutyConversion, a_nan_modulation_lands_on_zero_duty_rather_than_an_undefined_cast)
+{
+    const auto duties = foc::ToDutyCycles(Modulated{ Nan(), Nan(), Nan() });
+
+    EXPECT_EQ(duties.a.Value(), 0);
+    EXPECT_EQ(duties.b.Value(), 0);
+    EXPECT_EQ(duties.c.Value(), 0);
+}
+
+TEST_F(TestDutyConversion, an_infinite_modulation_saturates_to_a_defined_endpoint)
+{
+    const auto duties = foc::ToDutyCycles(Modulated{ Inf(), -Inf(), 0.5f });
+
+    EXPECT_EQ(duties.a.Value(), 100);
+    EXPECT_EQ(duties.b.Value(), 0);
+    EXPECT_EQ(duties.c.Value(), 50);
+}

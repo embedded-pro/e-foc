@@ -1,6 +1,7 @@
 #include "core/foc/cascade/PositionCascade.hpp"
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/cascade/TorqueCascade.hpp"
+#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
@@ -15,9 +16,33 @@
 #include "infra/stream/test/StreamMock.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/Terminal.hpp"
+#include <bit>
+#include <cstdint>
 #include <gtest/gtest.h>
 
 using namespace testing;
+
+namespace
+{
+    // Routed through volatile so the guard is exercised at runtime, as it is on values arriving from NVM or an estimator,
+    // rather than folded away against a compile-time constant
+    float NonFinite(uint32_t bits)
+    {
+        volatile uint32_t opaque = bits;
+
+        return std::bit_cast<float>(static_cast<uint32_t>(opaque));
+    }
+
+    float Infinity()
+    {
+        return NonFinite(0x7F800000u);
+    }
+
+    float NotANumber()
+    {
+        return NonFinite(0x7FC00000u);
+    }
+}
 
 using TestedControlMode = state_machine::ControlModeStateMachine;
 
@@ -1025,7 +1050,7 @@ TEST_F(ControlModeStateMachineExtTest, TrySetCurrentBandwidth_AcceptedInTorqueMo
     GivenNvmAlwaysInvalid();
     ConstructSubject();
 
-    EXPECT_TRUE(subject->TrySetCurrentBandwidth(8377.6f));
+    EXPECT_EQ(subject->TrySetCurrentBandwidth(8377.6f), state_machine::TuningResult::ok);
 }
 
 TEST_F(ControlModeStateMachineExtTest, TrySetSpeedBandwidth_RejectedInTorqueMode)
@@ -1033,7 +1058,7 @@ TEST_F(ControlModeStateMachineExtTest, TrySetSpeedBandwidth_RejectedInTorqueMode
     GivenNvmAlwaysInvalid();
     ConstructSubject();
 
-    EXPECT_FALSE(subject->TrySetSpeedBandwidth(50.0f));
+    EXPECT_EQ(subject->TrySetSpeedBandwidth(50.0f), state_machine::TuningResult::wrongMode);
 }
 
 TEST_F(ControlModeStateMachineExtTest, TrySetSpeedBandwidth_AcceptedInSpeedMode)
@@ -1044,7 +1069,7 @@ TEST_F(ControlModeStateMachineExtTest, TrySetSpeedBandwidth_AcceptedInSpeedMode)
 
     subject->Select(state_machine::ControlMode::speed, [](auto) {});
 
-    EXPECT_TRUE(subject->TrySetSpeedBandwidth(50.0f));
+    EXPECT_EQ(subject->TrySetSpeedBandwidth(50.0f), state_machine::TuningResult::ok);
 }
 
 TEST_F(ControlModeStateMachineExtTest, TrySetPositionBandwidth_AcceptedOnlyInPositionMode)
@@ -1053,11 +1078,74 @@ TEST_F(ControlModeStateMachineExtTest, TrySetPositionBandwidth_AcceptedOnlyInPos
     GivenNvmSaveConfigSucceeds();
     ConstructSubject();
 
-    EXPECT_FALSE(subject->TrySetPositionBandwidth(18.8f));
+    EXPECT_EQ(subject->TrySetPositionBandwidth(18.8f), state_machine::TuningResult::wrongMode);
 
     subject->Select(state_machine::ControlMode::position, [](auto) {});
 
-    EXPECT_TRUE(subject->TrySetPositionBandwidth(18.8f));
+    EXPECT_EQ(subject->TrySetPositionBandwidth(18.8f), state_machine::TuningResult::ok);
+}
+
+TEST_F(ControlModeStateMachineExtTest, TrySetCurrentBandwidth_RejectsValuesOutsideTheSharedLimits)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    EXPECT_EQ(subject->TrySetCurrentBandwidth(0.0f), state_machine::TuningResult::outOfRange);
+    EXPECT_EQ(subject->TrySetCurrentBandwidth(-6283.2f), state_machine::TuningResult::outOfRange);
+    EXPECT_EQ(subject->TrySetCurrentBandwidth(foc::CommandLimits::maxCurrentBandwidth + 1.0f), state_machine::TuningResult::outOfRange);
+}
+
+TEST_F(ControlModeStateMachineExtTest, TrySetBandwidth_RejectsNonFiniteValuesOnEveryLoop)
+{
+    GivenNvmAlwaysInvalid();
+    GivenNvmSaveConfigSucceeds();
+    ConstructSubject();
+
+    subject->Select(state_machine::ControlMode::position, [](auto) {});
+
+    EXPECT_EQ(subject->TrySetCurrentBandwidth(NotANumber()), state_machine::TuningResult::outOfRange);
+    EXPECT_EQ(subject->TrySetSpeedBandwidth(NotANumber()), state_machine::TuningResult::outOfRange);
+    EXPECT_EQ(subject->TrySetPositionBandwidth(NotANumber()), state_machine::TuningResult::outOfRange);
+
+    EXPECT_EQ(subject->TrySetCurrentBandwidth(Infinity()), state_machine::TuningResult::outOfRange);
+    EXPECT_EQ(subject->TrySetSpeedBandwidth(Infinity()), state_machine::TuningResult::outOfRange);
+    EXPECT_EQ(subject->TrySetPositionBandwidth(Infinity()), state_machine::TuningResult::outOfRange);
+}
+
+TEST_F(ControlModeStateMachineExtTest, TrySetBandwidth_RejectsAMisrangedValueBeforeCheckingTheMode)
+{
+    GivenNvmAlwaysInvalid();
+    ConstructSubject();
+
+    EXPECT_EQ(subject->TrySetSpeedBandwidth(-1.0f), state_machine::TuningResult::outOfRange);
+}
+
+TEST_F(ControlModeStateMachineExtTest, TrySetCurrentBandwidth_IsRejectedWhileEnabled)
+{
+    GivenNvmValid();
+    ConstructSubject();
+    AlignAfterBoot();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    subject->ActiveStateMachine().CmdEnable();
+
+    EXPECT_EQ(subject->TrySetCurrentBandwidth(6283.2f), state_machine::TuningResult::notWhileEnabled);
+}
+
+TEST_F(ControlModeStateMachineExtTest, TrySetCurrentBandwidth_IsAcceptedAgainOnceDisabled)
+{
+    GivenNvmValid();
+    ConstructSubject();
+    AlignAfterBoot();
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    subject->ActiveStateMachine().CmdEnable();
+    ASSERT_EQ(subject->TrySetCurrentBandwidth(6283.2f), state_machine::TuningResult::notWhileEnabled);
+
+    EXPECT_CALL(inverterMock, Stop()).Times(AnyNumber());
+    subject->ActiveStateMachine().CmdDisable();
+
+    EXPECT_EQ(subject->TrySetCurrentBandwidth(6283.2f), state_machine::TuningResult::ok);
 }
 
 TEST_F(ControlModeStateMachineExtTest, SelectCurrentAlgorithm_DefaultsToPid)
@@ -1252,9 +1340,9 @@ TEST_F(ControlModeStateMachineExtTest, TrySetBandwidths_AreAcceptedInPositionMod
     ConstructSubject();
     subject->Select(state_machine::ControlMode::position, [](auto) {});
 
-    EXPECT_TRUE(subject->TrySetCurrentBandwidth(6283.2f));
-    EXPECT_TRUE(subject->TrySetSpeedBandwidth(188.5f));
-    EXPECT_TRUE(subject->TrySetPositionBandwidth(18.8f));
+    EXPECT_EQ(subject->TrySetCurrentBandwidth(6283.2f), state_machine::TuningResult::ok);
+    EXPECT_EQ(subject->TrySetSpeedBandwidth(188.5f), state_machine::TuningResult::ok);
+    EXPECT_EQ(subject->TrySetPositionBandwidth(18.8f), state_machine::TuningResult::ok);
 }
 
 TEST_F(ControlModeStateMachineExtTest, TrySetSpeedAndPositionBandwidth_AreRejectedInTorqueMode)
@@ -1262,9 +1350,9 @@ TEST_F(ControlModeStateMachineExtTest, TrySetSpeedAndPositionBandwidth_AreReject
     GivenNvmAlwaysInvalid();
     ConstructSubject();
 
-    EXPECT_TRUE(subject->TrySetCurrentBandwidth(6283.2f));
-    EXPECT_FALSE(subject->TrySetSpeedBandwidth(188.5f));
-    EXPECT_FALSE(subject->TrySetPositionBandwidth(18.8f));
+    EXPECT_EQ(subject->TrySetCurrentBandwidth(6283.2f), state_machine::TuningResult::ok);
+    EXPECT_EQ(subject->TrySetSpeedBandwidth(188.5f), state_machine::TuningResult::wrongMode);
+    EXPECT_EQ(subject->TrySetPositionBandwidth(18.8f), state_machine::TuningResult::wrongMode);
 }
 
 TEST_F(ControlModeStateMachineExtTest, PersistedAlgorithmIsKeptInConfigWhileStillUnselectable)
@@ -1523,6 +1611,21 @@ TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Is_Accepted_In_Torque
     EXPECT_THAT(output, Not(HasSubstr("Unrecognized command.")));
     EXPECT_THAT(output, Not(HasSubstr("ERROR")));
     EXPECT_THAT(output, HasSubstr("> "));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Rejects_A_Non_Numeric_Argument)
+{
+    GivenTorqueModeReady();
+
+    EXPECT_THAT(OutputOf("scbw nan"), HasSubstr("ERROR"));
+    EXPECT_THAT(OutputOf("scbw inf"), HasSubstr("ERROR"));
+}
+
+TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Rejects_A_Value_Above_The_Shared_Limit)
+{
+    GivenTorqueModeReady();
+
+    EXPECT_THAT(OutputOf("scbw 20001.0"), HasSubstr("out of range"));
 }
 
 TEST_F(ControlModeStateMachineCliTest, SetCurrentBandwidth_Rejects_Wrong_Argument_Count)

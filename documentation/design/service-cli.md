@@ -122,6 +122,16 @@ for the requested bandwidth. Bandwidths are bounded below at 1 rad/s: a zero or 
 produces zero or sign-inverted gains, which inverts the sense of the loop's feedback on a motor that
 may be spinning.
 
+Both bounds and the enabled-state policy are enforced inside `ControlModeStateMachine::TrySet*Bandwidth`
+rather than in the command handlers, so the CLI and the CAN bridge cannot drift apart. The ranges come
+from `foc::CommandLimits`; the predicates that apply them live in `core/foc/math/ParameterValidation.hpp`.
+A rejected value is reported before any controller is touched, so a refused retune leaves the previously
+accepted bandwidth live.
+
+The same per-loop predicates gate bandwidths arriving from persisted calibration: `CurrentTuningsFor` and
+`OuterLoopStateMachine::ApplyMechanics` fall back to the compiled default unless the stored value is within
+the loop's range, so a record written by an older firmware cannot install an out-of-range or non-finite gain.
+
 ### Diagnostics Commands
 
 Three commands expose what the control loop and the CAN bus have been doing. Each of these numbers

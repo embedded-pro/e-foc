@@ -1,5 +1,8 @@
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
+#include "core/foc/math/FiniteGuard.hpp"
+#include <bit>
 #include <cmath>
+#include <cstdint>
 #include <gmock/gmock.h>
 #include <numbers>
 
@@ -13,6 +16,25 @@ namespace
     constexpr float busVoltage = 24.0f;
     constexpr uint32_t samplingFrequency = 20000;
     constexpr float samplePeriod = 1.0f / static_cast<float>(samplingFrequency);
+
+    // Routed through volatile so the guard is exercised at runtime, as it is on values arriving from NVM or an estimator,
+    // rather than folded away against a compile-time constant
+    float NonFinite(uint32_t bits)
+    {
+        volatile uint32_t opaque = bits;
+
+        return std::bit_cast<float>(static_cast<uint32_t>(opaque));
+    }
+
+    float Infinity()
+    {
+        return NonFinite(0x7F800000u);
+    }
+
+    float NotANumber()
+    {
+        return NonFinite(0x7FC00000u);
+    }
 
     foc::MotorModelParameters ValidParameters()
     {
@@ -203,4 +225,29 @@ TEST_F(TestCurrentPlantModel, a_voltage_vector_outside_the_modulation_circle_kee
     EXPECT_NEAR(std::hypot(output.d, output.q), 1.0f, 1e-5f);
     EXPECT_NEAR(output.d, 0.6f, 1e-5f);
     EXPECT_NEAR(output.q, -0.8f, 1e-5f);
+}
+
+TEST_F(TestCurrentPlantModel, an_infinite_electrical_parameter_is_rejected_rather_than_passing_the_positive_test)
+{
+    ASSERT_FALSE(foc::IsFiniteValue(Infinity()));
+
+    auto resistanceParameters = ValidParameters();
+    resistanceParameters.resistance = foc::Ohm{ Infinity() };
+    EXPECT_FALSE(foc::AreElectricalParametersValid(resistanceParameters));
+
+    auto inductanceParameters = ValidParameters();
+    inductanceParameters.inductance = foc::MilliHenry{ Infinity() };
+    EXPECT_FALSE(foc::AreElectricalParametersValid(inductanceParameters));
+
+    auto busVoltageParameters = ValidParameters();
+    busVoltageParameters.busVoltage = foc::Volts{ Infinity() };
+    EXPECT_FALSE(foc::AreElectricalParametersValid(busVoltageParameters));
+}
+
+TEST_F(TestCurrentPlantModel, a_nan_electrical_parameter_is_rejected)
+{
+    auto parameters = ValidParameters();
+    parameters.resistance = foc::Ohm{ NotANumber() };
+
+    EXPECT_FALSE(foc::AreElectricalParametersValid(parameters));
 }
