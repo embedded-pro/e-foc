@@ -5,7 +5,6 @@
 
 namespace
 {
-    // Positivity is the pre-existing completeness contract; finiteness is added because +inf passes every `> 0` test
     bool HasFiniteElectricalCalibration(const services::CalibrationData& data)
     {
         return foc::IsFinitePositive(data.rPhase) &&

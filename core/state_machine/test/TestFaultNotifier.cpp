@@ -14,8 +14,6 @@ namespace
     {
     };
 
-    // Minimal concrete derivation that implements pure virtuals but leaves
-    // ApplyOnlineEstimates() at the default base-class body.
     class MinimalStateMachine
         : public state_machine::FocStateMachineBase
     {

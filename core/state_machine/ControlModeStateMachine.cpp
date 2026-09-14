@@ -4,7 +4,6 @@
 #include "core/services/cli/TerminalHelper.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "infra/util/Tokenizer.hpp"
-#include "numerical/controllers/interfaces/PidController.hpp"
 #include <optional>
 
 namespace
@@ -285,7 +284,6 @@ namespace state_machine
         return true;
     }
 
-    // A loop redesign recomputes gains from scratch, so applying one under load would step the drive
     TuningResult ControlModeStateMachine::CheckRedesignPreconditions() const
     {
         if (std::holds_alternative<std::monostate>(activeSm))
@@ -356,7 +354,6 @@ namespace state_machine
         auto tunings = foc::PositionLoopTunings{};
         tunings.bandwidth = bandwidth;
 
-        // The position law is redesigned on retuning, so a rejected design must not look accepted
         return sm->GetController().SetPositionTunings(tunings) == foc::SelectResult::ok ? TuningResult::ok : TuningResult::outOfRange;
     }
 
@@ -459,8 +456,6 @@ namespace state_machine
         return nullptr;
     }
 
-    // Only a byte that names no algorithm is corrected; a valid choice that the loop cannot accept
-    // yet keeps its place in configData and is retried on the next entry to Ready (REQ-CTRL-006).
     void ControlModeStateMachine::ApplyPersistedAlgorithms()
     {
         if (auto* selectable = CurrentSelectable())

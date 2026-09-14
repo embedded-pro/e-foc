@@ -24,8 +24,6 @@ using namespace testing;
 
 namespace
 {
-    // Routed through volatile so the guard is exercised at runtime, as it is on values arriving from NVM or an estimator,
-    // rather than folded away against a compile-time constant
     float NonFinite(uint32_t bits)
     {
         volatile uint32_t opaque = bits;

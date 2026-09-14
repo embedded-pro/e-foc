@@ -44,7 +44,7 @@ namespace application
         : public state_machine::FocStateMachineBase
     {
     public:
-        virtual ~FocStateMachineCommon() = default;
+        ~FocStateMachineCommon() override = default;
         const state_machine::State& CurrentState() const override;
         state_machine::FaultCode LastFaultCode() const override;
         bool HasPendingAsyncWork() const override;
