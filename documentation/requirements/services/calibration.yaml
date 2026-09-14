@@ -54,3 +54,44 @@
     Encoder alignment shall fail after a configurable timeout measured from the start of the run.
     Its sample budget bounds the run only while phase-current samples keep arriving, so a drive
     that never starts delivers none and nothing else ends the step.
+
+- id: REQ-CAL-008
+  title: Mechanical identification runs against live control loops
+  shall: >
+    Before mechanical identification is started, the state machine shall apply the electrical
+    model it has just measured — phase resistance, inductance, pole pairs and flux linkage —
+    together with a bounded provisional mechanical model, and shall abandon the calibration
+    run as failed when either cannot be applied. Until both are applied the current loop holds
+    inert gains and the speed loop a zero current envelope, so the commanded excitation never
+    reaches the rotor and the run can only time out.
+
+- id: REQ-CAL-009
+  title: The provisional plant is never treated as a calibration result
+  shall: >
+    The provisional mechanical model applied for the duration of identification shall not be
+    persisted, reported as calibration data, or left in place after the run. When the run fails,
+    is aborted, or is interrupted by an emergency stop, the state machine shall restore the
+    model the drive held before the run, or, when no valid calibration is held, shall leave the
+    motor un-enableable until a calibration succeeds.
+
+- id: REQ-CAL-010
+  title: Mechanical excitation is bounded in current, speed and time
+  shall: >
+    The mechanical identification trajectory shall alternate between two commanded speed levels
+    so that every transition excites the acceleration term of the regressor, and shall be given
+    an explicit current envelope, speed limit and duration. The run shall end without an estimate
+    on the first sample whose phase current exceeds the envelope or whose measured speed exceeds
+    the limit, and a configuration that does not define a usable bounded trajectory shall be
+    rejected through the completion rather than started.
+
+- id: REQ-CAL-011
+  title: One-shot and online mechanical estimates share one acceptance policy
+  shall: >
+    An observation shall update a mechanical estimator only when the rotor is both moving and
+    accelerating, because a constant speed leaves the intercept and speed columns collinear and
+    the acceleration column at zero while still inflating the covariance. An estimate shall be
+    reported or published only after a minimum number of such observations, once the estimator
+    has converged against an uncertainty bound scaled to its forgetting factor, and only when
+    inertia and viscous friction are finite and inside the documented physical band. The one-shot
+    procedure and the online estimator shall apply the same policy, and an estimate that fails it
+    shall be reported as absent rather than persisted.

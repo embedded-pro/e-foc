@@ -98,8 +98,12 @@ namespace simulator
             {
                 controller.Stop();
                 gui.SetState(state_machine::Calibrating{ state_machine::CalibrationStep::frictionAndInertia });
+                auto identificationConfig = services::MechanicalParametersIdentification::Config{};
+                identificationConfig.maxCurrent = foc::Ampere{ defaults::maxCurrentAmps };
+                identificationConfig.maxSpeed = foc::RadiansPerSecond{ identificationConfig.targetSpeed.Value() * 2.0f };
+
                 mechanicalIdent->EstimateFrictionAndInertia(torqueConstant, motorParams.p,
-                    services::MechanicalParametersIdentification::Config{},
+                    identificationConfig,
                     [&gui](std::optional<foc::NewtonMeterSecondPerRadian> b, std::optional<foc::NewtonMeterSecondSquared> j)
                     {
                         if (b && j)

@@ -122,7 +122,9 @@ namespace application
         static constexpr float nyquistFactor = 15.0f;
 
         void ApplyElectricalCalibration(const services::CalibrationData& data);
-        void ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage);
+        bool ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage);
+        void MarkProvisionalControlApplied();
+        void RestoreControllerStateAfterAbortedCalibration();
         const services::CalibrationData& GetCalibration() const;
         foc::Weber EffectiveFluxLinkage(const services::CalibrationData& data) const;
         foc::CurrentLoopTunings CurrentTuningsFor(float bandwidth) const;
@@ -145,6 +147,7 @@ namespace application
         float pendingFluxLinkage{ 0.0f };
         bool bootCheckInFlight{ false };
         bool rotorReferenceValid_{ false };
+        bool provisionalControlApplied{ false };
 
         static constexpr uint8_t maxConsecutiveFaultClears{ 3 };
         bool faultLatched{ false };

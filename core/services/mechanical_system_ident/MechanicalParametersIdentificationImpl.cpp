@@ -1,8 +1,16 @@
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC optimize("O3", "fast-math")
+#endif
+
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
+#include "core/services/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "numerical/math/CompilerOptimizations.hpp"
+#include <algorithm>
+#include <cmath>
 
 namespace services
 {
@@ -12,22 +20,27 @@ namespace services
         , observable(observable)
         , encoder(encoder)
         , samplingPeriod(1.0f / static_cast<float>(driver.BaseFrequency().Value()))
+        , supportedCurrent(driver.MaxCurrentSupported())
     {
     }
 
     void MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone)
     {
-        if (rls.has_value())
+        if (rls.has_value() || !IsUsableIdentificationConfig(config) || !foc::IsFinitePositive(torqueConstant.Value()) || numberOfPolePairs == 0)
         {
             onDone(std::nullopt, std::nullopt);
             return;
         }
+
         this->currentConfig = config;
+        this->currentEnvelope = foc::Ampere{ std::min(config.maxCurrent.Value(), supportedCurrent.Value()) };
         this->onDone = onDone;
         this->previousPosition = encoder.Read().Value();
         this->previousSpeed = 0.0f;
         this->polePairs = static_cast<float>(numberOfPolePairs);
-        this->converged = false;
+        this->excitedUpdates = 0;
+        this->atDwellLevel = false;
+        this->outcome = Outcome::pending;
 
         rls.emplace(1000.0f, config.forgettingFactor);
 
@@ -40,12 +53,21 @@ namespace services
         controller.EnableSpeedCommand();
         controller.CommandSpeed(config.targetSpeed);
 
+        excitationTimer.Start(config.dwellTime, [this]()
+            {
+                CommandNextExcitationLevel();
+            });
+
         timeoutTimer.Start(config.timeout, [this]()
             {
-                ReleaseDrive();
-                rls.reset();
-                Complete(std::nullopt, std::nullopt);
+                FinishRun();
             });
+    }
+
+    void MechanicalParametersIdentificationImpl::CommandNextExcitationLevel()
+    {
+        atDwellLevel = !atDwellLevel;
+        controller.CommandSpeed(atDwellLevel ? currentConfig.dwellSpeed : currentConfig.targetSpeed);
     }
 
     void MechanicalParametersIdentificationImpl::Abort()
@@ -53,7 +75,7 @@ namespace services
         if (!rls.has_value())
             return;
 
-        timeoutTimer.Cancel();
+        StopExcitation();
         ReleaseDrive();
         rls.reset();
         onDone = nullptr;
@@ -62,6 +84,12 @@ namespace services
     bool MechanicalParametersIdentificationImpl::IsRunning() const
     {
         return rls.has_value();
+    }
+
+    void MechanicalParametersIdentificationImpl::StopExcitation()
+    {
+        timeoutTimer.Cancel();
+        excitationTimer.Cancel();
     }
 
     void MechanicalParametersIdentificationImpl::ReleaseDrive()
@@ -77,46 +105,74 @@ namespace services
             onDone(friction, inertia);
     }
 
+    void MechanicalParametersIdentificationImpl::ScheduleFinish()
+    {
+        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
+            [](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
+            {
+                self->FinishRun();
+            },
+            WeakFromThis());
+    }
+
+    void MechanicalParametersIdentificationImpl::FinishRun()
+    {
+        if (!rls.has_value())
+            return;
+
+        StopExcitation();
+        ReleaseDrive();
+
+        const auto& theta = rls->Coefficients();
+        const auto inertia = theta.at(1, 0);
+        const auto friction = theta.at(2, 0);
+        const bool usable = outcome == Outcome::converged && IsPlausibleMechanics(inertia, friction);
+        rls.reset();
+
+        if (usable)
+            Complete(foc::NewtonMeterSecondPerRadian{ friction }, foc::NewtonMeterSecondSquared{ inertia });
+        else
+            Complete(std::nullopt, std::nullopt);
+    }
+
+    OPTIMIZE_FOR_SPEED
     void MechanicalParametersIdentificationImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant)
     {
-        if (converged || !rls.has_value())
+        if (outcome != Outcome::pending || !rls.has_value())
             return;
 
         auto mechanicalPos = encoder.Read().Value();
-        auto electricalAngle = mechanicalPos * polePairs;
-        auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
-
         auto speed = foc::detail::PositionWithWrapAround(mechanicalPos - previousPosition) / samplingPeriod;
         auto acceleration = (speed - previousSpeed) / samplingPeriod;
-        MotorRLS::MakeRegressor(regressor, acceleration, speed);
-
-        torque.at(0, 0) = rotatingFrame.q * torqueConstant.Value();
-
-        auto metrics = rls->Update(regressor, torque);
 
         previousPosition = mechanicalPos;
         previousSpeed = speed;
 
-        if (MotorRLS::EvaluateConvergence(metrics, 1e-4f, 1e-2f) != estimators::State::converged)
+        if (ExceedsInjectionLimit(currentPhases, currentEnvelope) || std::abs(speed) > currentConfig.maxSpeed.Value())
+        {
+            outcome = Outcome::outsideEnvelope;
+            ScheduleFinish();
+            return;
+        }
+
+        if (!IsMechanicallyExciting(acceleration, speed))
             return;
 
-        converged = true;
-        timeoutTimer.Cancel();
+        auto electricalAngle = mechanicalPos * polePairs;
+        auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
 
-        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
-            [](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
-            {
-                if (!self->rls.has_value())
-                    return;
+        MechanicalRls::MakeRegressor(regressor, acceleration, speed);
+        torque.at(0, 0) = rotatingFrame.q * torqueConstant.Value();
 
-                self->ReleaseDrive();
+        auto metrics = rls->Update(regressor, torque);
 
-                auto& theta = self->rls->Coefficients();
-                const auto friction = foc::NewtonMeterSecondPerRadian{ theta.at(2, 0) };
-                const auto inertia = foc::NewtonMeterSecondSquared{ theta.at(1, 0) };
-                self->rls.reset();
-                self->Complete(friction, inertia);
-            },
-            WeakFromThis());
+        if (excitedUpdates != mechanical_estimate::minimumExcitedUpdates)
+            ++excitedUpdates;
+
+        if (!HasConvergedMechanics(metrics, excitedUpdates, currentConfig.forgettingFactor))
+            return;
+
+        outcome = Outcome::converged;
+        ScheduleFinish();
     }
 }

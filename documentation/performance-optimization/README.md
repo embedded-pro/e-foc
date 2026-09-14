@@ -325,9 +325,23 @@ Three complementary approaches verify cycle budgets. See [qemu-sil.md](qemu-sil.
 
 | Tier                | Tool                                            | Purpose           | Authoritative for                            |
 |---------------------|-------------------------------------------------|-------------------|----------------------------------------------|
-| 1 — Static estimate | `cortex-cycle-budget` CI action                 | Merge gate        | Absolute budget (≤ 4500 / ≤ 20000)           |
+| 1 — Static estimate | `cortex-cycle-budget` CI action                 | Merge gate        | Absolute budget (≤ 4500 / ≤ 6000 / ≤ 20000)  |
 | 2 — QEMU SIL        | `qemu-system-arm` + DWT CYCCNT                  | Regression signal | ARM ISA correctness, instruction-count delta |
 | 3 — On-silicon DWT  | `PlatformFactory::ElapsedCycles()` via TIVA HIL | Ground truth      | Absolute silicon timing                      |
+
+Tier 1 gates three paths, each with its own configuration under `targets/sync_foc_sensored/main/`:
+
+| Path                                                        | Configuration                      | Budget |
+|-------------------------------------------------------------|------------------------------------|--------|
+| ADC ISR → inner loop → PWM                                  | `cycle-analysis.json`              | 4500   |
+| Low-priority interrupt → outer loop → online estimators      | `cycle-analysis-outer.json`        | 20000  |
+| ADC ISR → inner loop → mechanical identification observer   | `cycle-analysis-identification.json` | 6000 |
+
+The identification path carries the whole 20 kHz period rather than the inner loop's 75% share. It only
+runs while a calibration is in progress: the control mode is `Calibrating`, no setpoint is being tracked,
+and nothing competes for the period except the 1 kHz outer loop that fires once every twenty periods. The
+RLS observer is attached to the same ADC interrupt as the inner loop for the duration of that run, which is
+why it is gated at all rather than treated as non-real-time work.
 
 ---
 

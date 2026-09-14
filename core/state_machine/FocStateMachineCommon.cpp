@@ -211,6 +211,7 @@ namespace application
         const bool wasActive = WasActive();
 
         AbortCalibrationServices();
+        RestoreControllerStateAfterAbortedCalibration();
         CompletePendingCommand(state_machine::CommandResult::abortedByFault);
 
         if (std::holds_alternative<state_machine::Fault>(currentState))
@@ -302,6 +303,7 @@ namespace application
             GetFocControl().Stop();
 
         AbortCalibrationServices();
+        RestoreControllerStateAfterAbortedCalibration();
 
         CompletePendingCommand(state_machine::CommandResult::abortedByFault);
     }
@@ -445,6 +447,8 @@ namespace application
         {
             auto data = std::get<state_machine::Calibrating>(currentState).pendingData;
 
+            provisionalControlApplied = false;
+
             if (data.stage == services::CalibrationStage::complete)
             {
                 ApplyElectricalCalibration(data);
@@ -556,9 +560,9 @@ namespace application
         ApplyElectricalModel(foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD }, data.polePairs, data.currentLoopBandwidth, EffectiveFluxLinkage(data));
     }
 
-    void FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage)
+    bool FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage)
     {
-        GetFoc().Configure(foc::MotorModelParameters{
+        const bool configured = GetFoc().Configure(foc::MotorModelParameters{
             resistance,
             inductance,
             fluxLinkage,
@@ -567,6 +571,33 @@ namespace application
             polePairs });
 
         CurrentTunable().SetCurrentTunings(CurrentTuningsFor(bandwidth));
+
+        return configured;
+    }
+
+    void FocStateMachineCommon::MarkProvisionalControlApplied()
+    {
+        provisionalControlApplied = true;
+    }
+
+    // A provisional model exists only to make the rotor move during identification. Whatever ends the run
+    // short of a committed calibration must put back the model the drive had before it, so that the loops
+    // are never left tuned for a plant nobody measured.
+    void FocStateMachineCommon::RestoreControllerStateAfterAbortedCalibration()
+    {
+        if (!provisionalControlApplied)
+            return;
+
+        provisionalControlApplied = false;
+
+        if (HasValidCalibration())
+        {
+            tracer.Trace() << "[SM] Provisional identification model discarded, previous calibration restored";
+            ApplyElectricalCalibration(calibrationData);
+            ApplyModeSpecificCalibration(calibrationData);
+        }
+        else
+            tracer.Trace() << "[SM] Provisional identification model discarded, no calibration held";
     }
 
     foc::Weber FocStateMachineCommon::EffectiveFluxLinkage(const services::CalibrationData& data) const
