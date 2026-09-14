@@ -21,8 +21,6 @@ namespace foc
     float SamplePeriod(hal::Hertz samplingFrequency);
     float InductanceInHenry(foc::MilliHenry inductance);
 
-    // Cancels cross-axis coupling and back-EMF so the controller sees the decoupled per-axis RL
-    // plant its gain design assumes; see documentation/theory/current-loop-controllers.md A1.
     class DecouplingFeedforward
     {
     public:
@@ -32,8 +30,10 @@ namespace foc
         {
             const auto speed = context.electricalSpeed;
 
-            return { voltages.d - speed * couplingScale * context.measured.q,
-                voltages.q + speed * (couplingScale * context.measured.d + backEmfScale) };
+            const auto d = voltages.d - speed * couplingScale * context.measured.q;
+            const auto q = voltages.q + speed * (couplingScale * context.measured.d + backEmfScale);
+
+            return { d, q };
         }
 
     private:
@@ -41,15 +41,11 @@ namespace foc
         float backEmfScale{ 0.0f };
     };
 
-    // SVM stays linear only inside the inscribed circle |Vdq| <= 1; a per-axis clamp would allow sqrt(2)
     ALWAYS_INLINE_HOT foc::RotatingFrame LimitToModulationCircle(const foc::RotatingFrame& voltages)
     {
         const auto squaredMagnitude = voltages.d * voltages.d + voltages.q * voltages.q;
 
-        if (squaredMagnitude <= 1.0f)
-            return voltages;
-
-        const auto scale = 1.0f / math::Sqrt(squaredMagnitude);
+        const auto scale = 1.0f / math::Sqrt(squaredMagnitude > 1.0f ? squaredMagnitude : 1.0f);
 
         return { voltages.d * scale, voltages.q * scale };
     }

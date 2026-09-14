@@ -25,15 +25,13 @@ namespace foc
         // The equivalent and switching terms are algebraic; there is no state to clear
     }
 
-    // Zero state and switching gain make the control law output zero until Configure supplies a plant
     SlidingModeCurrentController::ScalarSlidingMode SlidingModeCurrentController::Inert()
     {
-        return { ScalarSlidingMode::PlantType::WithFullStateOutput(
-                     ScalarSlidingMode::PlantType::StateMatrix{ 0.0f },
-                     ScalarSlidingMode::PlantType::InputMatrix{ 1.0f }),
-            ScalarSlidingMode::SurfaceMatrix{ 1.0f },
-            ScalarSlidingMode::InputVector{ 0.0f },
-            1.0f };
+        const auto stateMatrix = ScalarSlidingMode::PlantType::StateMatrix{ 0.0f };
+        const auto inputMatrix = ScalarSlidingMode::PlantType::InputMatrix{ 1.0f };
+        const auto plant = ScalarSlidingMode::PlantType::WithFullStateOutput(stateMatrix, inputMatrix);
+
+        return { plant, ScalarSlidingMode::SurfaceMatrix{ 1.0f }, ScalarSlidingMode::InputVector{ 0.0f }, 1.0f };
     }
 
     void SlidingModeCurrentController::Construct()
@@ -54,12 +52,12 @@ namespace foc
         normalizationScale = NormalizationScale(parameters.busVoltage);
         equilibriumGain = (1.0f - plant.ad) / plant.bd;
 
-        // Both axes share the same decoupled RL plant, so a single stateless controller serves d and q
-        slidingMode = ScalarSlidingMode{ ScalarSlidingMode::PlantType::WithFullStateOutput(
-                                             ScalarSlidingMode::PlantType::StateMatrix{ plant.ad },
-                                             ScalarSlidingMode::PlantType::InputMatrix{ plant.bd }),
-            ScalarSlidingMode::SurfaceMatrix{ 1.0f },
-            ScalarSlidingMode::InputVector{ switchingGain },
-            boundaryLayer };
+        const auto stateMatrix = ScalarSlidingMode::PlantType::StateMatrix{ plant.ad };
+        const auto inputMatrix = ScalarSlidingMode::PlantType::InputMatrix{ plant.bd };
+        const auto plantNew = ScalarSlidingMode::PlantType::WithFullStateOutput(stateMatrix, inputMatrix);
+        const auto surfaceMatrix = ScalarSlidingMode::SurfaceMatrix{ 1.0f };
+        const auto inputVector = ScalarSlidingMode::InputVector{ switchingGain };
+
+        slidingMode = ScalarSlidingMode{ plantNew, surfaceMatrix, inputVector, boundaryLayer };
     }
 }

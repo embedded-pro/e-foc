@@ -39,6 +39,7 @@ namespace
         infra::Execute setupTeardownExpectations{ [this]()
             {
                 EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(electricalIdentMock, IsRunning()).WillRepeatedly(Return(false));
                 EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
                 EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
             } };
@@ -1274,6 +1275,7 @@ namespace
         infra::Execute setupTeardownExpectations{ [this]()
             {
                 EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(electricalIdentMock, IsRunning()).WillRepeatedly(Return(false));
                 EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
                 EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
             } };
@@ -2465,6 +2467,16 @@ TEST_F(FocStateMachineTorqueCliTest, has_pending_async_work_false_after_nvm_load
     auto sm = CreateStateMachine();
 
     EXPECT_FALSE(sm.HasPendingAsyncWork());
+}
+
+TEST_F(FocStateMachineTorqueCliTest, has_pending_async_work_true_when_electrical_ident_is_running)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(electricalIdentMock, IsRunning()).WillOnce(Return(true)).WillRepeatedly(Return(false));
+    EXPECT_TRUE(sm.HasPendingAsyncWork());
 }
 
 TEST_F(FocStateMachineTorqueCliTest, register_ready_handler_called_when_state_enters_ready)

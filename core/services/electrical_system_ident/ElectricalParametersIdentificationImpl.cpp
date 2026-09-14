@@ -99,6 +99,11 @@ namespace services
         ApplyNextElectricalAngle();
     }
 
+    bool ElectricalParametersIdentificationImpl::IsRunning() const
+    {
+        return rlRunning || polePairsRunning;
+    }
+
     void ElectricalParametersIdentificationImpl::Abort()
     {
         resistanceEstimator.Abort();

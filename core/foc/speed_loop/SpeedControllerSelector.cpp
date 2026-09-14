@@ -7,8 +7,6 @@
 
 namespace foc
 {
-    // Only the model-based laws need the mechanical set; PID and Two-DOF stay selectable before
-    // mechanical identification and simply hold their output at zero until gains arrive (REQ-CTRL-012).
     bool SpeedControllerTraits::IsSelectable(SpeedAlgorithm algorithm, const MechanicalModelParameters& parameters, const SpeedLoopTunings&)
     {
         switch (algorithm)

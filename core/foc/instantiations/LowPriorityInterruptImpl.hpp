@@ -2,11 +2,13 @@
 
 #include "core/foc/interfaces/Execution.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "infra/util/SharedPtr.hpp"
 
 namespace foc
 {
     class LowPriorityInterruptImpl
         : public LowPriorityInterrupt
+        , public infra::EnableSharedFromThis<LowPriorityInterruptImpl>
     {
     public:
         void Register(const infra::Function<void()>& _handler) override
@@ -22,11 +24,13 @@ namespace foc
         void Trigger() override
         {
             if (handler)
-                infra::EventDispatcherWithWeakPtr::Instance().Schedule([this]()
+                infra::EventDispatcherWithWeakPtr::Instance().Schedule(
+                    [](const infra::SharedPtr<LowPriorityInterruptImpl>& self)
                     {
-                        if (handler)
-                            handler();
-                    });
+                        if (self->handler)
+                            self->handler();
+                    },
+                    WeakFromThis());
         }
 
     private:

@@ -64,7 +64,6 @@ namespace tool
         if (interfaceCombo->count() == 0)
             interfaceCombo->addItem("can0");
 
-        // Restore previous selection if still present, otherwise keep first item
         int idx = interfaceCombo->findText(current);
         if (idx >= 0)
             interfaceCombo->setCurrentIndex(idx);

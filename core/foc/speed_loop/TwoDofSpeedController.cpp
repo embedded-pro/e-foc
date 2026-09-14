@@ -34,7 +34,6 @@ namespace foc
         return feedback.Compute({ context.measured, foc::RadiansPerSecond{ referenceFilter.Filter(context.reference.Value()) } });
     }
 
-    // Pre-filtering the setpoint shapes tracking without touching the feedback gains that set load stiffness
     void TwoDofSpeedController::ApplyReferenceFilter()
     {
         if (samplingFrequency.Value() == 0 || referenceTimeConstant <= 0.0f)

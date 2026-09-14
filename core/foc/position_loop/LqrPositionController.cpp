@@ -29,7 +29,6 @@ namespace foc
         };
         const Design::InputWeightMatrix r{ NormalizedEffortWeight(tunings.bandwidth, parameters.samplingFrequency) };
 
-        // TryCreate keeps a non-convergent Riccati solve from aborting the firmware mid-operation
         return Design::TryCreate(a, b, q, r);
     }
 
@@ -43,9 +42,9 @@ namespace foc
         const auto deviation = -WrappedPositionError(context.reference, context.measured);
         const auto scaledSpeed = context.measuredSpeed.Value() * samplePeriod;
         const auto command = design.ComputeControl(Design::StateVector{ deviation, scaledSpeed });
+        const auto action = LimitToCurrentEnvelope(command.at(0, 0) * currentPerNormalizedInput, parameters.maxCurrent).Value();
 
-        return { PositionOutputKind::currentReference,
-            LimitToCurrentEnvelope(command.at(0, 0) * currentPerNormalizedInput, parameters.maxCurrent).Value() };
+        return { PositionOutputKind::currentReference, action };
     }
 
 }

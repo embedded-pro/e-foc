@@ -1,5 +1,5 @@
 #include "core/state_machine/PlatformFaultNotifier.hpp"
-#include "infra/event/EventDispatcher.hpp"
+#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 
 namespace state_machine
 {
@@ -17,11 +17,13 @@ namespace state_machine
         if (onFaultImmediate != nullptr)
             onFaultImmediate(code);
 
-        infra::EventDispatcher::Instance().Schedule([this, code]()
+        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
+            [code](const infra::SharedPtr<PlatformFaultNotifier>& self)
             {
-                if (onFaultDeferred != nullptr)
-                    onFaultDeferred(code);
-            });
+                if (self->onFaultDeferred != nullptr)
+                    self->onFaultDeferred(code);
+            },
+            WeakFromThis());
 
         if (onFaultSecondary != nullptr)
             onFaultSecondary(code);

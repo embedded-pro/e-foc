@@ -19,7 +19,10 @@ namespace foc
             const auto total = decoupling.Apply(proposed, context);
             const auto applied = LimitToModulationCircle(total);
 
-            pid.CommitRealized({ proposed.d + (applied.d - total.d), proposed.q + (applied.q - total.q) });
+            const auto d = proposed.d + (applied.d - total.d);
+            const auto q = proposed.q + (applied.q - total.q);
+
+            pid.CommitRealized({ d, q });
 
             return applied;
         }

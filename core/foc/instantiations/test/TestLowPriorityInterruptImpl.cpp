@@ -1,5 +1,6 @@
 #include "core/foc/instantiations/LowPriorityInterruptImpl.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
+#include "infra/util/WithSharedAccess.hpp"
 #include <gtest/gtest.h>
 
 namespace
@@ -9,13 +10,15 @@ namespace
         , public infra::EventDispatcherWithWeakPtrFixture
     {
     protected:
-        foc::LowPriorityInterruptImpl lowPriorityInterrupt;
+        void TearDown() override { ExecuteAllActions(); }
+
+        infra::WithSharedAccess<foc::LowPriorityInterruptImpl> lowPriorityInterrupt;
     };
 }
 
 TEST_F(TestLowPriorityInterruptImpl, trigger_without_registration_does_not_crash)
 {
-    lowPriorityInterrupt.Trigger();
+    lowPriorityInterrupt->Trigger();
     ExecuteAllActions();
 }
 
@@ -23,12 +26,12 @@ TEST_F(TestLowPriorityInterruptImpl, register_and_trigger_invokes_handler)
 {
     bool handlerCalled = false;
 
-    lowPriorityInterrupt.Register([&handlerCalled]()
+    lowPriorityInterrupt->Register([&handlerCalled]()
         {
             handlerCalled = true;
         });
 
-    lowPriorityInterrupt.Trigger();
+    lowPriorityInterrupt->Trigger();
     ExecuteAllActions();
 
     EXPECT_TRUE(handlerCalled);
@@ -39,17 +42,17 @@ TEST_F(TestLowPriorityInterruptImpl, register_overwrites_previous_handler)
     bool firstCalled = false;
     bool secondCalled = false;
 
-    lowPriorityInterrupt.Register([&firstCalled]()
+    lowPriorityInterrupt->Register([&firstCalled]()
         {
             firstCalled = true;
         });
 
-    lowPriorityInterrupt.Register([&secondCalled]()
+    lowPriorityInterrupt->Register([&secondCalled]()
         {
             secondCalled = true;
         });
 
-    lowPriorityInterrupt.Trigger();
+    lowPriorityInterrupt->Trigger();
     ExecuteAllActions();
 
     EXPECT_FALSE(firstCalled);
@@ -60,12 +63,12 @@ TEST_F(TestLowPriorityInterruptImpl, trigger_without_executing_does_not_call_han
 {
     bool handlerCalled = false;
 
-    lowPriorityInterrupt.Register([&handlerCalled]()
+    lowPriorityInterrupt->Register([&handlerCalled]()
         {
             handlerCalled = true;
         });
 
-    lowPriorityInterrupt.Trigger();
+    lowPriorityInterrupt->Trigger();
 
     EXPECT_FALSE(handlerCalled);
 

@@ -1,4 +1,5 @@
 #include "core/foc/instantiations/LowPriorityInterruptImpl.hpp"
+#include "infra/util/WithSharedAccess.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
@@ -31,12 +32,12 @@ namespace simulator
         const auto vdc = foc::Volts{ defaults::powerSupplyVoltageVolts };
         const auto& motorParams = foc::JK42BLS01_X038ED::parameters;
 
-        ThreePhaseMotorModel model{ motorParams, vdc, baseFrequency, std::optional<std::size_t>{} };
-        model.SetLoad(foc::NewtonMeter{ defaults::loadTorqueNm });
+        infra::WithSharedAccess<ThreePhaseMotorModel> model{ motorParams, vdc, baseFrequency, std::optional<std::size_t>{} };
+        model->SetLoad(foc::NewtonMeter{ defaults::loadTorqueNm });
 
-        foc::LowPriorityInterruptImpl lowPriorityInterrupt;
-        foc::FocSpeedController controller{ model, model, foc::Ampere{ defaults::maxCurrentAmps }, baseFrequency,
-            lowPriorityInterrupt, hal::Hertz{ defaults::lowPriorityFrequencyHz } };
+        infra::WithSharedAccess<foc::LowPriorityInterruptImpl> lowPriorityInterrupt;
+        foc::FocSpeedController controller{ *model, *model, foc::Ampere{ defaults::maxCurrentAmps }, baseFrequency,
+            *lowPriorityInterrupt, hal::Hertz{ defaults::lowPriorityFrequencyHz } };
 
         auto motorModel = foc::MotorModelParameters{};
         motorModel.resistance = motorParams.R;
@@ -73,21 +74,21 @@ namespace simulator
             .defaultValue = 0
         };
 
-        GuiSimulation simulation{ model, controller, eventDispatcher,
+        GuiSimulation simulation{ *model, controller, eventDispatcher,
             motorParams, pidParameters, setpointConfig, vdc };
 
-        services::MotorAlignmentImpl alignment{ model, model };
-        services::ElectricalParametersIdentificationImpl electricalIdent{ model, model, vdc };
-        services::MechanicalParametersIdentificationImpl mechanicalIdent{ controller, controller, controller, model, model };
+        services::MotorAlignmentImpl alignment{ *model, *model };
+        services::ElectricalParametersIdentificationImpl electricalIdent{ *model, *model, vdc };
+        infra::WithSharedAccess<services::MechanicalParametersIdentificationImpl> mechanicalIdent{ controller, controller, controller, *model, *model };
         const foc::NewtonMeter torqueConstant{ 1.5f * static_cast<float>(motorParams.p) * motorParams.psi_f.Value() };
 
         auto& gui = simulation.GetGui();
 
-        OnlineElectricalRls electricalRls{ model, motorParams.p, baseFrequency };
+        OnlineElectricalRls electricalRls{ *model, motorParams.p, baseFrequency };
         QObject::connect(&electricalRls, &OnlineElectricalRls::electricalEstimatesChanged,
             &gui, &Gui::OnElectricalRlsUpdate);
 
-        OnlineMechanicalRls mechanicalRls{ model, motorParams.p, torqueConstant, baseFrequency };
+        OnlineMechanicalRls mechanicalRls{ *model, motorParams.p, torqueConstant, baseFrequency };
         QObject::connect(&mechanicalRls, &OnlineMechanicalRls::mechanicalEstimatesChanged,
             &gui, &Gui::OnMechanicalRlsUpdate);
 
@@ -97,7 +98,7 @@ namespace simulator
             {
                 controller.Stop();
                 gui.SetState(state_machine::Calibrating{ state_machine::CalibrationStep::frictionAndInertia });
-                mechanicalIdent.EstimateFrictionAndInertia(torqueConstant, motorParams.p,
+                mechanicalIdent->EstimateFrictionAndInertia(torqueConstant, motorParams.p,
                     services::MechanicalParametersIdentification::Config{},
                     [&gui](std::optional<foc::NewtonMeterSecondPerRadian> b, std::optional<foc::NewtonMeterSecondSquared> j)
                     {

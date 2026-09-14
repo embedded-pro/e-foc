@@ -67,6 +67,19 @@ Required in every hot-path file:
 - `const`/`constexpr`-correct. Non-trivial logic in `.cpp` — small `inline`/`constexpr` helpers in headers ok
 - **No comments** except non-obvious *why*, unit/frame types don't carry, concurrency contract. One short line max. No `TODO`/`FIXME`/`HACK`, no commented-out code
 
+## Async callback lifetime safety
+
+Any service that schedules event-dispatcher closures and whose lifetime is managed by an FSM `std::variant` **must** follow this pattern (full design: `documentation/design/async-callback-lifetime.md`):
+
+1. **Inherit `infra::EnableSharedFromThis<T>`** on the service class.
+2. **Schedule via WeakPtr** — use `infra::EventDispatcherWithWeakPtr::Instance().Schedule([](const infra::SharedPtr<T>& self){ … }, WeakFromThis())`. Raw `[this]` captures on the dispatcher are forbidden.
+3. **Wrap at construction** — every construction site uses `infra::WithSharedAccess<T>` (from `infra/util/WithSharedAccess.hpp`), not a bare member or local variable.
+4. **Expose `IsRunning() const`** on the service interface; return `true` while estimation state is active.
+5. **Extend `HasPendingAsyncWork()`** — the `FocStateMachine` subclass that owns the service must OR `service.IsRunning()` into its `HasPendingAsyncWork()` override; omitting this causes mode-switch to proceed while hardware is still driven.
+6. **Test fixtures** — any fixture that holds a `WithSharedAccess`-wrapped member must call `ExecuteAllActions()` in `TearDown()`, and all `StrictMock` service mocks must have `EXPECT_CALL(…, IsRunning()).WillRepeatedly(Return(false))` in the teardown-setup block.
+
+*Static objects* (application-level composites that are never destroyed while the event loop runs) are exempt from rules 1–3.
+
 ## Interfaces & errors
 
 - Interfaces = pure virtual; `virtual ~I() = default` — **never** `= 0` destructors
@@ -181,6 +194,12 @@ Before finalizing any plan or implementation, verify:
 - [ ] Hardware injected via constructor; no global state
 - [ ] `documentation/` updated before or alongside behavioral changes
 - [ ] New files added to `CMakeLists.txt`; tests added via `add_subdirectory(test)`
+
+**Async callback lifetime safety**
+- [ ] No `EventDispatcherWithWeakPtr::Instance().Schedule([this]…)` raw captures on non-static objects
+- [ ] Services using WeakPtr dispatch inherit `EnableSharedFromThis<T>` and are wrapped in `WithSharedAccess<T>` at every construction site
+- [ ] New identification/async services expose `IsRunning()` and it is included in `HasPendingAsyncWork()`
+- [ ] Test fixtures with `WithSharedAccess` members call `ExecuteAllActions()` in `TearDown()`; `StrictMock` service mocks expect `IsRunning().WillRepeatedly(Return(false))`
 
 ## Assistant behavior — be terse
 

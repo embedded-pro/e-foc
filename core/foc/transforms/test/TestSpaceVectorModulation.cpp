@@ -135,7 +135,6 @@ TEST_F(TestSpaceVectorModulation, duty_cycles_are_continuous_across_every_sector
     }
 }
 
-// The alpha axis aligns with active vector V1, so 0, 60, ... 300 degrees are the hexagon vertex
 TEST_F(TestSpaceVectorModulation, active_vector_directions_collapse_onto_a_pure_switching_state)
 {
     constexpr float tolerance = 1e-5f;
@@ -160,7 +159,6 @@ TEST_F(TestSpaceVectorModulation, active_vector_directions_collapse_onto_a_pure_
     }
 }
 
-// Halfway between two active vectors the inscribed circle touches the hexagon edge, so |V| = 1 is
 TEST_F(TestSpaceVectorModulation, sector_centres_reach_the_limit_at_unit_magnitude)
 {
     constexpr float tolerance = 1e-5f;

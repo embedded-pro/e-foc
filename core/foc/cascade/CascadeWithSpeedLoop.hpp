@@ -2,15 +2,11 @@
 
 #include "core/foc/current_loop/CurrentControllerSelector.hpp"
 #include "core/foc/interfaces/Execution.hpp"
-#include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/math/AngleWrap.hpp"
-#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/speed_loop/SpeedControllerSelector.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
-#include "infra/util/ReallyAssert.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <atomic>
 
@@ -123,7 +119,7 @@ namespace foc
 
         void SetSpeedReference(RadiansPerSecond reference);
         void RunSpeedLoop(float mechanicalSpeed);
-        // Lets an outer law drive the current loop itself, bypassing the speed loop entirely
+
         void SetDirectCurrentReference(float current);
         float MeasureMechanicalSpeed();
 

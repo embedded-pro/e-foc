@@ -29,7 +29,6 @@ namespace foc
         twoDof = 4
     };
 
-    // Position algorithms either drive the speed loop or command torque directly.
     enum class PositionOutputKind : uint8_t
     {
         speedReference = 0,

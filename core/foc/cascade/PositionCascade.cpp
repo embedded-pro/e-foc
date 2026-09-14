@@ -43,7 +43,6 @@ namespace foc
 
     SelectResult PositionCascade::SetPositionTunings(const PositionLoopTunings& tunings)
     {
-        // Retuning redesigns the active law, which cannot be done underneath a running motor
         if (enabled)
             return SelectResult::busy;
 
@@ -150,7 +149,6 @@ namespace foc
 
         auto command = positionLoop.Compute(PositionControlContext{ Radians{ CurrentMechanicalAngle() }, lastPositionSetPoint, RadiansPerSecond{ mechanicalSpeed } });
 
-        // A law that sizes the current itself owns the mechanical response, so the speed loop steps aside
         if (command.kind == PositionOutputKind::speedReference)
         {
             SetSpeedReference(RadiansPerSecond{ command.value });

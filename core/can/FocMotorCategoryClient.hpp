@@ -34,6 +34,7 @@ namespace can
     {
     public:
         FocMotorCategoryClient(services::CanFrameTransport& transport, services::CanSequenceSource& sequenceSource);
+        virtual ~FocMotorCategoryClient() = default;
 
         uint8_t Id() const override;
 

@@ -7,17 +7,20 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/AutoResetFunction.hpp"
+#include "infra/util/SharedPtr.hpp"
 #include "numerical/estimators/online/RecursiveLeastSquares.hpp"
 
 namespace services
 {
     class MechanicalParametersIdentificationImpl
         : public MechanicalParametersIdentification
+        , public infra::EnableSharedFromThis<MechanicalParametersIdentificationImpl>
     {
     public:
         MechanicalParametersIdentificationImpl(foc::SpeedCommandable& controller, foc::Controllable& drive, foc::PhaseCurrentsObservable& observable, drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder);
 
         void EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone) override;
+        bool IsRunning() const override;
         void Abort() override;
 
     private:

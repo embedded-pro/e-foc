@@ -15,14 +15,26 @@ namespace
 {
     using namespace testing;
 
-    struct SequenceSourceStub : services::CanSequenceSource
+    struct SequenceSourceStub
+        : services::CanSequenceSource
     {
-        uint8_t PeekSequence(uint16_t) override { return seq; }
-        void CommitSequence(uint16_t, uint8_t, uint8_t) override { ++seq; }
+        virtual ~SequenceSourceStub() = default;
+
+        uint8_t PeekSequence(uint16_t) override
+        {
+            return seq;
+        }
+
+        void CommitSequence(uint16_t, uint8_t, uint8_t) override
+        {
+            ++seq;
+        }
+
         uint8_t seq{};
     };
 
-    class MockClientObserver : public can::FocMotorCategoryClientObserver
+    class MockClientObserver
+        : public can::FocMotorCategoryClientObserver
     {
     public:
         using can::FocMotorCategoryClientObserver::FocMotorCategoryClientObserver;
@@ -33,7 +45,8 @@ namespace
         MOCK_METHOD(void, OnTelemetryElectrical, (const hal::Can::Message& msg), (override));
     };
 
-    class FocMotorCategoryClientTest : public Test
+    class FocMotorCategoryClientTest
+        : public Test
     {
     public:
         FocMotorCategoryClientTest()
@@ -57,129 +70,127 @@ namespace
         uint8_t lastSentMsgType{};
         hal::Can::Message lastSentMsg;
     };
+}
 
-    TEST_F(FocMotorCategoryClientTest, CategoryId_IsFocMotorCategoryId)
-    {
-        EXPECT_EQ(client.Id(), can::focMotorCategoryId);
-    }
+TEST_F(FocMotorCategoryClientTest, CategoryId_IsFocMotorCategoryId)
+{
+    EXPECT_EQ(client.Id(), can::focMotorCategoryId);
+}
 
-    TEST_F(FocMotorCategoryClientTest, SendStart_TransmitsStartCommand)
-    {
-        client.SendStart(1);
-        EXPECT_EQ(lastSentMsgType, can::focStartId);
-    }
+TEST_F(FocMotorCategoryClientTest, SendStart_TransmitsStartCommand)
+{
+    client.SendStart(1);
+    EXPECT_EQ(lastSentMsgType, can::focStartId);
+}
 
-    TEST_F(FocMotorCategoryClientTest, SendStop_TransmitsStopCommand)
-    {
-        client.SendStop(1);
-        EXPECT_EQ(lastSentMsgType, can::focStopId);
-    }
+TEST_F(FocMotorCategoryClientTest, SendStop_TransmitsStopCommand)
+{
+    client.SendStop(1);
+    EXPECT_EQ(lastSentMsgType, can::focStopId);
+}
 
-    TEST_F(FocMotorCategoryClientTest, SendClearFault_TransmitsClearFaultCommand)
-    {
-        client.SendClearFault(1);
-        EXPECT_EQ(lastSentMsgType, can::focClearFaultId);
-    }
+TEST_F(FocMotorCategoryClientTest, SendClearFault_TransmitsClearFaultCommand)
+{
+    client.SendClearFault(1);
+    EXPECT_EQ(lastSentMsgType, can::focClearFaultId);
+}
 
-    TEST_F(FocMotorCategoryClientTest, SendEmergencyStop_TransmitsEmergencyStopCommand)
-    {
-        client.SendEmergencyStop(1);
-        EXPECT_EQ(lastSentMsgType, can::focEmergencyStopId);
-    }
+TEST_F(FocMotorCategoryClientTest, SendEmergencyStop_TransmitsEmergencyStopCommand)
+{
+    client.SendEmergencyStop(1);
+    EXPECT_EQ(lastSentMsgType, can::focEmergencyStopId);
+}
 
-    TEST_F(FocMotorCategoryClientTest, SendSelectControlMode_EncodesMode)
-    {
-        client.SendSelectControlMode(1, can::FocMotorMode::speed);
-        EXPECT_EQ(lastSentMsgType, can::focSelectControlModeId);
-        ASSERT_GE(lastSentMsg.size(), 2u);
-        EXPECT_EQ(lastSentMsg[1], static_cast<uint8_t>(can::FocMotorMode::speed));
-    }
+TEST_F(FocMotorCategoryClientTest, SendSelectControlMode_EncodesMode)
+{
+    client.SendSelectControlMode(1, can::FocMotorMode::speed);
+    EXPECT_EQ(lastSentMsgType, can::focSelectControlModeId);
+    ASSERT_GE(lastSentMsg.size(), 2u);
+    EXPECT_EQ(lastSentMsg[1], static_cast<uint8_t>(can::FocMotorMode::speed));
+}
 
-    TEST_F(FocMotorCategoryClientTest, SendSetTorqueSetpoint_EncodesCurrent)
-    {
-        client.SendSetTorqueSetpoint(1, foc::Ampere{ 1.5f });
-        EXPECT_EQ(lastSentMsgType, can::focSetTorqueSetpointId);
-        ASSERT_GE(lastSentMsg.size(), 3u);
-        const auto wireVal = services::CanFrameCodec::ReadInt16(lastSentMsg, 1);
-        EXPECT_NEAR(static_cast<float>(wireVal) / can::focCurrentScale, 1.5f, 0.01f);
-    }
+TEST_F(FocMotorCategoryClientTest, SendSetTorqueSetpoint_EncodesCurrent)
+{
+    client.SendSetTorqueSetpoint(1, foc::Ampere{ 1.5f });
+    EXPECT_EQ(lastSentMsgType, can::focSetTorqueSetpointId);
+    ASSERT_GE(lastSentMsg.size(), 3u);
+    const auto wireVal = services::CanFrameCodec::ReadInt16(lastSentMsg, 1);
+    EXPECT_NEAR(static_cast<float>(wireVal) / can::focCurrentScale, 1.5f, 0.01f);
+}
 
-    TEST_F(FocMotorCategoryClientTest, SendSetSpeedSetpoint_EncodesSpeed)
-    {
-        client.SendSetSpeedSetpoint(1, foc::RadiansPerSecond{ 300.0f });
-        EXPECT_EQ(lastSentMsgType, can::focSetSpeedSetpointId);
-        ASSERT_GE(lastSentMsg.size(), 3u);
-        const auto wireVal = services::CanFrameCodec::ReadInt16(lastSentMsg, 1);
-        EXPECT_NEAR(static_cast<float>(wireVal) / can::focSpeedScale, 300.0f, 0.1f);
-    }
+TEST_F(FocMotorCategoryClientTest, SendSetSpeedSetpoint_EncodesSpeed)
+{
+    client.SendSetSpeedSetpoint(1, foc::RadiansPerSecond{ 300.0f });
+    EXPECT_EQ(lastSentMsgType, can::focSetSpeedSetpointId);
+    ASSERT_GE(lastSentMsg.size(), 3u);
+    const auto wireVal = services::CanFrameCodec::ReadInt16(lastSentMsg, 1);
+    EXPECT_NEAR(static_cast<float>(wireVal) / can::focSpeedScale, 300.0f, 0.1f);
+}
 
-    TEST_F(FocMotorCategoryClientTest, SendSetPositionSetpoint_EncodesPosition)
-    {
-        client.SendSetPositionSetpoint(1, foc::Radians{ 3.14f });
-        EXPECT_EQ(lastSentMsgType, can::focSetPositionSetpointId);
-        ASSERT_GE(lastSentMsg.size(), 3u);
-        const auto wireVal = services::CanFrameCodec::ReadInt16(lastSentMsg, 1);
-        EXPECT_NEAR(static_cast<float>(wireVal) / can::focPositionScale, 3.14f, 0.01f);
-    }
+TEST_F(FocMotorCategoryClientTest, SendSetPositionSetpoint_EncodesPosition)
+{
+    client.SendSetPositionSetpoint(1, foc::Radians{ 3.14f });
+    EXPECT_EQ(lastSentMsgType, can::focSetPositionSetpointId);
+    ASSERT_GE(lastSentMsg.size(), 3u);
+    const auto wireVal = services::CanFrameCodec::ReadInt16(lastSentMsg, 1);
+    EXPECT_NEAR(static_cast<float>(wireVal) / can::focPositionScale, 3.14f, 0.01f);
+}
 
-    TEST_F(FocMotorCategoryClientTest, OnSelectControlModeResponse_NotifiesObserver)
-    {
-        EXPECT_CALL(observer, OnSelectControlModeResponse(can::FocMotorMode::position));
+TEST_F(FocMotorCategoryClientTest, OnSelectControlModeResponse_NotifiesObserver)
+{
+    EXPECT_CALL(observer, OnSelectControlModeResponse(can::FocMotorMode::position));
 
-        hal::Can::Message msg;
-        msg.push_back(static_cast<uint8_t>(can::FocMotorMode::position));
-        client.HandleMessage(can::focSelectControlModeResponseId, msg);
-    }
+    hal::Can::Message msg;
+    msg.push_back(static_cast<uint8_t>(can::FocMotorMode::position));
+    client.HandleMessage(can::focSelectControlModeResponseId, msg);
+}
 
-    TEST_F(FocMotorCategoryClientTest, OnCategoryError_NotifiesObserver)
-    {
-        EXPECT_CALL(observer, OnCategoryError(can::focSetPidCurrentId, can::FocMotorCategoryError::applicationError));
+TEST_F(FocMotorCategoryClientTest, OnCategoryError_NotifiesObserver)
+{
+    EXPECT_CALL(observer, OnCategoryError(can::focSetPidCurrentId, can::FocMotorCategoryError::applicationError));
 
-        hal::Can::Message msg;
-        msg.push_back(can::focSetPidCurrentId);
-        msg.push_back(static_cast<uint8_t>(can::FocMotorCategoryError::applicationError));
-        client.HandleMessage(services::canCategoryErrorResponseMessageTypeId, msg);
-    }
+    hal::Can::Message msg;
+    msg.push_back(can::focSetPidCurrentId);
+    msg.push_back(static_cast<uint8_t>(can::FocMotorCategoryError::applicationError));
+    client.HandleMessage(services::canCategoryErrorResponseMessageTypeId, msg);
+}
 
-    TEST_F(FocMotorCategoryClientTest, SendSetCurrentBandwidth_EncodesCorrectCommandAndValue)
-    {
-        client.SendSetCurrentBandwidth(1, 500.0f);
-        EXPECT_EQ(lastSentMsgType, can::focSetPidCurrentId);
-        ASSERT_GE(lastSentMsg.size(), 3u);
-        const auto wireVal = services::CanFrameCodec::ReadInt16(lastSentMsg, 1);
-        EXPECT_NEAR(static_cast<float>(wireVal) / can::focPidScale, 500.0f, 1.0f);
-    }
+TEST_F(FocMotorCategoryClientTest, SendSetCurrentBandwidth_EncodesCorrectCommandAndValue)
+{
+    client.SendSetCurrentBandwidth(1, 500.0f);
+    EXPECT_EQ(lastSentMsgType, can::focSetPidCurrentId);
+    ASSERT_GE(lastSentMsg.size(), 3u);
+    const auto wireVal = services::CanFrameCodec::ReadInt16(lastSentMsg, 1);
+    EXPECT_NEAR(static_cast<float>(wireVal) / can::focPidScale, 500.0f, 1.0f);
+}
 
-    TEST_F(FocMotorCategoryClientTest, SendSetSpeedBandwidth_EncodesCorrectCommandAndValue)
-    {
-        client.SendSetSpeedBandwidth(1, 188.5f);
-        EXPECT_EQ(lastSentMsgType, can::focSetPidSpeedId);
-        ASSERT_GE(lastSentMsg.size(), 3u);
-        const auto wireVal = services::CanFrameCodec::ReadInt16(lastSentMsg, 1);
-        EXPECT_NEAR(static_cast<float>(wireVal) / can::focPidScale, 188.5f, 1.0f);
-    }
+TEST_F(FocMotorCategoryClientTest, SendSetSpeedBandwidth_EncodesCorrectCommandAndValue)
+{
+    client.SendSetSpeedBandwidth(1, 188.5f);
+    EXPECT_EQ(lastSentMsgType, can::focSetPidSpeedId);
+    ASSERT_GE(lastSentMsg.size(), 3u);
+    const auto wireVal = services::CanFrameCodec::ReadInt16(lastSentMsg, 1);
+    EXPECT_NEAR(static_cast<float>(wireVal) / can::focPidScale, 188.5f, 1.0f);
+}
 
-    TEST_F(FocMotorCategoryClientTest, SendSetPositionBandwidth_EncodesCorrectCommandAndValue)
-    {
-        client.SendSetPositionBandwidth(1, 18.8f);
-        EXPECT_EQ(lastSentMsgType, can::focSetPidPositionId);
-        ASSERT_GE(lastSentMsg.size(), 3u);
-        const auto wireVal = services::CanFrameCodec::ReadInt16(lastSentMsg, 1);
-        EXPECT_NEAR(static_cast<float>(wireVal) / can::focPidScale, 18.8f, 1.0f);
-    }
+TEST_F(FocMotorCategoryClientTest, SendSetPositionBandwidth_EncodesCorrectCommandAndValue)
+{
+    client.SendSetPositionBandwidth(1, 18.8f);
+    EXPECT_EQ(lastSentMsgType, can::focSetPidPositionId);
+    ASSERT_GE(lastSentMsg.size(), 3u);
+    const auto wireVal = services::CanFrameCodec::ReadInt16(lastSentMsg, 1);
+    EXPECT_NEAR(static_cast<float>(wireVal) / can::focPidScale, 18.8f, 1.0f);
+}
 
-    TEST_F(FocMotorCategoryClientTest, SendSetCurrentBandwidth_PayloadIsExactlyOneFixed16Field)
-    {
-        client.SendSetCurrentBandwidth(1, 300.0f);
-        // Payload: [seq(1)] [bandwidth fixed16(2)] = 3 bytes total; no extra kp/ki/kd fields.
-        EXPECT_EQ(lastSentMsg.size(), 3u);
-    }
+TEST_F(FocMotorCategoryClientTest, SendSetCurrentBandwidth_PayloadIsExactlyOneFixed16Field)
+{
+    client.SendSetCurrentBandwidth(1, 300.0f);
+    EXPECT_EQ(lastSentMsg.size(), 3u);
+}
 
-    // REQ-INT-010 — client routes ACK/NACK; sequence byte is prepended
-    TEST_F(FocMotorCategoryClientTest, SendStart_PrependSequenceByte)
-    {
-        client.SendStart(1);
-        EXPECT_EQ(lastSentMsgType, can::focStartId);
-        ASSERT_GE(lastSentMsg.size(), 1u);
-    }
+TEST_F(FocMotorCategoryClientTest, SendStart_PrependSequenceByte)
+{
+    client.SendStart(1);
+    EXPECT_EQ(lastSentMsgType, can::focStartId);
+    ASSERT_GE(lastSentMsg.size(), 1u);
 }

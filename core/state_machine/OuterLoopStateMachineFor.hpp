@@ -88,11 +88,16 @@ namespace application
             return resolvedMechIdent.get();
         }
 
+        const services::MechanicalParametersIdentification& MechIdentImpl() const override
+        {
+            return resolvedMechIdent.get();
+        }
+
     private:
         Cascade focController;
         services::RealTimeFrictionAndInertiaEstimator onlineMechEstimator;
         services::RealTimeResistanceAndInductanceEstimator onlineElecEstimator;
-        std::optional<services::MechanicalParametersIdentificationImpl> ownMechIdent;
+        std::optional<infra::WithSharedAccess<services::MechanicalParametersIdentificationImpl>> ownMechIdent;
         std::reference_wrapper<services::MechanicalParametersIdentification> resolvedMechIdent;
     };
 }

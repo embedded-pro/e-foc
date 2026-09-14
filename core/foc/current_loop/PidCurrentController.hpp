@@ -27,8 +27,7 @@ namespace foc
 
         ALWAYS_INLINE_HOT RotatingFrame Propose(const CurrentControlContext& context)
         {
-            return { dPi.Propose(context.reference.d, context.measured.d),
-                qPi.Propose(context.reference.q, context.measured.q) };
+            return { dPi.Propose(context.reference.d, context.measured.d), qPi.Propose(context.reference.q, context.measured.q) };
         }
 
         ALWAYS_INLINE_HOT void CommitRealized(const RotatingFrame& applied)

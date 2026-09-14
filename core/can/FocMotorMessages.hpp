@@ -1,6 +1,5 @@
 #pragma once
 
-#include "can-lite/core/CanProtocolDefinitions.hpp"
 #include <cstdint>
 
 namespace can

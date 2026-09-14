@@ -1,11 +1,10 @@
 #pragma once
 
+#include "core/foc/position_loop/PositionController.hpp"
 #include "core/foc/position_loop/StateFeedbackPositionController.hpp"
 
 namespace foc
 {
-    // State feedback on (position deviation, scaled speed). Commands current directly, so the
-    // cascade bypasses the speed loop and the position law owns the whole mechanical response.
     class LqrPositionController
         : public StateFeedbackPositionController<LqrPositionController, 2>
     {

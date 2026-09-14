@@ -56,6 +56,12 @@ End with: total C/W/S counts + **APPROVE** or **REQUEST CHANGES**.
 - New FOC implementations satisfy all pure virtuals of `FocBase`/`FocTorque`/`FocSpeed`/`FocPosition`
 - Hardware injected via constructor; hardware ports from `interfaces/Drivers.hpp`
 
+**Async callback lifetime safety** (AGENTS.md §"Async callback lifetime safety", design: `documentation/design/async-callback-lifetime.md`):
+- Raw `[this]` capture in `EventDispatcherWithWeakPtr::Instance().Schedule(…)` on a non-static object → CRITICAL
+- `WeakFromThis()` used but class does not inherit `EnableSharedFromThis<T>`, or construction site is not `WithSharedAccess<T>` → CRITICAL
+- New async service bypasses `Calibrating` state without `IsRunning()` wired into `HasPendingAsyncWork()` → CRITICAL
+- Test fixture with `WithSharedAccess` member missing `TearDown()` drain or `StrictMock` missing `IsRunning()` expectation → WARNING
+
 **Documentation**:
 - Behavioral change with no matching `documentation/` update = CRITICAL
 

@@ -9,7 +9,8 @@
 
 namespace tool
 {
-    class ConnectionPanel : public QGroupBox
+    class ConnectionPanel
+        : public QGroupBox
     {
         Q_OBJECT
 

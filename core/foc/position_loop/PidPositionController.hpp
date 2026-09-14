@@ -1,12 +1,12 @@
 #pragma once
 
-#include "core/foc/position_loop/PositionPlantModel.hpp"
+#include "core/foc/interfaces/Algorithms.hpp"
+#include "core/foc/interfaces/LoopTunings.hpp"
+#include "core/foc/position_loop/PositionController.hpp"
 #include "numerical/controllers/implementations/PidIncremental.hpp"
 
 namespace foc
 {
-    // Proportional-integral position law whose output is a speed reference, so the cascade keeps
-    // the existing speed and current loops underneath and the tuning stays independent of the load.
     class PidPositionController
     {
     public:
@@ -22,10 +22,8 @@ namespace foc
         float SpeedEnvelope() const;
         void ApplyGains();
 
-        // The proportional law saturates one bandwidth of speed reference at half a turn of error
         static constexpr float maximumErrorInRadians{ std::numbers::pi_v<float> };
 
-        // The loop runs per-unit of the speed envelope so the incremental clamp doubles as anti-windup
         controllers::PidIncrementalSynchronous<float> positionPid{ { 0.0f, 0.0f, 0.0f }, { -1.0f, 1.0f } };
         PositionLoopTunings tunings{};
         hal::Hertz samplingFrequency{ 0 };

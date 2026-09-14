@@ -2,11 +2,13 @@
 
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
+#include "infra/util/SharedPtr.hpp"
 
 namespace state_machine
 {
     class PlatformFaultNotifier
         : public FaultNotifier
+        , public infra::EnableSharedFromThis<PlatformFaultNotifier>
     {
     public:
         explicit PlatformFaultNotifier(application::PlatformFactory& platform);

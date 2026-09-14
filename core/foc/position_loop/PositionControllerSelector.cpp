@@ -3,11 +3,10 @@
 #endif
 
 #include "core/foc/position_loop/PositionControllerSelector.hpp"
+#include "core/foc/interfaces/LoopTunings.hpp"
 
 namespace foc
 {
-    // The state feedback laws are only selectable once their Riccati design actually converges,
-    // so a rejected solve leaves the previously active algorithm running instead of a dead loop.
     bool PositionControllerTraits::IsSelectable(PositionAlgorithm algorithm, const MechanicalModelParameters& parameters, const PositionLoopTunings& tunings)
     {
         switch (algorithm)

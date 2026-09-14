@@ -1,4 +1,5 @@
 #include "core/foc/instantiations/LowPriorityInterruptImpl.hpp"
+#include "infra/util/WithSharedAccess.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "foc/instantiations/FocController.hpp"
@@ -32,9 +33,9 @@ namespace simulator
         ThreePhaseMotorModel model{ motorParams, vdc, baseFrequency, std::optional<std::size_t>{} };
         model.SetLoad(foc::NewtonMeter{ defaults::loadTorqueNm });
 
-        foc::LowPriorityInterruptImpl lowPriorityInterrupt;
+        infra::WithSharedAccess<foc::LowPriorityInterruptImpl> lowPriorityInterrupt;
         foc::FocPositionController controller{ model, model, foc::Ampere{ defaults::maxCurrentAmps }, baseFrequency,
-            lowPriorityInterrupt, hal::Hertz{ defaults::lowPriorityFrequencyHz } };
+            *lowPriorityInterrupt, hal::Hertz{ defaults::lowPriorityFrequencyHz } };
 
         auto motorModel = foc::MotorModelParameters{};
         motorModel.resistance = motorParams.R;
