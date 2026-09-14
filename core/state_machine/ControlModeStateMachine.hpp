@@ -4,6 +4,7 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
+#include "core/state_machine/AlgorithmPersistence.hpp"
 #include "core/state_machine/ControlMode.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include "core/state_machine/OuterLoopStateMachine.hpp"
@@ -68,22 +69,21 @@ namespace state_machine
         foc::SpeedAlgorithm ActiveSpeedAlgorithm() const;
         foc::PositionAlgorithm ActivePositionAlgorithm() const;
 
+        application::FocStateMachineCommon& ActiveCommon();
+        const application::FocStateMachineCommon& ActiveCommon() const;
+        application::OuterLoopStateMachine* ActiveOuterLoop();
+
     private:
         using CliResult = services::TerminalWithStorage::StatusWithMessage;
 
         void Activate(ControlMode mode);
         void AttachAlgorithmRestore(application::FocStateMachineCommon& stateMachine);
-        application::FocStateMachineCommon& ActiveCommon();
-        const application::FocStateMachineCommon& ActiveCommon() const;
-        void ApplyPersistedAlgorithms();
-        void PersistConfig();
         foc::CurrentLoopSelectable* CurrentSelectable();
         foc::SpeedLoopSelectable* SpeedSelectable();
         foc::PositionLoopSelectable* PositionSelectable();
         const foc::CurrentLoopSelectable* CurrentSelectable() const;
         const foc::SpeedLoopSelectable* SpeedSelectable() const;
         const foc::PositionLoopSelectable* PositionSelectable() const;
-        application::OuterLoopStateMachine* ActiveOuterLoop();
         void RegisterCliCommands();
         void RegisterSetpointCliCommands(services::TerminalWithStorage& terminal);
         void RegisterBandwidthCliCommands(services::TerminalWithStorage& terminal);
@@ -107,6 +107,7 @@ namespace state_machine
         OuterLoopArgs outerLoopArgs;
 
         services::ConfigData configData;
+        AlgorithmPersistence algorithmPersistence;
         ControlMode pendingSelectMode{ ControlMode::torque };
         infra::AutoResetFunction<void(SelectResult)> pendingSelectCallback;
         uint8_t previousDefaultControlMode{ 0 };

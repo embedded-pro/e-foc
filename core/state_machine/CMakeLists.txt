@@ -21,6 +21,8 @@ target_link_libraries(e_foc.state_machine PUBLIC
 )
 
 target_sources(e_foc.state_machine PRIVATE
+    AlgorithmPersistence.hpp
+    AlgorithmPersistence.cpp
     CalibrationOrchestrator.hpp
     CalibrationOrchestrator.cpp
     ControlMode.hpp

@@ -91,80 +91,6 @@ namespace
             return foc::PositionAlgorithm::twoDof;
         return std::nullopt;
     }
-
-    const char* CurrentAlgorithmName(foc::CurrentAlgorithm algorithm)
-    {
-        switch (algorithm)
-        {
-            case foc::CurrentAlgorithm::pid:
-                return "pid";
-            case foc::CurrentAlgorithm::decoupledPid:
-                return "decoupled";
-            case foc::CurrentAlgorithm::deadbeat:
-                return "deadbeat";
-            case foc::CurrentAlgorithm::slidingMode:
-                return "sliding";
-            default:
-                return "unknown";
-        }
-    }
-
-    const char* SpeedAlgorithmName(foc::SpeedAlgorithm algorithm)
-    {
-        switch (algorithm)
-        {
-            case foc::SpeedAlgorithm::pid:
-                return "pid";
-            case foc::SpeedAlgorithm::lqi:
-                return "lqi";
-            case foc::SpeedAlgorithm::adrc:
-                return "adrc";
-            case foc::SpeedAlgorithm::twoDof:
-                return "twodof";
-            default:
-                return "unknown";
-        }
-    }
-
-    const char* PositionAlgorithmName(foc::PositionAlgorithm algorithm)
-    {
-        switch (algorithm)
-        {
-            case foc::PositionAlgorithm::pid:
-                return "pid";
-            case foc::PositionAlgorithm::cascadeP:
-                return "cascadep";
-            case foc::PositionAlgorithm::lqr:
-                return "lqr";
-            case foc::PositionAlgorithm::lqi:
-                return "lqi";
-            case foc::PositionAlgorithm::twoDof:
-                return "twodof";
-            default:
-                return "unknown";
-        }
-    }
-
-    std::optional<foc::CurrentAlgorithm> CurrentAlgorithmFromRaw(uint8_t raw)
-    {
-        if (raw > static_cast<uint8_t>(foc::CurrentAlgorithm::slidingMode))
-            return std::nullopt;
-        return static_cast<foc::CurrentAlgorithm>(raw);
-    }
-
-    std::optional<foc::SpeedAlgorithm> SpeedAlgorithmFromRaw(uint8_t raw)
-    {
-        if (raw > static_cast<uint8_t>(foc::SpeedAlgorithm::twoDof))
-            return std::nullopt;
-        return static_cast<foc::SpeedAlgorithm>(raw);
-    }
-
-    std::optional<foc::PositionAlgorithm> PositionAlgorithmFromRaw(uint8_t raw)
-    {
-        if (raw > static_cast<uint8_t>(foc::PositionAlgorithm::twoDof))
-            return std::nullopt;
-        return static_cast<foc::PositionAlgorithm>(raw);
-    }
 }
 
 namespace state_machine
@@ -184,6 +110,7 @@ namespace state_machine
         , faultNotifier(faultNotifier)
         , outerLoopArgs(outerLoopArgs)
         , configData(configData)
+        , algorithmPersistence(nvm, this->configData, terminalAndTracer.tracer)
     {
         RegisterCliCommands();
         Activate(ControlModeFromRaw(configData.defaultControlMode));
@@ -394,12 +321,11 @@ namespace state_machine
     {
         stateMachine.RegisterReadyHandler([this]()
             {
-                ApplyPersistedAlgorithms();
+                algorithmPersistence.ApplyPersistedAlgorithms(CurrentSelectable(), SpeedSelectable(), PositionSelectable());
             });
 
-        // A synchronous NVM read reaches Ready inside the constructor, before the handler exists
         if (std::holds_alternative<Ready>(stateMachine.CurrentState()))
-            ApplyPersistedAlgorithms();
+            algorithmPersistence.ApplyPersistedAlgorithms(CurrentSelectable(), SpeedSelectable(), PositionSelectable());
     }
 
     foc::CurrentLoopSelectable* ControlModeStateMachine::CurrentSelectable()
@@ -456,115 +382,34 @@ namespace state_machine
         return nullptr;
     }
 
-    void ControlModeStateMachine::ApplyPersistedAlgorithms()
-    {
-        if (auto* selectable = CurrentSelectable())
-        {
-            const auto algorithm = CurrentAlgorithmFromRaw(configData.currentAlgorithm);
-            if (!algorithm.has_value())
-                configData.currentAlgorithm = static_cast<uint8_t>(selectable->ActiveCurrentAlgorithm());
-            else if (*algorithm != selectable->ActiveCurrentAlgorithm() &&
-                     selectable->SelectCurrentAlgorithm(*algorithm) == foc::SelectResult::invalidAlgorithm)
-                configData.currentAlgorithm = static_cast<uint8_t>(selectable->ActiveCurrentAlgorithm());
-        }
-
-        if (auto* selectable = SpeedSelectable())
-        {
-            const auto algorithm = SpeedAlgorithmFromRaw(configData.speedAlgorithm);
-            if (!algorithm.has_value())
-                configData.speedAlgorithm = static_cast<uint8_t>(selectable->ActiveSpeedAlgorithm());
-            else if (*algorithm != selectable->ActiveSpeedAlgorithm() &&
-                     selectable->SelectSpeedAlgorithm(*algorithm) == foc::SelectResult::invalidAlgorithm)
-                configData.speedAlgorithm = static_cast<uint8_t>(selectable->ActiveSpeedAlgorithm());
-        }
-
-        if (auto* selectable = PositionSelectable())
-        {
-            const auto algorithm = PositionAlgorithmFromRaw(configData.positionAlgorithm);
-            if (!algorithm.has_value())
-                configData.positionAlgorithm = static_cast<uint8_t>(selectable->ActivePositionAlgorithm());
-            else if (*algorithm != selectable->ActivePositionAlgorithm() &&
-                     selectable->SelectPositionAlgorithm(*algorithm) == foc::SelectResult::invalidAlgorithm)
-                configData.positionAlgorithm = static_cast<uint8_t>(selectable->ActivePositionAlgorithm());
-        }
-    }
-
-    void ControlModeStateMachine::PersistConfig()
-    {
-        nvm.SaveConfig(configData, [this](services::NvmStatus status)
-            {
-                if (status != services::NvmStatus::Ok)
-                    terminalAndTracer.tracer.Trace() << "config persist failed";
-            });
-    }
-
     foc::SelectResult ControlModeStateMachine::SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm)
     {
-        auto* selectable = CurrentSelectable();
-        if (selectable == nullptr)
-            return foc::SelectResult::invalidAlgorithm;
-
-        auto result = selectable->SelectCurrentAlgorithm(algorithm);
-        if (result != foc::SelectResult::ok)
-            return result;
-
-        configData.currentAlgorithm = static_cast<uint8_t>(algorithm);
-        PersistConfig();
-        return result;
+        return algorithmPersistence.SelectCurrentAlgorithm(algorithm, CurrentSelectable());
     }
 
     foc::SelectResult ControlModeStateMachine::SelectSpeedAlgorithm(foc::SpeedAlgorithm algorithm)
     {
-        auto* selectable = SpeedSelectable();
-        if (selectable == nullptr)
-            return foc::SelectResult::invalidAlgorithm;
-
-        auto result = selectable->SelectSpeedAlgorithm(algorithm);
-        if (result != foc::SelectResult::ok)
-            return result;
-
-        configData.speedAlgorithm = static_cast<uint8_t>(algorithm);
-        PersistConfig();
-        return result;
+        return algorithmPersistence.SelectSpeedAlgorithm(algorithm, SpeedSelectable());
     }
 
     foc::SelectResult ControlModeStateMachine::SelectPositionAlgorithm(foc::PositionAlgorithm algorithm)
     {
-        auto* selectable = PositionSelectable();
-        if (selectable == nullptr)
-            return foc::SelectResult::invalidAlgorithm;
-
-        auto result = selectable->SelectPositionAlgorithm(algorithm);
-        if (result != foc::SelectResult::ok)
-            return result;
-
-        configData.positionAlgorithm = static_cast<uint8_t>(algorithm);
-        PersistConfig();
-        return result;
+        return algorithmPersistence.SelectPositionAlgorithm(algorithm, PositionSelectable());
     }
 
     foc::CurrentAlgorithm ControlModeStateMachine::ActiveCurrentAlgorithm() const
     {
-        if (const auto* selectable = CurrentSelectable())
-            return selectable->ActiveCurrentAlgorithm();
-
-        return CurrentAlgorithmFromRaw(configData.currentAlgorithm).value_or(foc::CurrentAlgorithm::pid);
+        return algorithmPersistence.ActiveCurrentAlgorithm(CurrentSelectable());
     }
 
     foc::SpeedAlgorithm ControlModeStateMachine::ActiveSpeedAlgorithm() const
     {
-        if (const auto* selectable = SpeedSelectable())
-            return selectable->ActiveSpeedAlgorithm();
-
-        return SpeedAlgorithmFromRaw(configData.speedAlgorithm).value_or(foc::SpeedAlgorithm::pid);
+        return algorithmPersistence.ActiveSpeedAlgorithm(SpeedSelectable());
     }
 
     foc::PositionAlgorithm ControlModeStateMachine::ActivePositionAlgorithm() const
     {
-        if (const auto* selectable = PositionSelectable())
-            return selectable->ActivePositionAlgorithm();
-
-        return PositionAlgorithmFromRaw(configData.positionAlgorithm).value_or(foc::PositionAlgorithm::pid);
+        return algorithmPersistence.ActivePositionAlgorithm(PositionSelectable());
     }
 
     void ControlModeStateMachine::RegisterCliCommands()
@@ -628,9 +473,9 @@ namespace state_machine
         terminal.AddCommand({ { "active_algorithms", "aa", "Print the active loop algorithms" },
             [this](const infra::BoundedConstString&)
             {
-                terminalAndTracer.tracer.Trace() << "Current loop: " << CurrentAlgorithmName(ActiveCurrentAlgorithm());
-                terminalAndTracer.tracer.Trace() << "Speed loop: " << SpeedAlgorithmName(ActiveSpeedAlgorithm());
-                terminalAndTracer.tracer.Trace() << "Position loop: " << PositionAlgorithmName(ActivePositionAlgorithm());
+                terminalAndTracer.tracer.Trace() << "Current loop: " << AlgorithmPersistence::CurrentAlgorithmName(ActiveCurrentAlgorithm());
+                terminalAndTracer.tracer.Trace() << "Speed loop: " << AlgorithmPersistence::SpeedAlgorithmName(ActiveSpeedAlgorithm());
+                terminalAndTracer.tracer.Trace() << "Position loop: " << AlgorithmPersistence::PositionAlgorithmName(ActivePositionAlgorithm());
             } });
 
         terminal.AddCommand({ { "estimate_status", "es", "Print current online estimates" },
