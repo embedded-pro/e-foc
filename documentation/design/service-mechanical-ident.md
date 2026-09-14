@@ -151,11 +151,11 @@ speed
 
 The trajectory is given explicit limits and the run stays inside them:
 
-| Limit          | Meaning                                                                                       |
-|----------------|-----------------------------------------------------------------------------------------------|
-| current        | The largest phase-current magnitude the run may produce, clamped to what the inverter supports |
-| speed          | The largest rotor speed the run may reach, measured rather than commanded                      |
-| duration       | The timeout after which the run ends whether or not it has converged                           |
+| Limit    | Meaning                                                                                        |
+|----------|------------------------------------------------------------------------------------------------|
+| current  | The largest phase-current magnitude the run may produce, clamped to what the inverter supports |
+| speed    | The largest rotor speed the run may reach, measured rather than commanded                      |
+| duration | The timeout after which the run ends whether or not it has converged                           |
 
 On the first sample whose phase current exceeds the current envelope in any phase and in either
 direction, or whose measured speed exceeds the speed limit, the run stops the drive and reports absent
@@ -232,12 +232,12 @@ A `TimerSingleShot` starts when the procedure begins. When it fires, the current
 The procedure and the online estimator described below share one acceptance policy, so a value one of
 them refuses is refused by the other:
 
-| Gate              | Rule                                                                                                                   |
-|-------------------|------------------------------------------------------------------------------------------------------------------------|
+| Gate              | Rule                                                                                                                                                        |
+|-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | excitation        | An observation updates the estimator only when the rotor is both moving and accelerating: speed magnitude and acceleration magnitude are each above a floor |
-| informed estimate | At least a minimum number of such observations must have been taken since the estimator was started or seeded            |
-| convergence       | The innovation must be below a fixed bound and the covariance trace below a bound scaled to the forgetting factor        |
-| plausibility      | J must be finite, strictly positive and below an upper bound; B must be finite, non-negative and below an upper bound    |
+| informed estimate | At least a minimum number of such observations must have been taken since the estimator was started or seeded                                               |
+| convergence       | The innovation must be below a fixed bound and the covariance trace below a bound scaled to the forgetting factor                                           |
+| plausibility      | J must be finite, strictly positive and below an upper bound; B must be finite, non-negative and below an upper bound                                       |
 
 The covariance bound is expressed relative to the forgetting factor because an RLS that forgets cannot
 drive its covariance below a floor proportional to (1 − λ). A single absolute bound would be structurally
@@ -273,17 +273,17 @@ Only one estimation may be in progress at a time. A call to `EstimateFrictionAnd
 
 ### Provided
 
-| Interface                                                               | Purpose                                                                                                                                                              | Contract                                                                                                                         |
-|-------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| Interface                                                               | Purpose                                                                                                                                                                       | Contract                                                                                                                                                                                                                                                                              |
+|-------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `EstimateFrictionAndInertia(torqueConstant, polePairs, config, onDone)` | Runs the RLS estimator under active speed control along a bounded two-level trajectory; delivers `(optional<NewtonMeterSecondPerRadian>, optional<NewtonMeterSecondSquared>)` | Rejected (immediate failure callback) if already Running, if the configuration does not describe a usable bounded trajectory, or if the torque constant or pole-pair count is not positive; fires exactly once; delivers absent values unless the estimate is converged and plausible |
 
 ### Required
 
-| Interface            | Purpose                                                                                 | Contract                                                                       |
-|----------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| Interface            | Purpose                                                                                 | Contract                                                                                                                                                                       |
+|----------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `FocSpeed`           | Commands the two speed setpoints that excite the mechanical dynamics                    | Must already be active and in control of the motor before the procedure begins, with an electrical model and mechanics applied so its gains and current envelope are not inert |
-| `ThreePhaseInverter` | Source of ADC current callbacks that supply the Iq measurement on each computation step | Must not be stopped during the estimation procedure                            |
-| `Encoder`            | Supplies mechanical angle samples for speed and acceleration estimation                 | Must be tracking position at the configured sampling rate                      |
+| `ThreePhaseInverter` | Source of ADC current callbacks that supply the Iq measurement on each computation step | Must not be stopped during the estimation procedure                                                                                                                            |
+| `Encoder`            | Supplies mechanical angle samples for speed and acceleration estimation                 | Must be tracking position at the configured sampling rate                                                                                                                      |
 
 ---
 

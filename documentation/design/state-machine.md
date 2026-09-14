@@ -50,13 +50,13 @@ date: 2026-04-10
 
 The state machine has five named states:
 
-| State         | Motor condition                                                                                                       | Allowed transitions                                                                                                                                                                                   |
-|---------------|-----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled | → `Calibrating` (CmdCalibrate or CmdReAlign with loaded parameters), → `Fault` (hardware fault)                                                                                                       |
+| State         | Motor condition                                                                                                                       | Allowed transitions                                                                                                                                                                                   |
+|---------------|---------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled                 | → `Calibrating` (CmdCalibrate or CmdReAlign with loaded parameters), → `Fault` (hardware fault)                                                                                                       |
 | `Calibrating` | Calibration sequence in progress; motor is driven by identification services, under a provisional plant model for the mechanical step | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop with previously valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (any step fails or hardware fault) |
-| `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true), → `Calibrating` (CmdCalibrate re-runs), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                  |
-| `Enabled`     | FOC controller active; motor under closed-loop control                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                 |
-| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times                                                                               |
+| `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true), → `Calibrating` (CmdCalibrate re-runs), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                  |
+| `Enabled`     | FOC controller active; motor under closed-loop control                                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                 |
+| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times                                                                               |
 
 ### State Diagram
 
@@ -154,8 +154,8 @@ sequenceDiagram
 | 2. Resistance and inductance                   | Electrical Ident    | `rPhase`, `lD`, `lQ`                               |
 | 3. Alignment                                   | Motor Alignment     | `encoderZeroOffset`                                |
 | 4. Apply measured model + provisional plant    | FOC controller      | Nothing persisted; makes the loops able to move the rotor |
-| 5. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth` |
-| 6. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                 |
+| 5. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth`        |
+| 6. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                        |
 
 After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`. The encoder zero offset is not written back to the encoder at this point; it is established only by the alignment step itself during the calibration sequence.
 
@@ -195,10 +195,10 @@ The provisional model must not outlive the run that needed it. Whatever ends a c
 committed record — a failed step, a hardware fault, an emergency stop — restores what the drive held
 before:
 
-| Situation                          | Restored state                                                                 |
-|------------------------------------|---------------------------------------------------------------------------------|
-| A valid calibration is still held  | That record is re-applied: electrical model, current tunings, mechanics, estimator seeds |
-| No valid calibration is held       | Nothing is re-applied; the machine returns to `Idle` and the motor cannot be enabled until a calibration succeeds |
+| Situation                         | Restored state                                                                                                    |
+|-----------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| A valid calibration is still held | That record is re-applied: electrical model, current tunings, mechanics, estimator seeds                          |
+| No valid calibration is held      | Nothing is re-applied; the machine returns to `Idle` and the motor cannot be enabled until a calibration succeeds |
 
 The flag is cleared when a calibration is committed, so a successful run leaves the identified model in
 place and nothing to restore.

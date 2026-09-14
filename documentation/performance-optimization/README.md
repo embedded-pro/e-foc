@@ -331,11 +331,11 @@ Three complementary approaches verify cycle budgets. See [qemu-sil.md](qemu-sil.
 
 Tier 1 gates three paths, each with its own configuration under `targets/sync_foc_sensored/main/`:
 
-| Path                                                        | Configuration                      | Budget |
-|-------------------------------------------------------------|------------------------------------|--------|
-| ADC ISR → inner loop → PWM                                  | `cycle-analysis.json`              | 4500   |
-| Low-priority interrupt → outer loop → online estimators      | `cycle-analysis-outer.json`        | 20000  |
-| ADC ISR → inner loop → mechanical identification observer   | `cycle-analysis-identification.json` | 6000 |
+| Path                                                      | Configuration                        | Budget |
+|-----------------------------------------------------------|--------------------------------------|--------|
+| ADC ISR → inner loop → PWM                                | `cycle-analysis.json`                | 4500   |
+| Low-priority interrupt → outer loop → online estimators   | `cycle-analysis-outer.json`          | 20000  |
+| ADC ISR → inner loop → mechanical identification observer | `cycle-analysis-identification.json` | 6000   |
 
 The identification path carries the whole 20 kHz period rather than the inner loop's 75% share. It only
 runs while a calibration is in progress: the control mode is `Calibrating`, no setpoint is being tracked,
