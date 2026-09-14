@@ -11,11 +11,20 @@
 #include "core/state_machine/SpeedStateMachine.hpp"
 #include "core/state_machine/TorqueStateMachine.hpp"
 #include "infra/util/Function.hpp"
+#include <cstdint>
 #include <optional>
 #include <variant>
 
 namespace state_machine
 {
+    enum class TuningResult : uint8_t
+    {
+        ok,
+        outOfRange,
+        wrongMode,
+        notWhileEnabled
+    };
+
     class ControlModeStateMachine
     {
     public:
@@ -40,9 +49,9 @@ namespace state_machine
         bool TrySetSpeed(foc::RadiansPerSecond setpoint);
         bool TrySetPosition(foc::Radians setpoint);
 
-        bool TrySetCurrentBandwidth(float bandwidth);
-        bool TrySetSpeedBandwidth(float bandwidth);
-        bool TrySetPositionBandwidth(float bandwidth);
+        TuningResult TrySetCurrentBandwidth(float bandwidth);
+        TuningResult TrySetSpeedBandwidth(float bandwidth);
+        TuningResult TrySetPositionBandwidth(float bandwidth);
 
         void SetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(CommandResult)>& onDone);
         foc::Weber ActiveFluxLinkage() const;
@@ -78,6 +87,7 @@ namespace state_machine
         void RegisterCliCommands();
         void RegisterSetpointCliCommands(services::TerminalWithStorage& terminal);
         void RegisterBandwidthCliCommands(services::TerminalWithStorage& terminal);
+        TuningResult CheckRedesignPreconditions() const;
         std::optional<CliResult> RejectSetpoint(ControlMode requiredMode) const;
         CliResult SetTorqueSetpoint(const infra::BoundedConstString& input);
         CliResult SetSpeedSetpoint(const infra::BoundedConstString& input);

@@ -1,6 +1,7 @@
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
+#include <limits>
 #include <numbers>
 
 namespace
@@ -203,4 +204,50 @@ TEST_F(TestCurrentPlantModel, a_voltage_vector_outside_the_modulation_circle_kee
     EXPECT_NEAR(std::hypot(output.d, output.q), 1.0f, 1e-5f);
     EXPECT_NEAR(output.d, 0.6f, 1e-5f);
     EXPECT_NEAR(output.q, -0.8f, 1e-5f);
+}
+
+TEST_F(TestCurrentPlantModel, an_infinite_electrical_parameter_is_rejected_rather_than_passing_the_positive_test)
+{
+    constexpr auto infinity = std::numeric_limits<float>::infinity();
+
+    auto resistanceParameters = ValidParameters();
+    resistanceParameters.resistance = foc::Ohm{ infinity };
+    EXPECT_FALSE(foc::AreElectricalParametersValid(resistanceParameters));
+
+    auto inductanceParameters = ValidParameters();
+    inductanceParameters.inductance = foc::MilliHenry{ infinity };
+    EXPECT_FALSE(foc::AreElectricalParametersValid(inductanceParameters));
+
+    auto busVoltageParameters = ValidParameters();
+    busVoltageParameters.busVoltage = foc::Volts{ infinity };
+    EXPECT_FALSE(foc::AreElectricalParametersValid(busVoltageParameters));
+}
+
+TEST_F(TestCurrentPlantModel, a_nan_electrical_parameter_is_rejected)
+{
+    constexpr auto nan = std::numeric_limits<float>::quiet_NaN();
+
+    auto parameters = ValidParameters();
+    parameters.resistance = foc::Ohm{ nan };
+
+    EXPECT_FALSE(foc::AreElectricalParametersValid(parameters));
+}
+
+TEST_F(TestCurrentPlantModel, a_non_finite_flux_linkage_is_rejected_because_it_scales_the_back_emf_feedforward)
+{
+    auto parameters = ValidParameters();
+    parameters.fluxLinkage = foc::Weber{ std::numeric_limits<float>::infinity() };
+
+    EXPECT_FALSE(foc::AreElectricalParametersValid(parameters));
+
+    foc::DecouplingFeedforward feedforward;
+    EXPECT_FALSE(feedforward.Configure(parameters));
+}
+
+TEST_F(TestCurrentPlantModel, a_zero_flux_linkage_remains_acceptable)
+{
+    auto parameters = ValidParameters();
+    parameters.fluxLinkage = foc::Weber{ 0.0f };
+
+    EXPECT_TRUE(foc::AreElectricalParametersValid(parameters));
 }

@@ -61,6 +61,8 @@ namespace can
 
         void ReportCommandOutcome(uint8_t commandId, state_machine::CommandResult result,
             const infra::Function<void(services::CanAckStatus)>& onDone);
+        void ReportTuningOutcome(uint8_t messageId, state_machine::TuningResult result,
+            const infra::Function<void()>& onDone);
         void ReportSelectFailure(state_machine::SelectResult result);
         bool SetpointRejected(uint8_t commandId, state_machine::ControlMode requiredMode, bool withinRange);
         bool SetpointAllowedInCurrentState() const;

@@ -2,7 +2,6 @@
 
 #include "core/foc/interfaces/Signals.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
-#include <algorithm>
 #include <cstdint>
 
 namespace foc
@@ -12,7 +11,11 @@ namespace foc
     {
         const auto percent = [](float normalized)
         {
-            return hal::Percent{ static_cast<uint8_t>(std::clamp(normalized, 0.0f, 1.0f) * 100.0f + 0.5f) };
+            // std::clamp would pass NaN into an undefined cast; -ffinite-math-only drops this branch, so
+            // the real guarantee is that configuration boundaries reject non-finite values (REQ-PERF-003)
+            const auto bounded = normalized > 0.0f ? (normalized < 1.0f ? normalized : 1.0f) : 0.0f;
+
+            return hal::Percent{ static_cast<uint8_t>(bounded * 100.0f + 0.5f) };
         };
 
         return PhasePwmDutyCycles{ percent(output.a), percent(output.b), percent(output.c) };

@@ -148,32 +148,31 @@ namespace can
 
     void FocMotorCanBridge::OnSetPidCurrent(float bandwidth, const infra::Function<void()>& onDone)
     {
-        if (!controlMode.TrySetCurrentBandwidth(bandwidth))
-        {
-            server.SendCommandAck(can::focSetPidCurrentId, services::CanAckStatus::invalidPayload);
-            return;
-        }
-        onDone();
+        ReportTuningOutcome(can::focSetPidCurrentId, controlMode.TrySetCurrentBandwidth(bandwidth), onDone);
     }
 
     void FocMotorCanBridge::OnSetPidSpeed(float bandwidth, const infra::Function<void()>& onDone)
     {
-        if (!controlMode.TrySetSpeedBandwidth(bandwidth))
-        {
-            server.SendCommandAck(can::focSetPidSpeedId, services::CanAckStatus::invalidPayload);
-            return;
-        }
-        onDone();
+        ReportTuningOutcome(can::focSetPidSpeedId, controlMode.TrySetSpeedBandwidth(bandwidth), onDone);
     }
 
     void FocMotorCanBridge::OnSetPidPosition(float bandwidth, const infra::Function<void()>& onDone)
     {
-        if (!controlMode.TrySetPositionBandwidth(bandwidth))
+        ReportTuningOutcome(can::focSetPidPositionId, controlMode.TrySetPositionBandwidth(bandwidth), onDone);
+    }
+
+    void FocMotorCanBridge::ReportTuningOutcome(uint8_t messageId, state_machine::TuningResult result, const infra::Function<void()>& onDone)
+    {
+        if (result == state_machine::TuningResult::ok)
         {
-            server.SendCommandAck(can::focSetPidPositionId, services::CanAckStatus::invalidPayload);
+            onDone();
             return;
         }
-        onDone();
+
+        // A redesign refused because the drive is running is a state problem, not a malformed frame
+        server.SendCommandAck(messageId, result == state_machine::TuningResult::notWhileEnabled
+                                             ? services::CanAckStatus::invalidState
+                                             : services::CanAckStatus::invalidPayload);
     }
 
     void FocMotorCanBridge::OnAlign(const infra::Function<void(services::CanAckStatus)>& onDone)

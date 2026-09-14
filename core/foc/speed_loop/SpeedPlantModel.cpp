@@ -1,15 +1,16 @@
 #include "core/foc/speed_loop/SpeedPlantModel.hpp"
 #include "core/foc/interfaces/MotorModel.hpp"
+#include "core/foc/math/ParameterValidation.hpp"
 #include <hal/synchronous_interfaces/SynchronousPwm.hpp>
 
 namespace foc
 {
     bool AreMechanicalParametersValid(const MechanicalModelParameters& parameters)
     {
-        return parameters.inertia.Value() > 0.0f &&
-               parameters.viscousFriction.Value() >= 0.0f &&
-               parameters.torqueConstant.Value() > 0.0f &&
-               parameters.maxCurrent.Value() > 0.0f &&
+        return IsFinitePositive(parameters.inertia.Value()) &&
+               IsFiniteNonNegative(parameters.viscousFriction.Value()) &&
+               IsFinitePositive(parameters.torqueConstant.Value()) &&
+               IsFinitePositive(parameters.maxCurrent.Value()) &&
                parameters.samplingFrequency.Value() > 0;
     }
 

@@ -96,7 +96,10 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
 - `OnEmergencyStop` → `CmdEmergencyStop()`.
 - `OnSelectControlMode` → `Select(mode, onDone)`; the result callback sends the mode response or a category error.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` → validate mode and range, then delegate to `TrySet*` on the state machine.
-- PID bandwidth commands → `TrySet*Bandwidth(bandwidth)` on the state machine; `invalidPayload` if rejected.
+- PID bandwidth commands → `TrySet*Bandwidth(bandwidth)` on the state machine. The state machine applies the
+  same `foc::CommandLimits` ranges and the same enabled-state policy the CLI gets: a value outside the range
+  for that loop, or one that does not apply to the active mode, is acknowledged `invalidPayload`; a redesign
+  refused because the drive is running is acknowledged `invalidState`.
 - `OnIdentifyElectrical` → `CmdReserveExternalCalibration()` (state guard + `Calibrating` entry); run estimation; `CmdCompleteExternalCalibration(data, cb)` on success, which aligns the rotor and persists; `invalidState` / `calibrationFailed` / `busy` on failure. The command covers the electrical steps only — it never drives the mechanical estimator — so speed and position end in `Idle` reporting `partialCalibration`, while torque reaches `Ready`.
 - `OnIdentifyMechanical` → `ActiveCalibrationData()` (state guard + pole-pairs extraction in one call); run estimation; broadcast on success; `invalidState` / `calibrationFailed` / `busy` on failure.
 - `OnRequestTelemetry` → broadcast current state and fault code via `focTelemetryStatusResponseId`; always succeeds. `ToCanMotorState` maps `Idle` to `FocMotorState::partialCalibration` instead of `idle` when `HasPartialCalibration()` reports a non-empty but incomplete NVM record (old-schema or interrupted external calibration).
@@ -222,12 +225,18 @@ sequenceDiagram
     participant CAN as CAN Bus
     participant SRV as FocMotorCategoryServer
     participant BRG as FocMotorCanBridge
+    participant CMS as ControlModeStateMachine
 
     CAN->>SRV: HandleMessage(focSetPidCurrentId, payload)
     SRV->>BRG: OnSetPidCurrent(bandwidth, successCallback)
-    BRG->>SRV: SendCommandAck(focSetPidCurrentId, invalidPayload)
-    SRV->>CAN: commandAck frame (invalidPayload)
+    BRG->>CMS: TrySetCurrentBandwidth(bandwidth)
+    CMS->>BRG: outOfRange | wrongMode | notWhileEnabled
+    BRG->>SRV: SendCommandAck(focSetPidCurrentId, invalidPayload | invalidState)
+    SRV->>CAN: commandAck frame
 ```
+
+`outOfRange` and `wrongMode` map to `invalidPayload`; `notWhileEnabled` maps to `invalidState`, so a client
+can tell a badly formed request from one that was well formed but arrived while the drive was running.
 
 ---
 

@@ -1,5 +1,6 @@
 #include "core/foc/speed_loop/SpeedPlantModel.hpp"
 #include <gmock/gmock.h>
+#include <limits>
 
 namespace
 {
@@ -130,4 +131,44 @@ TEST_F(TestSpeedPlantModel, a_current_beyond_the_envelope_is_clamped_on_both_sid
 {
     EXPECT_NEAR(foc::LimitToCurrentEnvelope(100.0f, foc::Ampere{ maxCurrent }).Value(), maxCurrent, tolerance);
     EXPECT_NEAR(foc::LimitToCurrentEnvelope(-100.0f, foc::Ampere{ maxCurrent }).Value(), -maxCurrent, tolerance);
+}
+
+TEST_F(TestSpeedPlantModel, an_infinite_mechanical_parameter_is_rejected_rather_than_passing_the_positive_test)
+{
+    constexpr auto infinity = std::numeric_limits<float>::infinity();
+
+    auto inertiaParameters = ValidParameters();
+    inertiaParameters.inertia = foc::NewtonMeterSecondSquared{ infinity };
+    EXPECT_FALSE(foc::AreMechanicalParametersValid(inertiaParameters));
+
+    auto torqueParameters = ValidParameters();
+    torqueParameters.torqueConstant = foc::NewtonMeter{ infinity };
+    EXPECT_FALSE(foc::AreMechanicalParametersValid(torqueParameters));
+
+    auto currentParameters = ValidParameters();
+    currentParameters.maxCurrent = foc::Ampere{ infinity };
+    EXPECT_FALSE(foc::AreMechanicalParametersValid(currentParameters));
+}
+
+TEST_F(TestSpeedPlantModel, a_nan_mechanical_parameter_is_rejected)
+{
+    auto parameters = ValidParameters();
+    parameters.inertia = foc::NewtonMeterSecondSquared{ std::numeric_limits<float>::quiet_NaN() };
+
+    EXPECT_FALSE(foc::AreMechanicalParametersValid(parameters));
+}
+
+TEST_F(TestSpeedPlantModel, viscous_friction_may_be_zero_but_never_non_finite)
+{
+    auto frictionless = ValidParameters();
+    frictionless.viscousFriction = foc::NewtonMeterSecondPerRadian{ 0.0f };
+    EXPECT_TRUE(foc::AreMechanicalParametersValid(frictionless));
+
+    auto infiniteFriction = ValidParameters();
+    infiniteFriction.viscousFriction = foc::NewtonMeterSecondPerRadian{ std::numeric_limits<float>::infinity() };
+    EXPECT_FALSE(foc::AreMechanicalParametersValid(infiniteFriction));
+
+    auto negativeFriction = ValidParameters();
+    negativeFriction.viscousFriction = foc::NewtonMeterSecondPerRadian{ -1.0f };
+    EXPECT_FALSE(foc::AreMechanicalParametersValid(negativeFriction));
 }

@@ -1,5 +1,6 @@
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
 #include "core/foc/math/FiniteGuard.hpp"
+#include "core/foc/math/ParameterValidation.hpp"
 #include "numerical/math/Math.hpp"
 #include <numbers>
 
@@ -13,9 +14,10 @@ namespace foc
 {
     bool AreElectricalParametersValid(const MotorModelParameters& parameters)
     {
-        return parameters.resistance.Value() > 0.0f &&
-               parameters.inductance.Value() > 0.0f &&
-               parameters.busVoltage.Value() > 0.0f &&
+        return IsFinitePositive(parameters.resistance.Value()) &&
+               IsFinitePositive(parameters.inductance.Value()) &&
+               IsFinitePositive(parameters.busVoltage.Value()) &&
+               IsFiniteValue(parameters.fluxLinkage.Value()) &&
                parameters.samplingFrequency.Value() > 0;
     }
 

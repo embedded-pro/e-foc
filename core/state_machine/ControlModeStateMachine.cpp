@@ -1,5 +1,6 @@
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/foc/interfaces/CommandLimits.hpp"
+#include "core/foc/math/ParameterValidation.hpp"
 #include "core/services/cli/TerminalHelper.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "infra/util/Tokenizer.hpp"
@@ -13,6 +14,25 @@ namespace
 
     constexpr auto wrongModeMessage = "rejected: command does not apply to the active control mode.";
     constexpr auto wrongStateMessage = "rejected: setpoints are only accepted in Ready or Enabled.";
+    constexpr auto whileEnabledMessage = "rejected: bandwidth cannot be redesigned while enabled.";
+    constexpr auto outOfRangeMessage = "invalid value: out of range.";
+
+    CliStatusWithMessage ToCliResult(state_machine::TuningResult result)
+    {
+        switch (result)
+        {
+            case state_machine::TuningResult::ok:
+                return CliStatusWithMessage{};
+            case state_machine::TuningResult::outOfRange:
+                return CliStatusWithMessage{ CliStatus::error, outOfRangeMessage };
+            case state_machine::TuningResult::notWhileEnabled:
+                return CliStatusWithMessage{ CliStatus::error, whileEnabledMessage };
+            case state_machine::TuningResult::wrongMode:
+                break;
+        }
+
+        return CliStatusWithMessage{ CliStatus::error, wrongModeMessage };
+    }
 
     std::optional<CliStatusWithMessage> ParseSingleFloat(const infra::BoundedConstString& input, float& value, float minValue, float maxValue)
     {
@@ -25,8 +45,8 @@ namespace
         if (!parsed.has_value())
             return CliStatusWithMessage{ CliStatus::error, "invalid value. It should be a float." };
 
-        if (*parsed < minValue || *parsed > maxValue)
-            return CliStatusWithMessage{ CliStatus::error, "invalid value: out of range." };
+        if (!foc::IsWithinInclusive(*parsed, minValue, maxValue))
+            return CliStatusWithMessage{ CliStatus::error, outOfRangeMessage };
 
         value = *parsed;
         return std::nullopt;
@@ -265,58 +285,79 @@ namespace state_machine
         return true;
     }
 
-    bool ControlModeStateMachine::TrySetCurrentBandwidth(float bandwidth)
+    // A loop redesign recomputes gains from scratch, so applying one under load would step the drive
+    TuningResult ControlModeStateMachine::CheckRedesignPreconditions() const
     {
+        if (std::holds_alternative<std::monostate>(activeSm))
+            return TuningResult::wrongMode;
+
+        if (std::holds_alternative<Enabled>(ActiveStateMachine().CurrentState()))
+            return TuningResult::notWhileEnabled;
+
+        return TuningResult::ok;
+    }
+
+    TuningResult ControlModeStateMachine::TrySetCurrentBandwidth(float bandwidth)
+    {
+        if (!foc::IsAcceptableCurrentBandwidth(bandwidth))
+            return TuningResult::outOfRange;
+
+        if (const auto rejection = CheckRedesignPreconditions(); rejection != TuningResult::ok)
+            return rejection;
+
         auto tunings = foc::CurrentLoopTunings{};
         tunings.bandwidth = bandwidth;
 
         if (auto* sm = std::get_if<application::TorqueStateMachine>(&activeSm))
-        {
             sm->GetController().SetCurrentTunings(tunings);
-            return true;
-        }
-        if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-        {
+        else if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
             sm->GetController().SetCurrentTunings(tunings);
-            return true;
-        }
-        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-        {
+        else if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
             sm->GetController().SetCurrentTunings(tunings);
-            return true;
-        }
-        return false;
+        else
+            return TuningResult::wrongMode;
+
+        return TuningResult::ok;
     }
 
-    bool ControlModeStateMachine::TrySetSpeedBandwidth(float bandwidth)
+    TuningResult ControlModeStateMachine::TrySetSpeedBandwidth(float bandwidth)
     {
+        if (!foc::IsAcceptableSpeedBandwidth(bandwidth))
+            return TuningResult::outOfRange;
+
+        if (const auto rejection = CheckRedesignPreconditions(); rejection != TuningResult::ok)
+            return rejection;
+
         auto tunings = foc::SpeedLoopTunings{};
         tunings.bandwidth = bandwidth;
 
         if (auto* sm = std::get_if<application::SpeedStateMachine>(&activeSm))
-        {
             sm->GetController().SetSpeedTunings(tunings);
-            return true;
-        }
-        if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
-        {
+        else if (auto* sm = std::get_if<application::PositionStateMachine>(&activeSm))
             sm->GetController().SetSpeedTunings(tunings);
-            return true;
-        }
-        return false;
+        else
+            return TuningResult::wrongMode;
+
+        return TuningResult::ok;
     }
 
-    bool ControlModeStateMachine::TrySetPositionBandwidth(float bandwidth)
+    TuningResult ControlModeStateMachine::TrySetPositionBandwidth(float bandwidth)
     {
+        if (!foc::IsAcceptablePositionBandwidth(bandwidth))
+            return TuningResult::outOfRange;
+
+        if (const auto rejection = CheckRedesignPreconditions(); rejection != TuningResult::ok)
+            return rejection;
+
         auto* sm = std::get_if<application::PositionStateMachine>(&activeSm);
         if (sm == nullptr)
-            return false;
+            return TuningResult::wrongMode;
 
         auto tunings = foc::PositionLoopTunings{};
         tunings.bandwidth = bandwidth;
 
         // The position law is redesigned on retuning, so a rejected design must not look accepted
-        return sm->GetController().SetPositionTunings(tunings) == foc::SelectResult::ok;
+        return sm->GetController().SetPositionTunings(tunings) == foc::SelectResult::ok ? TuningResult::ok : TuningResult::outOfRange;
     }
 
     void ControlModeStateMachine::Activate(ControlMode mode)
@@ -715,10 +756,7 @@ namespace state_machine
         if (auto error = ParseSingleFloat(input, value, foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth); error.has_value())
             return *error;
 
-        if (!TrySetCurrentBandwidth(value))
-            return CliResult{ CliStatus::error, wrongModeMessage };
-
-        return CliResult{};
+        return ToCliResult(TrySetCurrentBandwidth(value));
     }
 
     ControlModeStateMachine::CliResult ControlModeStateMachine::SetSpeedBandwidth(const infra::BoundedConstString& input)
@@ -727,10 +765,7 @@ namespace state_machine
         if (auto error = ParseSingleFloat(input, value, foc::CommandLimits::minBandwidth, foc::CommandLimits::maxSpeedBandwidth); error.has_value())
             return *error;
 
-        if (!TrySetSpeedBandwidth(value))
-            return CliResult{ CliStatus::error, wrongModeMessage };
-
-        return CliResult{};
+        return ToCliResult(TrySetSpeedBandwidth(value));
     }
 
     ControlModeStateMachine::CliResult ControlModeStateMachine::SetPositionBandwidth(const infra::BoundedConstString& input)
@@ -743,10 +778,10 @@ namespace state_machine
             return CliResult{ CliStatus::error, wrongModeMessage };
 
         // Retuning redesigns the position law, which can be refused; never report that as applied
-        if (!TrySetPositionBandwidth(value))
+        if (const auto result = TrySetPositionBandwidth(value); result == TuningResult::outOfRange)
             return CliResult{ CliStatus::error, "rejected: no controller for this bandwidth." };
-
-        return CliResult{};
+        else
+            return ToCliResult(result);
     }
 
     ControlModeStateMachine::CliResult ControlModeStateMachine::SetFluxLinkageFromCli(const infra::BoundedConstString& input)
