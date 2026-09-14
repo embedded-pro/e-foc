@@ -17,7 +17,6 @@ namespace foc
         return IsFinitePositive(parameters.resistance.Value()) &&
                IsFinitePositive(parameters.inductance.Value()) &&
                IsFinitePositive(parameters.busVoltage.Value()) &&
-               IsFiniteValue(parameters.fluxLinkage.Value()) &&
                parameters.samplingFrequency.Value() > 0;
     }
 

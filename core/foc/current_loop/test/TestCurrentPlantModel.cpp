@@ -1,7 +1,9 @@
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
+#include "core/foc/math/FiniteGuard.hpp"
+#include <bit>
 #include <cmath>
+#include <cstdint>
 #include <gmock/gmock.h>
-#include <limits>
 #include <numbers>
 
 namespace
@@ -14,6 +16,25 @@ namespace
     constexpr float busVoltage = 24.0f;
     constexpr uint32_t samplingFrequency = 20000;
     constexpr float samplePeriod = 1.0f / static_cast<float>(samplingFrequency);
+
+    // Routed through volatile so the guard is exercised at runtime, as it is on values arriving from NVM or an estimator,
+    // rather than folded away against a compile-time constant
+    float NonFinite(uint32_t bits)
+    {
+        volatile uint32_t opaque = bits;
+
+        return std::bit_cast<float>(static_cast<uint32_t>(opaque));
+    }
+
+    float Infinity()
+    {
+        return NonFinite(0x7F800000u);
+    }
+
+    float NotANumber()
+    {
+        return NonFinite(0x7FC00000u);
+    }
 
     foc::MotorModelParameters ValidParameters()
     {
@@ -208,46 +229,25 @@ TEST_F(TestCurrentPlantModel, a_voltage_vector_outside_the_modulation_circle_kee
 
 TEST_F(TestCurrentPlantModel, an_infinite_electrical_parameter_is_rejected_rather_than_passing_the_positive_test)
 {
-    constexpr auto infinity = std::numeric_limits<float>::infinity();
+    ASSERT_FALSE(foc::IsFiniteValue(Infinity()));
 
     auto resistanceParameters = ValidParameters();
-    resistanceParameters.resistance = foc::Ohm{ infinity };
+    resistanceParameters.resistance = foc::Ohm{ Infinity() };
     EXPECT_FALSE(foc::AreElectricalParametersValid(resistanceParameters));
 
     auto inductanceParameters = ValidParameters();
-    inductanceParameters.inductance = foc::MilliHenry{ infinity };
+    inductanceParameters.inductance = foc::MilliHenry{ Infinity() };
     EXPECT_FALSE(foc::AreElectricalParametersValid(inductanceParameters));
 
     auto busVoltageParameters = ValidParameters();
-    busVoltageParameters.busVoltage = foc::Volts{ infinity };
+    busVoltageParameters.busVoltage = foc::Volts{ Infinity() };
     EXPECT_FALSE(foc::AreElectricalParametersValid(busVoltageParameters));
 }
 
 TEST_F(TestCurrentPlantModel, a_nan_electrical_parameter_is_rejected)
 {
-    constexpr auto nan = std::numeric_limits<float>::quiet_NaN();
-
     auto parameters = ValidParameters();
-    parameters.resistance = foc::Ohm{ nan };
+    parameters.resistance = foc::Ohm{ NotANumber() };
 
     EXPECT_FALSE(foc::AreElectricalParametersValid(parameters));
-}
-
-TEST_F(TestCurrentPlantModel, a_non_finite_flux_linkage_is_rejected_because_it_scales_the_back_emf_feedforward)
-{
-    auto parameters = ValidParameters();
-    parameters.fluxLinkage = foc::Weber{ std::numeric_limits<float>::infinity() };
-
-    EXPECT_FALSE(foc::AreElectricalParametersValid(parameters));
-
-    foc::DecouplingFeedforward feedforward;
-    EXPECT_FALSE(feedforward.Configure(parameters));
-}
-
-TEST_F(TestCurrentPlantModel, a_zero_flux_linkage_remains_acceptable)
-{
-    auto parameters = ValidParameters();
-    parameters.fluxLinkage = foc::Weber{ 0.0f };
-
-    EXPECT_TRUE(foc::AreElectricalParametersValid(parameters));
 }

@@ -1,5 +1,6 @@
 #include "core/state_machine/OuterLoopStateMachine.hpp"
 #include "core/foc/math/FiniteGuard.hpp"
+#include "core/foc/math/ParameterValidation.hpp"
 #include <cmath>
 
 namespace application
@@ -24,7 +25,7 @@ namespace application
             hal::Hertz{ 0 } });
 
         auto tunings = foc::SpeedLoopTunings{};
-        tunings.bandwidth = bandwidth > 0.0f ? bandwidth : velocityBandwidthRadPerSec;
+        tunings.bandwidth = foc::IsAcceptableSpeedBandwidth(bandwidth) ? bandwidth : velocityBandwidthRadPerSec;
         SpeedTunable().SetSpeedTunings(tunings);
     }
 

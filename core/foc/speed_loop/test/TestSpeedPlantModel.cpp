@@ -1,6 +1,8 @@
+#include "core/foc/math/FiniteGuard.hpp"
 #include "core/foc/speed_loop/SpeedPlantModel.hpp"
+#include <bit>
+#include <cstdint>
 #include <gmock/gmock.h>
-#include <limits>
 
 namespace
 {
@@ -11,6 +13,25 @@ namespace
     constexpr float maxCurrent = 10.0f;
     constexpr uint32_t samplingFrequency = 1000;
     constexpr float samplePeriod = 1.0f / static_cast<float>(samplingFrequency);
+
+    // Routed through volatile so the guard is exercised at runtime, as it is on values arriving from NVM or an estimator,
+    // rather than folded away against a compile-time constant
+    float NonFinite(uint32_t bits)
+    {
+        volatile uint32_t opaque = bits;
+
+        return std::bit_cast<float>(static_cast<uint32_t>(opaque));
+    }
+
+    float Infinity()
+    {
+        return NonFinite(0x7F800000u);
+    }
+
+    float NotANumber()
+    {
+        return NonFinite(0x7FC00000u);
+    }
 
     foc::MechanicalModelParameters ValidParameters()
     {
@@ -135,25 +156,25 @@ TEST_F(TestSpeedPlantModel, a_current_beyond_the_envelope_is_clamped_on_both_sid
 
 TEST_F(TestSpeedPlantModel, an_infinite_mechanical_parameter_is_rejected_rather_than_passing_the_positive_test)
 {
-    constexpr auto infinity = std::numeric_limits<float>::infinity();
+    ASSERT_FALSE(foc::IsFiniteValue(Infinity()));
 
     auto inertiaParameters = ValidParameters();
-    inertiaParameters.inertia = foc::NewtonMeterSecondSquared{ infinity };
+    inertiaParameters.inertia = foc::NewtonMeterSecondSquared{ Infinity() };
     EXPECT_FALSE(foc::AreMechanicalParametersValid(inertiaParameters));
 
     auto torqueParameters = ValidParameters();
-    torqueParameters.torqueConstant = foc::NewtonMeter{ infinity };
+    torqueParameters.torqueConstant = foc::NewtonMeter{ Infinity() };
     EXPECT_FALSE(foc::AreMechanicalParametersValid(torqueParameters));
 
     auto currentParameters = ValidParameters();
-    currentParameters.maxCurrent = foc::Ampere{ infinity };
+    currentParameters.maxCurrent = foc::Ampere{ Infinity() };
     EXPECT_FALSE(foc::AreMechanicalParametersValid(currentParameters));
 }
 
 TEST_F(TestSpeedPlantModel, a_nan_mechanical_parameter_is_rejected)
 {
     auto parameters = ValidParameters();
-    parameters.inertia = foc::NewtonMeterSecondSquared{ std::numeric_limits<float>::quiet_NaN() };
+    parameters.inertia = foc::NewtonMeterSecondSquared{ NotANumber() };
 
     EXPECT_FALSE(foc::AreMechanicalParametersValid(parameters));
 }
@@ -165,7 +186,7 @@ TEST_F(TestSpeedPlantModel, viscous_friction_may_be_zero_but_never_non_finite)
     EXPECT_TRUE(foc::AreMechanicalParametersValid(frictionless));
 
     auto infiniteFriction = ValidParameters();
-    infiniteFriction.viscousFriction = foc::NewtonMeterSecondPerRadian{ std::numeric_limits<float>::infinity() };
+    infiniteFriction.viscousFriction = foc::NewtonMeterSecondPerRadian{ Infinity() };
     EXPECT_FALSE(foc::AreMechanicalParametersValid(infiniteFriction));
 
     auto negativeFriction = ValidParameters();

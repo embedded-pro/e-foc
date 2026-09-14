@@ -1,9 +1,19 @@
 #include "TestFocStateMachineHelper.hpp"
 #include "core/foc/cascade/TorqueCascade.hpp"
+#include <bit>
+#include <cstdint>
 
 namespace
 {
     using namespace testing;
+
+    // Routed through volatile so the guard runs against a runtime value, as it does on a record loaded from NVM
+    float NonFiniteFloat(uint32_t bits)
+    {
+        volatile uint32_t opaque = bits;
+
+        return std::bit_cast<float>(static_cast<uint32_t>(opaque));
+    }
 
     class FocStateMachineTorqueCliTest
         : public ::testing::Test
@@ -373,7 +383,10 @@ TEST_F(FocStateMachineTorqueCliTest, realign_from_idle_without_valid_calibration
     auto sm = CreateStateMachine();
 
     auto result = state_machine::CommandResult::ok;
-    sm.CmdReAlign([&result](state_machine::CommandResult r) { result = r; });
+    sm.CmdReAlign([&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
 
     EXPECT_EQ(result, state_machine::CommandResult::rejected);
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
@@ -492,6 +505,38 @@ TEST_F(FocStateMachineTorqueCliTest, accept_external_calibration_runs_alignment_
 
     EXPECT_EQ(callbackResult, state_machine::CommandResult::ok);
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, external_calibration_carrying_a_non_finite_value_is_rejected_before_alignment)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    services::CalibrationData externalData{};
+    externalData.polePairs = 4;
+    externalData.rPhase = NonFiniteFloat(0x7F800000u);
+
+    EXPECT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+
+    state_machine::CommandResult callbackResult = state_machine::CommandResult::ok;
+    sm.CmdCompleteExternalCalibration(externalData, [&callbackResult](state_machine::CommandResult r)
+        {
+            callbackResult = r;
+        });
+
+    EXPECT_EQ(callbackResult, state_machine::CommandResult::rejected);
+    EXPECT_FALSE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, a_persisted_record_with_a_non_finite_resistance_does_not_reach_ready)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmHolds(7, NonFiniteFloat(0x7F800000u), services::CalibrationStage::complete);
+
+    auto sm = CreateStateMachine();
+
+    EXPECT_FALSE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineTorqueCliTest, accept_external_calibration_cannot_enable_before_alignment_completes)

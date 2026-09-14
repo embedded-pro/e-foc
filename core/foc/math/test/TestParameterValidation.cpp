@@ -1,22 +1,32 @@
 #include "core/foc/math/ParameterValidation.hpp"
+#include <bit>
+#include <cstdint>
 #include <gmock/gmock.h>
-#include <limits>
 
 namespace
 {
+    // Routed through volatile so the guard is exercised at runtime, as it is on values arriving from NVM or an estimator,
+    // rather than folded away against a compile-time constant
+    float NonFinite(uint32_t bits)
+    {
+        volatile uint32_t opaque = bits;
+
+        return std::bit_cast<float>(static_cast<uint32_t>(opaque));
+    }
+
+    float Infinity()
+    {
+        return NonFinite(0x7F800000u);
+    }
+
+    float NotANumber()
+    {
+        return NonFinite(0x7FC00000u);
+    }
+
     class TestParameterValidation
         : public ::testing::Test
     {
-    public:
-        static float Nan()
-        {
-            return std::numeric_limits<float>::quiet_NaN();
-        }
-
-        static float Inf()
-        {
-            return std::numeric_limits<float>::infinity();
-        }
     };
 }
 
@@ -36,16 +46,16 @@ TEST_F(TestParameterValidation, a_value_outside_the_range_is_rejected)
 
 TEST_F(TestParameterValidation, a_non_finite_value_is_rejected_rather_than_slipping_through_the_comparisons)
 {
-    EXPECT_FALSE(foc::IsWithinInclusive(Nan(), 1.0f, 10.0f));
-    EXPECT_FALSE(foc::IsWithinInclusive(Inf(), 1.0f, 10.0f));
-    EXPECT_FALSE(foc::IsWithinInclusive(-Inf(), 1.0f, 10.0f));
+    EXPECT_FALSE(foc::IsWithinInclusive(NotANumber(), 1.0f, 10.0f));
+    EXPECT_FALSE(foc::IsWithinInclusive(Infinity(), 1.0f, 10.0f));
+    EXPECT_FALSE(foc::IsWithinInclusive(-Infinity(), 1.0f, 10.0f));
 }
 
 TEST_F(TestParameterValidation, positive_infinity_does_not_satisfy_a_positive_domain)
 {
     EXPECT_TRUE(foc::IsFinitePositive(1e-9f));
-    EXPECT_FALSE(foc::IsFinitePositive(Inf()));
-    EXPECT_FALSE(foc::IsFinitePositive(Nan()));
+    EXPECT_FALSE(foc::IsFinitePositive(Infinity()));
+    EXPECT_FALSE(foc::IsFinitePositive(NotANumber()));
     EXPECT_FALSE(foc::IsFinitePositive(0.0f));
     EXPECT_FALSE(foc::IsFinitePositive(-1.0f));
 }
@@ -55,8 +65,8 @@ TEST_F(TestParameterValidation, a_non_negative_domain_admits_zero_but_not_infini
     EXPECT_TRUE(foc::IsFiniteNonNegative(0.0f));
     EXPECT_TRUE(foc::IsFiniteNonNegative(2.5f));
     EXPECT_FALSE(foc::IsFiniteNonNegative(-0.001f));
-    EXPECT_FALSE(foc::IsFiniteNonNegative(Inf()));
-    EXPECT_FALSE(foc::IsFiniteNonNegative(Nan()));
+    EXPECT_FALSE(foc::IsFiniteNonNegative(Infinity()));
+    EXPECT_FALSE(foc::IsFiniteNonNegative(NotANumber()));
 }
 
 TEST_F(TestParameterValidation, each_loop_bandwidth_carries_its_own_upper_bound)
@@ -84,11 +94,11 @@ TEST_F(TestParameterValidation, a_bandwidth_at_or_below_zero_is_rejected_on_ever
 
 TEST_F(TestParameterValidation, a_non_finite_bandwidth_is_rejected_on_every_loop)
 {
-    EXPECT_FALSE(foc::IsAcceptableCurrentBandwidth(Nan()));
-    EXPECT_FALSE(foc::IsAcceptableSpeedBandwidth(Nan()));
-    EXPECT_FALSE(foc::IsAcceptablePositionBandwidth(Nan()));
+    EXPECT_FALSE(foc::IsAcceptableCurrentBandwidth(NotANumber()));
+    EXPECT_FALSE(foc::IsAcceptableSpeedBandwidth(NotANumber()));
+    EXPECT_FALSE(foc::IsAcceptablePositionBandwidth(NotANumber()));
 
-    EXPECT_FALSE(foc::IsAcceptableCurrentBandwidth(Inf()));
-    EXPECT_FALSE(foc::IsAcceptableSpeedBandwidth(Inf()));
-    EXPECT_FALSE(foc::IsAcceptablePositionBandwidth(Inf()));
+    EXPECT_FALSE(foc::IsAcceptableCurrentBandwidth(Infinity()));
+    EXPECT_FALSE(foc::IsAcceptableSpeedBandwidth(Infinity()));
+    EXPECT_FALSE(foc::IsAcceptablePositionBandwidth(Infinity()));
 }

@@ -128,6 +128,10 @@ from `foc::CommandLimits`; the predicates that apply them live in `core/foc/math
 A rejected value is reported before any controller is touched, so a refused retune leaves the previously
 accepted bandwidth live.
 
+The same per-loop predicates gate bandwidths arriving from persisted calibration: `CurrentTuningsFor` and
+`OuterLoopStateMachine::ApplyMechanics` fall back to the compiled default unless the stored value is within
+the loop's range, so a record written by an older firmware cannot install an out-of-range or non-finite gain.
+
 ### Diagnostics Commands
 
 Three commands expose what the control loop and the CAN bus have been doing. Each of these numbers

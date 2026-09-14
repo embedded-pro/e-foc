@@ -16,10 +16,33 @@
 #include "infra/stream/test/StreamMock.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/Terminal.hpp"
+#include <bit>
+#include <cstdint>
 #include <gtest/gtest.h>
-#include <limits>
 
 using namespace testing;
+
+namespace
+{
+    // Routed through volatile so the guard is exercised at runtime, as it is on values arriving from NVM or an estimator,
+    // rather than folded away against a compile-time constant
+    float NonFinite(uint32_t bits)
+    {
+        volatile uint32_t opaque = bits;
+
+        return std::bit_cast<float>(static_cast<uint32_t>(opaque));
+    }
+
+    float Infinity()
+    {
+        return NonFinite(0x7F800000u);
+    }
+
+    float NotANumber()
+    {
+        return NonFinite(0x7FC00000u);
+    }
+}
 
 using TestedControlMode = state_machine::ControlModeStateMachine;
 
@@ -1074,22 +1097,19 @@ TEST_F(ControlModeStateMachineExtTest, TrySetCurrentBandwidth_RejectsValuesOutsi
 
 TEST_F(ControlModeStateMachineExtTest, TrySetBandwidth_RejectsNonFiniteValuesOnEveryLoop)
 {
-    constexpr auto nan = std::numeric_limits<float>::quiet_NaN();
-    constexpr auto infinity = std::numeric_limits<float>::infinity();
-
     GivenNvmAlwaysInvalid();
     GivenNvmSaveConfigSucceeds();
     ConstructSubject();
 
     subject->Select(state_machine::ControlMode::position, [](auto) {});
 
-    EXPECT_EQ(subject->TrySetCurrentBandwidth(nan), state_machine::TuningResult::outOfRange);
-    EXPECT_EQ(subject->TrySetSpeedBandwidth(nan), state_machine::TuningResult::outOfRange);
-    EXPECT_EQ(subject->TrySetPositionBandwidth(nan), state_machine::TuningResult::outOfRange);
+    EXPECT_EQ(subject->TrySetCurrentBandwidth(NotANumber()), state_machine::TuningResult::outOfRange);
+    EXPECT_EQ(subject->TrySetSpeedBandwidth(NotANumber()), state_machine::TuningResult::outOfRange);
+    EXPECT_EQ(subject->TrySetPositionBandwidth(NotANumber()), state_machine::TuningResult::outOfRange);
 
-    EXPECT_EQ(subject->TrySetCurrentBandwidth(infinity), state_machine::TuningResult::outOfRange);
-    EXPECT_EQ(subject->TrySetSpeedBandwidth(infinity), state_machine::TuningResult::outOfRange);
-    EXPECT_EQ(subject->TrySetPositionBandwidth(infinity), state_machine::TuningResult::outOfRange);
+    EXPECT_EQ(subject->TrySetCurrentBandwidth(Infinity()), state_machine::TuningResult::outOfRange);
+    EXPECT_EQ(subject->TrySetSpeedBandwidth(Infinity()), state_machine::TuningResult::outOfRange);
+    EXPECT_EQ(subject->TrySetPositionBandwidth(Infinity()), state_machine::TuningResult::outOfRange);
 }
 
 TEST_F(ControlModeStateMachineExtTest, TrySetBandwidth_RejectsAMisrangedValueBeforeCheckingTheMode)
