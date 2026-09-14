@@ -8,6 +8,7 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
+#include "core/state_machine/CalibrationOrchestrator.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include "core/state_machine/TransitionPolicies.hpp"
 #include "infra/util/AutoResetFunction.hpp"
@@ -104,8 +105,6 @@ namespace application
         bool HasPendingCommand() const;
         bool HasValidCalibration() const;
 
-        void RunPolePairsStep();
-        void RunResistanceAndInductanceStep();
         void RunAlignmentStep();
         void FailCalibrationStep();
         void OnCalibrationComplete();
@@ -135,9 +134,8 @@ namespace application
         drivers::ThreePhaseInverter& inverter;
         foc::Volts vdc;
         services::NonVolatileMemory& nvm;
-        services::ElectricalParametersIdentification& electricalIdent;
-        services::MotorAlignment& motorAlignment;
         foc::Weber configuredFluxLinkage;
+        CalibrationOrchestrator calibrationOrchestrator;
 
         state_machine::State currentState{ state_machine::Idle{} };
         state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::none };
@@ -150,6 +148,7 @@ namespace application
         bool faultLatched{ false };
         uint8_t consecutiveFaultClears{ 0 };
 
+        void OnAlignmentSucceeded(foc::Radians angle);
         void OnCalibrationInvalidated(services::NvmStatus status);
         void OnBootValidityChecked(bool valid);
         void OnBootCalibrationLoaded(services::NvmStatus status);

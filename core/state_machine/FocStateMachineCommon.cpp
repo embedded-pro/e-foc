@@ -26,9 +26,8 @@ namespace application
         , inverter(hardware.inverter)
         , vdc(hardware.vdc)
         , nvm(nvm)
-        , electricalIdent(calibServices.electricalIdent)
-        , motorAlignment(calibServices.motorAlignment)
         , configuredFluxLinkage(calibServices.fluxLinkage)
+        , calibrationOrchestrator(calibServices.electricalIdent, calibServices.motorAlignment, terminalAndTracer.tracer)
     {}
 
     void FocStateMachineCommon::RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier)
@@ -58,8 +57,7 @@ namespace application
 
     void FocStateMachineCommon::AbortCalibrationServices()
     {
-        electricalIdent.Abort();
-        motorAlignment.Abort();
+        calibrationOrchestrator.Abort();
         AbortModeSpecificServices();
     }
 
@@ -90,7 +88,7 @@ namespace application
 
     bool FocStateMachineCommon::HasPendingAsyncWork() const
     {
-        return HasPendingCommand() || bootCheckInFlight || std::holds_alternative<state_machine::Calibrating>(currentState) || electricalIdent.IsRunning();
+        return HasPendingCommand() || bootCheckInFlight || std::holds_alternative<state_machine::Calibrating>(currentState) || calibrationOrchestrator.IsRunning();
     }
 
     bool FocStateMachineCommon::HasPartialCalibration() const
@@ -240,9 +238,13 @@ namespace application
         tracer.Trace() << "[SM] Entering Calibrating";
         currentState = state_machine::Calibrating{};
 
-        std::get<state_machine::Calibrating>(currentState).pendingData.fluxLinkage = EffectiveFluxLinkage(calibrationData).Value();
+        auto& cal = std::get<state_machine::Calibrating>(currentState);
+        cal.pendingData.fluxLinkage = EffectiveFluxLinkage(calibrationData).Value();
 
-        RunPolePairsStep();
+        calibrationOrchestrator.Start(
+            cal.pendingData,
+            [this](foc::Radians angle) { OnAlignmentSucceeded(angle); },
+            [this] { FailCalibrationStep(); });
     }
 
     void FocStateMachineCommon::RegisterReadyHandler(const infra::Function<void()>& onReady)
@@ -330,80 +332,26 @@ namespace application
                HasValidModeSpecificCalibration(calibrationData);
     }
 
-    void FocStateMachineCommon::RunPolePairsStep()
-    {
-        tracer.Trace() << "[SM] Identifying pole pairs";
-        auto& calibrating = std::get<state_machine::Calibrating>(currentState);
-        calibrating.step = state_machine::CalibrationStep::polePairs;
-
-        electricalIdent.EstimateNumberOfPolePairs({}, [this](std::optional<std::size_t> result)
-            {
-                if (!IsCalibrating(state_machine::CalibrationStep::polePairs))
-                    return;
-
-                if (!result.has_value())
-                    FailCalibrationStep();
-                else
-                {
-                    auto& cal = std::get<state_machine::Calibrating>(currentState);
-                    cal.pendingData.polePairs = static_cast<uint8_t>(*result);
-                    RunResistanceAndInductanceStep();
-                }
-            });
-    }
-
-    void FocStateMachineCommon::RunResistanceAndInductanceStep()
-    {
-        tracer.Trace() << "[SM] Identifying resistance and inductance";
-        auto& calibrating = std::get<state_machine::Calibrating>(currentState);
-        calibrating.step = state_machine::CalibrationStep::resistanceAndInductance;
-
-        electricalIdent.EstimateResistanceAndInductance({},
-            [this](services::ElectricalParametersIdentification::ResistanceInductanceResult result)
-            {
-                if (!IsCalibrating(state_machine::CalibrationStep::resistanceAndInductance))
-                    return;
-
-                if (!result.resistance || !result.inductance || result.fitQuality < 0.5f)
-                    FailCalibrationStep();
-                else
-                {
-                    auto& cal = std::get<state_machine::Calibrating>(currentState);
-                    cal.pendingData.rPhase = result.resistance->Value();
-                    cal.pendingData.lD = result.inductance->Value();
-                    cal.pendingData.lQ = result.inductance->Value();
-                    RunAlignmentStep();
-                }
-            });
-    }
-
     void FocStateMachineCommon::RunAlignmentStep()
     {
-        tracer.Trace() << "[SM] Aligning motor";
-        auto& calibrating = std::get<state_machine::Calibrating>(currentState);
-        calibrating.step = state_machine::CalibrationStep::alignment;
-        const auto polePairs = calibrating.pendingData.polePairs;
+        auto& cal = std::get<state_machine::Calibrating>(currentState);
 
-        motorAlignment.ForceAlignment(polePairs, {},
-            [this](std::optional<foc::Radians> angle)
-            {
-                if (!IsCalibrating(state_machine::CalibrationStep::alignment))
-                    return;
+        calibrationOrchestrator.StartAlignmentOnly(
+            cal.pendingData,
+            [this](foc::Radians angle) { OnAlignmentSucceeded(angle); },
+            [this] { FailCalibrationStep(); });
+    }
 
-                if (!angle)
-                    FailCalibrationStep();
-                else
-                {
-                    auto& cal = std::get<state_machine::Calibrating>(currentState);
-                    cal.pendingData.encoderZeroOffset = std::bit_cast<int32_t>(angle->Value());
-                    rotorReferenceValid_ = true;
+    void FocStateMachineCommon::OnAlignmentSucceeded(foc::Radians angle)
+    {
+        auto& cal = std::get<state_machine::Calibrating>(currentState);
+        cal.pendingData.encoderZeroOffset = std::bit_cast<int32_t>(angle.Value());
+        rotorReferenceValid_ = true;
 
-                    if (cal.external)
-                        OnCalibrationComplete();
-                    else
-                        RunPostAlignmentStep();
-                }
-            });
+        if (cal.external)
+            OnCalibrationComplete();
+        else
+            RunPostAlignmentStep();
     }
 
     void FocStateMachineCommon::FailCalibrationStep()
