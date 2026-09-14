@@ -15,7 +15,6 @@ namespace foc
         RadiansPerSecond measuredSpeed{ 0.0f };
     };
 
-    // Carries its own kind so the cascade knows whether to drive the speed loop or bypass it.
     struct PositionOutput
     {
         PositionOutputKind kind{ PositionOutputKind::speedReference };

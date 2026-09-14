@@ -2,6 +2,7 @@
 
 #include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
 #include "core/foc/position_loop/PositionControllerSelector.hpp"
+#include "foc/interfaces/Foc.hpp"
 
 namespace foc
 {

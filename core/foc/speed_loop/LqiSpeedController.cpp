@@ -50,7 +50,6 @@ namespace foc
         return LimitToCurrentEnvelope(control * parameters.maxCurrent.Value(), parameters.maxCurrent);
     }
 
-    // Zero gains keep the control law at zero until Configure supplies a plant
     LqiSpeedController::SpeedLqi LqiSpeedController::Inert()
     {
         return { SpeedLqi::GainStateMatrix{ 0.0f }, SpeedLqi::GainIntegralMatrix{ 0.0f }, 1.0f };
@@ -72,11 +71,9 @@ namespace foc
         };
         const math::SquareMatrix<float, 1> inputWeight{ 1.0f };
 
-        // Per-unit current and unit-sample integration leave the gain unchanged but keep the DARE iteration inside float precision
-        lqi = SpeedLqi{ SpeedPlant::WithFullStateOutput(SpeedPlant::StateMatrix{ plant.ad },
-                            SpeedPlant::InputMatrix{ plant.bd * parameters.maxCurrent.Value() }),
-            stateWeight,
-            inputWeight,
-            1.0f };
+        const auto stateMatrix = SpeedPlant::StateMatrix{ plant.ad };
+        const auto inputMatrix = SpeedPlant::InputMatrix{ plant.bd * parameters.maxCurrent.Value() };
+        const auto model = SpeedPlant::WithFullStateOutput(stateMatrix, inputMatrix);
+        lqi = SpeedLqi{ model, stateWeight, inputWeight, 1.0f };
     }
 }

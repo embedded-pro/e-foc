@@ -11,8 +11,6 @@ namespace foc
     template<typename T, typename Algorithm>
     concept AlgorithmOf = std::same_as<std::remove_const_t<decltype(T::algorithm)>, Algorithm>;
 
-    // Holds every controller of one loop in fixed-size storage and dispatches by variant tag, so the
-    // hot path resolves to a direct call. Traits supplies the loop's types plus its readiness rule.
     template<typename Traits, typename... Controllers>
     class ControllerSelector
     {
@@ -54,7 +52,6 @@ namespace foc
             ApplyConfiguration();
         }
 
-        // Rejects tunings the active algorithm cannot be designed for, leaving the last accepted set live
         SelectResult TrySetTunings(const Tunings& controllerTunings)
         {
             if (!Traits::IsSelectable(activeAlgorithm, parameters, controllerTunings))

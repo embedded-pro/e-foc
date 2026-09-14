@@ -18,7 +18,6 @@ namespace foc
 
         const auto plant = PositionPlantModel::FromParameters(parameters);
 
-        // The integral state is scaled by Ts as well, so it simply accumulates the deviation
         const Design::StateMatrix a{
             { 1.0f, 1.0f, 0.0f },
             { 0.0f, 1.0f, 1.0f },
@@ -55,7 +54,6 @@ namespace foc
         const auto unlimited = command.at(0, 0) * currentPerNormalizedInput;
         const auto limited = LimitToCurrentEnvelope(unlimited, parameters.maxCurrent);
 
-        // Unwind the accumulation whenever the envelope saturates, so the integral cannot wind up
         if (limited.Value() != unlimited)
             accumulatedDeviation -= deviation;
 

@@ -249,7 +249,7 @@ namespace tool
         }
         else
         {
-            rxPollTimer.start(1); // 1 ms polling for adapters without a file descriptor (e.g. Windows)
+            rxPollTimer.start(1);
         }
     }
 

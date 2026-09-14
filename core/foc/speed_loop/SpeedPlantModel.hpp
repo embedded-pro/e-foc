@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/foc/speed_loop/SpeedController.hpp"
+#include "core/foc/interfaces/MotorModel.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <algorithm>
 

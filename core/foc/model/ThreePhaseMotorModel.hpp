@@ -6,6 +6,7 @@
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "infra/util/Function.hpp"
 #include "infra/util/Observer.hpp"
+#include "infra/util/SharedPtr.hpp"
 #include <cstddef>
 #include <optional>
 #include <random>
@@ -31,6 +32,7 @@ namespace foc
         : public drivers::ThreePhaseInverter
         , public drivers::Encoder
         , public infra::Subject<ThreePhaseMotorModelObserver>
+        , public infra::EnableSharedFromThis<ThreePhaseMotorModel>
     {
     public:
         struct Parameters

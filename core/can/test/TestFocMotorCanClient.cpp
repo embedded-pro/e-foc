@@ -34,59 +34,57 @@ namespace
 
         uint8_t lastSentMsgType{};
     };
+}
 
-    // REQ-INT-008 — client sends Start and the frame is queued
-    TEST_F(FocMotorCanClientTest, Start_TransmitsStartFrame)
-    {
-        client.Start();
-        EXPECT_EQ(lastSentMsgType, can::focStartId);
-    }
+TEST_F(FocMotorCanClientTest, Start_TransmitsStartFrame)
+{
+    client.Start();
+    EXPECT_EQ(lastSentMsgType, can::focStartId);
+}
 
-    TEST_F(FocMotorCanClientTest, Stop_TransmitsStopFrame)
-    {
-        client.Stop();
-        EXPECT_EQ(lastSentMsgType, can::focStopId);
-    }
+TEST_F(FocMotorCanClientTest, Stop_TransmitsStopFrame)
+{
+    client.Stop();
+    EXPECT_EQ(lastSentMsgType, can::focStopId);
+}
 
-    TEST_F(FocMotorCanClientTest, ClearFault_TransmitsClearFaultFrame)
-    {
-        client.ClearFault();
-        EXPECT_EQ(lastSentMsgType, can::focClearFaultId);
-    }
+TEST_F(FocMotorCanClientTest, ClearFault_TransmitsClearFaultFrame)
+{
+    client.ClearFault();
+    EXPECT_EQ(lastSentMsgType, can::focClearFaultId);
+}
 
-    TEST_F(FocMotorCanClientTest, EmergencyStop_TransmitsEmergencyStopFrame)
-    {
-        client.EmergencyStop();
-        EXPECT_EQ(lastSentMsgType, can::focEmergencyStopId);
-    }
+TEST_F(FocMotorCanClientTest, EmergencyStop_TransmitsEmergencyStopFrame)
+{
+    client.EmergencyStop();
+    EXPECT_EQ(lastSentMsgType, can::focEmergencyStopId);
+}
 
-    // REQ-INT-009 — client sends typed setpoints
-    TEST_F(FocMotorCanClientTest, SetTorque_TransmitsTorqueSetpointFrame)
-    {
-        client.SetTorque(foc::Ampere{ 1.5f });
-        EXPECT_EQ(lastSentMsgType, can::focSetTorqueSetpointId);
-    }
+TEST_F(FocMotorCanClientTest, SetTorque_TransmitsTorqueSetpointFrame)
+{
+    client.SetTorque(foc::Ampere{ 1.5f });
+    EXPECT_EQ(lastSentMsgType, can::focSetTorqueSetpointId);
+}
 
-    TEST_F(FocMotorCanClientTest, SetSpeed_TransmitsSpeedSetpointFrame)
-    {
-        client.SetSpeed(foc::RadiansPerSecond{ 100.0f });
-        EXPECT_EQ(lastSentMsgType, can::focSetSpeedSetpointId);
-    }
+TEST_F(FocMotorCanClientTest, SetSpeed_TransmitsSpeedSetpointFrame)
+{
+    client.SetSpeed(foc::RadiansPerSecond{ 100.0f });
+    EXPECT_EQ(lastSentMsgType, can::focSetSpeedSetpointId);
+}
 
-    TEST_F(FocMotorCanClientTest, SetPosition_TransmitsPositionSetpointFrame)
-    {
-        client.SetPosition(foc::Radians{ 1.0f });
-        EXPECT_EQ(lastSentMsgType, can::focSetPositionSetpointId);
-    }
+TEST_F(FocMotorCanClientTest, SetPosition_TransmitsPositionSetpointFrame)
+{
+    client.SetPosition(foc::Radians{ 1.0f });
+    EXPECT_EQ(lastSentMsgType, can::focSetPositionSetpointId);
+}
 
-    TEST_F(FocMotorCanClientTest, SelectControlMode_TransmitsSelectControlModeFrame)
-    {
-        client.SelectControlMode(can::FocMotorMode::speed);
-        EXPECT_EQ(lastSentMsgType, can::focSelectControlModeId);
-    }
+TEST_F(FocMotorCanClientTest, SelectControlMode_TransmitsSelectControlModeFrame)
+{
+    client.SelectControlMode(can::FocMotorMode::speed);
+    EXPECT_EQ(lastSentMsgType, can::focSelectControlModeId);
+}
 
-    TEST_F(FocMotorCanClientTest, CategoryClientIsRegisteredWithProtocolClient)
-    {
-        EXPECT_EQ(client.CategoryClient().Id(), can::focMotorCategoryId);
-    }
+TEST_F(FocMotorCanClientTest, CategoryClientIsRegisteredWithProtocolClient)
+{
+    EXPECT_EQ(client.CategoryClient().Id(), can::focMotorCategoryId);
 }

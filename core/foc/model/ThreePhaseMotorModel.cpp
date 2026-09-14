@@ -168,14 +168,16 @@ namespace foc
             return;
 
         selfDrive.cycleScheduled = true;
-        infra::EventDispatcherWithWeakPtr::Instance().Schedule([this]()
+        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
+            [](const infra::SharedPtr<ThreePhaseMotorModel>& self)
             {
-                selfDrive.cycleScheduled = false;
-                if (!selfDrive.driving)
+                self->selfDrive.cycleScheduled = false;
+                if (!self->selfDrive.driving)
                     return;
-                RunOneCycle(selfDrive.pendingDuties);
-                ScheduleNextCycle();
-            });
+                self->RunOneCycle(self->selfDrive.pendingDuties);
+                self->ScheduleNextCycle();
+            },
+            WeakFromThis());
     }
 
     void ThreePhaseMotorModel::Start()

@@ -1,4 +1,6 @@
 #include "core/foc/speed_loop/SpeedPlantModel.hpp"
+#include "core/foc/interfaces/MotorModel.hpp"
+#include <hal/synchronous_interfaces/SynchronousPwm.hpp>
 
 namespace foc
 {
@@ -24,7 +26,6 @@ namespace foc
         return parameters.torqueConstant.Value() / parameters.inertia.Value();
     }
 
-    // First-order ZOH approximation, valid while Bf * Ts / J << 1; it also stays defined for a frictionless load
     SpeedPlantModel SpeedPlantModel::FromParameters(const MechanicalModelParameters& parameters)
     {
         const auto samplePeriod = OuterSamplePeriod(parameters.samplingFrequency);

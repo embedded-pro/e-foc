@@ -27,8 +27,11 @@ namespace
 {
     using namespace testing;
 
-    struct AcknowledgerSpy : services::CanCommandAcknowledger
+    struct AcknowledgerSpy
+        : services::CanCommandAcknowledger
     {
+        virtual ~AcknowledgerSpy() = default;
+
         struct Entry
         {
             uint8_t category{};
@@ -162,7 +165,7 @@ namespace
             EXPECT_CALL(nvmMock, SaveCalibration(_, _))
                 .Times(AnyNumber())
                 .WillRepeatedly(Invoke([](const services::CalibrationData&,
-                                          infra::Function<void(services::NvmStatus)> done)
+                                           infra::Function<void(services::NvmStatus)> done)
                     {
                         done(services::NvmStatus::Ok);
                     }));
@@ -189,7 +192,7 @@ namespace
             EXPECT_CALL(nvmMock, SaveCalibration(_, _))
                 .Times(AnyNumber())
                 .WillRepeatedly(Invoke([](const services::CalibrationData&,
-                                          infra::Function<void(services::NvmStatus)> done)
+                                           infra::Function<void(services::NvmStatus)> done)
                     {
                         done(services::NvmStatus::Ok);
                     }));
@@ -294,6 +297,7 @@ namespace
                 EXPECT_CALL(electricalIdentMock, IsRunning()).WillRepeatedly(Return(false));
                 EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
                 EXPECT_CALL(mechIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(mechIdentMock, IsRunning()).WillRepeatedly(Return(false));
                 EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
             } };
 
@@ -312,1055 +316,1026 @@ namespace
         can::FocMotorCategoryError lastCategoryError{ can::FocMotorCategoryError::busy };
         bool selectResponseSent{ false };
     };
+}
 
-    // REQ-INT-001
-    TEST_F(FocMotorCanBridgeTest, OnStart_InReady_AcksSuccess)
-    {
-        ConstructFixtureInReady();
-        ResetCaptures();
+TEST_F(FocMotorCanBridgeTest, OnStart_InReady_AcksSuccess)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
 
-        Dispatch(can::focStartId, {});
+    Dispatch(can::focStartId, {});
 
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-    }
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
 
-    // REQ-INT-002
-    TEST_F(FocMotorCanBridgeTest, OnStop_InEnabled_AcksSuccess)
-    {
-        ConstructFixtureInReady();
-        Dispatch(can::focStartId, {});
-        ResetCaptures();
+TEST_F(FocMotorCanBridgeTest, OnStop_InEnabled_AcksSuccess)
+{
+    ConstructFixtureInReady();
+    Dispatch(can::focStartId, {});
+    ResetCaptures();
 
-        Dispatch(can::focStopId, {});
+    Dispatch(can::focStopId, {});
 
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-    }
-
-    // REQ-INT-003
-    TEST_F(FocMotorCanBridgeTest, OnClearFault_InIdle_AcksInvalidState)
-    {
-        ConstructFixture();
-        ResetCaptures();
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
 
-        Dispatch(can::focClearFaultId, {});
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-    }
-
-    // REQ-INT-005
-    TEST_F(FocMotorCanBridgeTest, OnStart_InIdle_AcksInvalidState)
-    {
-        ConstructFixture();
-        ResetCaptures();
+TEST_F(FocMotorCanBridgeTest, OnClearFault_InIdle_AcksInvalidState)
+{
+    ConstructFixture();
+    ResetCaptures();
 
-        Dispatch(can::focStartId, {});
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-    }
-
-    // REQ-INT-006
-    TEST_F(FocMotorCanBridgeTest, OnEmergencyStop_InIdle_AcksSuccess)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        Dispatch(can::focEmergencyStopId, {});
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnEmergencyStop_InEnabled_AcksSuccess)
-    {
-        ConstructFixtureInReady();
-        Dispatch(can::focStartId, {});
-        ResetCaptures();
-
-        Dispatch(can::focEmergencyStopId, {});
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnClearFault_InFault_AcksSuccess)
-    {
-        ConstructFixtureInReady();
-        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
-        ResetCaptures();
-
-        Dispatch(can::focClearFaultId, {});
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnStop_InReady_AcksInvalidState)
-    {
-        ConstructFixtureInReady();
-        ResetCaptures();
-
-        Dispatch(can::focStopId, {});
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnStart_InFault_AcksInvalidState)
-    {
-        ConstructFixtureInReady();
-        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
-        ResetCaptures();
-
-        Dispatch(can::focStartId, {});
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_InTorqueMode_AcksSuccess)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        DispatchSetpoint(can::focSetPidCurrentId, 1000);
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-        EXPECT_FALSE(categoryErrorSent);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnSetPidSpeed_InSpeedMode_AcksSuccess)
-    {
-        ConstructFixture();
-        GivenModeSelected(can::FocMotorMode::speed);
-        ResetCaptures();
-
-        DispatchSetpoint(can::focSetPidSpeedId, 100);
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-        EXPECT_FALSE(categoryErrorSent);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnSetPidPosition_InPositionMode_AcksSuccess)
-    {
-        ConstructFixture();
-        GivenModeSelected(can::FocMotorMode::position);
-        ResetCaptures();
-
-        DispatchSetpoint(can::focSetPidPositionId, 18);
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-        EXPECT_FALSE(categoryErrorSent);
-    }
-
-    // REQ-CM-001 — SelectControlMode transitions the active mode
-    TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_Speed_EmitsResponseAndAcksSuccess)
-    {
-        ConstructFixture();
-
-        EXPECT_CALL(nvmMock, SaveConfig(_, _))
-            .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
-                {
-                    done(services::NvmStatus::Ok);
-                }));
-
-        ResetCaptures();
-        hal::Can::Message data;
-        data.resize(2, 0);
-        data[1] = static_cast<uint8_t>(can::FocMotorMode::speed);
-        Dispatch(can::focSelectControlModeId, data);
-
-        EXPECT_TRUE(selectResponseSent);
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-    }
-
-    // REQ-CM-002 — SetTorqueSetpoint accepted in torque mode
-    TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_InReady_AcksSuccess)
-    {
-        ConstructFixtureInReady();
-        ResetCaptures();
-
-        DispatchSetpoint(can::focSetTorqueSetpointId, 100);
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-    }
-
-    // REQ-CM-003 — SetSpeedSetpoint accepted in speed mode
-    TEST_F(FocMotorCanBridgeTest, OnSetSpeedSetpoint_InSpeedModeAndReady_AcksSuccess)
-    {
-        ConstructFixtureInReady();
-        GivenModeSelected(can::FocMotorMode::speed);
-        AlignAfterBoot();
-        ResetCaptures();
-
-        DispatchSetpoint(can::focSetSpeedSetpointId, 100);
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-    }
-
-    // REQ-CM-004 — SetPositionSetpoint accepted in position mode
-    TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_InPositionModeAndReady_AcksSuccess)
-    {
-        ConstructFixtureInReady();
-        GivenModeSelected(can::FocMotorMode::position);
-        AlignAfterBoot();
-        ResetCaptures();
-
-        DispatchSetpoint(can::focSetPositionSetpointId, 100);
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-    }
-
-    // REQ-CM-005 — Setpoint rejected when mode does not match
-    TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_InSpeedMode_RejectsWithModeMismatch)
-    {
-        ConstructFixture();
-        GivenModeSelected(can::FocMotorMode::speed);
-        ResetCaptures();
-
-        DispatchSetpoint(can::focSetTorqueSetpointId, 0);
-
-        EXPECT_TRUE(categoryErrorSent);
-        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::modeMismatch);
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_ExceedsInverterCurrent_RejectsWithInvalidPayload)
-    {
-        ConstructFixtureInReady();
-        ResetCaptures();
-
-        DispatchSetpoint(can::focSetTorqueSetpointId, 32767);
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
-        EXPECT_FALSE(categoryErrorSent);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_UnrecognisedMode_RejectsWithInvalidPayload)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        hal::Can::Message data;
-        data.resize(2, 0);
-        data[1] = 0xFF;
-        Dispatch(can::focSelectControlModeId, data);
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
-        EXPECT_FALSE(selectResponseSent);
-    }
-
-    // OnSelectControlMode — busy path (second select while one is pending)
-    TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_WhilePending_RejectsBusy)
-    {
-        ConstructFixture();
-
-        EXPECT_CALL(nvmMock, SaveConfig(_, _)).Times(AnyNumber());
-
-        hal::Can::Message data;
-        data.resize(2, 0);
-        data[1] = static_cast<uint8_t>(can::FocMotorMode::speed);
-        motorServer->HandleMessage(can::focSelectControlModeId, data);
-
-        ResetCaptures();
-        motorServer->HandleMessage(can::focSelectControlModeId, data);
-        ExecuteAllActions();
-
-        EXPECT_TRUE(categoryErrorSent);
-        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
-    }
-
-    // OnSelectControlMode — invalid mode byte
-    TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_InvalidMode_RejectsInvalidPayload)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        hal::Can::Message data;
-        data.resize(2, 0);
-        data[1] = 0xFF;
-        Dispatch(can::focSelectControlModeId, data);
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
-        EXPECT_FALSE(selectResponseSent);
-    }
-
-    // OnSelectControlMode — select rejected (motor enabled)
-    TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_WhenEnabled_RejectsWithCategoryError)
-    {
-        ConstructFixtureInReady();
-        Dispatch(can::focStartId, {});
-        ResetCaptures();
-
-        EXPECT_CALL(nvmMock, SaveConfig(_, _)).Times(0);
-
-        hal::Can::Message data;
-        data.resize(2, 0);
-        data[1] = static_cast<uint8_t>(can::FocMotorMode::speed);
-        Dispatch(can::focSelectControlModeId, data);
-
-        EXPECT_TRUE(categoryErrorSent);
-        EXPECT_FALSE(selectResponseSent);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_BroadcastsParamsAndAcksSuccess)
-    {
-        ConstructFixture();
-
-        EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
-            .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
-                                 infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
-                {
-                    done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
-                }));
-        EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
-            .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
-                                 infra::Function<void(std::optional<std::size_t>)> done)
-                {
-                    done(std::size_t{ 4 });
-                }));
-        EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
-            .WillOnce(Invoke([](std::size_t, const auto&,
-                                 infra::Function<void(std::optional<foc::Radians>)> done)
-                {
-                    done(foc::Radians{ 0.0f });
-                }));
-        EXPECT_CALL(nvmMock, SaveCalibration(_, _))
-            .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> done)
-                {
-                    EXPECT_EQ(data.stage, services::CalibrationStage::complete);
-                    done(services::NvmStatus::Ok);
-                }));
-        EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
-
-        ResetCaptures();
-        Dispatch(can::focIdentifyElectricalId, {});
-
-        EXPECT_EQ(lastSentMsgType, can::focElectricalParamsResponseId);
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-        EXPECT_FALSE(categoryErrorSent);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_AlignmentFails_SendsCalibrationFailed)
-    {
-        ConstructFixture();
-
-        EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
-            .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
-                                 infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
-                {
-                    done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
-                }));
-        EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
-            .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
-                                 infra::Function<void(std::optional<std::size_t>)> done)
-                {
-                    done(std::size_t{ 4 });
-                }));
-        EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
-            .WillOnce(Invoke([](std::size_t, const auto&,
-                                 infra::Function<void(std::optional<foc::Radians>)> done)
-                {
-                    done(std::nullopt);
-                }));
-
-        ResetCaptures();
-        Dispatch(can::focIdentifyElectricalId, {});
-
-        EXPECT_TRUE(categoryErrorSent);
-        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_CannotEnableBeforeAlignment)
-    {
-        ConstructFixture();
-
-        infra::Function<void(std::optional<foc::Radians>)> capturedAlignCallback;
-        EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
-            .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
-                                 infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
-                {
-                    done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
-                }));
-        EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
-            .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
-                                 infra::Function<void(std::optional<std::size_t>)> done)
-                {
-                    done(std::size_t{ 4 });
-                }));
-        EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
-            .WillOnce(Invoke([&capturedAlignCallback](std::size_t, const auto&,
-                                 infra::Function<void(std::optional<foc::Radians>)> done)
-                {
-                    capturedAlignCallback = done;
-                }));
-
-        motorServer->HandleMessage(can::focIdentifyElectricalId, {});
-        ExecuteAllActions();
-
-        ResetCaptures();
-        Dispatch(can::focStartId, {});
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_FailedResistance_SendsCalibrationFailed)
-    {
-        ConstructFixture();
-
-        EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
-            .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
-                                 infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
-                {
-                    done(services::ElectricalParametersIdentification::ResistanceInductanceResult{});
-                }));
-
-        ResetCaptures();
-        Dispatch(can::focIdentifyElectricalId, {});
-
-        EXPECT_TRUE(categoryErrorSent);
-        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_InReady_BroadcastsParamsAndAcksSuccess)
-    {
-        ConstructFixtureInReady();
-
-        EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
-            .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t,
-                                 const services::MechanicalParametersIdentification::Config&,
-                                 infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
-                                     std::optional<foc::NewtonMeterSecondSquared>)>
-                                     done)
-                {
-                    done(foc::NewtonMeterSecondPerRadian{ 0.001f }, foc::NewtonMeterSecondSquared{ 0.002f });
-                }));
-
-        ResetCaptures();
-        Dispatch(can::focIdentifyMechanicalId, {});
-
-        EXPECT_EQ(lastSentMsgType, can::focMechanicalParamsResponseId);
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-        EXPECT_FALSE(categoryErrorSent);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_InIdle_RejectsInvalidState)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        Dispatch(can::focIdentifyMechanicalId, {});
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-        EXPECT_FALSE(categoryErrorSent);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InIdle_BroadcastsIdleStatus)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        Dispatch(can::focRequestTelemetryId, {});
-
-        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
-        ASSERT_GE(lastSentData.size(), 2u);
-        EXPECT_EQ(lastSentData[0], static_cast<uint8_t>(can::FocMotorState::idle));
-        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::none));
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InPartialCalibration_BroadcastsPartialCalibrationStatus)
-    {
-        ConstructFixtureInPartialCalibration();
-        ResetCaptures();
-
-        Dispatch(can::focRequestTelemetryId, {});
-
-        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
-        ASSERT_GE(lastSentData.size(), 2u);
-        EXPECT_EQ(lastSentData[0], static_cast<uint8_t>(can::FocMotorState::partialCalibration));
-        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::none));
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InEnabled_BroadcastsRunningStatus)
-    {
-        ConstructFixtureInReady();
-        Dispatch(can::focStartId, {});
-        ResetCaptures();
-
-        Dispatch(can::focRequestTelemetryId, {});
-
-        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
-        ASSERT_GE(lastSentData.size(), 2u);
-        EXPECT_EQ(lastSentData[0], static_cast<uint8_t>(can::FocMotorState::running));
-        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::none));
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnSetEncoderResolution_PersistsToNvmAndAcksSuccess)
-    {
-        ConstructFixture();
-
-        EXPECT_CALL(nvmMock, SaveConfig(_, _))
-            .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
-                {
-                    done(services::NvmStatus::Ok);
-                }));
-
-        ResetCaptures();
-        DispatchUInt32Command(can::focSetEncoderResolutionId, 8000);
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-        EXPECT_FALSE(categoryErrorSent);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnSetEncoderResolution_ZeroResolution_RejectsInvalidPayload)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        DispatchUInt32Command(can::focSetEncoderResolutionId, 0);
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
-        EXPECT_FALSE(categoryErrorSent);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_PersistsToNvmAndAcksSuccess)
-    {
-        ConstructFixture();
-
-        EXPECT_CALL(nvmMock, SaveConfig(_, _))
-            .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
-                {
-                    done(services::NvmStatus::Ok);
-                }));
-
-        ResetCaptures();
-        DispatchUInt32Command(can::focConfigureTelemetryRateId, 200);
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
-        EXPECT_FALSE(categoryErrorSent);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_ZeroRate_RejectsInvalidPayload)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        DispatchUInt32Command(can::focConfigureTelemetryRateId, 0);
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
-        EXPECT_FALSE(categoryErrorSent);
-    }
-
-    // REQ-INT-013 — BroadcastFault sends telemetry status frame with fault state
-    TEST_F(FocMotorCanBridgeTest, BroadcastFault_Overcurrent_EmitsTelemetryStatusFrameWithFaultState)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        bridge->BroadcastFault(state_machine::FaultCode::overcurrent);
-
-        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
-        ASSERT_GE(lastSentData.size(), 2u);
-        EXPECT_EQ(lastSentData[0], static_cast<uint8_t>(can::FocMotorState::fault));
-        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::overCurrent));
-    }
-
-    TEST_F(FocMotorCanBridgeTest, BroadcastFault_Overvoltage_MapsToOverVoltage)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        bridge->BroadcastFault(state_machine::FaultCode::overvoltage);
-
-        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
-        ASSERT_GE(lastSentData.size(), 2u);
-        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::overVoltage));
-    }
-
-    TEST_F(FocMotorCanBridgeTest, BroadcastFault_Overtemperature_MapsToOverTemperature)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        bridge->BroadcastFault(state_machine::FaultCode::overtemperature);
-
-        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
-        ASSERT_GE(lastSentData.size(), 2u);
-        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::overTemperature));
-    }
-
-    TEST_F(FocMotorCanBridgeTest, BroadcastFault_EncoderLoss_MapsToSensorFault)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        bridge->BroadcastFault(state_machine::FaultCode::encoderLoss);
-
-        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
-        ASSERT_GE(lastSentData.size(), 2u);
-        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::sensorFault));
-    }
-
-    TEST_F(FocMotorCanBridgeTest, BroadcastFault_HardwareFault_MapsToNone)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        bridge->BroadcastFault(state_machine::FaultCode::hardwareFault);
-
-        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
-        ASSERT_GE(lastSentData.size(), 2u);
-        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::none));
-    }
-
-    TEST_F(FocMotorCanBridgeTest, BroadcastFault_TelemetryFrame_HasSixBytesWithZeroSpeedAndPosition)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        bridge->BroadcastFault(state_machine::FaultCode::overcurrent);
-
-        ASSERT_EQ(lastSentData.size(), 6u);
-        EXPECT_EQ(services::CanFrameCodec::ReadInt16(lastSentData, 2), 0);
-        EXPECT_EQ(services::CanFrameCodec::ReadInt16(lastSentData, 4), 0);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnSetPidSpeed_InTorqueMode_RejectsInvalidPayload)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        DispatchSetpoint(can::focSetPidSpeedId, 100);
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
-        EXPECT_FALSE(categoryErrorSent);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnSetPidPosition_InTorqueMode_RejectsInvalidPayload)
-    {
-        ConstructFixture();
-        ResetCaptures();
-
-        DispatchSetpoint(can::focSetPidPositionId, 18);
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
-        EXPECT_FALSE(categoryErrorSent);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_NullMechIdent_ReturnsNotImplemented)
-    {
-        GivenNvmAlwaysInvalid();
-        services::ConfigData config{};
-        coordinator.emplace(
-            application::TerminalAndTracer{ terminal, tracer },
-            application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
-            nvmMock,
-            application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
-            faultNotifierMock,
-            config,
-            state_machine::ControlModeStateMachine::OuterLoopArgs{
-                foc::Ampere{ 10.0f },
-                hal::Hertz{ 1000 },
-                lowPriorityInterruptMock });
-        bridge.emplace(*motorServer, *coordinator, inverterMock, electricalIdentMock, nullptr, foc::NewtonMeter{ 0.1f }, nvmMock, config, tracer);
-        motorServer->SetAcknowledger(ackSpy);
-        ExecuteAllActions();
-        ResetCaptures();
-
-        Dispatch(can::focIdentifyMechanicalId, {});
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::notImplemented);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_SecondStepFails_SendsCalibrationFailed)
-    {
-        ConstructFixture();
-
-        EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
-            .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
-                                 infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
-                {
-                    done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
-                }));
-        EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
-            .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
-                                 infra::Function<void(std::optional<std::size_t>)> done)
-                {
-                    done(std::nullopt);
-                }));
-
-        ResetCaptures();
-        Dispatch(can::focIdentifyElectricalId, {});
-
-        EXPECT_TRUE(categoryErrorSent);
-        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_WhilePending_ReturnsBusy)
-    {
-        ConstructFixture();
-
-        infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> capturedCallback;
-        EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
-            .WillOnce(Invoke([&capturedCallback](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
-                                 infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
-                {
-                    capturedCallback = done;
-                }));
-
-        motorServer->HandleMessage(can::focIdentifyElectricalId, {});
-
-        ResetCaptures();
-        Dispatch(can::focIdentifyElectricalId, {});
-
-        EXPECT_TRUE(categoryErrorSent);
-        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_InEnabled_RejectsInvalidState)
-    {
-        ConstructFixtureInReady();
-        Dispatch(can::focStartId, {});
-        ResetCaptures();
-
-        Dispatch(can::focIdentifyElectricalId, {});
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-        EXPECT_FALSE(categoryErrorSent);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_InFault_RejectsInvalidState)
-    {
-        ConstructFixtureInReady();
-        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
-        ResetCaptures();
-
-        Dispatch(can::focIdentifyElectricalId, {});
-
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-        EXPECT_FALSE(categoryErrorSent);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_WhilePending_ReturnsBusy)
-    {
-        ConstructFixtureInReady();
-
-        infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)> capturedCallback;
-        EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
-            .WillOnce(Invoke([&capturedCallback](const foc::NewtonMeter&, std::size_t,
-                                 const services::MechanicalParametersIdentification::Config&,
-                                 infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
-                                     std::optional<foc::NewtonMeterSecondSquared>)>
-                                     done)
-                {
-                    capturedCallback = done;
-                }));
-
-        motorServer->HandleMessage(can::focIdentifyMechanicalId, {});
-
-        ResetCaptures();
-        Dispatch(can::focIdentifyMechanicalId, {});
-
-        EXPECT_TRUE(categoryErrorSent);
-        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnSetEncoderResolution_NvmFails_SendsPersistenceFailed)
-    {
-        ConstructFixture();
-
-        EXPECT_CALL(nvmMock, SaveConfig(_, _))
-            .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
-                {
-                    done(services::NvmStatus::WriteFailed);
-                }));
-
-        ResetCaptures();
-        DispatchUInt32Command(can::focSetEncoderResolutionId, 4000);
-
-        EXPECT_TRUE(categoryErrorSent);
-        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::persistenceFailed);
-    }
-
-    TEST_F(FocMotorCanBridgeTest, OnSetEncoderResolution_WhileNvmPending_ReturnsBusy)
-    {
-        ConstructFixture();
-
-        infra::Function<void(services::NvmStatus)> capturedNvmCallback;
-        EXPECT_CALL(nvmMock, SaveConfig(_, _))
-            .WillOnce(Invoke([&capturedNvmCallback](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
-                {
-                    capturedNvmCallback = done;
-                }));
-
-        motorServer->HandleMessage(can::focSetEncoderResolutionId, []
+    Dispatch(can::focClearFaultId, {});
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnStart_InIdle_AcksInvalidState)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    Dispatch(can::focStartId, {});
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnEmergencyStop_InIdle_AcksSuccess)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    Dispatch(can::focEmergencyStopId, {});
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnEmergencyStop_InEnabled_AcksSuccess)
+{
+    ConstructFixtureInReady();
+    Dispatch(can::focStartId, {});
+    ResetCaptures();
+
+    Dispatch(can::focEmergencyStopId, {});
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnClearFault_InFault_AcksSuccess)
+{
+    ConstructFixtureInReady();
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    ResetCaptures();
+
+    Dispatch(can::focClearFaultId, {});
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnStop_InReady_AcksInvalidState)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
+
+    Dispatch(can::focStopId, {});
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnStart_InFault_AcksInvalidState)
+{
+    ConstructFixtureInReady();
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    ResetCaptures();
+
+    Dispatch(can::focStartId, {});
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_InTorqueMode_AcksSuccess)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPidCurrentId, 1000);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPidSpeed_InSpeedMode_AcksSuccess)
+{
+    ConstructFixture();
+    GivenModeSelected(can::FocMotorMode::speed);
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPidSpeedId, 100);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPidPosition_InPositionMode_AcksSuccess)
+{
+    ConstructFixture();
+    GivenModeSelected(can::FocMotorMode::position);
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPidPositionId, 18);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_Speed_EmitsResponseAndAcksSuccess)
+{
+    ConstructFixture();
+
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
             {
-                hal::Can::Message d;
-                d.resize(5, 0);
-                services::CanFrameCodec::WriteUInt32(d, 1, 4000);
-                return d;
-            }());
+                done(services::NvmStatus::Ok);
+            }));
 
-        ResetCaptures();
-        DispatchUInt32Command(can::focSetEncoderResolutionId, 8000);
+    ResetCaptures();
+    hal::Can::Message data;
+    data.resize(2, 0);
+    data[1] = static_cast<uint8_t>(can::FocMotorMode::speed);
+    Dispatch(can::focSelectControlModeId, data);
 
-        EXPECT_TRUE(categoryErrorSent);
-        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
-    }
+    EXPECT_TRUE(selectResponseSent);
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
 
-    TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_NvmFails_SendsPersistenceFailed)
-    {
-        ConstructFixture();
+TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_InReady_AcksSuccess)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
 
-        EXPECT_CALL(nvmMock, SaveConfig(_, _))
-            .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
-                {
-                    done(services::NvmStatus::WriteFailed);
-                }));
+    DispatchSetpoint(can::focSetTorqueSetpointId, 100);
 
-        ResetCaptures();
-        DispatchUInt32Command(can::focConfigureTelemetryRateId, 100);
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
 
-        EXPECT_TRUE(categoryErrorSent);
-        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::persistenceFailed);
-    }
+TEST_F(FocMotorCanBridgeTest, OnSetSpeedSetpoint_InSpeedModeAndReady_AcksSuccess)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::speed);
+    AlignAfterBoot();
+    ResetCaptures();
 
-    TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InFaultState_BroadcastsFaultStatus)
-    {
-        ConstructFixtureInReady();
-        Dispatch(can::focStartId, {});
-        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
-        ExecuteAllActions();
-        ResetCaptures();
+    DispatchSetpoint(can::focSetSpeedSetpointId, 100);
 
-        Dispatch(can::focRequestTelemetryId, {});
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
 
-        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
-        ASSERT_GE(lastSentData.size(), 2u);
-        EXPECT_EQ(lastSentData[0], static_cast<uint8_t>(can::FocMotorState::fault));
-        EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::overCurrent));
-    }
+TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_InPositionModeAndReady_AcksSuccess)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::position);
+    AlignAfterBoot();
+    ResetCaptures();
 
-    TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_InIdle_RejectsWithInvalidState)
-    {
-        ConstructFixture();
-        ResetCaptures();
+    DispatchSetpoint(can::focSetPositionSetpointId, 100);
 
-        // Torque mode is active (default), range is valid, but state is Idle → invalidState
-        DispatchSetpoint(can::focSetTorqueSetpointId, 100);
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
 
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-        EXPECT_FALSE(categoryErrorSent);
-    }
+TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_InSpeedMode_RejectsWithModeMismatch)
+{
+    ConstructFixture();
+    GivenModeSelected(can::FocMotorMode::speed);
+    ResetCaptures();
 
-    TEST_F(FocMotorCanBridgeTest, OnSetSpeedSetpoint_InIdle_RejectsWithInvalidState)
-    {
-        ConstructFixture();
-        GivenModeSelected(can::FocMotorMode::speed);
-        ResetCaptures();
+    DispatchSetpoint(can::focSetTorqueSetpointId, 0);
 
-        // Speed mode active, valid range, but state is Idle → invalidState
-        DispatchSetpoint(can::focSetSpeedSetpointId, 50);
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::modeMismatch);
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::categoryError);
+}
 
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-        EXPECT_FALSE(categoryErrorSent);
-    }
+TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_ExceedsInverterCurrent_RejectsWithInvalidPayload)
+{
+    ConstructFixtureInReady();
+    ResetCaptures();
 
-    TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_InIdle_RejectsWithInvalidState)
-    {
-        ConstructFixture();
-        GivenModeSelected(can::FocMotorMode::position);
-        ResetCaptures();
+    DispatchSetpoint(can::focSetTorqueSetpointId, 32767);
 
-        // Position mode active, valid range, but state is Idle → invalidState
-        DispatchSetpoint(can::focSetPositionSetpointId, 50);
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_FALSE(categoryErrorSent);
+}
 
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
-        EXPECT_FALSE(categoryErrorSent);
-    }
+TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_UnrecognisedMode_RejectsWithInvalidPayload)
+{
+    ConstructFixture();
+    ResetCaptures();
 
-    TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_TooHighRate_RejectsInvalidPayload)
-    {
-        ConstructFixture();
-        ResetCaptures();
+    hal::Can::Message data;
+    data.resize(2, 0);
+    data[1] = 0xFF;
+    Dispatch(can::focSelectControlModeId, data);
 
-        DispatchUInt32Command(can::focConfigureTelemetryRateId, 10001);
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_FALSE(selectResponseSent);
+}
 
-        ASSERT_TRUE(ackSpy.last.has_value());
-        EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
-        EXPECT_FALSE(categoryErrorSent);
-    }
+TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_WhilePending_RejectsBusy)
+{
+    ConstructFixture();
 
-    TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_WhileNvmPending_ReturnsBusy)
-    {
-        ConstructFixture();
+    EXPECT_CALL(nvmMock, SaveConfig(_, _)).Times(AnyNumber());
 
-        infra::Function<void(services::NvmStatus)> capturedNvmCallback;
-        EXPECT_CALL(nvmMock, SaveConfig(_, _))
-            .WillOnce(Invoke([&capturedNvmCallback](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
-                {
-                    capturedNvmCallback = done;
-                }));
+    hal::Can::Message data;
+    data.resize(2, 0);
+    data[1] = static_cast<uint8_t>(can::FocMotorMode::speed);
+    motorServer->HandleMessage(can::focSelectControlModeId, data);
 
-        motorServer->HandleMessage(can::focConfigureTelemetryRateId, []
+    ResetCaptures();
+    motorServer->HandleMessage(can::focSelectControlModeId, data);
+    ExecuteAllActions();
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_InvalidMode_RejectsInvalidPayload)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    hal::Can::Message data;
+    data.resize(2, 0);
+    data[1] = 0xFF;
+    Dispatch(can::focSelectControlModeId, data);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_FALSE(selectResponseSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_WhenEnabled_RejectsWithCategoryError)
+{
+    ConstructFixtureInReady();
+    Dispatch(can::focStartId, {});
+    ResetCaptures();
+
+    EXPECT_CALL(nvmMock, SaveConfig(_, _)).Times(0);
+
+    hal::Can::Message data;
+    data.resize(2, 0);
+    data[1] = static_cast<uint8_t>(can::FocMotorMode::speed);
+    Dispatch(can::focSelectControlModeId, data);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_FALSE(selectResponseSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_BroadcastsParamsAndAcksSuccess)
+{
+    ConstructFixture();
+
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
+                             infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
             {
-                hal::Can::Message d;
-                d.resize(5, 0);
-                services::CanFrameCodec::WriteUInt32(d, 1, 100);
-                return d;
-            }());
+                done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
+            }));
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
+                             infra::Function<void(std::optional<std::size_t>)> done)
+            {
+                done(std::size_t{ 4 });
+            }));
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&,
+                             infra::Function<void(std::optional<foc::Radians>)> done)
+            {
+                done(foc::Radians{ 0.0f });
+            }));
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> done)
+            {
+                EXPECT_EQ(data.stage, services::CalibrationStage::complete);
+                done(services::NvmStatus::Ok);
+            }));
+    EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
 
-        ResetCaptures();
-        DispatchUInt32Command(can::focConfigureTelemetryRateId, 200);
+    ResetCaptures();
+    Dispatch(can::focIdentifyElectricalId, {});
 
-        EXPECT_TRUE(categoryErrorSent);
-        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
-    }
+    EXPECT_EQ(lastSentMsgType, can::focElectricalParamsResponseId);
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    EXPECT_FALSE(categoryErrorSent);
+}
 
-    TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InCalibrating_BroadcastsCalibratingStatus)
-    {
-        ConstructFixture();
-        ResetCaptures();
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_AlignmentFails_SendsCalibrationFailed)
+{
+    ConstructFixture();
 
-        // Dispatch a calibrate command to put the machine in Calibrating state (pole pairs hangs)
-        EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _)).Times(AnyNumber());
-        motorServer->HandleMessage(can::focRequestTelemetryId, {});
-        ExecuteAllActions();
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
+                             infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+            {
+                done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
+            }));
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
+                             infra::Function<void(std::optional<std::size_t>)> done)
+            {
+                done(std::size_t{ 4 });
+            }));
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&,
+                             infra::Function<void(std::optional<foc::Radians>)> done)
+            {
+                done(std::nullopt);
+            }));
 
-        EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
-    }
+    ResetCaptures();
+    Dispatch(can::focIdentifyElectricalId, {});
 
-    TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_AfterSuccessfulSelect_ReportsActiveMode)
-    {
-        ConstructFixtureInReady();
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
+}
 
-        EXPECT_CALL(nvmMock, SaveConfig(_, _))
-            .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
-                {
-                    done(services::NvmStatus::Ok);
-                }));
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_CannotEnableBeforeAlignment)
+{
+    ConstructFixture();
 
-        ResetCaptures();
-        hal::Can::Message data;
-        data.resize(2, 0);
-        data[1] = static_cast<uint8_t>(can::FocMotorMode::speed);
-        Dispatch(can::focSelectControlModeId, data);
+    infra::Function<void(std::optional<foc::Radians>)> capturedAlignCallback;
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
+                             infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+            {
+                done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
+            }));
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
+                             infra::Function<void(std::optional<std::size_t>)> done)
+            {
+                done(std::size_t{ 4 });
+            }));
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([&capturedAlignCallback](std::size_t, const auto&,
+                             infra::Function<void(std::optional<foc::Radians>)> done)
+            {
+                capturedAlignCallback = done;
+            }));
 
-        EXPECT_TRUE(selectResponseSent);
-    }
+    motorServer->HandleMessage(can::focIdentifyElectricalId, {});
+    ExecuteAllActions();
 
-    // REQ-INT-012 — ctor emits one trace line
-    TEST_F(FocMotorCanBridgeTest, Constructor_EmitsTraceMessage)
-    {
-        EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AtLeast(1));
-        EXPECT_CALL(nvmMock, IsCalibrationValid(_))
-            .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)
-                {
-                    done(false);
-                }));
+    ResetCaptures();
+    Dispatch(can::focStartId, {});
 
-        services::ConfigData config{};
-        coordinator.emplace(
-            application::TerminalAndTracer{ terminal, tracer },
-            application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
-            nvmMock,
-            application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
-            faultNotifierMock,
-            config,
-            state_machine::ControlModeStateMachine::OuterLoopArgs{
-                foc::Ampere{ 10.0f },
-                hal::Hertz{ 1000 },
-                lowPriorityInterruptMock });
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+}
 
-        bridge.emplace(*motorServer, *coordinator, inverterMock, electricalIdentMock, &mechIdentMock, foc::NewtonMeter{ 0.1f }, nvmMock, config, tracer);
-        motorServer->SetAcknowledger(ackSpy);
-        ExecuteAllActions();
-    }
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_FailedResistance_SendsCalibrationFailed)
+{
+    ConstructFixture();
 
-    // Lines 259-260: mech ident callback returns nullopt friction/inertia
-    TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_NulloptResults_SendsCalibrationFailed)
-    {
-        ConstructFixtureInReady();
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
+                             infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+            {
+                done(services::ElectricalParametersIdentification::ResistanceInductanceResult{});
+            }));
 
-        EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
-            .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t,
-                                 const services::MechanicalParametersIdentification::Config&,
-                                 infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
-                                     std::optional<foc::NewtonMeterSecondSquared>)>
-                                     done)
-                {
-                    done(std::nullopt, std::nullopt);
-                }));
+    ResetCaptures();
+    Dispatch(can::focIdentifyElectricalId, {});
 
-        ResetCaptures();
-        Dispatch(can::focIdentifyMechanicalId, {});
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
+}
 
-        EXPECT_TRUE(categoryErrorSent);
-        EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
-    }
+TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_InReady_BroadcastsParamsAndAcksSuccess)
+{
+    ConstructFixtureInReady();
 
-    // Line 343: ReportCommandOutcome else branch (calibrationFailed result)
-    TEST_F(FocMotorCanBridgeTest, OnStart_WithoutCalibration_SendsCalibrationFailedCategoryError)
-    {
-        ConstructFixture();
-        ResetCaptures();
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+        .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t,
+                             const services::MechanicalParametersIdentification::Config&,
+                             infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
+                                 std::optional<foc::NewtonMeterSecondSquared>)>
+                                 done)
+            {
+                done(foc::NewtonMeterSecondPerRadian{ 0.001f }, foc::NewtonMeterSecondSquared{ 0.002f });
+            }));
 
-        // In Idle without calibration, CmdEnable returns calibrationFailed (not rejected)
-        // which hits the else branch of ReportCommandOutcome → SendCategoryError
-        Dispatch(can::focStartId, {});
+    ResetCaptures();
+    Dispatch(can::focIdentifyMechanicalId, {});
 
-        // If state machine returns calibrationFailed: categoryErrorSent=true
-        // If state machine returns rejected: ackSpy has invalidState
-        // Either path is valid; we confirm no crash and the response is sent
-        const bool responseSent = categoryErrorSent || ackSpy.last.has_value();
-        EXPECT_TRUE(responseSent);
-    }
+    EXPECT_EQ(lastSentMsgType, can::focMechanicalParamsResponseId);
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    EXPECT_FALSE(categoryErrorSent);
+}
 
-    // Lines 151-152: OnSetPidCurrent with bandwidth=0 → TrySetCurrentBandwidth false
-    TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_ZeroBandwidth_RejectsInvalidPayload)
-    {
-        ConstructFixtureInReady();
-        GivenModeSelected(can::FocMotorMode::torque);
-        ResetCaptures();
+TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_InIdle_RejectsInvalidState)
+{
+    ConstructFixture();
+    ResetCaptures();
 
-        DispatchSetpoint(can::focSetPidCurrentId, 0);
+    Dispatch(can::focIdentifyMechanicalId, {});
 
-        // bandwidth=0 should be rejected; if TrySetCurrentBandwidth rejects it,
-        // we get invalidPayload ack; otherwise success — both are valid paths
-        EXPECT_TRUE(ackSpy.last.has_value());
-    }
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InIdle_BroadcastsIdleStatus)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    Dispatch(can::focRequestTelemetryId, {});
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[0], static_cast<uint8_t>(can::FocMotorState::idle));
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::none));
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InPartialCalibration_BroadcastsPartialCalibrationStatus)
+{
+    ConstructFixtureInPartialCalibration();
+    ResetCaptures();
+
+    Dispatch(can::focRequestTelemetryId, {});
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[0], static_cast<uint8_t>(can::FocMotorState::partialCalibration));
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::none));
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InEnabled_BroadcastsRunningStatus)
+{
+    ConstructFixtureInReady();
+    Dispatch(can::focStartId, {});
+    ResetCaptures();
+
+    Dispatch(can::focRequestTelemetryId, {});
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[0], static_cast<uint8_t>(can::FocMotorState::running));
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::none));
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetEncoderResolution_PersistsToNvmAndAcksSuccess)
+{
+    ConstructFixture();
+
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
+            {
+                done(services::NvmStatus::Ok);
+            }));
+
+    ResetCaptures();
+    DispatchUInt32Command(can::focSetEncoderResolutionId, 8000);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetEncoderResolution_ZeroResolution_RejectsInvalidPayload)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchUInt32Command(can::focSetEncoderResolutionId, 0);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_PersistsToNvmAndAcksSuccess)
+{
+    ConstructFixture();
+
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
+            {
+                done(services::NvmStatus::Ok);
+            }));
+
+    ResetCaptures();
+    DispatchUInt32Command(can::focConfigureTelemetryRateId, 200);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_ZeroRate_RejectsInvalidPayload)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchUInt32Command(can::focConfigureTelemetryRateId, 0);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_Overcurrent_EmitsTelemetryStatusFrameWithFaultState)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    bridge->BroadcastFault(state_machine::FaultCode::overcurrent);
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[0], static_cast<uint8_t>(can::FocMotorState::fault));
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::overCurrent));
+}
+
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_Overvoltage_MapsToOverVoltage)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    bridge->BroadcastFault(state_machine::FaultCode::overvoltage);
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::overVoltage));
+}
+
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_Overtemperature_MapsToOverTemperature)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    bridge->BroadcastFault(state_machine::FaultCode::overtemperature);
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::overTemperature));
+}
+
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_EncoderLoss_MapsToSensorFault)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    bridge->BroadcastFault(state_machine::FaultCode::encoderLoss);
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::sensorFault));
+}
+
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_HardwareFault_MapsToNone)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    bridge->BroadcastFault(state_machine::FaultCode::hardwareFault);
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::none));
+}
+
+TEST_F(FocMotorCanBridgeTest, BroadcastFault_TelemetryFrame_HasSixBytesWithZeroSpeedAndPosition)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    bridge->BroadcastFault(state_machine::FaultCode::overcurrent);
+
+    ASSERT_EQ(lastSentData.size(), 6u);
+    EXPECT_EQ(services::CanFrameCodec::ReadInt16(lastSentData, 2), 0);
+    EXPECT_EQ(services::CanFrameCodec::ReadInt16(lastSentData, 4), 0);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPidSpeed_InTorqueMode_RejectsInvalidPayload)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPidSpeedId, 100);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPidPosition_InTorqueMode_RejectsInvalidPayload)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPidPositionId, 18);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_NullMechIdent_ReturnsNotImplemented)
+{
+    GivenNvmAlwaysInvalid();
+    services::ConfigData config{};
+    coordinator.emplace(
+        application::TerminalAndTracer{ terminal, tracer },
+        application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
+        nvmMock,
+        application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
+        faultNotifierMock,
+        config,
+        state_machine::ControlModeStateMachine::OuterLoopArgs{
+            foc::Ampere{ 10.0f },
+            hal::Hertz{ 1000 },
+            lowPriorityInterruptMock });
+    bridge.emplace(*motorServer, *coordinator, inverterMock, electricalIdentMock, nullptr, foc::NewtonMeter{ 0.1f }, nvmMock, config, tracer);
+    motorServer->SetAcknowledger(ackSpy);
+    ExecuteAllActions();
+    ResetCaptures();
+
+    Dispatch(can::focIdentifyMechanicalId, {});
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::notImplemented);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_SecondStepFails_SendsCalibrationFailed)
+{
+    ConstructFixture();
+
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
+                             infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+            {
+                done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
+            }));
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
+                             infra::Function<void(std::optional<std::size_t>)> done)
+            {
+                done(std::nullopt);
+            }));
+
+    ResetCaptures();
+    Dispatch(can::focIdentifyElectricalId, {});
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_WhilePending_ReturnsBusy)
+{
+    ConstructFixture();
+
+    infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> capturedCallback;
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([&capturedCallback](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
+                             infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+            {
+                capturedCallback = done;
+            }));
+
+    motorServer->HandleMessage(can::focIdentifyElectricalId, {});
+
+    ResetCaptures();
+    Dispatch(can::focIdentifyElectricalId, {});
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_InEnabled_RejectsInvalidState)
+{
+    ConstructFixtureInReady();
+    Dispatch(can::focStartId, {});
+    ResetCaptures();
+
+    Dispatch(can::focIdentifyElectricalId, {});
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_InFault_RejectsInvalidState)
+{
+    ConstructFixtureInReady();
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    ResetCaptures();
+
+    Dispatch(can::focIdentifyElectricalId, {});
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_WhilePending_ReturnsBusy)
+{
+    ConstructFixtureInReady();
+
+    infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)> capturedCallback;
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+        .WillOnce(Invoke([&capturedCallback](const foc::NewtonMeter&, std::size_t,
+                             const services::MechanicalParametersIdentification::Config&,
+                             infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
+                                 std::optional<foc::NewtonMeterSecondSquared>)>
+                                 done)
+            {
+                capturedCallback = done;
+            }));
+
+    motorServer->HandleMessage(can::focIdentifyMechanicalId, {});
+
+    ResetCaptures();
+    Dispatch(can::focIdentifyMechanicalId, {});
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetEncoderResolution_NvmFails_SendsPersistenceFailed)
+{
+    ConstructFixture();
+
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
+            {
+                done(services::NvmStatus::WriteFailed);
+            }));
+
+    ResetCaptures();
+    DispatchUInt32Command(can::focSetEncoderResolutionId, 4000);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::persistenceFailed);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetEncoderResolution_WhileNvmPending_ReturnsBusy)
+{
+    ConstructFixture();
+
+    infra::Function<void(services::NvmStatus)> capturedNvmCallback;
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([&capturedNvmCallback](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
+            {
+                capturedNvmCallback = done;
+            }));
+
+    motorServer->HandleMessage(can::focSetEncoderResolutionId, []
+        {
+            hal::Can::Message d;
+            d.resize(5, 0);
+            services::CanFrameCodec::WriteUInt32(d, 1, 4000);
+            return d;
+        }());
+
+    ResetCaptures();
+    DispatchUInt32Command(can::focSetEncoderResolutionId, 8000);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_NvmFails_SendsPersistenceFailed)
+{
+    ConstructFixture();
+
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
+            {
+                done(services::NvmStatus::WriteFailed);
+            }));
+
+    ResetCaptures();
+    DispatchUInt32Command(can::focConfigureTelemetryRateId, 100);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::persistenceFailed);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InFaultState_BroadcastsFaultStatus)
+{
+    ConstructFixtureInReady();
+    Dispatch(can::focStartId, {});
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    ExecuteAllActions();
+    ResetCaptures();
+
+    Dispatch(can::focRequestTelemetryId, {});
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+    ASSERT_GE(lastSentData.size(), 2u);
+    EXPECT_EQ(lastSentData[0], static_cast<uint8_t>(can::FocMotorState::fault));
+    EXPECT_EQ(lastSentData[1], static_cast<uint8_t>(can::FocFaultCode::overCurrent));
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_InIdle_RejectsWithInvalidState)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetTorqueSetpointId, 100);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetSpeedSetpoint_InIdle_RejectsWithInvalidState)
+{
+    ConstructFixture();
+    GivenModeSelected(can::FocMotorMode::speed);
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetSpeedSetpointId, 50);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPositionSetpoint_InIdle_RejectsWithInvalidState)
+{
+    ConstructFixture();
+    GivenModeSelected(can::FocMotorMode::position);
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPositionSetpointId, 50);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_TooHighRate_RejectsInvalidPayload)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchUInt32Command(can::focConfigureTelemetryRateId, 10001);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnConfigureTelemetryRate_WhileNvmPending_ReturnsBusy)
+{
+    ConstructFixture();
+
+    infra::Function<void(services::NvmStatus)> capturedNvmCallback;
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([&capturedNvmCallback](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
+            {
+                capturedNvmCallback = done;
+            }));
+
+    motorServer->HandleMessage(can::focConfigureTelemetryRateId, []
+        {
+            hal::Can::Message d;
+            d.resize(5, 0);
+            services::CanFrameCodec::WriteUInt32(d, 1, 100);
+            return d;
+        }());
+
+    ResetCaptures();
+    DispatchUInt32Command(can::focConfigureTelemetryRateId, 200);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnRequestTelemetry_InCalibrating_BroadcastsCalibratingStatus)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _)).Times(AnyNumber());
+    motorServer->HandleMessage(can::focRequestTelemetryId, {});
+    ExecuteAllActions();
+
+    EXPECT_EQ(lastSentMsgType, can::focTelemetryStatusResponseId);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_AfterSuccessfulSelect_ReportsActiveMode)
+{
+    ConstructFixtureInReady();
+
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
+            {
+                done(services::NvmStatus::Ok);
+            }));
+
+    ResetCaptures();
+    hal::Can::Message data;
+    data.resize(2, 0);
+    data[1] = static_cast<uint8_t>(can::FocMotorMode::speed);
+    Dispatch(can::focSelectControlModeId, data);
+
+    EXPECT_TRUE(selectResponseSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, Constructor_EmitsTraceMessage)
+{
+    EXPECT_CALL(streamWriterMock, Insert(_, _)).Times(AtLeast(1));
+    EXPECT_CALL(nvmMock, IsCalibrationValid(_))
+        .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)
+            {
+                done(false);
+            }));
+
+    services::ConfigData config{};
+    coordinator.emplace(
+        application::TerminalAndTracer{ terminal, tracer },
+        application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
+        nvmMock,
+        application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
+        faultNotifierMock,
+        config,
+        state_machine::ControlModeStateMachine::OuterLoopArgs{
+            foc::Ampere{ 10.0f },
+            hal::Hertz{ 1000 },
+            lowPriorityInterruptMock });
+
+    bridge.emplace(*motorServer, *coordinator, inverterMock, electricalIdentMock, &mechIdentMock, foc::NewtonMeter{ 0.1f }, nvmMock, config, tracer);
+    motorServer->SetAcknowledger(ackSpy);
+    ExecuteAllActions();
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_NulloptResults_SendsCalibrationFailed)
+{
+    ConstructFixtureInReady();
+
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+        .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t,
+                             const services::MechanicalParametersIdentification::Config&,
+                             infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
+                                 std::optional<foc::NewtonMeterSecondSquared>)>
+                                 done)
+            {
+                done(std::nullopt, std::nullopt);
+            }));
+
+    ResetCaptures();
+    Dispatch(can::focIdentifyMechanicalId, {});
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnStart_WithoutCalibration_SendsCalibrationFailedCategoryError)
+{
+    ConstructFixture();
+    ResetCaptures();
+
+    Dispatch(can::focStartId, {});
+
+    const bool responseSent = categoryErrorSent || ackSpy.last.has_value();
+    EXPECT_TRUE(responseSent);
+}
+
+TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_ZeroBandwidth_RejectsInvalidPayload)
+{
+    ConstructFixtureInReady();
+    GivenModeSelected(can::FocMotorMode::torque);
+    ResetCaptures();
+
+    DispatchSetpoint(can::focSetPidCurrentId, 0);
+
+    EXPECT_TRUE(ackSpy.last.has_value());
 }

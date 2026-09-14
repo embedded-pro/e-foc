@@ -4,9 +4,7 @@
 #include "core/foc/interfaces/LoopTunings.hpp"
 #include "core/foc/interfaces/MotorModel.hpp"
 #include "core/foc/interfaces/Signals.hpp"
-#include "core/foc/interfaces/Units.hpp"
 #include <concepts>
-#include <cstdint>
 
 namespace foc
 {

@@ -546,3 +546,41 @@ TEST_F(ElectricalParametersIdentificationTest, abort_without_a_run_in_flight_is_
 {
     identification.Abort();
 }
+
+TEST_F(ElectricalParametersIdentificationTest, is_running_returns_false_initially)
+{
+    EXPECT_FALSE(identification.IsRunning());
+}
+
+TEST_F(ElectricalParametersIdentificationTest, is_running_returns_true_during_rl_estimation)
+{
+    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
+        hal::Percent{ 15 }, std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
+    };
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_)).Times(::testing::AnyNumber());
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_));
+
+    identification.EstimateResistanceAndInductance(config, [](auto) {});
+
+    EXPECT_TRUE(identification.IsRunning());
+
+    EXPECT_CALL(driverMock, Stop());
+    identification.Abort();
+    EXPECT_FALSE(identification.IsRunning());
+}
+
+TEST_F(ElectricalParametersIdentificationTest, is_running_returns_true_during_pole_pairs_estimation)
+{
+    EXPECT_CALL(encoderMock, Read()).WillOnce(::testing::Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_));
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_)).Times(::testing::AnyNumber());
+    EXPECT_CALL(driverMock, Stop()).Times(::testing::AnyNumber());
+
+    identification.EstimateNumberOfPolePairs({}, [](auto) {});
+
+    EXPECT_TRUE(identification.IsRunning());
+
+    identification.Abort();
+    EXPECT_FALSE(identification.IsRunning());
+}

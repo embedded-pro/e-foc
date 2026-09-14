@@ -14,7 +14,8 @@
 
 namespace tool
 {
-    class CommandPanel : public QWidget
+    class CommandPanel
+        : public QWidget
     {
         Q_OBJECT
 

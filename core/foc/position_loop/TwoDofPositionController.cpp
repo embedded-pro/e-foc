@@ -3,6 +3,7 @@
 #endif
 
 #include "core/foc/position_loop/TwoDofPositionController.hpp"
+#include "core/foc/speed_loop/SpeedPlantModel.hpp"
 #include "numerical/math/Math.hpp"
 
 namespace foc
@@ -27,7 +28,6 @@ namespace foc
         seeded = false;
     }
 
-    // Pre-filtering the setpoint shapes tracking without touching the feedback gains that set load stiffness
     void TwoDofPositionController::ApplyReferenceFilter()
     {
         filterActive = samplingFrequency.Value() != 0 && referenceTimeConstant > 0.0f;

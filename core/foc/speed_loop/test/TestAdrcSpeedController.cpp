@@ -82,7 +82,6 @@ TEST_F(TestAdrcSpeedController, saturating_step_does_not_wind_up_the_disturbance
     float speed{ 0.0f };
     float peak{ 0.0f };
 
-    // The step demands roughly 38 A against a 10 A envelope, so the command is clipped for hundreds of samples
     for (std::size_t step = 0; step != 8000; ++step)
     {
         auto current = controller.Compute({ foc::RadiansPerSecond{ speed }, foc::RadiansPerSecond{ 100.0f } });

@@ -17,10 +17,10 @@ namespace foc
 
         OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context) const
         {
-            const RotatingFrame inverted{ referenceGain * context.reference.d - feedbackGain * context.measured.d,
-                referenceGain * context.reference.q - feedbackGain * context.measured.q };
+            const auto d = referenceGain * context.reference.d - feedbackGain * context.measured.d;
+            const auto q = referenceGain * context.reference.q - feedbackGain * context.measured.q;
 
-            return LimitToModulationCircle(decoupling.Apply(inverted, context));
+            return LimitToModulationCircle(decoupling.Apply({ d, q }, context));
         }
 
     private:

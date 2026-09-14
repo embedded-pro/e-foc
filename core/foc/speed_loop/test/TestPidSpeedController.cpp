@@ -87,8 +87,6 @@ TEST_F(TestPidSpeedController, invalid_parameters_leave_gains_untouched)
     EXPECT_NEAR(output.Value(), 0.0f, tolerance);
 }
 
-// kp = 2*J*bandwidth/Kt and ki = kp*Bf/J*Ts, both per-unit of the current envelope. The first
-// incremental step after reset emits (kp + ki) * error, rescaled back to Amperes.
 TEST_F(TestPidSpeedController, gains_follow_the_inertia_based_design)
 {
     const auto parameters = ValidParameters();

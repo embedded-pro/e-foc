@@ -7,8 +7,6 @@
 
 namespace tool
 {
-    using namespace services;
-
     CommandPanel::CommandPanel(QWidget* parent)
         : QWidget(parent)
     {
@@ -69,7 +67,6 @@ namespace tool
 
         setpointStack = new QStackedWidget();
 
-        // Index 0: Torque setpoint
         auto* torqueGroup = new QGroupBox("Torque Setpoint");
         auto* torqueLayout = new QFormLayout(torqueGroup);
         auto* iqSpin = new QDoubleSpinBox();
@@ -87,7 +84,6 @@ namespace tool
                 emit SetTorqueSetpointRequested(static_cast<float>(iqSpin->value()));
             });
 
-        // Index 1: Speed setpoint
         auto* speedGroup = new QGroupBox("Speed Setpoint");
         auto* speedLayout = new QFormLayout(speedGroup);
         auto* speedSpin = new QDoubleSpinBox();
@@ -105,7 +101,6 @@ namespace tool
                 emit SetSpeedSetpointRequested(static_cast<float>(speedSpin->value()));
             });
 
-        // Index 2: Position setpoint
         auto* posGroup = new QGroupBox("Position Setpoint");
         auto* posLayout = new QFormLayout(posGroup);
         auto* posSpin = new QDoubleSpinBox();
@@ -165,14 +160,12 @@ namespace tool
                 });
         };
 
-        // Index 0: Torque mode — Current bandwidth
         auto* torquePidPage = new QWidget();
         auto* torquePidLayout = new QVBoxLayout(torquePidPage);
         addBandwidthGroup(torquePidLayout, "Current Loop Bandwidth", foc::CommandLimits::maxCurrentBandwidth, &CommandPanel::SetCurrentBandwidthRequested);
         torquePidLayout->addStretch();
         pidStack->addWidget(torquePidPage);
 
-        // Index 1: Speed mode — Current + Speed bandwidth
         auto* speedPidPage = new QWidget();
         auto* speedPidLayout = new QVBoxLayout(speedPidPage);
         addBandwidthGroup(speedPidLayout, "Current Loop Bandwidth", foc::CommandLimits::maxCurrentBandwidth, &CommandPanel::SetCurrentBandwidthRequested);
@@ -180,7 +173,6 @@ namespace tool
         speedPidLayout->addStretch();
         pidStack->addWidget(speedPidPage);
 
-        // Index 2: Position mode — Current + Speed + Position bandwidth
         auto* positionPidPage = new QWidget();
         auto* positionPidLayout = new QVBoxLayout(positionPidPage);
         addBandwidthGroup(positionPidLayout, "Current Loop Bandwidth", foc::CommandLimits::maxCurrentBandwidth, &CommandPanel::SetCurrentBandwidthRequested);

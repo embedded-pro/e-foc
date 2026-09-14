@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/foc/interfaces/Algorithms.hpp"
+#include "core/foc/position_loop/PositionController.hpp"
 #include "core/foc/position_loop/PositionPlantModel.hpp"
 
 namespace foc

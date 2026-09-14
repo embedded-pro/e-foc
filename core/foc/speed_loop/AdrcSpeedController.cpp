@@ -36,15 +36,13 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     foc::Ampere AdrcSpeedController::Compute(const SpeedControlContext& context)
     {
-        // Feeding the clipped current back keeps the disturbance estimate from winding up while the envelope is reached
-        const auto applied = LimitToCurrentEnvelope(adrc.Compute(context.reference.Value(), context.measured.Value(), lastApplied),
-            parameters.maxCurrent);
+        const auto current = adrc.Compute(context.reference.Value(), context.measured.Value(), lastApplied);
+        const auto applied = LimitToCurrentEnvelope(current, parameters.maxCurrent);
         lastApplied = applied.Value();
 
         return applied;
     }
 
-    // Zero bandwidths hold both the observer and the control law at zero; b0 stays finite to keep the division defined
     AdrcSpeedController::SpeedAdrc AdrcSpeedController::Inert()
     {
         return { 0.0f, 0.0f, 1.0f, 1.0f };

@@ -30,7 +30,6 @@ namespace foc
         virtual void SetCurrentTunings(const CurrentLoopTunings& tunings) = 0;
     };
 
-    // Selection is a configuration-time operation; implementations reject it while enabled.
     class CurrentLoopSelectable
     {
     public:
@@ -58,8 +57,6 @@ namespace foc
         virtual void SetSpeedTunings(const SpeedLoopTunings& tunings) = 0;
     };
 
-    // Reports rejection because the state feedback laws cannot always be redesigned for a
-    // new set of tunings, and implementations refuse retuning outright while the motor is enabled.
     class PositionLoopTunable
     {
     public:
@@ -117,7 +114,7 @@ namespace foc
         , public FocOnlineEstimableBase
     {
     public:
-        virtual ~FocSpeed() = default;
+        ~FocSpeed() override = default;
 
         virtual void SetPoint(RadiansPerSecond setPoint) = 0;
         virtual hal::Hertz OuterLoopFrequency() const = 0;
@@ -134,7 +131,7 @@ namespace foc
         , public FocOnlineEstimableBase
     {
     public:
-        virtual ~FocPosition() = default;
+        ~FocPosition() override = default;
 
         virtual void SetPoint(Radians setPoint) = 0;
     };

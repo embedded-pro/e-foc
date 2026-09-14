@@ -6,8 +6,6 @@
 
 namespace foc
 {
-    // Bodies live in the header so OPTIMIZE_FOR_SPEED's always_inline can apply at the
-    // 20 kHz call sites; the project builds without LTO, so a .cpp definition cannot inline.
     class Clarke
     {
     public:

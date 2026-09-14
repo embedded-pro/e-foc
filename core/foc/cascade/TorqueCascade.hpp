@@ -37,8 +37,7 @@ namespace foc
         float polePairs{ 0.0f };
         volatile bool enabled{ false };
         IdAndIqPoint lastSetPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
-        // Torque mode has no outer loop to measure speed, so the decoupling feedforward is fed
-        // from a filtered per-ISR angle difference; raw 20 kHz differences are all encoder quantisation.
+
         float electricalSpeedScale{ 0.0f };
         float speedFilterAlpha{ 1.0f };
         float previousMechanicalAngle{ 0.0f };

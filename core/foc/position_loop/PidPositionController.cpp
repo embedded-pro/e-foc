@@ -3,6 +3,9 @@
 #endif
 
 #include "core/foc/position_loop/PidPositionController.hpp"
+#include "core/foc/position_loop/PositionController.hpp"
+#include "core/foc/position_loop/PositionPlantModel.hpp"
+#include "core/foc/speed_loop/SpeedPlantModel.hpp"
 
 namespace foc
 {
@@ -26,14 +29,11 @@ namespace foc
     OPTIMIZE_FOR_SPEED
     PositionOutput PidPositionController::Compute(const PositionControlContext& context)
     {
-        // Feeding the wrapped error against a zero measurement keeps the shortest path across the seam
         positionPid.SetPoint(WrappedPositionError(context.reference, context.measured));
 
         return { PositionOutputKind::speedReference, positionPid.Process(0.0f) * SpeedEnvelope() };
     }
 
-    // One radian of error commands the loop bandwidth in radians per second, which is the
-    // proportional law the cascade shipped with; the integral term removes the standing error.
     float PidPositionController::SpeedEnvelope() const
     {
         return tunings.bandwidth * maximumErrorInRadians;

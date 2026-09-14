@@ -102,7 +102,6 @@ TEST_F(TestPositionControllerSelector, a_rejected_design_leaves_the_previous_alg
     selector.Configure(ValidParameters());
     ASSERT_EQ(selector.Select(foc::PositionAlgorithm::cascadeP), foc::SelectResult::ok);
 
-    // Zeroing the torque constant makes the rigid-body model unusable for state feedback
     auto degraded = ValidParameters();
     degraded.torqueConstant = foc::NewtonMeter{ 0.0f };
     selector.Configure(degraded);
@@ -130,7 +129,6 @@ TEST_F(TestPositionControllerSelector, the_error_takes_the_short_way_across_the_
 
     constexpr float pi = std::numbers::pi_v<float>;
 
-    // Just past the seam is a 0.2 rad step forward, not a 6.08 rad run backwards
     const auto forward = selector.Compute(Context(-pi + 0.1f, pi - 0.1f, 0.0f)).value;
     const auto reference = selector.Compute(Context(0.2f, 0.0f, 0.0f)).value;
 

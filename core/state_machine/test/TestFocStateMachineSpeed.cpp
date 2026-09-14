@@ -44,6 +44,7 @@ namespace
                 EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
                 EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
                 EXPECT_CALL(mechIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(mechIdentMock, IsRunning()).WillRepeatedly(Return(false));
                 EXPECT_CALL(electricalIdentMock, IsRunning()).WillRepeatedly(Return(false));
                 EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
             } };
@@ -1105,6 +1106,7 @@ namespace
                 EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
                 EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
                 EXPECT_CALL(mechIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(mechIdentMock, IsRunning()).WillRepeatedly(Return(false));
                 EXPECT_CALL(electricalIdentMock, IsRunning()).WillRepeatedly(Return(false));
                 EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
             } };
@@ -2287,4 +2289,26 @@ TEST_F(FocStateMachineSpeedAutoTest, apply_online_estimates_does_not_change_stat
     sm.ApplyOnlineEstimates();
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineSpeedCliTest, has_pending_async_work_true_when_mech_ident_is_running)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateSpeedStateMachine();
+    state_machine::FocStateMachineBase& base = sm;
+
+    EXPECT_CALL(mechIdentMock, IsRunning()).WillOnce(Return(true)).WillRepeatedly(Return(false));
+    EXPECT_TRUE(base.HasPendingAsyncWork());
+}
+
+TEST_F(FocStateMachineSpeedCliTest, has_pending_async_work_true_when_electrical_ident_is_running)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateSpeedStateMachine();
+    state_machine::FocStateMachineBase& base = sm;
+
+    EXPECT_CALL(electricalIdentMock, IsRunning()).WillOnce(Return(true)).WillRepeatedly(Return(false));
+    EXPECT_TRUE(base.HasPendingAsyncWork());
 }

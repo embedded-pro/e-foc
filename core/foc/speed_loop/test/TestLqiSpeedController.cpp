@@ -91,7 +91,6 @@ TEST_F(TestLqiSpeedController, saturation_freezes_the_integrator)
     float speed{ 0.0f };
     float peak{ 0.0f };
 
-    // The step is far enough away that the current stays clipped for hundreds of samples
     for (std::size_t step = 0; step != 5000; ++step)
     {
         auto current = controller.Compute({ foc::RadiansPerSecond{ speed }, foc::RadiansPerSecond{ 2000.0f } });

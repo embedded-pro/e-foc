@@ -16,6 +16,7 @@ namespace services
                 const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
                     std::optional<foc::NewtonMeterSecondSquared>)>& onDone),
             (override));
+        MOCK_METHOD(bool, IsRunning, (), (const, override));
         MOCK_METHOD(void, Abort, (), (override));
     };
 }

@@ -18,10 +18,10 @@ namespace foc
 
         OPTIMIZE_FOR_SPEED RotatingFrame Compute(const CurrentControlContext& context)
         {
-            const RotatingFrame proposed{ ComputeAxis(context.measured.d, context.reference.d),
-                ComputeAxis(context.measured.q, context.reference.q) };
+            auto d = ComputeAxis(context.measured.d, context.reference.d);
+            auto q = ComputeAxis(context.measured.q, context.reference.q);
 
-            return LimitToModulationCircle(decoupling.Apply(proposed, context));
+            return LimitToModulationCircle(decoupling.Apply({ d, q }, context));
         }
 
     private:
@@ -32,8 +32,7 @@ namespace foc
 
         OPTIMIZE_FOR_SPEED float ComputeAxis(float measured, float reference)
         {
-            const auto control = slidingMode.ComputeControl(ScalarSlidingMode::StateVector{ measured },
-                ScalarSlidingMode::StateVector{ reference });
+            const auto control = slidingMode.ComputeControl(ScalarSlidingMode::StateVector{ measured }, ScalarSlidingMode::StateVector{ reference });
 
             return (control.at(0, 0) + equilibriumGain * reference) * normalizationScale;
         }

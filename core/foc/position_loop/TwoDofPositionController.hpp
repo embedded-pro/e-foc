@@ -2,10 +2,10 @@
 
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/position_loop/PidPositionController.hpp"
+#include "core/foc/position_loop/PositionPlantModel.hpp"
 
 namespace foc
 {
-    // Shapes the setpoint before the feedback law, so tracking and disturbance rejection tune apart.
     class TwoDofPositionController
     {
     public:
@@ -37,8 +37,7 @@ namespace foc
                 seeded = true;
             }
 
-            shapedReference = detail::PositionWithWrapAround(
-                shapedReference + alpha * WrappedPositionError(context.reference, Radians{ shapedReference }));
+            shapedReference = detail::PositionWithWrapAround(shapedReference + alpha * WrappedPositionError(context.reference, Radians{ shapedReference }));
 
             return Radians{ shapedReference };
         }

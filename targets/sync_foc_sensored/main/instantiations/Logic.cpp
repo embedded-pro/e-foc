@@ -1,5 +1,5 @@
 #include "targets/sync_foc_sensored/main/instantiations/Logic.hpp"
-#include "infra/event/EventDispatcher.hpp"
+#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 
 namespace application
 {
@@ -46,7 +46,7 @@ namespace application
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
                 platformFaultNotifier->RegisterSecondary([this](state_machine::FaultCode code)
                     {
-                        infra::EventDispatcher::Instance().Schedule([this, code]()
+                        infra::EventDispatcherWithWeakPtr::Instance().Schedule([this, code]()
                             {
                                 canBridge->BroadcastFault(code);
                             });

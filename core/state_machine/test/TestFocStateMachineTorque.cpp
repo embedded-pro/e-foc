@@ -2469,6 +2469,16 @@ TEST_F(FocStateMachineTorqueCliTest, has_pending_async_work_false_after_nvm_load
     EXPECT_FALSE(sm.HasPendingAsyncWork());
 }
 
+TEST_F(FocStateMachineTorqueCliTest, has_pending_async_work_true_when_electrical_ident_is_running)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(electricalIdentMock, IsRunning()).WillOnce(Return(true)).WillRepeatedly(Return(false));
+    EXPECT_TRUE(sm.HasPendingAsyncWork());
+}
+
 TEST_F(FocStateMachineTorqueCliTest, register_ready_handler_called_when_state_enters_ready)
 {
     GivenFaultNotifierRegistered();

@@ -73,7 +73,6 @@ TEST_F(TestRunner, DisableStopsInverterThenFoc)
     EXPECT_CALL(focMock, Disable());
 
     runner.Disable();
-    // destructor calls Disable() again
 }
 
 TEST_F(TestRunner, PhaseCurrentsCallbackReadsEncoderCalculatesFocAndOutputsPwm)
@@ -115,14 +114,13 @@ TEST_F(TestRunner, MultipleEnableDisableCyclesWork)
 
     EXPECT_CALL(focMock, Enable()).Times(2);
     EXPECT_CALL(inverterMock, Start()).Times(2);
-    EXPECT_CALL(inverterMock, Stop()).Times(3); // 2 explicit + 1 destructor
-    EXPECT_CALL(focMock, Disable()).Times(3);   // 2 explicit + 1 destructor
+    EXPECT_CALL(inverterMock, Stop()).Times(3);
+    EXPECT_CALL(focMock, Disable()).Times(3);
 
     runner.Enable();
     runner.Disable();
     runner.Enable();
     runner.Disable();
-    // destructor calls Disable() again
 }
 
 TEST_F(TestRunner, ALateCallbackAfterDisableDoesNotDriveThePwm)

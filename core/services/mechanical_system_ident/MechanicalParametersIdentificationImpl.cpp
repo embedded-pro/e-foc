@@ -59,6 +59,11 @@ namespace services
         onDone = nullptr;
     }
 
+    bool MechanicalParametersIdentificationImpl::IsRunning() const
+    {
+        return rls.has_value();
+    }
+
     void MechanicalParametersIdentificationImpl::ReleaseDrive()
     {
         drive.Stop();

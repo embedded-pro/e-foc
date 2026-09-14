@@ -60,8 +60,6 @@ namespace foc
             return;
 
         electricalSpeedScale = polePairs * samplingFrequency;
-        // Smooth to the same 1 ms the speed cascade measures over, so the feedforward tracks the
-        // rotor without passing encoder quantisation through to Vd and Vq.
         speedFilterAlpha = 1.0f - math::Exp(-1.0f / (speedFilterTimeConstant * samplingFrequency));
     }
 

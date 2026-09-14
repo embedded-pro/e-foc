@@ -18,7 +18,6 @@ namespace foc
         OPTIMIZE_FOR_SPEED foc::Ampere Compute(const SpeedControlContext& context);
 
     private:
-        // The mechanical plant is first order; the extended state adds the lumped load torque
         using SpeedAdrc = robust_control::ActiveDisturbanceRejectionControl<float, 1>;
 
         static SpeedAdrc Inert();

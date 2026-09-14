@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
+#include "foc/interfaces/Foc.hpp"
 
 namespace foc
 {

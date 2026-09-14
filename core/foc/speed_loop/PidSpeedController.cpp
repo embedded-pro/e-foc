@@ -40,7 +40,6 @@ namespace foc
         const auto inertia = parameters.inertia.Value();
         const auto scale = 1.0f / parameters.maxCurrent.Value();
         const auto kp = 2.0f * inertia * bandwidth / parameters.torqueConstant.Value();
-        // Floor the integral zero at bandwidth/10 so Ki is non-zero even when Bf == 0
         const auto integralZero = std::max(parameters.viscousFriction.Value() / inertia, bandwidth / 10.0f);
         const auto ki = kp * integralZero * OuterSamplePeriod(parameters.samplingFrequency);
 

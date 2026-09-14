@@ -1,6 +1,8 @@
 #pragma once
 
+#include "core/foc/interfaces/LoopTunings.hpp"
 #include "core/foc/position_loop/PositionPlantModel.hpp"
+#include "core/foc/speed_loop/SpeedPlantModel.hpp"
 #include "numerical/controllers/implementations/Lqr.hpp"
 
 namespace foc
@@ -10,10 +12,6 @@ namespace foc
     {
     public:
         using Design = controllers::Lqr<float, StateSize, 1>;
-
-        StateFeedbackPositionController()
-            : design(Derived::Inert())
-        {}
 
         static bool IsDesignFeasible(const MechanicalModelParameters& parameters, const PositionLoopTunings& tunings)
         {
@@ -50,6 +48,6 @@ namespace foc
         PositionLoopTunings tunings{};
         float currentPerNormalizedInput{ 0.0f };
         float samplePeriod{ 0.0f };
-        Design design;
+        Design design{ Derived::Inert() };
     };
 }

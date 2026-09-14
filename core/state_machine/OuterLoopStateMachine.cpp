@@ -95,6 +95,11 @@ namespace application
         RunMechanicalIdentStep();
     }
 
+    bool OuterLoopStateMachine::HasPendingAsyncWork() const
+    {
+        return FocStateMachineCommon::HasPendingAsyncWork() || MechIdentImpl().IsRunning();
+    }
+
     void OuterLoopStateMachine::AbortModeSpecificServices()
     {
         MechIdentImpl().Abort();

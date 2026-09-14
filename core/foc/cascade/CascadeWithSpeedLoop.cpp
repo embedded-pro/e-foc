@@ -3,7 +3,9 @@
 #endif
 
 #include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
+#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/DutyConversion.hpp"
+#include "core/foc/math/FastTrigonometry.hpp"
 
 namespace foc
 {
@@ -49,10 +51,7 @@ namespace foc
             return;
 
         const auto& snapshot = Acquire();
-        mechanical->Update(
-            snapshot.phaseCurrents,
-            RadiansPerSecond{ mechanicalSpeed },
-            Radians{ snapshot.electricalAngle });
+        mechanical->Update(snapshot.phaseCurrents, RadiansPerSecond{ mechanicalSpeed }, Radians{ snapshot.electricalAngle });
     }
 
     void EstimatorChannel::UpdateElectrical(float electricalSpeed, float vdcInvScale)
@@ -61,11 +60,7 @@ namespace foc
             return;
 
         const auto& snapshot = Acquire();
-        electrical->Update(
-            Volts{ snapshot.normalizedVd * vdcInvScale },
-            Ampere{ snapshot.measuredId },
-            Ampere{ snapshot.measuredIq },
-            RadiansPerSecond{ electricalSpeed });
+        electrical->Update(Volts{ snapshot.normalizedVd * vdcInvScale }, Ampere{ snapshot.measuredId }, Ampere{ snapshot.measuredIq }, RadiansPerSecond{ electricalSpeed });
     }
 
     CascadeWithSpeedLoop::CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)

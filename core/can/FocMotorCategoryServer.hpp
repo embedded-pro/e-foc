@@ -47,6 +47,7 @@ namespace can
     {
     public:
         explicit FocMotorCategoryServer(services::CanFrameTransport& transport);
+        virtual ~FocMotorCategoryServer() = default;
 
         uint8_t Id() const override;
 
