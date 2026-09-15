@@ -1,19 +1,5 @@
 #include "core/state_machine/FocStateMachineCommon.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
 #include <bit>
-#include <numbers>
-
-namespace
-{
-    // Positivity is the pre-existing completeness contract; finiteness is added because +inf passes every `> 0` test
-    bool HasFiniteElectricalCalibration(const services::CalibrationData& data)
-    {
-        return foc::IsFinitePositive(data.rPhase) &&
-               foc::IsFiniteValue(data.lD) &&
-               foc::IsFiniteValue(data.fluxLinkage) &&
-               foc::IsFiniteValue(data.currentLoopBandwidth);
-    }
-}
 
 namespace application
 {
@@ -24,19 +10,16 @@ namespace application
         const CalibrationServices& calibServices)
         : terminal(terminalAndTracer.terminal)
         , tracer(terminalAndTracer.tracer)
-        , inverter(hardware.inverter)
-        , vdc(hardware.vdc)
         , nvm(nvm)
-        , electricalIdent(calibServices.electricalIdent)
-        , motorAlignment(calibServices.motorAlignment)
-        , configuredFluxLinkage(calibServices.fluxLinkage)
+        , calibrationContext(hardware.inverter, hardware.vdc, calibServices.fluxLinkage)
+        , calibrationOrchestrator(calibServices.electricalIdent, calibServices.motorAlignment, terminalAndTracer.tracer)
     {}
 
     void FocStateMachineCommon::RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier)
     {
-        registeredFaultNotifier = &faultNotifier;
-
-        faultNotifier.Register([this](state_machine::FaultCode)
+        faultController.Register(
+            faultNotifier,
+            [this](state_machine::FaultCode)
             {
                 GetFocControl().Stop();
             },
@@ -49,18 +32,12 @@ namespace application
     void FocStateMachineCommon::ReleaseExternalResources()
     {
         AbortCalibrationServices();
-
-        if (registeredFaultNotifier != nullptr)
-        {
-            registeredFaultNotifier->Unregister();
-            registeredFaultNotifier = nullptr;
-        }
+        faultController.Unregister();
     }
 
     void FocStateMachineCommon::AbortCalibrationServices()
     {
-        electricalIdent.Abort();
-        motorAlignment.Abort();
+        calibrationOrchestrator.Abort();
         AbortModeSpecificServices();
     }
 
@@ -91,12 +68,12 @@ namespace application
 
     bool FocStateMachineCommon::HasPendingAsyncWork() const
     {
-        return HasPendingCommand() || bootCheckInFlight || std::holds_alternative<state_machine::Calibrating>(currentState) || electricalIdent.IsRunning();
+        return HasPendingCommand() || bootCheckInFlight || std::holds_alternative<state_machine::Calibrating>(currentState) || calibrationOrchestrator.IsRunning();
     }
 
     bool FocStateMachineCommon::HasPartialCalibration() const
     {
-        return std::holds_alternative<state_machine::Idle>(currentState) && calibrationData.stage != services::CalibrationStage::complete && (calibrationData.polePairs != 0 || calibrationData.rPhase > 0.0f);
+        return std::holds_alternative<state_machine::Idle>(currentState) && calibrationContext.HasPartial();
     }
 
     void FocStateMachineCommon::CmdCalibrate(const infra::Function<void(state_machine::CommandResult)>& onDone)
@@ -113,7 +90,7 @@ namespace application
 
     state_machine::CommandResult FocStateMachineCommon::CmdEnable()
     {
-        if (!std::holds_alternative<state_machine::Ready>(currentState) || faultLatched)
+        if (!std::holds_alternative<state_machine::Ready>(currentState) || faultController.IsLatched())
             return state_machine::CommandResult::rejected;
 
         if (!std::get<state_machine::Ready>(currentState).rotorReferenceValid)
@@ -136,8 +113,8 @@ namespace application
             return state_machine::CommandResult::rejected;
 
         GetFocControl().Stop();
-        consecutiveFaultClears = 0;
-        EnterReady(calibrationData);
+        faultController.ResetClearCount();
+        EnterReady(calibrationContext.Data());
         return state_machine::CommandResult::ok;
     }
 
@@ -146,60 +123,15 @@ namespace application
         if (!std::holds_alternative<state_machine::Fault>(currentState))
             return state_machine::CommandResult::rejected;
 
-        if (consecutiveFaultClears >= maxConsecutiveFaultClears)
+        if (!faultController.TryClear())
         {
             tracer.Trace() << "[SM] Fault clear refused, retry limit reached; reset required";
             return state_machine::CommandResult::rejected;
         }
 
-        ++consecutiveFaultClears;
-        faultLatched = false;
         tracer.Trace() << "[SM] Fault cleared";
-
         EnterReadyOrIdle();
-
         return state_machine::CommandResult::ok;
-    }
-
-    void FocStateMachineCommon::CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>& onDone)
-    {
-        if (!state_machine::IsStopped(currentState) || HasPendingCommand())
-        {
-            onDone(state_machine::CommandResult::rejected);
-            return;
-        }
-
-        pendingCommandCallback = onDone;
-        nvm.InvalidateCalibration([this](services::NvmStatus status)
-            {
-                OnCalibrationInvalidated(status);
-            });
-    }
-
-    void FocStateMachineCommon::OnCalibrationInvalidated(services::NvmStatus status)
-    {
-        if (!HasPendingCommand() || !state_machine::IsStopped(currentState))
-            return;
-
-        if (status == services::NvmStatus::Busy)
-        {
-            CompletePendingCommand(state_machine::CommandResult::rejected);
-            return;
-        }
-
-        if (status != services::NvmStatus::Ok)
-        {
-            CompletePendingCommand(state_machine::CommandResult::nvmFailed);
-            EnterFault(state_machine::FaultCode::hardwareFault);
-        }
-        else
-        {
-            tracer.Trace() << "[SM] Calibration invalidated in NVM";
-            calibrationData = services::CalibrationData{};
-            rotorReferenceValid_ = false;
-            currentState = state_machine::Idle{};
-            CompletePendingCommand(state_machine::CommandResult::ok);
-        }
     }
 
     state_machine::CommandResult FocStateMachineCommon::CmdEmergencyStop()
@@ -241,9 +173,17 @@ namespace application
         tracer.Trace() << "[SM] Entering Calibrating";
         currentState = state_machine::Calibrating{};
 
-        std::get<state_machine::Calibrating>(currentState).pendingData.fluxLinkage = EffectiveFluxLinkage(calibrationData).Value();
+        auto& cal = std::get<state_machine::Calibrating>(currentState);
+        cal.pendingData.fluxLinkage = calibrationContext.EffectiveFluxLinkage().Value();
 
-        RunPolePairsStep();
+        calibrationOrchestrator.Start(
+            cal.pendingData,
+            [this](state_machine::CalibrationStep step)
+            {
+                std::get<state_machine::Calibrating>(currentState).step = step;
+            },
+            [this](foc::Radians angle) { OnAlignmentSucceeded(angle); },
+            [this] { FailCalibrationStep(); });
     }
 
     void FocStateMachineCommon::RegisterReadyHandler(const infra::Function<void()>& onReady)
@@ -254,8 +194,8 @@ namespace application
     void FocStateMachineCommon::EnterReady(const services::CalibrationData& data)
     {
         tracer.Trace() << "[SM] Entering Ready";
-        calibrationData = data;
-        currentState = state_machine::Ready{ data, rotorReferenceValid_ };
+        calibrationContext.SetData(data);
+        currentState = state_machine::Ready{ data, calibrationContext.IsRotorReferenceValid() };
 
         if (readyHandler != nullptr)
             readyHandler();
@@ -264,7 +204,7 @@ namespace application
     void FocStateMachineCommon::EnterReadyOrIdle()
     {
         if (HasValidCalibration())
-            EnterReady(calibrationData);
+            EnterReady(calibrationContext.Data());
         else
             currentState = state_machine::Idle{};
     }
@@ -272,7 +212,7 @@ namespace application
     void FocStateMachineCommon::EnterIdleWithPartialCalibration(const services::CalibrationData& data)
     {
         tracer.Trace() << "[SM] Entering Idle, calibration incomplete for this mode";
-        calibrationData = data;
+        calibrationContext.SetData(data);
         currentState = state_machine::Idle{};
     }
 
@@ -296,7 +236,7 @@ namespace application
 
         lastFaultCode = code;
         currentState = state_machine::Fault{ code };
-        faultLatched = true;
+        faultController.EnterFault();
 
         if (wasActive)
             GetFocControl().Stop();
@@ -325,137 +265,39 @@ namespace application
 
     bool FocStateMachineCommon::HasValidCalibration() const
     {
-        return calibrationData.stage == services::CalibrationStage::complete &&
-               calibrationData.polePairs != 0 &&
-               HasFiniteElectricalCalibration(calibrationData) &&
-               HasValidModeSpecificCalibration(calibrationData);
-    }
-
-    void FocStateMachineCommon::RunPolePairsStep()
-    {
-        tracer.Trace() << "[SM] Identifying pole pairs";
-        auto& calibrating = std::get<state_machine::Calibrating>(currentState);
-        calibrating.step = state_machine::CalibrationStep::polePairs;
-
-        electricalIdent.EstimateNumberOfPolePairs({}, [this](std::optional<std::size_t> result)
-            {
-                if (!IsCalibrating(state_machine::CalibrationStep::polePairs))
-                    return;
-
-                if (!result.has_value())
-                    FailCalibrationStep();
-                else
-                {
-                    auto& cal = std::get<state_machine::Calibrating>(currentState);
-                    cal.pendingData.polePairs = static_cast<uint8_t>(*result);
-                    RunResistanceAndInductanceStep();
-                }
-            });
-    }
-
-    void FocStateMachineCommon::RunResistanceAndInductanceStep()
-    {
-        tracer.Trace() << "[SM] Identifying resistance and inductance";
-        auto& calibrating = std::get<state_machine::Calibrating>(currentState);
-        calibrating.step = state_machine::CalibrationStep::resistanceAndInductance;
-
-        electricalIdent.EstimateResistanceAndInductance({},
-            [this](services::ElectricalParametersIdentification::ResistanceInductanceResult result)
-            {
-                if (!IsCalibrating(state_machine::CalibrationStep::resistanceAndInductance))
-                    return;
-
-                if (!result.resistance || !result.inductance || result.fitQuality < 0.5f)
-                    FailCalibrationStep();
-                else
-                {
-                    auto& cal = std::get<state_machine::Calibrating>(currentState);
-                    cal.pendingData.rPhase = result.resistance->Value();
-                    cal.pendingData.lD = result.inductance->Value();
-                    cal.pendingData.lQ = result.inductance->Value();
-                    RunAlignmentStep();
-                }
-            });
+        return calibrationContext.IsComplete(HasValidModeSpecificCalibration(calibrationContext.Data()));
     }
 
     void FocStateMachineCommon::RunAlignmentStep()
     {
-        tracer.Trace() << "[SM] Aligning motor";
-        auto& calibrating = std::get<state_machine::Calibrating>(currentState);
-        calibrating.step = state_machine::CalibrationStep::alignment;
-        const auto polePairs = calibrating.pendingData.polePairs;
+        auto& cal = std::get<state_machine::Calibrating>(currentState);
 
-        motorAlignment.ForceAlignment(polePairs, {},
-            [this](std::optional<foc::Radians> angle)
+        calibrationOrchestrator.StartAlignmentOnly(
+            cal.pendingData,
+            [this](state_machine::CalibrationStep step)
             {
-                if (!IsCalibrating(state_machine::CalibrationStep::alignment))
-                    return;
+                std::get<state_machine::Calibrating>(currentState).step = step;
+            },
+            [this](foc::Radians angle) { OnAlignmentSucceeded(angle); },
+            [this] { FailCalibrationStep(); });
+    }
 
-                if (!angle)
-                    FailCalibrationStep();
-                else
-                {
-                    auto& cal = std::get<state_machine::Calibrating>(currentState);
-                    cal.pendingData.encoderZeroOffset = std::bit_cast<int32_t>(angle->Value());
-                    rotorReferenceValid_ = true;
+    void FocStateMachineCommon::OnAlignmentSucceeded(foc::Radians angle)
+    {
+        auto& cal = std::get<state_machine::Calibrating>(currentState);
+        cal.pendingData.encoderZeroOffset = std::bit_cast<int32_t>(angle.Value());
+        calibrationContext.SetRotorReferenceValid(true);
 
-                    if (cal.external)
-                        OnCalibrationComplete();
-                    else
-                        RunPostAlignmentStep();
-                }
-            });
+        if (cal.external)
+            OnCalibrationComplete();
+        else
+            RunPostAlignmentStep();
     }
 
     void FocStateMachineCommon::FailCalibrationStep()
     {
         CompletePendingCommand(state_machine::CommandResult::calibrationFailed);
         EnterFault(state_machine::FaultCode::calibrationFailed);
-    }
-
-    void FocStateMachineCommon::OnCalibrationComplete()
-    {
-        if (!std::holds_alternative<state_machine::Calibrating>(currentState))
-            return;
-
-        auto& calibrating = std::get<state_machine::Calibrating>(currentState);
-        calibrating.pendingData.stage = HasValidModeSpecificCalibration(calibrating.pendingData)
-                                            ? services::CalibrationStage::complete
-                                            : services::CalibrationStage::none;
-        auto pendingData = calibrating.pendingData;
-
-        nvm.SaveCalibration(pendingData,
-            [this](services::NvmStatus status)
-            {
-                OnCalibrationSaved(status);
-            });
-    }
-
-    void FocStateMachineCommon::OnCalibrationSaved(services::NvmStatus status)
-    {
-        if (!std::holds_alternative<state_machine::Calibrating>(currentState))
-            return;
-
-        if (status != services::NvmStatus::Ok)
-        {
-            CompletePendingCommand(state_machine::CommandResult::nvmFailed);
-            EnterFault(state_machine::FaultCode::calibrationFailed);
-        }
-        else
-        {
-            auto data = std::get<state_machine::Calibrating>(currentState).pendingData;
-
-            if (data.stage == services::CalibrationStage::complete)
-            {
-                ApplyElectricalCalibration(data);
-                ApplyModeSpecificCalibration(data);
-                EnterReady(data);
-            }
-            else
-                EnterIdleWithPartialCalibration(data);
-
-            CompletePendingCommand(state_machine::CommandResult::ok);
-        }
     }
 
     bool FocStateMachineCommon::IsCalibrating(state_machine::CalibrationStep expected) const
@@ -489,7 +331,7 @@ namespace application
             return;
         }
 
-        nvm.LoadCalibration(calibrationData, [this](services::NvmStatus status)
+        nvm.LoadCalibration(calibrationContext.MutableData(), [this](services::NvmStatus status)
             {
                 OnBootCalibrationLoaded(status);
             });
@@ -509,8 +351,8 @@ namespace application
         else
         {
             tracer.Trace() << "[SM] Electrical parameters restored; run alignment before enabling";
-            ApplyElectricalCalibration(calibrationData);
-            ApplyModeSpecificCalibration(calibrationData);
+            calibrationContext.Apply(GetFoc(), CurrentTunable());
+            ApplyModeSpecificCalibration(calibrationContext.Data());
         }
     }
 
@@ -521,12 +363,12 @@ namespace application
 
     drivers::ThreePhaseInverter& FocStateMachineCommon::GetInverter()
     {
-        return inverter;
+        return calibrationContext.GetInverter();
     }
 
     foc::Volts FocStateMachineCommon::GetVdc() const
     {
-        return vdc;
+        return calibrationContext.GetVdc();
     }
 
     state_machine::State& FocStateMachineCommon::GetCurrentState()
@@ -539,137 +381,18 @@ namespace application
         return currentState;
     }
 
-    float FocStateMachineCommon::DefaultCurrentLoopBandwidth() const
+    const services::CalibrationData& FocStateMachineCommon::GetCalibration() const
     {
-        return (static_cast<float>(inverter.BaseFrequency().Value()) / nyquistFactor) * 2.0f * std::numbers::pi_v<float>;
-    }
-
-    foc::CurrentLoopTunings FocStateMachineCommon::CurrentTuningsFor(float bandwidth) const
-    {
-        auto tunings = foc::CurrentLoopTunings{};
-        tunings.bandwidth = foc::IsAcceptableCurrentBandwidth(bandwidth) ? bandwidth : DefaultCurrentLoopBandwidth();
-        return tunings;
-    }
-
-    void FocStateMachineCommon::ApplyElectricalCalibration(const services::CalibrationData& data)
-    {
-        ApplyElectricalModel(foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD }, data.polePairs, data.currentLoopBandwidth, EffectiveFluxLinkage(data));
-    }
-
-    void FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage)
-    {
-        GetFoc().Configure(foc::MotorModelParameters{
-            resistance,
-            inductance,
-            fluxLinkage,
-            vdc,
-            inverter.BaseFrequency(),
-            polePairs });
-
-        CurrentTunable().SetCurrentTunings(CurrentTuningsFor(bandwidth));
+        return calibrationContext.Data();
     }
 
     foc::Weber FocStateMachineCommon::EffectiveFluxLinkage(const services::CalibrationData& data) const
     {
-        return foc::IsFinitePositive(data.fluxLinkage) ? foc::Weber{ data.fluxLinkage } : configuredFluxLinkage;
+        return calibrationContext.EffectiveFluxLinkage(data);
     }
 
-    foc::Weber FocStateMachineCommon::ActiveFluxLinkage() const
+    void FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage)
     {
-        return EffectiveFluxLinkage(calibrationData);
-    }
-
-    state_machine::CommandResult FocStateMachineCommon::CmdReserveExternalCalibration()
-    {
-        if (!state_machine::IsStopped(currentState) || HasPendingAsyncWork())
-            return state_machine::CommandResult::rejected;
-
-        tracer.Trace() << "[SM] Entering Calibrating (external)";
-        currentState = state_machine::Calibrating{};
-        std::get<state_machine::Calibrating>(currentState).external = true;
-        return state_machine::CommandResult::ok;
-    }
-
-    void FocStateMachineCommon::CmdCompleteExternalCalibration(const services::CalibrationData& data,
-        const infra::Function<void(state_machine::CommandResult)>& onDone)
-    {
-        if (!std::holds_alternative<state_machine::Calibrating>(currentState))
-        {
-            onDone(state_machine::CommandResult::rejected);
-            return;
-        }
-
-        if (!HasFiniteElectricalCalibration(data))
-        {
-            tracer.Trace() << "[SM] External calibration rejected: implausible electrical data";
-            onDone(state_machine::CommandResult::rejected);
-            return;
-        }
-
-        pendingCommandCallback = onDone;
-        std::get<state_machine::Calibrating>(currentState).pendingData = data;
-        RunAlignmentStep();
-    }
-
-    void FocStateMachineCommon::CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone)
-    {
-        if (fluxLinkage.Value() <= 0.0f || !state_machine::IsStopped(currentState) || HasPendingCommand() || !HasValidCalibration())
-        {
-            tracer.Trace() << "[SM] Flux linkage rejected: needs a positive value and a calibrated motor in Idle or Ready";
-            onDone(state_machine::CommandResult::rejected);
-            return;
-        }
-
-        pendingFluxLinkage = fluxLinkage.Value();
-        pendingCommandCallback = onDone;
-
-        auto updated = calibrationData;
-        updated.fluxLinkage = pendingFluxLinkage;
-
-        nvm.SaveCalibration(updated, [this](services::NvmStatus status)
-            {
-                OnFluxLinkageSaved(status);
-            });
-    }
-
-    void FocStateMachineCommon::OnFluxLinkageSaved(services::NvmStatus status)
-    {
-        if (!HasPendingCommand())
-            return;
-
-        if (status != services::NvmStatus::Ok)
-        {
-            tracer.Trace() << "[SM] Flux linkage not persisted";
-            CompletePendingCommand(status == services::NvmStatus::Busy ? state_machine::CommandResult::rejected : state_machine::CommandResult::nvmFailed);
-            return;
-        }
-
-        calibrationData.fluxLinkage = pendingFluxLinkage;
-        ApplyElectricalCalibration(calibrationData);
-        tracer.Trace() << "[SM] Flux linkage stored";
-        CompletePendingCommand(state_machine::CommandResult::ok);
-    }
-
-    const services::CalibrationData& FocStateMachineCommon::GetCalibration() const
-    {
-        return calibrationData;
-    }
-
-    void FocStateMachineCommon::CmdReAlign(const infra::Function<void(state_machine::CommandResult)>& onDone)
-    {
-        if (!state_machine::IsStopped(currentState) || HasPendingCommand() || !HasValidCalibration())
-        {
-            onDone(state_machine::CommandResult::rejected);
-            return;
-        }
-
-        pendingCommandCallback = onDone;
-        rotorReferenceValid_ = false;
-        currentState = state_machine::Calibrating{};
-        auto& calibrating = std::get<state_machine::Calibrating>(currentState);
-        calibrating.pendingData = calibrationData;
-        calibrating.external = true;
-
-        RunAlignmentStep();
+        calibrationContext.ApplyModel(resistance, inductance, polePairs, bandwidth, fluxLinkage, GetFoc(), CurrentTunable());
     }
 }

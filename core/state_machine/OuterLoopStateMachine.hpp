@@ -23,7 +23,7 @@ namespace application
         : public FocStateMachineCommon
     {
     public:
-        virtual ~OuterLoopStateMachine() = default;
+        ~OuterLoopStateMachine() override = default;
         void ApplyOnlineEstimates() override;
         void TraceOnlineEstimates();
 
