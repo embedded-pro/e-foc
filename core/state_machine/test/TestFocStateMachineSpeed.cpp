@@ -2312,3 +2312,278 @@ TEST_F(FocStateMachineSpeedCliTest, has_pending_async_work_true_when_electrical_
     EXPECT_CALL(electricalIdentMock, IsRunning()).WillOnce(Return(true)).WillRepeatedly(Return(false));
     EXPECT_TRUE(base.HasPendingAsyncWork());
 }
+
+namespace
+{
+    // Records what the state machine pushes into the live cascade, so a test can tell whether the loops were
+    // configured before identification was allowed to excite them, and what was left behind afterwards.
+    class RecordingSpeedCascade
+        : public foc::SpeedCascade
+    {
+    public:
+        using foc::SpeedCascade::SpeedCascade;
+
+        bool Configure(const foc::MotorModelParameters& parameters) override
+        {
+            ++electricalConfigurations;
+            lastElectrical = parameters;
+            return foc::SpeedCascade::Configure(parameters);
+        }
+
+        bool ConfigureMechanics(const foc::MechanicalModelParameters& parameters) override
+        {
+            ++mechanicalConfigurations;
+            lastMechanical = parameters;
+            return foc::SpeedCascade::ConfigureMechanics(parameters);
+        }
+
+        std::size_t electricalConfigurations{ 0 };
+        std::size_t mechanicalConfigurations{ 0 };
+        foc::MotorModelParameters lastElectrical{};
+        foc::MechanicalModelParameters lastMechanical{};
+    };
+
+    using RecordingSpeedController = foc::FocController<RecordingSpeedCascade>;
+
+    // Refuses the plant it is handed while still being a real cascade, so a test can check what the state
+    // machine leaves behind when the controller rejects the pending electrical model.
+    class RefusingSpeedCascade
+        : public RecordingSpeedCascade
+    {
+    public:
+        using RecordingSpeedCascade::RecordingSpeedCascade;
+
+        bool Configure(const foc::MotorModelParameters& parameters) override
+        {
+            RecordingSpeedCascade::Configure(parameters);
+            return !refuseNextConfigure;
+        }
+
+        bool refuseNextConfigure{ false };
+    };
+
+    using RefusingSpeedController = foc::FocController<RefusingSpeedCascade>;
+
+    class FocStateMachineSpeedIdentificationTest
+        : public FocStateMachineSpeedCliTest
+    {
+    public:
+        using RecordingStateMachine = application::OuterLoopStateMachineFor<RecordingSpeedController, RecordingSpeedController>;
+
+        foc::NewtonMeter torqueConstant{ 0.1f };
+
+        using RefusingStateMachine = application::OuterLoopStateMachineFor<RefusingSpeedController, RefusingSpeedController>;
+
+        RefusingStateMachine CreateRefusingStateMachine()
+        {
+            return RefusingStateMachine{
+                application::TerminalAndTracer{ terminal, tracer },
+                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                nvmMock,
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), torqueConstant },
+                faultNotifierMock,
+                state_machine::TransitionPolicy::Cli,
+                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
+            };
+        }
+
+        RecordingStateMachine CreateRecordingStateMachine()
+        {
+            return RecordingStateMachine{
+                application::TerminalAndTracer{ terminal, tracer },
+                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                nvmMock,
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), torqueConstant },
+                faultNotifierMock,
+                state_machine::TransitionPolicy::Cli,
+                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
+            };
+        }
+
+        void GivenElectricalStepsSucceed()
+        {
+            EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+                .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
+                    {
+                        cb(std::size_t{ 4 });
+                    }));
+            EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+                .WillOnce(Invoke([](const auto&, const infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)>& cb)
+                    {
+                        cb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
+                    }));
+            EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+                .WillOnce(Invoke([](std::size_t, const auto&, const infra::Function<void(std::optional<foc::Radians>)>& cb)
+                    {
+                        cb(foc::Radians{ 0.0f });
+                    }));
+        }
+    };
+}
+
+TEST_F(FocStateMachineSpeedIdentificationTest, identification_only_starts_once_the_measured_model_and_a_provisional_plant_are_live)
+{
+    struct Observed
+    {
+        std::size_t electricalConfigurations = 0;
+        std::size_t mechanicalConfigurations = 0;
+        float resistance = 0.0f;
+        float provisionalInertia = 0.0f;
+    } observed;
+
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    GivenElectricalStepsSucceed();
+
+    auto sm = CreateRecordingStateMachine();
+    auto& cascade = sm.GetController();
+
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+        .WillOnce(Invoke([&observed, &cascade](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto& cb)
+            {
+                observed.electricalConfigurations = cascade.electricalConfigurations;
+                observed.mechanicalConfigurations = cascade.mechanicalConfigurations;
+                observed.resistance = cascade.lastElectrical.resistance.Value();
+                observed.provisionalInertia = cascade.lastMechanical.inertia.Value();
+                cb(std::nullopt, std::nullopt);
+            }));
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    EXPECT_EQ(observed.electricalConfigurations, 1u);
+    EXPECT_EQ(observed.mechanicalConfigurations, 1u);
+    EXPECT_NEAR(observed.resistance, 0.5f, 1e-6f);
+    EXPECT_GT(observed.provisionalInertia, 0.0f);
+}
+
+TEST_F(FocStateMachineSpeedIdentificationTest, identification_is_bounded_by_the_drive_current_envelope_and_a_speed_limit)
+{
+    services::MechanicalParametersIdentification::Config observed{};
+
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    GivenElectricalStepsSucceed();
+
+    auto sm = CreateRecordingStateMachine();
+
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+        .WillOnce(Invoke([&observed](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config& config, const auto& cb)
+            {
+                observed = config;
+                cb(std::nullopt, std::nullopt);
+            }));
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    EXPECT_GT(observed.maxCurrent.Value(), 10.0f);
+    EXPECT_LE(observed.maxCurrent.Value(), 12.0f);
+    EXPECT_GT(observed.maxSpeed.Value(), observed.targetSpeed.Value());
+    EXPECT_LT(observed.dwellSpeed.Value(), observed.targetSpeed.Value());
+    EXPECT_TRUE(services::IsUsableIdentificationConfig(observed));
+}
+
+TEST_F(FocStateMachineSpeedIdentificationTest, identification_never_runs_when_the_speed_loop_cannot_be_configured)
+{
+    torqueConstant = foc::NewtonMeter{ 0.0f };
+
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    GivenElectricalStepsSucceed();
+
+    auto sm = CreateRecordingStateMachine();
+
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _)).Times(0);
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _)).Times(0);
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(std::get<state_machine::Fault>(sm.CurrentState()).code, state_machine::FaultCode::calibrationFailed);
+}
+
+TEST_F(FocStateMachineSpeedIdentificationTest, an_implausible_identified_inertia_is_never_persisted)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    GivenElectricalStepsSucceed();
+
+    auto sm = CreateRecordingStateMachine();
+
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+        .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto& cb)
+            {
+                cb(foc::NewtonMeterSecondPerRadian{ 0.01f }, foc::NewtonMeterSecondSquared{ 1.0e30f });
+            }));
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _)).Times(0);
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(std::get<state_machine::Fault>(sm.CurrentState()).code, state_machine::FaultCode::calibrationFailed);
+}
+
+TEST_F(FocStateMachineSpeedIdentificationTest, a_failed_identification_restores_the_model_the_drive_had_before_it)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithSpeedGainsAndInertia();
+    GivenElectricalStepsSucceed();
+
+    auto sm = CreateRecordingStateMachine();
+    auto& cascade = sm.GetController();
+
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+        .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto& cb)
+            {
+                cb(std::nullopt, std::nullopt);
+            }));
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_NEAR(cascade.lastMechanical.inertia.Value(), 0.01f, 1e-6f);
+    EXPECT_NEAR(cascade.lastMechanical.viscousFriction.Value(), 0.005f, 1e-6f);
+    EXPECT_NEAR(cascade.lastElectrical.resistance.Value(), 0.5f, 1e-6f);
+}
+
+TEST_F(FocStateMachineSpeedIdentificationTest, an_emergency_stop_during_identification_restores_the_previous_model)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithSpeedGainsAndInertia();
+    GivenElectricalStepsSucceed();
+
+    auto sm = CreateRecordingStateMachine();
+    auto& cascade = sm.GetController();
+
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+        .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto&) {}));
+    EXPECT_CALL(mechIdentMock, IsRunning()).WillRepeatedly(Return(true));
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    EXPECT_CALL(mechIdentMock, IsRunning()).WillRepeatedly(Return(false));
+    EXPECT_EQ(sm.CmdEmergencyStop(), state_machine::CommandResult::ok);
+
+    EXPECT_NEAR(cascade.lastMechanical.inertia.Value(), 0.01f, 1e-6f);
+    EXPECT_NEAR(cascade.lastElectrical.resistance.Value(), 0.5f, 1e-6f);
+}
+
+TEST_F(FocStateMachineSpeedIdentificationTest, a_refused_electrical_model_still_restores_the_previous_one)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithSpeedGainsAndInertia();
+    GivenElectricalStepsSucceed();
+
+    auto sm = CreateRefusingStateMachine();
+    auto& cascade = sm.GetController();
+
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _)).Times(0);
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _)).Times(0);
+
+    cascade.refuseNextConfigure = true;
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_GE(cascade.electricalConfigurations, 2u);
+    EXPECT_NEAR(cascade.lastElectrical.resistance.Value(), 0.5f, 1e-6f);
+    EXPECT_NEAR(cascade.lastMechanical.inertia.Value(), 0.01f, 1e-6f);
+}

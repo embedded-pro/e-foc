@@ -167,6 +167,26 @@ jobs:
       - name: Outer loop cycle analysis summary
         if: matrix.target == 'EK-TM4C1294XL'
         run: cat cycle-analysis/outer/cycle_estimation_report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Run identification path cycle analysis
+        if: matrix.target == 'EK-TM4C1294XL'
+        uses: embedded-pro/cortex-cycle-budget@de7fc1f448138bf1ee96f03d46d8a675023b6008 # v0.2.2
+        with:
+          comment-marker: "<!-- cycle-analysis-identification-comment -->"
+          config-path: targets/sync_foc_sensored/main/cycle-analysis-identification.json
+          elf-path: build/${{ matrix.target }}/targets/sync_foc_sensored/main/${{ matrix.configuration }}/e_foc.sync_foc_sensored.main.elf
+          target: ${{ matrix.target }}
+          build-config: ${{ matrix.configuration }}
+          clock-mhz: "120"
+          cortex: "m4"
+          output-dir: cycle-analysis/identification
+          # The whole 20 kHz period, not the 75% inner-loop share: this path only runs during calibration,
+          # where nothing competes for the period except the 1 kHz outer loop.
+          fail-over-max-cycles: "6000"
+          post-comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          artifact-name: cycle-analysis-identification
+      - name: Identification path cycle analysis summary
+        if: matrix.target == 'EK-TM4C1294XL'
+        run: cat cycle-analysis/identification/cycle_estimation_report.md >> "$GITHUB_STEP_SUMMARY"
       - name: Run memory analysis
         if: matrix.target == 'EK-TM4C1294XL'
         uses: embedded-pro/cortex-memory-budget@cc5057b824ad7a5c340dfa6a3c8d22be0b89b35c
