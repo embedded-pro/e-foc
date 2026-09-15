@@ -158,11 +158,27 @@ The trajectory is given explicit limits and the run stays inside them:
 | duration | The timeout after which the run ends whether or not it has converged                           |
 
 On the first sample whose phase current exceeds the current envelope in any phase and in either
-direction, or whose measured speed exceeds the speed limit, the run stops the drive and reports absent
-values. A configuration that does not describe a usable bounded trajectory — a dwell speed that is not
-below the target speed, a non-positive envelope, a speed limit below the target, a timeout that does not
-outlast one dwell period, a forgetting factor outside (0, 1] — is refused through the completion rather
-than started, as is a request without a positive torque constant or pole-pair count.
+direction, or whose measured speed exceeds the speed limit, the run ends and reports absent values.
+
+The power stage is stopped **in the interrupt that observed the sample**, not with the rest of the
+teardown. Deferring it would leave the inverter driving an out-of-envelope current for as long as the
+dispatcher takes to run, which is the one thing the envelope exists to prevent; stopping the inverter
+touches no callback slot, so it is safe from the interrupt, whereas releasing the observer there would
+destroy the closure being executed. Releasing the observer, stopping the drive through the controller and
+delivering the completion therefore stay deferred, as they are for every other way a run ends.
+
+The envelope is evaluated on **every** sample for as long as the drive is live — including samples that
+arrive after a converged one has queued its completion but before the dispatcher has run. A run is only
+over once the drive has been released, so a sample that leaves the envelope in that window still
+invalidates the estimate rather than letting a converged value through.
+
+A configuration that does not describe a usable bounded trajectory — a dwell speed that is not below the
+target speed, a non-positive envelope, a speed limit that is not finite and positive or that sits below
+the target, a timeout that does not outlast one dwell period, a forgetting factor outside (0, 1] — is
+refused through the completion rather than started, as is a request without a positive torque constant or
+pole-pair count. The speed limit in particular must be finite: an infinite bound passes every comparison
+against the target speed while making the run-time check unreachable, which is a bounded trajectory in
+name only.
 
 ### Recursive Least Squares Estimator
 
@@ -260,7 +276,7 @@ stateDiagram-v2
     Idle --> Running : EstimateFrictionAndInertia called
     Running --> Finishing : TimerSingleShot fires
     Running --> Finishing : converged observation
-    Running --> Finishing : sample outside the\ncurrent or speed envelope
+    Running --> Finishing : sample outside the\ncurrent or speed envelope\n(power stage stopped at once)
     Running --> Idle : Abort (completion dropped)
     Finishing --> Idle : onDone(J, B) when converged and plausible,\notherwise onDone(nullopt)
 ```

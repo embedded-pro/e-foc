@@ -8,6 +8,7 @@
 #include "infra/util/WithSharedAccess.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
+#include <limits>
 #include <numbers>
 
 namespace
@@ -131,6 +132,18 @@ namespace
             AdvanceProfile();
             const auto torque = trueCoulomb + trueInertia * lastAcceleration + trueFriction * lastSpeed;
             observableMock.Publish(CurrentsProducing(torque, position));
+        }
+
+        void ExpectPowerStageStoppedImmediately()
+        {
+            EXPECT_CALL(driverMock, Stop());
+        }
+
+        // Nothing else is scheduled during a run driven sample by sample, so a non-idle dispatcher means
+        // the terminal outcome has queued its finish.
+        bool AFinishIsQueued() const
+        {
+            return !IsIdle();
         }
 
         void PublishCurrents(float a = 1.0f, float b = -0.5f, float c = -0.5f)
@@ -363,7 +376,8 @@ TEST_F(MechanicalParametersIdentificationTest, a_run_that_has_not_converged_keep
             {
                 const std::size_t index = (callIndex == 0) ? 0u : (callIndex + 1) / 2;
                 ++callIndex;
-                const float pos = static_cast<float>(index) * static_cast<float>(index) * 1e-5f;
+                // Gentle enough that the ramp stays inside the run's default speed limit for the whole loop.
+                const float pos = static_cast<float>(index) * static_cast<float>(index) * 1e-7f;
                 return foc::Radians{ pos };
             }));
 
@@ -445,6 +459,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_sample_above_the_current_envelo
     GivenEncoderFollowsTheProfile();
     ExpectRunStarted();
     EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
+    ExpectPowerStageStoppedImmediately();
     ExpectDriveReleased();
 
     identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config,
@@ -479,6 +494,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_rotor_faster_than_the_speed_lim
             }));
     ExpectRunStarted();
     EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
+    ExpectPowerStageStoppedImmediately();
     ExpectDriveReleased();
 
     identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config,
@@ -530,4 +546,96 @@ TEST_F(MechanicalParametersIdentificationTest, a_rotor_held_at_a_constant_speed_
 
     ExpectDriveReleased();
     identification->Abort();
+}
+
+TEST_F(MechanicalParametersIdentificationTest, a_config_without_a_finite_speed_limit_is_rejected_immediately)
+{
+    auto config = DefaultConfig();
+    config.maxSpeed = foc::RadiansPerSecond{ std::numeric_limits<float>::infinity() };
+
+    bool fired = false;
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config,
+        [&fired](auto friction, auto inertia)
+        {
+            fired = true;
+            EXPECT_FALSE(friction.has_value());
+            EXPECT_FALSE(inertia.has_value());
+        });
+
+    EXPECT_TRUE(fired);
+    EXPECT_FALSE(identification->IsRunning());
+}
+
+TEST_F(MechanicalParametersIdentificationTest, an_envelope_violation_stops_the_power_stage_before_the_dispatcher_runs)
+{
+    auto config = DefaultConfig();
+    config.timeout = std::chrono::seconds{ 60 };
+    config.maxCurrent = foc::Ampere{ 2.0f };
+
+    bool powerStageStopped = false;
+
+    GivenEncoderFollowsTheProfile();
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
+    EXPECT_CALL(driverMock, Stop())
+        .WillOnce(Invoke([&powerStageStopped]()
+            {
+                powerStageStopped = true;
+            }));
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config, [](auto, auto) {});
+
+    AdvanceProfile();
+    PublishCurrents(5.0f, -2.5f, -2.5f);
+
+    EXPECT_TRUE(powerStageStopped);
+    EXPECT_TRUE(observableMock.HasObserver());
+
+    ExpectDriveReleased();
+    ExecuteAllActions();
+
+    EXPECT_FALSE(observableMock.HasObserver());
+}
+
+TEST_F(MechanicalParametersIdentificationTest, a_sample_outside_the_envelope_invalidates_an_estimate_that_has_already_converged)
+{
+    auto config = DefaultConfig();
+    config.timeout = std::chrono::seconds{ 60 };
+    config.maxCurrent = foc::Ampere{ 4.0f };
+
+    struct Outcome
+    {
+        bool fired = false;
+        std::optional<foc::NewtonMeterSecondPerRadian> friction;
+        std::optional<foc::NewtonMeterSecondSquared> inertia;
+    } outcome;
+
+    GivenEncoderFollowsTheProfile();
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
+    EXPECT_CALL(driverMock, Stop());
+    ExpectDriveReleased();
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config,
+        [&outcome](auto b, auto j)
+        {
+            outcome.fired = true;
+            outcome.friction = b;
+            outcome.inertia = j;
+        });
+
+    for (std::size_t i = 0; i != 4000 && !AFinishIsQueued(); ++i)
+        PublishConsistentSample();
+
+    ASSERT_TRUE(AFinishIsQueued());
+    EXPECT_FALSE(outcome.fired);
+
+    AdvanceProfile();
+    PublishCurrents(9.0f, -4.5f, -4.5f);
+    ExecuteAllActions();
+
+    ASSERT_TRUE(outcome.fired);
+    EXPECT_FALSE(outcome.inertia.has_value());
+    EXPECT_FALSE(outcome.friction.has_value());
 }

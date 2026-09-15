@@ -2345,6 +2345,25 @@ namespace
 
     using RecordingSpeedController = foc::FocController<RecordingSpeedCascade>;
 
+    // Refuses the plant it is handed while still being a real cascade, so a test can check what the state
+    // machine leaves behind when the controller rejects the pending electrical model.
+    class RefusingSpeedCascade
+        : public RecordingSpeedCascade
+    {
+    public:
+        using RecordingSpeedCascade::RecordingSpeedCascade;
+
+        bool Configure(const foc::MotorModelParameters& parameters) override
+        {
+            RecordingSpeedCascade::Configure(parameters);
+            return !refuseNextConfigure;
+        }
+
+        bool refuseNextConfigure{ false };
+    };
+
+    using RefusingSpeedController = foc::FocController<RefusingSpeedCascade>;
+
     class FocStateMachineSpeedIdentificationTest
         : public FocStateMachineSpeedCliTest
     {
@@ -2352,6 +2371,21 @@ namespace
         using RecordingStateMachine = application::OuterLoopStateMachineFor<RecordingSpeedController, RecordingSpeedController>;
 
         foc::NewtonMeter torqueConstant{ 0.1f };
+
+        using RefusingStateMachine = application::OuterLoopStateMachineFor<RefusingSpeedController, RefusingSpeedController>;
+
+        RefusingStateMachine CreateRefusingStateMachine()
+        {
+            return RefusingStateMachine{
+                application::TerminalAndTracer{ terminal, tracer },
+                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                nvmMock,
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), torqueConstant },
+                faultNotifierMock,
+                state_machine::TransitionPolicy::Cli,
+                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
+            };
+        }
 
         RecordingStateMachine CreateRecordingStateMachine()
         {
@@ -2531,4 +2565,25 @@ TEST_F(FocStateMachineSpeedIdentificationTest, an_emergency_stop_during_identifi
 
     EXPECT_NEAR(cascade.lastMechanical.inertia.Value(), 0.01f, 1e-6f);
     EXPECT_NEAR(cascade.lastElectrical.resistance.Value(), 0.5f, 1e-6f);
+}
+
+TEST_F(FocStateMachineSpeedIdentificationTest, a_refused_electrical_model_still_restores_the_previous_one)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithSpeedGainsAndInertia();
+    GivenElectricalStepsSucceed();
+
+    auto sm = CreateRefusingStateMachine();
+    auto& cascade = sm.GetController();
+
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _)).Times(0);
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _)).Times(0);
+
+    cascade.refuseNextConfigure = true;
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_GE(cascade.electricalConfigurations, 2u);
+    EXPECT_NEAR(cascade.lastElectrical.resistance.Value(), 0.5f, 1e-6f);
+    EXPECT_NEAR(cascade.lastMechanical.inertia.Value(), 0.01f, 1e-6f);
 }

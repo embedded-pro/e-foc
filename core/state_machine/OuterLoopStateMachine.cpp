@@ -134,10 +134,13 @@ namespace application
         if (!foc::IsFinitePositive(pending.rPhase) || !foc::IsFiniteValue(pending.lD) || pending.polePairs == 0 || !foc::IsFinitePositive(mechTorqueConstant.Value()))
             return false;
 
+        // Marked before the first call, not after: applying an electrical model sets the current-loop
+        // tunings whether or not the plant itself was accepted, so from here on there is something to
+        // restore even when this returns false.
+        MarkProvisionalControlApplied();
+
         if (!ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, pending.currentLoopBandwidth, EffectiveFluxLinkage(pending)))
             return false;
-
-        MarkProvisionalControlApplied();
 
         return ApplyMechanics(foc::NewtonMeterSecondSquared{ provisionalInertia }, foc::NewtonMeterSecondPerRadian{ provisionalFriction }, identificationBandwidthRadPerSec);
     }

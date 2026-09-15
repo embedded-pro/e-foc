@@ -18,6 +18,7 @@ namespace services
         : controller(controller)
         , drive(drive)
         , observable(observable)
+        , inverter(driver)
         , encoder(encoder)
         , samplingPeriod(1.0f / static_cast<float>(driver.BaseFrequency().Value()))
         , supportedCurrent(driver.MaxCurrentSupported())
@@ -138,7 +139,7 @@ namespace services
     OPTIMIZE_FOR_SPEED
     void MechanicalParametersIdentificationImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant)
     {
-        if (outcome != Outcome::pending || !rls.has_value())
+        if (!rls.has_value())
             return;
 
         auto mechanicalPos = encoder.Read().Value();
@@ -148,12 +149,26 @@ namespace services
         previousPosition = mechanicalPos;
         previousSpeed = speed;
 
+        // Checked on every sample the drive is still live, a converged one included: the run is only over
+        // once the dispatcher has released the drive, so a sample that leaves the envelope in between must
+        // still invalidate the estimate. The power stage is stopped here rather than with the rest of the
+        // teardown, because leaving it driving an out-of-envelope current until the dispatcher runs is what
+        // the envelope exists to prevent. Releasing the observer here would destroy the closure being
+        // executed, so that, and the completion, stay deferred.
         if (ExceedsInjectionLimit(currentPhases, currentEnvelope) || std::abs(speed) > currentConfig.maxSpeed.Value())
         {
-            outcome = Outcome::outsideEnvelope;
-            ScheduleFinish();
+            if (outcome != Outcome::outsideEnvelope)
+            {
+                outcome = Outcome::outsideEnvelope;
+                inverter.Stop();
+                ScheduleFinish();
+            }
+
             return;
         }
+
+        if (outcome != Outcome::pending)
+            return;
 
         if (!IsMechanicallyExciting(acceleration, speed))
             return;

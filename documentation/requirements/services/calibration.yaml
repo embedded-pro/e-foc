@@ -79,10 +79,13 @@
   shall: >
     The mechanical identification trajectory shall alternate between two commanded speed levels
     so that every transition excites the acceleration term of the regressor, and shall be given
-    an explicit current envelope, speed limit and duration. The run shall end without an estimate
-    on the first sample whose phase current exceeds the envelope or whose measured speed exceeds
-    the limit, and a configuration that does not define a usable bounded trajectory shall be
-    rejected through the completion rather than started.
+    an explicit current envelope, a finite speed limit and a duration. The run shall end without an
+    estimate on the first sample whose phase current exceeds the envelope or whose measured speed
+    exceeds the limit, and shall stop the power stage from that same sample rather than leaving it
+    driving until deferred cleanup runs. It shall keep evaluating the envelope on every sample until
+    the drive is released, so that a violation arriving after an estimate has converged still
+    invalidates it. A configuration that does not define a usable bounded trajectory — an infinite
+    speed limit included — shall be rejected through the completion rather than started.
 
 - id: REQ-CAL-011
   title: One-shot and online mechanical estimates share one acceptance policy

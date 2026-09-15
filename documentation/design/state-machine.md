@@ -137,7 +137,7 @@ sequenceDiagram
     note over SM,MI: Speed and position modes only
     SM->>FOC: Configure(measured R, L, pole pairs, flux)
     SM->>FOC: ConfigureMechanics(provisional J, B)
-    note over SM,FOC: Failure here fails the step;\nidentification is never started
+    note over SM,FOC: Failure here fails the step, identification never starts
     SM->>MI: EstimateFrictionAndInertia(bounded excitation)
     MI-->>SM: result (B, J or failure)
     SM->>NVM: SaveCalibration(data)

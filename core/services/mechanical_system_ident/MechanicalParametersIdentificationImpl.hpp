@@ -42,6 +42,7 @@ namespace services
         foc::SpeedCommandable& controller;
         foc::Controllable& drive;
         foc::PhaseCurrentsObservable& observable;
+        drivers::ThreePhaseInverter& inverter;
         drivers::Encoder& encoder;
 
         float samplingPeriod;

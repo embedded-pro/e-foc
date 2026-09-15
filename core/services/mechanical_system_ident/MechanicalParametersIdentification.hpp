@@ -49,6 +49,7 @@ namespace services
                foc::IsFinitePositive(config.dwellSpeed.Value()) &&
                config.dwellSpeed.Value() < config.targetSpeed.Value() &&
                foc::IsFinitePositive(config.maxCurrent.Value()) &&
+               foc::IsFinitePositive(config.maxSpeed.Value()) &&
                config.maxSpeed.Value() >= config.targetSpeed.Value() &&
                foc::IsWithinInclusive(config.forgettingFactor, 0.0f, 1.0f) && config.forgettingFactor > 0.0f &&
                config.dwellTime > infra::Duration::zero() &&
