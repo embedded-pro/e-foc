@@ -289,9 +289,13 @@ Only one estimation may be in progress at a time. A call to `EstimateFrictionAnd
 
 ### Provided
 
-| Interface                                                               | Purpose                                                                                                                                                                       | Contract                                                                                                                                                                                                                                                                              |
-|-------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `EstimateFrictionAndInertia(torqueConstant, polePairs, config, onDone)` | Runs the RLS estimator under active speed control along a bounded two-level trajectory; delivers `(optional<NewtonMeterSecondPerRadian>, optional<NewtonMeterSecondSquared>)` | Rejected (immediate failure callback) if already Running, if the configuration does not describe a usable bounded trajectory, or if the torque constant or pole-pair count is not positive; fires exactly once; delivers absent values unless the estimate is converged and plausible |
+| Interface                                                               | Purpose                                                                                | Contract                                                                                                                                                  |
+|-------------------------------------------------------------------------|----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `EstimateFrictionAndInertia(torqueConstant, polePairs, config, onDone)` | Runs the RLS estimator under active speed control along a bounded two-level trajectory | Delivers `(optional<NewtonMeterSecondPerRadian>, optional<NewtonMeterSecondSquared>)` exactly once; absent unless the estimate is converged and plausible |
+
+A request is rejected through its own completion, with both values absent, when a run is already in
+flight, when the configuration does not describe a usable bounded trajectory, or when the torque constant
+or pole-pair count is not positive.
 
 ### Required
 
@@ -330,7 +334,12 @@ direction on every sample, so $P$ grows as $\lambda^{-n}$. At $\lambda = 0.995$ 
 roughly $5\times10^{21}$ after ten seconds of standstill, and the first sample of real excitation then
 produces an enormous coefficient jump.
 
-The estimator therefore applies an explicit gate: an observation updates the RLS only when $|\dot{\omega}|$ **and** $|\omega|$ both exceed a minimum. Requiring only one of the two admits a rotor held at a constant speed, which excites neither the inertia direction (the acceleration column is zero) nor the friction direction separately from the intercept (the two columns are collinear) while still inflating $P$ on every sample. Unexcited observations are skipped entirely, so the covariance is frozen rather than inflated, and the previous coefficients are reported unchanged.
+The estimator therefore applies an explicit gate: an observation updates the RLS only when $|\dot{\omega}|$
+**and** $|\omega|$ both exceed a minimum. Requiring only one of the two admits a rotor held at a constant
+speed, which excites neither the inertia direction (the acceleration column is zero) nor the friction
+direction separately from the intercept (the two columns are collinear) while still inflating $P$ on every
+sample. Unexcited observations are skipped entirely, so the covariance is frozen rather than inflated, and
+the previous coefficients are reported unchanged.
 
 ### Plausibility Band and Update Rate
 

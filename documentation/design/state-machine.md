@@ -148,11 +148,11 @@ sequenceDiagram
 
 **Steps and data produced:**
 
-| Step                                           | Service             | Data stored                                        |
-|------------------------------------------------|---------------------|----------------------------------------------------|
-| 1. Pole pairs                                  | Electrical Ident    | `polePairs`                                        |
-| 2. Resistance and inductance                   | Electrical Ident    | `rPhase`, `lD`, `lQ`                               |
-| 3. Alignment                                   | Motor Alignment     | `encoderZeroOffset`                                |
+| Step                                           | Service             | Data stored                                               |
+|------------------------------------------------|---------------------|-----------------------------------------------------------|
+| 1. Pole pairs                                  | Electrical Ident    | `polePairs`                                               |
+| 2. Resistance and inductance                   | Electrical Ident    | `rPhase`, `lD`, `lQ`                                      |
+| 3. Alignment                                   | Motor Alignment     | `encoderZeroOffset`                                       |
 | 4. Apply measured model + provisional plant    | FOC controller      | Nothing persisted; makes the loops able to move the rotor |
 | 5. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth`        |
 | 6. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                        |
