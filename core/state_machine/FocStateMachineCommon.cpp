@@ -19,8 +19,14 @@ namespace application
     {
         faultController.Register(
             faultNotifier,
-            [this](state_machine::FaultCode) { GetFocControl().Stop(); },
-            [this](state_machine::FaultCode code) { EnterFault(code); });
+            [this](state_machine::FaultCode)
+            {
+                GetFocControl().Stop();
+            },
+            [this](state_machine::FaultCode code)
+            {
+                EnterFault(code);
+            });
     }
 
     void FocStateMachineCommon::ReleaseExternalResources()
@@ -172,8 +178,14 @@ namespace application
 
         calibrationOrchestrator.Start(
             cal.pendingData,
-            [this](foc::Radians angle) { OnAlignmentSucceeded(angle); },
-            [this] { FailCalibrationStep(); });
+            [this](foc::Radians angle)
+            {
+                OnAlignmentSucceeded(angle);
+            },
+            [this]
+            {
+                FailCalibrationStep();
+            });
     }
 
     void FocStateMachineCommon::RegisterReadyHandler(const infra::Function<void()>& onReady)
@@ -264,8 +276,14 @@ namespace application
 
         calibrationOrchestrator.StartAlignmentOnly(
             cal.pendingData,
-            [this](foc::Radians angle) { OnAlignmentSucceeded(angle); },
-            [this] { FailCalibrationStep(); });
+            [this](foc::Radians angle)
+            {
+                OnAlignmentSucceeded(angle);
+            },
+            [this]
+            {
+                FailCalibrationStep();
+            });
     }
 
     void FocStateMachineCommon::OnAlignmentSucceeded(foc::Radians angle)
