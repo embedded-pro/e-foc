@@ -6,9 +6,10 @@
 #include "core/services/alignment/MotorAlignment.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
-#include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
+#include "core/state_machine/CalibrationContext.hpp"
 #include "core/state_machine/CalibrationOrchestrator.hpp"
+#include "core/state_machine/FaultController.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include "core/state_machine/TransitionPolicies.hpp"
 #include "infra/util/AutoResetFunction.hpp"
@@ -118,35 +119,21 @@ namespace application
         state_machine::State& GetCurrentState();
         const state_machine::State& GetCurrentState() const;
 
-        static constexpr float nyquistFactor = 15.0f;
-
-        void ApplyElectricalCalibration(const services::CalibrationData& data);
-        void ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage);
         const services::CalibrationData& GetCalibration() const;
         foc::Weber EffectiveFluxLinkage(const services::CalibrationData& data) const;
-        foc::CurrentLoopTunings CurrentTuningsFor(float bandwidth) const;
-        float DefaultCurrentLoopBandwidth() const;
+        void ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage);
 
     private:
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
-        state_machine::FaultNotifier* registeredFaultNotifier{ nullptr };
-        drivers::ThreePhaseInverter& inverter;
-        foc::Volts vdc;
         services::NonVolatileMemory& nvm;
-        foc::Weber configuredFluxLinkage;
+        CalibrationContext calibrationContext;
+        FaultController faultController;
         CalibrationOrchestrator calibrationOrchestrator;
 
         state_machine::State currentState{ state_machine::Idle{} };
         state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::none };
-        services::CalibrationData calibrationData{};
-        float pendingFluxLinkage{ 0.0f };
         bool bootCheckInFlight{ false };
-        bool rotorReferenceValid_{ false };
-
-        static constexpr uint8_t maxConsecutiveFaultClears{ 3 };
-        bool faultLatched{ false };
-        uint8_t consecutiveFaultClears{ 0 };
 
         void OnAlignmentSucceeded(foc::Radians angle);
         void OnCalibrationInvalidated(services::NvmStatus status);
