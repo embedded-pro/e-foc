@@ -64,9 +64,8 @@ namespace application
         calibrating.pendingData.stage = HasValidModeSpecificCalibration(calibrating.pendingData)
                                             ? services::CalibrationStage::complete
                                             : services::CalibrationStage::none;
-        auto pendingData = calibrating.pendingData;
 
-        nvm.SaveCalibration(pendingData,
+        nvm.SaveCalibration(calibrating.pendingData,
             [this](services::NvmStatus status)
             {
                 OnCalibrationSaved(status);

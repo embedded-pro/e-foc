@@ -127,36 +127,12 @@ namespace
 
         return std::nullopt;
     }
-}
 
-namespace state_machine
-{
-    void RegisterControlModeCliCommands(services::TerminalWithStorage& terminal, ControlModeStateMachine& sm, services::Tracer& tracer)
+    void RegisterAlgorithmCliCommands(
+        services::TerminalWithStorage& terminal,
+        state_machine::ControlModeStateMachine& sm,
+        services::Tracer& tracer)
     {
-        application::RegisterLifecycleCliCommands(terminal,
-            [&sm]() -> application::FocStateMachineCommon&
-            {
-                return sm.ActiveCommon();
-            });
-
-        terminal.AddCommand({ { "apply_estimates", "ae", "Apply online estimates to PID gains" },
-            [&sm](const infra::BoundedConstString&)
-            {
-                sm.ActiveStateMachine().ApplyOnlineEstimates();
-            } });
-
-        terminal.AddCommand({ { "active_mode", "am", "Print the active control mode" },
-            [&sm, &tracer](const infra::BoundedConstString&)
-            {
-                const auto activeMode = sm.Active();
-                if (activeMode == ControlMode::speed)
-                    tracer.Trace() << "Active mode: speed";
-                else if (activeMode == ControlMode::position)
-                    tracer.Trace() << "Active mode: position";
-                else
-                    tracer.Trace() << "Active mode: torque";
-            } });
-
         terminal.AddCommand({ { "select_current_algorithm", "sca", "Select current loop algorithm [pid|decoupled|deadbeat|sliding]. Ex: sca deadbeat" },
             [&sm, &tracer](const infra::BoundedConstString& param)
             {
@@ -190,20 +166,16 @@ namespace state_machine
         terminal.AddCommand({ { "active_algorithms", "aa", "Print the active loop algorithms" },
             [&sm, &tracer](const infra::BoundedConstString&)
             {
-                tracer.Trace() << "Current loop: " << AlgorithmPersistence::CurrentAlgorithmName(sm.ActiveCurrentAlgorithm());
-                tracer.Trace() << "Speed loop: " << AlgorithmPersistence::SpeedAlgorithmName(sm.ActiveSpeedAlgorithm());
-                tracer.Trace() << "Position loop: " << AlgorithmPersistence::PositionAlgorithmName(sm.ActivePositionAlgorithm());
+                tracer.Trace() << "Current loop: " << state_machine::AlgorithmPersistence::CurrentAlgorithmName(sm.ActiveCurrentAlgorithm());
+                tracer.Trace() << "Speed loop: " << state_machine::AlgorithmPersistence::SpeedAlgorithmName(sm.ActiveSpeedAlgorithm());
+                tracer.Trace() << "Position loop: " << state_machine::AlgorithmPersistence::PositionAlgorithmName(sm.ActivePositionAlgorithm());
             } });
+    }
 
-        terminal.AddCommand({ { "estimate_status", "es", "Print current online estimates" },
-            [&sm, &tracer](const infra::BoundedConstString&)
-            {
-                if (auto* outerLoop = sm.ActiveOuterLoop())
-                    outerLoop->TraceOnlineEstimates();
-                else
-                    tracer.Trace() << "Rejected: online estimates are not available in torque mode";
-            } });
-
+    void RegisterSetpointCliCommands(
+        services::TerminalWithStorage& terminal,
+        state_machine::ControlModeStateMachine& sm)
+    {
         terminal.AddCommand({ { "set_flux_linkage", "sfl", "Set and persist rotor flux linkage in Wb. set_flux_linkage <psi>. Ex: sfl 0.007" },
             [&sm, &terminal](const infra::BoundedConstString& params)
             {
@@ -213,7 +185,8 @@ namespace state_machine
                     terminal.ProcessResult(*error);
                     return;
                 }
-                sm.SetFluxLinkage(foc::Weber{ value }, [](CommandResult) {});
+                sm.SetFluxLinkage(foc::Weber{ value }, [](state_machine::CommandResult) {});
+                terminal.ProcessResult(CliResult{});
             } });
 
         terminal.AddCommand({ { "set_torque", "st", "Set q-axis current in A, torque mode only. set_torque <iq>. Ex: st 2.5" },
@@ -225,12 +198,13 @@ namespace state_machine
                     terminal.ProcessResult(*error);
                     return;
                 }
-                if (auto rejection = RejectSetpoint(ControlMode::torque, sm); rejection.has_value())
+                if (auto rejection = RejectSetpoint(state_machine::ControlMode::torque, sm); rejection.has_value())
                 {
                     terminal.ProcessResult(*rejection);
                     return;
                 }
                 sm.TrySetTorque(foc::IdAndIqPoint{ foc::Ampere{ 0.0f }, foc::Ampere{ value } });
+                terminal.ProcessResult(CliResult{});
             } });
 
         terminal.AddCommand({ { "set_speed", "ss", "Set speed in rad/s, speed mode only. set_speed <speed>. Ex: ss 20.0" },
@@ -242,12 +216,13 @@ namespace state_machine
                     terminal.ProcessResult(*error);
                     return;
                 }
-                if (auto rejection = RejectSetpoint(ControlMode::speed, sm); rejection.has_value())
+                if (auto rejection = RejectSetpoint(state_machine::ControlMode::speed, sm); rejection.has_value())
                 {
                     terminal.ProcessResult(*rejection);
                     return;
                 }
                 sm.TrySetSpeed(foc::RadiansPerSecond{ value });
+                terminal.ProcessResult(CliResult{});
             } });
 
         terminal.AddCommand({ { "set_position", "sp", "Set mechanical position in rad, position mode only. set_position <position>. Ex: sp 3.14" },
@@ -259,14 +234,20 @@ namespace state_machine
                     terminal.ProcessResult(*error);
                     return;
                 }
-                if (auto rejection = RejectSetpoint(ControlMode::position, sm); rejection.has_value())
+                if (auto rejection = RejectSetpoint(state_machine::ControlMode::position, sm); rejection.has_value())
                 {
                     terminal.ProcessResult(*rejection);
                     return;
                 }
                 sm.TrySetPosition(foc::Radians{ value });
+                terminal.ProcessResult(CliResult{});
             } });
+    }
 
+    void RegisterBandwidthCliCommands(
+        services::TerminalWithStorage& terminal,
+        state_machine::ControlModeStateMachine& sm)
+    {
         terminal.AddCommand({ { "set_current_bandwidth", "scbw", "Set current loop bandwidth in rad/s. set_current_bandwidth <bandwidth>. Ex: scbw 6283.2" },
             [&sm, &terminal](const infra::BoundedConstString& params)
             {
@@ -300,15 +281,58 @@ namespace state_machine
                     terminal.ProcessResult(*error);
                     return;
                 }
-                if (sm.Active() != ControlMode::position)
+                if (sm.Active() != state_machine::ControlMode::position)
                 {
                     terminal.ProcessResult(CliResult{ CliStatus::error, wrongModeMessage });
                     return;
                 }
-                if (const auto result = sm.TrySetPositionBandwidth(value); result == TuningResult::outOfRange)
+                if (const auto result = sm.TrySetPositionBandwidth(value); result == state_machine::TuningResult::outOfRange)
                     terminal.ProcessResult(CliResult{ CliStatus::error, "rejected: no controller for this bandwidth." });
                 else
                     terminal.ProcessResult(ToCliResult(result));
             } });
+    }
+}
+
+namespace state_machine
+{
+    void RegisterControlModeCliCommands(services::TerminalWithStorage& terminal, ControlModeStateMachine& sm, services::Tracer& tracer)
+    {
+        application::RegisterLifecycleCliCommands(terminal,
+            [&sm]() -> application::FocStateMachineCommon&
+            {
+                return sm.ActiveCommon();
+            });
+
+        terminal.AddCommand({ { "apply_estimates", "ae", "Apply online estimates to PID gains" },
+            [&sm](const infra::BoundedConstString&)
+            {
+                sm.ActiveStateMachine().ApplyOnlineEstimates();
+            } });
+
+        terminal.AddCommand({ { "active_mode", "am", "Print the active control mode" },
+            [&sm, &tracer](const infra::BoundedConstString&)
+            {
+                const auto activeMode = sm.Active();
+                if (activeMode == ControlMode::speed)
+                    tracer.Trace() << "Active mode: speed";
+                else if (activeMode == ControlMode::position)
+                    tracer.Trace() << "Active mode: position";
+                else
+                    tracer.Trace() << "Active mode: torque";
+            } });
+
+        terminal.AddCommand({ { "estimate_status", "es", "Print current online estimates" },
+            [&sm, &tracer](const infra::BoundedConstString&)
+            {
+                if (auto* outerLoop = sm.ActiveOuterLoop())
+                    outerLoop->TraceOnlineEstimates();
+                else
+                    tracer.Trace() << "Rejected: online estimates are not available in torque mode";
+            } });
+
+        RegisterAlgorithmCliCommands(terminal, sm, tracer);
+        RegisterSetpointCliCommands(terminal, sm);
+        RegisterBandwidthCliCommands(terminal, sm);
     }
 }

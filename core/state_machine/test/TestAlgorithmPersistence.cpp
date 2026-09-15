@@ -11,7 +11,7 @@ namespace
     {
     public:
         StrictMock<services::NonVolatileMemoryMock> nvm;
-        infra::StreamWriterMock streamWriter;
+        StrictMock<infra::StreamWriterMock> streamWriter;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriter };
         services::TracerToStream tracer{ stream };
         services::ConfigData configData{};

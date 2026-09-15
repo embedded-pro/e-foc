@@ -11,7 +11,7 @@ namespace
     public:
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdent;
         StrictMock<services::MotorAlignmentMock> motorAlignment;
-        infra::StreamWriterMock streamWriter;
+        StrictMock<infra::StreamWriterMock> streamWriter;
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriter };
         services::TracerToStream tracer{ stream };
         application::CalibrationOrchestrator orchestrator{ electricalIdent, motorAlignment, tracer };
@@ -40,6 +40,7 @@ namespace
         {
             orchestrator.Start(
                 pendingData,
+                [](state_machine::CalibrationStep) {},
                 [this](foc::Radians angle)
                 {
                     alignedCalled = true;
@@ -56,6 +57,7 @@ namespace
             pendingData.polePairs = 4;
             orchestrator.StartAlignmentOnly(
                 pendingData,
+                [](state_machine::CalibrationStep) {},
                 [this](foc::Radians angle)
                 {
                     alignedCalled = true;
