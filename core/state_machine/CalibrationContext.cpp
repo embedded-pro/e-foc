@@ -102,10 +102,10 @@ namespace application
         std::size_t polePairs,
         float bandwidth,
         foc::Weber fluxLinkage,
-        foc::FocBase& foc,
+        foc::FocBase& controller,
         foc::CurrentLoopTunable& tunable)
     {
-        foc.Configure(foc::MotorModelParameters{
+        controller.Configure(foc::MotorModelParameters{
             resistance,
             inductance,
             fluxLinkage,
