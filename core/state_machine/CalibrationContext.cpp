@@ -84,7 +84,7 @@ namespace application
         calibrationData.fluxLinkage = pendingFluxLinkage;
     }
 
-    void CalibrationContext::Apply(foc::FocBase& foc, foc::CurrentLoopTunable& tunable)
+    void CalibrationContext::Apply(foc::FocBase& controller, foc::CurrentLoopTunable& tunable)
     {
         ApplyModel(
             foc::Ohm{ calibrationData.rPhase },
@@ -92,7 +92,7 @@ namespace application
             calibrationData.polePairs,
             calibrationData.currentLoopBandwidth,
             EffectiveFluxLinkage(),
-            foc,
+            controller,
             tunable);
     }
 
