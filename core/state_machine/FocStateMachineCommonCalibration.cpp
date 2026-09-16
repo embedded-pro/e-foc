@@ -1,17 +1,5 @@
-#include "core/foc/math/ParameterValidation.hpp"
 #include "core/state_machine/FocStateMachineCommon.hpp"
 #include <bit>
-
-namespace
-{
-    bool HasFiniteElectricalCalibration(const services::CalibrationData& data)
-    {
-        return foc::IsFinitePositive(data.rPhase) &&
-               foc::IsFiniteValue(data.lD) &&
-               foc::IsFiniteValue(data.fluxLinkage) &&
-               foc::IsFiniteValue(data.currentLoopBandwidth);
-    }
-}
 
 namespace application
 {
@@ -120,7 +108,7 @@ namespace application
             return;
         }
 
-        if (!HasFiniteElectricalCalibration(data))
+        if (!CalibrationContext::HasFiniteElectricalParameters(data))
         {
             tracer.Trace() << "[SM] External calibration rejected: implausible electrical data";
             onDone(state_machine::CommandResult::rejected);

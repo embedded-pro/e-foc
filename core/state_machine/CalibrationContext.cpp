@@ -2,17 +2,6 @@
 #include "core/foc/math/ParameterValidation.hpp"
 #include <numbers>
 
-namespace
-{
-    bool HasFiniteElectricalCalibration(const services::CalibrationData& data)
-    {
-        return foc::IsFinitePositive(data.rPhase) &&
-               foc::IsFiniteValue(data.lD) &&
-               foc::IsFiniteValue(data.fluxLinkage) &&
-               foc::IsFiniteValue(data.currentLoopBandwidth);
-    }
-}
-
 namespace application
 {
     CalibrationContext::CalibrationContext(
@@ -45,11 +34,19 @@ namespace application
         rotorReferenceValid_ = false;
     }
 
+    bool CalibrationContext::HasFiniteElectricalParameters(const services::CalibrationData& data)
+    {
+        return foc::IsFinitePositive(data.rPhase) &&
+               foc::IsFiniteValue(data.lD) &&
+               foc::IsFiniteValue(data.fluxLinkage) &&
+               foc::IsFiniteValue(data.currentLoopBandwidth);
+    }
+
     bool CalibrationContext::IsComplete(bool modeSpecificValid) const
     {
         return calibrationData.stage == services::CalibrationStage::complete &&
                calibrationData.polePairs != 0 &&
-               HasFiniteElectricalCalibration(calibrationData) &&
+               HasFiniteElectricalParameters(calibrationData) &&
                modeSpecificValid;
     }
 

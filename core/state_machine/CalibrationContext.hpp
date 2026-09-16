@@ -23,6 +23,8 @@ namespace application
         bool IsComplete(bool modeSpecificValid) const;
         bool HasPartial() const;
 
+        static bool HasFiniteElectricalParameters(const services::CalibrationData& data);
+
         bool IsRotorReferenceValid() const;
         void SetRotorReferenceValid(bool valid);
 
