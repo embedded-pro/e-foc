@@ -182,8 +182,14 @@ namespace application
             {
                 std::get<state_machine::Calibrating>(currentState).step = step;
             },
-            [this](foc::Radians angle) { OnAlignmentSucceeded(angle); },
-            [this] { FailCalibrationStep(); });
+            [this](foc::Radians angle)
+            {
+                OnAlignmentSucceeded(angle);
+            },
+            [this]
+            {
+                FailCalibrationStep();
+            });
     }
 
     void FocStateMachineCommon::RegisterReadyHandler(const infra::Function<void()>& onReady)
@@ -278,8 +284,14 @@ namespace application
             {
                 std::get<state_machine::Calibrating>(currentState).step = step;
             },
-            [this](foc::Radians angle) { OnAlignmentSucceeded(angle); },
-            [this] { FailCalibrationStep(); });
+            [this](foc::Radians angle)
+            {
+                OnAlignmentSucceeded(angle);
+            },
+            [this]
+            {
+                FailCalibrationStep();
+            });
     }
 
     void FocStateMachineCommon::OnAlignmentSucceeded(foc::Radians angle)
