@@ -7,7 +7,6 @@ namespace
 {
     using namespace testing;
 
-    // Routed through volatile so the guard runs against a runtime value, as it does on a record loaded from NVM
     float NonFiniteFloat(uint32_t bits)
     {
         volatile uint32_t opaque = bits;

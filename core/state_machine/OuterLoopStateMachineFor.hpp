@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/foc/instantiations/FocController.hpp"
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
@@ -10,8 +9,6 @@
 
 namespace application
 {
-    // Speed and position modes differ only in which cascade they drive; the estimators, the
-    // mechanical identification fallback and the accessor wiring are the same for both.
     template<class Cascade, class ControlInterface>
     class OuterLoopStateMachineFor
         : public OuterLoopStateMachine

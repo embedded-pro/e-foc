@@ -21,15 +21,25 @@ target_link_libraries(e_foc.state_machine PUBLIC
 )
 
 target_sources(e_foc.state_machine PRIVATE
+    AlgorithmPersistence.hpp
+    AlgorithmPersistence.cpp
+    CalibrationContext.hpp
+    CalibrationContext.cpp
+    CalibrationOrchestrator.hpp
+    CalibrationOrchestrator.cpp
     ControlMode.hpp
+    ControlModeCliCommands.hpp
+    ControlModeCliCommands.cpp
     ControlModeStateMachine.hpp
     ControlModeStateMachine.cpp
+    FaultController.hpp
+    FaultController.cpp
     FaultNotifier.hpp
-    FaultNotifierImpl.cpp
     FocStateMachine.hpp
     FocStateMachineImpl.cpp
     FocStateMachineCommon.hpp
     FocStateMachineCommon.cpp
+    FocStateMachineCommonCalibration.cpp
     OuterLoopStateMachine.hpp
     OuterLoopStateMachine.cpp
     OuterLoopStateMachineFor.hpp
