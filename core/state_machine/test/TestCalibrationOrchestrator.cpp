@@ -243,3 +243,27 @@ TEST_F(CalibrationOrchestratorTest, is_running_delegates_to_electrical_ident)
     EXPECT_CALL(electricalIdent, IsRunning()).WillOnce(Return(true));
     EXPECT_TRUE(orchestrator.IsRunning());
 }
+
+TEST_F(CalibrationOrchestratorTest, stale_alignment_callback_after_new_run_is_suppressed)
+{
+    ExpectPolePairCall();
+    StartOrchestrator();
+    ExpectRlCall();
+    storedPolePairsCb(std::size_t{ 4 });
+    ExpectAlignCall();
+    storedRlCb(ValidRlResult());
+
+    const auto staleAlignCb = storedAlignCb;
+
+    EXPECT_CALL(electricalIdent, Abort());
+    EXPECT_CALL(motorAlignment, Abort());
+    orchestrator.Abort();
+
+    ExpectPolePairCall();
+    StartOrchestrator();
+
+    staleAlignCb(foc::Radians{ 1.5f });
+
+    EXPECT_FALSE(alignedCalled);
+    EXPECT_FALSE(failedCalled);
+}

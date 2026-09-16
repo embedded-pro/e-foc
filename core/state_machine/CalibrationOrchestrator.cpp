@@ -23,6 +23,7 @@ namespace application
         this->onAlignmentDone = onAlignmentDone;
         this->onFailed = onFailed;
         aborted = false;
+        ++runToken;
         RunPolePairsStep();
     }
 
@@ -37,6 +38,7 @@ namespace application
         this->onAlignmentDone = onAlignmentDone;
         this->onFailed = onFailed;
         aborted = false;
+        ++runToken;
         RunAlignmentStep();
     }
 
@@ -57,9 +59,10 @@ namespace application
         tracer.Trace() << "[SM] Identifying pole pairs";
         onStepChanged(state_machine::CalibrationStep::polePairs);
 
-        electricalIdent.EstimateNumberOfPolePairs({}, [this](std::optional<std::size_t> result)
+        const auto token = runToken;
+        electricalIdent.EstimateNumberOfPolePairs({}, [this, token](std::optional<std::size_t> result)
             {
-                if (aborted)
+                if (aborted || token != runToken)
                     return;
 
                 if (!result.has_value())
@@ -77,10 +80,11 @@ namespace application
         tracer.Trace() << "[SM] Identifying resistance and inductance";
         onStepChanged(state_machine::CalibrationStep::resistanceAndInductance);
 
+        const auto token = runToken;
         electricalIdent.EstimateResistanceAndInductance({},
-            [this](services::ElectricalParametersIdentification::ResistanceInductanceResult result)
+            [this, token](services::ElectricalParametersIdentification::ResistanceInductanceResult result)
             {
-                if (aborted)
+                if (aborted || token != runToken)
                     return;
 
                 if (!result.resistance || !result.inductance || result.fitQuality < 0.5f)
@@ -100,10 +104,11 @@ namespace application
         tracer.Trace() << "[SM] Aligning motor";
         onStepChanged(state_machine::CalibrationStep::alignment);
 
+        const auto token = runToken;
         motorAlignment.ForceAlignment(pendingData->polePairs, {},
-            [this](std::optional<foc::Radians> angle)
+            [this, token](std::optional<foc::Radians> angle)
             {
-                if (aborted)
+                if (aborted || token != runToken)
                     return;
 
                 if (!angle)

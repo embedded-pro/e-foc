@@ -46,5 +46,6 @@ namespace application
         infra::AutoResetFunction<void(foc::Radians)> onAlignmentDone;
         infra::AutoResetFunction<void()> onFailed;
         bool aborted{ false };
+        uint32_t runToken{ 0 };
     };
 }
