@@ -3,7 +3,7 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
-#include "core/platform_abstraction/WatchdogPlaceholder.hpp"
+#include "core/platform_abstraction/SoftwareWatchdog.hpp"
 #include "hal/cortex_m/EventDispatcherCortex.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
 #include "hal/cortex_m/SystemTickTimerService.hpp"
@@ -169,7 +169,7 @@ namespace application
         SemihostingSerial serial;
         TerminalAndTracerBlock terminalAndTracer{ serial };
         SemihostingEeprom eeprom{ "/tmp/eeprom.bin" };
-        WatchdogPlaceholder watchdog;
+        SoftwareWatchdog watchdog;
         GpioPinStub operationalPin;
         GpioPinStub warningPin;
         GpioPinStub failurePin;

@@ -27,8 +27,8 @@ date: 2026-09-19
 - Accepting a progress signal from any execution context, including the control interrupt.
 - Reporting a missed deadline to the application within a bounded time, so the application can bring the
   power stage to a safe state.
-- Backing that software supervision with MCU hardware on targets whose vendor layer provides a watchdog, so
-  that a stall which also kills the interrupt or the event loop resets the target from hardware.
+- Backing that software supervision with hardware on targets whose hardware abstraction provides a watchdog
+  driver, so that a stall which also kills the interrupt or the event loop resets the target from hardware.
 - Reporting whether supervision is active and which deadline is being held, so a target that cannot
   supervise says so rather than pretending to.
 
@@ -100,16 +100,18 @@ different failures:
 Both detection paths call the same handler, so the application sees one event regardless of which layer
 noticed.
 
-ST gets software supervision only. Wiring its MCU watchdog is consistent work for whenever that platform
-stops being a set of stubs; see Constraints and Open Questions.
+ST and the emulated target get software supervision only. Both have a watchdog peripheral that could back
+it — ST's window watchdog, and the CMSDK watchdog that the emulated machine models at 0x40008000 off a
+25 MHz clock — but neither hardware abstraction carries a driver for one yet. Wiring either is tracked in
+Open Questions; the emulated one is the more valuable of the two, because it is the only one a
+continuous-integration job can exercise.
 
-### Part D — targets that have no watchdog
+### Part D — the host build
 
-The emulated target and the host build implement the port with a placeholder: it accepts a progress signal,
-does nothing with it, and reports supervision as disabled whatever the application asks for. Neither target
-has a watchdog to drive — the emulator's hardware abstraction provides no watchdog driver, and the host
-build is not a target that can be reset — so supervising there would mean running machinery that proves
-nothing while reporting a protection the target does not have.
+The host build implements the port with a placeholder: it accepts a progress signal, does nothing with it,
+and reports supervision as disabled whatever the application asks for. It is not a target that can be
+reset, so supervising there would mean running machinery that proves nothing while reporting a protection
+the build does not have.
 
 Reporting *disabled* rather than accepting the enable request is the whole point of the placeholder: code
 that asks whether supervision is running gets a truthful answer on every platform.
@@ -247,9 +249,10 @@ graph LR
 | Feed cost                          | One flag write; safe from the control interrupt, no allocation, no timer work                              |
 | Supervision cannot be stopped      | No disable operation, and expiry is terminal — feeding after a miss does not restart supervision           |
 | Supervision does not survive reset | The application enables it again on each boot                                                              |
-| Hardware backing                   | TI targets only; ST gets software supervision, so it detects an application stall but no CPU lockup        |
+| Hardware backing                   | TI targets only; ST and the emulated target detect an application stall but no CPU lockup                  |
 | ST target                          | No MCU watchdog is configured, consistent with a platform whose peripherals are stubs and drives no bridge |
-| Emulated and host targets          | No watchdog at all — the port is a placeholder that always reports supervision as disabled                 |
+| Emulated target                    | The machine models a CMSDK watchdog, but no driver exists for it, so supervision is software only          |
+| Host build                         | No watchdog at all — the port is a placeholder that always reports supervision as disabled                 |
 | Progress sources                   | One aggregate progress signal; per-context progress accounting is not implemented yet                      |
 
 ---
@@ -261,4 +264,5 @@ graph LR
 | 1 | Which execution contexts must make progress in each lifecycle state and mode?   | Per-state progress table; per-mode table; a health aggregator owned by the state machine            | open   |
 | 2 | Who enables supervision in the production application, and with which deadline? | The state machine on leaving startup; the application at boot with a wide startup grace             | open   |
 | 3 | Should the ST target configure its MCU watchdog?                                | Wire the vendor driver; leave it software-only until the platform drives a bridge                   | open   |
+| 5 | Should the emulated target drive the CMSDK watchdog the machine already models? | Write a driver and compose it as on TI, which would let a SIL job assert a watchdog reset; leave it | open   |
 | 4 | Should a missed deadline be a fault code before the reset?                      | Raise the watchdog-timeout fault code and broadcast it; reset immediately without reporting outward | open   |
