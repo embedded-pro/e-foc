@@ -29,7 +29,8 @@ date: 2026-09-19
   power stage to a safe state.
 - Backing that software supervision with MCU hardware on targets whose vendor layer provides a watchdog, so
   that a stall which also kills the interrupt or the event loop resets the target from hardware.
-- Reporting whether supervision is active and which deadline is being held.
+- Reporting whether supervision is active and which deadline is being held, so a target that cannot
+  supervise says so rather than pretending to.
 
 **Is NOT responsible for:**
 - Deciding which execution contexts must make progress in which lifecycle state or control mode. The port
@@ -66,7 +67,8 @@ deadline wide enough for the phase, not by suspending protection.
 
 ### Part B — the software progress watchdog
 
-Every platform gets the same software supervision, which is what makes the port behave alike across targets.
+Targets that run on real hardware get software supervision, which is what makes the port behave alike
+across them.
 
 It keeps a single *fed* flag and a repeating check that runs on the event loop at the deadline period. Each
 check reads the flag and clears it: if the flag was set, the supervised work made progress since the previous
@@ -98,10 +100,21 @@ different failures:
 Both detection paths call the same handler, so the application sees one event regardless of which layer
 noticed.
 
-The ST and emulated targets currently get software supervision only. On ST that is consistent with the rest
-of that platform, whose peripherals are still stubs and which does not drive a bridge; see Constraints.
+ST gets software supervision only. Wiring its MCU watchdog is consistent work for whenever that platform
+stops being a set of stubs; see Constraints and Open Questions.
 
-### Part D — validation surface
+### Part D — targets that have no watchdog
+
+The emulated target and the host build implement the port with a placeholder: it accepts a progress signal,
+does nothing with it, and reports supervision as disabled whatever the application asks for. Neither target
+has a watchdog to drive — the emulator's hardware abstraction provides no watchdog driver, and the host
+build is not a target that can be reset — so supervising there would mean running machinery that proves
+nothing while reporting a protection the target does not have.
+
+Reporting *disabled* rather than accepting the enable request is the whole point of the placeholder: code
+that asks whether supervision is running gets a truthful answer on every platform.
+
+### Part E — validation surface
 
 The bring-up application exposes supervision over its CLI, so the behaviour can be exercised on real
 hardware rather than only reasoned about:
@@ -128,6 +141,7 @@ supervision does not survive a reset and has to be asked for again.
 | Watchdog enabled query          | Whether supervision is running                                | Event loop only                                                             |
 | Watchdog deadline query         | The deadline being held                                       | Event loop only; zero before supervision is enabled                         |
 | Platform factory watchdog port  | Reach the platform's watchdog                                 | Required on every platform; the reference is valid for the platform's life  |
+| Watchdog placeholder            | Satisfy the port on a target that has no watchdog             | Reports disabled always; feeding and enabling have no effect                |
 
 ### Required
 
@@ -233,8 +247,9 @@ graph LR
 | Feed cost                         | One flag write; safe from the control interrupt, no allocation, no timer work                               |
 | Supervision cannot be stopped     | No disable operation, and expiry is terminal — feeding after a miss does not restart supervision            |
 | Supervision does not survive reset| The application enables it again on each boot                                                               |
-| Hardware backing                  | TI targets only; ST, emulated and host targets get software supervision, so they detect no CPU lockup       |
+| Hardware backing                  | TI targets only; ST gets software supervision, so it detects an application stall but no CPU lockup         |
 | ST target                         | No MCU watchdog is configured, consistent with a platform whose peripherals are stubs and drives no bridge  |
+| Emulated and host targets         | No watchdog at all — the port is a placeholder that always reports supervision as disabled                  |
 | Progress sources                  | One aggregate progress signal; per-context progress accounting is not implemented yet                       |
 
 ---

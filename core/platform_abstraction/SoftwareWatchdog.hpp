@@ -24,7 +24,6 @@ namespace application
         std::chrono::microseconds deadline{ 0 };
         infra::Function<void()> onDeadlineMissed;
         infra::TimerRepeating checkTimer;
-        // Written from every supervised context, read from the event loop
         std::atomic<bool> fed{ false };
         bool enabled{ false };
         bool expired{ false };

@@ -75,7 +75,10 @@
     an explicit deadline, to signal progress from any execution context
     including interrupt context, and to read back whether supervision is
     active and which deadline is being held. The port shall offer no way to
-    disable supervision once it has been enabled.
+    disable supervision once it has been enabled. A target that has no
+    watchdog to drive shall satisfy the port with a placeholder that reports
+    supervision as disabled, so that a query for supervision state is
+    answered truthfully on every platform.
 
 - id: REQ-EH-009
   title: Watchdog expiry brings the power stage to a safe state

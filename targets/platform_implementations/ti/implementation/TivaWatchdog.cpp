@@ -11,7 +11,6 @@ namespace application
 
         hal::tiva::WatchDog::Config config;
         config.expirationTimeout = std::chrono::duration_cast<infra::Duration>(deadline);
-        // The second hardware timeout resets the MCU when the interrupt itself stops running
         config.resetOnMissedInterrupt = true;
 
         hardwareWatchdog.emplace(watchDogIndex, onDeadlineMissed, config);
