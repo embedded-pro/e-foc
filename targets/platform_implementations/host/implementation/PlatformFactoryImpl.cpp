@@ -261,6 +261,11 @@ namespace application
         std::exit(0);
     }
 
+    void PlatformFactoryImpl::ResetFromWatchdogExpiry()
+    {
+        Reset();
+    }
+
     ResetCause PlatformFactoryImpl::GetResetCause() const
     {
         return resetCause;

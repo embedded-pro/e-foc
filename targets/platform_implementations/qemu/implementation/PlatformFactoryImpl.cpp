@@ -104,6 +104,11 @@ namespace application
     void PlatformFactoryImpl::Reset()
     {}
 
+    void PlatformFactoryImpl::ResetFromWatchdogExpiry()
+    {
+        Reset();
+    }
+
     ResetCause PlatformFactoryImpl::GetResetCause() const
     {
         return ResetCause::powerUp;

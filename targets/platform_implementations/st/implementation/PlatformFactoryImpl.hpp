@@ -48,6 +48,7 @@ namespace application
         hal::Eeprom& Eeprom() override;
         drivers::Watchdog& Watchdog() override;
         void Reset() override;
+        void ResetFromWatchdogExpiry() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;

@@ -128,6 +128,7 @@ about two dozen inlined instructions, under one percent of the 20 kHz period.
 | Interface                                | Purpose                                               | Contract                                                                  |
 |------------------------------------------|-------------------------------------------------------|---------------------------------------------------------------------------|
 | `PlatformFactory::Reset()`               | Trigger an immediate software reset                   | Called synchronously; does not return                                     |
+| `PlatformFactory::ResetFromWatchdogExpiry()` | Reset after a supervision expiry                  | Records the expiry where it survives the reset, then does not return      |
 | `PlatformFactory::GetResetCause() const` | Return the reset cause captured at boot               | Valid for the lifetime of the application; thread-safe by value semantics |
 | `PlatformFactory::FaultStatus() const`   | Return the formatted fault string (empty if no fault) | Valid for the lifetime of the application once the constructor returns    |
 | `PlatformFactory::Watchdog()`            | Reach the platform's watchdog port                    | Required on every platform; see [Watchdog Design](watchdog.md)            |
@@ -149,14 +150,20 @@ about two dozen inlined instructions, under one percent of the 20 kHz period.
 | PersistentFaultData | magic                   | 32-bit unsigned       | 0 or 0xDEADBEEF                                 | Written last to commit capture          |
 | PersistentFaultData | r0–r3, r12, lr, pc, psr | 32-bit unsigned       | Any                                             | ARM exception stack frame words         |
 | PersistentFaultData | cfsr, mmfar, bfar       | 32-bit unsigned       | Any                                             | Cortex-M fault status registers         |
-| PersistentFaultData | stackTrace[243]         | 32-bit unsigned array | Any                                             | Addresses within `.text` found on stack |
-| PersistentFaultData | stackTraceCount         | 32-bit unsigned       | 0–243                                           | Number of valid trace entries           |
+| PersistentFaultData | stackTrace[242]         | 32-bit unsigned array | Any                                             | Addresses within `.text` found on stack |
+| PersistentFaultData | stackTraceCount         | 32-bit unsigned       | 0–242                                           | Number of valid trace entries           |
+| PersistentFaultData | watchdogExpiryMagic     | 32-bit unsigned       | 0 or 0x5731C0DE                                 | Set before a watchdog-expiry reset; read and cleared at boot |
 | ResetCause          | —                       | enum                  | powerUp, brownOut, software, hardware, watchdog | MCU-agnostic                            |
 
-`ResetCause::watchdog` is reported when the MCU watchdog peripheral reset the target — that is, when the
-stall was deep enough to stop the watchdog interrupt itself. A stall that the software supervision catches
-while the CPU is still alive is handled by the application, which stops the power stage and resets; that
-reset is reported as `software`. See [Watchdog Design](watchdog.md).
+`ResetCause::watchdog` covers both watchdog paths. The MCU watchdog peripheral reports it through the reset
+source bits when the stall was deep enough to stop the watchdog interrupt itself. A stall that the software
+supervision catches while the CPU is still alive resets through `ResetFromWatchdogExpiry()`, which records
+`watchdogExpiryMagic` in the no-init region first; the next boot finds that marker and reports `watchdog`
+rather than the `software` the reset source bits would otherwise show. The marker carries its own magic, so
+it and a hard-fault capture in the same region survive each other. See [Watchdog Design](watchdog.md).
+
+Cortex-M targets record the marker. The host and emulated builds do not have a surviving no-init region to
+record it in, so a software-detected expiry there is not distinguishable after the reset.
 
 ---
 

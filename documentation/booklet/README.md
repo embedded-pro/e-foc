@@ -57,7 +57,7 @@ files.
 | 21 | [Service: Command-Line Interface](../design/service-cli.md)                            | CLI command routing, parameter read/write, observer interface   |
 | 22 | [CAN Service Layer](../design/service-can.md)                                          | CAN service design, message dispatch, FOC command/response flow |
 | 23 | [Error Handling](../design/error-handling.md)                                          | Error taxonomy, propagation, recovery, and safe-state entry     |
-| 24 | [Watchdog](../design/watchdog.md)                                                      | Watchdog port, progress supervision, hardware backing           |
+| 24 | [Watchdog](../design/watchdog.md)                                                      | Watchdog port, progress supervision, health aggregation, hardware backing |
 | 25 | [Integration Testing Design](../design/integration-testing.md)                         | Test architecture, fixture composition, coverage strategy       |
 
 ## Building the booklet

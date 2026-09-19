@@ -3,6 +3,12 @@
 
 namespace application
 {
+    Logic::WatchdogSupervision::WatchdogSupervision(application::PlatformFactory& hardware, services::Tracer& tracer)
+        : inverter{ hardware, health.InnerLoopProgress() }
+        , lowPriorityInterrupt{ hardware.LowPriorityInterrupt(), health.OuterLoopProgress() }
+        , supervisor{ hardware, health, tracer }
+    {}
+
     Logic::Logic(application::PlatformFactory& hardware)
         : hardware{ hardware }
         , debugLed{ hardware.OperationalLed(), std::chrono::milliseconds(50), std::chrono::milliseconds(1950) }
@@ -15,8 +21,14 @@ namespace application
         , electricalIdent{ hardware, hardware, vdc }
         , motorAlignment{ hardware, hardware }
         , platformFaultNotifier{ hardware }
+        , watchdog{ hardware, hardware.Tracer() }
     {
         hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shorter);
+
+        watchdog.supervisor.Enable({ .deadline = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::milliseconds(watchdogDeadlineMs)),
+            .startupGrace = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::milliseconds(watchdogStartupGraceMs)),
+            .evaluationsPerDeadline = watchdogEvaluationsPerDeadline });
+
         nvm.LoadConfig(configData, [this](services::NvmStatus status)
             {
                 if (status != services::NvmStatus::Ok)
@@ -33,7 +45,7 @@ namespace application
 
                 controlMode.emplace(
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
-                    MotorHardware{ this->hardware, this->hardware, vdc },
+                    MotorHardware{ watchdog.inverter, this->hardware, vdc },
                     nvm,
                     CalibrationServices{ .electricalIdent = electricalIdent, .motorAlignment = motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb } },
                     *platformFaultNotifier,
@@ -41,9 +53,10 @@ namespace application
                     ControlMode::OuterLoopArgs{
                         this->hardware.MaxCurrentSupported(),
                         this->hardware.BaseFrequency(),
-                        this->hardware.LowPriorityInterrupt() });
+                        watchdog.lowPriorityInterrupt });
                 canBridge.emplace(*motorCanServer, *controlMode, this->hardware, electricalIdent, nullptr, foc::NewtonMeter{ motorTorqueConstantNm }, nvm, configData, this->hardware.Tracer());
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
+                watchdog.supervisor.AttachControlMode(*controlMode);
                 platformFaultNotifier->RegisterSecondary([this](state_machine::FaultCode code)
                     {
                         infra::EventDispatcherWithWeakPtr::Instance().Schedule([this, code]()

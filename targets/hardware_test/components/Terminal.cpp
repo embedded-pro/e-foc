@@ -725,7 +725,7 @@ namespace application
         hardware.Stop();
         watchdogSupervision.feedTimer.Cancel();
         tracer.Trace() << "[WDT] deadline missed, power stage stopped";
-        hardware.Reset();
+        hardware.ResetFromWatchdogExpiry();
     }
 
     void TerminalInteractor::RunIdent()

@@ -23,3 +23,11 @@ Feature: Hardware Watchdog Supervision
     And the watchdog_stall command is sent to the hardware target
     And the hardware target reconnects after reset
     Then the watchdog command reports supervision is disabled
+
+  @REQ-EH-012 @hil
+  Scenario: A watchdog expiry is reported as the reset cause after reboot
+    Given the hardware target is connected and responding
+    When the watchdog is enabled with a deadline of 1000 ms
+    And the watchdog_stall command is sent to the hardware target
+    And the hardware target reconnects after reset
+    Then the reset_cause command reports Watchdog

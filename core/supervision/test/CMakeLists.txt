@@ -1,0 +1,31 @@
+add_executable(e_foc.supervision_test)
+emil_build_for(e_foc.supervision_test HOST All BOOL E_FOC_BUILD_TESTS)
+emil_add_test(e_foc.supervision_test)
+
+target_link_libraries(e_foc.supervision_test PUBLIC
+    gmock_main
+    e_foc.supervision
+    e_foc.state_machine
+    e_foc.foc.cascade
+    e_foc.platform_abstraction_mock
+    e_foc.state_machine_mock
+    e_foc.drivers_mock
+    e_foc.services.alignment_mock
+    e_foc.services.electrical_system_ident_mock
+    e_foc.services.mechanical_system_ident_mock
+    e_foc.services.non_volatile_memory_mock
+    e_foc.foc_mock
+    hal.interfaces_test_doubles
+    infra.timer_test_helper
+    infra.event_test_helper
+)
+
+target_sources(e_foc.supervision_test PRIVATE
+    TestControlHealth.cpp
+    TestSupervisedProgress.cpp
+    TestWatchdogSupervisor.cpp
+)
+
+if (EMIL_ENABLE_COVERAGE)
+    emil_enable_coverage_for(e_foc.supervision_test)
+endif()

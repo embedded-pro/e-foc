@@ -47,6 +47,9 @@ namespace application
             persistentFaultData.Invalidate();
         }
 
+        if (persistentFaultData.TakeWatchdogExpiry())
+            resetCause = ResetCause::watchdog;
+
         HAL_Init();
     }
 
@@ -299,6 +302,12 @@ namespace application
 
     void PlatformFactoryImpl::Reset()
     {
+        NVIC_SystemReset();
+    }
+
+    void PlatformFactoryImpl::ResetFromWatchdogExpiry()
+    {
+        persistentFaultData.RecordWatchdogExpiry();
         NVIC_SystemReset();
     }
 

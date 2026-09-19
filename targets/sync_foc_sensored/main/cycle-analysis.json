@@ -13,6 +13,7 @@
         "InterruptTable::Invoke",
         "ImmediateInterruptHandler::Invoke",
         "Runner::OnPhaseCurrents",
+        "ProgressSignal::Signal",
         "ControlLoopMetrics::Record",
         "ControlLoopMetrics::RecordReentry"
       ]
@@ -71,6 +72,7 @@
         "SynchronousPwm::Sync",
         "hal::tiva::Pwm::Start",
         "Pwm::Start.*Percent.*Percent.*Percent",
+        "SupervisedInverter::ThreePhasePwmOutput",
         "PlatformFactoryImpl::ThreePhasePwmOutput"
       ]
     },

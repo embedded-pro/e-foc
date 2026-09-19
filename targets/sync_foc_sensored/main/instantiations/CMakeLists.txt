@@ -10,6 +10,7 @@ target_link_libraries(e_foc.sync_foc_sensored.main.inst PUBLIC
     e_foc.platform_abstraction
     e_foc.state_machine
     e_foc.can
+    e_foc.supervision
     e_foc.foc.cascade
     e_foc.services.cli
     e_foc.services.electrical_system_ident
