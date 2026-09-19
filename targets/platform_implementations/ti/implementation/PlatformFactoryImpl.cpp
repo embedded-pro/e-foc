@@ -2,7 +2,6 @@
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
-#include "targets/platform_implementations/error_handling_cortex_m/PowerStageCutOff.hpp"
 #include DEVICE_HEADER
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -186,7 +185,6 @@ namespace application
 
     void PlatformFactoryImpl::ReconfigurePwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime)
     {
-        application::PowerStageCutOff::Unregister();
         peripherals->asyncPwm.reset();
         peripherals->syncPwm.reset();
 
@@ -215,7 +213,6 @@ namespace application
                 });
 
             peripherals->asyncPwm->SetBaseFrequency(baseFrequency);
-            application::PowerStageCutOff::Register(*peripherals->asyncPwm);
         }
         else
         {
@@ -231,7 +228,6 @@ namespace application
                 cfg.pwmConfig);
 
             peripherals->syncPwm->SetBaseFrequency(baseFrequency);
-            application::PowerStageCutOff::Register(*peripherals->syncPwm);
         }
     }
 

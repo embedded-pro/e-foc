@@ -1,5 +1,5 @@
+#include "targets/platform_implementations/error_handling_cortex_m/CutPowerStage.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
-#include "targets/platform_implementations/error_handling_cortex_m/PowerStageCutOff.hpp"
 #include DEVICE_HEADER
 #include <cstdlib>
 
@@ -35,7 +35,10 @@ extern "C"
         using application::PersistentFaultData;
         using application::persistentFaultData;
 
-        application::PowerStageCutOff::Cut();
+        // Registers only: this handler may have been entered because the objects a registered cutoff
+        // would go through are corrupt, and a virtual call on one of those faults again — from here, that
+        // is a lockup rather than a cutoff.
+        application::CutPowerStage();
 
         // Invalidate while writing to prevent partially-written data being
         // read as valid on a watchdog timeout mid-write.

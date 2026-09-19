@@ -1,6 +1,6 @@
 #include "targets/platform_implementations/ti/implementation/TivaWatchdog.hpp"
 #include "infra/util/ReallyAssert.hpp"
-#include "targets/platform_implementations/error_handling_cortex_m/PowerStageCutOff.hpp"
+#include "targets/platform_implementations/error_handling_cortex_m/CutPowerStage.hpp"
 #include DEVICE_HEADER
 
 namespace application
@@ -40,7 +40,9 @@ namespace application
 
     void TivaWatchdog::CutPowerStageAndReset()
     {
-        PowerStageCutOff::Cut();
+        // The context that owns the PWM driver is the one that stopped making progress, so the cutoff
+        // reaches the registers without it.
+        CutPowerStage();
         NVIC_SystemReset();
     }
 }
