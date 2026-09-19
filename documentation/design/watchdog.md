@@ -91,11 +91,11 @@ running on the CPU can detect the CPU locking up. That is what MCU watchdog hard
 On the TI target the port composes the software watchdog with the vendor watchdog driver. The two cover
 different failures:
 
-| Failure                                          | Detected by                        | Outcome                                  |
-|--------------------------------------------------|------------------------------------|------------------------------------------|
-| A supervised context stops signalling progress    | Software check on the event loop   | Handler called, application decides       |
-| The event loop stalls but interrupts still run    | Vendor driver's own feed timer     | Handler called, application decides       |
-| Interrupts stop running — CPU lockup              | Second hardware timeout            | MCU reset, reset cause reports Watchdog   |
+| Failure                                        | Detected by                      | Outcome                                 |
+|------------------------------------------------|----------------------------------|-----------------------------------------|
+| A supervised context stops signalling progress | Software check on the event loop | Handler called, application decides     |
+| The event loop stalls but interrupts still run | Vendor driver's own feed timer   | Handler called, application decides     |
+| Interrupts stop running — CPU lockup           | Second hardware timeout          | MCU reset, reset cause reports Watchdog |
 
 Both detection paths call the same handler, so the application sees one event regardless of which layer
 noticed.
@@ -134,23 +134,23 @@ supervision does not survive a reset and has to be asked for again.
 
 ### Provided
 
-| Interface                       | Purpose                                                      | Contract                                                                   |
-|---------------------------------|--------------------------------------------------------------|----------------------------------------------------------------------------|
-| Watchdog enable                 | Start supervision with a deadline and a miss handler          | Called once, from the event loop; a second call is a programming error      |
-| Watchdog feed                   | Signal that supervised work made progress                     | Callable from any context including interrupts; bounded, allocation-free    |
-| Watchdog enabled query          | Whether supervision is running                                | Event loop only                                                             |
-| Watchdog deadline query         | The deadline being held                                       | Event loop only; zero before supervision is enabled                         |
-| Platform factory watchdog port  | Reach the platform's watchdog                                 | Required on every platform; the reference is valid for the platform's life  |
-| Watchdog placeholder            | Satisfy the port on a target that has no watchdog             | Reports disabled always; feeding and enabling have no effect                |
+| Interface                      | Purpose                                              | Contract                                                                   |
+|--------------------------------|------------------------------------------------------|----------------------------------------------------------------------------|
+| Watchdog enable                | Start supervision with a deadline and a miss handler | Called once, from the event loop; a second call is a programming error     |
+| Watchdog feed                  | Signal that supervised work made progress            | Callable from any context including interrupts; bounded, allocation-free   |
+| Watchdog enabled query         | Whether supervision is running                       | Event loop only                                                            |
+| Watchdog deadline query        | The deadline being held                              | Event loop only; zero before supervision is enabled                        |
+| Platform factory watchdog port | Reach the platform's watchdog                        | Required on every platform; the reference is valid for the platform's life |
+| Watchdog placeholder           | Satisfy the port on a target that has no watchdog    | Reports disabled always; feeding and enabling have no effect               |
 
 ### Required
 
-| Interface                     | Purpose                                                  | Contract                                                              |
-|-------------------------------|-----------------------------------------------------------|------------------------------------------------------------------------|
-| Event-loop timer service      | Run the periodic progress check                           | Must be running before supervision is enabled                          |
-| MCU watchdog peripheral (TI)  | Reset the target when interrupts stop running             | Configured when supervision is enabled; reset enabled on missed refresh |
-| Power stage stop              | Reach a safe state after a missed deadline                | Called from the miss handler before the reset                          |
-| Platform reset                | Restart the target after the safe state is reached        | Does not return                                                        |
+| Interface                    | Purpose                                            | Contract                                                                |
+|------------------------------|----------------------------------------------------|-------------------------------------------------------------------------|
+| Event-loop timer service     | Run the periodic progress check                    | Must be running before supervision is enabled                           |
+| MCU watchdog peripheral (TI) | Reset the target when interrupts stop running      | Configured when supervision is enabled; reset enabled on missed refresh |
+| Power stage stop             | Reach a safe state after a missed deadline         | Called from the miss handler before the reset                           |
+| Platform reset               | Restart the target after the safe state is reached | Does not return                                                         |
 
 ---
 
@@ -241,24 +241,24 @@ graph LR
 
 ## Constraints & Limitations
 
-| Constraint                        | Value / Description                                                                                       |
-|-----------------------------------|------------------------------------------------------------------------------------------------------------|
-| Detection latency                 | Between one and two deadline periods from the last feed; size the deadline at half the tolerable stall      |
-| Feed cost                         | One flag write; safe from the control interrupt, no allocation, no timer work                               |
-| Supervision cannot be stopped     | No disable operation, and expiry is terminal — feeding after a miss does not restart supervision            |
-| Supervision does not survive reset| The application enables it again on each boot                                                               |
-| Hardware backing                  | TI targets only; ST gets software supervision, so it detects an application stall but no CPU lockup         |
-| ST target                         | No MCU watchdog is configured, consistent with a platform whose peripherals are stubs and drives no bridge  |
-| Emulated and host targets         | No watchdog at all — the port is a placeholder that always reports supervision as disabled                  |
-| Progress sources                  | One aggregate progress signal; per-context progress accounting is not implemented yet                       |
+| Constraint                         | Value / Description                                                                                        |
+|------------------------------------|------------------------------------------------------------------------------------------------------------|
+| Detection latency                  | Between one and two deadline periods from the last feed; size the deadline at half the tolerable stall     |
+| Feed cost                          | One flag write; safe from the control interrupt, no allocation, no timer work                              |
+| Supervision cannot be stopped      | No disable operation, and expiry is terminal — feeding after a miss does not restart supervision           |
+| Supervision does not survive reset | The application enables it again on each boot                                                              |
+| Hardware backing                   | TI targets only; ST gets software supervision, so it detects an application stall but no CPU lockup        |
+| ST target                          | No MCU watchdog is configured, consistent with a platform whose peripherals are stubs and drives no bridge |
+| Emulated and host targets          | No watchdog at all — the port is a placeholder that always reports supervision as disabled                 |
+| Progress sources                   | One aggregate progress signal; per-context progress accounting is not implemented yet                      |
 
 ---
 
 ## Open Questions
 
-| # | Question                                                                          | Options                                                                                             | Status |
-|---|-----------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|--------|
-| 1 | Which execution contexts must make progress in each lifecycle state and mode?     | Per-state progress table; per-mode table; a health aggregator owned by the state machine              | open   |
-| 2 | Who enables supervision in the production application, and with which deadline?    | The state machine on leaving startup; the application at boot with a wide startup grace               | open   |
-| 3 | Should the ST target configure its MCU watchdog?                                   | Wire the vendor driver; leave it software-only until the platform drives a bridge                     | open   |
-| 4 | Should a missed deadline be a fault code before the reset?                          | Raise the watchdog-timeout fault code and broadcast it; reset immediately without reporting outward   | open   |
+| # | Question                                                                        | Options                                                                                             | Status |
+|---|---------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|--------|
+| 1 | Which execution contexts must make progress in each lifecycle state and mode?   | Per-state progress table; per-mode table; a health aggregator owned by the state machine            | open   |
+| 2 | Who enables supervision in the production application, and with which deadline? | The state machine on leaving startup; the application at boot with a wide startup grace             | open   |
+| 3 | Should the ST target configure its MCU watchdog?                                | Wire the vendor driver; leave it software-only until the platform drives a bridge                   | open   |
+| 4 | Should a missed deadline be a fault code before the reset?                      | Raise the watchdog-timeout fault code and broadcast it; reset immediately without reporting outward | open   |
