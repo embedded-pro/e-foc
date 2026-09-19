@@ -13,6 +13,9 @@ namespace supervision
     {
         really_assert(config.evaluationsPerDeadline > 0);
         really_assert(config.deadline > std::chrono::microseconds::zero());
+        // A negative grace would divide to a negative count and wrap on conversion, leaving startup
+        // supervised in name only
+        really_assert(config.startupGrace >= std::chrono::microseconds::zero());
 
         const auto evaluationPeriod = config.deadline / config.evaluationsPerDeadline;
         really_assert(evaluationPeriod > std::chrono::microseconds::zero());

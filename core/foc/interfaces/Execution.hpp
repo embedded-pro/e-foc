@@ -13,12 +13,12 @@ namespace foc
         // Signal is callable from any context including interrupts; TakeProgress runs on the event loop only
         ALWAYS_INLINE_HOT void Signal()
         {
-            progressed.store(true, std::memory_order_relaxed);
+            progressed.store(true);
         }
 
         bool TakeProgress()
         {
-            return progressed.exchange(false, std::memory_order_relaxed);
+            return progressed.exchange(false);
         }
 
     private:

@@ -182,6 +182,13 @@ TEST_F(WatchdogSupervisorTest, the_startup_grace_keeps_feeding_before_a_control_
     ForwardTime(std::chrono::duration_cast<std::chrono::milliseconds>(startupGrace));
 }
 
+TEST_F(WatchdogSupervisorTest, a_zero_startup_grace_withholds_the_feed_from_the_first_evaluation)
+{
+    supervisor.Enable({ deadline, std::chrono::microseconds::zero(), evaluationsPerDeadline });
+
+    ForwardTime(std::chrono::milliseconds(1000));
+}
+
 TEST_F(WatchdogSupervisorTest, a_boot_that_never_attaches_a_control_mode_stops_being_fed)
 {
     Enable();

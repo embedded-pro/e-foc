@@ -14,6 +14,8 @@ namespace supervision
 
     void SupervisedLowPriorityInterrupt::Register(const infra::Function<void()>& handler)
     {
+        // Stored before the trampoline is attached, and cleared only after it is detached, so the
+        // interrupt never reaches a handler that is being written
         this->handler = handler;
 
         lowPriorityInterrupt.Register([this]()
@@ -26,7 +28,7 @@ namespace supervision
 
     void SupervisedLowPriorityInterrupt::Unregister()
     {
-        handler = nullptr;
         lowPriorityInterrupt.Unregister();
+        handler = nullptr;
     }
 }

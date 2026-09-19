@@ -88,6 +88,21 @@ TEST_F(SupervisedLowPriorityInterruptTest, running_the_outer_loop_handler_signal
     EXPECT_EQ(1u, handlerInvocations);
 }
 
+TEST_F(SupervisedLowPriorityInterruptTest, the_stored_handler_is_still_intact_when_the_interrupt_is_detached)
+{
+    RegisterCountingHandler();
+
+    EXPECT_CALL(lowPriorityInterruptMock, Unregister()).WillOnce(Invoke([this]()
+        {
+            installedHandler();
+        }));
+
+    lowPriorityInterrupt.Unregister();
+
+    EXPECT_EQ(1u, handlerInvocations);
+    EXPECT_TRUE(progress.TakeProgress());
+}
+
 TEST_F(SupervisedLowPriorityInterruptTest, unregistering_stops_invoking_the_application_handler)
 {
     RegisterCountingHandler();
