@@ -220,6 +220,13 @@ namespace application
             void DisableInterrupt() override;
         };
 
+        struct LedPins
+        {
+            GpioPinStub operational;
+            GpioPinStub warning;
+            GpioPinStub failure;
+        };
+
         struct TerminalAndTracer
         {
             explicit TerminalAndTracer(hal::SerialCommunication& com)
@@ -238,9 +245,7 @@ namespace application
     private:
         infra::Function<void()> onInitialized;
         SimpleLowPriorityInterrupt simpleLowPriorityInterrupt;
-        GpioPinStub operationalPin;
-        GpioPinStub warningPin;
-        GpioPinStub failurePin;
+        LedPins ledPins;
         SerialCommunicationStub serial;
         TerminalAndTracer terminalAndTracer{ serial };
         std::optional<AdcPhaseCurrentMeasurementImpl<AdcMultiChannelStub>> phaseCurrentAdc;

@@ -86,7 +86,7 @@ namespace application
         , systemClock{ hardware.SystemClock() }
         , foc{ hardware.MaxCurrentSupported(), hal::Hertz{ 1000 }, hardware.LowPriorityInterrupt() }
         , eeprom{ hardware.Eeprom() }
-        , watchdog{ hardware.Watchdog() }
+        , watchdogSupervision{ hardware.Watchdog() }
     {
         terminal.AddCommand({ { "enc", "e", "Read encoder. stop. Ex: enc" },
             [this](const auto&)
@@ -246,11 +246,11 @@ namespace application
         if (!frequency.has_value())
             return { error, "invalid value. It should be a float between 10000 and 20000." };
 
-        currentPwmDeadTime_ = std::chrono::nanoseconds{ *deadTime };
-        currentPwmFrequency_ = hal::Hertz{ *frequency };
+        peripheralConfiguration.pwmDeadTime = std::chrono::nanoseconds{ *deadTime };
+        peripheralConfiguration.pwmFrequency = hal::Hertz{ *frequency };
         adcActive_ = false;
-        hardware.ConfigureAdcAndPwm(currentPwmFrequency_, currentPwmDeadTime_, currentSah_);
-        StartAdc(currentSah_);
+        hardware.ConfigureAdcAndPwm(peripheralConfiguration.pwmFrequency, peripheralConfiguration.pwmDeadTime, peripheralConfiguration.sampleAndHold);
+        StartAdc(peripheralConfiguration.sampleAndHold);
 
         return { success };
     }
@@ -267,7 +267,7 @@ namespace application
             return { error, "invalid value. It should be one of: shortest, shorter, medium, longer, longest." };
 
         adcActive_ = false;
-        hardware.ConfigureAdcAndPwm(currentPwmFrequency_, currentPwmDeadTime_, ToSampleAndHold(*sampleAndHold));
+        hardware.ConfigureAdcAndPwm(peripheralConfiguration.pwmFrequency, peripheralConfiguration.pwmDeadTime, ToSampleAndHold(*sampleAndHold));
         StartAdc(ToSampleAndHold(*sampleAndHold));
 
         return { success };
@@ -429,9 +429,9 @@ namespace application
 
     void TerminalInteractor::StartAdc(PlatformFactory::SampleAndHold sampleAndHold)
     {
-        currentSah_ = sampleAndHold;
+        peripheralConfiguration.sampleAndHold = sampleAndHold;
         adcActive_ = true;
-        hardware.PhaseCurrentsReady(currentPwmFrequency_, [this](foc::PhaseCurrents phases)
+        hardware.PhaseCurrentsReady(peripheralConfiguration.pwmFrequency, [this](foc::PhaseCurrents phases)
             {
                 if (!adcActive_)
                     return;
@@ -681,21 +681,21 @@ namespace application
         if (tokenizer.Size() != 1)
             return { error, "invalid number of arguments" };
 
-        if (watchdog.IsEnabled())
+        if (watchdogSupervision.watchdog.IsEnabled())
             return { error, "watchdog already enabled" };
 
         auto deadlineMs = ParseInput<uint32_t>(tokenizer.Token(0), minimumWatchdogDeadlineMs, maximumWatchdogDeadlineMs);
         if (!deadlineMs.has_value())
             return { error, "invalid value for deadline_ms. It should be an integer between 50 and 10000." };
 
-        watchdog.Enable(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::milliseconds(*deadlineMs)), [this]()
+        watchdogSupervision.watchdog.Enable(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::milliseconds(*deadlineMs)), [this]()
             {
                 OnWatchdogDeadlineMissed();
             });
 
-        watchdogFeedTimer.Start(std::chrono::milliseconds(*deadlineMs / watchdogFeedsPerDeadline), [this]()
+        watchdogSupervision.feedTimer.Start(std::chrono::milliseconds(*deadlineMs / watchdogFeedsPerDeadline), [this]()
             {
-                watchdog.Feed();
+                watchdogSupervision.watchdog.Feed();
             });
 
         ReportWatchdogState();
@@ -704,18 +704,18 @@ namespace application
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::StallWatchdog()
     {
-        if (!watchdog.IsEnabled())
+        if (!watchdogSupervision.watchdog.IsEnabled())
             return { error, "watchdog not enabled" };
 
-        watchdogFeedTimer.Cancel();
+        watchdogSupervision.feedTimer.Cancel();
         tracer.Trace() << "[WDT] feeding stopped";
         return { success };
     }
 
     void TerminalInteractor::ReportWatchdogState()
     {
-        if (watchdog.IsEnabled())
-            tracer.Trace() << "[WDT] enabled deadline=" << static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(watchdog.Deadline()).count()) << "ms";
+        if (watchdogSupervision.watchdog.IsEnabled())
+            tracer.Trace() << "[WDT] enabled deadline=" << static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(watchdogSupervision.watchdog.Deadline()).count()) << "ms";
         else
             tracer.Trace() << "[WDT] disabled";
     }
@@ -723,7 +723,7 @@ namespace application
     void TerminalInteractor::OnWatchdogDeadlineMissed()
     {
         hardware.Stop();
-        watchdogFeedTimer.Cancel();
+        watchdogSupervision.feedTimer.Cancel();
         tracer.Trace() << "[WDT] deadline missed, power stage stopped";
         hardware.Reset();
     }

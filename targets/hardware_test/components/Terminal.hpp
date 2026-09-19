@@ -73,6 +73,23 @@ namespace application
             bool alignRunning{ false };
         };
 
+        struct PeripheralConfiguration
+        {
+            hal::Hertz pwmFrequency{ 10000 };
+            std::chrono::nanoseconds pwmDeadTime{ 500 };
+            PlatformFactory::SampleAndHold sampleAndHold{ PlatformFactory::SampleAndHold::shortest };
+        };
+
+        struct WatchdogSupervision
+        {
+            explicit WatchdogSupervision(drivers::Watchdog& watchdog)
+                : watchdog{ watchdog }
+            {}
+
+            drivers::Watchdog& watchdog;
+            infra::TimerRepeating feedTimer;
+        };
+
     private:
         const infra::BoundedVector<infra::BoundedConstString>::WithMaxSize<5> acceptedAdcValues{ { "shortest", "shorter", "medium", "longer", "longest" } };
 
@@ -80,9 +97,7 @@ namespace application
         services::Tracer& tracer;
         application::PlatformFactory& hardware;
         IdentificationState identState;
-        hal::Hertz currentPwmFrequency_{ 10000 };
-        std::chrono::nanoseconds currentPwmDeadTime_{ 500 };
-        PlatformFactory::SampleAndHold currentSah_{ PlatformFactory::SampleAndHold::shortest };
+        PeripheralConfiguration peripheralConfiguration;
         bool adcActive_{ false };
         bool canStarted = false;
         QueueOfPhaseCurrents queueOfPhaseCurrents;
@@ -94,8 +109,7 @@ namespace application
         std::optional<std::size_t> polePairs = 0;
         foc::SpeedCascade foc;
         hal::Eeprom& eeprom;
-        drivers::Watchdog& watchdog;
-        infra::TimerRepeating watchdogFeedTimer;
+        WatchdogSupervision watchdogSupervision;
         std::array<uint8_t, 64> eepromBuffer{};
     };
 }
