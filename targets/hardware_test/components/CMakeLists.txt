@@ -7,6 +7,7 @@ target_include_directories(e_foc.hardware_test.components PUBLIC
 
 target_link_libraries(e_foc.hardware_test.components PUBLIC
     infra.util
+    infra.timer
     e_foc.platform_abstraction
     services.util
     services.tracer

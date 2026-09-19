@@ -341,6 +341,11 @@ namespace application
         return peripherals->eepromPeripheral;
     }
 
+    drivers::Watchdog& PlatformFactoryImpl::Watchdog()
+    {
+        return watchdog;
+    }
+
     void PlatformFactoryImpl::RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>& onProtection)
     {
         onFaultCallback = onProtection;

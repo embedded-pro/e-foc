@@ -8,6 +8,7 @@ add_library(e_foc.integration_tests.steps OBJECT
     ResetCauseSteps.cpp
     StateMachineSteps.cpp
     UartSteps.cpp
+    WatchdogSteps.cpp
 )
 
 target_link_libraries(e_foc.integration_tests.steps PUBLIC

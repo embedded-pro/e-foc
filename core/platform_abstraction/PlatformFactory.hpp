@@ -78,6 +78,7 @@ namespace application
         virtual foc::Volts PowerSupplyVoltage() = 0;
         virtual foc::LowPriorityInterrupt& LowPriorityInterrupt() = 0;
         virtual hal::Eeprom& Eeprom() = 0;
+        virtual drivers::Watchdog& Watchdog() = 0;
 
         virtual void RegisterBoardProtection(const infra::Function<void(BoardProtectionReason)>& onProtection) = 0;
 

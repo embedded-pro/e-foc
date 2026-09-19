@@ -159,6 +159,11 @@ namespace application
         return eepromStub;
     }
 
+    drivers::Watchdog& PlatformFactoryImpl::Watchdog()
+    {
+        return watchdog;
+    }
+
     void PlatformFactoryImpl::SerialCommunicationStub::SendData(infra::ConstByteRange, infra::Function<void()>)
     {}
 

@@ -7,6 +7,7 @@
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "hal/interfaces/Eeprom.hpp"
 #include "hal/interfaces/Pwm.hpp"
+#include "infra/timer/Timer.hpp"
 #include "infra/util/BoundedDeque.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
@@ -41,10 +42,17 @@ namespace application
         StatusWithMessage GetResetCauseStatus();
         StatusWithMessage GetFaultStatus();
         StatusWithMessage ForceHardfault();
+        StatusWithMessage ConfigureWatchdog(const infra::BoundedConstString& param);
+        StatusWithMessage StallWatchdog();
+        void ReportWatchdogState();
+        void OnWatchdogDeadlineMissed();
         void RunIdent();
         void RunAlign();
 
     private:
+        static constexpr uint32_t minimumWatchdogDeadlineMs = 50;
+        static constexpr uint32_t maximumWatchdogDeadlineMs = 10000;
+        static constexpr uint32_t watchdogFeedsPerDeadline = 4;
         static constexpr std::size_t averageSampleSize = 100;
         using QueueOfPhaseCurrents = infra::BoundedDeque<foc::PhaseCurrents>::WithMaxSize<averageSampleSize>;
 
@@ -86,6 +94,8 @@ namespace application
         std::optional<std::size_t> polePairs = 0;
         foc::SpeedCascade foc;
         hal::Eeprom& eeprom;
+        drivers::Watchdog& watchdog;
+        infra::TimerRepeating watchdogFeedTimer;
         std::array<uint8_t, 64> eepromBuffer{};
     };
 }

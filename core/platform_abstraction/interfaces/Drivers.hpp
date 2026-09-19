@@ -4,6 +4,7 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/util/Function.hpp"
+#include <chrono>
 
 namespace drivers
 {
@@ -23,6 +24,18 @@ namespace drivers
         virtual ~HallSensor() = default;
 
         virtual std::pair<foc::HallState, foc::Direction> Read() const = 0;
+    };
+
+    class Watchdog
+    {
+    public:
+        virtual ~Watchdog() = default;
+
+        virtual void Enable(std::chrono::microseconds deadline, const infra::Function<void()>& onDeadlineMissed) = 0;
+        // Callable from interrupt context; every other method runs on the event loop only
+        virtual void Feed() = 0;
+        virtual bool IsEnabled() const = 0;
+        virtual std::chrono::microseconds Deadline() const = 0;
     };
 
     class ThreePhaseInverter
