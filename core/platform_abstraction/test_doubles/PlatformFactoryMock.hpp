@@ -33,6 +33,7 @@ namespace application
         MOCK_METHOD(drivers::Watchdog&, Watchdog, (), (override));
         MOCK_METHOD(application::PlatformDiagnostics&, Diagnostics, (), (override));
         MOCK_METHOD(void, Reset, (), (override));
+        MOCK_METHOD(void, ResetFromWatchdogExpiry, (), (override));
         MOCK_METHOD(application::ResetCause, GetResetCause, (), (const, override));
         MOCK_METHOD(infra::BoundedConstString, FaultStatus, (), (const, override));
         MOCK_METHOD(void, RegisterBoardProtection, (const infra::Function<void(PlatformFactory::BoardProtectionReason)>&), (override));

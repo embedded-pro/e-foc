@@ -34,6 +34,7 @@ namespace
         MOCK_METHOD(void, RegisterBoardProtection, (const infra::Function<void(application::PlatformFactory::BoardProtectionReason)>&), (override));
         MOCK_METHOD(application::PlatformDiagnostics&, Diagnostics, (), (override));
         MOCK_METHOD(void, Reset, (), (override));
+        MOCK_METHOD(void, ResetFromWatchdogExpiry, (), (override));
         MOCK_METHOD(application::ResetCause, GetResetCause, (), (const, override));
         MOCK_METHOD(infra::BoundedConstString, FaultStatus, (), (const, override));
 
@@ -1847,7 +1848,7 @@ TEST_F(TestHardwareTerminal, a_missed_deadline_stops_the_power_stage_before_rese
 
     ::testing::InSequence _;
     EXPECT_CALL(platformFactoryMock, Stop());
-    EXPECT_CALL(platformFactoryMock, Reset());
+    EXPECT_CALL(platformFactoryMock, ResetFromWatchdogExpiry());
 
     watchdogMock.RaiseDeadlineMissed();
 }

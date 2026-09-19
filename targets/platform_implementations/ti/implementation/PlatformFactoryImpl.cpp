@@ -50,6 +50,9 @@ namespace application
             persistentFaultData.Invalidate();
         }
 
+        if (persistentFaultData.TakeWatchdogExpiry())
+            resetCause = ResetCause::watchdog;
+
         application::Clocks::Initialize();
         peripherals.emplace();
         services::SetGlobalTracerInstance(peripherals->terminalAndTracer.tracer);
@@ -353,6 +356,12 @@ namespace application
 
     void PlatformFactoryImpl::Reset()
     {
+        NVIC_SystemReset();
+    }
+
+    void PlatformFactoryImpl::ResetFromWatchdogExpiry()
+    {
+        persistentFaultData.RecordWatchdogExpiry();
         NVIC_SystemReset();
     }
 

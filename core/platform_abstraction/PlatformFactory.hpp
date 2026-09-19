@@ -85,6 +85,8 @@ namespace application
         virtual PlatformDiagnostics& Diagnostics() = 0;
 
         virtual void Reset() = 0;
+        // Records the expiry where it survives the reset, so the next boot reports Watchdog rather than Software
+        virtual void ResetFromWatchdogExpiry() = 0;
         virtual ResetCause GetResetCause() const = 0;
         virtual infra::BoundedConstString FaultStatus() const = 0;
     };
