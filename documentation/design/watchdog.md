@@ -151,13 +151,13 @@ supervision does not survive a reset and has to be asked for again.
 
 ### Required
 
-| Interface                    | Purpose                                            | Contract                                                                |
-|------------------------------|----------------------------------------------------|-------------------------------------------------------------------------|
-| Event-loop timer service     | Run the periodic progress check                    | Must be running before supervision is enabled                           |
-| MCU watchdog peripheral (TI) | Reset the target when interrupts stop running      | Configured when supervision is enabled; reset enabled on missed refresh |
-| Power stage stop             | Reach a safe state after a missed deadline         | Called from the miss handler before the reset                            |
+| Interface                    | Purpose                                            | Contract                                                                  |
+|------------------------------|----------------------------------------------------|---------------------------------------------------------------------------|
+| Event-loop timer service     | Run the periodic progress check                    | Must be running before supervision is enabled                             |
+| MCU watchdog peripheral (TI) | Reset the target when interrupts stop running      | Configured when supervision is enabled; reset enabled on missed refresh   |
+| Power stage stop             | Reach a safe state after a missed deadline         | Called from the miss handler before the reset                             |
 | Direct power-stage cutoff    | Reach a safe state from the watchdog interrupt     | Interrupt-safe, depends on no driver state; shared with the fault handler |
-| Platform reset               | Restart the target after the safe state is reached | Does not return                                                         |
+| Platform reset               | Restart the target after the safe state is reached | Does not return                                                           |
 
 ---
 
