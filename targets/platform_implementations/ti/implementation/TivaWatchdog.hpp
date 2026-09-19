@@ -18,6 +18,9 @@ namespace application
         std::chrono::microseconds Deadline() const override;
 
     private:
+        // Runs in the watchdog interrupt, with the event loop already proven stalled
+        static void CutPowerStageAndReset();
+
         static constexpr uint8_t watchDogIndex{ 0 };
 
         SoftwareWatchdog progressWatchdog;

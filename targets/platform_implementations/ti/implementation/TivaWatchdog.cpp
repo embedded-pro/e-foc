@@ -1,5 +1,7 @@
 #include "targets/platform_implementations/ti/implementation/TivaWatchdog.hpp"
 #include "infra/util/ReallyAssert.hpp"
+#include "targets/platform_implementations/error_handling_cortex_m/PowerStageCutOff.hpp"
+#include DEVICE_HEADER
 
 namespace application
 {
@@ -13,7 +15,12 @@ namespace application
         config.expirationTimeout = std::chrono::duration_cast<infra::Duration>(deadline);
         config.resetOnMissedInterrupt = true;
 
-        hardwareWatchdog.emplace(watchDogIndex, onDeadlineMissed, config);
+        hardwareWatchdog.emplace(
+            watchDogIndex, []()
+            {
+                CutPowerStageAndReset();
+            },
+            config);
     }
 
     void TivaWatchdog::Feed()
@@ -29,5 +36,11 @@ namespace application
     std::chrono::microseconds TivaWatchdog::Deadline() const
     {
         return progressWatchdog.Deadline();
+    }
+
+    void TivaWatchdog::CutPowerStageAndReset()
+    {
+        PowerStageCutOff::Cut();
+        NVIC_SystemReset();
     }
 }

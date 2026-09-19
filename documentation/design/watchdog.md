@@ -91,14 +91,18 @@ running on the CPU can detect the CPU locking up. That is what MCU watchdog hard
 On the TI target the port composes the software watchdog with the vendor watchdog driver. The two cover
 different failures:
 
-| Failure                                        | Detected by                      | Outcome                                 |
-|------------------------------------------------|----------------------------------|-----------------------------------------|
-| A supervised context stops signalling progress | Software check on the event loop | Handler called, application decides     |
-| The event loop stalls but interrupts still run | Vendor driver's own feed timer   | Handler called, application decides     |
-| Interrupts stop running — CPU lockup           | Second hardware timeout          | MCU reset, reset cause reports Watchdog |
+| Failure                                        | Detected by                      | Outcome                                      |
+|------------------------------------------------|----------------------------------|----------------------------------------------|
+| A supervised context stops signalling progress | Software check on the event loop | Handler called, application decides          |
+| The event loop stalls but interrupts still run | Vendor driver's own feed timer   | Power stage cut in the interrupt, then reset |
+| Interrupts stop running — CPU lockup           | Second hardware timeout          | MCU reset, reset cause reports Watchdog      |
 
-Both detection paths call the same handler, so the application sees one event regardless of which layer
-noticed.
+The two paths end differently, and they have to. The software check runs on the event loop, so it can hand
+the miss to the application and let it choose the safe state. The hardware path runs in the watchdog
+interrupt precisely *because* the event loop has stopped, so there is nobody to hand it to: scheduling work
+on a dead dispatcher would never run, and calling an application handler there would run event-loop code —
+timers, tracing — from interrupt context. It instead does the one thing that is safe in an interrupt and
+needs no driver state: the same direct power-stage cutoff the hard fault handler uses, then a reset.
 
 ST and the emulated target get software supervision only. Both have a watchdog peripheral that could back
 it — ST's window watchdog, and the CMSDK watchdog that the emulated machine models at 0x40008000 off a
@@ -151,7 +155,8 @@ supervision does not survive a reset and has to be asked for again.
 |------------------------------|----------------------------------------------------|-------------------------------------------------------------------------|
 | Event-loop timer service     | Run the periodic progress check                    | Must be running before supervision is enabled                           |
 | MCU watchdog peripheral (TI) | Reset the target when interrupts stop running      | Configured when supervision is enabled; reset enabled on missed refresh |
-| Power stage stop             | Reach a safe state after a missed deadline         | Called from the miss handler before the reset                           |
+| Power stage stop             | Reach a safe state after a missed deadline         | Called from the miss handler before the reset                            |
+| Direct power-stage cutoff    | Reach a safe state from the watchdog interrupt     | Interrupt-safe, depends on no driver state; shared with the fault handler |
 | Platform reset               | Restart the target after the safe state is reached | Does not return                                                         |
 
 ---
@@ -236,7 +241,8 @@ graph LR
     Handler --> Safe[Power stage stopped]
     Safe --> Reset[Target reset]
     HW[MCU watchdog peripheral] -->|interrupts dead| Reset
-    HW -->|event loop dead| Handler
+    HW -->|event loop dead| Cut[Direct cutoff in the interrupt]
+    Cut --> Reset
 ```
 
 ---
@@ -254,6 +260,7 @@ graph LR
 | Emulated target                    | The machine models a CMSDK watchdog, but no driver exists for it, so supervision is software only          |
 | Host build                         | No watchdog at all — the port is a placeholder that always reports supervision as disabled                 |
 | Progress sources                   | One aggregate progress signal; per-context progress accounting is not implemented yet                      |
+| Hardware-path notification         | A stall the hardware catches resets without calling the application handler; the software path reports it  |
 
 ---
 

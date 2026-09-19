@@ -87,9 +87,11 @@
     watchdog shall report the missed deadline to the application within two
     deadline periods, and the application shall stop the power stage before
     the target resets. On a target whose watchdog is backed by MCU hardware,
-    a stall that also stops the watchdog interrupt shall reset the target
-    from hardware, and the reset cause on the subsequent boot shall be
-    reported as Watchdog.
+    a stall of the event loop itself shall cut the power stage from the
+    watchdog interrupt and reset the target, without calling the application
+    handler from interrupt context; and a stall that also stops the watchdog
+    interrupt shall reset the target from hardware, with the reset cause on
+    the subsequent boot reported as Watchdog.
 
 - id: REQ-HIL-011
   title: Watchdog state is observable over the CLI
