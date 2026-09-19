@@ -212,6 +212,74 @@ TEST_F(TestPlatformFaultNotifier, board_protection_cuts_the_bridge_in_the_interr
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
+TEST_F(TestPlatformFaultNotifier, a_fault_while_the_inverter_starts_leaves_the_drive_faulted_before_the_dispatcher_runs)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+    EXPECT_CALL(platformFactory, Start())
+        .WillOnce(Invoke([this]()
+            {
+                platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+            }));
+
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::abortedByFault);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    ExecuteAllActions();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
+}
+
+TEST_F(TestPlatformFaultNotifier, a_fault_while_the_phase_current_slot_is_taken_never_starts_the_inverter)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    bool enabling = false;
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+    EXPECT_CALL(platformFactory, PhaseCurrentsReady(_, _))
+        .Times(AnyNumber())
+        .WillRepeatedly(Invoke([this, &enabling](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>&)
+            {
+                if (!enabling)
+                    return;
+
+                enabling = false;
+                platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+            }));
+
+    enabling = true;
+
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::abortedByFault);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    ExecuteAllActions();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(TestPlatformFaultNotifier, an_enable_is_refused_while_an_interrupt_fault_awaits_its_transition)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
+
+    ExecuteAllActions();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
 TEST_F(TestPlatformFaultNotifier, over_voltage_maps_to_overvoltage_fault_code)
 {
     GivenCalibrationInNvm();

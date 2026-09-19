@@ -20,8 +20,25 @@ namespace application
         }
     }
 
+    void FaultController::LatchFromInterrupt(state_machine::FaultCode code)
+    {
+        pendingCode = code;
+        faultPending = true;
+        faultLatched = true;
+    }
+
+    bool FaultController::TakePendingFault()
+    {
+        if (!faultPending)
+            return false;
+
+        faultPending = false;
+        return true;
+    }
+
     void FaultController::EnterFault()
     {
+        faultPending = false;
         faultLatched = true;
     }
 
@@ -43,5 +60,10 @@ namespace application
     bool FaultController::IsLatched() const
     {
         return faultLatched;
+    }
+
+    state_machine::FaultCode FaultController::PendingCode() const
+    {
+        return pendingCode;
     }
 }

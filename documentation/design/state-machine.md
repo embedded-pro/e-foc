@@ -196,8 +196,21 @@ pointing at a stopped control loop is another path back to `ThreePhasePwmOutput`
 afterwards. A fault raised in the window where current first flows would otherwise observe `Ready`, skip the
 stop, and then be overwritten by the pending assignment to `Enabled` — leaving an energised bridge on faulted
 hardware with the machine reporting `Enabled`. Because the state is committed first, such a fault stops the
-drive, and the re-check stops it again if the fault arrived while `Start()` was running. `CmdEnable` reports
-`abortedByFault` in that case.
+drive.
+
+The state re-check alone does not cover a fault delivered from an interrupt, because that path records the
+`Fault` state on the dispatcher, not in the interrupt: re-reading `currentState` at the end of `EnterEnabled`
+would still see `Enabled`. The latch is therefore set **in the interrupt**, and `EnterEnabled` consults the
+latch rather than the state. A fault taken this way is turned into the transition there and then, so the whole
+enable sequence is atomic with respect to the fault and `CmdEnable` reports `abortedByFault`.
+
+The same reasoning applies one level down, inside `Runner::Enable()`. Its steps — take the phase-current slot,
+enable the control law, start the inverter, set the `enabled` flag — are individually interruptible, and a
+`Stop()` from the faulting context between any two of them would be undone by the steps that follow it,
+re-arming the bridge on hardware that has just faulted, with no control loop attached to update it. `Enable()`
+therefore snapshots a stop sequence counter that `Disable()` advances, re-checks it after every step, and
+unwinds through `Disable()` when it has moved. A stop landing after the last check needs no unwinding: it runs
+after every write the sequence makes.
 
 #### Fault Latching
 
@@ -219,14 +232,20 @@ The last fault code is preserved in `LastFaultCode()` and remains readable even 
 multi-word `std::variant` that the CLI and the CAN bridge read concurrently, and completes a pending command
 that reaches non-volatile memory.
 
-The split is therefore: **cut the bridge in the interrupt, record the fault in the dispatcher.** The registered
-handler calls `Stop()` on the FOC controller synchronously — unconditionally, without consulting the state,
-because hardware saying "fault" outranks the state machine's belief about what it was doing — and then hands
-`EnterFault` to `infra::EventDispatcher`. The secondary handler, which broadcasts the fault over CAN, already
-worked this way.
+The split is therefore: **latch and cut the bridge in the interrupt, record the fault in the dispatcher.** The
+registered handler latches the fault and calls `Stop()` on the FOC controller synchronously — unconditionally,
+without consulting the state, because hardware saying "fault" outranks the state machine's belief about what
+it was doing — and then hands the transition to `infra::EventDispatcher`. The secondary handler, which
+broadcasts the fault over CAN, already worked this way.
+
+Latching is two single-word writes (`faultLatched`, `pendingCode`), which is all an interrupt may do here: the
+tracing, the multi-word `std::variant` write and the pending-command completion stay on the dispatcher.
 
 A consequence worth knowing when reading the code or the tests: between the interrupt and the dispatcher turn,
-the bridge is off but `CurrentState()` still reports the pre-fault state.
+the bridge is off and the latch is set, but `CurrentState()` still reports the pre-fault state. Commands
+consult the latch, not the state, so an enable arriving in that window is refused rather than acted on. The
+transition is taken exactly once — whichever of the dispatcher turn or the enable sequence reaches it first
+takes the pending fault, and the other finds nothing left to record.
 
 #### Registration lifetime
 

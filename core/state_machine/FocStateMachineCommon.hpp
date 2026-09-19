@@ -99,6 +99,7 @@ namespace application
         void EnterReadyOrIdle();
         void EnterIdleWithPartialCalibration(const services::CalibrationData& data);
         void EnterEnabled();
+        void RecordFault(state_machine::FaultCode code);
         void EnterFault(state_machine::FaultCode code);
         bool WasActive() const;
 

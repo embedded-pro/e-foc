@@ -124,7 +124,10 @@
     When a fault is raised while the state machine is starting the FOC controller in
     response to an enable command, the state machine shall remain in the Fault state
     rather than the Enabled state, shall stop the FOC controller, and shall report the
-    enable command as abortedByFault.
+    enable command as abortedByFault. This shall hold for a fault delivered from an
+    interrupt, whose state transition is deferred to the event dispatcher, as it does
+    for one delivered synchronously: the enable command shall not report success and
+    return with the power stage armed while the transition is still queued.
 
 - id: REQ-SM-018
   title: Repeated fault clearance is refused
@@ -169,3 +172,24 @@
     outlive the state machines that use them — a control-mode switch destroys one state
     machine and constructs the next in its place — so a registration or a pending
     identification callback left behind would be invoked against freed storage.
+
+- id: REQ-SM-023
+  title: A fault is latched in the faulting context
+  shall: >
+    A fault raised in an interrupt shall latch before the interrupt returns, using only
+    single-word writes so that the constraints of REQ-SM-021 are preserved. Every command
+    that arms the power stage shall consult that latch rather than the lifecycle state,
+    which the deferred transition has not yet written, so that an enable issued between the
+    interrupt and the dispatcher turn is refused. The transition shall be taken exactly
+    once, by whichever of the dispatcher turn or the enable sequence observes the latched
+    fault first.
+
+- id: REQ-SM-024
+  title: An interrupted enable sequence never re-arms the power stage
+  shall: >
+    The steps that arm the power stage — taking the phase-current callback slot, enabling
+    the control law, starting the inverter and committing the enabled flag — shall detect a
+    stop issued from the faulting context at any point between them, and shall bring the
+    drive back to the stopped state rather than completing. No step shall undo a stop that
+    preceded it, so that a fault cannot be followed by an armed bridge that no control loop
+    is updating.

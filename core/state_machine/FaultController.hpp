@@ -15,15 +15,21 @@ namespace application
 
         void Unregister();
 
+        void LatchFromInterrupt(state_machine::FaultCode code);
+        bool TakePendingFault();
+
         void EnterFault();
         bool TryClear();
         void ResetClearCount();
 
         bool IsLatched() const;
+        state_machine::FaultCode PendingCode() const;
 
     private:
         state_machine::FaultNotifier* registeredNotifier{ nullptr };
-        bool faultLatched{ false };
+        volatile bool faultLatched{ false };
+        volatile bool faultPending{ false };
+        volatile state_machine::FaultCode pendingCode{ state_machine::FaultCode::none };
         uint8_t consecutiveFaultClears{ 0 };
         static constexpr uint8_t maxConsecutiveFaultClears{ 3 };
     };

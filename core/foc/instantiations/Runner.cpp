@@ -22,18 +22,53 @@ namespace foc
 
     void Runner::Enable()
     {
+        const auto sequence = stopSequence;
+
         RegisterPhaseCurrents();
+
+        if (StoppedSince(sequence))
+        {
+            Disable();
+            return;
+        }
+
         foc.Enable();
+
+        if (StoppedSince(sequence))
+        {
+            Disable();
+            return;
+        }
+
         inverter.Start();
+
+        if (StoppedSince(sequence))
+        {
+            Disable();
+            return;
+        }
+
         enabled = true;
+
+        // A stop from the faulting context between two of these steps would otherwise be undone by the
+        // steps that follow it, re-arming the bridge on faulted hardware. A stop landing after this last
+        // check needs no undoing: it runs after every write this sequence makes.
+        if (StoppedSince(sequence))
+            Disable();
     }
 
     void Runner::Disable()
     {
+        stopSequence = static_cast<uint8_t>(stopSequence + 1u);
         enabled = false;
         inverter.Stop();
         ReleasePhaseCurrents();
         foc.Disable();
+    }
+
+    bool Runner::StoppedSince(uint8_t sequence) const
+    {
+        return stopSequence != sequence;
     }
 
     void Runner::RegisterPhaseCurrentsObserver(const infra::Function<void(const PhaseCurrents& currentPhases)>& observer)

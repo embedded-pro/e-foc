@@ -63,6 +63,36 @@ TEST_F(FaultControllerTest, enter_fault_sets_latched)
     EXPECT_TRUE(controller.IsLatched());
 }
 
+TEST_F(FaultControllerTest, latching_from_an_interrupt_sets_the_latch_and_records_the_code)
+{
+    controller.LatchFromInterrupt(state_machine::FaultCode::overcurrent);
+
+    EXPECT_TRUE(controller.IsLatched());
+    EXPECT_EQ(controller.PendingCode(), state_machine::FaultCode::overcurrent);
+}
+
+TEST_F(FaultControllerTest, a_pending_fault_is_taken_once)
+{
+    controller.LatchFromInterrupt(state_machine::FaultCode::overcurrent);
+
+    EXPECT_TRUE(controller.TakePendingFault());
+    EXPECT_FALSE(controller.TakePendingFault());
+}
+
+TEST_F(FaultControllerTest, no_fault_is_pending_before_an_interrupt_latches_one)
+{
+    EXPECT_FALSE(controller.TakePendingFault());
+}
+
+TEST_F(FaultControllerTest, recording_the_fault_consumes_the_pending_one)
+{
+    controller.LatchFromInterrupt(state_machine::FaultCode::overcurrent);
+    controller.EnterFault();
+
+    EXPECT_FALSE(controller.TakePendingFault());
+    EXPECT_TRUE(controller.IsLatched());
+}
+
 TEST_F(FaultControllerTest, try_clear_returns_true_and_clears_latch)
 {
     controller.EnterFault();

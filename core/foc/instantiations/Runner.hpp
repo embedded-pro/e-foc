@@ -3,6 +3,7 @@
 #include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
+#include <cstdint>
 
 namespace foc
 {
@@ -28,6 +29,7 @@ namespace foc
         void RegisterPhaseCurrents();
         void ReleasePhaseCurrents();
         void OnPhaseCurrents(const PhaseCurrents& currentPhases);
+        bool StoppedSince(uint8_t sequence) const;
 
         drivers::ThreePhaseInverter& inverter;
         drivers::Encoder& encoder;
@@ -35,5 +37,6 @@ namespace foc
         infra::Function<void(const PhaseCurrents& currentPhases)> phaseCurrentsObserver;
         volatile bool observerRegistered{ false };
         volatile bool enabled{ false };
+        volatile uint8_t stopSequence{ 0 };
     };
 }

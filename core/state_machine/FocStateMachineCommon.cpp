@@ -19,13 +19,14 @@ namespace application
     {
         faultController.Register(
             faultNotifier,
-            [this](state_machine::FaultCode)
+            [this](state_machine::FaultCode code)
             {
+                faultController.LatchFromInterrupt(code);
                 GetFocControl().Stop();
             },
             [this](state_machine::FaultCode code)
             {
-                EnterFault(code);
+                RecordFault(code);
             });
     }
 
@@ -231,7 +232,24 @@ namespace application
         GetFocControl().Start();
 
         if (std::holds_alternative<state_machine::Fault>(currentState))
+        {
             GetFocControl().Stop();
+            return;
+        }
+
+        // A fault delivered from an interrupt while Start() ran has cut the bridge but its transition is
+        // still queued on the dispatcher; taking it here keeps the enable sequence atomic with respect to
+        // the fault, so the command cannot report success on a drive the hardware has already faulted.
+        if (faultController.TakePendingFault())
+            EnterFault(faultController.PendingCode());
+    }
+
+    void FocStateMachineCommon::RecordFault(state_machine::FaultCode code)
+    {
+        if (!faultController.TakePendingFault())
+            return;
+
+        EnterFault(code);
     }
 
     void FocStateMachineCommon::EnterFault(state_machine::FaultCode code)

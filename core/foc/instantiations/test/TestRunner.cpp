@@ -8,6 +8,7 @@
 namespace
 {
     using testing::_;
+    using testing::AtLeast;
     using testing::Return;
 
     MATCHER_P(DutiesEqual, expected, "")
@@ -121,6 +122,66 @@ TEST_F(TestRunner, MultipleEnableDisableCyclesWork)
     runner.Disable();
     runner.Enable();
     runner.Disable();
+}
+
+TEST_F(TestRunner, AStopWhileThePhaseCurrentsSlotIsTakenNeverStartsTheInverter)
+{
+    foc::Runner runner{ inverterMock, encoderMock, focMock };
+
+    EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this, &runner](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+            {
+                inverterMock.StorePhaseCurrentsCallback(onDone);
+                runner.Disable();
+            })
+        .WillRepeatedly([this](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+            {
+                inverterMock.StorePhaseCurrentsCallback(onDone);
+            });
+
+    EXPECT_CALL(inverterMock, Stop()).Times(AtLeast(1));
+    EXPECT_CALL(focMock, Disable()).Times(AtLeast(1));
+
+    runner.Enable();
+
+    inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
+}
+
+TEST_F(TestRunner, AStopWhileTheControlLawIsEnabledNeverStartsTheInverter)
+{
+    foc::Runner runner{ inverterMock, encoderMock, focMock };
+
+    EXPECT_CALL(focMock, Enable())
+        .WillOnce([&runner]()
+            {
+                runner.Disable();
+            });
+
+    EXPECT_CALL(inverterMock, Stop()).Times(AtLeast(1));
+    EXPECT_CALL(focMock, Disable()).Times(AtLeast(1));
+
+    runner.Enable();
+
+    inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
+}
+
+TEST_F(TestRunner, AStopWhileTheInverterStartsLeavesTheBridgeStopped)
+{
+    foc::Runner runner{ inverterMock, encoderMock, focMock };
+
+    EXPECT_CALL(focMock, Enable());
+    EXPECT_CALL(inverterMock, Start())
+        .WillOnce([&runner]()
+            {
+                runner.Disable();
+            });
+
+    EXPECT_CALL(inverterMock, Stop()).Times(AtLeast(2));
+    EXPECT_CALL(focMock, Disable()).Times(AtLeast(2));
+
+    runner.Enable();
+
+    inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
 }
 
 TEST_F(TestRunner, ALateCallbackAfterDisableDoesNotDriveThePwm)
