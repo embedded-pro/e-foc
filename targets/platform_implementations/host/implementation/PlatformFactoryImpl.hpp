@@ -4,6 +4,7 @@
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
+#include "core/platform_abstraction/WatchdogPlaceholder.hpp"
 #include "hal/interfaces/Can.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/interfaces/Pwm.hpp"
@@ -47,6 +48,7 @@ namespace application
         foc::Volts PowerSupplyVoltage() override;
         foc::LowPriorityInterrupt& LowPriorityInterrupt() override;
         hal::Eeprom& Eeprom() override;
+        drivers::Watchdog& Watchdog() override;
         void Reset() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
@@ -218,6 +220,13 @@ namespace application
             void DisableInterrupt() override;
         };
 
+        struct LedPins
+        {
+            GpioPinStub operational;
+            GpioPinStub warning;
+            GpioPinStub failure;
+        };
+
         struct TerminalAndTracer
         {
             explicit TerminalAndTracer(hal::SerialCommunication& com)
@@ -236,9 +245,7 @@ namespace application
     private:
         infra::Function<void()> onInitialized;
         SimpleLowPriorityInterrupt simpleLowPriorityInterrupt;
-        GpioPinStub operationalPin;
-        GpioPinStub warningPin;
-        GpioPinStub failurePin;
+        LedPins ledPins;
         SerialCommunicationStub serial;
         TerminalAndTracer terminalAndTracer{ serial };
         std::optional<AdcPhaseCurrentMeasurementImpl<AdcMultiChannelStub>> phaseCurrentAdc;
@@ -246,6 +253,7 @@ namespace application
         std::optional<QuadratureEncoderDecoratorImpl<SynchronousQuadratureEncoderStub>> encoder;
         std::optional<CanBusAdapterImpl<CanStub>> canBus;
         EepromStub eepromStub;
+        WatchdogPlaceholder watchdog;
         ResetCause resetCause{ ResetCause::powerUp };
         ControlLoopMetrics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };

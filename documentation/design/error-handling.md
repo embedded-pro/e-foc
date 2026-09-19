@@ -29,6 +29,8 @@ date: 2026-04-13
 
 **Is NOT responsible for:**
 - Deciding what the application does after a fault (handled by the application layer).
+- Supervising application progress and configuring the MCU watchdog — that is the watchdog component's work
+  ([Watchdog Design](watchdog.md)). This component only reports a watchdog reset once it has happened.
 - Correcting or masking the fault condition.
 - Logging to persistent storage beyond the single 1 KiB fault region.
 - CAN-bus boot notification or any network-layer diagnostics.
@@ -128,6 +130,7 @@ about two dozen inlined instructions, under one percent of the 20 kHz period.
 | `PlatformFactory::Reset()`               | Trigger an immediate software reset                   | Called synchronously; does not return                                     |
 | `PlatformFactory::GetResetCause() const` | Return the reset cause captured at boot               | Valid for the lifetime of the application; thread-safe by value semantics |
 | `PlatformFactory::FaultStatus() const`   | Return the formatted fault string (empty if no fault) | Valid for the lifetime of the application once the constructor returns    |
+| `PlatformFactory::Watchdog()`            | Reach the platform's watchdog port                    | Required on every platform; see [Watchdog Design](watchdog.md)            |
 
 ### Required
 
@@ -149,6 +152,11 @@ about two dozen inlined instructions, under one percent of the 20 kHz period.
 | PersistentFaultData | stackTrace[243]         | 32-bit unsigned array | Any                                             | Addresses within `.text` found on stack |
 | PersistentFaultData | stackTraceCount         | 32-bit unsigned       | 0–243                                           | Number of valid trace entries           |
 | ResetCause          | —                       | enum                  | powerUp, brownOut, software, hardware, watchdog | MCU-agnostic                            |
+
+`ResetCause::watchdog` is reported when the MCU watchdog peripheral reset the target — that is, when the
+stall was deep enough to stop the watchdog interrupt itself. A stall that the software supervision catches
+while the CPU is still alive is handled by the application, which stops the power stage and resets; that
+reset is reported as `software`. See [Watchdog Design](watchdog.md).
 
 ---
 

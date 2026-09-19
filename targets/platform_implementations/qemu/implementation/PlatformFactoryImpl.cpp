@@ -93,6 +93,11 @@ namespace application
         return eeprom;
     }
 
+    drivers::Watchdog& PlatformFactoryImpl::Watchdog()
+    {
+        return watchdog;
+    }
+
     void PlatformFactoryImpl::RegisterBoardProtection(const infra::Function<void(BoardProtectionReason)>&)
     {}
 

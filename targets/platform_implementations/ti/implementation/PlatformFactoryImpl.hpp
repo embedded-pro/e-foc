@@ -27,6 +27,7 @@
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
+#include "targets/platform_implementations/ti/implementation/TivaWatchdog.hpp"
 
 extern "C" uint32_t SystemCoreClock;
 
@@ -68,6 +69,7 @@ namespace application
         foc::Volts PowerSupplyVoltage() override;
         foc::LowPriorityInterrupt& LowPriorityInterrupt() override;
         hal::Eeprom& Eeprom() override;
+        drivers::Watchdog& Watchdog() override;
         void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>& onProtection) override;
         void Reset() override;
         ResetCause GetResetCause() const override;
@@ -254,6 +256,7 @@ namespace application
         infra::Function<void()> onInitialized;
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         ResetCause resetCause{ ResetCause::powerUp };
+        TivaWatchdog watchdog;
         [[no_unique_address]] CycleCounter cycleCounter;
         ControlLoopMetrics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };

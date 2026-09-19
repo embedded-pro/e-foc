@@ -24,17 +24,17 @@ namespace application
 
     hal::GpioPin& PlatformFactoryImpl::OperationalLed()
     {
-        return operationalPin;
+        return ledPins.operational;
     }
 
     hal::GpioPin& PlatformFactoryImpl::WarningLed()
     {
-        return warningPin;
+        return ledPins.warning;
     }
 
     hal::GpioPin& PlatformFactoryImpl::FailureLed()
     {
-        return failurePin;
+        return ledPins.failure;
     }
 
     uint8_t PlatformFactoryImpl::BoardId() const
@@ -157,6 +157,11 @@ namespace application
     hal::Eeprom& PlatformFactoryImpl::Eeprom()
     {
         return eepromStub;
+    }
+
+    drivers::Watchdog& PlatformFactoryImpl::Watchdog()
+    {
+        return watchdog;
     }
 
     void PlatformFactoryImpl::SerialCommunicationStub::SendData(infra::ConstByteRange, infra::Function<void()>)

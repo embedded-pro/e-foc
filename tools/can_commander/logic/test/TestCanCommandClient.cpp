@@ -24,7 +24,8 @@ namespace
             FixtureInit(StrictMock<CanBusAdapterMock>& adapter,
                 infra::Function<void(hal::Can::Id, const hal::Can::Message&)>& receiveCallback)
             {
-                EXPECT_CALL(adapter, ReceiveData(_)).WillOnce([&receiveCallback](const auto& callback)
+                // Registered by the client's constructor and deregistered by its destructor
+                EXPECT_CALL(adapter, ReceiveData(_)).Times(2).WillRepeatedly([&receiveCallback](const auto& callback)
                     {
                         receiveCallback = callback;
                     });
@@ -527,7 +528,8 @@ namespace
             FailingFixtureInit(StrictMock<CanBusAdapterMock>& adapter,
                 infra::Function<void(hal::Can::Id, const hal::Can::Message&)>& receiveCallback)
             {
-                EXPECT_CALL(adapter, ReceiveData(_)).WillOnce([&receiveCallback](const auto& callback)
+                // Registered by the client's constructor and deregistered by its destructor
+                EXPECT_CALL(adapter, ReceiveData(_)).Times(2).WillRepeatedly([&receiveCallback](const auto& callback)
                     {
                         receiveCallback = callback;
                     });
