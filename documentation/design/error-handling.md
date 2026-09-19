@@ -125,13 +125,13 @@ about two dozen inlined instructions, under one percent of the 20 kHz period.
 
 ### Provided
 
-| Interface                                | Purpose                                               | Contract                                                                  |
-|------------------------------------------|-------------------------------------------------------|---------------------------------------------------------------------------|
-| `PlatformFactory::Reset()`               | Trigger an immediate software reset                   | Called synchronously; does not return                                     |
-| `PlatformFactory::ResetFromWatchdogExpiry()` | Reset after a supervision expiry                  | Records the expiry where it survives the reset, then does not return      |
-| `PlatformFactory::GetResetCause() const` | Return the reset cause captured at boot               | Valid for the lifetime of the application; thread-safe by value semantics |
-| `PlatformFactory::FaultStatus() const`   | Return the formatted fault string (empty if no fault) | Valid for the lifetime of the application once the constructor returns    |
-| `PlatformFactory::Watchdog()`            | Reach the platform's watchdog port                    | Required on every platform; see [Watchdog Design](watchdog.md)            |
+| Interface                                    | Purpose                                               | Contract                                                                  |
+|----------------------------------------------|-------------------------------------------------------|---------------------------------------------------------------------------|
+| `PlatformFactory::Reset()`                   | Trigger an immediate software reset                   | Called synchronously; does not return                                     |
+| `PlatformFactory::ResetFromWatchdogExpiry()` | Reset after a supervision expiry                      | Records the expiry where it survives the reset, then does not return      |
+| `PlatformFactory::GetResetCause() const`     | Return the reset cause captured at boot               | Valid for the lifetime of the application; thread-safe by value semantics |
+| `PlatformFactory::FaultStatus() const`       | Return the formatted fault string (empty if no fault) | Valid for the lifetime of the application once the constructor returns    |
+| `PlatformFactory::Watchdog()`                | Reach the platform's watchdog port                    | Required on every platform; see [Watchdog Design](watchdog.md)            |
 
 ### Required
 
@@ -153,7 +153,7 @@ about two dozen inlined instructions, under one percent of the 20 kHz period.
 | PersistentFaultData | stackTrace[242]         | 32-bit unsigned array | Any                                             | Addresses within `.text` found on stack |
 | PersistentFaultData | stackTraceCount         | 32-bit unsigned       | 0–242                                           | Number of valid trace entries           |
 | PersistentFaultData | watchdogExpiryMagic     | 32-bit unsigned       | 0 or 0x5731C0DE                                 | Set before a watchdog-expiry reset; read and cleared at boot |
-| ResetCause          | —                       | enum                  | powerUp, brownOut, software, hardware, watchdog | MCU-agnostic                            |
+| ResetCause          | —                       | enum                  | powerUp, brownOut, software, hardware, watchdog | MCU-agnostic                                                 |
 
 `ResetCause::watchdog` covers both watchdog paths. The MCU watchdog peripheral reports it through the reset
 source bits when the stall was deep enough to stop the watchdog interrupt itself. A stall that the software

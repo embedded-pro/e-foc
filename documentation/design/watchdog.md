@@ -150,11 +150,11 @@ and a context that is expected and silent withholds the feed.
 
 Three execution contexts exist, and they are supervised differently because they fail differently:
 
-| Context               | Runs in                                           | Signals progress by                                     |
-|-----------------------|---------------------------------------------------|----------------------------------------------------------|
-| Inner control loop    | The phase-current interrupt, at the control rate  | Writing the phase duty cycles                            |
-| Outer loop            | The low-priority interrupt, at a divided rate     | Completing one outer-loop pass                           |
-| Event loop            | The main dispatcher                               | The evaluation itself running at all                     |
+| Context            | Runs in                                          | Signals progress by                  |
+|--------------------|--------------------------------------------------|--------------------------------------|
+| Inner control loop | The phase-current interrupt, at the control rate | Writing the phase duty cycles        |
+| Outer loop         | The low-priority interrupt, at a divided rate    | Completing one outer-loop pass       |
+| Event loop         | The main dispatcher                              | The evaluation itself running at all |
 
 The event loop needs no flag: the evaluation runs on it, so an evaluation that happens is proof it is alive.
 That is also its limit — a stalled event loop stops the evaluation rather than reporting it, which is why
@@ -163,14 +163,14 @@ event-loop one.
 
 #### What each state and mode expects
 
-| Lifecycle state | Torque mode              | Speed and position modes             |
-|-----------------|--------------------------|---------------------------------------|
-| Startup         | nothing (graced, bounded)| nothing (graced, bounded)             |
-| Idle            | nothing                  | nothing                               |
-| Ready           | nothing                  | nothing                               |
-| Calibrating     | nothing                  | nothing                               |
-| Enabled         | inner loop               | inner loop **and** outer loop         |
-| Fault           | nothing                  | nothing                               |
+| Lifecycle state | Torque mode               | Speed and position modes      |
+|-----------------|---------------------------|-------------------------------|
+| Startup         | nothing (graced, bounded) | nothing (graced, bounded)     |
+| Idle            | nothing                   | nothing                       |
+| Ready           | nothing                   | nothing                       |
+| Calibrating     | nothing                   | nothing                       |
+| Enabled         | inner loop                | inner loop **and** outer loop |
+| Fault           | nothing                   | nothing                       |
 
 Two rows carry most of the safety argument.
 
@@ -349,11 +349,11 @@ graph LR
 | Emulated target                    | The machine models a CMSDK watchdog, but no driver exists for it, so supervision is software only          |
 | Host build                         | No watchdog at all — the port is a placeholder that always reports supervision as disabled                 |
 | Progress sources                   | Inner loop and outer loop are accounted separately; the event loop is proven by the evaluation running     |
-| Stall-to-safe-state bound          | One evaluation period plus two deadline periods, from the last progress of an expected context            |
-| Startup grace                      | Bounded in evaluations and never replenished; a boot that does not complete expires the deadline          |
-| Calibration                        | Expects no control-loop progress; bounded by the identification services' own no-sample timeouts          |
+| Stall-to-safe-state bound          | One evaluation period plus two deadline periods, from the last progress of an expected context             |
+| Startup grace                      | Bounded in evaluations and never replenished; a boot that does not complete expires the deadline           |
+| Calibration                        | Expects no control-loop progress; bounded by the identification services' own no-sample timeouts           |
 | Hardware-path notification         | A stall the hardware catches resets without calling the application handler; the software path reports it  |
-| Software-path reset cause          | Recorded across the reset on Cortex-M targets only; the host and emulated builds cannot report it         |
+| Software-path reset cause          | Recorded across the reset on Cortex-M targets only; the host and emulated builds cannot report it          |
 
 ---
 
