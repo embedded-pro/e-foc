@@ -34,7 +34,7 @@ namespace application
         return lastFaultCode;
     }
 
-    bool OperationFlow::IsEnableAllowed(const state_machine::Ready& ready)
+    bool OperationFlow::IsEnableAllowed(const state_machine::Ready& ready) const
     {
         if (faultController.IsLatched())
             return false;

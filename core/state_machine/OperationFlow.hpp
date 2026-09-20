@@ -21,7 +21,7 @@ namespace application
         void UnregisterFaultHandler();
         state_machine::FaultCode LastFaultCode() const;
 
-        bool IsEnableAllowed(const state_machine::Ready& ready);
+        bool IsEnableAllowed(const state_machine::Ready& ready) const;
         state_machine::Enabled BuildEnabled();
         state_machine::Ready DisableToReady();
 

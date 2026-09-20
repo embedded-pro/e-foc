@@ -26,7 +26,7 @@ namespace application
         state_machine::Calibrating BeginReAlign(const state_machine::ReAlign& command);
         static state_machine::Calibrating Reserve();
 
-        bool IsPlausibleExternal(const state_machine::CompleteExternalCalibration& command);
+        bool IsPlausibleExternal(const state_machine::CompleteExternalCalibration& command) const;
         void BeginExternal(state_machine::Calibrating& calibrating, const state_machine::CompleteExternalCalibration& command);
 
         void RunSequence(state_machine::Calibrating& calibrating);

@@ -49,7 +49,7 @@ namespace application
         return state_machine::Calibrating{ state_machine::CalibrationStep::polePairs, {}, true };
     }
 
-    bool CalibrationFlow::IsPlausibleExternal(const state_machine::CompleteExternalCalibration& command)
+    bool CalibrationFlow::IsPlausibleExternal(const state_machine::CompleteExternalCalibration& command) const
     {
         if (CalibrationContext::HasFiniteElectricalParameters(command.data))
             return true;
