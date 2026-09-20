@@ -89,10 +89,10 @@ The WeakPtr mechanism ensures memory safety regardless of timing. The second lay
 
 ```mermaid
 graph TD
-    A[HasPendingAsyncWork] --> B{pending NVM command?}
-    A --> C{boot NVM check in flight?}
+    A[HasPendingAsyncWork] --> B{command callback pending?}
+    A --> C{any NVM operation in flight?}
     A --> D{Calibrating state?}
-    A --> E{electricalIdent.IsRunning?}
+    A --> E{calibration orchestrator running?}
     A --> F{mechIdent.IsRunning?}
     B -- yes --> G[return true]
     C -- yes --> G
@@ -102,6 +102,8 @@ graph TD
 ```
 
 `ControlModeStateMachine::Select()` checks `HasPendingAsyncWork()` before initiating a mode switch. If it returns `true`, the select returns `busy` and the caller retries. If it returns `false`, the mode switch proceeds.
+
+The lifecycle transition table uses the same predicate as the guard of every command that starts asynchronous work (`Calibrate`, `ReAlign`, `ReserveExternalCalibration`, `ClearCalibration`, `SetFluxLinkage`) and of `Enable`, so a request never overlaps outstanding work of an earlier one (see the transition table section of `state-machine.md`).
 
 Each identification service exposes `IsRunning()` on its interface. This method reports whether the service is actively running an identification sweep — not merely whether a dispatcher slot is pending. The `HasPendingAsyncWork()` check at mode-switch time and the WeakPtr discard at dispatch time together cover all failure scenarios.
 
@@ -125,10 +127,12 @@ Member declaration order is load-bearing: `sharedPtr` is destroyed first (drops 
 Every class in the `FocStateMachine` hierarchy that adds async operations must also extend the return value of `HasPendingAsyncWork()` to cover those operations.
 
 The base implementation (`FocStateMachineCommon`) covers:
-- Pending NVM commands (`HasPendingCommand()`)
-- Boot-time NVM validity check (`bootCheckInFlight`)
+- The pending command callback (`PendingCommand::Pending()`)
+- Every NVM operation from the call until its callback, the boot-time check and load included (`NvmActivity::InFlight()`)
 - Active calibration state (`Calibrating` variant)
-- Direct CAN electrical identification (`electricalIdent.IsRunning()`)
+- The calibration orchestrator, from the moment a run starts until it succeeds, fails or is
+  aborted, and for as long as the electrical identification reports itself running. The run
+  covers the alignment step as well, which the electrical identification alone does not see
 
 `OuterLoopStateMachine` overrides to additionally cover:
 - Direct CAN mechanical identification (`mechIdent.IsRunning()`)

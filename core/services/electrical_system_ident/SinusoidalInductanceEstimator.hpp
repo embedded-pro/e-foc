@@ -43,6 +43,7 @@ namespace services
         void BeginInjection();
         void AdvanceInjection();
         void OnCurrentSample(foc::PhaseCurrents currents);
+        void StartSampleWatchdog();
         void FailMeasurement();
         Result ComputeResult() const;
 
@@ -55,7 +56,8 @@ namespace services
 
         Config activeConfig;
         infra::AutoResetFunction<void(Result)> onDone;
-        infra::TimerSingleShot noSampleTimer;
+        infra::TimerRepeating noSampleTimer;
+        volatile bool sampleSeen{ false };
 
         float injectionPhase{ 0.0f };
         float phaseIncrement{ 0.0f };

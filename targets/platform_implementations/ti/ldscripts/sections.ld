@@ -88,4 +88,7 @@ SECTIONS
     . = ALIGN(4);
     end = . ;
     _end = . ;
+
+    ASSERT(end <= (_estack - __Main_Stack_Size),
+           "static RAM reaches into the reserved main stack")
 }

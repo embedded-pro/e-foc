@@ -23,6 +23,7 @@ namespace application
         this->onAlignmentDone = onAlignmentDone;
         this->onFailed = onFailed;
         aborted = false;
+        running = true;
         ++runToken;
         RunPolePairsStep();
     }
@@ -38,6 +39,7 @@ namespace application
         this->onAlignmentDone = onAlignmentDone;
         this->onFailed = onFailed;
         aborted = false;
+        running = true;
         ++runToken;
         RunAlignmentStep();
     }
@@ -45,13 +47,19 @@ namespace application
     void CalibrationOrchestrator::Abort()
     {
         aborted = true;
+        running = false;
         electricalIdent.Abort();
         motorAlignment.Abort();
     }
 
     bool CalibrationOrchestrator::IsRunning() const
     {
-        return electricalIdent.IsRunning();
+        return running || electricalIdent.IsRunning();
+    }
+
+    bool CalibrationOrchestrator::HasRunInFlight() const
+    {
+        return running;
     }
 
     void CalibrationOrchestrator::RunPolePairsStep()
@@ -111,6 +119,8 @@ namespace application
                 if (aborted || token != runToken)
                     return;
 
+                running = false;
+
                 if (!angle)
                     Fail();
                 else
@@ -120,6 +130,8 @@ namespace application
 
     void CalibrationOrchestrator::Fail()
     {
+        running = false;
+
         if (onFailed != nullptr)
             onFailed();
     }

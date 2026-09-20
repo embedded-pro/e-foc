@@ -2,9 +2,9 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: state-machine
-date: 2026-04-10
+date: 2026-09-20
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-04-10
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.1.0                      |
+| Version   | 0.2.0                      |
 | Component | state-machine              |
-| Date      | 2026-04-10                 |
+| Date      | 2026-09-20                 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -50,13 +50,13 @@ date: 2026-04-10
 
 The state machine has five named states:
 
-| State         | Motor condition                                                                                                       | Allowed transitions                                                                                                                                                                                   |
-|---------------|-----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled | → `Calibrating` (CmdCalibrate or CmdReAlign with loaded parameters), → `Fault` (hardware fault)                                                                                                       |
-| `Calibrating` | Calibration sequence in progress; motor is driven by identification services                                          | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop with previously valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (any step fails or hardware fault) |
-| `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true), → `Calibrating` (CmdCalibrate re-runs), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                  |
-| `Enabled`     | FOC controller active; motor under closed-loop control                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                 |
-| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times                                                                               |
+| State         | Motor condition                                                                                                       | Allowed transitions                                                                                                                                                                                                                                                  |
+|---------------|-----------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled | → `Calibrating` (CmdCalibrate, CmdReAlign with loaded parameters, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                                                                                      |
+| `Calibrating` | Calibration sequence in progress; motor is driven by identification services                                          | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop with previously valid calibration), → `Idle` (record saved but incomplete for this mode, or CmdEmergencyStop without valid calibration), → `Fault` (any step or the NVM save fails, or hardware fault) |
+| `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true), → `Calibrating` (CmdCalibrate re-runs, CmdReAlign, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault, or the NVM invalidation failing)                  |
+| `Enabled`     | FOC controller active; motor under closed-loop control                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                                                                                |
+| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times. A further fault re-enters `Fault` but keeps the code that first tripped the drive                                                           |
 
 ### State Diagram
 
@@ -64,18 +64,20 @@ The state machine has five named states:
 stateDiagram-v2
     [*] --> Idle
 
-    Idle --> Calibrating : CmdCalibrate\nor CmdReAlign (if R/L loaded)
+    Idle --> Calibrating : CmdCalibrate,\nCmdReAlign (if R/L loaded)\nor CmdReserveExternalCalibration
+    Idle --> Idle : CmdClearCalibration
     Idle --> Fault : hardware fault
 
     Calibrating --> Ready : sequence complete\n+ NVM saved
+    Calibrating --> Idle : NVM saved but record\nincomplete for this mode
     Calibrating --> Ready : CmdEmergencyStop\n(calibration still valid)
     Calibrating --> Idle : CmdEmergencyStop\n(no valid calibration)
-    Calibrating --> Fault : any step fails\nor hardware fault
+    Calibrating --> Fault : any step or the NVM save fails\nor hardware fault
 
     Ready --> Enabled : CmdEnable
-    Ready --> Calibrating : CmdCalibrate\n(re-calibrate)
+    Ready --> Calibrating : CmdCalibrate (re-calibrate),\nCmdReAlign\nor CmdReserveExternalCalibration
     Ready --> Idle : CmdClearCalibration
-    Ready --> Fault : hardware fault
+    Ready --> Fault : hardware fault\nor NVM invalidation failure
 
     Enabled --> Ready : CmdDisable
     Enabled --> Ready : CmdEmergencyStop\n(calibration still valid)
@@ -84,11 +86,104 @@ stateDiagram-v2
 
     Fault --> Ready : CmdClearFault\n(valid calibration held)
     Fault --> Idle : CmdClearFault\n(no valid calibration)
+    Fault --> Fault : further hardware fault\n(first code kept)
 ```
+
+### Transition Table
+
+The graph above is not a description of hand-written command handlers; it is the
+transition table the FOC state machine is built from. Every operator command, every
+service completion and every fault notification is an **event**, and every arrow in the
+diagram is a **row** of the table: source state, event, target state, an optional guard and
+the action that builds the target state. Rows that must be accepted in a state without
+leaving it (a calibration sub-step changing, a flux-linkage save completing) are declared
+as internal rows.
+
+The table is a compile-time constant. Its rows are `constexpr` values whose guards and
+actions are captureless functions receiving the state machine as their context, so the
+whole table lives in flash; the machine itself only holds the current state and a bounded
+queue of events. That is what keeps the lifecycle within the RAM of the 32 KB targets.
+
+The queue depth is budgeted, not rounded up: each slot costs a whole `Event`, and overflowing
+it is an assertion failure rather than a dropped event. The deepest run of nested dispatches is
+a calibration sequence whose identification services report inline — the three steps the
+orchestrator announces plus the alignment result that follows the last one — which peaks at four.
+The friction-and-inertia step is not among them, because the control mode sets that step directly
+instead of announcing it, and the events that follow the alignment are pushed only once the queue
+has drained again. The remaining slots absorb a command chained from a completion callback, giving
+the six the machine reserves. Adding a calibration step that announces itself therefore costs a
+slot, and on the 32 KB targets a slot has to be paid for out of a RAM budget the linker now guards.
+
+The table is the single source of truth for what the machine accepts:
+
+- An event that arrives in a state with no row for it is **forbidden**: nothing changes, the
+  command reports `rejected`, and the trace shows which event was refused in which state.
+- An event whose rows exist but whose guards all refuse it is **rejected** in the same way;
+  the guard is where conditions such as "asynchronous work is outstanding" or "the rotor
+  reference is not established" live.
+- Before the machine starts, the table is checked for consistency: duplicate rows, rows
+  that can never be selected because an unguarded row precedes them, and states that no
+  sequence of rows reaches from `Idle` all refuse to start the machine. A malformed
+  lifecycle therefore fails at boot on the host, in the unit tests, rather than on the
+  motor.
+
+Events are handled to completion. An event dispatched while another is being handled, for
+instance a service that completes synchronously inside the action that started it, or a
+fault raised while the drive is being started, is queued and handled once the current
+transition has been committed and announced. Actions therefore always observe a consistent
+state, and the target state is committed before its side effects (starting the drive,
+completing the pending command, notifying the ready handler) run, in that order.
+
+Every operator command that starts asynchronous work (`Calibrate`, `ReAlign`,
+`ReserveExternalCalibration`, `ClearCalibration`, `SetFluxLinkage`) and `Enable` are guarded by
+`HasPendingAsyncWork()`: they are rejected while a command is pending, while any NVM operation
+is in flight, including the boot-time check and load, or while an identification service is
+running. One request therefore owns the machine at a time. A save still outstanding after an
+emergency stop cannot be overlapped by the save of a new run, a clear or a flux-linkage change
+in progress cannot be interrupted by `Enable`, whose transition would discard the completion
+and leave the command pending forever, and the boot-time load cannot overwrite the record of a
+calibration that started before it answered. The command is completed with `rejected` and the
+client retries once the outstanding work has completed.
+
+A command issued from inside a completion callback is such a queued event, and it reports
+`CommandResult::queued`, which is distinct from `ok`: the event was accepted for processing,
+the table has not yet decided it, and the caller must not read it as "applied". Callers that
+translate a command outcome onward — the CAN bridge turns it into `busy` — therefore never
+report success for work whose outcome is still unknown. A command that carries a callback is
+not left dangling when the table then refuses it: `CommandRejections` observes every forbidden
+or rejected event and completes that command's callback with `rejected`, whether the event was
+dispatched directly or from the queue.
+
+The transition table is observable: a tracer prints every transition as
+`fsm: <from> --<event>--> <to>` next to the existing `[SM]` lines, and every forbidden,
+rejected or discarded event with its state.
+
+### Structure
+
+`FocStateMachineCommon` is a composition root, not the place where the lifecycle logic lives.
+It owns the table-driven machine and hands the rows a `LifecycleContext`: references to the
+collaborators that carry out the work, each with one responsibility.
+
+| Collaborator         | Responsibility                                                                                                                     |
+|----------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| `FocLifecycleTable`  | The 45 `constexpr` rows and the entered hooks; the only place that knows which event is legal in which state                       |
+| `CalibrationFlow`    | Full calibration, re-alignment and external calibration: running the orchestrator, saving the record and completing the command    |
+| `MaintenanceFlow`    | Clearing the stored calibration and changing the flux linkage                                                                      |
+| `BootSequence`       | The boot-time validity check and load of the stored record                                                                         |
+| `OperationFlow`      | Enable and disable, faults and emergency stop, and the post-commit work of every state                                             |
+| `PendingCommand`     | The one outstanding operator command, and the result held back until the target state has been committed                           |
+| `CommandRejections`  | The observer that completes a queued command's callback with `rejected` when the table refuses it, so no callback is left dangling |
+| `NvmActivity`        | The count of NVM operations whose callbacks still capture the machine; part of `HasPendingAsyncWork()`                             |
+| `CalibrationContext` | The calibration record in RAM and its application to the controller                                                                |
+| `ModeHooks`          | The interface through which the flows reach the control mode: the controller, its tunables and the mode-specific calibration steps |
+
+`TorqueStateMachine`, `SpeedStateMachine` and `PositionStateMachine` derive from
+`FocStateMachineCommon` and implement `ModeHooks`; nothing else in the lifecycle depends on the
+concrete control mode.
 
 ### Emergency Stop
 
-`CmdEmergencyStop` is the unconditional safety command: it is accepted from **every** state and always returns `CommandResult::ok`. Its first action is to stop the FOC controller and therefore the PWM output, before any state evaluation takes place. Any command callback still outstanding (a running calibration or a pending `CmdClearCalibration`) is completed with `CommandResult::abortedByFault`.
+`CmdEmergencyStop` is the unconditional safety command: it is accepted from **every** state and always returns `CommandResult::ok`. Its first action is to stop the FOC controller and therefore the PWM output, before any state evaluation takes place. The stop is not left to that entry point alone: every `EmergencyStop` row stops the controller in its own action as well, so the PWM output is cut by the table itself and an `EmergencyStop` reaching the machine by any other route cannot transition out of `Enabled` with the bridge still switching. Stopping twice is harmless because the call is idempotent. Any command callback still outstanding (a running calibration or a pending `CmdClearCalibration`) is completed with `CommandResult::abortedByFault`.
 
 The resulting state depends on the state the command was issued from:
 
@@ -158,31 +253,39 @@ After saving, calibration data is applied to the FOC controller (current PID gai
 
 An external client (e.g. the CAN bridge) can supply pre-measured calibration data without running the internal identification chain. This uses a two-command protocol to ensure the FSM state is correct before any inverter interaction begins:
 
-1. **`CmdReserveExternalCalibration()`** — synchronous. Checks that the machine is in `Idle` or `Ready` with no pending async work, then transitions to `Calibrating` and returns `CommandResult::ok`. Returns `CommandResult::rejected` in any other state. The `Calibrating` state prevents a second request from being accepted concurrently.
+1. **`CmdReserveExternalCalibration()`** — synchronous. Checks that the machine is in `Idle` or `Ready` with no pending async work, like every command that starts asynchronous work, then transitions to `Calibrating` and returns `CommandResult::ok`. Returns `CommandResult::rejected` in any other state. The `Calibrating` state prevents a second request from being accepted concurrently.
 
-2. **`CmdCompleteExternalCalibration(data, onDone)`** — async. Called by the external client after its own estimation is finished. Stores `data` in the pending `Calibrating` slot and runs the alignment step, so an externally supplied record still gets a live rotor frame before it can be used. If a fault occurred between the two calls, `EnterFault` has already aborted the identification service (via `AbortCalibrationServices`) so this path is never reached; the client observes the failure through its own estimation callback.
+2. **`CmdCompleteExternalCalibration(data, onDone)`** — async. Called by the external client after its own estimation is finished. Stores `data` in the pending `Calibrating` slot and runs the alignment step, so an externally supplied record still gets a live rotor frame before it can be used. Its guard refuses the command while another command is still pending, so a second completion sent while the first is aligning is rejected instead of overwriting the pending record. If a fault occurred between the two calls, the machine is in `Fault`, where the completion command has no row and is rejected; the client observes the failure through its own estimation callback.
 
 The two-command split ensures the FSM enters `Calibrating` before any open-loop PWM is applied, and that the state guard lives entirely inside the state machine rather than in the calling layer.
 
-The external path stops after alignment; it does not chain into mechanical identification. `OnIdentifyElectrical` and `OnIdentifyMechanical` are separate CAN commands (REQ-INT-011), so the electrical command must not drive the mechanical estimator. `OnCalibrationComplete()` therefore stamps `stage = complete` only when the record satisfies `HasValidModeSpecificCalibration()` for the active mode. Torque mode is satisfied by electrical parameters plus alignment and transitions to `Ready`. Speed and position still lack inertia and friction, so their record is persisted with `stage = none` and the machine returns to `Idle` holding a partial record, reported over CAN as `FocMotorState::partialCalibration`. Completing those modes requires the internal `CmdCalibrate` chain, which runs mechanical identification.
+The external path stops after alignment; it does not chain into mechanical identification. `OnIdentifyElectrical` and `OnIdentifyMechanical` are separate CAN commands (REQ-INT-011), so the electrical command must not drive the mechanical estimator. The NVM save therefore stamps `stage = complete` only when the record satisfies the active mode's own validity requirements. Torque mode is satisfied by electrical parameters plus alignment and transitions to `Ready`. Speed and position still lack inertia and friction, so their record is persisted with `stage = none` and the machine returns to `Idle` holding a partial record, reported over CAN as `FocMotorState::partialCalibration`. Completing those modes requires the internal `CmdCalibrate` chain, which runs mechanical identification.
 
 ### Fault Safety
 
-**Event-dispatcher path.** `EnterFault()` commits the `Fault` state first, then stops the inverter if the
-machine was in `Enabled` or `Calibrating`, then aborts the calibration services. Committing the state first
-means a fault raised inside the stop sees `Fault` rather than the state it is leaving, and a calibration
-completion that arrives afterwards no longer finds itself in `Calibrating`.
+**Event-dispatcher path.** The `FaultDetected` event has a row from every state to `Fault`. Its action
+records the code, latches the fault controller, stops the inverter if the machine was in `Enabled` or
+`Calibrating`, and aborts the calibration services; only then is `Fault` committed. Any event raised while
+that happens, a further fault from inside the stop or a calibration completion the abort could not
+suppress, is queued and handled only after `Fault` has been committed, so it cannot observe the state
+being left. A further fault does re-enter `Fault`, but the recorded code is the one that first tripped the
+drive: the fault raised while shutting down is a consequence, and overwriting the root cause with it would
+lose the only diagnostic the operator has. The new code is recorded again once the fault has been cleared.
+
+The clear budget is spent where the transition commits, not where the command is issued. `CmdClearFault`
+only reads whether a clear is still allowed; the row action is what consumes one of the three attempts and
+releases the latch, so a `ClearFault` that is queued and then refused does not silently cost an attempt.
 
 **Interrupt path (board protection, CAN bus-off).** When a fault is delivered in interrupt context, the
 platform stops the FOC controller bridge immediately within that interrupt — before any state mutation or
-tracing. The `EnterFault()` call, its trace output and any pending-command completion are posted to the event
+tracing. The `FaultDetected` event, its trace output and any pending-command completion are posted to the event
 dispatcher and execute on the next dispatcher turn. This ensures no multi-word state write, tracing call or
 non-volatile-memory access runs from an interrupt context (see REQ-SM-021).
 
 Stopping the inverter is not on its own enough to cut the PWM output. The identification services drive the
 bridge through their own timers and phase-current callbacks, and one left running writes duty cycles on its
-next tick — `ThreePhasePwmOutput` re-arms the peripheral that `Stop()` just disabled. So `EnterFault` and
-`CmdEmergencyStop` both call `Abort()` on the electrical identification, the alignment and (in speed and
+next tick — `ThreePhasePwmOutput` re-arms the peripheral that `Stop()` just disabled. So the transition to
+`Fault` and `CmdEmergencyStop` both call `Abort()` on the electrical identification, the alignment and (in speed and
 position modes) the mechanical identification. `Abort()` stops injection, cancels the service's timers, and
 drops the pending completion **without invoking it**: the state machine owns the outcome, and a late
 calibration result must not overwrite the fault that interrupted it. A service that has been aborted or has
@@ -192,8 +295,8 @@ callback slot — reassigning that slot from inside its own invocation would des
 The `Runner` releases the inverter's phase-current callback in `Disable()` for the same reason: a callback left
 pointing at a stopped control loop is another path back to `ThreePhasePwmOutput`.
 
-`EnterEnabled` commits the `Enabled` state **before** it starts the FOC controller, and re-checks the state
-afterwards. A fault raised in the window where current first flows would otherwise observe `Ready`, skip the
+The transition to `Enabled` commits the state **before** the FOC controller is started: the start runs as a
+post-commit effect of the transition, and a fault raised while it runs is queued behind it. A fault raised in the window where current first flows would otherwise observe `Ready`, skip the
 stop, and then be overwritten by the pending assignment to `Enabled` — leaving an energised bridge on faulted
 hardware with the machine reporting `Enabled`. Because the state is committed first, such a fault stops the
 drive, and the re-check stops it again if the fault arrived while `Start()` was running. `CmdEnable` reports
@@ -215,14 +318,14 @@ The last fault code is preserved in `LastFaultCode()` and remains readable even 
 #### Faults raised in interrupt context
 
 `PlatformFaultNotifier`'s primary path runs in the PWM fault interrupt (board protection) or the CAN interrupt
-(bus-off). Neither is a context in which the transition itself can be taken: `EnterFault` traces, writes a
-multi-word `std::variant` that the CLI and the CAN bridge read concurrently, and completes a pending command
-that reaches non-volatile memory.
+(bus-off). Neither is a context in which the transition itself can be taken: the transition to `Fault` traces,
+writes a multi-word `std::variant` that the CLI and the CAN bridge read concurrently, and completes a pending
+command that reaches non-volatile memory.
 
 The split is therefore: **cut the bridge in the interrupt, record the fault in the dispatcher.** The registered
 handler calls `Stop()` on the FOC controller synchronously — unconditionally, without consulting the state,
 because hardware saying "fault" outranks the state machine's belief about what it was doing — and then hands
-`EnterFault` to `infra::EventDispatcher`. The secondary handler, which broadcasts the fault over CAN, already
+the `FaultDetected` event to `infra::EventDispatcher`. The secondary handler, which broadcasts the fault over CAN, already
 worked this way.
 
 A consequence worth knowing when reading the code or the tests: between the interrupt and the dispatcher turn,
@@ -247,18 +350,43 @@ A protection event raised before the state machine has registered its handler is
 
 ### Async-Callback State Invariant
 
-Every asynchronous callback registered with a service (NVM, electrical ident, mechanical ident, motor alignment) **must check the current state before mutating it**. A hardware fault, an operator command, or a second calibration attempt may have moved the state machine to a different state between the moment the service call was issued and the moment the callback fires.
+A hardware fault, an operator command, or a second calibration attempt may move the state
+machine between the moment a service call is issued and the moment its callback fires. The
+invariant is: **a callback may only apply its result if the state machine is still in the
+state that issued the service call.**
 
-The invariant is: **a callback may only apply its result if the state machine is still in the state that issued the service call.**
+This invariant is no longer a convention that every callback re-implements. Each callback
+translates its result into an event and dispatches it; whether the result is applied is
+decided by the transition table:
 
-Specifically:
+- Results from calibration steps (`EstimateNumberOfPolePairs`, `EstimateResistanceAndInductance`,
+  `ForceAlignment`, `EstimateFrictionAndInertia`) become the events `CalibrationStepChanged`,
+  `AlignmentSucceeded`, `MechanicalParametersIdentified` and `CalibrationStepFailed`, which only
+  have rows in `Calibrating`. The mechanical result additionally carries a guard on the active
+  sub-step. The calibration orchestrator also drops results of a run that was aborted.
+- The `SaveCalibration` completion becomes `CalibrationSaved`, which only has rows in
+  `Calibrating`. The callback also carries the epoch of the transition that issued the save,
+  so a save completing after an emergency stop and a fresh `CmdCalibrate` is discarded
+  instead of being consumed by the new run.
+- The boot-time NVM completions become `BootValidityChecked` and `BootCalibrationLoaded`, which
+  only have rows in `Idle`.
+- The `InvalidateCalibration` completion becomes `CalibrationInvalidated`, with rows in `Idle`
+  and `Ready`, leading to `Idle` on success, to `Fault` on failure, and completing the command
+  with `rejected` when the NVM is busy. It needs no request identity: the guard on every
+  command that starts NVM work means one invalidation at most is outstanding.
+- The flux-linkage save completion becomes `FluxLinkageSaved`, handled in `Idle` and `Ready`
+  and completing the pending command without a transition.
+- Both NVM completions also have rows in `Fault`, because a fault or an emergency stop while
+  the operation is in flight aborts the command but not the erase or the write. The RAM record
+  follows the NVM outcome whatever happened to the command: a successful invalidation drops the
+  record, so a later `CmdClearFault` returns to `Idle` rather than restoring a calibration that
+  no longer exists in NVM, and a stored flux linkage is applied. An invalidation that fails
+  while already in `Fault` is ignored; the fault is already latched.
 
-- Callbacks from calibration steps (`EstimateNumberOfPolePairs`, `EstimateResistanceAndInductance`, `ForceAlignment`, `EstimateFrictionAndInertia`) check that the machine is still in `Calibrating` **and** that the expected calibration sub-step is active.
-- The `SaveCalibration` callback checks that the machine is still in `Calibrating`.
-- The `IsCalibrationValid` and `LoadCalibration` callbacks from the boot-time NVM check verify that the machine is still in `Idle`.
-- The `InvalidateCalibration` callback from `CmdClearCalibration` verifies that the machine is still in `Idle` or `Ready` before transitioning to `Idle` (on success) or `Fault` (on failure).
-
-Any callback that fires after the state has moved away from the expected source state **returns silently**. It must never overwrite a later state (such as `Enabled` or `Fault`) with a stale result.
+Any of these events arriving in a state without a row for it is **forbidden**, and the save
+completion arriving after a transition is **discarded** before it reaches the table. Either
+way it is traced, and it never overwrites a later state such as `Enabled` or `Fault` with a
+stale result.
 
 ```mermaid
 sequenceDiagram
@@ -273,8 +401,8 @@ sequenceDiagram
     Op->>SM: CmdEnable
     SM-->>SM: State → Enabled
 
-    NVM-->>SM: callback(Ok)
-    note over SM: Guard: not in Idle or Ready → silently ignore
+    NVM-->>SM: callback(Ok) → event CalibrationInvalidated
+    note over SM: No row for CalibrationInvalidated in Enabled → forbidden, traced, ignored
     note over SM: State remains Enabled ✓
 ```
 
@@ -287,22 +415,28 @@ sequenceDiagram
     participant NVM as NVM Service
 
     SM->>NVM: InvalidateCalibration(callback)
-    HW-->>SM: fault notification
+    HW-->>SM: fault notification → event FaultDetected
     SM-->>SM: State → Fault
 
-    NVM-->>SM: callback(Ok)
-    note over SM: Guard: not in Idle or Ready → silently ignore
+    NVM-->>SM: callback(Ok) → event CalibrationInvalidated
+    note over SM: No row for CalibrationInvalidated in Fault → forbidden, traced, ignored
     note over SM: State remains Fault ✓
 ```
 
 ### Transition Policies
 
-The state machine supports two transition policies, selected at build time via the `E_FOC_AUTO_TRANSITION_POLICY` CMake cache variable:
+Each state machine instance is constructed with a transition policy that only decides
+whether the lifecycle commands appear on the terminal:
 
-- **CLI policy (default, `E_FOC_AUTO_TRANSITION_POLICY=OFF`)**: The state machine registers the commands `calibrate`, `enable`, `disable`, `clear_fault`, and `clear_cal` on the connected terminal. Users interact via a serial console. Suitable for development, commissioning, and diagnostics.
-- **Automatic policy (`E_FOC_AUTO_TRANSITION_POLICY=ON`)**: No terminal commands are registered. The caller drives transitions programmatically by invoking `CmdCalibrate()`, `CmdEnable()`, `CmdDisable()`, `CmdClearFault()`, and `CmdClearCalibration()` directly — for example, from CAN message handlers or automated production sequences.
+- **CLI policy**: the commands `calibrate`, `align`, `enable`, `disable`, `clear_fault`
+  and `clear_cal` are registered on the connected terminal. Used by the state machine unit
+  tests and for commissioning over a serial console.
+- **Automatic policy**: no terminal commands are registered. The caller drives transitions
+  programmatically, for example from CAN message handlers. This is the policy the
+  `ControlModeStateMachine` uses for the torque, speed and position machines it owns.
 
-The policy is enforced for all application targets at once: setting `E_FOC_AUTO_TRANSITION_POLICY=ON` in a CMake preset or on the command line applies to the torque, speed, and position targets simultaneously. Both policies share identical state transition logic; they differ only in whether lifecycle commands appear on the terminal.
+Both policies share the same transition table; they differ only in whether lifecycle
+commands appear on the terminal.
 
 ### Mechanical Identification and Control Mode
 
@@ -324,10 +458,10 @@ On construction, the state machine asynchronously checks whether valid calibrati
 
 1. Enters `Calibrating` at the alignment sub-step, copying the stored electrical parameters into `pendingData`.
 2. Calls the Motor Alignment service using the stored pole pairs.
-3. On success: marks `rotorReferenceValid`, saves the updated offset to NVM via `OnCalibrationComplete`, applies mode-specific calibration from the stored parameters, and transitions to `Ready`.
+3. On success: marks `rotorReferenceValid`, saves the updated offset to NVM through the same completion path as a full calibration, applies mode-specific calibration from the stored parameters, and transitions to `Ready`.
 4. On failure: enters `Fault` with code `calibrationFailed`.
 
-The CLI command is `align` (short form `aln`). Because `OnCalibrationComplete` is used, the speed and position loop parameters are also re-applied from the stored calibration, so mechanical identification does not need to be re-run after an alignment-only recovery.
+The CLI command is `align` (short form `aln`). Because the same completion path is used, the speed and position loop parameters are also re-applied from the stored calibration, so mechanical identification does not need to be re-run after an alignment-only recovery.
 
 ### Online Parameter Estimation (Speed/Position Modes)
 
@@ -350,7 +484,7 @@ sequenceDiagram
     SM->>ME: SetInitialEstimate(J_cal, B_cal)
     SM->>EE: SetInitialEstimate(R_cal, Ld_cal)
 
-    SM->>ME: SetTorqueConstant(kt) [on EnterEnabled]
+    SM->>ME: SetTorqueConstant(kt) [on entering Enabled]
     note over ME,EE: Estimators update opportunistically at outer-loop rate\nwhile FOC controller is running
 ```
 
@@ -408,9 +542,10 @@ Behavioral rule: if a `Select()` is called while a previous `Select()` callback 
 The same guard covers the active mode's own asynchronous work. Applying a selection destroys the active
 `FocStateMachineCommon` instance, while its outstanding NVM and identification callbacks still capture that
 instance. `Select()` therefore also returns `SelectResult::busy` when
-`ActiveStateMachine().HasPendingAsyncWork()` is true — that is, while a command callback is pending, the
-boot-time NVM check is in flight, or a calibration step is running — in addition to the existing check that
-the active machine is stopped.
+`ActiveStateMachine().HasPendingAsyncWork()` is true — that is, while a command callback is pending, any
+NVM operation is in flight, or a calibration step is running — in addition to the existing check that the
+active machine is stopped. `NvmActivity` counts every NVM operation from the call until its callback, so a
+save or invalidation still outstanding after an emergency stop keeps the machine alive until it completes.
 
 ```mermaid
 sequenceDiagram
@@ -457,37 +592,37 @@ sequenceDiagram
 
 ### Provided
 
-| Interface                | Purpose                                                                                | Contract                                                                                                                                                                                                                                                     |
-|--------------------------|----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `FocStateMachineBase`    | Abstract lifecycle controller — state query and command dispatch                       | Constructed once per application; all command methods are safe to call from any state (invalid transitions are silently ignored)                                                                                                                             |
-| `CurrentState()`         | Returns the current `State` variant for inspection                                     | Returns a const reference; valid for the lifetime of the state machine                                                                                                                                                                                       |
-| `LastFaultCode()`        | Returns the most recent fault code                                                     | Returns `FaultCode::none` until the first fault occurs; afterwards it retains the last fault code, also after the fault is cleared                                                                                                                           |
-| `CmdCalibrate()`         | Requests start of full calibration sequence                                            | Only effective from `Idle` or `Ready`; ignored from all other states                                                                                                                                                                                         |
-| `CmdReAlign()`           | Re-establishes the rotor reference without re-running R/L or mechanical identification | Only effective from `Idle` or `Ready` with valid electrical calibration loaded; enters `Calibrating` (alignment sub-step only), then `Ready` with `rotorReferenceValid` on success, or `Fault` on failure                                                    |
-| `CmdEnable()`            | Requests enabling the FOC controller                                                   | Only effective from `Ready` when `rotorReferenceValid` is true; rejected when the rotor reference has not been established since the last reset                                                                                                              |
-| `CmdDisable()`           | Requests disabling the FOC controller                                                  | Only effective from `Enabled`; ignored from all other states                                                                                                                                                                                                 |
-| `CmdClearFault()`        | Clears the fault and returns to `Ready` if valid calibration is held, otherwise `Idle` | Only effective from `Fault`; ignored from all other states                                                                                                                                                                                                   |
-| `CmdClearCalibration()`  | Invalidates NVM calibration and returns to `Idle`                                      | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`.                                                                                                                            |
-| `CmdEmergencyStop()`     | Stops PWM immediately and leaves the active states                                     | Accepted from every state and always returns `ok`. From `Enabled` or `Calibrating` it goes to `Ready` when calibration data is valid, otherwise to `Idle`. `Idle`, `Ready` and `Fault` are left unchanged. Aborts any pending command with `abortedByFault`. |
-| `HasPendingAsyncWork()`  | Reports whether a service callback capturing the machine is outstanding                | True while a command callback is pending, the boot-time NVM check is in flight, or a calibration step is running. Used by `ControlModeStateMachine` to refuse destroying the machine.                                                                        |
-| `HasPartialCalibration()`| Reports whether `Idle` holds a non-empty but incomplete NVM record                     | True only in `Idle`, when `stage != complete` but pole pairs or resistance are non-zero (an old-schema or interrupted record). Used by the CAN bridge to broadcast `FocMotorState::partialCalibration` instead of `idle`.                                    |
-| `ApplyOnlineEstimates()` | Retunes speed and current PID gains from online estimators                             | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only.                                                                                                         |
+| Interface                 | Purpose                                                                                | Contract                                                                                                                                                                                                                                                     |
+|---------------------------|----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `FocStateMachineBase`     | Abstract lifecycle controller — state query and command dispatch                       | Constructed once per application; all command methods are safe to call from any state (a command without a row in the current state is rejected with a status and traced, never applied)                                                                     |
+| `CurrentState()`          | Returns the current `State` variant for inspection                                     | Returns a const reference; valid for the lifetime of the state machine                                                                                                                                                                                       |
+| `LastFaultCode()`         | Returns the most recent fault code                                                     | Returns `FaultCode::none` until the first fault occurs; afterwards it retains the last fault code, also after the fault is cleared                                                                                                                           |
+| `CmdCalibrate()`          | Requests start of full calibration sequence                                            | Only effective from `Idle` or `Ready`; ignored from all other states                                                                                                                                                                                         |
+| `CmdReAlign()`            | Re-establishes the rotor reference without re-running R/L or mechanical identification | Only effective from `Idle` or `Ready` with valid electrical calibration loaded; enters `Calibrating` (alignment sub-step only), then `Ready` with `rotorReferenceValid` on success, or `Fault` on failure                                                    |
+| `CmdEnable()`             | Requests enabling the FOC controller                                                   | Only effective from `Ready` when `rotorReferenceValid` is true; rejected when the rotor reference has not been established since the last reset                                                                                                              |
+| `CmdDisable()`            | Requests disabling the FOC controller                                                  | Only effective from `Enabled`; ignored from all other states                                                                                                                                                                                                 |
+| `CmdClearFault()`         | Clears the fault and returns to `Ready` if valid calibration is held, otherwise `Idle` | Only effective from `Fault`; ignored from all other states                                                                                                                                                                                                   |
+| `CmdClearCalibration()`   | Invalidates NVM calibration and returns to `Idle`                                      | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`.                                                                                                                            |
+| `CmdEmergencyStop()`      | Stops PWM immediately and leaves the active states                                     | Accepted from every state and always returns `ok`. From `Enabled` or `Calibrating` it goes to `Ready` when calibration data is valid, otherwise to `Idle`. `Idle`, `Ready` and `Fault` are left unchanged. Aborts any pending command with `abortedByFault`. |
+| `HasPendingAsyncWork()`   | Reports whether a service callback capturing the machine is outstanding                | True while a command callback is pending, any NVM operation is in flight, or a calibration step is running. Used by `ControlModeStateMachine` to refuse destroying the machine.                                                                              |
+| `HasPartialCalibration()` | Reports whether `Idle` holds a non-empty but incomplete NVM record                     | True only in `Idle`, when `stage != complete` but pole pairs or resistance are non-zero (an old-schema or interrupted record). Used by the CAN bridge to broadcast `FocMotorState::partialCalibration` instead of `idle`.                                    |
+| `ApplyOnlineEstimates()`  | Retunes speed and current PID gains from online estimators                             | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only.                                                                                                         |
 
 ### Required
 
-| Interface                                  | Purpose                                                                               | Contract                                                                                                                              |
-|--------------------------------------------|---------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| `NonVolatileMemory`                        | Persists and retrieves calibration data across power cycles                           | Must remain valid for the lifetime of the state machine                                                                               |
-| `ElectricalParametersIdentification`       | Estimates pole pairs, phase resistance, and dq inductances                            | Operations are asynchronous; callback fires on the same event loop                                                                    |
-| `MotorAlignment`                           | Forces rotor to a known angle and returns the encoder zero offset                     | Operation is asynchronous; result is optional (nullopt = failure)                                                                     |
-| `MechanicalParametersIdentification`       | Estimates rotor inertia and viscous friction (speed/position modes only)              | Operation is asynchronous; result is optional (nullopt = failure)                                                                     |
-| `FaultNotifier`                            | Delivers hardware fault notifications to the state machine                            | `Register()` must be called during construction; callback may fire at any time. Production implementation is `PlatformFaultNotifier`. |
-| `ThreePhaseInverter`                       | Used by the FOC controller to issue PWM and read phase currents                       | Stopped immediately on any fault from `Enabled` or `Calibrating` state                                                                |
-| `Encoder`                                  | Rotor position sensor; zero point established by the alignment step                   | Read-only from the state machine's perspective; `SetZero()` is called by `MotorAlignment` during calibration, never by the state machine itself                                                              |
-| `TerminalWithStorage`                      | Serial command interface for CLI-mode transition policy                               | Commands registered in constructor; terminal must outlive the state machine                                                           |
-| `Tracer`                                   | Debug trace output for lifecycle events                                               | All state transitions and calibration steps are traced                                                                                |
-| `RealTimeFrictionAndInertiaEstimator`      | Online RLS estimator for rotor inertia and viscous friction (speed/position only)     | Seeded from calibration data; torque constant set on `EnterEnabled`; updates run while FOC outer loop is active                       |
-| `RealTimeResistanceAndInductanceEstimator` | Online RLS estimator for phase resistance and d-axis inductance (speed/position only) | Assumes non-salient motor (Ld ≈ Lq); seeded using `lD` from calibration                                                               |
+| Interface                                  | Purpose                                                                               | Contract                                                                                                                                        |
+|--------------------------------------------|---------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
+| `NonVolatileMemory`                        | Persists and retrieves calibration data across power cycles                           | Must remain valid for the lifetime of the state machine                                                                                         |
+| `ElectricalParametersIdentification`       | Estimates pole pairs, phase resistance, and dq inductances                            | Operations are asynchronous; callback fires on the same event loop                                                                              |
+| `MotorAlignment`                           | Forces rotor to a known angle and returns the encoder zero offset                     | Operation is asynchronous; result is optional (nullopt = failure)                                                                               |
+| `MechanicalParametersIdentification`       | Estimates rotor inertia and viscous friction (speed/position modes only)              | Operation is asynchronous; result is optional (nullopt = failure)                                                                               |
+| `FaultNotifier`                            | Delivers hardware fault notifications to the state machine                            | `Register()` must be called during construction; callback may fire at any time. Production implementation is `PlatformFaultNotifier`.           |
+| `ThreePhaseInverter`                       | Used by the FOC controller to issue PWM and read phase currents                       | Stopped immediately on any fault from `Enabled` or `Calibrating` state                                                                          |
+| `Encoder`                                  | Rotor position sensor; zero point established by the alignment step                   | Read-only from the state machine's perspective; `SetZero()` is called by `MotorAlignment` during calibration, never by the state machine itself |
+| `TerminalWithStorage`                      | Serial command interface for CLI-mode transition policy                               | Commands registered in constructor; terminal must outlive the state machine                                                                     |
+| `Tracer`                                   | Debug trace output for lifecycle events                                               | All state transitions and calibration steps are traced                                                                                          |
+| `RealTimeFrictionAndInertiaEstimator`      | Online RLS estimator for rotor inertia and viscous friction (speed/position only)     | Seeded from calibration data; torque constant set on entering `Enabled`; updates run while FOC outer loop is active                             |
+| `RealTimeResistanceAndInductanceEstimator` | Online RLS estimator for phase resistance and d-axis inductance (speed/position only) | Assumes non-salient motor (Ld ≈ Lq); seeded using `lD` from calibration                                                                         |
 
 ---
 

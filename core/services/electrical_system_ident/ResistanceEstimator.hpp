@@ -39,6 +39,7 @@ namespace services
         void StartMeasurementPhase();
         void OnMeasurementSample(foc::PhaseCurrents currents);
         void OnMeasurementComplete();
+        void StartSampleWatchdog();
         void FailMeasurement();
 
         static constexpr uint8_t neutralDuty = 1;
@@ -55,6 +56,7 @@ namespace services
         infra::BoundedDeque<float>::WithMaxSize<averageFilterSize> currentSamples;
         infra::BoundedVector<float>::WithMaxSize<steadyStateSamplesSize> filteredSamples;
         infra::TimerSingleShot settleTimer;
-        infra::TimerSingleShot noSampleTimer;
+        infra::TimerRepeating noSampleTimer;
+        volatile bool sampleSeen{ false };
     };
 }

@@ -16,6 +16,7 @@ target_link_libraries(e_foc.state_machine PUBLIC
     e_foc.services.mechanical_system_ident
     e_foc.services.non_volatile_memory
     infra.util
+    services.fsm
     services.tracer
     services.util
 )
@@ -36,10 +37,29 @@ target_sources(e_foc.state_machine PRIVATE
     FaultController.cpp
     FaultNotifier.hpp
     FocStateMachine.hpp
-    FocStateMachineImpl.cpp
+    FocStateMachineEvents.hpp
+    BootSequence.hpp
+    BootSequence.cpp
+    CalibrationFlow.hpp
+    CalibrationFlow.cpp
+    CommandRejections.hpp
+    CommandRejections.cpp
+    FocLifecycleTable.hpp
+    FocLifecycleTable.cpp
     FocStateMachineCommon.hpp
     FocStateMachineCommon.cpp
-    FocStateMachineCommonCalibration.cpp
+    FocStateMachineDependencies.hpp
+    LifecycleCliCommands.hpp
+    LifecycleContext.hpp
+    MaintenanceFlow.hpp
+    MaintenanceFlow.cpp
+    ModeHooks.hpp
+    NvmActivity.hpp
+    NvmActivity.cpp
+    OperationFlow.hpp
+    OperationFlow.cpp
+    PendingCommand.hpp
+    PendingCommand.cpp
     OuterLoopStateMachine.hpp
     OuterLoopStateMachine.cpp
     OuterLoopStateMachineFor.hpp

@@ -48,5 +48,6 @@ namespace services
         MotorRLS::InputMatrix regressor;
         math::Matrix<float, 1, 1> torque;
         volatile bool converged{ false };
+        uint32_t run{ 0 };
     };
 }

@@ -1,52 +1,43 @@
 #pragma once
 
-#include "core/foc/interfaces/Execution.hpp"
-#include "core/foc/interfaces/Foc.hpp"
-#include "core/platform_abstraction/interfaces/Drivers.hpp"
-#include "core/services/alignment/MotorAlignment.hpp"
-#include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
-#include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
+#include "core/state_machine/BootSequence.hpp"
 #include "core/state_machine/CalibrationContext.hpp"
-#include "core/state_machine/CalibrationOrchestrator.hpp"
-#include "core/state_machine/FaultController.hpp"
+#include "core/state_machine/CalibrationFlow.hpp"
+#include "core/state_machine/CommandRejections.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
+#include "core/state_machine/FocStateMachineDependencies.hpp"
+#include "core/state_machine/FocStateMachineEvents.hpp"
+#include "core/state_machine/LifecycleContext.hpp"
+#include "core/state_machine/MaintenanceFlow.hpp"
+#include "core/state_machine/ModeHooks.hpp"
+#include "core/state_machine/NvmActivity.hpp"
+#include "core/state_machine/OperationFlow.hpp"
+#include "core/state_machine/PendingCommand.hpp"
 #include "core/state_machine/TransitionPolicies.hpp"
-#include "infra/util/AutoResetFunction.hpp"
-#include "services/tracer/Tracer.hpp"
-#include "services/util/TerminalWithStorage.hpp"
-#include <functional>
-#include <optional>
+#include "services/fsm/StateMachineTracer.hpp"
 
 namespace application
 {
-    struct TerminalAndTracer
-    {
-        services::TerminalWithStorage& terminal;
-        services::Tracer& tracer;
-    };
-
-    struct MotorHardware
-    {
-        drivers::ThreePhaseInverter& inverter;
-        drivers::Encoder& encoder;
-        foc::Volts vdc;
-    };
-
-    struct CalibrationServices
-    {
-        services::ElectricalParametersIdentification& electricalIdent;
-        services::MotorAlignment& motorAlignment;
-        std::optional<std::reference_wrapper<services::MechanicalParametersIdentification>> mechIdentOverride{ std::nullopt };
-        foc::NewtonMeter mechTorqueConstant{ foc::NewtonMeter{ 0.1f } };
-        foc::Weber fluxLinkage{ foc::Weber{ 0.0f } };
-    };
-
     class FocStateMachineCommon
         : public state_machine::FocStateMachineBase
+        , protected ModeHooks
     {
     public:
+        using StateMachine = LifecycleMachine;
+        using StateId = StateMachine::StateId;
+
+        // The deepest run of nested dispatches is a calibration sequence whose identification services
+        // report inline: the three steps the orchestrator announces plus the AlignmentSucceeded that
+        // follows the last one, which peaks at four. frictionAndInertia is not among them, because the
+        // mode hook sets that step directly rather than dispatching it, and the events that follow the
+        // alignment are pushed only once the queue has drained. The remaining slots absorb a command
+        // chained from a completion callback. Overflow is a really_assert, and each slot costs
+        // sizeof(Event), so this is budgeted against the 32 KB targets rather than rounded up.
+        static constexpr std::size_t eventQueueDepth{ 6 };
+
         ~FocStateMachineCommon() override = default;
+
         const state_machine::State& CurrentState() const override;
         state_machine::FaultCode LastFaultCode() const override;
         bool HasPendingAsyncWork() const override;
@@ -59,16 +50,14 @@ namespace application
         void CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>& onDone) override;
         state_machine::CommandResult CmdEmergencyStop() override;
 
+        void CmdReAlign(const infra::Function<void(state_machine::CommandResult)>& onDone);
+        state_machine::CommandResult CmdReserveExternalCalibration();
+        void CmdCompleteExternalCalibration(const services::CalibrationData& data, const infra::Function<void(state_machine::CommandResult)>& onDone);
         void CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone);
         foc::Weber ActiveFluxLinkage() const;
 
-        void CmdReAlign(const infra::Function<void(state_machine::CommandResult)>& onDone);
-
-        state_machine::CommandResult CmdReserveExternalCalibration();
-        void CmdCompleteExternalCalibration(const services::CalibrationData& data,
-            const infra::Function<void(state_machine::CommandResult)>& onDone);
-
         void RegisterReadyHandler(const infra::Function<void()>& onReady);
+        const StateMachine& TransitionTable() const;
 
     protected:
         FocStateMachineCommon(const TerminalAndTracer& terminalAndTracer,
@@ -77,113 +66,44 @@ namespace application
             const CalibrationServices& calibServices);
 
         void RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier);
-
         void ReleaseExternalResources();
-        void AbortCalibrationServices();
-        virtual void AbortModeSpecificServices();
         void RegisterCliIfNeeded(state_machine::TransitionPolicy transitionPolicy);
-        void CheckNvmOnBoot();
+        void Boot();
 
-        virtual foc::FocBase& GetFoc() = 0;
-        virtual foc::Controllable& GetFocControl() = 0;
-        virtual void RunPostAlignmentStep() = 0;
-        virtual foc::CurrentLoopTunable& CurrentTunable() = 0;
+        void ApplyModeSpecificCalibration(const services::CalibrationData& data) override;
+        bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const override;
+        void PrepareForEnabled() override;
+        void AbortModeSpecificServices() override;
+        bool HasModeSpecificWorkPending() const override;
+        void RegisterModeSpecificCli(services::TerminalWithStorage& terminal) override;
 
-        virtual void ApplyModeSpecificCalibration(const services::CalibrationData& data);
-        virtual bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const;
-        virtual void PrepareForEnabled();
-        virtual void RegisterModeSpecificCli(services::TerminalWithStorage& terminal);
-
-        void EnterCalibrating();
-        void EnterReady(const services::CalibrationData& data);
-        void EnterReadyOrIdle();
-        void EnterIdleWithPartialCalibration(const services::CalibrationData& data);
-        void EnterEnabled();
-        void EnterFault(state_machine::FaultCode code);
-        bool WasActive() const;
-
-        void CompletePendingCommand(state_machine::CommandResult result);
-        bool HasPendingCommand() const;
-        bool HasValidCalibration() const;
-
-        void RunAlignmentStep();
-        void FailCalibrationStep();
-        void OnCalibrationComplete();
-        void OnCalibrationSaved(services::NvmStatus status);
-
-        bool IsCalibrating(state_machine::CalibrationStep expected) const;
+        void SaveCalibration(state_machine::Calibrating& calibrating);
+        services::DispatchResult Dispatch(const state_machine::Event& event);
 
         services::Tracer& GetTracer();
         drivers::ThreePhaseInverter& GetInverter();
         foc::Volts GetVdc() const;
-        state_machine::State& GetCurrentState();
-        const state_machine::State& GetCurrentState() const;
-
         const services::CalibrationData& GetCalibration() const;
         foc::Weber EffectiveFluxLinkage(const services::CalibrationData& data) const;
         void ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage);
 
     private:
+        static state_machine::CommandResult ToCommandResult(services::DispatchResult result);
+
+    private:
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
-        services::NonVolatileMemory& nvm;
         CalibrationContext calibrationContext;
-        FaultController faultController;
-        CalibrationOrchestrator calibrationOrchestrator;
-
-        state_machine::State currentState{ state_machine::Idle{} };
-        state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::none };
-        bool bootCheckInFlight{ false };
-
-        void OnAlignmentSucceeded(foc::Radians angle);
-        void OnCalibrationInvalidated(services::NvmStatus status);
-        void OnBootValidityChecked(bool valid);
-        void OnBootCalibrationLoaded(services::NvmStatus status);
-        void OnFluxLinkageSaved(services::NvmStatus status);
-
-        infra::AutoResetFunction<void(state_machine::CommandResult)> pendingCommandCallback;
-        infra::Function<void()> readyHandler;
+        NvmActivity nvmActivity;
+        PendingCommand pendingCommand;
+        LifecycleEnvironment environment;
+        CalibrationFlow calibration;
+        MaintenanceFlow maintenance;
+        BootSequence boot;
+        OperationFlow operation;
+        LifecycleContext context;
+        StateMachine::WithStorage<eventQueueDepth> stateMachine;
+        services::StateMachineTracer<state_machine::State, state_machine::Event> stateMachineTracer;
+        CommandRejections commandRejections;
     };
-
-    template<class GetActiveSm>
-    void RegisterLifecycleCliCommands(
-        services::TerminalWithStorage& terminal,
-        GetActiveSm getActiveSm)
-    {
-        terminal.AddCommand({ { "calibrate", "cal", "Run full calibration sequence" },
-            [getActiveSm](const infra::BoundedConstString&)
-            {
-                getActiveSm().CmdCalibrate([](state_machine::CommandResult) {});
-            } });
-
-        terminal.AddCommand({ { "align", "aln", "Re-establish rotor reference without full recalibration" },
-            [getActiveSm](const infra::BoundedConstString&)
-            {
-                getActiveSm().CmdReAlign([](state_machine::CommandResult) {});
-            } });
-
-        terminal.AddCommand({ { "enable", "en", "Enable FOC controller" },
-            [getActiveSm](const infra::BoundedConstString&)
-            {
-                getActiveSm().CmdEnable();
-            } });
-
-        terminal.AddCommand({ { "disable", "dis", "Disable FOC controller" },
-            [getActiveSm](const infra::BoundedConstString&)
-            {
-                getActiveSm().CmdDisable();
-            } });
-
-        terminal.AddCommand({ { "clear_fault", "cf", "Clear fault and return to Idle" },
-            [getActiveSm](const infra::BoundedConstString&)
-            {
-                getActiveSm().CmdClearFault();
-            } });
-
-        terminal.AddCommand({ { "clear_cal", "cc", "Clear calibration data from NVM" },
-            [getActiveSm](const infra::BoundedConstString&)
-            {
-                getActiveSm().CmdClearCalibration([](state_machine::CommandResult) {});
-            } });
-    }
 }

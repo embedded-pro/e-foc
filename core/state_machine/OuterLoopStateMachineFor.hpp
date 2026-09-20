@@ -31,7 +31,7 @@ namespace application
             focController.SetOnlineElectricalEstimator(onlineElecEstimator);
             RegisterFaultHandler(faultNotifier);
             RegisterCliIfNeeded(transitionPolicy);
-            CheckNvmOnBoot();
+            Boot();
         }
 
         ~OuterLoopStateMachineFor() override

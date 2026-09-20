@@ -43,7 +43,7 @@ namespace
         const float fInj = static_cast<float>(config.injectionFrequency.Value());
         const auto samplesPerPeriod = static_cast<std::size_t>(std::round(fs / fInj));
         const float omegaExact = twoPi * fs / static_cast<float>(samplesPerPeriod);
-        const float phaseInc = omegaExact / fs;  // = 2π / samplesPerPeriod
+        const float phaseInc = omegaExact / fs; // = 2π / samplesPerPeriod
 
         const float vNorm = static_cast<float>(config.injectionVoltagePercent.Value()) / 100.0f;
         const float vTermAmp = vNorm * 0.75f * vdc;
@@ -51,10 +51,10 @@ namespace
 
         // ZOH-theoretic expected L: Im(Z_ZOH) / (omegaExact * terminalFactor).
         // Z_ZOH = (1 − ad·e^{−jω·Ts}) / bd  →  Im(Z_ZOH) = ad·sin(ω·Ts) / bd.
-        const float omegaTs = phaseInc;  // = omegaExact / fs
+        const float omegaTs = phaseInc; // = omegaExact / fs
         const float imZZOH = plant.ad * std::sin(omegaTs) / plant.bd;
         const float termFactor = config.windingConfig == services::WindingConfiguration::Delta ? 0.5f : 1.5f;
-        const float expectedL = imZZOH / (omegaExact * termFactor) * 1000.0f;  // mH
+        const float expectedL = imZZOH / (omegaExact * termFactor) * 1000.0f; // mH
 
         services::SinusoidalInductanceEstimator::Result result{};
 
@@ -66,7 +66,10 @@ namespace
         EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(totalSamples + 1);
         EXPECT_CALL(driverMock, Stop());
 
-        estimator.Start(config, [&result](auto r) { result = r; });
+        estimator.Start(config, [&result](auto r)
+            {
+                result = r;
+            });
 
         float phase = 0.0f;
         float iAlpha = 0.0f;
@@ -122,11 +125,17 @@ TEST_F(SinusoidalInductanceEstimatorTest, zero_current_response_returns_no_induc
     services::SinusoidalInductanceEstimator::Result result{};
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
-        .WillOnce([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(totalSamples + 1);
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r) { result = r; });
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
 
     for (std::size_t k = 0; k < totalSamples; ++k)
         driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
@@ -199,11 +208,17 @@ TEST_F(SinusoidalInductanceEstimatorTest, fitQuality_drops_for_unexpected_signal
     services::SinusoidalInductanceEstimator::Result result{};
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
-        .WillOnce([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(totalSamples + 1);
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r) { result = r; });
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
 
     // Provide a DC current signal (incoherent with f_inj).
     for (std::size_t k = 0; k < totalSamples; ++k)
@@ -221,7 +236,10 @@ TEST_F(SinusoidalInductanceEstimatorTest, zero_injection_frequency_returns_empty
 
     services::SinusoidalInductanceEstimator::Result result{ foc::MilliHenry{ 99.0f }, 1.0f };
 
-    estimator.Start(config, [&result](auto r) { result = r; });
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
 
     EXPECT_FALSE(result.inductance.has_value());
     EXPECT_FLOAT_EQ(result.fitQuality, 0.0f);
@@ -242,11 +260,17 @@ TEST_F(SinusoidalInductanceEstimatorTest, negative_zimag_returns_nullopt_inducta
     services::SinusoidalInductanceEstimator::Result result{};
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
-        .WillOnce([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(totalSamples + 1);
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r) { result = r; });
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
 
     // Feed a cosine signal (90° phase-shifted from injection sine) so Goertzel gives Im > 0 but Re < 0,
     // making zImag = -vTerm * N/2 * iRe / magSquared positive only when iRe < 0.
@@ -274,11 +298,17 @@ TEST_F(SinusoidalInductanceEstimatorTest, overcurrent_on_first_sample_stops_driv
     services::SinusoidalInductanceEstimator::Result result{ foc::MilliHenry{ 99.0f }, 1.0f };
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
-        .WillOnce([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r) { result = r; });
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
 
     driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
         foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f },
@@ -298,11 +328,17 @@ TEST_F(SinusoidalInductanceEstimatorTest, overcurrent_on_phase_b_also_aborts)
     services::SinusoidalInductanceEstimator::Result result{ foc::MilliHenry{ 99.0f }, 1.0f };
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
-        .WillOnce([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r) { result = r; });
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
 
     driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
         foc::Ampere{ 0.0f },
@@ -338,19 +374,25 @@ TEST_F(SinusoidalInductanceEstimatorTest, no_sample_timeout_fires_if_no_adc_call
     services::SinusoidalInductanceEstimator::Result result{ foc::MilliHenry{ 99.0f }, 1.0f };
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
-        .WillOnce([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r) { result = r; });
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
 
-    ForwardTime(config.noSampleTimeout + std::chrono::milliseconds{ 1 });
+    ForwardTime(2 * config.noSampleTimeout + std::chrono::milliseconds{ 1 });
 
     EXPECT_FALSE(result.inductance.has_value());
     EXPECT_FLOAT_EQ(result.fitQuality, 0.0f);
 }
 
-TEST_F(SinusoidalInductanceEstimatorTest, no_sample_timeout_resets_per_sample_and_fires_when_samples_stop)
+TEST_F(SinusoidalInductanceEstimatorTest, sample_watchdog_fires_once_samples_stop_arriving)
 {
     services::SinusoidalInductanceEstimator::Config config{
         hal::Hertz{ 700 }, hal::Percent{ 15 }, 2, 5, 1, services::WindingConfiguration::Wye
@@ -360,17 +402,23 @@ TEST_F(SinusoidalInductanceEstimatorTest, no_sample_timeout_resets_per_sample_an
     services::SinusoidalInductanceEstimator::Result result{ foc::MilliHenry{ 99.0f }, 1.0f };
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
-        .WillOnce([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(samplesSent + 1);
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r) { result = r; });
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
 
     for (std::size_t k = 0; k < samplesSent; ++k)
         driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
             foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
-    ForwardTime(config.noSampleTimeout + std::chrono::milliseconds{ 1 });
+    ForwardTime(2 * config.noSampleTimeout + std::chrono::milliseconds{ 1 });
 
     EXPECT_FALSE(result.inductance.has_value());
     EXPECT_FLOAT_EQ(result.fitQuality, 0.0f);

@@ -16,6 +16,8 @@ namespace application
         void Unregister();
 
         void EnterFault();
+        bool CanClear() const;
+        void Clear();
         bool TryClear();
         void ResetClearCount();
 
