@@ -12,13 +12,15 @@ namespace application
         : terminal(terminalAndTracer.terminal)
         , tracer(terminalAndTracer.tracer)
         , calibrationContext(hardware.inverter, hardware.vdc, calibServices.fluxLinkage)
-        , calibration(stateMachine, calibrationContext, nvm, pendingCommand, *this, tracer, calibServices.electricalIdent, calibServices.motorAlignment)
-        , maintenance(stateMachine, calibrationContext, nvm, pendingCommand, *this, tracer, calibration)
-        , boot(stateMachine, calibrationContext, nvm, *this, tracer, calibration)
-        , operation(stateMachine, calibration, pendingCommand, *this, tracer)
+        , environment{ stateMachine, calibrationContext, nvm, nvmActivity, pendingCommand, *this, tracer }
+        , calibration(environment, calibServices)
+        , maintenance(environment, calibration)
+        , boot(environment, calibration)
+        , operation(environment, calibration)
         , context{ *this, calibration, maintenance, boot, operation, pendingCommand }
         , stateMachine(context, FocLifecycleTable::Rows())
         , stateMachineTracer(stateMachine, tracer)
+        , commandRejections(stateMachine)
     {
         FocLifecycleTable::RegisterEnteredHooks(stateMachine);
     }
@@ -64,7 +66,7 @@ namespace application
 
     bool FocStateMachineCommon::HasPendingAsyncWork() const
     {
-        return pendingCommand.Pending() || boot.InFlight() || stateMachine.Is<state_machine::Calibrating>() || calibration.IsRunning() || HasModeSpecificWorkPending();
+        return pendingCommand.Pending() || nvmActivity.InFlight() || stateMachine.Is<state_machine::Calibrating>() || calibration.IsRunning() || HasModeSpecificWorkPending();
     }
 
     bool FocStateMachineCommon::HasPartialCalibration() const
@@ -79,7 +81,7 @@ namespace application
 
     void FocStateMachineCommon::CmdCalibrate(const infra::Function<void(state_machine::CommandResult)>& onDone)
     {
-        DispatchCommand(state_machine::Calibrate{ onDone }, onDone);
+        Dispatch(state_machine::Calibrate{ state_machine::CommandCallback{ onDone } });
     }
 
     state_machine::CommandResult FocStateMachineCommon::CmdEnable()
@@ -108,7 +110,7 @@ namespace application
 
     void FocStateMachineCommon::CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>& onDone)
     {
-        DispatchCommand(state_machine::ClearCalibration{ onDone }, onDone);
+        Dispatch(state_machine::ClearCalibration{ state_machine::CommandCallback{ onDone } });
     }
 
     state_machine::CommandResult FocStateMachineCommon::CmdEmergencyStop()
@@ -120,7 +122,7 @@ namespace application
 
     void FocStateMachineCommon::CmdReAlign(const infra::Function<void(state_machine::CommandResult)>& onDone)
     {
-        DispatchCommand(state_machine::ReAlign{ onDone }, onDone);
+        Dispatch(state_machine::ReAlign{ state_machine::CommandCallback{ onDone } });
     }
 
     state_machine::CommandResult FocStateMachineCommon::CmdReserveExternalCalibration()
@@ -130,12 +132,12 @@ namespace application
 
     void FocStateMachineCommon::CmdCompleteExternalCalibration(const services::CalibrationData& data, const infra::Function<void(state_machine::CommandResult)>& onDone)
     {
-        DispatchCommand(state_machine::CompleteExternalCalibration{ data, onDone }, onDone);
+        Dispatch(state_machine::CompleteExternalCalibration{ data, state_machine::CommandCallback{ onDone } });
     }
 
     void FocStateMachineCommon::CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone)
     {
-        DispatchCommand(state_machine::SetFluxLinkage{ fluxLinkage, onDone }, onDone);
+        Dispatch(state_machine::SetFluxLinkage{ fluxLinkage, state_machine::CommandCallback{ onDone } });
     }
 
     foc::Weber FocStateMachineCommon::ActiveFluxLinkage() const
@@ -208,12 +210,6 @@ namespace application
     void FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage)
     {
         calibrationContext.ApplyModel(resistance, inductance, polePairs, bandwidth, fluxLinkage, GetFoc(), CurrentTunable());
-    }
-
-    void FocStateMachineCommon::DispatchCommand(const state_machine::Event& event, const infra::Function<void(state_machine::CommandResult)>& onDone)
-    {
-        if (ToCommandResult(Dispatch(event)) != state_machine::CommandResult::ok)
-            onDone(state_machine::CommandResult::rejected);
     }
 
     state_machine::CommandResult FocStateMachineCommon::ToCommandResult(services::DispatchResult result)

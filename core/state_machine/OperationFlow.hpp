@@ -3,10 +3,7 @@
 #include "core/state_machine/CalibrationFlow.hpp"
 #include "core/state_machine/FaultController.hpp"
 #include "core/state_machine/LifecycleContext.hpp"
-#include "core/state_machine/ModeHooks.hpp"
-#include "core/state_machine/PendingCommand.hpp"
 #include "infra/util/Function.hpp"
-#include "services/tracer/Tracer.hpp"
 
 namespace application
 {
@@ -15,7 +12,7 @@ namespace application
     public:
         using StateId = LifecycleMachine::StateId;
 
-        OperationFlow(LifecycleMachine& machine, CalibrationFlow& calibration, PendingCommand& pending, ModeHooks& mode, services::Tracer& tracer);
+        OperationFlow(const LifecycleEnvironment& environment, CalibrationFlow& calibration);
 
         void RegisterFaultHandler(state_machine::FaultNotifier& notifier);
         void UnregisterFaultHandler();
@@ -41,11 +38,8 @@ namespace application
         void AbortActiveWork();
 
     private:
-        LifecycleMachine& machine;
+        LifecycleEnvironment env;
         CalibrationFlow& calibration;
-        PendingCommand& pending;
-        ModeHooks& mode;
-        services::Tracer& tracer;
         FaultController faultController;
         state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::none };
         infra::Function<void()> readyHandler;

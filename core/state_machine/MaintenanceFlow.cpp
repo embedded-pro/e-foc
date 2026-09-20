@@ -2,79 +2,86 @@
 
 namespace application
 {
-    MaintenanceFlow::MaintenanceFlow(LifecycleMachine& machine,
-        CalibrationContext& context,
-        services::NonVolatileMemory& nvm,
-        PendingCommand& pending,
-        ModeHooks& mode,
-        services::Tracer& tracer,
-        const CalibrationFlow& calibration)
-        : machine(machine)
-        , context(context)
-        , nvm(nvm)
-        , pending(pending)
-        , mode(mode)
-        , tracer(tracer)
+    MaintenanceFlow::MaintenanceFlow(const LifecycleEnvironment& environment, const CalibrationFlow& calibration)
+        : env(environment)
         , calibration(calibration)
     {}
 
     void MaintenanceFlow::BeginClear(const state_machine::ClearCalibration& command)
     {
-        pending.Accept(command.onDone);
-        nvm.InvalidateCalibration(machine.CompletionWith<void(services::NvmStatus)>([](services::NvmStatus status)
+        env.pending.Accept(command.onDone);
+        completion = env.machine.CompletionWith<void(services::NvmStatus)>([](services::NvmStatus status)
             {
                 return state_machine::CalibrationInvalidated{ status };
-            }));
+            });
+        env.nvmActivity.Begin();
+        env.nvm.InvalidateCalibration([this](services::NvmStatus status)
+            {
+                OnNvmDone(status);
+            });
     }
 
     state_machine::Idle MaintenanceFlow::CompleteClear()
     {
-        tracer.Trace() << "[SM] Calibration invalidated in NVM";
-        context.Invalidate();
-        pending.CompleteAfterTransition(state_machine::CommandResult::ok);
+        env.tracer.Trace() << "[SM] Calibration invalidated in NVM";
+        env.context.Invalidate();
+        env.pending.CompleteAfterTransition(state_machine::CommandResult::ok);
         return state_machine::Idle{};
     }
 
     void MaintenanceFlow::RejectClear()
     {
-        pending.Complete(state_machine::CommandResult::rejected);
+        env.pending.Complete(state_machine::CommandResult::rejected);
     }
 
     bool MaintenanceFlow::IsAcceptableFluxLinkage(const state_machine::SetFluxLinkage& command) const
     {
-        if (command.fluxLinkage.Value() > 0.0f && !pending.Pending() && calibration.HasValidCalibration())
+        if (command.fluxLinkage.Value() > 0.0f && !env.pending.Pending() && calibration.HasValidCalibration())
             return true;
 
-        tracer.Trace() << "[SM] Flux linkage rejected: needs a positive value and a calibrated motor in Idle or Ready";
+        env.tracer.Trace() << "[SM] Flux linkage rejected: needs a positive value and a calibrated motor in Idle or Ready";
         return false;
     }
 
     void MaintenanceFlow::BeginSetFluxLinkage(const state_machine::SetFluxLinkage& command)
     {
-        context.SetPendingFluxLinkage(command.fluxLinkage.Value());
-        pending.Accept(command.onDone);
+        env.context.SetPendingFluxLinkage(command.fluxLinkage.Value());
+        env.pending.Accept(command.onDone);
 
-        auto updated = context.Data();
-        updated.fluxLinkage = context.PendingFluxLinkage();
+        auto updated = env.context.Data();
+        updated.fluxLinkage = env.context.PendingFluxLinkage();
 
-        nvm.SaveCalibration(updated, machine.CompletionWith<void(services::NvmStatus)>([](services::NvmStatus status)
-                                         {
-                                             return state_machine::FluxLinkageSaved{ status };
-                                         }));
+        completion = env.machine.CompletionWith<void(services::NvmStatus)>([](services::NvmStatus status)
+            {
+                return state_machine::FluxLinkageSaved{ status };
+            });
+        env.nvmActivity.Begin();
+        env.nvm.SaveCalibration(updated, [this](services::NvmStatus status)
+            {
+                OnNvmDone(status);
+            });
     }
 
     void MaintenanceFlow::OnFluxLinkageSaved(services::NvmStatus status)
     {
         if (status != services::NvmStatus::Ok)
         {
-            tracer.Trace() << "[SM] Flux linkage not persisted";
-            pending.Complete(status == services::NvmStatus::Busy ? state_machine::CommandResult::rejected : state_machine::CommandResult::nvmFailed);
+            env.tracer.Trace() << "[SM] Flux linkage not persisted";
+            env.pending.Complete(status == services::NvmStatus::Busy ? state_machine::CommandResult::rejected : state_machine::CommandResult::nvmFailed);
             return;
         }
 
-        context.CommitPendingFluxLinkage();
-        context.Apply(mode.GetFoc(), mode.CurrentTunable());
-        tracer.Trace() << "[SM] Flux linkage stored";
-        pending.Complete(state_machine::CommandResult::ok);
+        env.context.CommitPendingFluxLinkage();
+        env.context.Apply(env.mode.GetFoc(), env.mode.CurrentTunable());
+        env.tracer.Trace() << "[SM] Flux linkage stored";
+        env.pending.Complete(state_machine::CommandResult::ok);
+    }
+
+    void MaintenanceFlow::OnNvmDone(services::NvmStatus status)
+    {
+        env.nvmActivity.End();
+        auto done = completion;
+        completion = nullptr;
+        done(status);
     }
 }

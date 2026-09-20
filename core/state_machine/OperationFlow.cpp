@@ -2,12 +2,9 @@
 
 namespace application
 {
-    OperationFlow::OperationFlow(LifecycleMachine& machine, CalibrationFlow& calibration, PendingCommand& pending, ModeHooks& mode, services::Tracer& tracer)
-        : machine(machine)
+    OperationFlow::OperationFlow(const LifecycleEnvironment& environment, CalibrationFlow& calibration)
+        : env(environment)
         , calibration(calibration)
-        , pending(pending)
-        , mode(mode)
-        , tracer(tracer)
     {}
 
     void OperationFlow::RegisterFaultHandler(state_machine::FaultNotifier& notifier)
@@ -16,11 +13,11 @@ namespace application
             notifier,
             [this](state_machine::FaultCode)
             {
-                mode.GetFocControl().Stop();
+                env.mode.GetFocControl().Stop();
             },
             [this](state_machine::FaultCode code)
             {
-                machine.Dispatch(state_machine::FaultDetected{ code });
+                env.machine.Dispatch(state_machine::FaultDetected{ code });
             });
     }
 
@@ -40,20 +37,20 @@ namespace application
             return false;
 
         if (!ready.rotorReferenceValid)
-            tracer.Trace() << "[SM] Enable rejected: rotor reference not established; run alignment";
+            env.tracer.Trace() << "[SM] Enable rejected: rotor reference not established; run alignment";
 
         return ready.rotorReferenceValid;
     }
 
     state_machine::Enabled OperationFlow::BuildEnabled()
     {
-        mode.PrepareForEnabled();
+        env.mode.PrepareForEnabled();
         return state_machine::Enabled{};
     }
 
     state_machine::Ready OperationFlow::DisableToReady()
     {
-        mode.GetFocControl().Stop();
+        env.mode.GetFocControl().Stop();
         faultController.ResetClearCount();
         return calibration.ReadyState();
     }
@@ -64,10 +61,10 @@ namespace application
         faultController.EnterFault();
 
         if (wasActive)
-            mode.GetFocControl().Stop();
+            env.mode.GetFocControl().Stop();
 
         calibration.Abort();
-        pending.CompleteAfterTransition(pendingResult);
+        env.pending.CompleteAfterTransition(pendingResult);
         return state_machine::Fault{ code };
     }
 
@@ -76,45 +73,45 @@ namespace application
         if (faultController.TryClear())
             return true;
 
-        tracer.Trace() << "[SM] Fault clear refused, retry limit reached; reset required";
+        env.tracer.Trace() << "[SM] Fault clear refused, retry limit reached; reset required";
         return false;
     }
 
     state_machine::Ready OperationFlow::ClearFaultToReady()
     {
-        tracer.Trace() << "[SM] Fault cleared";
+        env.tracer.Trace() << "[SM] Fault cleared";
         return calibration.ReadyState();
     }
 
     state_machine::Idle OperationFlow::ClearFaultToIdle()
     {
-        tracer.Trace() << "[SM] Fault cleared";
+        env.tracer.Trace() << "[SM] Fault cleared";
         return state_machine::Idle{};
     }
 
     void OperationFlow::AbortActiveWork()
     {
-        tracer.Trace() << "[SM] Emergency stop";
+        env.tracer.Trace() << "[SM] Emergency stop";
         calibration.Abort();
     }
 
     void OperationFlow::StopWithoutTransition()
     {
         AbortActiveWork();
-        pending.Complete(state_machine::CommandResult::abortedByFault);
+        env.pending.Complete(state_machine::CommandResult::abortedByFault);
     }
 
     state_machine::Idle OperationFlow::StopToIdle()
     {
         AbortActiveWork();
-        pending.CompleteAfterTransition(state_machine::CommandResult::abortedByFault);
+        env.pending.CompleteAfterTransition(state_machine::CommandResult::abortedByFault);
         return state_machine::Idle{};
     }
 
     state_machine::Ready OperationFlow::StopToReady()
     {
         AbortActiveWork();
-        pending.CompleteAfterTransition(state_machine::CommandResult::abortedByFault);
+        env.pending.CompleteAfterTransition(state_machine::CommandResult::abortedByFault);
         return calibration.ReadyState();
     }
 
@@ -126,9 +123,9 @@ namespace application
     void OperationFlow::StateEntered(StateId state)
     {
         if (state.Is<state_machine::Enabled>())
-            mode.GetFocControl().Start();
+            env.mode.GetFocControl().Start();
 
-        pending.FlushDeferred();
+        env.pending.FlushDeferred();
 
         if (state.Is<state_machine::Ready>() && readyHandler != nullptr)
             readyHandler();

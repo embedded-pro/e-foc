@@ -4,12 +4,14 @@
 #include "core/state_machine/BootSequence.hpp"
 #include "core/state_machine/CalibrationContext.hpp"
 #include "core/state_machine/CalibrationFlow.hpp"
+#include "core/state_machine/CommandRejections.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include "core/state_machine/FocStateMachineDependencies.hpp"
 #include "core/state_machine/FocStateMachineEvents.hpp"
 #include "core/state_machine/LifecycleContext.hpp"
 #include "core/state_machine/MaintenanceFlow.hpp"
 #include "core/state_machine/ModeHooks.hpp"
+#include "core/state_machine/NvmActivity.hpp"
 #include "core/state_machine/OperationFlow.hpp"
 #include "core/state_machine/PendingCommand.hpp"
 #include "core/state_machine/TransitionPolicies.hpp"
@@ -77,14 +79,15 @@ namespace application
         void ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage);
 
     private:
-        void DispatchCommand(const state_machine::Event& event, const infra::Function<void(state_machine::CommandResult)>& onDone);
         static state_machine::CommandResult ToCommandResult(services::DispatchResult result);
 
     private:
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
         CalibrationContext calibrationContext;
+        NvmActivity nvmActivity;
         PendingCommand pendingCommand;
+        LifecycleEnvironment environment;
         CalibrationFlow calibration;
         MaintenanceFlow maintenance;
         BootSequence boot;
@@ -92,5 +95,6 @@ namespace application
         LifecycleContext context;
         StateMachine::WithStorage<4> stateMachine;
         services::StateMachineTracer<state_machine::State, state_machine::Event> stateMachineTracer;
+        CommandRejections commandRejections;
     };
 }

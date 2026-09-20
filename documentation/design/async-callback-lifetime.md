@@ -90,7 +90,7 @@ The WeakPtr mechanism ensures memory safety regardless of timing. The second lay
 ```mermaid
 graph TD
     A[HasPendingAsyncWork] --> B{pending NVM command?}
-    A --> C{boot NVM check in flight?}
+    A --> C{any NVM operation in flight?}
     A --> D{Calibrating state?}
     A --> E{electricalIdent.IsRunning?}
     A --> F{mechIdent.IsRunning?}

@@ -1,26 +1,15 @@
 #pragma once
 
-#include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
-#include "core/state_machine/CalibrationContext.hpp"
 #include "core/state_machine/CalibrationOrchestrator.hpp"
+#include "core/state_machine/FocStateMachineDependencies.hpp"
 #include "core/state_machine/LifecycleContext.hpp"
-#include "core/state_machine/ModeHooks.hpp"
-#include "core/state_machine/PendingCommand.hpp"
-#include "services/tracer/Tracer.hpp"
 
 namespace application
 {
     class CalibrationFlow
     {
     public:
-        CalibrationFlow(LifecycleMachine& machine,
-            CalibrationContext& context,
-            services::NonVolatileMemory& nvm,
-            PendingCommand& pending,
-            ModeHooks& mode,
-            services::Tracer& tracer,
-            services::ElectricalParametersIdentification& electricalIdent,
-            services::MotorAlignment& motorAlignment);
+        CalibrationFlow(const LifecycleEnvironment& environment, const CalibrationServices& services);
 
         state_machine::Calibrating Begin(const state_machine::Calibrate& command);
         state_machine::Calibrating BeginReAlign(const state_machine::ReAlign& command);
@@ -44,12 +33,11 @@ namespace application
         void Abort();
 
     private:
-        LifecycleMachine& machine;
-        CalibrationContext& context;
-        services::NonVolatileMemory& nvm;
-        PendingCommand& pending;
-        ModeHooks& mode;
-        services::Tracer& tracer;
+        void OnSaved(services::NvmStatus status);
+
+    private:
+        LifecycleEnvironment env;
         CalibrationOrchestrator orchestrator;
+        infra::Function<void(services::NvmStatus)> saveCompletion;
     };
 }

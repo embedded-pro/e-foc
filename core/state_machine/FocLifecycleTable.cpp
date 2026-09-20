@@ -62,7 +62,7 @@ namespace application
                     },
                     [](const LifecycleContext& context, const state_machine::Calibrating&, const state_machine::CompleteExternalCalibration& command)
                     {
-                        return context.calibration.IsPlausibleExternal(command);
+                        return !context.pending.Pending() && context.calibration.IsPlausibleExternal(command);
                     }),
                 Machine::InternalRow<state_machine::Calibrating, state_machine::RunCalibrationSequence>(
                     [](LifecycleContext& context, state_machine::Calibrating& calibrating, const state_machine::RunCalibrationSequence&)
@@ -118,12 +118,12 @@ namespace application
                 {
                     return calibrating.pendingData.stage == services::CalibrationStage::complete;
                 },
-                [](LifecycleContext& context, state_machine::Calibrating& calibrating, const state_machine::CalibrationSaved&)
+                [](LifecycleContext& context, const state_machine::Calibrating& calibrating, const state_machine::CalibrationSaved&)
                 {
                     return context.calibration.Complete(calibrating);
                 }),
             Machine::Row<state_machine::Calibrating, state_machine::CalibrationSaved, state_machine::Idle>(nullptr,
-                [](LifecycleContext& context, state_machine::Calibrating& calibrating, const state_machine::CalibrationSaved&)
+                [](LifecycleContext& context, const state_machine::Calibrating& calibrating, const state_machine::CalibrationSaved&)
                 {
                     return context.calibration.CompletePartial(calibrating);
                 }),

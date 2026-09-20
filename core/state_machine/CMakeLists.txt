@@ -42,6 +42,8 @@ target_sources(e_foc.state_machine PRIVATE
     BootSequence.cpp
     CalibrationFlow.hpp
     CalibrationFlow.cpp
+    CommandRejections.hpp
+    CommandRejections.cpp
     FocLifecycleTable.hpp
     FocLifecycleTable.cpp
     FocStateMachineCommon.hpp
@@ -52,6 +54,8 @@ target_sources(e_foc.state_machine PRIVATE
     MaintenanceFlow.hpp
     MaintenanceFlow.cpp
     ModeHooks.hpp
+    NvmActivity.hpp
+    NvmActivity.cpp
     OperationFlow.hpp
     OperationFlow.cpp
     PendingCommand.hpp

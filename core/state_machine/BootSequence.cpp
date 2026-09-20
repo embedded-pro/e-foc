@@ -2,24 +2,15 @@
 
 namespace application
 {
-    BootSequence::BootSequence(LifecycleMachine& machine,
-        CalibrationContext& context,
-        services::NonVolatileMemory& nvm,
-        ModeHooks& mode,
-        services::Tracer& tracer,
-        const CalibrationFlow& calibration)
-        : machine(machine)
-        , context(context)
-        , nvm(nvm)
-        , mode(mode)
-        , tracer(tracer)
+    BootSequence::BootSequence(const LifecycleEnvironment& environment, const CalibrationFlow& calibration)
+        : env(environment)
         , calibration(calibration)
     {}
 
     void BootSequence::Begin()
     {
-        inFlight = true;
-        nvm.IsCalibrationValid([this](bool valid)
+        env.nvmActivity.Begin();
+        env.nvm.IsCalibrationValid([this](bool valid)
             {
                 OnValidityChecked(valid);
             });
@@ -29,12 +20,12 @@ namespace application
     {
         if (!valid)
         {
-            tracer.Trace() << "[SM] NVM invalid, starting in Idle";
+            env.tracer.Trace() << "[SM] NVM invalid, starting in Idle";
             return;
         }
 
-        inFlight = true;
-        nvm.LoadCalibration(context.MutableData(), [this](services::NvmStatus status)
+        env.nvmActivity.Begin();
+        env.nvm.LoadCalibration(env.context.MutableData(), [this](services::NvmStatus status)
             {
                 OnCalibrationLoaded(status);
             });
@@ -43,31 +34,26 @@ namespace application
     void BootSequence::Finish(services::NvmStatus status)
     {
         if (status != services::NvmStatus::Ok)
-            tracer.Trace() << "[SM] NVM load failed, starting in Idle";
+            env.tracer.Trace() << "[SM] NVM load failed, starting in Idle";
         else if (!calibration.HasValidCalibration())
-            tracer.Trace() << "[SM] NVM data incomplete, starting in Idle";
+            env.tracer.Trace() << "[SM] NVM data incomplete, starting in Idle";
         else
         {
-            tracer.Trace() << "[SM] Electrical parameters restored; run alignment before enabling";
-            context.Apply(mode.GetFoc(), mode.CurrentTunable());
-            mode.ApplyModeSpecificCalibration(context.Data());
+            env.tracer.Trace() << "[SM] Electrical parameters restored; run alignment before enabling";
+            env.context.Apply(env.mode.GetFoc(), env.mode.CurrentTunable());
+            env.mode.ApplyModeSpecificCalibration(env.context.Data());
         }
-    }
-
-    bool BootSequence::InFlight() const
-    {
-        return inFlight;
     }
 
     void BootSequence::OnValidityChecked(bool valid)
     {
-        inFlight = false;
-        machine.Dispatch(state_machine::BootValidityChecked{ valid });
+        env.nvmActivity.End();
+        env.machine.Dispatch(state_machine::BootValidityChecked{ valid });
     }
 
     void BootSequence::OnCalibrationLoaded(services::NvmStatus status)
     {
-        inFlight = false;
-        machine.Dispatch(state_machine::BootCalibrationLoaded{ status });
+        env.nvmActivity.End();
+        env.machine.Dispatch(state_machine::BootCalibrationLoaded{ status });
     }
 }

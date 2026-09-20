@@ -124,6 +124,13 @@ transition has been committed and announced. Actions therefore always observe a 
 state, and the target state is committed before its side effects (starting the drive,
 completing the pending command, notifying the ready handler) run, in that order.
 
+A command issued from inside a completion callback is such a queued event. Its synchronous
+result is `ok`, meaning accepted for processing, not applied; the table decides when the
+queued event is handled. A command that carries a callback is not left dangling when the
+table then refuses it: `CommandRejections` observes every forbidden or rejected event and
+completes that command's callback with `rejected`, whether the event was dispatched directly
+or from the queue.
+
 The transition table is observable: a tracer prints every transition as
 `fsm: <from> --<event>--> <to>` next to the existing `[SM]` lines, and every forbidden,
 rejected or discarded event with its state.
@@ -142,6 +149,8 @@ collaborators that carry out the work, each with one responsibility.
 | `BootSequence`       | The boot-time validity check and load of the stored record                                                                         |
 | `OperationFlow`      | Enable and disable, faults and emergency stop, and the post-commit work of every state                                             |
 | `PendingCommand`     | The one outstanding operator command, and the result held back until the target state has been committed                           |
+| `CommandRejections`  | The observer that completes a queued command's callback with `rejected` when the table refuses it, so no callback is left dangling |
+| `NvmActivity`        | The count of NVM operations whose callbacks still capture the machine; part of `HasPendingAsyncWork()`                             |
 | `CalibrationContext` | The calibration record in RAM and its application to the controller                                                                |
 | `ModeHooks`          | The interface through which the flows reach the control mode: the controller, its tunables and the mode-specific calibration steps |
 
@@ -223,7 +232,7 @@ An external client (e.g. the CAN bridge) can supply pre-measured calibration dat
 
 1. **`CmdReserveExternalCalibration()`** — synchronous. Checks that the machine is in `Idle` or `Ready` with no pending async work, then transitions to `Calibrating` and returns `CommandResult::ok`. Returns `CommandResult::rejected` in any other state. The `Calibrating` state prevents a second request from being accepted concurrently.
 
-2. **`CmdCompleteExternalCalibration(data, onDone)`** — async. Called by the external client after its own estimation is finished. Stores `data` in the pending `Calibrating` slot and runs the alignment step, so an externally supplied record still gets a live rotor frame before it can be used. If a fault occurred between the two calls, the machine is in `Fault`, where the completion command has no row and is rejected; the client observes the failure through its own estimation callback.
+2. **`CmdCompleteExternalCalibration(data, onDone)`** — async. Called by the external client after its own estimation is finished. Stores `data` in the pending `Calibrating` slot and runs the alignment step, so an externally supplied record still gets a live rotor frame before it can be used. Its guard refuses the command while another command is still pending, so a second completion sent while the first is aligning is rejected instead of overwriting the pending record. If a fault occurred between the two calls, the machine is in `Fault`, where the completion command has no row and is rejected; the client observes the failure through its own estimation callback.
 
 The two-command split ensures the FSM enters `Calibrating` before any open-loop PWM is applied, and that the state guard lives entirely inside the state machine rather than in the calling layer.
 
@@ -497,9 +506,10 @@ Behavioral rule: if a `Select()` is called while a previous `Select()` callback 
 The same guard covers the active mode's own asynchronous work. Applying a selection destroys the active
 `FocStateMachineCommon` instance, while its outstanding NVM and identification callbacks still capture that
 instance. `Select()` therefore also returns `SelectResult::busy` when
-`ActiveStateMachine().HasPendingAsyncWork()` is true — that is, while a command callback is pending, the
-boot-time NVM check is in flight, or a calibration step is running — in addition to the existing check that
-the active machine is stopped.
+`ActiveStateMachine().HasPendingAsyncWork()` is true — that is, while a command callback is pending, any
+NVM operation is in flight, or a calibration step is running — in addition to the existing check that the
+active machine is stopped. `NvmActivity` counts every NVM operation from the call until its callback, so a
+save or invalidation still outstanding after an emergency stop keeps the machine alive until it completes.
 
 ```mermaid
 sequenceDiagram
@@ -558,7 +568,7 @@ sequenceDiagram
 | `CmdClearFault()`         | Clears the fault and returns to `Ready` if valid calibration is held, otherwise `Idle` | Only effective from `Fault`; ignored from all other states                                                                                                                                                                                                   |
 | `CmdClearCalibration()`   | Invalidates NVM calibration and returns to `Idle`                                      | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`.                                                                                                                            |
 | `CmdEmergencyStop()`      | Stops PWM immediately and leaves the active states                                     | Accepted from every state and always returns `ok`. From `Enabled` or `Calibrating` it goes to `Ready` when calibration data is valid, otherwise to `Idle`. `Idle`, `Ready` and `Fault` are left unchanged. Aborts any pending command with `abortedByFault`. |
-| `HasPendingAsyncWork()`   | Reports whether a service callback capturing the machine is outstanding                | True while a command callback is pending, the boot-time NVM check is in flight, or a calibration step is running. Used by `ControlModeStateMachine` to refuse destroying the machine.                                                                        |
+| `HasPendingAsyncWork()`   | Reports whether a service callback capturing the machine is outstanding                | True while a command callback is pending, any NVM operation is in flight, or a calibration step is running. Used by `ControlModeStateMachine` to refuse destroying the machine.                                                                              |
 | `HasPartialCalibration()` | Reports whether `Idle` holds a non-empty but incomplete NVM record                     | True only in `Idle`, when `stage != complete` but pole pairs or resistance are non-zero (an old-schema or interrupted record). Used by the CAN bridge to broadcast `FocMotorState::partialCalibration` instead of `idle`.                                    |
 | `ApplyOnlineEstimates()`  | Retunes speed and current PID gains from online estimators                             | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only.                                                                                                         |
 

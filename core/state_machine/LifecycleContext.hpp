@@ -1,8 +1,14 @@
 #pragma once
 
+#include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
+#include "core/state_machine/CalibrationContext.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include "core/state_machine/FocStateMachineEvents.hpp"
+#include "core/state_machine/ModeHooks.hpp"
+#include "core/state_machine/NvmActivity.hpp"
+#include "core/state_machine/PendingCommand.hpp"
 #include "services/fsm/TableStateMachine.hpp"
+#include "services/tracer/Tracer.hpp"
 
 namespace application
 {
@@ -10,7 +16,6 @@ namespace application
     class CalibrationFlow;
     class MaintenanceFlow;
     class OperationFlow;
-    class PendingCommand;
 
     struct LifecycleContext
     {
@@ -23,4 +28,15 @@ namespace application
     };
 
     using LifecycleMachine = services::TableStateMachine<state_machine::State, state_machine::Event, LifecycleContext>;
+
+    struct LifecycleEnvironment
+    {
+        LifecycleMachine& machine;
+        CalibrationContext& context;
+        services::NonVolatileMemory& nvm;
+        NvmActivity& nvmActivity;
+        PendingCommand& pending;
+        ModeHooks& mode;
+        services::Tracer& tracer;
+    };
 }
