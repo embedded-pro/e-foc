@@ -36,7 +36,7 @@ namespace application
         void OnSaved(services::NvmStatus status);
 
     private:
-        LifecycleEnvironment env;
+        const LifecycleEnvironment& env;
         CalibrationOrchestrator orchestrator;
         infra::Function<void(services::NvmStatus)> saveCompletion;
     };

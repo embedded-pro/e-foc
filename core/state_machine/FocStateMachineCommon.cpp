@@ -86,8 +86,10 @@ namespace application
 
     state_machine::CommandResult FocStateMachineCommon::CmdEnable()
     {
-        if (ToCommandResult(Dispatch(state_machine::Enable{})) != state_machine::CommandResult::ok)
-            return state_machine::CommandResult::rejected;
+        const auto dispatched = ToCommandResult(Dispatch(state_machine::Enable{}));
+
+        if (dispatched != state_machine::CommandResult::ok)
+            return dispatched;
 
         if (stateMachine.Is<state_machine::Fault>())
             return state_machine::CommandResult::abortedByFault;
@@ -102,7 +104,7 @@ namespace application
 
     state_machine::CommandResult FocStateMachineCommon::CmdClearFault()
     {
-        if (!stateMachine.Is<state_machine::Fault>() || !operation.TryClearFault())
+        if (!stateMachine.Is<state_machine::Fault>() || !operation.CanClearFault())
             return state_machine::CommandResult::rejected;
 
         return ToCommandResult(Dispatch(state_machine::ClearFault{}));
@@ -216,6 +218,9 @@ namespace application
     {
         if (result == services::DispatchResult::rejected || result == services::DispatchResult::forbidden)
             return state_machine::CommandResult::rejected;
+
+        if (result == services::DispatchResult::queued)
+            return state_machine::CommandResult::queued;
 
         return state_machine::CommandResult::ok;
     }

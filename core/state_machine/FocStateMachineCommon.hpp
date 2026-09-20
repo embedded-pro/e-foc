@@ -27,6 +27,13 @@ namespace application
         using StateMachine = LifecycleMachine;
         using StateId = StateMachine::StateId;
 
+        // The deepest run of nested dispatches is a calibration sequence whose identification steps
+        // report inline: one CalibrationStepChanged per step plus the AlignmentSucceeded that follows
+        // the last one. With the four steps of CalibrationStep that peak is 5; the remaining slot
+        // absorbs a command chained from a completion callback. Overflow is a really_assert, and each
+        // slot costs sizeof(Event), so this is budgeted against the 32 KB targets rather than rounded up.
+        static constexpr std::size_t eventQueueDepth{ 6 };
+
         ~FocStateMachineCommon() override = default;
 
         const state_machine::State& CurrentState() const override;
@@ -93,7 +100,7 @@ namespace application
         BootSequence boot;
         OperationFlow operation;
         LifecycleContext context;
-        StateMachine::WithStorage<4> stateMachine;
+        StateMachine::WithStorage<eventQueueDepth> stateMachine;
         services::StateMachineTracer<state_machine::State, state_machine::Event> stateMachineTracer;
         CommandRejections commandRejections;
     };

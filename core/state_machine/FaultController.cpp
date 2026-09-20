@@ -1,4 +1,5 @@
 #include "core/state_machine/FaultController.hpp"
+#include "infra/util/ReallyAssert.hpp"
 
 namespace application
 {
@@ -25,13 +26,25 @@ namespace application
         faultLatched = true;
     }
 
-    bool FaultController::TryClear()
+    bool FaultController::CanClear() const
     {
-        if (consecutiveFaultClears >= maxConsecutiveFaultClears)
-            return false;
+        return consecutiveFaultClears < maxConsecutiveFaultClears;
+    }
+
+    void FaultController::Clear()
+    {
+        really_assert(CanClear());
 
         ++consecutiveFaultClears;
         faultLatched = false;
+    }
+
+    bool FaultController::TryClear()
+    {
+        if (!CanClear())
+            return false;
+
+        Clear();
         return true;
     }
 

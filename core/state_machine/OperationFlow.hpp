@@ -23,7 +23,7 @@ namespace application
         state_machine::Ready DisableToReady();
 
         state_machine::Fault EnterFault(state_machine::FaultCode code, bool wasActive, state_machine::CommandResult pendingResult = state_machine::CommandResult::abortedByFault);
-        bool TryClearFault();
+        bool CanClearFault() const;
         state_machine::Ready ClearFaultToReady();
         state_machine::Idle ClearFaultToIdle();
 
@@ -38,7 +38,7 @@ namespace application
         void AbortActiveWork();
 
     private:
-        LifecycleEnvironment env;
+        const LifecycleEnvironment& env;
         CalibrationFlow& calibration;
         FaultController faultController;
         state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::none };

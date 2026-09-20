@@ -2916,6 +2916,87 @@ namespace
         EXPECT_FALSE(sm.HasPendingAsyncWork());
     }
 
+    TEST_F(FocStateMachineTorqueCliTest, a_further_fault_while_faulted_keeps_the_first_fault_code)
+    {
+        GivenFaultNotifierRegistered();
+        GivenNvmInvalid();
+        auto sm = CreateStateMachine();
+
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overvoltage);
+
+        ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+        EXPECT_EQ(state_machine::FaultCode::overcurrent, std::get<state_machine::Fault>(sm.CurrentState()).code);
+        EXPECT_EQ(state_machine::FaultCode::overcurrent, sm.LastFaultCode());
+    }
+
+    TEST_F(FocStateMachineTorqueCliTest, the_first_fault_code_survives_a_clear_and_a_new_fault_records_the_new_one)
+    {
+        GivenFaultNotifierRegistered();
+        GivenNvmInvalid();
+        auto sm = CreateStateMachine();
+
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overvoltage);
+        EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdClearFault());
+
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overtemperature);
+
+        ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+        EXPECT_EQ(state_machine::FaultCode::overtemperature, sm.LastFaultCode());
+    }
+
+    TEST_F(FocStateMachineTorqueCliTest, a_synchronous_command_issued_from_a_completion_callback_reports_queued_not_ok)
+    {
+        GivenFaultNotifierRegistered();
+        GivenNvmValid();
+        auto sm = CreateStateMachine();
+
+        EXPECT_CALL(nvmMock, InvalidateCalibration(_))
+            .WillOnce(Invoke([](infra::Function<void(services::NvmStatus)> onDone)
+                {
+                    onDone(services::NvmStatus::Ok);
+                }));
+
+        std::optional<state_machine::CommandResult> enableResult;
+        sm.CmdClearCalibration([&sm, &enableResult](state_machine::CommandResult)
+            {
+                enableResult = sm.CmdEnable();
+            });
+
+        EXPECT_EQ(state_machine::CommandResult::queued, enableResult);
+        EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    }
+
+    TEST_F(FocStateMachineTorqueCliTest, a_second_external_completion_without_a_callback_is_still_refused_while_aligning)
+    {
+        GivenFaultNotifierRegistered();
+        GivenNvmInvalid();
+        auto sm = CreateStateMachine();
+
+        services::CalibrationData externalData{};
+        externalData.polePairs = 7;
+        externalData.rPhase = 0.5f;
+        externalData.lD = 1.0f;
+        externalData.lQ = 1.0f;
+        externalData.currentLoopBandwidth = 1000.0f;
+
+        EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+            .WillOnce(Invoke([](std::size_t, const auto&, const infra::Function<void(std::optional<foc::Radians>)>&) {}));
+
+        EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdReserveExternalCalibration());
+        sm.CmdCompleteExternalCalibration(externalData, infra::Function<void(state_machine::CommandResult)>{});
+
+        std::optional<state_machine::CommandResult> second;
+        sm.CmdCompleteExternalCalibration(externalData, [&second](state_machine::CommandResult r)
+            {
+                second = r;
+            });
+
+        EXPECT_EQ(state_machine::CommandResult::rejected, second);
+        EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+    }
+
     TEST_F(FocStateMachineTorqueCliTest, destruction_releases_the_fault_registration_and_the_services)
     {
         GivenFaultNotifierRegistered();

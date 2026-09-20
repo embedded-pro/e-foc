@@ -24,7 +24,7 @@ namespace application
         void OnFluxLinkageStored(services::NvmStatus status);
 
     private:
-        LifecycleEnvironment env;
+        const LifecycleEnvironment& env;
         const CalibrationFlow& calibration;
     };
 }

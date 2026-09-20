@@ -19,7 +19,7 @@ namespace application
         void OnCalibrationLoaded(services::NvmStatus status);
 
     private:
-        LifecycleEnvironment env;
+        const LifecycleEnvironment& env;
         const CalibrationFlow& calibration;
     };
 }

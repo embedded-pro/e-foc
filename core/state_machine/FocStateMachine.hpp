@@ -58,7 +58,8 @@ namespace state_machine
         rejected,
         calibrationFailed,
         nvmFailed,
-        abortedByFault
+        abortedByFault,
+        queued
     };
 
     inline bool IsStopped(const State& state)

@@ -58,7 +58,7 @@ namespace
         Event<state_machine::ClearFault>(),
     };
 
-    struct Completion
+    struct NonCommandEvent
     {
         EventId event;
         std::array<bool, StateId::count> handledIn;
@@ -69,20 +69,20 @@ namespace
     constexpr std::array<bool, StateId::count> idleReadyAndFault{ true, false, true, false, true };
     constexpr std::array<bool, StateId::count> everywhere{ true, true, true, true, true };
 
-    constexpr std::array serviceCompletions{
-        Completion{ Event<state_machine::CalibrationStepChanged>(), onlyCalibrating },
-        Completion{ Event<state_machine::AlignmentSucceeded>(), onlyCalibrating },
-        Completion{ Event<state_machine::CalibrationStepFailed>(), onlyCalibrating },
-        Completion{ Event<state_machine::MechanicalParametersIdentified>(), onlyCalibrating },
-        Completion{ Event<state_machine::CalibrationSaved>(), onlyCalibrating },
-        Completion{ Event<state_machine::RunCalibrationSequence>(), onlyCalibrating },
-        Completion{ Event<state_machine::RunAlignmentOnly>(), onlyCalibrating },
-        Completion{ Event<state_machine::CalibrationInvalidated>(), idleReadyAndFault },
-        Completion{ Event<state_machine::BootValidityChecked>(), onlyIdle },
-        Completion{ Event<state_machine::BootCalibrationLoaded>(), onlyIdle },
-        Completion{ Event<state_machine::FluxLinkageSaved>(), idleReadyAndFault },
-        Completion{ Event<state_machine::FaultDetected>(), everywhere },
-        Completion{ Event<state_machine::EmergencyStop>(), everywhere },
+    constexpr std::array nonCommandEvents{
+        NonCommandEvent{ Event<state_machine::CalibrationStepChanged>(), onlyCalibrating },
+        NonCommandEvent{ Event<state_machine::AlignmentSucceeded>(), onlyCalibrating },
+        NonCommandEvent{ Event<state_machine::CalibrationStepFailed>(), onlyCalibrating },
+        NonCommandEvent{ Event<state_machine::MechanicalParametersIdentified>(), onlyCalibrating },
+        NonCommandEvent{ Event<state_machine::CalibrationSaved>(), onlyCalibrating },
+        NonCommandEvent{ Event<state_machine::RunCalibrationSequence>(), onlyCalibrating },
+        NonCommandEvent{ Event<state_machine::RunAlignmentOnly>(), onlyCalibrating },
+        NonCommandEvent{ Event<state_machine::CalibrationInvalidated>(), idleReadyAndFault },
+        NonCommandEvent{ Event<state_machine::BootValidityChecked>(), onlyIdle },
+        NonCommandEvent{ Event<state_machine::BootCalibrationLoaded>(), onlyIdle },
+        NonCommandEvent{ Event<state_machine::FluxLinkageSaved>(), idleReadyAndFault },
+        NonCommandEvent{ Event<state_machine::FaultDetected>(), everywhere },
+        NonCommandEvent{ Event<state_machine::EmergencyStop>(), everywhere },
     };
 
     class FocStateMachineTableTest
@@ -158,9 +158,9 @@ TEST_F(FocStateMachineTableTest, commands_are_accepted_exactly_where_the_design_
         }
 }
 
-TEST_F(FocStateMachineTableTest, service_completions_are_handled_only_in_the_state_that_issued_them)
+TEST_F(FocStateMachineTableTest, service_completions_and_notifications_are_handled_only_where_the_design_allows_them)
 {
-    for (const auto& completion : serviceCompletions)
+    for (const auto& completion : nonCommandEvents)
         for (std::size_t state = 0; state != StateId::count; ++state)
             EXPECT_EQ(completion.handledIn[state], HasTransition(StateId::FromIndex(state), completion.event)) << completion.event.Name() << " in " << StateId::FromIndex(state).Name();
 }
@@ -172,7 +172,7 @@ TEST_F(FocStateMachineTableTest, every_event_is_covered_by_the_documented_sets)
         bool covered = false;
         for (auto command : commandEvents)
             covered = covered || command == EventId::FromIndex(event);
-        for (const auto& completion : serviceCompletions)
+        for (const auto& completion : nonCommandEvents)
             covered = covered || completion.event == EventId::FromIndex(event);
 
         EXPECT_TRUE(covered) << EventId::FromIndex(event).Name();

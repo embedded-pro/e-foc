@@ -56,7 +56,7 @@ The state machine has five named states:
 | `Calibrating` | Calibration sequence in progress; motor is driven by identification services                                          | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop with previously valid calibration), → `Idle` (record saved but incomplete for this mode, or CmdEmergencyStop without valid calibration), → `Fault` (any step or the NVM save fails, or hardware fault) |
 | `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true), → `Calibrating` (CmdCalibrate re-runs, CmdReAlign, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault, or the NVM invalidation failing)                  |
 | `Enabled`     | FOC controller active; motor under closed-loop control                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                                                                                |
-| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times. A further fault re-enters `Fault` with the new code                                                                                         |
+| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times. A further fault re-enters `Fault` but keeps the code that first tripped the drive                                                           |
 
 ### State Diagram
 
@@ -86,7 +86,7 @@ stateDiagram-v2
 
     Fault --> Ready : CmdClearFault\n(valid calibration held)
     Fault --> Idle : CmdClearFault\n(no valid calibration)
-    Fault --> Fault : further hardware fault\n(code updated)
+    Fault --> Fault : further hardware fault\n(first code kept)
 ```
 
 ### Transition Table
@@ -101,8 +101,16 @@ as internal rows.
 
 The table is a compile-time constant. Its rows are `constexpr` values whose guards and
 actions are captureless functions receiving the state machine as their context, so the
-whole table lives in flash; the machine itself only holds the current state and a queue of
-four events. That is what keeps the lifecycle within the RAM of the 32 KB targets.
+whole table lives in flash; the machine itself only holds the current state and a bounded
+queue of events. That is what keeps the lifecycle within the RAM of the 32 KB targets.
+
+The queue depth is budgeted, not rounded up: each slot costs a whole `Event`, and overflowing
+it is an assertion failure rather than a dropped event. The deepest run of nested dispatches is
+a calibration sequence whose identification services report inline — one step-changed event per
+`CalibrationStep` plus the alignment result that follows the last one — which peaks at five with
+the four steps defined today. One further slot absorbs a command chained from a completion
+callback, giving the six the machine reserves. Adding a calibration step therefore costs a slot,
+and on the 32 KB targets a slot has to be paid for out of a RAM budget the linker now guards.
 
 The table is the single source of truth for what the machine accepts:
 
@@ -135,12 +143,14 @@ and leave the command pending forever, and the boot-time load cannot overwrite t
 calibration that started before it answered. The command is completed with `rejected` and the
 client retries once the outstanding work has completed.
 
-A command issued from inside a completion callback is such a queued event. Its synchronous
-result is `ok`, meaning accepted for processing, not applied; the table decides when the
-queued event is handled. A command that carries a callback is not left dangling when the
-table then refuses it: `CommandRejections` observes every forbidden or rejected event and
-completes that command's callback with `rejected`, whether the event was dispatched directly
-or from the queue.
+A command issued from inside a completion callback is such a queued event, and it reports
+`CommandResult::queued`, which is distinct from `ok`: the event was accepted for processing,
+the table has not yet decided it, and the caller must not read it as "applied". Callers that
+translate a command outcome onward — the CAN bridge turns it into `busy` — therefore never
+report success for work whose outcome is still unknown. A command that carries a callback is
+not left dangling when the table then refuses it: `CommandRejections` observes every forbidden
+or rejected event and completes that command's callback with `rejected`, whether the event was
+dispatched directly or from the queue.
 
 The transition table is observable: a tracer prints every transition as
 `fsm: <from> --<event>--> <to>` next to the existing `[SM]` lines, and every forbidden,
@@ -171,7 +181,7 @@ concrete control mode.
 
 ### Emergency Stop
 
-`CmdEmergencyStop` is the unconditional safety command: it is accepted from **every** state and always returns `CommandResult::ok`. Its first action is to stop the FOC controller and therefore the PWM output, before any state evaluation takes place. Any command callback still outstanding (a running calibration or a pending `CmdClearCalibration`) is completed with `CommandResult::abortedByFault`.
+`CmdEmergencyStop` is the unconditional safety command: it is accepted from **every** state and always returns `CommandResult::ok`. Its first action is to stop the FOC controller and therefore the PWM output, before any state evaluation takes place. The stop is not left to that entry point alone: every `EmergencyStop` row stops the controller in its own action as well, so the PWM output is cut by the table itself and an `EmergencyStop` reaching the machine by any other route cannot transition out of `Enabled` with the bridge still switching. Stopping twice is harmless because the call is idempotent. Any command callback still outstanding (a running calibration or a pending `CmdClearCalibration`) is completed with `CommandResult::abortedByFault`.
 
 The resulting state depends on the state the command was issued from:
 
@@ -255,8 +265,14 @@ The external path stops after alignment; it does not chain into mechanical ident
 records the code, latches the fault controller, stops the inverter if the machine was in `Enabled` or
 `Calibrating`, and aborts the calibration services; only then is `Fault` committed. Any event raised while
 that happens, a further fault from inside the stop or a calibration completion the abort could not
-suppress, is queued and handled only after `Fault` has been committed, so it can neither observe the state
-being left nor find a row that overwrites `Fault` with a stale result.
+suppress, is queued and handled only after `Fault` has been committed, so it cannot observe the state
+being left. A further fault does re-enter `Fault`, but the recorded code is the one that first tripped the
+drive: the fault raised while shutting down is a consequence, and overwriting the root cause with it would
+lose the only diagnostic the operator has. The new code is recorded again once the fault has been cleared.
+
+The clear budget is spent where the transition commits, not where the command is issued. `CmdClearFault`
+only reads whether a clear is still allowed; the row action is what consumes one of the three attempts and
+releases the latch, so a `ClearFault` that is queued and then refused does not silently cost an attempt.
 
 **Interrupt path (board protection, CAN bus-off).** When a fault is delivered in interrupt context, the
 platform stops the FOC controller bridge immediately within that interrupt — before any state mutation or

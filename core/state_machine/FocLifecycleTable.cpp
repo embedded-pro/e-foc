@@ -62,7 +62,7 @@ namespace application
                     },
                     [](const LifecycleContext& context, const state_machine::Calibrating&, const state_machine::CompleteExternalCalibration& command)
                     {
-                        return !context.pending.Pending() && context.calibration.IsPlausibleExternal(command);
+                        return !context.pending.Pending() && !context.calibration.IsRunning() && context.calibration.IsPlausibleExternal(command);
                     }),
                 Machine::InternalRow<state_machine::Calibrating, state_machine::RunCalibrationSequence>(
                     [](LifecycleContext& context, state_machine::Calibrating& calibrating, const state_machine::RunCalibrationSequence&)
@@ -114,9 +114,9 @@ namespace application
                     return context.operation.EnterFault(state_machine::FaultCode::calibrationFailed, true, state_machine::CommandResult::nvmFailed);
                 }),
             Machine::Row<state_machine::Calibrating, state_machine::CalibrationSaved, state_machine::Ready>(
-                [](const LifecycleContext&, const state_machine::Calibrating& calibrating, const state_machine::CalibrationSaved&)
+                [](const LifecycleContext&, const state_machine::Calibrating& calibrating, const state_machine::CalibrationSaved& event)
                 {
-                    return calibrating.pendingData.stage == services::CalibrationStage::complete;
+                    return event.status == services::NvmStatus::Ok && calibrating.pendingData.stage == services::CalibrationStage::complete;
                 },
                 [](LifecycleContext& context, const state_machine::Calibrating& calibrating, const state_machine::CalibrationSaved&)
                 {
@@ -238,7 +238,7 @@ namespace application
             Machine::Row<Stopped, state_machine::CalibrationInvalidated, state_machine::Fault>(
                 [](const LifecycleContext&, const Stopped&, const state_machine::CalibrationInvalidated& event)
                 {
-                    return event.status != services::NvmStatus::Busy;
+                    return event.status != services::NvmStatus::Ok && event.status != services::NvmStatus::Busy;
                 },
                 [](LifecycleContext& context, Stopped&, const state_machine::CalibrationInvalidated&)
                 {

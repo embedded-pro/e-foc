@@ -57,7 +57,11 @@ namespace application
 
     state_machine::Fault OperationFlow::EnterFault(state_machine::FaultCode code, bool wasActive, state_machine::CommandResult pendingResult)
     {
-        lastFaultCode = code;
+        if (!faultController.IsLatched())
+            lastFaultCode = code;
+        else
+            env.tracer.Trace() << "[SM] Further fault while faulted; keeping the first code";
+
         faultController.EnterFault();
 
         if (wasActive)
@@ -65,12 +69,12 @@ namespace application
 
         calibration.Abort();
         env.pending.CompleteAfterTransition(pendingResult);
-        return state_machine::Fault{ code };
+        return state_machine::Fault{ lastFaultCode };
     }
 
-    bool OperationFlow::TryClearFault()
+    bool OperationFlow::CanClearFault() const
     {
-        if (faultController.TryClear())
+        if (faultController.CanClear())
             return true;
 
         env.tracer.Trace() << "[SM] Fault clear refused, retry limit reached; reset required";
@@ -79,12 +83,14 @@ namespace application
 
     state_machine::Ready OperationFlow::ClearFaultToReady()
     {
+        faultController.Clear();
         env.tracer.Trace() << "[SM] Fault cleared";
         return calibration.ReadyState();
     }
 
     state_machine::Idle OperationFlow::ClearFaultToIdle()
     {
+        faultController.Clear();
         env.tracer.Trace() << "[SM] Fault cleared";
         return state_machine::Idle{};
     }
@@ -92,6 +98,7 @@ namespace application
     void OperationFlow::AbortActiveWork()
     {
         env.tracer.Trace() << "[SM] Emergency stop";
+        env.mode.GetFocControl().Stop();
         calibration.Abort();
     }
 
