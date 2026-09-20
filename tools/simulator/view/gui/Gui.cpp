@@ -22,11 +22,11 @@ namespace simulator
         }
     }
 
-    Gui::Gui(ThreePhaseMotorModel& motorModel, foc::Controllable& motorController, infra::EventDispatcherWithWeakPtr& dispatcher,
-        const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
+    Gui::Gui(foc::ThreePhaseMotorModel& motorModel, foc::Controllable& motorController, infra::EventDispatcherWithWeakPtr& dispatcher,
+        const foc::ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
         const ControlPanel::SetpointConfig& setpointConfig, foc::Volts powerSupplyVoltage, QWidget* parent)
         : QMainWindow(parent)
-        , ThreePhaseMotorModelObserver(motorModel)
+        , foc::ThreePhaseMotorModelObserver(motorModel)
         , model(motorModel)
         , controller(motorController)
         , eventDispatcher(dispatcher)
@@ -86,19 +86,19 @@ namespace simulator
         connect(controlPanel, &ControlPanel::identifyMechanicalClicked, this, &Gui::identifyMechanicalRequested);
 
         connect(parametersPanel, &ParametersPanel::noiseConfigChanged, this,
-            [this](ThreePhaseMotorModel::NoiseConfig c)
+            [this](foc::ThreePhaseMotorModel::NoiseConfig c)
             {
                 this->model.SetAdcNoise(c);
             });
 
         connect(parametersPanel, &ParametersPanel::encoderNoiseConfigChanged, this,
-            [this](ThreePhaseMotorModel::EncoderNoiseConfig c)
+            [this](foc::ThreePhaseMotorModel::EncoderNoiseConfig c)
             {
                 this->model.SetEncoderNoise(c);
             });
 
         connect(parametersPanel, &ParametersPanel::thermalConfigChanged, this,
-            [this](ThreePhaseMotorModel::ThermalConfig c)
+            [this](foc::ThreePhaseMotorModel::ThermalConfig c)
             {
                 this->model.SetThermalConfig(c);
             });

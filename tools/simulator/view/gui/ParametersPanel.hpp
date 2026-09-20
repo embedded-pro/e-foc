@@ -2,7 +2,6 @@
 
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
-using namespace foc;
 #include <QDoubleSpinBox>
 #include <QLabel>
 #include <QPushButton>
@@ -32,7 +31,7 @@ namespace simulator
             std::optional<LoopPid> position;
         };
 
-        ParametersPanel(const ThreePhaseMotorModel::Parameters& motorParameters, const PidParameters& pidParameters, QWidget* parent = nullptr);
+        ParametersPanel(const foc::ThreePhaseMotorModel::Parameters& motorParameters, const PidParameters& pidParameters, QWidget* parent = nullptr);
 
         void UpdatePidParameters(const PidParameters& pidParameters);
         void UpdateResistance(foc::Ohm value);

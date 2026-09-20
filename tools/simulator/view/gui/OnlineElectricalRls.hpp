@@ -8,18 +8,16 @@
 #include <QObject>
 #include <cstdint>
 
-using namespace foc;
-
 namespace simulator
 {
     class OnlineElectricalRls
         : public QObject
-        , public ThreePhaseMotorModelObserver
+        , public foc::ThreePhaseMotorModelObserver
     {
         Q_OBJECT
 
     public:
-        OnlineElectricalRls(ThreePhaseMotorModel& model, uint8_t polePairs, hal::Hertz baseFrequency, QObject* parent = nullptr);
+        OnlineElectricalRls(foc::ThreePhaseMotorModel& model, uint8_t polePairs, hal::Hertz baseFrequency, QObject* parent = nullptr);
 
         void Started() override;
         void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currents, foc::Radians thetaMech, foc::RadiansPerSecond omegaMech) override;

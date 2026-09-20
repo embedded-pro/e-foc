@@ -6,7 +6,6 @@
 #include "core/state_machine/FocStateMachine.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
-using namespace foc;
 #include "tools/simulator/view/gui/ControlPanel.hpp"
 #include "tools/simulator/view/gui/ParametersPanel.hpp"
 #include "tools/simulator/view/gui/ScopesPanel.hpp"
@@ -19,16 +18,16 @@ namespace simulator
 {
     class Gui
         : public QMainWindow
-        , public ThreePhaseMotorModelObserver
+        , public foc::ThreePhaseMotorModelObserver
     {
         Q_OBJECT
 
     public:
-        Gui(ThreePhaseMotorModel& motorModel, foc::Controllable& motorController, infra::EventDispatcherWithWeakPtr& dispatcher,
-            const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
+        Gui(foc::ThreePhaseMotorModel& motorModel, foc::Controllable& motorController, infra::EventDispatcherWithWeakPtr& dispatcher,
+            const foc::ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
             const ControlPanel::SetpointConfig& setpointConfig, foc::Volts powerSupplyVoltage, QWidget* parent = nullptr);
 
-        // ThreePhaseMotorModelObserver
+        // foc::ThreePhaseMotorModelObserver
         void Started() override;
         void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currentPhases, foc::Radians theta, foc::RadiansPerSecond omegaMech) override;
         void StatorVoltages(foc::ThreePhase phaseVoltages, foc::TwoPhase alphaBeta) override;
@@ -63,7 +62,7 @@ namespace simulator
         void DisableMechanicalIdent();
 
     private:
-        ThreePhaseMotorModel& model;
+        foc::ThreePhaseMotorModel& model;
         foc::Controllable& controller;
         infra::EventDispatcherWithWeakPtr& eventDispatcher;
 

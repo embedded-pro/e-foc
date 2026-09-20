@@ -3,9 +3,9 @@
 
 namespace simulator
 {
-    OnlineElectricalRls::OnlineElectricalRls(ThreePhaseMotorModel& model, uint8_t polePairs, hal::Hertz baseFrequency, QObject* parent)
+    OnlineElectricalRls::OnlineElectricalRls(foc::ThreePhaseMotorModel& model, uint8_t polePairs, hal::Hertz baseFrequency, QObject* parent)
         : QObject(parent)
-        , ThreePhaseMotorModelObserver(model)
+        , foc::ThreePhaseMotorModelObserver(model)
         , polePairs(polePairs)
         , estimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, baseFrequency)
     {}

@@ -2,13 +2,13 @@
 
 namespace simulator
 {
-    OnlineMechanicalRls::OnlineMechanicalRls(ThreePhaseMotorModel& model,
+    OnlineMechanicalRls::OnlineMechanicalRls(foc::ThreePhaseMotorModel& model,
         uint8_t polePairs,
         foc::NewtonMeter torqueConstant,
         hal::Hertz baseFrequency,
         QObject* parent)
         : QObject(parent)
-        , ThreePhaseMotorModelObserver(model)
+        , foc::ThreePhaseMotorModelObserver(model)
         , polePairs(polePairs)
         , estimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, baseFrequency)
     {

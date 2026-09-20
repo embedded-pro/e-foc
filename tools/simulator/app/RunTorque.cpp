@@ -25,7 +25,7 @@ namespace simulator
         const auto baseFrequency = defaults::BaseFrequency();
         const auto vdc = foc::Volts{ defaults::powerSupplyVoltageVolts };
 
-        ThreePhaseMotorModel model{ foc::JK42BLS01_X038ED::parameters, vdc, baseFrequency, std::optional<std::size_t>{} };
+        foc::ThreePhaseMotorModel model{ foc::JK42BLS01_X038ED::parameters, vdc, baseFrequency, std::optional<std::size_t>{} };
         model.SetLoad(foc::NewtonMeter{ defaults::loadTorqueNm });
 
         foc::FocTorqueController controller{ model, model, foc::Ampere{ defaults::maxCurrentAmps } };

@@ -18,7 +18,7 @@ namespace simulator
         }
     }
 
-    ParametersPanel::ParametersPanel(const ThreePhaseMotorModel::Parameters& motorParameters, const PidParameters& pidParameters, QWidget* parent)
+    ParametersPanel::ParametersPanel(const foc::ThreePhaseMotorModel::Parameters& motorParameters, const PidParameters& pidParameters, QWidget* parent)
         : QWidget(parent)
     {
         auto* outerLayout = QtOwned<QVBoxLayout>(this);
@@ -421,7 +421,7 @@ namespace simulator
 
     void ParametersPanel::EmitNoiseConfig()
     {
-        ThreePhaseMotorModel::NoiseConfig c;
+        foc::ThreePhaseMotorModel::NoiseConfig c;
         c.sigmaAmpere = static_cast<float>(sigmaSpin->value() / 1000.0);
         c.biasAmpereA = static_cast<float>(biasASpin->value() / 1000.0);
         c.biasAmpereB = static_cast<float>(biasBSpin->value() / 1000.0);
@@ -431,7 +431,7 @@ namespace simulator
 
     void ParametersPanel::EmitEncoderNoiseConfig()
     {
-        ThreePhaseMotorModel::EncoderNoiseConfig c;
+        foc::ThreePhaseMotorModel::EncoderNoiseConfig c;
         c.sigmaRadians = static_cast<float>(encoderSigmaSpin->value() / 1000.0);
         c.biasRadians = static_cast<float>(encoderBiasSpin->value() / 1000.0);
         emit encoderNoiseConfigChanged(c);
@@ -439,7 +439,7 @@ namespace simulator
 
     void ParametersPanel::EmitThermalConfig()
     {
-        ThreePhaseMotorModel::ThermalConfig c;
+        foc::ThreePhaseMotorModel::ThermalConfig c;
         c.ambientCelsius = static_cast<float>(tAmbientSpin->value());
         c.thermalResistance = static_cast<float>(rThSpin->value());
         c.thermalCapacitance = static_cast<float>(cThSpin->value());

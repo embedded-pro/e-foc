@@ -13,7 +13,7 @@ namespace simulator
     template<typename ControllerT>
     void WireCommonCalibrations(Gui& gui, ControllerT& controller,
         services::MotorAlignmentImpl& alignment, services::ElectricalParametersIdentificationImpl& electricalIdent,
-        const ThreePhaseMotorModel::Parameters& motorParams)
+        const foc::ThreePhaseMotorModel::Parameters& motorParams)
     {
         QObject::connect(&gui, &Gui::alignRequested, [&]()
             {

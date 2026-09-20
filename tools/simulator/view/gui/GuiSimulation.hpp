@@ -7,15 +7,13 @@
 #include "tools/simulator/view/gui/ParametersPanel.hpp"
 #include <QTimer>
 
-using namespace foc;
-
 namespace simulator
 {
     class GuiSimulation
     {
     public:
-        GuiSimulation(ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
-            const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
+        GuiSimulation(foc::ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
+            const foc::ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
             const ControlPanel::SetpointConfig& setpointConfig, foc::Volts powerSupplyVoltage);
 
         Gui& GetGui();
