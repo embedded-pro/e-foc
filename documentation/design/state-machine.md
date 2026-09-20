@@ -52,11 +52,11 @@ The state machine has five named states:
 
 | State         | Motor condition                                                                                                       | Allowed transitions                                                                                                                                                                                   |
 |---------------|-----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled | → `Calibrating` (CmdCalibrate or CmdReAlign with loaded parameters), → `Fault` (hardware fault)                                                                                                       |
-| `Calibrating` | Calibration sequence in progress; motor is driven by identification services                                          | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop with previously valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (any step fails or hardware fault) |
-| `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true), → `Calibrating` (CmdCalibrate re-runs), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                  |
+| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled | → `Calibrating` (CmdCalibrate, CmdReAlign with loaded parameters, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                        |
+| `Calibrating` | Calibration sequence in progress; motor is driven by identification services                                          | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop with previously valid calibration), → `Idle` (record saved but incomplete for this mode, or CmdEmergencyStop without valid calibration), → `Fault` (any step or the NVM save fails, or hardware fault) |
+| `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true), → `Calibrating` (CmdCalibrate re-runs, CmdReAlign, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault, or the NVM invalidation failing) |
 | `Enabled`     | FOC controller active; motor under closed-loop control                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                 |
-| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times                                                                               |
+| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times. A further fault re-enters `Fault` with the new code                        |
 
 ### State Diagram
 
@@ -64,18 +64,20 @@ The state machine has five named states:
 stateDiagram-v2
     [*] --> Idle
 
-    Idle --> Calibrating : CmdCalibrate\nor CmdReAlign (if R/L loaded)
+    Idle --> Calibrating : CmdCalibrate,\nCmdReAlign (if R/L loaded)\nor CmdReserveExternalCalibration
+    Idle --> Idle : CmdClearCalibration
     Idle --> Fault : hardware fault
 
     Calibrating --> Ready : sequence complete\n+ NVM saved
+    Calibrating --> Idle : NVM saved but record\nincomplete for this mode
     Calibrating --> Ready : CmdEmergencyStop\n(calibration still valid)
     Calibrating --> Idle : CmdEmergencyStop\n(no valid calibration)
-    Calibrating --> Fault : any step fails\nor hardware fault
+    Calibrating --> Fault : any step or the NVM save fails\nor hardware fault
 
     Ready --> Enabled : CmdEnable
-    Ready --> Calibrating : CmdCalibrate\n(re-calibrate)
+    Ready --> Calibrating : CmdCalibrate (re-calibrate),\nCmdReAlign\nor CmdReserveExternalCalibration
     Ready --> Idle : CmdClearCalibration
-    Ready --> Fault : hardware fault
+    Ready --> Fault : hardware fault\nor NVM invalidation failure
 
     Enabled --> Ready : CmdDisable
     Enabled --> Ready : CmdEmergencyStop\n(calibration still valid)
@@ -84,6 +86,7 @@ stateDiagram-v2
 
     Fault --> Ready : CmdClearFault\n(valid calibration held)
     Fault --> Idle : CmdClearFault\n(no valid calibration)
+    Fault --> Fault : further hardware fault\n(code updated)
 ```
 
 ### Transition Table
@@ -194,29 +197,31 @@ An external client (e.g. the CAN bridge) can supply pre-measured calibration dat
 
 1. **`CmdReserveExternalCalibration()`** — synchronous. Checks that the machine is in `Idle` or `Ready` with no pending async work, then transitions to `Calibrating` and returns `CommandResult::ok`. Returns `CommandResult::rejected` in any other state. The `Calibrating` state prevents a second request from being accepted concurrently.
 
-2. **`CmdCompleteExternalCalibration(data, onDone)`** — async. Called by the external client after its own estimation is finished. Stores `data` in the pending `Calibrating` slot and runs the alignment step, so an externally supplied record still gets a live rotor frame before it can be used. If a fault occurred between the two calls, `EnterFault` has already aborted the identification service (via `AbortCalibrationServices`) so this path is never reached; the client observes the failure through its own estimation callback.
+2. **`CmdCompleteExternalCalibration(data, onDone)`** — async. Called by the external client after its own estimation is finished. Stores `data` in the pending `Calibrating` slot and runs the alignment step, so an externally supplied record still gets a live rotor frame before it can be used. If a fault occurred between the two calls, the machine is in `Fault`, where the completion command has no row and is rejected; the client observes the failure through its own estimation callback.
 
 The two-command split ensures the FSM enters `Calibrating` before any open-loop PWM is applied, and that the state guard lives entirely inside the state machine rather than in the calling layer.
 
-The external path stops after alignment; it does not chain into mechanical identification. `OnIdentifyElectrical` and `OnIdentifyMechanical` are separate CAN commands (REQ-INT-011), so the electrical command must not drive the mechanical estimator. `OnCalibrationComplete()` therefore stamps `stage = complete` only when the record satisfies `HasValidModeSpecificCalibration()` for the active mode. Torque mode is satisfied by electrical parameters plus alignment and transitions to `Ready`. Speed and position still lack inertia and friction, so their record is persisted with `stage = none` and the machine returns to `Idle` holding a partial record, reported over CAN as `FocMotorState::partialCalibration`. Completing those modes requires the internal `CmdCalibrate` chain, which runs mechanical identification.
+The external path stops after alignment; it does not chain into mechanical identification. `OnIdentifyElectrical` and `OnIdentifyMechanical` are separate CAN commands (REQ-INT-011), so the electrical command must not drive the mechanical estimator. The NVM save therefore stamps `stage = complete` only when the record satisfies the active mode's own validity requirements. Torque mode is satisfied by electrical parameters plus alignment and transitions to `Ready`. Speed and position still lack inertia and friction, so their record is persisted with `stage = none` and the machine returns to `Idle` holding a partial record, reported over CAN as `FocMotorState::partialCalibration`. Completing those modes requires the internal `CmdCalibrate` chain, which runs mechanical identification.
 
 ### Fault Safety
 
-**Event-dispatcher path.** `EnterFault()` commits the `Fault` state first, then stops the inverter if the
-machine was in `Enabled` or `Calibrating`, then aborts the calibration services. Committing the state first
-means a fault raised inside the stop sees `Fault` rather than the state it is leaving, and a calibration
-completion that arrives afterwards no longer finds itself in `Calibrating`.
+**Event-dispatcher path.** The `FaultDetected` event has a row from every state to `Fault`. Its action
+records the code, latches the fault controller, stops the inverter if the machine was in `Enabled` or
+`Calibrating`, and aborts the calibration services; only then is `Fault` committed. Any event raised while
+that happens, a further fault from inside the stop or a calibration completion the abort could not
+suppress, is queued and handled only after `Fault` has been committed, so it can neither observe the state
+being left nor find a row that overwrites `Fault` with a stale result.
 
 **Interrupt path (board protection, CAN bus-off).** When a fault is delivered in interrupt context, the
 platform stops the FOC controller bridge immediately within that interrupt — before any state mutation or
-tracing. The `EnterFault()` call, its trace output and any pending-command completion are posted to the event
+tracing. The `FaultDetected` event, its trace output and any pending-command completion are posted to the event
 dispatcher and execute on the next dispatcher turn. This ensures no multi-word state write, tracing call or
 non-volatile-memory access runs from an interrupt context (see REQ-SM-021).
 
 Stopping the inverter is not on its own enough to cut the PWM output. The identification services drive the
 bridge through their own timers and phase-current callbacks, and one left running writes duty cycles on its
-next tick — `ThreePhasePwmOutput` re-arms the peripheral that `Stop()` just disabled. So `EnterFault` and
-`CmdEmergencyStop` both call `Abort()` on the electrical identification, the alignment and (in speed and
+next tick — `ThreePhasePwmOutput` re-arms the peripheral that `Stop()` just disabled. So the transition to
+`Fault` and `CmdEmergencyStop` both call `Abort()` on the electrical identification, the alignment and (in speed and
 position modes) the mechanical identification. `Abort()` stops injection, cancels the service's timers, and
 drops the pending completion **without invoking it**: the state machine owns the outcome, and a late
 calibration result must not overwrite the fault that interrupted it. A service that has been aborted or has
@@ -226,8 +231,8 @@ callback slot — reassigning that slot from inside its own invocation would des
 The `Runner` releases the inverter's phase-current callback in `Disable()` for the same reason: a callback left
 pointing at a stopped control loop is another path back to `ThreePhasePwmOutput`.
 
-`EnterEnabled` commits the `Enabled` state **before** it starts the FOC controller, and re-checks the state
-afterwards. A fault raised in the window where current first flows would otherwise observe `Ready`, skip the
+The transition to `Enabled` commits the state **before** the FOC controller is started: the start runs as a
+post-commit effect of the transition, and a fault raised while it runs is queued behind it. A fault raised in the window where current first flows would otherwise observe `Ready`, skip the
 stop, and then be overwritten by the pending assignment to `Enabled` — leaving an energised bridge on faulted
 hardware with the machine reporting `Enabled`. Because the state is committed first, such a fault stops the
 drive, and the re-check stops it again if the fault arrived while `Start()` was running. `CmdEnable` reports
@@ -249,14 +254,14 @@ The last fault code is preserved in `LastFaultCode()` and remains readable even 
 #### Faults raised in interrupt context
 
 `PlatformFaultNotifier`'s primary path runs in the PWM fault interrupt (board protection) or the CAN interrupt
-(bus-off). Neither is a context in which the transition itself can be taken: `EnterFault` traces, writes a
-multi-word `std::variant` that the CLI and the CAN bridge read concurrently, and completes a pending command
-that reaches non-volatile memory.
+(bus-off). Neither is a context in which the transition itself can be taken: the transition to `Fault` traces,
+writes a multi-word `std::variant` that the CLI and the CAN bridge read concurrently, and completes a pending
+command that reaches non-volatile memory.
 
 The split is therefore: **cut the bridge in the interrupt, record the fault in the dispatcher.** The registered
 handler calls `Stop()` on the FOC controller synchronously — unconditionally, without consulting the state,
 because hardware saying "fault" outranks the state machine's belief about what it was doing — and then hands
-`EnterFault` to `infra::EventDispatcher`. The secondary handler, which broadcasts the fault over CAN, already
+the `FaultDetected` event to `infra::EventDispatcher`. The secondary handler, which broadcasts the fault over CAN, already
 worked this way.
 
 A consequence worth knowing when reading the code or the tests: between the interrupt and the dispatcher turn,
@@ -377,10 +382,10 @@ On construction, the state machine asynchronously checks whether valid calibrati
 
 1. Enters `Calibrating` at the alignment sub-step, copying the stored electrical parameters into `pendingData`.
 2. Calls the Motor Alignment service using the stored pole pairs.
-3. On success: marks `rotorReferenceValid`, saves the updated offset to NVM via `OnCalibrationComplete`, applies mode-specific calibration from the stored parameters, and transitions to `Ready`.
+3. On success: marks `rotorReferenceValid`, saves the updated offset to NVM through the same completion path as a full calibration, applies mode-specific calibration from the stored parameters, and transitions to `Ready`.
 4. On failure: enters `Fault` with code `calibrationFailed`.
 
-The CLI command is `align` (short form `aln`). Because `OnCalibrationComplete` is used, the speed and position loop parameters are also re-applied from the stored calibration, so mechanical identification does not need to be re-run after an alignment-only recovery.
+The CLI command is `align` (short form `aln`). Because the same completion path is used, the speed and position loop parameters are also re-applied from the stored calibration, so mechanical identification does not need to be re-run after an alignment-only recovery.
 
 ### Online Parameter Estimation (Speed/Position Modes)
 
@@ -403,7 +408,7 @@ sequenceDiagram
     SM->>ME: SetInitialEstimate(J_cal, B_cal)
     SM->>EE: SetInitialEstimate(R_cal, Ld_cal)
 
-    SM->>ME: SetTorqueConstant(kt) [on EnterEnabled]
+    SM->>ME: SetTorqueConstant(kt) [on entering Enabled]
     note over ME,EE: Estimators update opportunistically at outer-loop rate\nwhile FOC controller is running
 ```
 
@@ -539,7 +544,7 @@ sequenceDiagram
 | `Encoder`                                  | Rotor position sensor; zero point established by the alignment step                   | Read-only from the state machine's perspective; `SetZero()` is called by `MotorAlignment` during calibration, never by the state machine itself                                                              |
 | `TerminalWithStorage`                      | Serial command interface for CLI-mode transition policy                               | Commands registered in constructor; terminal must outlive the state machine                                                           |
 | `Tracer`                                   | Debug trace output for lifecycle events                                               | All state transitions and calibration steps are traced                                                                                |
-| `RealTimeFrictionAndInertiaEstimator`      | Online RLS estimator for rotor inertia and viscous friction (speed/position only)     | Seeded from calibration data; torque constant set on `EnterEnabled`; updates run while FOC outer loop is active                       |
+| `RealTimeFrictionAndInertiaEstimator`      | Online RLS estimator for rotor inertia and viscous friction (speed/position only)     | Seeded from calibration data; torque constant set on entering `Enabled`; updates run while FOC outer loop is active                       |
 | `RealTimeResistanceAndInductanceEstimator` | Online RLS estimator for phase resistance and d-axis inductance (speed/position only) | Assumes non-salient motor (Ld ≈ Lq); seeded using `lD` from calibration                                                               |
 
 ---

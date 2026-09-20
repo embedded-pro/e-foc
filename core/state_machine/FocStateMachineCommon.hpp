@@ -108,7 +108,6 @@ namespace application
         services::Tracer& GetTracer();
         drivers::ThreePhaseInverter& GetInverter();
         foc::Volts GetVdc() const;
-        const state_machine::State& GetCurrentState() const;
 
         const services::CalibrationData& GetCalibration() const;
         foc::Weber EffectiveFluxLinkage(const services::CalibrationData& data) const;
@@ -153,7 +152,7 @@ namespace application
         state_machine::Ready CompleteCalibration(state_machine::Calibrating& calibrating);
         state_machine::Idle CompletePartialCalibration(state_machine::Calibrating& calibrating);
 
-        state_machine::Ready BuildReady(const services::CalibrationData& data);
+        state_machine::Ready BuildReady();
         state_machine::Enabled BuildEnabled();
         state_machine::Fault BuildFault(state_machine::FaultCode code, bool wasActive);
         state_machine::Idle StopToIdle();

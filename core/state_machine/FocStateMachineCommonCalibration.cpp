@@ -5,7 +5,6 @@ namespace application
 {
     state_machine::Calibrating FocStateMachineCommon::BeginCalibration(const state_machine::Calibrate& command)
     {
-        tracer.Trace() << "[SM] Entering Calibrating";
         pendingCommandCallback = command.onDone;
 
         state_machine::Calibrating calibrating{};
@@ -22,7 +21,7 @@ namespace application
 
         state_machine::Calibrating calibrating{};
         calibrating.pendingData = calibrationContext.Data();
-        calibrating.external = true;
+        calibrating.alignmentOnly = true;
 
         Dispatch(state_machine::RunAlignmentOnly{});
         return calibrating;
@@ -69,7 +68,7 @@ namespace application
         calibrating.pendingData.encoderZeroOffset = std::bit_cast<int32_t>(angle.Value());
         calibrationContext.SetRotorReferenceValid(true);
 
-        if (calibrating.external)
+        if (calibrating.alignmentOnly)
             SaveCalibration(calibrating);
         else
             RunPostAlignmentStep(calibrating);
@@ -111,12 +110,12 @@ namespace application
         calibrationContext.Apply(GetFoc(), CurrentTunable());
         ApplyModeSpecificCalibration(data);
         CompleteAfterTransition(state_machine::CommandResult::ok);
-        return BuildReady(data);
+        return BuildReady();
     }
 
     state_machine::Idle FocStateMachineCommon::CompletePartialCalibration(state_machine::Calibrating& calibrating)
     {
-        tracer.Trace() << "[SM] Entering Idle, calibration incomplete for this mode";
+        tracer.Trace() << "[SM] Calibration incomplete for this mode; record kept as partial";
         calibrationContext.SetData(calibrating.pendingData);
         CompleteAfterTransition(state_machine::CommandResult::ok);
         return state_machine::Idle{};

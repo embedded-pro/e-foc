@@ -68,9 +68,8 @@ namespace application
             {
                 return !HasPendingAsyncWork();
             },
-            [this](Stopped&, const state_machine::ReserveExternalCalibration&)
+            [](Stopped&, const state_machine::ReserveExternalCalibration&)
             {
-                tracer.Trace() << "[SM] Entering Calibrating (external)";
                 return state_machine::Calibrating{ state_machine::CalibrationStep::polePairs, {}, true };
             });
     }
@@ -203,7 +202,7 @@ namespace application
             {
                 GetFocControl().Stop();
                 faultController.ResetClearCount();
-                return BuildReady(calibrationContext.Data());
+                return BuildReady();
             });
     }
 
@@ -222,7 +221,7 @@ namespace application
             [this](state_machine::Fault&, const state_machine::ClearFault&)
             {
                 tracer.Trace() << "[SM] Fault cleared";
-                return BuildReady(calibrationContext.Data());
+                return BuildReady();
             });
 
         stateMachine.Add<state_machine::Fault, state_machine::ClearFault, state_machine::Idle>(nullptr, [this](state_machine::Fault&, const state_machine::ClearFault&)
@@ -354,6 +353,7 @@ namespace application
 
     state_machine::CommandResult FocStateMachineCommon::CmdEmergencyStop()
     {
+        GetFocControl().Stop();
         Dispatch(state_machine::EmergencyStop{});
         return state_machine::CommandResult::ok;
     }
@@ -377,24 +377,19 @@ namespace application
     void FocStateMachineCommon::RegisterModeSpecificCli(services::TerminalWithStorage& /*terminal*/)
     {}
 
-    state_machine::Ready FocStateMachineCommon::BuildReady(const services::CalibrationData& data)
+    state_machine::Ready FocStateMachineCommon::BuildReady()
     {
-        tracer.Trace() << "[SM] Entering Ready";
-        calibrationContext.SetData(data);
-        return state_machine::Ready{ data, calibrationContext.IsRotorReferenceValid() };
+        return state_machine::Ready{ calibrationContext.Data(), calibrationContext.IsRotorReferenceValid() };
     }
 
     state_machine::Enabled FocStateMachineCommon::BuildEnabled()
     {
-        tracer.Trace() << "[SM] Entering Enabled";
         PrepareForEnabled();
         return state_machine::Enabled{};
     }
 
     state_machine::Fault FocStateMachineCommon::BuildFault(state_machine::FaultCode code, bool wasActive)
     {
-        tracer.Trace() << "[SM] Entering Fault";
-
         lastFaultCode = code;
         faultController.EnterFault();
 
@@ -408,7 +403,6 @@ namespace application
 
     void FocStateMachineCommon::StopWithoutTransition()
     {
-        GetFocControl().Stop();
         tracer.Trace() << "[SM] Emergency stop";
         AbortCalibrationServices();
         CompletePendingCommand(state_machine::CommandResult::abortedByFault);
@@ -423,7 +417,7 @@ namespace application
     state_machine::Ready FocStateMachineCommon::StopToReady()
     {
         StopWithoutTransition();
-        return BuildReady(calibrationContext.Data());
+        return BuildReady();
     }
 
     void FocStateMachineCommon::OnStateChanged(StateId to)
@@ -544,11 +538,6 @@ namespace application
     foc::Volts FocStateMachineCommon::GetVdc() const
     {
         return calibrationContext.GetVdc();
-    }
-
-    const state_machine::State& FocStateMachineCommon::GetCurrentState() const
-    {
-        return stateMachine.CurrentState();
     }
 
     const services::CalibrationData& FocStateMachineCommon::GetCalibration() const

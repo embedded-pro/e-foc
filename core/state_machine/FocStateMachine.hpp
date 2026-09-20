@@ -27,7 +27,7 @@ namespace state_machine
 
         CalibrationStep step{ CalibrationStep::polePairs };
         services::CalibrationData pendingData{};
-        bool external{ false };
+        bool alignmentOnly{ false };
     };
 
     struct Ready
@@ -69,7 +69,7 @@ namespace state_machine
     class FocStateMachineBase
     {
     public:
-        virtual ~FocStateMachineBase();
+        virtual ~FocStateMachineBase() = default;
         virtual const State& CurrentState() const = 0;
         virtual FaultCode LastFaultCode() const = 0;
 

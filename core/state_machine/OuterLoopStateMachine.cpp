@@ -63,7 +63,7 @@ namespace application
 
     void OuterLoopStateMachine::ApplyOnlineEstimates()
     {
-        if (!std::holds_alternative<state_machine::Enabled>(GetCurrentState()))
+        if (!std::holds_alternative<state_machine::Enabled>(CurrentState()))
             return;
 
         const auto inertia = GetOnlineMechEstimator().CurrentInertia();

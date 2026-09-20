@@ -38,7 +38,6 @@ target_sources(e_foc.state_machine PRIVATE
     FaultNotifier.hpp
     FocStateMachine.hpp
     FocStateMachineEvents.hpp
-    FocStateMachineImpl.cpp
     FocStateMachineCommon.hpp
     FocStateMachineCommon.cpp
     FocStateMachineCommonCalibration.cpp
