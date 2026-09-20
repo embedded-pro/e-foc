@@ -82,8 +82,7 @@ namespace application
         } };
     }
 
-    // Buffer capacities for the shared platform implementation. This part has 32 KB of SRAM against
-    // the TM4C1294's 256 KB, so it cannot afford that board's tracer and history depth.
+    // Buffer capacities read by the shared platform implementation.
     namespace Resources
     {
         constexpr std::size_t tracerBufferSize{ 2048 };
