@@ -66,7 +66,7 @@ namespace
 
     constexpr std::array<bool, StateId::count> onlyIdle{ true, false, false, false, false };
     constexpr std::array<bool, StateId::count> onlyCalibrating{ false, true, false, false, false };
-    constexpr std::array<bool, StateId::count> idleAndReady{ true, false, true, false, false };
+    constexpr std::array<bool, StateId::count> idleReadyAndFault{ true, false, true, false, true };
     constexpr std::array<bool, StateId::count> everywhere{ true, true, true, true, true };
 
     constexpr std::array serviceCompletions{
@@ -77,10 +77,10 @@ namespace
         Completion{ Event<state_machine::CalibrationSaved>(), onlyCalibrating },
         Completion{ Event<state_machine::RunCalibrationSequence>(), onlyCalibrating },
         Completion{ Event<state_machine::RunAlignmentOnly>(), onlyCalibrating },
-        Completion{ Event<state_machine::CalibrationInvalidated>(), idleAndReady },
+        Completion{ Event<state_machine::CalibrationInvalidated>(), idleReadyAndFault },
         Completion{ Event<state_machine::BootValidityChecked>(), onlyIdle },
         Completion{ Event<state_machine::BootCalibrationLoaded>(), onlyIdle },
-        Completion{ Event<state_machine::FluxLinkageSaved>(), idleAndReady },
+        Completion{ Event<state_machine::FluxLinkageSaved>(), idleReadyAndFault },
         Completion{ Event<state_machine::FaultDetected>(), everywhere },
         Completion{ Event<state_machine::EmergencyStop>(), everywhere },
     };

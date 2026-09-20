@@ -154,7 +154,7 @@ collaborators that carry out the work, each with one responsibility.
 
 | Collaborator         | Responsibility                                                                                                                     |
 |----------------------|------------------------------------------------------------------------------------------------------------------------------------|
-| `FocLifecycleTable`  | The 42 `constexpr` rows and the entered hooks; the only place that knows which event is legal in which state                       |
+| `FocLifecycleTable`  | The 45 `constexpr` rows and the entered hooks; the only place that knows which event is legal in which state                       |
 | `CalibrationFlow`    | Full calibration, re-alignment and external calibration: running the orchestrator, saving the record and completing the command    |
 | `MaintenanceFlow`    | Clearing the stored calibration and changing the flux linkage                                                                      |
 | `BootSequence`       | The boot-time validity check and load of the stored record                                                                         |
@@ -352,16 +352,23 @@ decided by the transition table:
   instead of being consumed by the new run.
 - The boot-time NVM completions become `BootValidityChecked` and `BootCalibrationLoaded`, which
   only have rows in `Idle`.
-- The `InvalidateCalibration` completion becomes `CalibrationInvalidated`, which only has rows in
-  `Idle` and `Ready`, leading to `Idle` on success, to `Fault` on failure, and completing the
-  command with `rejected` when the NVM is busy. It carries the request epoch as well.
+- The `InvalidateCalibration` completion becomes `CalibrationInvalidated`, with rows in `Idle`
+  and `Ready`, leading to `Idle` on success, to `Fault` on failure, and completing the command
+  with `rejected` when the NVM is busy. It needs no request identity: the guard on every
+  command that starts NVM work means one invalidation at most is outstanding.
 - The flux-linkage save completion becomes `FluxLinkageSaved`, handled in `Idle` and `Ready`
-  only, carrying the request epoch, and completing the pending command without a transition.
+  and completing the pending command without a transition.
+- Both NVM completions also have rows in `Fault`, because a fault or an emergency stop while
+  the operation is in flight aborts the command but not the erase or the write. The RAM record
+  follows the NVM outcome whatever happened to the command: a successful invalidation drops the
+  record, so a later `CmdClearFault` returns to `Idle` rather than restoring a calibration that
+  no longer exists in NVM, and a stored flux linkage is applied. An invalidation that fails
+  while already in `Fault` is ignored; the fault is already latched.
 
-Any of these events arriving after the state has moved away is **forbidden**, or, for the
-NVM completions that carry an epoch, **discarded** before it reaches the table. Either way it
-is traced, and it never overwrites a later state such as `Enabled` or `Fault` with a stale
-result.
+Any of these events arriving in a state without a row for it is **forbidden**, and the save
+completion arriving after a transition is **discarded** before it reaches the table. Either
+way it is traced, and it never overwrites a later state such as `Enabled` or `Fault` with a
+stale result.
 
 ```mermaid
 sequenceDiagram

@@ -12,6 +12,7 @@ namespace application
 
         void BeginClear(const state_machine::ClearCalibration& command);
         state_machine::Idle CompleteClear();
+        void ReconcileClear();
         void RejectClear();
 
         bool IsAcceptableFluxLinkage(const state_machine::SetFluxLinkage& command) const;
@@ -19,11 +20,11 @@ namespace application
         void OnFluxLinkageSaved(services::NvmStatus status);
 
     private:
-        void OnNvmDone(services::NvmStatus status);
+        void OnInvalidated(services::NvmStatus status);
+        void OnFluxLinkageStored(services::NvmStatus status);
 
     private:
         LifecycleEnvironment env;
         const CalibrationFlow& calibration;
-        infra::Function<void(services::NvmStatus)> completion;
     };
 }

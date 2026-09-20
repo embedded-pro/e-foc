@@ -227,18 +227,18 @@ namespace application
                     return !context.lifecycle.HasPendingAsyncWork();
                 }),
             Machine::Row<Stopped, state_machine::CalibrationInvalidated, state_machine::Idle>(
-                [](const LifecycleContext& context, const Stopped&, const state_machine::CalibrationInvalidated& event)
+                [](const LifecycleContext&, const Stopped&, const state_machine::CalibrationInvalidated& event)
                 {
-                    return context.pending.Pending() && event.status == services::NvmStatus::Ok;
+                    return event.status == services::NvmStatus::Ok;
                 },
                 [](LifecycleContext& context, Stopped&, const state_machine::CalibrationInvalidated&)
                 {
                     return context.maintenance.CompleteClear();
                 }),
             Machine::Row<Stopped, state_machine::CalibrationInvalidated, state_machine::Fault>(
-                [](const LifecycleContext& context, const Stopped&, const state_machine::CalibrationInvalidated& event)
+                [](const LifecycleContext&, const Stopped&, const state_machine::CalibrationInvalidated& event)
                 {
-                    return context.pending.Pending() && event.status != services::NvmStatus::Busy;
+                    return event.status != services::NvmStatus::Busy;
                 },
                 [](LifecycleContext& context, Stopped&, const state_machine::CalibrationInvalidated&)
                 {
@@ -261,27 +261,41 @@ namespace application
         };
     }
 
-    template<class Stopped>
+    template<class S>
     constexpr FocLifecycleTable::Transition FocLifecycleTable::FluxLinkageSavedRow()
     {
-        return Machine::InternalRow<Stopped, state_machine::FluxLinkageSaved>(
-            [](LifecycleContext& context, Stopped&, const state_machine::FluxLinkageSaved& event)
+        return Machine::InternalRow<S, state_machine::FluxLinkageSaved>(
+            [](LifecycleContext& context, S&, const state_machine::FluxLinkageSaved& event)
             {
                 context.maintenance.OnFluxLinkageSaved(event.status);
-            },
-            [](const LifecycleContext& context, const Stopped&, const state_machine::FluxLinkageSaved&)
-            {
-                return context.pending.Pending();
             });
     }
 
-    constexpr std::array<FocLifecycleTable::Transition, 12> FocLifecycleTable::MaintenanceRows()
+    constexpr std::array<FocLifecycleTable::Transition, 3> FocLifecycleTable::FaultReconciliationRows()
+    {
+        return {
+            Machine::InternalRow<state_machine::Fault, state_machine::CalibrationInvalidated>(
+                [](LifecycleContext& context, state_machine::Fault&, const state_machine::CalibrationInvalidated&)
+                {
+                    context.maintenance.ReconcileClear();
+                },
+                [](const LifecycleContext&, const state_machine::Fault&, const state_machine::CalibrationInvalidated& event)
+                {
+                    return event.status == services::NvmStatus::Ok;
+                }),
+            Machine::InternalRow<state_machine::Fault, state_machine::CalibrationInvalidated>(),
+            FluxLinkageSavedRow<state_machine::Fault>(),
+        };
+    }
+
+    constexpr std::array<FocLifecycleTable::Transition, 15> FocLifecycleTable::MaintenanceRows()
     {
         return services::JoinRows(MaintenanceRowsFor<state_machine::Idle>(), MaintenanceRowsFor<state_machine::Ready>(),
             std::array{
                 FluxLinkageSavedRow<state_machine::Idle>(),
                 FluxLinkageSavedRow<state_machine::Ready>(),
-            });
+            },
+            FaultReconciliationRows());
     }
 
     constexpr std::array<FocLifecycleTable::Transition, 2> FocLifecycleTable::BootRows()

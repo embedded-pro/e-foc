@@ -1993,7 +1993,7 @@ TEST_F(FocStateMachineTorqueCliTest, enable_is_rejected_while_a_clear_calibratio
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidate_callback_after_fault_is_ignored)
+TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidated_after_a_fault_drops_the_record_so_clear_fault_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -2005,13 +2005,22 @@ TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidate_callback_after_fault_i
             {
                 capturedCb = onDone;
             }));
-    sm.CmdClearCalibration([](state_machine::CommandResult) {});
+    std::optional<state_machine::CommandResult> result;
+    sm.CmdClearCalibration([&result](state_machine::CommandResult value)
+        {
+            result = value;
+        });
 
     faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::abortedByFault, result);
 
     capturedCb(services::NvmStatus::Ok);
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdClearFault());
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidate_failure_callback_after_fault_does_not_re_enter_fault)
@@ -2065,7 +2074,7 @@ TEST_F(FocStateMachineTorqueAutoTest, enable_is_rejected_while_a_clear_calibrati
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueAutoTest, clear_cal_invalidate_callback_after_fault_is_ignored)
+TEST_F(FocStateMachineTorqueAutoTest, clear_cal_invalidated_after_a_fault_drops_the_record_so_clear_fault_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -2077,13 +2086,22 @@ TEST_F(FocStateMachineTorqueAutoTest, clear_cal_invalidate_callback_after_fault_
             {
                 capturedCb = onDone;
             }));
-    sm.CmdClearCalibration([](state_machine::CommandResult) {});
+    std::optional<state_machine::CommandResult> result;
+    sm.CmdClearCalibration([&result](state_machine::CommandResult value)
+        {
+            result = value;
+        });
 
     faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::abortedByFault, result);
 
     capturedCb(services::NvmStatus::Ok);
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdClearFault());
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineTorqueAutoTest, clear_cal_invalidate_failure_callback_after_fault_does_not_re_enter_fault)
@@ -2775,7 +2793,7 @@ TEST_F(FocStateMachineTorqueCliTest, register_ready_handler_called_when_state_en
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_late_callback_when_no_pending_command_is_ignored)
+TEST_F(FocStateMachineTorqueCliTest, flux_linkage_stored_after_a_fault_is_still_applied_to_the_record)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
@@ -2789,15 +2807,73 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_late_callback_when_no_pend
                 capturedCb = onDone;
             }));
 
-    sm.CmdSetFluxLinkage(foc::Weber{ 0.05f }, [](state_machine::CommandResult) {});
+    std::optional<state_machine::CommandResult> result;
+    sm.CmdSetFluxLinkage(foc::Weber{ 0.05f }, [&result](state_machine::CommandResult value)
+        {
+            result = value;
+        });
 
-    // Fault clears the pending command
     faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::abortedByFault, result);
 
-    // Late NVM callback should be ignored (pendingCommandCallback is null)
     capturedCb(services::NvmStatus::Ok);
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_NEAR(0.05f, sm.ActiveFluxLinkage().Value(), 1e-6f);
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+}
+
+TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidated_after_the_fault_was_cleared_returns_the_machine_to_idle)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    infra::Function<void(services::NvmStatus)> capturedCb;
+    EXPECT_CALL(nvmMock, InvalidateCalibration(_))
+        .WillOnce(Invoke([&capturedCb](infra::Function<void(services::NvmStatus)> onDone)
+            {
+                capturedCb = onDone;
+            }));
+    sm.CmdClearCalibration([](state_machine::CommandResult) {});
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdClearFault());
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::rejected, sm.CmdEnable());
+
+    capturedCb(services::NvmStatus::Ok);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+}
+
+TEST_F(FocStateMachineTorqueCliTest, clear_cal_invalidated_after_an_emergency_stop_drops_the_record)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    infra::Function<void(services::NvmStatus)> capturedCb;
+    EXPECT_CALL(nvmMock, InvalidateCalibration(_))
+        .WillOnce(Invoke([&capturedCb](infra::Function<void(services::NvmStatus)> onDone)
+            {
+                capturedCb = onDone;
+            }));
+    std::optional<state_machine::CommandResult> result;
+    sm.CmdClearCalibration([&result](state_machine::CommandResult value)
+        {
+            result = value;
+        });
+
+    sm.CmdEmergencyStop();
+    EXPECT_EQ(state_machine::CommandResult::abortedByFault, result);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+
+    capturedCb(services::NvmStatus::Ok);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
 }
 
 namespace

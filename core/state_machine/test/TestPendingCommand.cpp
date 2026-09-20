@@ -3,21 +3,24 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-class PendingCommandTest
-    : public testing::Test
+namespace
 {
-public:
-    state_machine::CommandCallback Callback()
+    class PendingCommandTest
+        : public testing::Test
     {
-        return state_machine::CommandCallback{ [this](state_machine::CommandResult result)
-            {
-                onDone.callback(result);
-            } };
-    }
+    public:
+        state_machine::CommandCallback Callback()
+        {
+            return state_machine::CommandCallback{ [this](state_machine::CommandResult result)
+                {
+                    onDone.callback(result);
+                } };
+        }
 
-    testing::StrictMock<infra::MockCallback<void(state_machine::CommandResult)>> onDone;
-    application::PendingCommand pending;
-};
+        testing::StrictMock<infra::MockCallback<void(state_machine::CommandResult)>> onDone;
+        application::PendingCommand pending;
+    };
+}
 
 TEST_F(PendingCommandTest, nothing_is_pending_initially)
 {

@@ -1,5 +1,4 @@
 #include "core/state_machine/MaintenanceFlow.hpp"
-#include "infra/util/ReallyAssert.hpp"
 
 namespace application
 {
@@ -10,16 +9,11 @@ namespace application
 
     void MaintenanceFlow::BeginClear(const state_machine::ClearCalibration& command)
     {
-        really_assert(completion == nullptr);
         env.pending.Accept(command.onDone);
-        completion = env.machine.CompletionWith<void(services::NvmStatus)>([](services::NvmStatus status)
-            {
-                return state_machine::CalibrationInvalidated{ status };
-            });
         env.nvmActivity.Begin();
         env.nvm.InvalidateCalibration([this](services::NvmStatus status)
             {
-                OnNvmDone(status);
+                OnInvalidated(status);
             });
     }
 
@@ -29,6 +23,12 @@ namespace application
         env.context.Invalidate();
         env.pending.CompleteAfterTransition(state_machine::CommandResult::ok);
         return state_machine::Idle{};
+    }
+
+    void MaintenanceFlow::ReconcileClear()
+    {
+        env.tracer.Trace() << "[SM] Calibration invalidated in NVM while faulted; record dropped";
+        env.context.Invalidate();
     }
 
     void MaintenanceFlow::RejectClear()
@@ -47,21 +47,16 @@ namespace application
 
     void MaintenanceFlow::BeginSetFluxLinkage(const state_machine::SetFluxLinkage& command)
     {
-        really_assert(completion == nullptr);
         env.context.SetPendingFluxLinkage(command.fluxLinkage.Value());
         env.pending.Accept(command.onDone);
 
         auto updated = env.context.Data();
         updated.fluxLinkage = env.context.PendingFluxLinkage();
 
-        completion = env.machine.CompletionWith<void(services::NvmStatus)>([](services::NvmStatus status)
-            {
-                return state_machine::FluxLinkageSaved{ status };
-            });
         env.nvmActivity.Begin();
         env.nvm.SaveCalibration(updated, [this](services::NvmStatus status)
             {
-                OnNvmDone(status);
+                OnFluxLinkageStored(status);
             });
     }
 
@@ -80,11 +75,15 @@ namespace application
         env.pending.Complete(state_machine::CommandResult::ok);
     }
 
-    void MaintenanceFlow::OnNvmDone(services::NvmStatus status)
+    void MaintenanceFlow::OnInvalidated(services::NvmStatus status)
     {
         env.nvmActivity.End();
-        auto done = completion;
-        completion = nullptr;
-        done(status);
+        env.machine.Dispatch(state_machine::CalibrationInvalidated{ status });
+    }
+
+    void MaintenanceFlow::OnFluxLinkageStored(services::NvmStatus status)
+    {
+        env.nvmActivity.End();
+        env.machine.Dispatch(state_machine::FluxLinkageSaved{ status });
     }
 }

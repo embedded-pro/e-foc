@@ -1667,7 +1667,7 @@ TEST_F(FocStateMachinePositionCliTest, enable_is_rejected_while_a_clear_calibrat
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachinePositionCliTest, clear_cal_invalidate_callback_after_fault_is_ignored)
+TEST_F(FocStateMachinePositionCliTest, clear_cal_invalidated_after_a_fault_drops_the_record_so_clear_fault_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
@@ -1679,13 +1679,22 @@ TEST_F(FocStateMachinePositionCliTest, clear_cal_invalidate_callback_after_fault
             {
                 capturedCb = onDone;
             }));
-    sm.CmdClearCalibration([](state_machine::CommandResult) {});
+    std::optional<state_machine::CommandResult> result;
+    sm.CmdClearCalibration([&result](state_machine::CommandResult value)
+        {
+            result = value;
+        });
 
     faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::abortedByFault, result);
 
     capturedCb(services::NvmStatus::Ok);
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdClearFault());
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachinePositionCliTest, clear_cal_invalidate_failure_callback_after_fault_does_not_re_enter_fault)
@@ -1991,7 +2000,7 @@ TEST_F(FocStateMachinePositionAutoTest, enable_is_rejected_while_a_clear_calibra
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachinePositionAutoTest, clear_cal_invalidate_callback_after_fault_is_ignored)
+TEST_F(FocStateMachinePositionAutoTest, clear_cal_invalidated_after_a_fault_drops_the_record_so_clear_fault_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithPositionGains();
@@ -2003,13 +2012,22 @@ TEST_F(FocStateMachinePositionAutoTest, clear_cal_invalidate_callback_after_faul
             {
                 capturedCb = onDone;
             }));
-    sm.CmdClearCalibration([](state_machine::CommandResult) {});
+    std::optional<state_machine::CommandResult> result;
+    sm.CmdClearCalibration([&result](state_machine::CommandResult value)
+        {
+            result = value;
+        });
 
     faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::abortedByFault, result);
 
     capturedCb(services::NvmStatus::Ok);
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdClearFault());
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachinePositionAutoTest, clear_cal_invalidate_failure_callback_after_fault_does_not_re_enter_fault)
