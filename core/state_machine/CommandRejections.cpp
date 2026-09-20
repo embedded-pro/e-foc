@@ -1,5 +1,4 @@
 #include "core/state_machine/CommandRejections.hpp"
-#include <type_traits>
 #include <variant>
 
 namespace application
@@ -29,9 +28,9 @@ namespace application
 
     void CommandRejections::Reject(const state_machine::Event& event)
     {
-        std::visit([](const auto& command)
+        std::visit([]<class Command>(const Command& command)
             {
-                if constexpr (CarriesCallback<std::remove_cvref_t<decltype(command)>>)
+                if constexpr (CarriesCallback<Command>)
                     command.onDone.Callback()(state_machine::CommandResult::rejected);
             },
             event);
