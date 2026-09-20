@@ -11,44 +11,44 @@ namespace application
 {
     namespace Pins
     {
-        static hal::tiva::GpioPin currentPhaseA{ hal::tiva::Port::E, 3 };
-        static hal::tiva::GpioPin currentPhaseB{ hal::tiva::Port::E, 2 };
-        static hal::tiva::GpioPin currentPhaseC{ hal::tiva::Port::E, 1 };
-        static hal::tiva::GpioPin powerSupplyVoltage{ hal::tiva::Port::B, 5 };
-        static hal::tiva::GpioPin currentTotal{ hal::tiva::Port::B, 4 };
+        inline hal::tiva::GpioPin currentPhaseA{ hal::tiva::Port::E, 3 };
+        inline hal::tiva::GpioPin currentPhaseB{ hal::tiva::Port::E, 2 };
+        inline hal::tiva::GpioPin currentPhaseC{ hal::tiva::Port::E, 1 };
+        inline hal::tiva::GpioPin powerSupplyVoltage{ hal::tiva::Port::B, 5 };
+        inline hal::tiva::GpioPin currentTotal{ hal::tiva::Port::B, 4 };
 
-        static hal::tiva::GpioPin hallSensorA{ hal::tiva::Port::E, 4 };
-        static hal::tiva::GpioPin hallSensorB{ hal::tiva::Port::E, 5 };
-        static hal::tiva::GpioPin hallSensorC{ hal::tiva::Port::E, 6 };
+        inline hal::tiva::GpioPin hallSensorA{ hal::tiva::Port::E, 4 };
+        inline hal::tiva::GpioPin hallSensorB{ hal::tiva::Port::E, 5 };
+        inline hal::tiva::GpioPin hallSensorC{ hal::tiva::Port::E, 6 };
 
-        static hal::tiva::GpioPin encoderA{ hal::tiva::Port::L, 1 };
-        static hal::tiva::GpioPin encoderB{ hal::tiva::Port::L, 2 };
-        static hal::tiva::GpioPin encoderZ{ hal::tiva::Port::L, 3 };
+        inline hal::tiva::GpioPin encoderA{ hal::tiva::Port::L, 1 };
+        inline hal::tiva::GpioPin encoderB{ hal::tiva::Port::L, 2 };
+        inline hal::tiva::GpioPin encoderZ{ hal::tiva::Port::L, 3 };
 
-        static hal::tiva::GpioPin pwmPhase1a{ hal::tiva::Port::F, 2 };
-        static hal::tiva::GpioPin pwmPhase1b{ hal::tiva::Port::F, 3 };
-        static hal::tiva::GpioPin pwmPhase2a{ hal::tiva::Port::G, 0 };
-        static hal::tiva::GpioPin pwmPhase2b{ hal::tiva::Port::G, 1 };
-        static hal::tiva::GpioPin pwmPhase3a{ hal::tiva::Port::K, 4 };
-        static hal::tiva::GpioPin pwmPhase3b{ hal::tiva::Port::K, 5 };
+        inline hal::tiva::GpioPin pwmPhase1a{ hal::tiva::Port::F, 2 };
+        inline hal::tiva::GpioPin pwmPhase1b{ hal::tiva::Port::F, 3 };
+        inline hal::tiva::GpioPin pwmPhase2a{ hal::tiva::Port::G, 0 };
+        inline hal::tiva::GpioPin pwmPhase2b{ hal::tiva::Port::G, 1 };
+        inline hal::tiva::GpioPin pwmPhase3a{ hal::tiva::Port::K, 4 };
+        inline hal::tiva::GpioPin pwmPhase3b{ hal::tiva::Port::K, 5 };
 
-        static hal::tiva::GpioPin operationalLed{ hal::tiva::Port::N, 3 };
-        static hal::tiva::GpioPin warningLed{ hal::tiva::Port::N, 2 };
-        static hal::tiva::GpioPin failureLed{ hal::tiva::Port::P, 2 };
+        inline hal::tiva::GpioPin operationalLed{ hal::tiva::Port::N, 3 };
+        inline hal::tiva::GpioPin warningLed{ hal::tiva::Port::N, 2 };
+        inline hal::tiva::GpioPin failureLed{ hal::tiva::Port::P, 2 };
 
-        static hal::tiva::GpioPin boardId0{ hal::tiva::Port::K, 0, hal::tiva::Drive::Up };
-        static hal::tiva::GpioPin boardId1{ hal::tiva::Port::K, 1, hal::tiva::Drive::Up };
-        static hal::tiva::GpioPin boardId2{ hal::tiva::Port::K, 2, hal::tiva::Drive::Up };
+        inline hal::tiva::GpioPin boardId0{ hal::tiva::Port::K, 0, hal::tiva::Drive::Up };
+        inline hal::tiva::GpioPin boardId1{ hal::tiva::Port::K, 1, hal::tiva::Drive::Up };
+        inline hal::tiva::GpioPin boardId2{ hal::tiva::Port::K, 2, hal::tiva::Drive::Up };
 
-        static hal::tiva::GpioPin powerStatus{ hal::tiva::Port::C, 6, hal::tiva::Drive::Up };
+        inline hal::tiva::GpioPin powerStatus{ hal::tiva::Port::C, 6, hal::tiva::Drive::Up };
 
-        static hal::tiva::GpioPin uartRx{ hal::tiva::Port::D, 4 };
-        static hal::tiva::GpioPin uartTx{ hal::tiva::Port::D, 5 };
+        inline hal::tiva::GpioPin uartRx{ hal::tiva::Port::D, 4 };
+        inline hal::tiva::GpioPin uartTx{ hal::tiva::Port::D, 5 };
 
-        static hal::tiva::GpioPin canRx{ hal::tiva::Port::A, 0 };
-        static hal::tiva::GpioPin canTx{ hal::tiva::Port::A, 1 };
+        inline hal::tiva::GpioPin canRx{ hal::tiva::Port::A, 0 };
+        inline hal::tiva::GpioPin canTx{ hal::tiva::Port::A, 1 };
 
-        static hal::tiva::GpioPin performance{ hal::tiva::Port::N, 4 };
+        inline hal::tiva::GpioPin performance{ hal::tiva::Port::N, 4 };
     }
 
     namespace Peripheral
@@ -79,20 +79,13 @@ namespace application
         constexpr static uint16_t overcurrentThresholdCounts =
             application::BoardCharacteristics::OvercurrentThresholdCounts(adcResolution);
 
-        static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator1;
+        constexpr static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator1;
 
-        static hal_pwm::PinChannel asyncPwmPhase1{ hal_pwm::GeneratorIndex::generator1, Pins::pwmPhase1a, Pins::pwmPhase1b, true, true, std::make_optional(hal::tiva::Pwm::PinChannel::Trigger::countZero) };
-        static hal_pwm::PinChannel asyncPwmPhase2{ hal_pwm::GeneratorIndex::generator2, Pins::pwmPhase2a, Pins::pwmPhase2b, true, true, std::nullopt };
-        static hal_pwm::PinChannel asyncPwmPhase3{ hal_pwm::GeneratorIndex::generator3, Pins::pwmPhase3a, Pins::pwmPhase3b, true, true, std::nullopt };
-
-        static std::array<hal_pwm::PinChannel, 3> asyncPwmPhases{ { asyncPwmPhase1, asyncPwmPhase2, asyncPwmPhase3 } };
-
-        // Synchronous PWM stubs — not used on this board; required for compilation only.
-        static hal::tiva::SynchronousPwm::PinChannel syncPwmPhase1{ hal::tiva::SynchronousPwm::GeneratorIndex::generator0, Pins::pwmPhase1a, Pins::pwmPhase1b, true, true, std::nullopt };
-        static hal::tiva::SynchronousPwm::PinChannel syncPwmPhase2{ hal::tiva::SynchronousPwm::GeneratorIndex::generator1, Pins::pwmPhase2a, Pins::pwmPhase2b, true, true, std::nullopt };
-        static hal::tiva::SynchronousPwm::PinChannel syncPwmPhase3{ hal::tiva::SynchronousPwm::GeneratorIndex::generator2, Pins::pwmPhase3a, Pins::pwmPhase3b, true, true, std::nullopt };
-
-        static std::array<hal::tiva::SynchronousPwm::PinChannel, 3> syncPwmPhases{ { syncPwmPhase1, syncPwmPhase2, syncPwmPhase3 } };
+        inline std::array<hal_pwm::PinChannel, 3> pwmPhases{ {
+            { hal_pwm::GeneratorIndex::generator1, Pins::pwmPhase1a, Pins::pwmPhase1b, true, true, std::make_optional(hal_pwm::PinChannel::Trigger::countZero) },
+            { hal_pwm::GeneratorIndex::generator2, Pins::pwmPhase2a, Pins::pwmPhase2b, true, true, std::nullopt },
+            { hal_pwm::GeneratorIndex::generator3, Pins::pwmPhase3a, Pins::pwmPhase3b, true, true, std::nullopt },
+        } };
     }
 
     namespace Clocks

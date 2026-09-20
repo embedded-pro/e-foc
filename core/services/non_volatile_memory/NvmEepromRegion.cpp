@@ -11,7 +11,6 @@ namespace services
         really_assert(regionSize <= maxRegionSize);
         really_assert(regionSize <= eeprom.Size());
         really_assert(baseAddress <= eeprom.Size() - regionSize);
-        eraseBuffer.fill(0xFF);
     }
 
     void NvmEepromRegion::Write(infra::ConstByteRange data, infra::Function<void()> onDone)
@@ -28,7 +27,7 @@ namespace services
 
     void NvmEepromRegion::Erase(infra::Function<void()> onDone)
     {
-        eeprom.WriteBuffer(infra::ConstByteRange{ eraseBuffer.data(), eraseBuffer.data() + regionSize }, baseAddress, onDone);
+        eeprom.WriteBuffer(infra::ConstByteRange{ erasePattern.data(), erasePattern.data() + regionSize }, baseAddress, onDone);
     }
 
     std::size_t NvmEepromRegion::Size() const

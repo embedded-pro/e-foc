@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <type_traits>
 #include HARDWARE_PINS_AND_PERIPHERALS_HEADER
 #include MOTOR_BOARD_CHARACTERISTICS_HEADER
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
@@ -124,7 +125,7 @@ namespace application
 
         struct AdcForPhaseCurrentMeasurementImpl
         {
-            const std::array<hal::tiva::Adc::SampleAndHold, 5> toSampleAndHold{ { hal::tiva::Adc::SampleAndHold::sampleAndHold4,
+            static constexpr std::array<hal::tiva::Adc::SampleAndHold, 5> toSampleAndHold{ { hal::tiva::Adc::SampleAndHold::sampleAndHold4,
                 hal::tiva::Adc::SampleAndHold::sampleAndHold16,
                 hal::tiva::Adc::SampleAndHold::sampleAndHold32,
                 hal::tiva::Adc::SampleAndHold::sampleAndHold64,
@@ -181,8 +182,33 @@ namespace application
             hal::tiva::SynchronousPwm::Config pwmConfig{ false, false, controlConfig, clockDivisor, std::make_optional(deadTimeConfig) };
         };
 
+        using PwmDriver = Peripheral::hal_pwm;
+        using PwmConfiguration = std::conditional_t<Peripheral::hasFaultComparators, AsyncPwmConfig, SyncPwmConfig>;
+
         void ReconfigureAdc(SampleAndHold sampleAndHold);
         void ReconfigurePwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime);
+        void OnPwmFault(hal::tiva::Pwm::FaultEvent event);
+
+        // Condition must depend on Config: a discarded if constexpr branch is still type-checked otherwise.
+        template<typename Config>
+        void EmplacePwm(Config& config)
+        {
+            if constexpr (std::is_same_v<Config, AsyncPwmConfig>)
+                peripherals->pwm.emplace(
+                    Peripheral::PwmIndex,
+                    infra::MakeRange(Peripheral::pwmPhases),
+                    config.pwmConfig,
+                    infra::Function<void(hal::tiva::Pwm::NormalEvent)>{},
+                    [this](hal::tiva::Pwm::FaultEvent event)
+                    {
+                        OnPwmFault(event);
+                    });
+            else
+                peripherals->pwm.emplace(
+                    Peripheral::PwmIndex,
+                    infra::MakeRange(Peripheral::pwmPhases),
+                    config.pwmConfig);
+        }
 
         static CanBusAdapter::CanError ToAdapterError(hal::tiva::Can::Error error)
         {
@@ -222,13 +248,11 @@ namespace application
             TerminalAndTracer terminalAndTracer;
             AdcForPowerSupplyMeasurementImpl adcForPowerSupplyMeasurementImpl;
             AdcForPhaseCurrentMeasurementImpl adcForPhaseCurrentMeasurementImpl;
-            AsyncPwmConfig asyncPwmConfig;
-            SyncPwmConfig syncPwmConfig;
+            PwmConfiguration pwmConfig;
             hal::tiva::Eeprom eepromPeripheral;
 
             std::optional<AdcPhaseCurrentMeasurementImpl<hal::tiva::Adc>> phaseCurrentAdc;
-            std::optional<hal::tiva::Pwm> asyncPwm;
-            std::optional<hal::tiva::SynchronousPwm> syncPwm;
+            std::optional<PwmDriver> pwm;
             std::optional<QuadratureEncoderDecoratorImpl<hal::tiva::QuadratureEncoder>> encoder;
             std::optional<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<32>>> canBus;
 
@@ -247,10 +271,7 @@ namespace application
         template<typename Fn>
         void WithPwm(Fn&& fn)
         {
-            if constexpr (Peripheral::hasFaultComparators)
-                fn(*peripherals->asyncPwm);
-            else
-                fn(*peripherals->syncPwm);
+            fn(*peripherals->pwm);
         }
 
     private:
