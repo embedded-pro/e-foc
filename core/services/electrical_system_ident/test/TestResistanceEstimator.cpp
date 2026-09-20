@@ -244,20 +244,26 @@ TEST_F(ResistanceEstimatorTest, no_sample_timeout_aborts_if_no_adc_callback_afte
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .Times(2)
-        .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r) { result = r; });
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
     ForwardTime(config.settleTime);
 
-    ForwardTime(config.noSampleTimeout + std::chrono::milliseconds{ 1 });
+    ForwardTime(2 * config.noSampleTimeout + std::chrono::milliseconds{ 1 });
 
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->resistance.has_value());
 }
 
-TEST_F(ResistanceEstimatorTest, no_sample_timeout_resets_per_sample_and_fires_when_samples_stop)
+TEST_F(ResistanceEstimatorTest, sample_watchdog_fires_once_samples_stop_arriving)
 {
     services::ResistanceEstimator::Config config{
         hal::Percent{ 15 }, std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye,
@@ -268,18 +274,24 @@ TEST_F(ResistanceEstimatorTest, no_sample_timeout_resets_per_sample_and_fires_wh
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
         .Times(2)
-        .WillRepeatedly([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r) { result = r; });
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
     ForwardTime(config.settleTime);
 
     for (std::size_t i = 0; i < 5; ++i)
         driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
             foc::Ampere{ 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
 
-    ForwardTime(config.noSampleTimeout + std::chrono::milliseconds{ 1 });
+    ForwardTime(2 * config.noSampleTimeout + std::chrono::milliseconds{ 1 });
 
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->resistance.has_value());
@@ -295,13 +307,19 @@ TEST_F(ResistanceEstimatorTest, no_sample_timeout_fires_during_settle_if_no_adc_
     std::optional<services::ResistanceEstimator::Result> result;
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
-        .WillOnce([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r) { result = r; });
+    estimator.Start(config, [&result](auto r)
+        {
+            result = r;
+        });
 
-    ForwardTime(config.noSampleTimeout + std::chrono::milliseconds{ 1 });
+    ForwardTime(2 * config.noSampleTimeout + std::chrono::milliseconds{ 1 });
 
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->resistance.has_value());

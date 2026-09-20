@@ -54,10 +54,7 @@ namespace services
                 if (!this->onDone)
                     return;
 
-                noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
-                    {
-                        FailMeasurement();
-                    });
+                sampleSeen = true;
 
                 if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
                     FailMeasurement();
@@ -67,10 +64,7 @@ namespace services
             hal::Percent{ neutralDuty },
             hal::Percent{ neutralDuty } });
 
-        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
-            {
-                FailMeasurement();
-            });
+        StartSampleWatchdog();
         settleTimer.Start(activeConfig.settleTime, [this]()
             {
                 StartMeasurementPhase();
@@ -79,10 +73,7 @@ namespace services
 
     void ResistanceEstimator::StartMeasurementPhase()
     {
-        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
-            {
-                FailMeasurement();
-            });
+        StartSampleWatchdog();
         driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
             {
                 OnMeasurementSample(currents);
@@ -94,10 +85,7 @@ namespace services
         if (!onDone)
             return;
 
-        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
-            {
-                FailMeasurement();
-            });
+        sampleSeen = true;
 
         if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
         {
@@ -123,6 +111,18 @@ namespace services
         noSampleTimer.Cancel();
         driver.Stop();
         onDone = nullptr;
+    }
+
+    void ResistanceEstimator::StartSampleWatchdog()
+    {
+        sampleSeen = false;
+        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
+            {
+                if (!sampleSeen)
+                    FailMeasurement();
+
+                sampleSeen = false;
+            });
     }
 
     void ResistanceEstimator::FailMeasurement()
