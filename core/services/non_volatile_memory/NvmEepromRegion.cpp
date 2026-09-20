@@ -3,6 +3,19 @@
 
 namespace services
 {
+    namespace
+    {
+        // consteval, so the pattern can never be built at run time and land back in .bss.
+        consteval std::array<uint8_t, NvmEepromRegion::maxRegionSize> MakeErasePattern()
+        {
+            std::array<uint8_t, NvmEepromRegion::maxRegionSize> pattern{};
+            pattern.fill(0xFF);
+            return pattern;
+        }
+    }
+
+    const std::array<uint8_t, NvmEepromRegion::maxRegionSize> NvmEepromRegion::erasePattern{ MakeErasePattern() };
+
     NvmEepromRegion::NvmEepromRegion(hal::Eeprom& eeprom, uint32_t baseAddress, uint32_t regionSize)
         : eeprom(eeprom)
         , baseAddress(baseAddress)

@@ -7,17 +7,6 @@
 
 namespace services
 {
-    namespace detail
-    {
-        template<std::size_t Size>
-        constexpr std::array<uint8_t, Size> MakeErasePattern()
-        {
-            std::array<uint8_t, Size> pattern{};
-            pattern.fill(0xFF);
-            return pattern;
-        }
-    }
-
     class NvmEepromRegion
         : public NvmRegion
     {
@@ -32,7 +21,7 @@ namespace services
         std::size_t Size() const override;
 
     private:
-        static constexpr std::array<uint8_t, maxRegionSize> erasePattern{ detail::MakeErasePattern<maxRegionSize>() };
+        static const std::array<uint8_t, maxRegionSize> erasePattern;
 
         hal::Eeprom& eeprom;
         uint32_t baseAddress;
