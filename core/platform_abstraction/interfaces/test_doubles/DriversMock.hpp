@@ -21,6 +21,30 @@ namespace drivers
         MOCK_METHOD((std::pair<foc::HallState, foc::Direction>), Read, (), (const, override));
     };
 
+    class WatchdogMock
+        : public Watchdog
+    {
+    public:
+        MOCK_METHOD(void, Enable, (std::chrono::microseconds deadline, const infra::Function<void()>& onDeadlineMissed), (override));
+        MOCK_METHOD(void, Feed, (), (override));
+        MOCK_METHOD(bool, IsEnabled, (), (const, override));
+        MOCK_METHOD(std::chrono::microseconds, Deadline, (), (const, override));
+
+        void StoreDeadlineMissedHandler(std::chrono::microseconds, const infra::Function<void()>& onDeadlineMissed)
+        {
+            deadlineMissedHandler = onDeadlineMissed;
+        }
+
+        void RaiseDeadlineMissed()
+        {
+            if (deadlineMissedHandler != nullptr)
+                deadlineMissedHandler();
+        }
+
+    private:
+        infra::Function<void()> deadlineMissedHandler;
+    };
+
     class ThreePhaseInverterMock
         : public ThreePhaseInverter
     {

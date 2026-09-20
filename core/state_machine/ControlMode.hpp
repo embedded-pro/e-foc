@@ -103,6 +103,8 @@ namespace state_machine
                 return can::FocMotorCategoryError::persistenceFailed;
             case CommandResult::abortedByFault:
                 return can::FocMotorCategoryError::abortedByFault;
+            case CommandResult::queued:
+                return can::FocMotorCategoryError::busy;
             case CommandResult::rejected:
             default:
                 return can::FocMotorCategoryError::modeMismatch;

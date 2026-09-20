@@ -116,6 +116,9 @@ Two consequences follow from the observer running in the ADC interrupt:
   completion reaches non-volatile memory through the state machine.
 - An abort takes effect immediately — the drive is stopped and the observer released — but the pending
   completion is dropped rather than invoked. The caller that aborted owns the outcome.
+- Because the completion is deferred, an abort and a new run can both happen before the dispatcher gets to
+  it. Each run therefore carries a generation, and a queued completion finishes only the run that queued
+  it; a terminal outcome belonging to an aborted run can never complete the run that followed it.
 
 Each observation reads the encoder once. Reading it twice within a callback samples two different rotor positions and mixes them into a single difference.
 

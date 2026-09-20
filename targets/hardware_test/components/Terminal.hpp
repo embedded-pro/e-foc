@@ -7,6 +7,7 @@
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "hal/interfaces/Eeprom.hpp"
 #include "hal/interfaces/Pwm.hpp"
+#include "infra/timer/Timer.hpp"
 #include "infra/util/BoundedDeque.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
@@ -41,10 +42,17 @@ namespace application
         StatusWithMessage GetResetCauseStatus();
         StatusWithMessage GetFaultStatus();
         StatusWithMessage ForceHardfault();
+        StatusWithMessage ConfigureWatchdog(const infra::BoundedConstString& param);
+        StatusWithMessage StallWatchdog();
+        void ReportWatchdogState();
+        void OnWatchdogDeadlineMissed();
         void RunIdent();
         void RunAlign();
 
     private:
+        static constexpr uint32_t minimumWatchdogDeadlineMs = 50;
+        static constexpr uint32_t maximumWatchdogDeadlineMs = 10000;
+        static constexpr uint32_t watchdogFeedsPerDeadline = 4;
         static constexpr std::size_t averageSampleSize = 100;
         using QueueOfPhaseCurrents = infra::BoundedDeque<foc::PhaseCurrents>::WithMaxSize<averageSampleSize>;
 
@@ -65,6 +73,23 @@ namespace application
             bool alignRunning{ false };
         };
 
+        struct PeripheralConfiguration
+        {
+            hal::Hertz pwmFrequency{ 10000 };
+            std::chrono::nanoseconds pwmDeadTime{ 500 };
+            PlatformFactory::SampleAndHold sampleAndHold{ PlatformFactory::SampleAndHold::shortest };
+        };
+
+        struct WatchdogSupervision
+        {
+            explicit WatchdogSupervision(drivers::Watchdog& watchdog)
+                : watchdog{ watchdog }
+            {}
+
+            drivers::Watchdog& watchdog;
+            infra::TimerRepeating feedTimer;
+        };
+
     private:
         const infra::BoundedVector<infra::BoundedConstString>::WithMaxSize<5> acceptedAdcValues{ { "shortest", "shorter", "medium", "longer", "longest" } };
 
@@ -72,9 +97,7 @@ namespace application
         services::Tracer& tracer;
         application::PlatformFactory& hardware;
         IdentificationState identState;
-        hal::Hertz currentPwmFrequency_{ 10000 };
-        std::chrono::nanoseconds currentPwmDeadTime_{ 500 };
-        PlatformFactory::SampleAndHold currentSah_{ PlatformFactory::SampleAndHold::shortest };
+        PeripheralConfiguration peripheralConfiguration;
         bool adcActive_{ false };
         bool canStarted = false;
         QueueOfPhaseCurrents queueOfPhaseCurrents;
@@ -86,6 +109,7 @@ namespace application
         std::optional<std::size_t> polePairs = 0;
         foc::SpeedCascade foc;
         hal::Eeprom& eeprom;
+        WatchdogSupervision watchdogSupervision;
         std::array<uint8_t, 64> eepromBuffer{};
     };
 }

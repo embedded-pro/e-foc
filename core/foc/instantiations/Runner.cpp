@@ -22,14 +22,41 @@ namespace foc
 
     void Runner::Enable()
     {
+        stopRequested = false;
+
         RegisterPhaseCurrents();
+
+        if (stopRequested)
+        {
+            Disable();
+            return;
+        }
+
         foc.Enable();
+
+        if (stopRequested)
+        {
+            Disable();
+            return;
+        }
+
         inverter.Start();
+
+        if (stopRequested)
+        {
+            Disable();
+            return;
+        }
+
         enabled = true;
+
+        if (stopRequested)
+            Disable();
     }
 
     void Runner::Disable()
     {
+        stopRequested = true;
         enabled = false;
         inverter.Stop();
         ReleasePhaseCurrents();

@@ -19,6 +19,5 @@ namespace application
     private:
         ControlLoopMetrics& metrics;
         CanBusAdapter* canBus{ nullptr };
-        CanBusAdapter::ErrorCounters noBus;
     };
 }

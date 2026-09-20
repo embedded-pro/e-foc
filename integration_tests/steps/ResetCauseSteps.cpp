@@ -7,6 +7,26 @@
 
 using namespace integration;
 
+namespace
+{
+    void ExpectReportedResetCause(Fixture& fixture, const std::string& cause)
+    {
+        ASSERT_TRUE(fixture.SendCommand("reset_cause", hil::timeouts::command))
+            << "reset_cause command did not respond";
+
+        bool found = false;
+        for (const auto& line : fixture.allLines)
+        {
+            if (line.find(cause) != std::string::npos)
+            {
+                found = true;
+                break;
+            }
+        }
+        EXPECT_TRUE(found) << "Expected '" << cause << "' in reset_cause output";
+    }
+}
+
 WHEN(R"(the reset command is sent to the hardware target)")
 {
     context.Get<Fixture>().SendCommand("reset", hil::timeouts::cleanup);
@@ -35,17 +55,10 @@ WHEN(R"(the hardware target reconnects after reset)")
 
 THEN(R"(the reset_cause command reports Software)")
 {
-    auto& fixture = context.Get<Fixture>();
-    ASSERT_TRUE(fixture.SendCommand("reset_cause", hil::timeouts::command))
-        << "reset_cause command did not respond";
-    bool foundSoftware = false;
-    for (const auto& line : fixture.allLines)
-    {
-        if (line.find("Software") != std::string::npos)
-        {
-            foundSoftware = true;
-            break;
-        }
-    }
-    EXPECT_TRUE(foundSoftware) << "Expected 'Software' in reset_cause output";
+    ExpectReportedResetCause(context.Get<Fixture>(), "Software");
+}
+
+THEN(R"(the reset_cause command reports Watchdog)")
+{
+    ExpectReportedResetCause(context.Get<Fixture>(), "Watchdog");
 }

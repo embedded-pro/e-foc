@@ -6,10 +6,12 @@ target_link_libraries(e_foc.platform_abstraction_test PUBLIC
     gmock_main
     e_foc.platform_abstraction
     can_lite.test_util
+    infra.timer_test_helper
 )
 
 target_sources(e_foc.platform_abstraction_test PRIVATE
     TestAdcPhaseCurrentMeasurement.cpp
     TestCanErrorCounters.cpp
     TestControlLoopMetrics.cpp
+    TestSoftwareWatchdog.cpp
 )

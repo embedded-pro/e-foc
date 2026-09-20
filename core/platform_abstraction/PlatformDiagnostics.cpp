@@ -2,6 +2,11 @@
 
 namespace application
 {
+    namespace
+    {
+        constexpr CanBusAdapter::ErrorCounters noBus{};
+    }
+
     PlatformDiagnostics::PlatformDiagnostics(ControlLoopMetrics& metrics)
         : metrics(metrics)
     {}

@@ -35,5 +35,6 @@ namespace foc
         infra::Function<void(const PhaseCurrents& currentPhases)> phaseCurrentsObserver;
         volatile bool observerRegistered{ false };
         volatile bool enabled{ false };
+        volatile bool stopRequested{ false };
     };
 }

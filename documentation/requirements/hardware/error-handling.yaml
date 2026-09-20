@@ -66,6 +66,84 @@
     subsequent boot shall return captured fault diagnostic data including
     at minimum the faulting PC address.
 
+- id: REQ-EH-008
+  title: Watchdog abstraction present on every platform
+  shall: >
+    The platform abstraction shall define a watchdog port and every platform
+    implementation shall provide it, so that no target can be built without
+    one. The port shall allow the application to enable supervision once with
+    an explicit deadline, to signal progress from any execution context
+    including interrupt context, and to read back whether supervision is
+    active and which deadline is being held. The port shall offer no way to
+    disable supervision once it has been enabled. A target that has no
+    watchdog to drive shall satisfy the port with a placeholder that reports
+    supervision as disabled, so that a query for supervision state is
+    answered truthfully on every platform.
+
+- id: REQ-EH-009
+  title: Watchdog expiry brings the power stage to a safe state
+  shall: >
+    When a supervised execution context stops signalling progress, the
+    watchdog shall report the missed deadline to the application within two
+    deadline periods, and the application shall stop the power stage before
+    the target resets. On a target whose watchdog is backed by MCU hardware,
+    a stall of the event loop itself shall cut the power stage from the
+    watchdog interrupt and reset the target, without calling the application
+    handler from interrupt context; and a stall that also stops the watchdog
+    interrupt shall reset the target from hardware, with the reset cause on
+    the subsequent boot reported as Watchdog.
+
+- id: REQ-EH-010
+  title: Watchdog servicing requires every expected execution context
+  shall: >
+    The application shall service the watchdog only when every execution
+    context that the current lifecycle state and control mode expect has made
+    progress since the previous evaluation. While the drive is Enabled the
+    inner control loop shall be expected in every control mode, and the outer
+    loop shall additionally be expected in speed and position mode, so that
+    inner-loop progress alone shall not service the watchdog in those modes.
+    While the drive is stopped, calibrating or faulted, and in torque mode
+    which has no outer loop, no control-loop progress shall be expected, so
+    that a healthy drive shall not be reset for the absence of a heartbeat its
+    current state cannot produce.
+
+- id: REQ-EH-011
+  title: Startup is graced within an explicit bound, never exempted
+  shall: >
+    The production application shall enable watchdog supervision as it is
+    constructed and before the asynchronous configuration load completes. Until
+    the lifecycle state machine exists the evaluation shall expect no control
+    loop and shall service the watchdog, for an explicitly bounded number of
+    evaluations only. A startup that has not completed within that bound shall
+    stop servicing the watchdog, so that a hung boot reaches a safe state and
+    resets by the same path as any other stall. Supervision shall never be
+    disabled or suspended to accommodate startup or calibration.
+
+- id: REQ-EH-012
+  title: A software-detected watchdog expiry is reported after reboot
+  shall: >
+    When the application detects a missed watchdog deadline, it shall stop the
+    drive and the power stage before resetting, and shall record the expiry in
+    storage that survives the reset. On a Cortex-M target the subsequent boot
+    shall report the reset cause as Watchdog rather than Software, and that
+    record shall be independent of any hard fault capture held in the same
+    region, so that neither overwrites the other.
+
+- id: REQ-HIL-011
+  title: Watchdog state is observable over the CLI
+  shall: >
+    The hardware_test CLI shall report watchdog supervision as disabled
+    before it is enabled, and after the "watchdog <deadline_ms>" command
+    shall report supervision as enabled together with the deadline it is
+    holding.
+
+- id: REQ-HIL-012
+  title: A deliberately stalled feed context resets the target
+  shall: >
+    When the "watchdog_stall" CLI command stops the supervised feed context,
+    the device shall stop the power stage, reset, and report watchdog
+    supervision as disabled again on the subsequent boot.
+
 - id: REQ-EH-007
   title: The hard fault handler cuts the power stage first
   shall: >

@@ -68,7 +68,7 @@ namespace application
 
     void OuterLoopStateMachine::ApplyOnlineEstimates()
     {
-        if (!std::holds_alternative<state_machine::Enabled>(GetCurrentState()))
+        if (!std::holds_alternative<state_machine::Enabled>(CurrentState()))
             return;
 
         const auto inertia = GetOnlineMechEstimator().CurrentInertia();
@@ -95,14 +95,14 @@ namespace application
         }
     }
 
-    void OuterLoopStateMachine::RunPostAlignmentStep()
+    void OuterLoopStateMachine::RunPostAlignmentStep(state_machine::Calibrating& calibrating)
     {
-        RunMechanicalIdentStep();
+        RunMechanicalIdentStep(calibrating);
     }
 
-    bool OuterLoopStateMachine::HasPendingAsyncWork() const
+    bool OuterLoopStateMachine::HasModeSpecificWorkPending() const
     {
-        return FocStateMachineCommon::HasPendingAsyncWork() || MechIdentImpl().IsRunning();
+        return MechIdentImpl().IsRunning();
     }
 
     void OuterLoopStateMachine::AbortModeSpecificServices()
@@ -153,16 +153,15 @@ namespace application
         return config;
     }
 
-    void OuterLoopStateMachine::RunMechanicalIdentStep()
+    void OuterLoopStateMachine::RunMechanicalIdentStep(state_machine::Calibrating& calibrating)
     {
-        auto& calibrating = std::get<state_machine::Calibrating>(GetCurrentState());
         calibrating.step = state_machine::CalibrationStep::frictionAndInertia;
         const auto pending = calibrating.pendingData;
 
         if (!ApplyIdentificationControl(pending))
         {
             GetTracer().Trace() << "[SM] Mechanical identification refused: control loops would not move the rotor";
-            FailCalibrationStep();
+            Dispatch(state_machine::CalibrationStepFailed{});
             return;
         }
 
@@ -170,22 +169,7 @@ namespace application
 
         MechIdentImpl().EstimateFrictionAndInertia(mechTorqueConstant, static_cast<std::size_t>(pending.polePairs), ExcitationConfig(), [this](auto friction, auto inertia)
             {
-                if (!IsCalibrating(state_machine::CalibrationStep::frictionAndInertia))
-                    return;
-
-                if (!friction || !inertia || !services::IsPlausibleMechanics(inertia->Value(), friction->Value()))
-                {
-                    GetTracer().Trace() << "[SM] Mechanical identification produced no usable estimate";
-                    FailCalibrationStep();
-                }
-                else
-                {
-                    auto& cal = std::get<state_machine::Calibrating>(GetCurrentState());
-                    cal.pendingData.inertia = inertia->Value();
-                    cal.pendingData.frictionViscous = friction->Value();
-                    cal.pendingData.speedLoopBandwidth = velocityBandwidthRadPerSec;
-                    OnCalibrationComplete();
-                }
+                Dispatch(state_machine::MechanicalParametersIdentified{ friction, inertia, velocityBandwidthRadPerSec });
             });
     }
 }

@@ -10,7 +10,8 @@ namespace application
     struct PersistentFaultData
     {
         static constexpr uint32_t kMagicValid = 0xDEADBEEFu;
-        static constexpr std::size_t kMaxStackTraceEntries = 243u;
+        static constexpr uint32_t kWatchdogExpiryValid = 0x5731C0DEu;
+        static constexpr std::size_t kMaxStackTraceEntries = 242u;
 
         uint32_t magic{ 0 };
         uint32_t r0{ 0 };
@@ -25,10 +26,16 @@ namespace application
         uint32_t mmfar{ 0 };
         uint32_t bfar{ 0 };
         uint32_t stackTraceCount{ 0 };
+        // Carries its own magic so a watchdog expiry survives a hard-fault record written over the same
+        // region, and vice versa
+        uint32_t watchdogExpiryMagic{ 0 };
         std::array<uint32_t, kMaxStackTraceEntries> stackTrace{};
 
         bool IsValid() const;
         void Invalidate();
+
+        void RecordWatchdogExpiry();
+        bool TakeWatchdogExpiry();
     };
 
     static_assert(sizeof(PersistentFaultData) == 1024u,

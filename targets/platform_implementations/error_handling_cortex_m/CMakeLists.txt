@@ -13,8 +13,7 @@ target_link_libraries(e_foc.error_handling_cortex_m PUBLIC
 target_sources(e_foc.error_handling_cortex_m PRIVATE
     PersistentFaultData.hpp
     PersistentFaultData.cpp
-    PowerStageCutOff.hpp
-    PowerStageCutOff.cpp
+    CutPowerStage.hpp
 )
 
 add_subdirectory(test)

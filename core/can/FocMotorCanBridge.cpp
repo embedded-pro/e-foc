@@ -203,9 +203,15 @@ namespace can
             return;
         }
 
-        if (controlMode.CmdReserveExternalCalibration() != state_machine::CommandResult::ok)
+        const auto reservation = controlMode.CmdReserveExternalCalibration();
+
+        if (reservation != state_machine::CommandResult::ok)
         {
-            server.SendCommandAck(can::focIdentifyElectricalId, services::CanAckStatus::invalidState);
+            if (reservation == state_machine::CommandResult::queued)
+                server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::busy);
+            else
+                server.SendCommandAck(can::focIdentifyElectricalId, services::CanAckStatus::invalidState);
+
             return;
         }
 

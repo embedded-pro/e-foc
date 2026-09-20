@@ -937,7 +937,7 @@ TEST_F(FocStateMachineSpeedCliTest, late_nvm_save_callback_after_fault_is_ignore
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, nvm_boot_callback_ignored_if_calibration_started)
+TEST_F(FocStateMachineSpeedCliTest, calibrate_is_rejected_until_the_boot_check_has_completed)
 {
     GivenFaultNotifierRegistered();
     infra::Function<void(bool)> bootCb;
@@ -949,14 +949,20 @@ TEST_F(FocStateMachineSpeedCliTest, nvm_boot_callback_ignored_if_calibration_sta
     ExpectSpeedCalibrationSequence();
     auto sm = CreateSpeedStateMachine();
 
-    sm.CmdCalibrate([](state_machine::CommandResult) {});
-    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    std::optional<state_machine::CommandResult> result;
+    sm.CmdCalibrate([&result](state_machine::CommandResult value)
+        {
+            result = value;
+        });
+    EXPECT_EQ(state_machine::CommandResult::rejected, result);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 
-    bootCb(true);
+    bootCb(false);
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, clear_cal_invalidate_callback_after_enable_is_ignored)
+TEST_F(FocStateMachineSpeedCliTest, enable_is_rejected_while_a_clear_calibration_is_outstanding)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -969,18 +975,22 @@ TEST_F(FocStateMachineSpeedCliTest, clear_cal_invalidate_callback_after_enable_i
             {
                 capturedCb = onDone;
             }));
-    sm.CmdClearCalibration([](state_machine::CommandResult) {});
+    std::optional<state_machine::CommandResult> result;
+    sm.CmdClearCalibration([&result](state_machine::CommandResult value)
+        {
+            result = value;
+        });
     ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    sm.CmdEnable();
-    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::rejected, sm.CmdEnable());
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 
     capturedCb(services::NvmStatus::Ok);
-    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::ok, result);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedCliTest, clear_cal_invalidate_callback_after_fault_is_ignored)
+TEST_F(FocStateMachineSpeedCliTest, clear_cal_invalidated_after_a_fault_drops_the_record_so_clear_fault_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -992,13 +1002,22 @@ TEST_F(FocStateMachineSpeedCliTest, clear_cal_invalidate_callback_after_fault_is
             {
                 capturedCb = onDone;
             }));
-    sm.CmdClearCalibration([](state_machine::CommandResult) {});
+    std::optional<state_machine::CommandResult> result;
+    sm.CmdClearCalibration([&result](state_machine::CommandResult value)
+        {
+            result = value;
+        });
 
     faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::abortedByFault, result);
 
     capturedCb(services::NvmStatus::Ok);
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdClearFault());
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineSpeedCliTest, clear_cal_invalidate_failure_callback_after_fault_does_not_re_enter_fault)
@@ -1706,7 +1725,7 @@ TEST_F(FocStateMachineSpeedAutoTest, late_nvm_save_callback_after_fault_is_ignor
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedAutoTest, nvm_boot_callback_ignored_if_calibration_started)
+TEST_F(FocStateMachineSpeedAutoTest, calibrate_is_rejected_until_the_boot_check_has_completed)
 {
     GivenFaultNotifierRegistered();
     infra::Function<void(bool)> bootCb;
@@ -1718,10 +1737,16 @@ TEST_F(FocStateMachineSpeedAutoTest, nvm_boot_callback_ignored_if_calibration_st
     ExpectSpeedCalibrationSequence();
     auto sm = CreateSpeedAutoStateMachine();
 
-    sm.CmdCalibrate([](state_machine::CommandResult) {});
-    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    std::optional<state_machine::CommandResult> result;
+    sm.CmdCalibrate([&result](state_machine::CommandResult value)
+        {
+            result = value;
+        });
+    EXPECT_EQ(state_machine::CommandResult::rejected, result);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 
-    bootCb(true);
+    bootCb(false);
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
@@ -1756,7 +1781,7 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_cal_nvm_failure_enters_fault)
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedAutoTest, clear_cal_invalidate_callback_after_enable_is_ignored)
+TEST_F(FocStateMachineSpeedAutoTest, enable_is_rejected_while_a_clear_calibration_is_outstanding)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -1769,18 +1794,22 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_cal_invalidate_callback_after_enable_
             {
                 capturedCb = onDone;
             }));
-    sm.CmdClearCalibration([](state_machine::CommandResult) {});
+    std::optional<state_machine::CommandResult> result;
+    sm.CmdClearCalibration([&result](state_machine::CommandResult value)
+        {
+            result = value;
+        });
     ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 
-    EXPECT_CALL(inverterMock, Start()).Times(1);
-    sm.CmdEnable();
-    ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::rejected, sm.CmdEnable());
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 
     capturedCb(services::NvmStatus::Ok);
-    EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::ok, result);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineSpeedAutoTest, clear_cal_invalidate_callback_after_fault_is_ignored)
+TEST_F(FocStateMachineSpeedAutoTest, clear_cal_invalidated_after_a_fault_drops_the_record_so_clear_fault_returns_to_idle)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGains();
@@ -1792,13 +1821,22 @@ TEST_F(FocStateMachineSpeedAutoTest, clear_cal_invalidate_callback_after_fault_i
             {
                 capturedCb = onDone;
             }));
-    sm.CmdClearCalibration([](state_machine::CommandResult) {});
+    std::optional<state_machine::CommandResult> result;
+    sm.CmdClearCalibration([&result](state_machine::CommandResult value)
+        {
+            result = value;
+        });
 
     faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::abortedByFault, result);
 
     capturedCb(services::NvmStatus::Ok);
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdClearFault());
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineSpeedAutoTest, clear_cal_invalidate_failure_callback_after_fault_does_not_re_enter_fault)
@@ -2554,13 +2592,25 @@ TEST_F(FocStateMachineSpeedIdentificationTest, an_emergency_stop_during_identifi
     auto sm = CreateRecordingStateMachine();
     auto& cascade = sm.GetController();
 
+    // The service only reports itself running once the step has actually started it; entering Calibrating
+    // is guarded on no async work being in flight, so it must not claim to be running before that.
+    bool identificationInFlight = false;
+
     EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
-        .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto&) {}));
-    EXPECT_CALL(mechIdentMock, IsRunning()).WillRepeatedly(Return(true));
+        .WillOnce(Invoke([&identificationInFlight](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto&)
+            {
+                identificationInFlight = true;
+            }));
+    EXPECT_CALL(mechIdentMock, IsRunning()).WillRepeatedly(Invoke([&identificationInFlight]()
+        {
+            return identificationInFlight;
+        }));
 
     sm.CmdCalibrate([](state_machine::CommandResult) {});
 
-    EXPECT_CALL(mechIdentMock, IsRunning()).WillRepeatedly(Return(false));
+    ASSERT_TRUE(identificationInFlight);
+
+    identificationInFlight = false;
     EXPECT_EQ(sm.CmdEmergencyStop(), state_machine::CommandResult::ok);
 
     EXPECT_NEAR(cascade.lastMechanical.inertia.Value(), 0.01f, 1e-6f);
@@ -2585,5 +2635,9 @@ TEST_F(FocStateMachineSpeedIdentificationTest, a_refused_electrical_model_still_
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
     EXPECT_GE(cascade.electricalConfigurations, 2u);
     EXPECT_NEAR(cascade.lastElectrical.resistance.Value(), 0.5f, 1e-6f);
+    // The identified resistance happens to equal the stored one, so the value alone cannot show the
+    // restore ran. Boot configures the mechanics once; a second configuration can only come from the
+    // restore, since the refused electrical model stops the step before the provisional plant is applied.
+    EXPECT_GE(cascade.mechanicalConfigurations, 2u);
     EXPECT_NEAR(cascade.lastMechanical.inertia.Value(), 0.01f, 1e-6f);
 }

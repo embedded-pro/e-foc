@@ -3,6 +3,7 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
+#include "core/platform_abstraction/SoftwareWatchdog.hpp"
 #include "hal/cortex_m/EventDispatcherCortex.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
 #include "hal/cortex_m/SystemTickTimerService.hpp"
@@ -49,8 +50,10 @@ namespace application
         foc::Volts PowerSupplyVoltage() override;
         foc::LowPriorityInterrupt& LowPriorityInterrupt() override;
         hal::Eeprom& Eeprom() override;
+        drivers::Watchdog& Watchdog() override;
         void RegisterBoardProtection(const infra::Function<void(BoardProtectionReason)>& onProtection) override;
         void Reset() override;
+        void ResetFromWatchdogExpiry() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
@@ -167,6 +170,7 @@ namespace application
         SemihostingSerial serial;
         TerminalAndTracerBlock terminalAndTracer{ serial };
         SemihostingEeprom eeprom{ "/tmp/eeprom.bin" };
+        SoftwareWatchdog watchdog;
         GpioPinStub operationalPin;
         GpioPinStub warningPin;
         GpioPinStub failurePin;

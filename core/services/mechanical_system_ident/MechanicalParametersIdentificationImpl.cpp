@@ -42,6 +42,7 @@ namespace services
         this->excitedUpdates = 0;
         this->atDwellLevel = false;
         this->outcome = Outcome::pending;
+        ++run;
 
         rls.emplace(1000.0f, config.forgettingFactor);
 
@@ -106,11 +107,16 @@ namespace services
             onDone(friction, inertia);
     }
 
+    // The finish is deferred, so an abort and a new run can both happen before it is dispatched. Tagging it
+    // with the run that queued it keeps a terminal outcome from completing the run that followed it.
     void MechanicalParametersIdentificationImpl::ScheduleFinish()
     {
         infra::EventDispatcherWithWeakPtr::Instance().Schedule(
-            [](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
+            [finishingRun = run](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
             {
+                if (self->run != finishingRun)
+                    return;
+
                 self->FinishRun();
             },
             WeakFromThis());

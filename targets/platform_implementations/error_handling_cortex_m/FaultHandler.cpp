@@ -1,5 +1,5 @@
+#include "targets/platform_implementations/error_handling_cortex_m/CutPowerStage.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
-#include "targets/platform_implementations/error_handling_cortex_m/PowerStageCutOff.hpp"
 #include DEVICE_HEADER
 #include <cstdlib>
 
@@ -35,7 +35,7 @@ extern "C"
         using application::PersistentFaultData;
         using application::persistentFaultData;
 
-        application::PowerStageCutOff::Cut();
+        application::CutPowerStage();
 
         // Invalidate while writing to prevent partially-written data being
         // read as valid on a watchdog timeout mid-write.

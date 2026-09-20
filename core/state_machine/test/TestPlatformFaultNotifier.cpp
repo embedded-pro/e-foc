@@ -4,11 +4,11 @@
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/non_volatile_memory/test_doubles/NonVolatileMemoryMock.hpp"
 #include "core/state_machine/PlatformFaultNotifier.hpp"
-#include "infra/util/WithSharedAccess.hpp"
 #include "core/state_machine/TorqueStateMachine.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
 #include "infra/stream/test/StreamMock.hpp"
+#include "infra/util/WithSharedAccess.hpp"
 #include "services/tracer/Tracer.hpp"
 #include <gmock/gmock.h>
 
@@ -54,6 +54,7 @@ namespace
             {
                 EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
                 EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(electricalIdentMock, IsRunning()).WillRepeatedly(Return(false));
             } };
 
         foc::Volts vdc{ 24.0f };
@@ -209,6 +210,140 @@ TEST_F(TestPlatformFaultNotifier, board_protection_cuts_the_bridge_in_the_interr
 
     ExecuteAllActions();
 
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(TestPlatformFaultNotifier, a_fault_while_the_inverter_starts_leaves_the_drive_faulted_before_the_dispatcher_runs)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+    EXPECT_CALL(platformFactory, Start())
+        .WillOnce(Invoke([this]()
+            {
+                platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+            }));
+
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::abortedByFault);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    ExecuteAllActions();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(sm.LastFaultCode(), state_machine::FaultCode::overcurrent);
+}
+
+TEST_F(TestPlatformFaultNotifier, a_fault_while_the_phase_current_slot_is_taken_never_starts_the_inverter)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    bool enabling = false;
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+    EXPECT_CALL(platformFactory, PhaseCurrentsReady(_, _))
+        .Times(AnyNumber())
+        .WillRepeatedly(Invoke([this, &enabling](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>&)
+            {
+                if (!enabling)
+                    return;
+
+                enabling = false;
+                platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+            }));
+
+    enabling = true;
+
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::abortedByFault);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    ExecuteAllActions();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(TestPlatformFaultNotifier, an_enable_is_refused_while_an_interrupt_fault_awaits_its_transition)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
+
+    ExecuteAllActions();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(TestPlatformFaultNotifier, a_calibrate_is_refused_while_an_interrupt_fault_awaits_its_transition)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+
+    auto result = state_machine::CommandResult::ok;
+    sm.CmdCalibrate([&result](state_machine::CommandResult value)
+        {
+            result = value;
+        });
+
+    EXPECT_EQ(state_machine::CommandResult::rejected, result);
+    EXPECT_FALSE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+    ExecuteAllActions();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(TestPlatformFaultNotifier, a_fault_clear_is_refused_while_a_further_fault_awaits_its_transition)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+    ExecuteAllActions();
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overVoltage);
+
+    EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::rejected);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    ExecuteAllActions();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::ok);
+}
+
+TEST_F(TestPlatformFaultNotifier, a_fault_awaiting_its_transition_counts_as_pending_async_work)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+
+    EXPECT_TRUE(sm.HasPendingAsyncWork());
+
+    ExecuteAllActions();
+
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 

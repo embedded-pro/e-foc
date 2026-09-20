@@ -64,5 +64,6 @@ namespace services
         MechanicalRls::InputMatrix regressor;
         math::Matrix<float, 1, 1> torque;
         volatile Outcome outcome{ Outcome::pending };
+        uint32_t run{ 0 };
     };
 }

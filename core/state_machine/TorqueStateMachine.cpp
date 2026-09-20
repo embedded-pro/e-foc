@@ -14,7 +14,7 @@ namespace application
     {
         RegisterFaultHandler(faultNotifier);
         RegisterCliIfNeeded(transitionPolicy);
-        CheckNvmOnBoot();
+        Boot();
     }
 
     TorqueStateMachine::~TorqueStateMachine()
@@ -47,8 +47,8 @@ namespace application
         return focController;
     }
 
-    void TorqueStateMachine::RunPostAlignmentStep()
+    void TorqueStateMachine::RunPostAlignmentStep(state_machine::Calibrating& calibrating)
     {
-        OnCalibrationComplete();
+        SaveCalibration(calibrating);
     }
 }

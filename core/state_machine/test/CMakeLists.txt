@@ -21,12 +21,18 @@ target_link_libraries(e_foc.state_machine_test PUBLIC
 
 target_sources(e_foc.state_machine_test PRIVATE
     TestFocStateMachineHelper.hpp
+    TestAlgorithmPersistence.cpp
+    TestCalibrationContext.cpp
+    TestCalibrationOrchestrator.cpp
     TestControlMode.cpp
+    TestFaultController.cpp
     TestControlModeStateMachine.cpp
     TestFaultNotifier.cpp
+    TestFocStateMachineTable.cpp
     TestFocStateMachineTorque.cpp
     TestFocStateMachineSpeed.cpp
     TestFocStateMachinePosition.cpp
+    TestPendingCommand.cpp
     TestPlatformFaultNotifier.cpp
 )
 

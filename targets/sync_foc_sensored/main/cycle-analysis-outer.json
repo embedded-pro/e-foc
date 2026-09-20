@@ -9,6 +9,7 @@
     {
       "label": "FOC Outer Loop (LowPriorityHandler)",
       "patterns": [
+        "SupervisedLowPriorityInterrupt::Register",
         "PositionCascade::LowPriorityHandler",
         "SpeedCascade::LowPriorityHandler",
         "CascadeWithSpeedLoop::RunSpeedLoop",
