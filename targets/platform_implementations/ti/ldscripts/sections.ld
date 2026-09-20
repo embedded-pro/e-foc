@@ -22,6 +22,11 @@ SECTIONS
         *(.ARM.extab* .gnu.linkonce.armextab.*)
 
         . = ALIGN(4);
+        PROVIDE_HIDDEN (__exidx_start = .);
+        *(.ARM.exidx* .gnu.linkonce.armexidx.*)
+        PROVIDE_HIDDEN (__exidx_end = .);
+
+        . = ALIGN(4);
         KEEP(*(.init))
         . = ALIGN(4);
         __preinit_array_start = .;
@@ -79,13 +84,6 @@ SECTIONS
     } > REGION_RAM
     ASSERT((_error_handling_end - _error_handling_start) <= 1024,
            "error_handling section exceeds 1 KiB")
-
-    PROVIDE_HIDDEN (__exidx_start = .);
-    .ARM.exidx :
-    {
-      *(.ARM.exidx* .gnu.linkonce.armexidx.*)
-    } > REGION_RAM
-    PROVIDE_HIDDEN (__exidx_end = .);
 
     . = ALIGN(4);
     end = . ;

@@ -1,6 +1,6 @@
+#include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include "hal/interfaces/test_doubles/EepromStub.hpp"
 #include "infra/event/test_helper/EventDispatcherFixture.hpp"
-#include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include <gtest/gtest.h>
 
 namespace
@@ -127,8 +127,8 @@ TEST_F(NvmEepromRegionTest, erase_fills_region_with_0xFF)
         });
     RunUntilDone(eraseDone);
 
-    // Assert
-    std::array<uint8_t, 5> readback{};
+    // Assert — the whole region, not just the bytes the arrange step dirtied
+    std::array<uint8_t, 128> readback{};
     bool readDone = false;
     region.Read(infra::MakeByteRange(readback), [&]
         {
@@ -138,6 +138,40 @@ TEST_F(NvmEepromRegionTest, erase_fills_region_with_0xFF)
 
     for (auto byte : readback)
         EXPECT_EQ(byte, 0xFF);
+}
+
+TEST_F(NvmEepromRegionTest, erase_does_not_affect_region_after_it)
+{
+    // Arrange — write data to the region starting right after this one, at offset 384
+    services::NvmEepromRegion after{ eeprom, 384, 128 };
+    const std::array<uint8_t, 3> data = { 0x88, 0x99, 0xAA };
+    bool writeDone = false;
+    after.Write(infra::MakeConstByteRange(data), [&]
+        {
+            writeDone = true;
+        });
+    RunUntilDone(writeDone);
+
+    // Act — erase the region at offset 256
+    bool eraseDone = false;
+    region.Erase([&]
+        {
+            eraseDone = true;
+        });
+    RunUntilDone(eraseDone);
+
+    // Assert — region at 384 is unchanged; fails if Erase writes the whole erasePattern
+    std::array<uint8_t, 3> readback{};
+    bool readDone = false;
+    after.Read(infra::MakeByteRange(readback), [&]
+        {
+            readDone = true;
+        });
+    RunUntilDone(readDone);
+
+    EXPECT_EQ(readback[0], 0x88);
+    EXPECT_EQ(readback[1], 0x99);
+    EXPECT_EQ(readback[2], 0xAA);
 }
 
 TEST_F(NvmEepromRegionTest, erase_does_not_affect_region_before_it)
