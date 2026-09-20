@@ -79,6 +79,8 @@ namespace
                 EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
                 EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
                 EXPECT_CALL(mechIdentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(electricalIdentMock, IsRunning()).WillRepeatedly(Return(false));
+                EXPECT_CALL(mechIdentMock, IsRunning()).WillRepeatedly(Return(false));
                 EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                     .Times(AnyNumber())
                     .WillRepeatedly(Invoke([](infra::Function<void(bool)> done)

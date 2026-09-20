@@ -23,7 +23,7 @@ namespace application
     protected:
         foc::FocBase& GetFoc() override;
         foc::Controllable& GetFocControl() override;
-        void RunPostAlignmentStep() override;
+        void RunPostAlignmentStep(state_machine::Calibrating& calibrating) override;
         foc::CurrentLoopTunable& CurrentTunable() override;
 
     private:

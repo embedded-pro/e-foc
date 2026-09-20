@@ -21,9 +21,10 @@ namespace services
         std::size_t Size() const override;
 
     private:
+        static const std::array<uint8_t, maxRegionSize> erasePattern;
+
         hal::Eeprom& eeprom;
         uint32_t baseAddress;
         uint32_t regionSize;
-        std::array<uint8_t, maxRegionSize> eraseBuffer{};
     };
 }

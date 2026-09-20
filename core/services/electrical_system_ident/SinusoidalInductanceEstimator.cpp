@@ -82,10 +82,7 @@ namespace services
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ 0.0f, 0.0f }, 1.0f, 0.0f)));
 
-        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
-            {
-                FailMeasurement();
-            });
+        StartSampleWatchdog();
     }
 
     void SinusoidalInductanceEstimator::Abort()
@@ -98,8 +95,21 @@ namespace services
         onDone = nullptr;
     }
 
+    void SinusoidalInductanceEstimator::StartSampleWatchdog()
+    {
+        sampleSeen = false;
+        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
+            {
+                if (!sampleSeen)
+                    FailMeasurement();
+
+                sampleSeen = false;
+            });
+    }
+
     void SinusoidalInductanceEstimator::FailMeasurement()
     {
+        noSampleTimer.Cancel();
         driver.Stop();
         if (onDone)
             onDone(Result{});
@@ -107,10 +117,7 @@ namespace services
 
     void SinusoidalInductanceEstimator::AdvanceInjection()
     {
-        noSampleTimer.Start(activeConfig.noSampleTimeout, [this]()
-            {
-                FailMeasurement();
-            });
+        sampleSeen = true;
 
         const float vNorm = injectionAmplitude * math::Sin(injectionPhase);
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(

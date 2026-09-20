@@ -4,11 +4,11 @@
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/non_volatile_memory/test_doubles/NonVolatileMemoryMock.hpp"
 #include "core/state_machine/PlatformFaultNotifier.hpp"
-#include "infra/util/WithSharedAccess.hpp"
 #include "core/state_machine/TorqueStateMachine.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
 #include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
 #include "infra/stream/test/StreamMock.hpp"
+#include "infra/util/WithSharedAccess.hpp"
 #include "services/tracer/Tracer.hpp"
 #include <gmock/gmock.h>
 
@@ -54,6 +54,7 @@ namespace
             {
                 EXPECT_CALL(electricalIdentMock, Abort()).Times(AnyNumber());
                 EXPECT_CALL(alignmentMock, Abort()).Times(AnyNumber());
+                EXPECT_CALL(electricalIdentMock, IsRunning()).WillRepeatedly(Return(false));
             } };
 
         foc::Volts vdc{ 24.0f };

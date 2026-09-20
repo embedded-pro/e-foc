@@ -183,52 +183,32 @@ namespace application
             adcCfg);
     }
 
+    void PlatformFactoryImpl::OnPwmFault(hal::tiva::Pwm::FaultEvent event)
+    {
+        if (!onFaultCallback)
+            return;
+
+        const auto bits = static_cast<uint8_t>(event.comparatorInputsByGenerator[1]);
+
+        if (bits & static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator0))
+            onFaultCallback(PlatformFactory::BoardProtectionReason::overCurrent);
+        if (bits & static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1))
+            onFaultCallback(PlatformFactory::BoardProtectionReason::overVoltage);
+    }
+
     void PlatformFactoryImpl::ReconfigurePwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime)
     {
-        peripherals->asyncPwm.reset();
-        peripherals->syncPwm.reset();
+        peripherals->pwm.reset();
 
-        if constexpr (Peripheral::hasFaultComparators)
-        {
-            auto& cfg = peripherals->asyncPwmConfig;
-            const auto deadTimeCycles = hal::tiva::Pwm::CalculateDeadTimeCycles(deadTime, cfg.clockDivisor);
-            cfg.deadTimeConfig.fallInClockCycles = deadTimeCycles;
-            cfg.deadTimeConfig.riseInClockCycles = deadTimeCycles;
-            cfg.pwmConfig.deadTime = std::make_optional(cfg.deadTimeConfig);
+        auto& cfg = peripherals->pwmConfig;
+        const auto deadTimeCycles = PwmDriver::CalculateDeadTimeCycles(deadTime, cfg.clockDivisor);
+        cfg.deadTimeConfig.fallInClockCycles = deadTimeCycles;
+        cfg.deadTimeConfig.riseInClockCycles = deadTimeCycles;
+        cfg.pwmConfig.deadTime = std::make_optional(cfg.deadTimeConfig);
 
-            peripherals->asyncPwm.emplace(
-                Peripheral::PwmIndex,
-                infra::MakeRange(Peripheral::asyncPwmPhases),
-                cfg.pwmConfig,
-                infra::Function<void(hal::tiva::Pwm::NormalEvent)>{},
-                [this](hal::tiva::Pwm::FaultEvent ev)
-                {
-                    if (!onFaultCallback)
-                        return;
-                    const auto bits = static_cast<uint8_t>(ev.comparatorInputsByGenerator[1]);
-                    if (bits & static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator0))
-                        onFaultCallback(PlatformFactory::BoardProtectionReason::overCurrent);
-                    if (bits & static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1))
-                        onFaultCallback(PlatformFactory::BoardProtectionReason::overVoltage);
-                });
+        EmplacePwm(cfg);
 
-            peripherals->asyncPwm->SetBaseFrequency(baseFrequency);
-        }
-        else
-        {
-            auto& cfg = peripherals->syncPwmConfig;
-            const auto deadTimeCycles = hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(deadTime, cfg.clockDivisor);
-            cfg.deadTimeConfig.fallInClockCycles = deadTimeCycles;
-            cfg.deadTimeConfig.riseInClockCycles = deadTimeCycles;
-            cfg.pwmConfig.deadTime = std::make_optional(cfg.deadTimeConfig);
-
-            peripherals->syncPwm.emplace(
-                Peripheral::PwmIndex,
-                infra::MakeRange(Peripheral::syncPwmPhases),
-                cfg.pwmConfig);
-
-            peripherals->syncPwm->SetBaseFrequency(baseFrequency);
-        }
+        peripherals->pwm->SetBaseFrequency(baseFrequency);
     }
 
     void PlatformFactoryImpl::SetEncoderResolution(uint32_t resolution)

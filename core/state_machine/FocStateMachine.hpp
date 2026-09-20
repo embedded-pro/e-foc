@@ -17,26 +17,36 @@ namespace state_machine
     };
 
     struct Idle
-    {};
+    {
+        static constexpr const char* name{ "Idle" };
+    };
 
     struct Calibrating
     {
+        static constexpr const char* name{ "Calibrating" };
+
         CalibrationStep step{ CalibrationStep::polePairs };
         services::CalibrationData pendingData{};
-        bool external{ false };
+        bool alignmentOnly{ false };
     };
 
     struct Ready
     {
+        static constexpr const char* name{ "Ready" };
+
         services::CalibrationData loadedData{};
         bool rotorReferenceValid{ false };
     };
 
     struct Enabled
-    {};
+    {
+        static constexpr const char* name{ "Enabled" };
+    };
 
     struct Fault
     {
+        static constexpr const char* name{ "Fault" };
+
         FaultCode code{ FaultCode::hardwareFault };
     };
 
@@ -48,7 +58,8 @@ namespace state_machine
         rejected,
         calibrationFailed,
         nvmFailed,
-        abortedByFault
+        abortedByFault,
+        queued
     };
 
     inline bool IsStopped(const State& state)
@@ -59,7 +70,7 @@ namespace state_machine
     class FocStateMachineBase
     {
     public:
-        virtual ~FocStateMachineBase();
+        virtual ~FocStateMachineBase() = default;
         virtual const State& CurrentState() const = 0;
         virtual FaultCode LastFaultCode() const = 0;
 

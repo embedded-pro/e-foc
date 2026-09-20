@@ -30,6 +30,7 @@ namespace application
 
         void Abort();
         bool IsRunning() const;
+        bool HasRunInFlight() const;
 
     private:
         void RunPolePairsStep();
@@ -46,6 +47,7 @@ namespace application
         infra::AutoResetFunction<void(foc::Radians)> onAlignmentDone;
         infra::AutoResetFunction<void()> onFailed;
         bool aborted{ false };
+        bool running{ false };
         uint32_t runToken{ 0 };
     };
 }

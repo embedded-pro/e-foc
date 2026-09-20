@@ -28,6 +28,7 @@ namespace services
         this->previousSpeed = 0.0f;
         this->polePairs = static_cast<float>(numberOfPolePairs);
         this->converged = false;
+        ++run;
 
         rls.emplace(1000.0f, config.forgettingFactor);
 
@@ -104,9 +105,9 @@ namespace services
         timeoutTimer.Cancel();
 
         infra::EventDispatcherWithWeakPtr::Instance().Schedule(
-            [](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
+            [convergedRun = run](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
             {
-                if (!self->rls.has_value())
+                if (!self->rls.has_value() || self->run != convergedRun)
                     return;
 
                 self->ReleaseDrive();

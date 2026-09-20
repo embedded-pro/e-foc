@@ -12,7 +12,7 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `core/foc/cascade/` — Cascade orchestration + gain design; no hardware dependency
 - `core/foc/instantiations/` — Concrete wiring (`Runner`, `FocController`)
 - `core/platform_abstraction/` — `PlatformFactory` + hardware ports (`drivers::ThreePhaseInverter`, `drivers::Encoder`, `drivers::HallSensor`) in `interfaces/Drivers.hpp`
-- `core/state_machine/` — Motor lifecycle FSM (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`). `TransitionPolicy::{Cli,Auto}`. `std::variant` states.
+- `core/state_machine/` — Motor lifecycle FSM (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) on EmIL `services::TableStateMachine`: `std::variant` states, `std::variant` events (`FocStateMachineEvents.hpp`), transition table in `FocLifecycleTable`. `TransitionPolicy::{Cli,Auto}` only selects terminal commands.
 - `core/services/` — Alignment, CLI, system ID, NVM
 - `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`) + platform implementations (`host`, `ti`, `st`)
 - `infra/numerical-toolbox/` — PID, filters, fixed-point math (see its own `AGENTS.md`)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <type_traits>
 #include HARDWARE_PINS_AND_PERIPHERALS_HEADER
 #include MOTOR_BOARD_CHARACTERISTICS_HEADER
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
@@ -94,9 +95,16 @@ namespace application
         static constexpr float adcReferenceVoltage = 3.3f;
         static constexpr float adcResolution = 4096.0f;
 
+        // The UART hands the terminal a whole DMA half-buffer in one call from the ISR, and
+        // QueueForOneReaderOneIrqWriter copies the range without checking that it fits.
+        static_assert(Resources::terminalQueueSize >= Resources::uartReceiveBufferSize / 2,
+            "terminal queue must absorb a whole DMA half-buffer");
+        static_assert(Resources::faultStatusSize >= 251,
+            "fault status must hold the full register and FSR/FAR dump");
+
         struct Cortex
         {
-            infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
+            infra::EventDispatcherWithWeakPtr::WithSize<Resources::eventDispatcherSize> eventDispatcher;
             hal::cortex::DataWatchpointAndTrace dataWatchPointAndTrace;
             hal::cortex::SystemTickTimerService systemTick{ SystemCoreClock, std::chrono::milliseconds(1) };
         };
@@ -105,11 +113,11 @@ namespace application
         {
             hal::tiva::Dma dma{ infra::emptyFunction };
             hal::tiva::UartWithDma::Config uartConfig{ true, true, hal::tiva::UartWithDma::Baudrate::_921000_bps, hal::tiva::UartWithDma::FlowControl::none, hal::tiva::UartWithDma::Parity::none, hal::tiva::UartWithDma::StopBits::one, hal::tiva::UartWithDma::NumberOfBytes::_8_bytes, std::make_optional(InterruptPriorities::uart) };
-            hal::tiva::UartWithDma::WithRxBuffer<256> uart{ Peripheral::UartIndex, Pins::uartTx, Pins::uartRx, dma, uartConfig };
-            services::StreamWriterOnSerialCommunication::WithStorage<8192> streamWriterOnSerialCommunication{ uart };
+            hal::tiva::UartWithDma::WithRxBuffer<Resources::uartReceiveBufferSize> uart{ Peripheral::UartIndex, Pins::uartTx, Pins::uartRx, dma, uartConfig };
+            services::StreamWriterOnSerialCommunication::WithStorage<Resources::tracerBufferSize> streamWriterOnSerialCommunication{ uart };
             infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterOnSerialCommunication };
             services::TracerWithDateTime tracer{ tracerStream };
-            services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<256, 10> terminal{ uart, tracer };
+            services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<Resources::terminalQueueSize, Resources::terminalHistorySize> terminal{ uart, tracer };
         };
 
         struct AdcForPowerSupplyMeasurementImpl
@@ -124,7 +132,7 @@ namespace application
 
         struct AdcForPhaseCurrentMeasurementImpl
         {
-            const std::array<hal::tiva::Adc::SampleAndHold, 5> toSampleAndHold{ { hal::tiva::Adc::SampleAndHold::sampleAndHold4,
+            static constexpr std::array<hal::tiva::Adc::SampleAndHold, 5> toSampleAndHold{ { hal::tiva::Adc::SampleAndHold::sampleAndHold4,
                 hal::tiva::Adc::SampleAndHold::sampleAndHold16,
                 hal::tiva::Adc::SampleAndHold::sampleAndHold32,
                 hal::tiva::Adc::SampleAndHold::sampleAndHold64,
@@ -181,8 +189,33 @@ namespace application
             hal::tiva::SynchronousPwm::Config pwmConfig{ false, false, controlConfig, clockDivisor, std::make_optional(deadTimeConfig) };
         };
 
+        using PwmDriver = Peripheral::hal_pwm;
+        using PwmConfiguration = std::conditional_t<Peripheral::hasFaultComparators, AsyncPwmConfig, SyncPwmConfig>;
+
         void ReconfigureAdc(SampleAndHold sampleAndHold);
         void ReconfigurePwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime);
+        void OnPwmFault(hal::tiva::Pwm::FaultEvent event);
+
+        // Condition must depend on Config: a discarded if constexpr branch is still type-checked otherwise.
+        template<typename Config>
+        void EmplacePwm(Config& config)
+        {
+            if constexpr (std::is_same_v<Config, AsyncPwmConfig>)
+                peripherals->pwm.emplace(
+                    Peripheral::PwmIndex,
+                    infra::MakeRange(Peripheral::pwmPhases),
+                    config.pwmConfig,
+                    infra::Function<void(hal::tiva::Pwm::NormalEvent)>{},
+                    [this](hal::tiva::Pwm::FaultEvent event)
+                    {
+                        OnPwmFault(event);
+                    });
+            else
+                peripherals->pwm.emplace(
+                    Peripheral::PwmIndex,
+                    infra::MakeRange(Peripheral::pwmPhases),
+                    config.pwmConfig);
+        }
 
         static CanBusAdapter::CanError ToAdapterError(hal::tiva::Can::Error error)
         {
@@ -222,15 +255,13 @@ namespace application
             TerminalAndTracer terminalAndTracer;
             AdcForPowerSupplyMeasurementImpl adcForPowerSupplyMeasurementImpl;
             AdcForPhaseCurrentMeasurementImpl adcForPhaseCurrentMeasurementImpl;
-            AsyncPwmConfig asyncPwmConfig;
-            SyncPwmConfig syncPwmConfig;
+            PwmConfiguration pwmConfig;
             hal::tiva::Eeprom eepromPeripheral;
 
             std::optional<AdcPhaseCurrentMeasurementImpl<hal::tiva::Adc>> phaseCurrentAdc;
-            std::optional<hal::tiva::Pwm> asyncPwm;
-            std::optional<hal::tiva::SynchronousPwm> syncPwm;
+            std::optional<PwmDriver> pwm;
             std::optional<QuadratureEncoderDecoratorImpl<hal::tiva::QuadratureEncoder>> encoder;
-            std::optional<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<32>>> canBus;
+            std::optional<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<Resources::canReceiveBufferSize>>> canBus;
 
             struct PerformanceTrackerImpl
                 : hal::PerformanceTracker
@@ -247,10 +278,7 @@ namespace application
         template<typename Fn>
         void WithPwm(Fn&& fn)
         {
-            if constexpr (Peripheral::hasFaultComparators)
-                fn(*peripherals->asyncPwm);
-            else
-                fn(*peripherals->syncPwm);
+            fn(*peripherals->pwm);
         }
 
     private:
@@ -262,7 +290,7 @@ namespace application
         ControlLoopMetrics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
         volatile bool controlLoopEntered{ false };
-        infra::BoundedString::WithStorage<1024> faultStatusString;
+        infra::BoundedString::WithStorage<Resources::faultStatusSize> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
