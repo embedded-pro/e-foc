@@ -32,6 +32,7 @@ target_sources(e_foc.state_machine_test PRIVATE
     TestFocStateMachineTorque.cpp
     TestFocStateMachineSpeed.cpp
     TestFocStateMachinePosition.cpp
+    TestPendingCommand.cpp
     TestPlatformFaultNotifier.cpp
 )
 

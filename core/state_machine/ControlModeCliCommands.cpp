@@ -4,6 +4,7 @@
 #include "core/services/cli/TerminalHelper.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/FocStateMachineCommon.hpp"
+#include "core/state_machine/LifecycleCliCommands.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include <optional>
 

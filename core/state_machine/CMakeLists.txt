@@ -38,10 +38,24 @@ target_sources(e_foc.state_machine PRIVATE
     FaultNotifier.hpp
     FocStateMachine.hpp
     FocStateMachineEvents.hpp
+    BootSequence.hpp
+    BootSequence.cpp
+    CalibrationFlow.hpp
+    CalibrationFlow.cpp
+    FocLifecycleTable.hpp
+    FocLifecycleTable.cpp
     FocStateMachineCommon.hpp
     FocStateMachineCommon.cpp
-    FocStateMachineCommonCalibration.cpp
-    FocStateMachineTable.cpp
+    FocStateMachineDependencies.hpp
+    LifecycleCliCommands.hpp
+    LifecycleContext.hpp
+    MaintenanceFlow.hpp
+    MaintenanceFlow.cpp
+    ModeHooks.hpp
+    OperationFlow.hpp
+    OperationFlow.cpp
+    PendingCommand.hpp
+    PendingCommand.cpp
     OuterLoopStateMachine.hpp
     OuterLoopStateMachine.cpp
     OuterLoopStateMachineFor.hpp

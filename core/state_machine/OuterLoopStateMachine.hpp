@@ -33,7 +33,7 @@ namespace application
             services::NonVolatileMemory& nvm,
             const CalibrationServices& calibServices);
 
-        bool HasPendingAsyncWork() const override;
+        bool HasModeSpecificWorkPending() const override;
         void ApplyModeSpecificCalibration(const services::CalibrationData& data) override;
         bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const override;
         void PrepareForEnabled() override;

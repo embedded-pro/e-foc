@@ -998,6 +998,28 @@ TEST_F(FocStateMachineTorqueCliTest, clear_cal_from_idle_calls_invalidate)
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
+TEST_F(FocStateMachineTorqueCliTest, clear_cal_while_nvm_is_busy_completes_with_rejected_and_keeps_the_record)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(nvmMock, InvalidateCalibration(_))
+        .WillOnce(Invoke([](infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Busy);
+            }));
+    std::optional<state_machine::CommandResult> result;
+    sm.CmdClearCalibration([&result](state_machine::CommandResult value)
+        {
+            result = value;
+        });
+
+    EXPECT_EQ(state_machine::CommandResult::rejected, result);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+}
+
 TEST_F(FocStateMachineTorqueCliTest, clear_cal_from_enabled_is_rejected)
 {
     GivenFaultNotifierRegistered();
