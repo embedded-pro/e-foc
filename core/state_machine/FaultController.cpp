@@ -40,7 +40,6 @@ namespace application
 
     void FaultController::EnterFault()
     {
-        faultPending = false;
         faultLatched = true;
         faultRecorded = true;
     }

@@ -8,7 +8,6 @@
 namespace
 {
     using testing::_;
-    using testing::AtLeast;
     using testing::Return;
 
     MATCHER_P(DutiesEqual, expected, "")
@@ -139,8 +138,8 @@ TEST_F(TestRunner, AStopWhileThePhaseCurrentsSlotIsTakenNeverStartsTheInverter)
                 inverterMock.StorePhaseCurrentsCallback(onDone);
             });
 
-    EXPECT_CALL(inverterMock, Stop()).Times(AtLeast(1));
-    EXPECT_CALL(focMock, Disable()).Times(AtLeast(1));
+    EXPECT_CALL(inverterMock, Stop()).Times(3);
+    EXPECT_CALL(focMock, Disable()).Times(3);
 
     runner.Enable();
 
@@ -157,8 +156,8 @@ TEST_F(TestRunner, AStopWhileTheControlLawIsEnabledNeverStartsTheInverter)
                 runner.Disable();
             });
 
-    EXPECT_CALL(inverterMock, Stop()).Times(AtLeast(1));
-    EXPECT_CALL(focMock, Disable()).Times(AtLeast(1));
+    EXPECT_CALL(inverterMock, Stop()).Times(3);
+    EXPECT_CALL(focMock, Disable()).Times(3);
 
     runner.Enable();
 
@@ -176,8 +175,8 @@ TEST_F(TestRunner, AStopWhileTheInverterStartsLeavesTheBridgeStopped)
                 runner.Disable();
             });
 
-    EXPECT_CALL(inverterMock, Stop()).Times(AtLeast(2));
-    EXPECT_CALL(focMock, Disable()).Times(AtLeast(2));
+    EXPECT_CALL(inverterMock, Stop()).Times(3);
+    EXPECT_CALL(focMock, Disable()).Times(3);
 
     runner.Enable();
 

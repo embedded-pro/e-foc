@@ -177,12 +177,15 @@
   title: A fault is latched in the faulting context
   shall: >
     A fault raised in an interrupt shall latch before the interrupt returns, using only
-    single-word writes so that the constraints of REQ-SM-021 are preserved. Every command
-    that arms the power stage shall consult that latch rather than the lifecycle state,
-    which the deferred transition has not yet written, so that an enable issued between the
-    interrupt and the dispatcher turn is refused. The transition shall be taken exactly
+    single-word writes so that the constraints of REQ-SM-021 are preserved. The latch shall
+    record both that a fault is in force and that its transition is still owed. Every command
+    that arms the power stage, and every command that would clear the fault or destroy the
+    state machine holding the latch, shall consult that latch rather than the lifecycle state,
+    which the deferred transition has not yet written, so that such a command issued between
+    the interrupt and the dispatcher turn is refused. The transition shall be taken exactly
     once, by whichever of the dispatcher turn or the enable sequence observes the latched
-    fault first.
+    fault first; taking a transition shall not discharge a fault latched after it began, which
+    is owed a transition of its own.
 
 - id: REQ-SM-024
   title: An interrupted enable sequence never re-arms the power stage

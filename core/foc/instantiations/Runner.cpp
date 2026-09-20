@@ -22,11 +22,11 @@ namespace foc
 
     void Runner::Enable()
     {
-        const auto sequence = stopSequence;
+        stopRequested = false;
 
         RegisterPhaseCurrents();
 
-        if (StoppedSince(sequence))
+        if (stopRequested)
         {
             Disable();
             return;
@@ -34,7 +34,7 @@ namespace foc
 
         foc.Enable();
 
-        if (StoppedSince(sequence))
+        if (stopRequested)
         {
             Disable();
             return;
@@ -42,7 +42,7 @@ namespace foc
 
         inverter.Start();
 
-        if (StoppedSince(sequence))
+        if (stopRequested)
         {
             Disable();
             return;
@@ -50,22 +50,17 @@ namespace foc
 
         enabled = true;
 
-        if (StoppedSince(sequence))
+        if (stopRequested)
             Disable();
     }
 
     void Runner::Disable()
     {
-        stopSequence = static_cast<uint8_t>(stopSequence + 1u);
+        stopRequested = true;
         enabled = false;
         inverter.Stop();
         ReleasePhaseCurrents();
         foc.Disable();
-    }
-
-    bool Runner::StoppedSince(uint8_t sequence) const
-    {
-        return stopSequence != sequence;
     }
 
     void Runner::RegisterPhaseCurrentsObserver(const infra::Function<void(const PhaseCurrents& currentPhases)>& observer)

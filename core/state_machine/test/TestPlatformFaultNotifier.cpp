@@ -304,6 +304,29 @@ TEST_F(TestPlatformFaultNotifier, a_calibrate_is_refused_while_an_interrupt_faul
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
+TEST_F(TestPlatformFaultNotifier, a_fault_clear_is_refused_while_a_further_fault_awaits_its_transition)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+    ExecuteAllActions();
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overVoltage);
+
+    EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::rejected);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    ExecuteAllActions();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::ok);
+}
+
 TEST_F(TestPlatformFaultNotifier, a_fault_awaiting_its_transition_counts_as_pending_async_work)
 {
     GivenCalibrationInNvm();
