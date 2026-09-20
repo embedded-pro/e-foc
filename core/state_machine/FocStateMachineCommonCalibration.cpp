@@ -78,8 +78,7 @@ namespace application
     {
         if (!event.friction || !event.inertia)
         {
-            CompletePendingCommand(state_machine::CommandResult::calibrationFailed);
-            Dispatch(state_machine::FaultDetected{ state_machine::FaultCode::calibrationFailed });
+            Dispatch(state_machine::CalibrationStepFailed{});
             return;
         }
 
@@ -158,8 +157,7 @@ namespace application
             },
             [this](Stopped&, const state_machine::CalibrationInvalidated&)
             {
-                CompletePendingCommand(state_machine::CommandResult::nvmFailed);
-                return BuildFault(state_machine::FaultCode::hardwareFault, false);
+                return BuildFault(state_machine::FaultCode::hardwareFault, false, state_machine::CommandResult::nvmFailed);
             });
 
         stateMachine.AddInternal<Stopped, state_machine::CalibrationInvalidated>([this](Stopped&, const state_machine::CalibrationInvalidated&)

@@ -149,8 +149,7 @@ namespace application
     {
         stateMachine.Add<state_machine::Calibrating, state_machine::CalibrationStepFailed, state_machine::Fault>(nullptr, [this](state_machine::Calibrating&, const state_machine::CalibrationStepFailed&)
             {
-                CompletePendingCommand(state_machine::CommandResult::calibrationFailed);
-                return BuildFault(state_machine::FaultCode::calibrationFailed, true);
+                return BuildFault(state_machine::FaultCode::calibrationFailed, true, state_machine::CommandResult::calibrationFailed);
             });
 
         stateMachine.Add<state_machine::Calibrating, state_machine::CalibrationSaved, state_machine::Fault>(
@@ -160,8 +159,7 @@ namespace application
             },
             [this](state_machine::Calibrating&, const state_machine::CalibrationSaved&)
             {
-                CompletePendingCommand(state_machine::CommandResult::nvmFailed);
-                return BuildFault(state_machine::FaultCode::calibrationFailed, true);
+                return BuildFault(state_machine::FaultCode::calibrationFailed, true, state_machine::CommandResult::nvmFailed);
             });
 
         stateMachine.Add<state_machine::Calibrating, state_machine::CalibrationSaved, state_machine::Ready>(
@@ -388,7 +386,7 @@ namespace application
         return state_machine::Enabled{};
     }
 
-    state_machine::Fault FocStateMachineCommon::BuildFault(state_machine::FaultCode code, bool wasActive)
+    state_machine::Fault FocStateMachineCommon::BuildFault(state_machine::FaultCode code, bool wasActive, state_machine::CommandResult pendingResult)
     {
         lastFaultCode = code;
         faultController.EnterFault();
@@ -397,26 +395,33 @@ namespace application
             GetFocControl().Stop();
 
         AbortCalibrationServices();
-        CompleteAfterTransition(state_machine::CommandResult::abortedByFault);
+        CompleteAfterTransition(pendingResult);
         return state_machine::Fault{ code };
+    }
+
+    void FocStateMachineCommon::AbortActiveWork()
+    {
+        tracer.Trace() << "[SM] Emergency stop";
+        AbortCalibrationServices();
     }
 
     void FocStateMachineCommon::StopWithoutTransition()
     {
-        tracer.Trace() << "[SM] Emergency stop";
-        AbortCalibrationServices();
+        AbortActiveWork();
         CompletePendingCommand(state_machine::CommandResult::abortedByFault);
     }
 
     state_machine::Idle FocStateMachineCommon::StopToIdle()
     {
-        StopWithoutTransition();
+        AbortActiveWork();
+        CompleteAfterTransition(state_machine::CommandResult::abortedByFault);
         return state_machine::Idle{};
     }
 
     state_machine::Ready FocStateMachineCommon::StopToReady()
     {
-        StopWithoutTransition();
+        AbortActiveWork();
+        CompleteAfterTransition(state_machine::CommandResult::abortedByFault);
         return BuildReady();
     }
 
@@ -425,15 +430,15 @@ namespace application
         if (to.Is<state_machine::Enabled>())
             GetFocControl().Start();
 
-        if (to.Is<state_machine::Ready>() && readyHandler != nullptr)
-            readyHandler();
-
         if (deferredCompletion.has_value())
         {
             auto result = *deferredCompletion;
             deferredCompletion.reset();
             CompletePendingCommand(result);
         }
+
+        if (to.Is<state_machine::Ready>() && readyHandler != nullptr)
+            readyHandler();
     }
 
     void FocStateMachineCommon::CompleteAfterTransition(state_machine::CommandResult result)

@@ -154,10 +154,11 @@ namespace application
 
         state_machine::Ready BuildReady();
         state_machine::Enabled BuildEnabled();
-        state_machine::Fault BuildFault(state_machine::FaultCode code, bool wasActive);
+        state_machine::Fault BuildFault(state_machine::FaultCode code, bool wasActive, state_machine::CommandResult pendingResult = state_machine::CommandResult::abortedByFault);
         state_machine::Idle StopToIdle();
         state_machine::Ready StopToReady();
         void StopWithoutTransition();
+        void AbortActiveWork();
 
         void OnFluxLinkageSaved(services::NvmStatus status);
         void OnBootValidityChecked(bool valid);
@@ -178,7 +179,7 @@ namespace application
         FaultController faultController;
         CalibrationOrchestrator calibrationOrchestrator;
 
-        StateMachine::WithStorage<48, 16> stateMachine;
+        StateMachine::WithStorage<45, 4> stateMachine;
         Observer observer{ stateMachine, *this };
         services::StateMachineTracer<state_machine::State, state_machine::Event> stateMachineTracer;
 
