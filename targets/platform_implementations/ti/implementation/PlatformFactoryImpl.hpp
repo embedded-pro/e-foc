@@ -95,9 +95,16 @@ namespace application
         static constexpr float adcReferenceVoltage = 3.3f;
         static constexpr float adcResolution = 4096.0f;
 
+        // The UART hands the terminal a whole DMA half-buffer in one call from the ISR, and
+        // QueueForOneReaderOneIrqWriter copies the range without checking that it fits.
+        static_assert(Resources::terminalQueueSize >= Resources::uartReceiveBufferSize / 2,
+            "terminal queue must absorb a whole DMA half-buffer");
+        static_assert(Resources::faultStatusSize >= 251,
+            "fault status must hold the full register and FSR/FAR dump");
+
         struct Cortex
         {
-            infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
+            infra::EventDispatcherWithWeakPtr::WithSize<Resources::eventDispatcherSize> eventDispatcher;
             hal::cortex::DataWatchpointAndTrace dataWatchPointAndTrace;
             hal::cortex::SystemTickTimerService systemTick{ SystemCoreClock, std::chrono::milliseconds(1) };
         };
@@ -106,11 +113,11 @@ namespace application
         {
             hal::tiva::Dma dma{ infra::emptyFunction };
             hal::tiva::UartWithDma::Config uartConfig{ true, true, hal::tiva::UartWithDma::Baudrate::_921000_bps, hal::tiva::UartWithDma::FlowControl::none, hal::tiva::UartWithDma::Parity::none, hal::tiva::UartWithDma::StopBits::one, hal::tiva::UartWithDma::NumberOfBytes::_8_bytes, std::make_optional(InterruptPriorities::uart) };
-            hal::tiva::UartWithDma::WithRxBuffer<256> uart{ Peripheral::UartIndex, Pins::uartTx, Pins::uartRx, dma, uartConfig };
-            services::StreamWriterOnSerialCommunication::WithStorage<8192> streamWriterOnSerialCommunication{ uart };
+            hal::tiva::UartWithDma::WithRxBuffer<Resources::uartReceiveBufferSize> uart{ Peripheral::UartIndex, Pins::uartTx, Pins::uartRx, dma, uartConfig };
+            services::StreamWriterOnSerialCommunication::WithStorage<Resources::tracerBufferSize> streamWriterOnSerialCommunication{ uart };
             infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterOnSerialCommunication };
             services::TracerWithDateTime tracer{ tracerStream };
-            services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<256, 10> terminal{ uart, tracer };
+            services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<Resources::terminalQueueSize, Resources::terminalHistorySize> terminal{ uart, tracer };
         };
 
         struct AdcForPowerSupplyMeasurementImpl
@@ -254,7 +261,7 @@ namespace application
             std::optional<AdcPhaseCurrentMeasurementImpl<hal::tiva::Adc>> phaseCurrentAdc;
             std::optional<PwmDriver> pwm;
             std::optional<QuadratureEncoderDecoratorImpl<hal::tiva::QuadratureEncoder>> encoder;
-            std::optional<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<32>>> canBus;
+            std::optional<CanBusAdapterImpl<hal::tiva::Can::WithMaxRxBuffer<Resources::canReceiveBufferSize>>> canBus;
 
             struct PerformanceTrackerImpl
                 : hal::PerformanceTracker
@@ -283,7 +290,7 @@ namespace application
         ControlLoopMetrics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
         volatile bool controlLoopEntered{ false };
-        infra::BoundedString::WithStorage<1024> faultStatusString;
+        infra::BoundedString::WithStorage<Resources::faultStatusSize> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;

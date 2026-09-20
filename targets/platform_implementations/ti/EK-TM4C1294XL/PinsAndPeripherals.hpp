@@ -88,6 +88,19 @@ namespace application
         } };
     }
 
+    // Buffer capacities for the shared platform implementation. 256 KB of SRAM leaves room for the
+    // deepest tracer and command history.
+    namespace Resources
+    {
+        constexpr std::size_t tracerBufferSize{ 8192 };
+        constexpr std::size_t terminalQueueSize{ 256 };
+        constexpr std::size_t terminalHistorySize{ 10 };
+        constexpr std::size_t uartReceiveBufferSize{ 256 };
+        constexpr std::size_t eventDispatcherSize{ 50 };
+        constexpr std::size_t canReceiveBufferSize{ 32 };
+        constexpr std::size_t faultStatusSize{ 1024 };
+    }
+
     namespace Clocks
     {
         inline void Initialize()

@@ -82,6 +82,19 @@ namespace application
         } };
     }
 
+    // Buffer capacities for the shared platform implementation. This part has 32 KB of SRAM against
+    // the TM4C1294's 256 KB, so it cannot afford that board's tracer and history depth.
+    namespace Resources
+    {
+        constexpr std::size_t tracerBufferSize{ 2048 };
+        constexpr std::size_t terminalQueueSize{ 256 };
+        constexpr std::size_t terminalHistorySize{ 4 };
+        constexpr std::size_t uartReceiveBufferSize{ 256 };
+        constexpr std::size_t eventDispatcherSize{ 50 };
+        constexpr std::size_t canReceiveBufferSize{ 32 };
+        constexpr std::size_t faultStatusSize{ 1024 };
+    }
+
     namespace Clocks
     {
         inline void Initialize()
