@@ -146,8 +146,8 @@ namespace application
         void StartAlignmentOnly(state_machine::Calibrating& calibrating);
         void OnAlignmentSucceeded(state_machine::Calibrating& calibrating, foc::Radians angle);
         void OnMechanicalParametersIdentified(state_machine::Calibrating& calibrating, const state_machine::MechanicalParametersIdentified& event);
-        state_machine::Ready CompleteCalibration(state_machine::Calibrating& calibrating);
-        state_machine::Idle CompletePartialCalibration(state_machine::Calibrating& calibrating);
+        state_machine::Ready CompleteCalibration(const state_machine::Calibrating& calibrating);
+        state_machine::Idle CompletePartialCalibration(const state_machine::Calibrating& calibrating);
 
         void BeginClearCalibration(const state_machine::ClearCalibration& command);
         state_machine::Idle CompleteClearCalibration();

@@ -5,7 +5,7 @@ namespace application
 {
     state_machine::Calibrating FocStateMachineCommon::BeginCalibration(const state_machine::Calibrate& command)
     {
-        pendingCommandCallback = command.onDone;
+        pendingCommandCallback = command.onDone.Callback();
 
         state_machine::Calibrating calibrating{};
         calibrating.pendingData.fluxLinkage = calibrationContext.EffectiveFluxLinkage().Value();
@@ -16,7 +16,7 @@ namespace application
 
     state_machine::Calibrating FocStateMachineCommon::BeginReAlign(const state_machine::ReAlign& command)
     {
-        pendingCommandCallback = command.onDone;
+        pendingCommandCallback = command.onDone.Callback();
         calibrationContext.SetRotorReferenceValid(false);
 
         state_machine::Calibrating calibrating{};
@@ -38,7 +38,7 @@ namespace application
 
     void FocStateMachineCommon::BeginExternalCalibration(state_machine::Calibrating& calibrating, const state_machine::CompleteExternalCalibration& command)
     {
-        pendingCommandCallback = command.onDone;
+        pendingCommandCallback = command.onDone.Callback();
         calibrating.pendingData = command.data;
         StartAlignmentOnly(calibrating);
     }
@@ -116,9 +116,9 @@ namespace application
                                                          }));
     }
 
-    state_machine::Ready FocStateMachineCommon::CompleteCalibration(state_machine::Calibrating& calibrating)
+    state_machine::Ready FocStateMachineCommon::CompleteCalibration(const state_machine::Calibrating& calibrating)
     {
-        auto data = calibrating.pendingData;
+        const auto& data = calibrating.pendingData;
 
         calibrationContext.SetData(data);
         calibrationContext.Apply(GetFoc(), CurrentTunable());
@@ -127,7 +127,7 @@ namespace application
         return BuildReady();
     }
 
-    state_machine::Idle FocStateMachineCommon::CompletePartialCalibration(state_machine::Calibrating& calibrating)
+    state_machine::Idle FocStateMachineCommon::CompletePartialCalibration(const state_machine::Calibrating& calibrating)
     {
         tracer.Trace() << "[SM] Calibration incomplete for this mode; record kept as partial";
         calibrationContext.SetData(calibrating.pendingData);
@@ -137,7 +137,7 @@ namespace application
 
     void FocStateMachineCommon::BeginClearCalibration(const state_machine::ClearCalibration& command)
     {
-        pendingCommandCallback = command.onDone;
+        pendingCommandCallback = command.onDone.Callback();
         nvm.InvalidateCalibration(stateMachine.CompletionWith<void(services::NvmStatus)>([](services::NvmStatus status)
             {
                 return state_machine::CalibrationInvalidated{ status };
@@ -164,7 +164,7 @@ namespace application
     void FocStateMachineCommon::BeginSetFluxLinkage(const state_machine::SetFluxLinkage& command)
     {
         calibrationContext.SetPendingFluxLinkage(command.fluxLinkage.Value());
-        pendingCommandCallback = command.onDone;
+        pendingCommandCallback = command.onDone.Callback();
 
         auto updated = calibrationContext.Data();
         updated.fluxLinkage = calibrationContext.PendingFluxLinkage();

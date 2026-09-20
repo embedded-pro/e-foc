@@ -10,7 +10,53 @@
 
 namespace state_machine
 {
-    using CommandCallback = infra::Function<void(CommandResult)>;
+    class CommandCallback
+    {
+    public:
+        using Function = infra::Function<void(CommandResult)>;
+
+        CommandCallback() = default;
+        CommandCallback(const Function& function);
+        CommandCallback(const CommandCallback& other) noexcept;
+        CommandCallback(CommandCallback&& other) noexcept;
+        CommandCallback& operator=(const CommandCallback& other) noexcept;
+        CommandCallback& operator=(CommandCallback&& other) noexcept;
+        ~CommandCallback() = default;
+
+        const Function& Callback() const;
+
+    private:
+        Function function;
+    };
+
+    inline CommandCallback::CommandCallback(const Function& function)
+        : function(function)
+    {}
+
+    inline CommandCallback::CommandCallback(const CommandCallback& other) noexcept
+        : function(other.function)
+    {}
+
+    inline CommandCallback::CommandCallback(CommandCallback&& other) noexcept
+        : function(other.function)
+    {}
+
+    inline CommandCallback& CommandCallback::operator=(const CommandCallback& other) noexcept
+    {
+        function = other.function;
+        return *this;
+    }
+
+    inline CommandCallback& CommandCallback::operator=(CommandCallback&& other) noexcept
+    {
+        function = other.function;
+        return *this;
+    }
+
+    inline const CommandCallback::Function& CommandCallback::Callback() const
+    {
+        return function;
+    }
 
     struct Calibrate
     {

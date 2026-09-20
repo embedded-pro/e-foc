@@ -15,7 +15,7 @@ namespace application
     {
         return {
             StateMachine::Row<Stopped, state_machine::Calibrate, state_machine::Calibrating>(
-                [](FocStateMachineCommon& owner, const Stopped&, const state_machine::Calibrate&)
+                [](const FocStateMachineCommon& owner, const Stopped&, const state_machine::Calibrate&)
                 {
                     return !owner.HasPendingCommand();
                 },
@@ -24,7 +24,7 @@ namespace application
                     return owner.BeginCalibration(command);
                 }),
             StateMachine::Row<Stopped, state_machine::ReAlign, state_machine::Calibrating>(
-                [](FocStateMachineCommon& owner, const Stopped&, const state_machine::ReAlign&)
+                [](const FocStateMachineCommon& owner, const Stopped&, const state_machine::ReAlign&)
                 {
                     return !owner.HasPendingCommand() && owner.HasValidCalibration();
                 },
@@ -33,7 +33,7 @@ namespace application
                     return owner.BeginReAlign(command);
                 }),
             StateMachine::Row<Stopped, state_machine::ReserveExternalCalibration, state_machine::Calibrating>(
-                [](FocStateMachineCommon& owner, const Stopped&, const state_machine::ReserveExternalCalibration&)
+                [](const FocStateMachineCommon& owner, const Stopped&, const state_machine::ReserveExternalCalibration&)
                 {
                     return !owner.HasPendingAsyncWork();
                 },
@@ -148,7 +148,7 @@ namespace application
     {
         return {
             StateMachine::Row<Active, state_machine::EmergencyStop, state_machine::Ready>(
-                [](FocStateMachineCommon& owner, const Active&, const state_machine::EmergencyStop&)
+                [](const FocStateMachineCommon& owner, const Active&, const state_machine::EmergencyStop&)
                 {
                     return owner.HasValidCalibration();
                 },
@@ -178,12 +178,12 @@ namespace application
         return services::JoinRows(
             std::array{
                 StateMachine::RowFromAny<state_machine::FaultDetected, state_machine::Fault>(nullptr,
-                    [](FocStateMachineCommon& owner, state_machine::State& from, const state_machine::FaultDetected& event)
+                    [](FocStateMachineCommon& owner, const state_machine::State& from, const state_machine::FaultDetected& event)
                     {
                         return owner.BuildFault(event.code, WasActive(from));
                     }),
                 StateMachine::Row<state_machine::Fault, state_machine::ClearFault, state_machine::Ready>(
-                    [](FocStateMachineCommon& owner, const state_machine::Fault&, const state_machine::ClearFault&)
+                    [](const FocStateMachineCommon& owner, const state_machine::Fault&, const state_machine::ClearFault&)
                     {
                         return owner.HasValidCalibration();
                     },
@@ -215,12 +215,12 @@ namespace application
                 {
                     owner.BeginClearCalibration(command);
                 },
-                [](FocStateMachineCommon& owner, const Stopped&, const state_machine::ClearCalibration&)
+                [](const FocStateMachineCommon& owner, const Stopped&, const state_machine::ClearCalibration&)
                 {
                     return !owner.HasPendingCommand();
                 }),
             StateMachine::Row<Stopped, state_machine::CalibrationInvalidated, state_machine::Idle>(
-                [](FocStateMachineCommon& owner, const Stopped&, const state_machine::CalibrationInvalidated& event)
+                [](const FocStateMachineCommon& owner, const Stopped&, const state_machine::CalibrationInvalidated& event)
                 {
                     return owner.HasPendingCommand() && event.status == services::NvmStatus::Ok;
                 },
@@ -229,7 +229,7 @@ namespace application
                     return owner.CompleteClearCalibration();
                 }),
             StateMachine::Row<Stopped, state_machine::CalibrationInvalidated, state_machine::Fault>(
-                [](FocStateMachineCommon& owner, const Stopped&, const state_machine::CalibrationInvalidated& event)
+                [](const FocStateMachineCommon& owner, const Stopped&, const state_machine::CalibrationInvalidated& event)
                 {
                     return owner.HasPendingCommand() && event.status != services::NvmStatus::Busy;
                 },
@@ -262,7 +262,7 @@ namespace application
             {
                 owner.OnFluxLinkageSaved(event.status);
             },
-            [](FocStateMachineCommon& owner, const Stopped&, const state_machine::FluxLinkageSaved&)
+            [](const FocStateMachineCommon& owner, const Stopped&, const state_machine::FluxLinkageSaved&)
             {
                 return owner.HasPendingCommand();
             });
