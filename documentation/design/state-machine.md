@@ -137,8 +137,8 @@ completing the pending command, notifying the ready handler) run, in that order.
 Every operator command that starts asynchronous work (`Calibrate`, `ReAlign`,
 `ReserveExternalCalibration`, `ClearCalibration`, `SetFluxLinkage`) and `Enable` are guarded by
 `HasPendingAsyncWork()`: they are rejected while a command is pending, while any NVM operation
-is in flight, including the boot-time check and load, or while an identification service is
-running. One request therefore owns the machine at a time. A save still outstanding after an
+is in flight, including the boot-time check and load, while an identification service is
+running, or while a fault latched in an interrupt still owes its transition. One request therefore owns the machine at a time. A save still outstanding after an
 emergency stop cannot be overlapped by the save of a new run, a clear or a flux-linkage change
 in progress cannot be interrupted by `Enable`, whose transition would discard the completion
 and leave the command pending forever, and the boot-time load cannot overwrite the record of a
@@ -299,8 +299,25 @@ The transition to `Enabled` commits the state **before** the FOC controller is s
 post-commit effect of the transition, and a fault raised while it runs is queued behind it. A fault raised in the window where current first flows would otherwise observe `Ready`, skip the
 stop, and then be overwritten by the pending assignment to `Enabled` — leaving an energised bridge on faulted
 hardware with the machine reporting `Enabled`. Because the state is committed first, such a fault stops the
-drive, and the re-check stops it again if the fault arrived while `Start()` was running. `CmdEnable` reports
-`abortedByFault` in that case.
+drive.
+
+Committing the state first is not on its own enough for a fault delivered from an interrupt, because that path
+dispatches `FaultDetected` on the event dispatcher, not in the interrupt: reading the lifecycle state around
+the start would still see `Enabled`. The latch is therefore set **in the interrupt**, and the `Enabled` entry
+hook consults the latch rather than the state — before `Start()`, so the cutoff the interrupt performed is not
+undone, and again after it, for a fault raised while `Start()` ran. Either check turns the latched fault into a
+`FaultDetected` dispatch, which the table queues and drains before the `Enable` dispatch returns; the whole
+enable sequence is therefore atomic with respect to the fault and `CmdEnable` reports `abortedByFault`.
+
+The same reasoning applies one level down, inside `Runner::Enable()`. Its steps — take the phase-current slot,
+enable the control law, start the inverter, set the `enabled` flag — are individually interruptible, and a
+`Stop()` from the faulting context between any two of them would be undone by the steps that follow it,
+re-arming the bridge on hardware that has just faulted, with no control loop attached to update it. `Enable()`
+therefore clears a `stopRequested` flag that `Disable()` sets, re-checks it after every step, and unwinds
+through `Disable()` once it is set. A stop landing after the last check needs no unwinding: it runs after
+every write the sequence makes. The flag is written from the faulting context as well as the mainline, so it
+is set and cleared outright rather than counted — a read-modify-write shared with an interrupt is exactly what
+REQ-SM-021 excludes.
 
 #### Fault Latching
 
@@ -322,14 +339,35 @@ The last fault code is preserved in `LastFaultCode()` and remains readable even 
 writes a multi-word `std::variant` that the CLI and the CAN bridge read concurrently, and completes a pending
 command that reaches non-volatile memory.
 
-The split is therefore: **cut the bridge in the interrupt, record the fault in the dispatcher.** The registered
-handler calls `Stop()` on the FOC controller synchronously — unconditionally, without consulting the state,
-because hardware saying "fault" outranks the state machine's belief about what it was doing — and then hands
-the `FaultDetected` event to `infra::EventDispatcher`. The secondary handler, which broadcasts the fault over CAN, already
-worked this way.
+The split is therefore: **latch and cut the bridge in the interrupt, record the fault in the dispatcher.** The
+registered handler latches the fault and calls `Stop()` on the FOC controller synchronously — unconditionally,
+without consulting the state, because hardware saying "fault" outranks the state machine's belief about what
+it was doing — and then hands the `FaultDetected` event to `infra::EventDispatcher`. The secondary handler,
+which broadcasts the fault over CAN, already worked this way.
+
+Latching is three single-word writes (`pendingCode`, `faultPending`, `faultLatched`), which is all an interrupt
+may do here: the tracing, the multi-word `std::variant` write and the pending-command completion stay on the
+dispatcher. `faultLatched` says a fault is in force and is what commands consult; `faultPending` says the
+`FaultDetected` transition it owes has not been taken yet, and is consumed by whichever context takes it.
+`FaultController` keeps a third, dispatcher-only flag, `faultRecorded`, for "the transition has been taken" —
+the distinction `faultLatched` carried before latching moved into the interrupt, and what decides whether an
+arriving fault is the one that tripped the drive or a further one whose code is kept out of `LastFaultCode()`.
+
+`TakePendingFault()` claims the flag and the code together and hands back the code, so a second interrupt
+landing mid-claim cannot leave the taker dispatching one fault's transition under another's code. Claiming is
+the *only* thing that clears `faultPending`: taking the transition does not, or a fault latched while that
+transition ran would be wiped before its own dispatcher turn reached it and would never be recorded at all.
+For the same reason `CmdClearFault` is refused while a fault is pending — clearing there would drop the latch
+of a fault that has already tripped the drive, and spend one of the three permitted clears on a state the
+next dispatcher turn immediately undoes. A fault whose
+transition is still owed also counts as pending asynchronous work, which is what stops a control-mode switch
+from destroying the state machine — and with it the latch and the queued `FaultDetected` — in that window.
 
 A consequence worth knowing when reading the code or the tests: between the interrupt and the dispatcher turn,
-the bridge is off but `CurrentState()` still reports the pre-fault state.
+the bridge is off and the latch is set, but `CurrentState()` still reports the pre-fault state. Commands
+consult the latch, not the state, so an enable arriving in that window is refused rather than acted on. The
+transition is taken exactly once — whichever of the dispatcher turn or the enable sequence reaches it first
+takes the pending fault, and the other finds nothing left to record.
 
 #### Registration lifetime
 
@@ -543,8 +581,10 @@ The same guard covers the active mode's own asynchronous work. Applying a select
 `FocStateMachineCommon` instance, while its outstanding NVM and identification callbacks still capture that
 instance. `Select()` therefore also returns `SelectResult::busy` when
 `ActiveStateMachine().HasPendingAsyncWork()` is true — that is, while a command callback is pending, any
-NVM operation is in flight, or a calibration step is running — in addition to the existing check that the
-active machine is stopped. `NvmActivity` counts every NVM operation from the call until its callback, so a
+NVM operation is in flight, a calibration step is running, or a fault latched in an interrupt still owes its
+transition — in addition to the existing check that the active machine is stopped. Without that last
+condition the machine, its latch and the queued transition would all be destroyed in the window between the
+interrupt and the dispatcher turn, and the machine built in its place would start unlatched. `NvmActivity` counts every NVM operation from the call until its callback, so a
 save or invalidation still outstanding after an emergency stop keeps the machine alive until it completes.
 
 ```mermaid
@@ -604,7 +644,7 @@ sequenceDiagram
 | `CmdClearFault()`         | Clears the fault and returns to `Ready` if valid calibration is held, otherwise `Idle` | Only effective from `Fault`; ignored from all other states                                                                                                                                                                                                   |
 | `CmdClearCalibration()`   | Invalidates NVM calibration and returns to `Idle`                                      | Only effective from `Idle` or `Ready`; ignored from `Calibrating`, `Enabled`, and `Fault`. On NVM failure transitions to `Fault`.                                                                                                                            |
 | `CmdEmergencyStop()`      | Stops PWM immediately and leaves the active states                                     | Accepted from every state and always returns `ok`. From `Enabled` or `Calibrating` it goes to `Ready` when calibration data is valid, otherwise to `Idle`. `Idle`, `Ready` and `Fault` are left unchanged. Aborts any pending command with `abortedByFault`. |
-| `HasPendingAsyncWork()`   | Reports whether a service callback capturing the machine is outstanding                | True while a command callback is pending, any NVM operation is in flight, or a calibration step is running. Used by `ControlModeStateMachine` to refuse destroying the machine.                                                                              |
+| `HasPendingAsyncWork()`   | Reports whether a service callback capturing the machine is outstanding                | True while a command callback is pending, any NVM operation is in flight, a calibration step is running, or a fault latched in an interrupt still owes its transition. Used by `ControlModeStateMachine` to refuse destroying the machine.                   |
 | `HasPartialCalibration()` | Reports whether `Idle` holds a non-empty but incomplete NVM record                     | True only in `Idle`, when `stage != complete` but pole pairs or resistance are non-zero (an old-schema or interrupted record). Used by the CAN bridge to broadcast `FocMotorState::partialCalibration` instead of `idle`.                                    |
 | `ApplyOnlineEstimates()`  | Retunes speed and current PID gains from online estimators                             | Only effective from `Enabled`; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only.                                                                                                         |
 

@@ -63,6 +63,88 @@ TEST_F(FaultControllerTest, enter_fault_sets_latched)
     EXPECT_TRUE(controller.IsLatched());
 }
 
+TEST_F(FaultControllerTest, latching_from_an_interrupt_sets_the_latch_and_records_the_code)
+{
+    controller.LatchFromInterrupt(state_machine::FaultCode::overcurrent);
+
+    EXPECT_TRUE(controller.IsLatched());
+    EXPECT_TRUE(controller.IsPending());
+    EXPECT_EQ(controller.TakePendingFault(), state_machine::FaultCode::overcurrent);
+}
+
+TEST_F(FaultControllerTest, a_pending_fault_is_taken_once)
+{
+    controller.LatchFromInterrupt(state_machine::FaultCode::overcurrent);
+
+    EXPECT_TRUE(controller.TakePendingFault().has_value());
+    EXPECT_FALSE(controller.TakePendingFault().has_value());
+}
+
+TEST_F(FaultControllerTest, a_second_interrupt_replaces_the_code_the_pending_fault_carries)
+{
+    controller.LatchFromInterrupt(state_machine::FaultCode::overcurrent);
+    controller.LatchFromInterrupt(state_machine::FaultCode::overvoltage);
+
+    EXPECT_EQ(controller.TakePendingFault(), state_machine::FaultCode::overvoltage);
+}
+
+TEST_F(FaultControllerTest, no_fault_is_pending_before_an_interrupt_latches_one)
+{
+    EXPECT_FALSE(controller.IsPending());
+    EXPECT_FALSE(controller.TakePendingFault().has_value());
+}
+
+TEST_F(FaultControllerTest, only_taking_the_pending_fault_consumes_it)
+{
+    controller.LatchFromInterrupt(state_machine::FaultCode::overcurrent);
+
+    EXPECT_EQ(controller.TakePendingFault(), state_machine::FaultCode::overcurrent);
+
+    controller.EnterFault();
+
+    EXPECT_FALSE(controller.TakePendingFault().has_value());
+    EXPECT_TRUE(controller.IsLatched());
+}
+
+TEST_F(FaultControllerTest, a_fault_latched_while_the_transition_runs_is_not_swallowed_by_it)
+{
+    controller.LatchFromInterrupt(state_machine::FaultCode::overcurrent);
+    EXPECT_EQ(controller.TakePendingFault(), state_machine::FaultCode::overcurrent);
+
+    controller.LatchFromInterrupt(state_machine::FaultCode::overvoltage);
+    controller.EnterFault();
+
+    EXPECT_TRUE(controller.IsPending());
+    EXPECT_EQ(controller.TakePendingFault(), state_machine::FaultCode::overvoltage);
+}
+
+TEST_F(FaultControllerTest, clearing_leaves_a_pending_fault_for_its_own_transition)
+{
+    controller.LatchFromInterrupt(state_machine::FaultCode::overcurrent);
+    EXPECT_EQ(controller.TakePendingFault(), state_machine::FaultCode::overcurrent);
+    controller.EnterFault();
+
+    controller.LatchFromInterrupt(state_machine::FaultCode::overvoltage);
+    controller.Clear();
+
+    EXPECT_TRUE(controller.IsPending());
+    EXPECT_EQ(controller.TakePendingFault(), state_machine::FaultCode::overvoltage);
+}
+
+TEST_F(FaultControllerTest, entering_the_fault_marks_it_recorded_and_clearing_unmarks_it)
+{
+    EXPECT_FALSE(controller.IsRecorded());
+
+    controller.LatchFromInterrupt(state_machine::FaultCode::overcurrent);
+    EXPECT_FALSE(controller.IsRecorded());
+
+    controller.EnterFault();
+    EXPECT_TRUE(controller.IsRecorded());
+
+    controller.Clear();
+    EXPECT_FALSE(controller.IsRecorded());
+}
+
 TEST_F(FaultControllerTest, try_clear_returns_true_and_clears_latch)
 {
     controller.EnterFault();

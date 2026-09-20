@@ -21,9 +21,27 @@ namespace application
         }
     }
 
+    void FaultController::LatchFromInterrupt(state_machine::FaultCode code)
+    {
+        pendingCode = code;
+        faultPending = true;
+        faultLatched = true;
+    }
+
+    std::optional<state_machine::FaultCode> FaultController::TakePendingFault()
+    {
+        if (!faultPending)
+            return std::nullopt;
+
+        const auto code = pendingCode;
+        faultPending = false;
+        return code;
+    }
+
     void FaultController::EnterFault()
     {
         faultLatched = true;
+        faultRecorded = true;
     }
 
     bool FaultController::CanClear() const
@@ -37,6 +55,7 @@ namespace application
 
         ++consecutiveFaultClears;
         faultLatched = false;
+        faultRecorded = false;
     }
 
     bool FaultController::TryClear()
@@ -56,5 +75,15 @@ namespace application
     bool FaultController::IsLatched() const
     {
         return faultLatched;
+    }
+
+    bool FaultController::IsRecorded() const
+    {
+        return faultRecorded;
+    }
+
+    bool FaultController::IsPending() const
+    {
+        return faultPending;
     }
 }

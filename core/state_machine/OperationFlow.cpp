@@ -11,13 +11,14 @@ namespace application
     {
         faultController.Register(
             notifier,
-            [this](state_machine::FaultCode)
-            {
-                env.mode.GetFocControl().Stop();
-            },
             [this](state_machine::FaultCode code)
             {
-                env.machine.Dispatch(state_machine::FaultDetected{ code });
+                faultController.LatchFromInterrupt(code);
+                env.mode.GetFocControl().Stop();
+            },
+            [this](state_machine::FaultCode)
+            {
+                DispatchPendingFault();
             });
     }
 
@@ -29,6 +30,11 @@ namespace application
     state_machine::FaultCode OperationFlow::LastFaultCode() const
     {
         return lastFaultCode;
+    }
+
+    bool OperationFlow::HasPendingFault() const
+    {
+        return faultController.IsPending();
     }
 
     bool OperationFlow::IsEnableAllowed(const state_machine::Ready& ready) const
@@ -57,7 +63,7 @@ namespace application
 
     state_machine::Fault OperationFlow::EnterFault(state_machine::FaultCode code, bool wasActive, state_machine::CommandResult pendingResult)
     {
-        if (!faultController.IsLatched())
+        if (!faultController.IsRecorded())
             lastFaultCode = code;
         else
             env.tracer.Trace() << "[SM] Further fault while faulted; keeping the first code";
@@ -128,10 +134,31 @@ namespace application
         readyHandler = onReady;
     }
 
+    void OperationFlow::StartUnlessFaulted()
+    {
+        if (DispatchPendingFault())
+            return;
+
+        env.mode.GetFocControl().Start();
+
+        DispatchPendingFault();
+    }
+
+    bool OperationFlow::DispatchPendingFault()
+    {
+        const auto code = faultController.TakePendingFault();
+
+        if (!code.has_value())
+            return false;
+
+        env.machine.Dispatch(state_machine::FaultDetected{ *code });
+        return true;
+    }
+
     void OperationFlow::StateEntered(StateId state)
     {
         if (state.Is<state_machine::Enabled>())
-            env.mode.GetFocControl().Start();
+            StartUnlessFaulted();
 
         env.pending.FlushDeferred();
 
