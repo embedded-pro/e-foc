@@ -90,9 +90,9 @@ namespace application
         }
     }
 
-    void OuterLoopStateMachine::RunPostAlignmentStep()
+    void OuterLoopStateMachine::RunPostAlignmentStep(state_machine::Calibrating& calibrating)
     {
-        RunMechanicalIdentStep();
+        RunMechanicalIdentStep(calibrating);
     }
 
     bool OuterLoopStateMachine::HasPendingAsyncWork() const
@@ -121,33 +121,17 @@ namespace application
         return **ownMechIdent;
     }
 
-    void OuterLoopStateMachine::RunMechanicalIdentStep()
+    void OuterLoopStateMachine::RunMechanicalIdentStep(state_machine::Calibrating& calibrating)
     {
         GetTracer().Trace() << "[SM] Estimating mechanical parameters";
 
-        auto& calibrating = std::get<state_machine::Calibrating>(GetCurrentState());
         calibrating.step = state_machine::CalibrationStep::frictionAndInertia;
         const auto polePairs = static_cast<std::size_t>(calibrating.pendingData.polePairs);
         auto config = services::MechanicalParametersIdentification::Config{};
 
         MechIdentImpl().EstimateFrictionAndInertia(mechTorqueConstant, polePairs, config, [this](auto friction, auto inertia)
             {
-                if (!IsCalibrating(state_machine::CalibrationStep::frictionAndInertia))
-                    return;
-
-                if (!friction || !inertia)
-                {
-                    CompletePendingCommand(state_machine::CommandResult::calibrationFailed);
-                    EnterFault(state_machine::FaultCode::calibrationFailed);
-                }
-                else
-                {
-                    auto& cal = std::get<state_machine::Calibrating>(GetCurrentState());
-                    cal.pendingData.inertia = inertia->Value();
-                    cal.pendingData.frictionViscous = friction->Value();
-                    cal.pendingData.speedLoopBandwidth = velocityBandwidthRadPerSec;
-                    OnCalibrationComplete();
-                }
+                Dispatch(state_machine::MechanicalParametersIdentified{ friction, inertia, velocityBandwidthRadPerSec });
             });
     }
 }

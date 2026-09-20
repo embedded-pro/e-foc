@@ -2,9 +2,9 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: state-machine
-date: 2026-04-10
+date: 2026-09-20
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-04-10
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.1.0                      |
+| Version   | 0.2.0                      |
 | Component | state-machine              |
-| Date      | 2026-04-10                 |
+| Date      | 2026-09-20                 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -85,6 +85,40 @@ stateDiagram-v2
     Fault --> Ready : CmdClearFault\n(valid calibration held)
     Fault --> Idle : CmdClearFault\n(no valid calibration)
 ```
+
+### Transition Table
+
+The graph above is not a description of hand-written command handlers; it is the
+transition table the FOC state machine is built from. Every operator command, every
+service completion and every fault notification is an **event**, and every arrow in the
+diagram is a **row** of the table: source state, event, target state, an optional guard and
+the action that builds the target state. Rows that must be accepted in a state without
+leaving it (a calibration sub-step changing, a flux-linkage save completing) are declared
+as internal rows.
+
+The table is the single source of truth for what the machine accepts:
+
+- An event that arrives in a state with no row for it is **forbidden**: nothing changes, the
+  command reports `rejected`, and the trace shows which event was refused in which state.
+- An event whose rows exist but whose guards all refuse it is **rejected** in the same way;
+  the guard is where conditions such as "a command is already pending" or "the rotor
+  reference is not established" live.
+- Before the machine starts, the table is checked for consistency: duplicate rows, rows
+  that can never be selected because an unguarded row precedes them, and states that no
+  sequence of rows reaches from `Idle` all refuse to start the machine. A malformed
+  lifecycle therefore fails at boot on the host, in the unit tests, rather than on the
+  motor.
+
+Events are handled to completion. An event dispatched while another is being handled, for
+instance a service that completes synchronously inside the action that started it, or a
+fault raised while the drive is being started, is queued and handled once the current
+transition has been committed and announced. Actions therefore always observe a consistent
+state, and the target state is committed before its side effects (starting the drive,
+notifying the ready handler, completing the pending command) run.
+
+The transition table is observable: a tracer prints every transition as
+`fsm: <from> --<event>--> <to>` next to the existing `[SM]` lines, and every forbidden,
+rejected or discarded event with its state.
 
 ### Emergency Stop
 
@@ -247,18 +281,31 @@ A protection event raised before the state machine has registered its handler is
 
 ### Async-Callback State Invariant
 
-Every asynchronous callback registered with a service (NVM, electrical ident, mechanical ident, motor alignment) **must check the current state before mutating it**. A hardware fault, an operator command, or a second calibration attempt may have moved the state machine to a different state between the moment the service call was issued and the moment the callback fires.
+A hardware fault, an operator command, or a second calibration attempt may move the state
+machine between the moment a service call is issued and the moment its callback fires. The
+invariant is: **a callback may only apply its result if the state machine is still in the
+state that issued the service call.**
 
-The invariant is: **a callback may only apply its result if the state machine is still in the state that issued the service call.**
+This invariant is no longer a convention that every callback re-implements. Each callback
+translates its result into an event and dispatches it; whether the result is applied is
+decided by the transition table:
 
-Specifically:
+- Results from calibration steps (`EstimateNumberOfPolePairs`, `EstimateResistanceAndInductance`,
+  `ForceAlignment`, `EstimateFrictionAndInertia`) become the events `CalibrationStepChanged`,
+  `AlignmentSucceeded`, `MechanicalParametersIdentified` and `CalibrationStepFailed`, which only
+  have rows in `Calibrating`. The mechanical result additionally carries a guard on the active
+  sub-step. The calibration orchestrator also drops results of a run that was aborted.
+- The `SaveCalibration` completion becomes `CalibrationSaved`, which only has rows in
+  `Calibrating`.
+- The boot-time NVM completions become `BootValidityChecked` and `BootCalibrationLoaded`, which
+  only have rows in `Idle`.
+- The `InvalidateCalibration` completion becomes `CalibrationInvalidated`, which only has rows in
+  `Idle` and `Ready`, leading to `Idle` on success, to `Fault` on failure, and completing the
+  command with `rejected` when the NVM is busy.
 
-- Callbacks from calibration steps (`EstimateNumberOfPolePairs`, `EstimateResistanceAndInductance`, `ForceAlignment`, `EstimateFrictionAndInertia`) check that the machine is still in `Calibrating` **and** that the expected calibration sub-step is active.
-- The `SaveCalibration` callback checks that the machine is still in `Calibrating`.
-- The `IsCalibrationValid` and `LoadCalibration` callbacks from the boot-time NVM check verify that the machine is still in `Idle`.
-- The `InvalidateCalibration` callback from `CmdClearCalibration` verifies that the machine is still in `Idle` or `Ready` before transitioning to `Idle` (on success) or `Fault` (on failure).
-
-Any callback that fires after the state has moved away from the expected source state **returns silently**. It must never overwrite a later state (such as `Enabled` or `Fault`) with a stale result.
+Any of these events arriving after the state has moved away is **forbidden**: it is traced and
+discarded, and it never overwrites a later state such as `Enabled` or `Fault` with a stale
+result.
 
 ```mermaid
 sequenceDiagram
@@ -273,8 +320,8 @@ sequenceDiagram
     Op->>SM: CmdEnable
     SM-->>SM: State → Enabled
 
-    NVM-->>SM: callback(Ok)
-    note over SM: Guard: not in Idle or Ready → silently ignore
+    NVM-->>SM: callback(Ok) → event CalibrationInvalidated
+    note over SM: No row for CalibrationInvalidated in Enabled → forbidden, traced, ignored
     note over SM: State remains Enabled ✓
 ```
 
@@ -287,22 +334,28 @@ sequenceDiagram
     participant NVM as NVM Service
 
     SM->>NVM: InvalidateCalibration(callback)
-    HW-->>SM: fault notification
+    HW-->>SM: fault notification → event FaultDetected
     SM-->>SM: State → Fault
 
-    NVM-->>SM: callback(Ok)
-    note over SM: Guard: not in Idle or Ready → silently ignore
+    NVM-->>SM: callback(Ok) → event CalibrationInvalidated
+    note over SM: No row for CalibrationInvalidated in Fault → forbidden, traced, ignored
     note over SM: State remains Fault ✓
 ```
 
 ### Transition Policies
 
-The state machine supports two transition policies, selected at build time via the `E_FOC_AUTO_TRANSITION_POLICY` CMake cache variable:
+Each state machine instance is constructed with a transition policy that only decides
+whether the lifecycle commands appear on the terminal:
 
-- **CLI policy (default, `E_FOC_AUTO_TRANSITION_POLICY=OFF`)**: The state machine registers the commands `calibrate`, `enable`, `disable`, `clear_fault`, and `clear_cal` on the connected terminal. Users interact via a serial console. Suitable for development, commissioning, and diagnostics.
-- **Automatic policy (`E_FOC_AUTO_TRANSITION_POLICY=ON`)**: No terminal commands are registered. The caller drives transitions programmatically by invoking `CmdCalibrate()`, `CmdEnable()`, `CmdDisable()`, `CmdClearFault()`, and `CmdClearCalibration()` directly — for example, from CAN message handlers or automated production sequences.
+- **CLI policy**: the commands `calibrate`, `align`, `enable`, `disable`, `clear_fault`
+  and `clear_cal` are registered on the connected terminal. Used by the state machine unit
+  tests and for commissioning over a serial console.
+- **Automatic policy**: no terminal commands are registered. The caller drives transitions
+  programmatically, for example from CAN message handlers. This is the policy the
+  `ControlModeStateMachine` uses for the torque, speed and position machines it owns.
 
-The policy is enforced for all application targets at once: setting `E_FOC_AUTO_TRANSITION_POLICY=ON` in a CMake preset or on the command line applies to the torque, speed, and position targets simultaneously. Both policies share identical state transition logic; they differ only in whether lifecycle commands appear on the terminal.
+Both policies share the same transition table; they differ only in whether lifecycle
+commands appear on the terminal.
 
 ### Mechanical Identification and Control Mode
 
@@ -459,7 +512,7 @@ sequenceDiagram
 
 | Interface                | Purpose                                                                                | Contract                                                                                                                                                                                                                                                     |
 |--------------------------|----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `FocStateMachineBase`    | Abstract lifecycle controller — state query and command dispatch                       | Constructed once per application; all command methods are safe to call from any state (invalid transitions are silently ignored)                                                                                                                             |
+| `FocStateMachineBase`    | Abstract lifecycle controller — state query and command dispatch                       | Constructed once per application; all command methods are safe to call from any state (a command without a row in the current state is rejected with a status and traced, never applied)                                                                                                                             |
 | `CurrentState()`         | Returns the current `State` variant for inspection                                     | Returns a const reference; valid for the lifetime of the state machine                                                                                                                                                                                       |
 | `LastFaultCode()`        | Returns the most recent fault code                                                     | Returns `FaultCode::none` until the first fault occurs; afterwards it retains the last fault code, also after the fault is cleared                                                                                                                           |
 | `CmdCalibrate()`         | Requests start of full calibration sequence                                            | Only effective from `Idle` or `Ready`; ignored from all other states                                                                                                                                                                                         |

@@ -38,10 +38,10 @@ namespace application
         bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const override;
         void PrepareForEnabled() override;
         void RegisterModeSpecificCli(services::TerminalWithStorage& terminal) override;
-        void RunPostAlignmentStep() override;
+        void RunPostAlignmentStep(state_machine::Calibrating& calibrating) override;
         void AbortModeSpecificServices() override;
 
-        void RunMechanicalIdentStep();
+        void RunMechanicalIdentStep(state_machine::Calibrating& calibrating);
 
         static services::MechanicalParametersIdentification& ResolveMechIdent(
             const CalibrationServices& calibServices,

@@ -3,52 +3,95 @@
 
 namespace application
 {
-    void FocStateMachineCommon::CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>& onDone)
+    state_machine::Calibrating FocStateMachineCommon::BeginCalibration(const state_machine::Calibrate& command)
     {
-        if (!state_machine::IsStopped(currentState) || HasPendingCommand())
-        {
-            onDone(state_machine::CommandResult::rejected);
-            return;
-        }
+        tracer.Trace() << "[SM] Entering Calibrating";
+        pendingCommandCallback = command.onDone;
 
-        pendingCommandCallback = onDone;
-        nvm.InvalidateCalibration([this](services::NvmStatus status)
+        state_machine::Calibrating calibrating{};
+        calibrating.pendingData.fluxLinkage = calibrationContext.EffectiveFluxLinkage().Value();
+
+        Dispatch(state_machine::RunCalibrationSequence{});
+        return calibrating;
+    }
+
+    state_machine::Calibrating FocStateMachineCommon::BeginReAlign(const state_machine::ReAlign& command)
+    {
+        pendingCommandCallback = command.onDone;
+        calibrationContext.SetRotorReferenceValid(false);
+
+        state_machine::Calibrating calibrating{};
+        calibrating.pendingData = calibrationContext.Data();
+        calibrating.external = true;
+
+        Dispatch(state_machine::RunAlignmentOnly{});
+        return calibrating;
+    }
+
+    void FocStateMachineCommon::StartCalibrationSequence(state_machine::Calibrating& calibrating)
+    {
+        calibrationOrchestrator.Start(
+            calibrating.pendingData,
+            [this](state_machine::CalibrationStep step)
             {
-                OnCalibrationInvalidated(status);
+                Dispatch(state_machine::CalibrationStepChanged{ step });
+            },
+            [this](foc::Radians angle)
+            {
+                Dispatch(state_machine::AlignmentSucceeded{ angle });
+            },
+            [this]
+            {
+                Dispatch(state_machine::CalibrationStepFailed{});
             });
     }
 
-    void FocStateMachineCommon::OnCalibrationInvalidated(services::NvmStatus status)
+    void FocStateMachineCommon::StartAlignmentOnly(state_machine::Calibrating& calibrating)
     {
-        if (!HasPendingCommand() || !state_machine::IsStopped(currentState))
-            return;
-
-        if (status == services::NvmStatus::Busy)
-        {
-            CompletePendingCommand(state_machine::CommandResult::rejected);
-            return;
-        }
-
-        if (status != services::NvmStatus::Ok)
-        {
-            CompletePendingCommand(state_machine::CommandResult::nvmFailed);
-            EnterFault(state_machine::FaultCode::hardwareFault);
-        }
-        else
-        {
-            tracer.Trace() << "[SM] Calibration invalidated in NVM";
-            calibrationContext.Invalidate();
-            currentState = state_machine::Idle{};
-            CompletePendingCommand(state_machine::CommandResult::ok);
-        }
+        calibrationOrchestrator.StartAlignmentOnly(
+            calibrating.pendingData,
+            [this](state_machine::CalibrationStep step)
+            {
+                Dispatch(state_machine::CalibrationStepChanged{ step });
+            },
+            [this](foc::Radians angle)
+            {
+                Dispatch(state_machine::AlignmentSucceeded{ angle });
+            },
+            [this]
+            {
+                Dispatch(state_machine::CalibrationStepFailed{});
+            });
     }
 
-    void FocStateMachineCommon::OnCalibrationComplete()
+    void FocStateMachineCommon::OnAlignmentSucceeded(state_machine::Calibrating& calibrating, foc::Radians angle)
     {
-        if (!std::holds_alternative<state_machine::Calibrating>(currentState))
-            return;
+        calibrating.pendingData.encoderZeroOffset = std::bit_cast<int32_t>(angle.Value());
+        calibrationContext.SetRotorReferenceValid(true);
 
-        auto& calibrating = std::get<state_machine::Calibrating>(currentState);
+        if (calibrating.external)
+            SaveCalibration(calibrating);
+        else
+            RunPostAlignmentStep(calibrating);
+    }
+
+    void FocStateMachineCommon::OnMechanicalParametersIdentified(state_machine::Calibrating& calibrating, const state_machine::MechanicalParametersIdentified& event)
+    {
+        if (!event.friction || !event.inertia)
+        {
+            CompletePendingCommand(state_machine::CommandResult::calibrationFailed);
+            Dispatch(state_machine::FaultDetected{ state_machine::FaultCode::calibrationFailed });
+            return;
+        }
+
+        calibrating.pendingData.inertia = event.inertia->Value();
+        calibrating.pendingData.frictionViscous = event.friction->Value();
+        calibrating.pendingData.speedLoopBandwidth = event.speedLoopBandwidth;
+        SaveCalibration(calibrating);
+    }
+
+    void FocStateMachineCommon::SaveCalibration(state_machine::Calibrating& calibrating)
+    {
         calibrating.pendingData.stage = HasValidModeSpecificCalibration(calibrating.pendingData)
                                             ? services::CalibrationStage::complete
                                             : services::CalibrationStage::none;
@@ -56,96 +99,127 @@ namespace application
         nvm.SaveCalibration(calibrating.pendingData,
             [this](services::NvmStatus status)
             {
-                OnCalibrationSaved(status);
+                Dispatch(state_machine::CalibrationSaved{ status });
             });
     }
 
-    void FocStateMachineCommon::OnCalibrationSaved(services::NvmStatus status)
+    state_machine::Ready FocStateMachineCommon::CompleteCalibration(state_machine::Calibrating& calibrating)
     {
-        if (!std::holds_alternative<state_machine::Calibrating>(currentState))
-            return;
+        auto data = calibrating.pendingData;
 
-        if (status != services::NvmStatus::Ok)
-        {
-            CompletePendingCommand(state_machine::CommandResult::nvmFailed);
-            EnterFault(state_machine::FaultCode::calibrationFailed);
-        }
-        else
-        {
-            auto data = std::get<state_machine::Calibrating>(currentState).pendingData;
+        calibrationContext.SetData(data);
+        calibrationContext.Apply(GetFoc(), CurrentTunable());
+        ApplyModeSpecificCalibration(data);
+        CompleteAfterTransition(state_machine::CommandResult::ok);
+        return BuildReady(data);
+    }
 
-            if (data.stage == services::CalibrationStage::complete)
+    state_machine::Idle FocStateMachineCommon::CompletePartialCalibration(state_machine::Calibrating& calibrating)
+    {
+        tracer.Trace() << "[SM] Entering Idle, calibration incomplete for this mode";
+        calibrationContext.SetData(calibrating.pendingData);
+        CompleteAfterTransition(state_machine::CommandResult::ok);
+        return state_machine::Idle{};
+    }
+
+    template<class Stopped>
+    void FocStateMachineCommon::AddMaintenanceRowsFor()
+    {
+        stateMachine.AddInternal<Stopped, state_machine::ClearCalibration>(
+            [this](Stopped&, const state_machine::ClearCalibration& command)
             {
-                calibrationContext.SetData(data);
-                calibrationContext.Apply(GetFoc(), CurrentTunable());
-                ApplyModeSpecificCalibration(data);
-                EnterReady(data);
-            }
-            else
-                EnterIdleWithPartialCalibration(data);
-
-            CompletePendingCommand(state_machine::CommandResult::ok);
-        }
-    }
-
-    state_machine::CommandResult FocStateMachineCommon::CmdReserveExternalCalibration()
-    {
-        if (!state_machine::IsStopped(currentState) || HasPendingAsyncWork())
-            return state_machine::CommandResult::rejected;
-
-        tracer.Trace() << "[SM] Entering Calibrating (external)";
-        currentState = state_machine::Calibrating{};
-        std::get<state_machine::Calibrating>(currentState).external = true;
-        return state_machine::CommandResult::ok;
-    }
-
-    void FocStateMachineCommon::CmdCompleteExternalCalibration(const services::CalibrationData& data,
-        const infra::Function<void(state_machine::CommandResult)>& onDone)
-    {
-        if (!std::holds_alternative<state_machine::Calibrating>(currentState))
-        {
-            onDone(state_machine::CommandResult::rejected);
-            return;
-        }
-
-        if (!CalibrationContext::HasFiniteElectricalParameters(data))
-        {
-            tracer.Trace() << "[SM] External calibration rejected: implausible electrical data";
-            onDone(state_machine::CommandResult::rejected);
-            return;
-        }
-
-        pendingCommandCallback = onDone;
-        std::get<state_machine::Calibrating>(currentState).pendingData = data;
-        RunAlignmentStep();
-    }
-
-    void FocStateMachineCommon::CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone)
-    {
-        if (fluxLinkage.Value() <= 0.0f || !state_machine::IsStopped(currentState) || HasPendingCommand() || !HasValidCalibration())
-        {
-            tracer.Trace() << "[SM] Flux linkage rejected: needs a positive value and a calibrated motor in Idle or Ready";
-            onDone(state_machine::CommandResult::rejected);
-            return;
-        }
-
-        calibrationContext.SetPendingFluxLinkage(fluxLinkage.Value());
-        pendingCommandCallback = onDone;
-
-        auto updated = calibrationContext.Data();
-        updated.fluxLinkage = calibrationContext.PendingFluxLinkage();
-
-        nvm.SaveCalibration(updated, [this](services::NvmStatus status)
+                pendingCommandCallback = command.onDone;
+                nvm.InvalidateCalibration([this](services::NvmStatus status)
+                    {
+                        Dispatch(state_machine::CalibrationInvalidated{ status });
+                    });
+            },
+            [this](const Stopped&, const state_machine::ClearCalibration&)
             {
-                OnFluxLinkageSaved(status);
+                return !HasPendingCommand();
             });
+
+        stateMachine.Add<Stopped, state_machine::CalibrationInvalidated, state_machine::Idle>(
+            [this](const Stopped&, const state_machine::CalibrationInvalidated& event)
+            {
+                return HasPendingCommand() && event.status == services::NvmStatus::Ok;
+            },
+            [this](Stopped&, const state_machine::CalibrationInvalidated&)
+            {
+                tracer.Trace() << "[SM] Calibration invalidated in NVM";
+                calibrationContext.Invalidate();
+                CompleteAfterTransition(state_machine::CommandResult::ok);
+                return state_machine::Idle{};
+            });
+
+        stateMachine.Add<Stopped, state_machine::CalibrationInvalidated, state_machine::Fault>(
+            [this](const Stopped&, const state_machine::CalibrationInvalidated& event)
+            {
+                return HasPendingCommand() && event.status != services::NvmStatus::Busy;
+            },
+            [this](Stopped&, const state_machine::CalibrationInvalidated&)
+            {
+                CompletePendingCommand(state_machine::CommandResult::nvmFailed);
+                return BuildFault(state_machine::FaultCode::hardwareFault, false);
+            });
+
+        stateMachine.AddInternal<Stopped, state_machine::CalibrationInvalidated>([this](Stopped&, const state_machine::CalibrationInvalidated&)
+            {
+                CompletePendingCommand(state_machine::CommandResult::rejected);
+            });
+
+        stateMachine.AddInternal<Stopped, state_machine::SetFluxLinkage>(
+            [this](Stopped&, const state_machine::SetFluxLinkage& command)
+            {
+                calibrationContext.SetPendingFluxLinkage(command.fluxLinkage.Value());
+                pendingCommandCallback = command.onDone;
+
+                auto updated = calibrationContext.Data();
+                updated.fluxLinkage = calibrationContext.PendingFluxLinkage();
+
+                nvm.SaveCalibration(updated, [this](services::NvmStatus status)
+                    {
+                        Dispatch(state_machine::FluxLinkageSaved{ status });
+                    });
+            },
+            [this](const Stopped&, const state_machine::SetFluxLinkage& command)
+            {
+                if (command.fluxLinkage.Value() > 0.0f && !HasPendingCommand() && HasValidCalibration())
+                    return true;
+
+                tracer.Trace() << "[SM] Flux linkage rejected: needs a positive value and a calibrated motor in Idle or Ready";
+                return false;
+            });
+    }
+
+    template<class AnyState>
+    void FocStateMachineCommon::AddFluxLinkageSavedRow()
+    {
+        stateMachine.AddInternal<AnyState, state_machine::FluxLinkageSaved>(
+            [this](AnyState&, const state_machine::FluxLinkageSaved& event)
+            {
+                OnFluxLinkageSaved(event.status);
+            },
+            [this](const AnyState&, const state_machine::FluxLinkageSaved&)
+            {
+                return HasPendingCommand();
+            });
+    }
+
+    void FocStateMachineCommon::AddMaintenanceRows()
+    {
+        AddMaintenanceRowsFor<state_machine::Idle>();
+        AddMaintenanceRowsFor<state_machine::Ready>();
+
+        AddFluxLinkageSavedRow<state_machine::Idle>();
+        AddFluxLinkageSavedRow<state_machine::Calibrating>();
+        AddFluxLinkageSavedRow<state_machine::Ready>();
+        AddFluxLinkageSavedRow<state_machine::Enabled>();
+        AddFluxLinkageSavedRow<state_machine::Fault>();
     }
 
     void FocStateMachineCommon::OnFluxLinkageSaved(services::NvmStatus status)
     {
-        if (!HasPendingCommand())
-            return;
-
         if (status != services::NvmStatus::Ok)
         {
             tracer.Trace() << "[SM] Flux linkage not persisted";
@@ -159,6 +233,18 @@ namespace application
         CompletePendingCommand(state_machine::CommandResult::ok);
     }
 
+    void FocStateMachineCommon::CmdClearCalibration(const infra::Function<void(state_machine::CommandResult)>& onDone)
+    {
+        if (ToCommandResult(Dispatch(state_machine::ClearCalibration{ onDone })) != state_machine::CommandResult::ok)
+            onDone(state_machine::CommandResult::rejected);
+    }
+
+    void FocStateMachineCommon::CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone)
+    {
+        if (ToCommandResult(Dispatch(state_machine::SetFluxLinkage{ fluxLinkage, onDone })) != state_machine::CommandResult::ok)
+            onDone(state_machine::CommandResult::rejected);
+    }
+
     foc::Weber FocStateMachineCommon::ActiveFluxLinkage() const
     {
         return calibrationContext.ActiveFluxLinkage();
@@ -166,19 +252,19 @@ namespace application
 
     void FocStateMachineCommon::CmdReAlign(const infra::Function<void(state_machine::CommandResult)>& onDone)
     {
-        if (!state_machine::IsStopped(currentState) || HasPendingCommand() || !HasValidCalibration())
-        {
+        if (ToCommandResult(Dispatch(state_machine::ReAlign{ onDone })) != state_machine::CommandResult::ok)
             onDone(state_machine::CommandResult::rejected);
-            return;
-        }
+    }
 
-        pendingCommandCallback = onDone;
-        calibrationContext.SetRotorReferenceValid(false);
-        currentState = state_machine::Calibrating{};
-        auto& calibrating = std::get<state_machine::Calibrating>(currentState);
-        calibrating.pendingData = calibrationContext.Data();
-        calibrating.external = true;
+    state_machine::CommandResult FocStateMachineCommon::CmdReserveExternalCalibration()
+    {
+        return ToCommandResult(Dispatch(state_machine::ReserveExternalCalibration{}));
+    }
 
-        RunAlignmentStep();
+    void FocStateMachineCommon::CmdCompleteExternalCalibration(const services::CalibrationData& data,
+        const infra::Function<void(state_machine::CommandResult)>& onDone)
+    {
+        if (ToCommandResult(Dispatch(state_machine::CompleteExternalCalibration{ data, onDone })) != state_machine::CommandResult::ok)
+            onDone(state_machine::CommandResult::rejected);
     }
 }

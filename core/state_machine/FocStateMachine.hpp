@@ -17,10 +17,14 @@ namespace state_machine
     };
 
     struct Idle
-    {};
+    {
+        static constexpr const char* name{ "Idle" };
+    };
 
     struct Calibrating
     {
+        static constexpr const char* name{ "Calibrating" };
+
         CalibrationStep step{ CalibrationStep::polePairs };
         services::CalibrationData pendingData{};
         bool external{ false };
@@ -28,15 +32,21 @@ namespace state_machine
 
     struct Ready
     {
+        static constexpr const char* name{ "Ready" };
+
         services::CalibrationData loadedData{};
         bool rotorReferenceValid{ false };
     };
 
     struct Enabled
-    {};
+    {
+        static constexpr const char* name{ "Enabled" };
+    };
 
     struct Fault
     {
+        static constexpr const char* name{ "Fault" };
+
         FaultCode code{ FaultCode::hardwareFault };
     };
 
