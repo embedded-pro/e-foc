@@ -18,6 +18,7 @@
 #include "services/fsm/TableStateMachine.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
+#include <array>
 #include <functional>
 #include <optional>
 
@@ -49,7 +50,7 @@ namespace application
         : public state_machine::FocStateMachineBase
     {
     public:
-        using StateMachine = services::TableStateMachine<state_machine::State, state_machine::Event>;
+        using StateMachine = services::TableStateMachine<state_machine::State, state_machine::Event, FocStateMachineCommon>;
         using StateId = StateMachine::StateId;
 
         ~FocStateMachineCommon() override = default;
@@ -116,41 +117,43 @@ namespace application
         services::DispatchResult Dispatch(const state_machine::Event& event);
 
     private:
-        class Observer
-            : public services::StateMachineObserver<state_machine::State, state_machine::Event>
-        {
-        public:
-            Observer(StateMachine& subject, FocStateMachineCommon& owner);
+        using Transition = StateMachine::Transition;
 
-            void StateChanged(StateId from, const state_machine::Event& event, StateId to) override;
-
-        private:
-            FocStateMachineCommon& owner;
-        };
-
-        void AddCalibrationRows();
-        void AddCalibrationCompletionRows();
-        void AddOperationRows();
-        void AddSafetyRows();
-        void AddMaintenanceRows();
-        void AddBootRows();
+        static StateMachine::Table Rows();
+        static constexpr std::array<Transition, 12> CalibrationRows();
+        static constexpr std::array<Transition, 4> CalibrationCompletionRows();
+        static constexpr std::array<Transition, 2> OperationRows();
+        static constexpr std::array<Transition, 10> SafetyRows();
+        static constexpr std::array<Transition, 12> MaintenanceRows();
+        static constexpr std::array<Transition, 2> BootRows();
         template<class Stopped>
-        void AddCalibrationEntryRows();
+        static constexpr std::array<Transition, 3> CalibrationEntryRows();
         template<class Active>
-        void AddEmergencyStopRows();
+        static constexpr std::array<Transition, 2> EmergencyStopRows();
+        template<class S>
+        static constexpr Transition EmergencyStopInternalRow();
         template<class Stopped>
-        void AddMaintenanceRowsFor();
-        template<class AnyState>
-        void AddFluxLinkageSavedRow();
+        static constexpr std::array<Transition, 5> MaintenanceRowsFor();
+        template<class Stopped>
+        static constexpr Transition FluxLinkageSavedRow();
+        void RegisterEnteredHooks();
 
         state_machine::Calibrating BeginCalibration(const state_machine::Calibrate& command);
         state_machine::Calibrating BeginReAlign(const state_machine::ReAlign& command);
+        bool IsPlausibleExternalCalibration(const state_machine::CompleteExternalCalibration& command);
+        void BeginExternalCalibration(state_machine::Calibrating& calibrating, const state_machine::CompleteExternalCalibration& command);
         void StartCalibrationSequence(state_machine::Calibrating& calibrating);
         void StartAlignmentOnly(state_machine::Calibrating& calibrating);
         void OnAlignmentSucceeded(state_machine::Calibrating& calibrating, foc::Radians angle);
         void OnMechanicalParametersIdentified(state_machine::Calibrating& calibrating, const state_machine::MechanicalParametersIdentified& event);
         state_machine::Ready CompleteCalibration(state_machine::Calibrating& calibrating);
         state_machine::Idle CompletePartialCalibration(state_machine::Calibrating& calibrating);
+
+        void BeginClearCalibration(const state_machine::ClearCalibration& command);
+        state_machine::Idle CompleteClearCalibration();
+        bool IsAcceptableFluxLinkage(const state_machine::SetFluxLinkage& command);
+        void BeginSetFluxLinkage(const state_machine::SetFluxLinkage& command);
+        void OnFluxLinkageSaved(services::NvmStatus status);
 
         state_machine::Ready BuildReady();
         state_machine::Enabled BuildEnabled();
@@ -159,15 +162,20 @@ namespace application
         state_machine::Ready StopToReady();
         void StopWithoutTransition();
         void AbortActiveWork();
+        bool IsEnableAllowed(const state_machine::Ready& ready);
+        state_machine::Ready DisableToReady();
+        state_machine::Ready ClearFaultToReady();
+        state_machine::Idle ClearFaultToIdle();
 
-        void OnFluxLinkageSaved(services::NvmStatus status);
+        void ContinueBoot(bool valid);
+        void FinishBoot(services::NvmStatus status);
         void OnBootValidityChecked(bool valid);
         void OnBootCalibrationLoaded(services::NvmStatus status);
 
         void CompleteAfterTransition(state_machine::CommandResult result);
         void CompletePendingCommand(state_machine::CommandResult result);
         bool HasPendingCommand() const;
-        void OnStateChanged(StateId to);
+        void OnStateEntered(StateId state);
 
         static state_machine::CommandResult ToCommandResult(services::DispatchResult result);
 
@@ -179,8 +187,7 @@ namespace application
         FaultController faultController;
         CalibrationOrchestrator calibrationOrchestrator;
 
-        StateMachine::WithStorage<45, 4> stateMachine;
-        Observer observer{ stateMachine, *this };
+        StateMachine::WithStorage<4> stateMachine;
         services::StateMachineTracer<state_machine::State, state_machine::Event> stateMachineTracer;
 
         state_machine::FaultCode lastFaultCode{ state_machine::FaultCode::none };

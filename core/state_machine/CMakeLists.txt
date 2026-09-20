@@ -41,6 +41,7 @@ target_sources(e_foc.state_machine PRIVATE
     FocStateMachineCommon.hpp
     FocStateMachineCommon.cpp
     FocStateMachineCommonCalibration.cpp
+    FocStateMachineTable.cpp
     OuterLoopStateMachine.hpp
     OuterLoopStateMachine.cpp
     OuterLoopStateMachineFor.hpp

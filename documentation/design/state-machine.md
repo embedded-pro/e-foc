@@ -99,6 +99,11 @@ the action that builds the target state. Rows that must be accepted in a state w
 leaving it (a calibration sub-step changing, a flux-linkage save completing) are declared
 as internal rows.
 
+The table is a compile-time constant. Its rows are `constexpr` values whose guards and
+actions are captureless functions receiving the state machine as their context, so the
+whole table lives in flash; the machine itself only holds the current state and a queue of
+four events. That is what keeps the lifecycle within the RAM of the 32 KB targets.
+
 The table is the single source of truth for what the machine accepts:
 
 - An event that arrives in a state with no row for it is **forbidden**: nothing changes, the
@@ -301,15 +306,20 @@ decided by the transition table:
   have rows in `Calibrating`. The mechanical result additionally carries a guard on the active
   sub-step. The calibration orchestrator also drops results of a run that was aborted.
 - The `SaveCalibration` completion becomes `CalibrationSaved`, which only has rows in
-  `Calibrating`.
+  `Calibrating`. The callback also carries the epoch of the transition that issued the save,
+  so a save completing after an emergency stop and a fresh `CmdCalibrate` is discarded
+  instead of being consumed by the new run.
 - The boot-time NVM completions become `BootValidityChecked` and `BootCalibrationLoaded`, which
   only have rows in `Idle`.
 - The `InvalidateCalibration` completion becomes `CalibrationInvalidated`, which only has rows in
   `Idle` and `Ready`, leading to `Idle` on success, to `Fault` on failure, and completing the
-  command with `rejected` when the NVM is busy.
+  command with `rejected` when the NVM is busy. It carries the request epoch as well.
+- The flux-linkage save completion becomes `FluxLinkageSaved`, handled in `Idle` and `Ready`
+  only, carrying the request epoch, and completing the pending command without a transition.
 
-Any of these events arriving after the state has moved away is **forbidden**: it is traced and
-discarded, and it never overwrites a later state such as `Enabled` or `Fault` with a stale
+Any of these events arriving after the state has moved away is **forbidden**, or, for the
+NVM completions that carry an epoch, **discarded** before it reaches the table. Either way it
+is traced, and it never overwrites a later state such as `Enabled` or `Fault` with a stale
 result.
 
 ```mermaid

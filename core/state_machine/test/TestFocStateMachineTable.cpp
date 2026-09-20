@@ -80,7 +80,7 @@ namespace
         Completion{ Event<state_machine::CalibrationInvalidated>(), idleAndReady },
         Completion{ Event<state_machine::BootValidityChecked>(), onlyIdle },
         Completion{ Event<state_machine::BootCalibrationLoaded>(), onlyIdle },
-        Completion{ Event<state_machine::FluxLinkageSaved>(), everywhere },
+        Completion{ Event<state_machine::FluxLinkageSaved>(), idleAndReady },
         Completion{ Event<state_machine::FaultDetected>(), everywhere },
         Completion{ Event<state_machine::EmergencyStop>(), everywhere },
     };
