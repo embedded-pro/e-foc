@@ -1,4 +1,5 @@
 #include "core/state_machine/MaintenanceFlow.hpp"
+#include "infra/util/ReallyAssert.hpp"
 
 namespace application
 {
@@ -9,6 +10,7 @@ namespace application
 
     void MaintenanceFlow::BeginClear(const state_machine::ClearCalibration& command)
     {
+        really_assert(completion == nullptr);
         env.pending.Accept(command.onDone);
         completion = env.machine.CompletionWith<void(services::NvmStatus)>([](services::NvmStatus status)
             {
@@ -36,15 +38,16 @@ namespace application
 
     bool MaintenanceFlow::IsAcceptableFluxLinkage(const state_machine::SetFluxLinkage& command) const
     {
-        if (command.fluxLinkage.Value() > 0.0f && !env.pending.Pending() && calibration.HasValidCalibration())
+        if (command.fluxLinkage.Value() > 0.0f && calibration.HasValidCalibration())
             return true;
 
-        env.tracer.Trace() << "[SM] Flux linkage rejected: needs a positive value and a calibrated motor in Idle or Ready";
+        env.tracer.Trace() << "[SM] Flux linkage rejected: needs a positive value and a calibrated motor";
         return false;
     }
 
     void MaintenanceFlow::BeginSetFluxLinkage(const state_machine::SetFluxLinkage& command)
     {
+        really_assert(completion == nullptr);
         env.context.SetPendingFluxLinkage(command.fluxLinkage.Value());
         env.pending.Accept(command.onDone);
 

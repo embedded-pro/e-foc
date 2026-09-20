@@ -1,4 +1,5 @@
 #include "core/state_machine/CalibrationFlow.hpp"
+#include "infra/util/ReallyAssert.hpp"
 #include <bit>
 
 namespace application
@@ -120,6 +121,7 @@ namespace application
                                             ? services::CalibrationStage::complete
                                             : services::CalibrationStage::none;
 
+        really_assert(saveCompletion == nullptr);
         saveCompletion = env.machine.CompletionWith<void(services::NvmStatus)>([](services::NvmStatus status)
             {
                 return state_machine::CalibrationSaved{ status };

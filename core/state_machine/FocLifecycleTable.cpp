@@ -24,7 +24,7 @@ namespace application
             Machine::Row<Stopped, state_machine::Calibrate, state_machine::Calibrating>(
                 [](const LifecycleContext& context, const Stopped&, const state_machine::Calibrate&)
                 {
-                    return !context.pending.Pending();
+                    return !context.lifecycle.HasPendingAsyncWork();
                 },
                 [](LifecycleContext& context, Stopped&, const state_machine::Calibrate& command)
                 {
@@ -33,7 +33,7 @@ namespace application
             Machine::Row<Stopped, state_machine::ReAlign, state_machine::Calibrating>(
                 [](const LifecycleContext& context, const Stopped&, const state_machine::ReAlign&)
                 {
-                    return !context.pending.Pending() && context.calibration.HasValidCalibration();
+                    return !context.lifecycle.HasPendingAsyncWork() && context.calibration.HasValidCalibration();
                 },
                 [](LifecycleContext& context, Stopped&, const state_machine::ReAlign& command)
                 {
@@ -136,7 +136,7 @@ namespace application
             Machine::Row<state_machine::Ready, state_machine::Enable, state_machine::Enabled>(
                 [](const LifecycleContext& context, const state_machine::Ready& ready, const state_machine::Enable&)
                 {
-                    return context.operation.IsEnableAllowed(ready);
+                    return !context.lifecycle.HasPendingAsyncWork() && context.operation.IsEnableAllowed(ready);
                 },
                 [](LifecycleContext& context, state_machine::Ready&, const state_machine::Enable&)
                 {
@@ -224,7 +224,7 @@ namespace application
                 },
                 [](const LifecycleContext& context, const Stopped&, const state_machine::ClearCalibration&)
                 {
-                    return !context.pending.Pending();
+                    return !context.lifecycle.HasPendingAsyncWork();
                 }),
             Machine::Row<Stopped, state_machine::CalibrationInvalidated, state_machine::Idle>(
                 [](const LifecycleContext& context, const Stopped&, const state_machine::CalibrationInvalidated& event)
@@ -256,7 +256,7 @@ namespace application
                 },
                 [](const LifecycleContext& context, const Stopped&, const state_machine::SetFluxLinkage& command)
                 {
-                    return context.maintenance.IsAcceptableFluxLinkage(command);
+                    return !context.lifecycle.HasPendingAsyncWork() && context.maintenance.IsAcceptableFluxLinkage(command);
                 }),
         };
     }

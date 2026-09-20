@@ -109,7 +109,7 @@ The table is the single source of truth for what the machine accepts:
 - An event that arrives in a state with no row for it is **forbidden**: nothing changes, the
   command reports `rejected`, and the trace shows which event was refused in which state.
 - An event whose rows exist but whose guards all refuse it is **rejected** in the same way;
-  the guard is where conditions such as "a command is already pending" or "the rotor
+  the guard is where conditions such as "asynchronous work is outstanding" or "the rotor
   reference is not established" live.
 - Before the machine starts, the table is checked for consistency: duplicate rows, rows
   that can never be selected because an unguarded row precedes them, and states that no
@@ -123,6 +123,17 @@ fault raised while the drive is being started, is queued and handled once the cu
 transition has been committed and announced. Actions therefore always observe a consistent
 state, and the target state is committed before its side effects (starting the drive,
 completing the pending command, notifying the ready handler) run, in that order.
+
+Every operator command that starts asynchronous work (`Calibrate`, `ReAlign`,
+`ReserveExternalCalibration`, `ClearCalibration`, `SetFluxLinkage`) and `Enable` are guarded by
+`HasPendingAsyncWork()`: they are rejected while a command is pending, while any NVM operation
+is in flight, including the boot-time check and load, or while an identification service is
+running. One request therefore owns the machine at a time. A save still outstanding after an
+emergency stop cannot be overlapped by the save of a new run, a clear or a flux-linkage change
+in progress cannot be interrupted by `Enable`, whose transition would discard the completion
+and leave the command pending forever, and the boot-time load cannot overwrite the record of a
+calibration that started before it answered. The command is completed with `rejected` and the
+client retries once the outstanding work has completed.
 
 A command issued from inside a completion callback is such a queued event. Its synchronous
 result is `ok`, meaning accepted for processing, not applied; the table decides when the
@@ -230,7 +241,7 @@ After saving, calibration data is applied to the FOC controller (current PID gai
 
 An external client (e.g. the CAN bridge) can supply pre-measured calibration data without running the internal identification chain. This uses a two-command protocol to ensure the FSM state is correct before any inverter interaction begins:
 
-1. **`CmdReserveExternalCalibration()`** — synchronous. Checks that the machine is in `Idle` or `Ready` with no pending async work, then transitions to `Calibrating` and returns `CommandResult::ok`. Returns `CommandResult::rejected` in any other state. The `Calibrating` state prevents a second request from being accepted concurrently.
+1. **`CmdReserveExternalCalibration()`** — synchronous. Checks that the machine is in `Idle` or `Ready` with no pending async work, like every command that starts asynchronous work, then transitions to `Calibrating` and returns `CommandResult::ok`. Returns `CommandResult::rejected` in any other state. The `Calibrating` state prevents a second request from being accepted concurrently.
 
 2. **`CmdCompleteExternalCalibration(data, onDone)`** — async. Called by the external client after its own estimation is finished. Stores `data` in the pending `Calibrating` slot and runs the alignment step, so an externally supplied record still gets a live rotor frame before it can be used. Its guard refuses the command while another command is still pending, so a second completion sent while the first is aligning is rejected instead of overwriting the pending record. If a fault occurred between the two calls, the machine is in `Fault`, where the completion command has no row and is rejected; the client observes the failure through its own estimation callback.
 

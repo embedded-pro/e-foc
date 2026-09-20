@@ -1,11 +1,15 @@
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/foc/interfaces/test_doubles/FocMock.hpp"
+#include "core/foc/math/AngleWrap.hpp"
+#include "core/foc/math/FastTrigonometry.hpp"
+#include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
+#include <numbers>
 
 namespace
 {
@@ -16,7 +20,10 @@ namespace
         , public infra::ClockFixture
     {
     public:
-        void TearDown() override { ExecuteAllActions(); }
+        void TearDown() override
+        {
+            ExecuteAllActions();
+        }
 
         StrictMock<foc::SpeedCommandableMock> controllerMock;
         StrictMock<foc::ControllableMock> driveMock;
@@ -57,6 +64,78 @@ namespace
         {
             observableMock.Publish(foc::PhaseCurrents{ foc::Ampere{ a }, foc::Ampere{ b }, foc::Ampere{ c } });
         }
+
+        struct MotorModel
+        {
+            float inertia{ 1e-3f };
+            float friction{ 5e-3f };
+            float coulomb{ 2e-2f };
+            float torqueConstant{ 0.1f };
+            std::size_t polePairs{ 1 };
+        };
+
+        class Excitation
+        {
+        public:
+            explicit Excitation(const MotorModel& model)
+                : model(model)
+            {}
+
+            foc::Radians Position() const
+            {
+                return foc::Radians{ amplitude * (1.0f - std::cos(2.0f * std::numbers::pi_v<float> * frequency * static_cast<float>(sample) * samplingPeriod)) };
+            }
+
+            void Advance()
+            {
+                ++sample;
+                const auto position = Position().Value();
+                const auto speed = foc::detail::PositionWithWrapAround(position - previousPosition) / samplingPeriod;
+                const auto acceleration = (speed - previousSpeed) / samplingPeriod;
+                previousPosition = position;
+                previousSpeed = speed;
+                torque = model.coulomb + model.inertia * acceleration + model.friction * speed;
+            }
+
+            foc::PhaseCurrents Currents() const
+            {
+                const auto electricalAngle = Position().Value() * static_cast<float>(model.polePairs);
+                const auto cosine = foc::FastTrigonometry::Cosine(electricalAngle);
+                const auto sine = foc::FastTrigonometry::Sine(electricalAngle);
+                const auto quadrature = torque / model.torqueConstant / (cosine * cosine + sine * sine);
+                const auto phases = foc::ClarkePark{}.Inverse(foc::RotatingFrame{ 0.0f, quadrature }, cosine, sine);
+                return foc::PhaseCurrents{ foc::Ampere{ phases.a }, foc::Ampere{ phases.b }, foc::Ampere{ phases.c } };
+            }
+
+        private:
+            MotorModel model;
+            float samplingPeriod{ 1.0f / 10000.0f };
+            float amplitude{ 0.5f };
+            float frequency{ 10.0f };
+            std::size_t sample{ 0 };
+            float previousPosition{ 0.0f };
+            float previousSpeed{ 0.0f };
+            float torque{ 0.0f };
+        };
+
+        void ExpectEncoderToFollow(Excitation& excitation)
+        {
+            EXPECT_CALL(encoderMock, Read()).WillRepeatedly(Invoke([&excitation]()
+                {
+                    return excitation.Position();
+                }));
+        }
+
+        void PublishExcitation(Excitation& excitation, std::size_t samples)
+        {
+            for (std::size_t i = 0; i != samples; ++i)
+            {
+                excitation.Advance();
+                observableMock.Publish(excitation.Currents());
+            }
+        }
+
+        static constexpr std::size_t samplesUntilConvergence{ 1000 };
     };
 }
 
@@ -267,4 +346,87 @@ TEST_F(MechanicalParametersIdentificationTest, a_run_that_has_not_converged_keep
         ExpectDriveReleased();
         identification->Abort();
     }
+}
+
+TEST_F(MechanicalParametersIdentificationTest, a_converged_run_completes_with_the_identified_parameters)
+{
+    services::MechanicalParametersIdentification::Config config{
+        foc::RadiansPerSecond{ 50.0f },
+        0.998f,
+        std::chrono::seconds{ 60 }
+    };
+    MotorModel model;
+    Excitation excitation{ model };
+
+    struct Result
+    {
+        bool fired = false;
+        std::optional<foc::NewtonMeterSecondPerRadian> friction;
+        std::optional<foc::NewtonMeterSecondSquared> inertia;
+    } outcome;
+
+    ExpectEncoderToFollow(excitation);
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_));
+    ExpectDriveReleased();
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ model.torqueConstant }, model.polePairs, config,
+        [&outcome](auto f, auto i)
+        {
+            outcome.fired = true;
+            outcome.friction = f;
+            outcome.inertia = i;
+        });
+
+    PublishExcitation(excitation, samplesUntilConvergence);
+    ExecuteAllActions();
+
+    ASSERT_TRUE(outcome.fired);
+    ASSERT_TRUE(outcome.friction.has_value());
+    ASSERT_TRUE(outcome.inertia.has_value());
+    EXPECT_NEAR(outcome.friction->Value(), model.friction, 1e-4f);
+    EXPECT_NEAR(outcome.inertia->Value(), model.inertia, 1e-4f);
+    EXPECT_FALSE(identification->IsRunning());
+}
+
+TEST_F(MechanicalParametersIdentificationTest, a_convergence_scheduled_before_an_abort_does_not_complete_the_run_started_after_it)
+{
+    services::MechanicalParametersIdentification::Config config{
+        foc::RadiansPerSecond{ 50.0f },
+        0.998f,
+        std::chrono::seconds{ 60 }
+    };
+    MotorModel model;
+    Excitation excitation{ model };
+
+    bool firstFired = false;
+    bool secondFired = false;
+
+    ExpectEncoderToFollow(excitation);
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_));
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ model.torqueConstant }, model.polePairs, config, [&firstFired](auto, auto)
+        {
+            firstFired = true;
+        });
+    PublishExcitation(excitation, samplesUntilConvergence);
+
+    ExpectDriveReleased();
+    identification->Abort();
+
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_));
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ model.torqueConstant }, model.polePairs, config, [&secondFired](auto, auto)
+        {
+            secondFired = true;
+        });
+
+    ExecuteAllActions();
+
+    EXPECT_FALSE(firstFired);
+    EXPECT_FALSE(secondFired);
+    EXPECT_TRUE(identification->IsRunning());
+
+    ExpectDriveReleased();
+    identification->Abort();
 }
