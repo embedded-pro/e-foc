@@ -32,6 +32,11 @@ namespace application
         return lastFaultCode;
     }
 
+    bool OperationFlow::HasPendingFault() const
+    {
+        return faultController.IsPending();
+    }
+
     bool OperationFlow::IsEnableAllowed(const state_machine::Ready& ready) const
     {
         if (faultController.IsLatched())
@@ -131,12 +136,6 @@ namespace application
 
     void OperationFlow::StartUnlessFaulted()
     {
-        // A fault delivered from an interrupt cuts the bridge there and then, but the FaultDetected event
-        // carrying its transition is still queued on the event dispatcher, so the lifecycle state does not
-        // show it yet. Consult the latch instead: before Start(), so no step of the enable sequence undoes
-        // the cutoff that preceded it, and again after it, for a fault raised while Start() ran. The
-        // transition dispatched here is queued by the table and drained before the Enable dispatch returns,
-        // so CmdEnable reports abortedByFault rather than success on a drive the hardware has faulted.
         if (DispatchPendingFault())
             return;
 
@@ -147,10 +146,12 @@ namespace application
 
     bool OperationFlow::DispatchPendingFault()
     {
-        if (!faultController.TakePendingFault())
+        const auto code = faultController.TakePendingFault();
+
+        if (!code.has_value())
             return false;
 
-        env.machine.Dispatch(state_machine::FaultDetected{ faultController.PendingCode() });
+        env.machine.Dispatch(state_machine::FaultDetected{ *code });
         return true;
     }
 

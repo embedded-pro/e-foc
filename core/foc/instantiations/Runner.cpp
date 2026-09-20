@@ -50,9 +50,6 @@ namespace foc
 
         enabled = true;
 
-        // A stop from the faulting context between two of these steps would otherwise be undone by the
-        // steps that follow it, re-arming the bridge on faulted hardware. A stop landing after this last
-        // check needs no undoing: it runs after every write this sequence makes.
         if (StoppedSince(sequence))
             Disable();
     }

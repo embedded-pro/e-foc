@@ -40,8 +40,6 @@ namespace application
 
     void TivaWatchdog::CutPowerStageAndReset()
     {
-        // The context that owns the PWM driver is the one that stopped making progress, so the cutoff
-        // reaches the registers without it.
         CutPowerStage();
         NVIC_SystemReset();
     }

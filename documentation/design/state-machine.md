@@ -351,6 +351,11 @@ dispatcher. `faultLatched` says a fault is in force and is what commands consult
 the distinction `faultLatched` carried before latching moved into the interrupt, and what decides whether an
 arriving fault is the one that tripped the drive or a further one whose code is kept out of `LastFaultCode()`.
 
+`TakePendingFault()` claims the flag and the code together and hands back the code, so a second interrupt
+landing mid-claim cannot leave the taker dispatching one fault's transition under another's code. A fault whose
+transition is still owed also counts as pending asynchronous work, which is what stops a control-mode switch
+from destroying the state machine — and with it the latch and the queued `FaultDetected` — in that window.
+
 A consequence worth knowing when reading the code or the tests: between the interrupt and the dispatcher turn,
 the bridge is off and the latch is set, but `CurrentState()` still reports the pre-fault state. Commands
 consult the latch, not the state, so an enable arriving in that window is refused rather than acted on. The

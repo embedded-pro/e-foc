@@ -28,13 +28,14 @@ namespace application
         faultLatched = true;
     }
 
-    bool FaultController::TakePendingFault()
+    std::optional<state_machine::FaultCode> FaultController::TakePendingFault()
     {
         if (!faultPending)
-            return false;
+            return std::nullopt;
 
+        const auto code = pendingCode;
         faultPending = false;
-        return true;
+        return code;
     }
 
     void FaultController::EnterFault()
@@ -82,8 +83,8 @@ namespace application
         return faultRecorded;
     }
 
-    state_machine::FaultCode FaultController::PendingCode() const
+    bool FaultController::IsPending() const
     {
-        return pendingCode;
+        return faultPending;
     }
 }

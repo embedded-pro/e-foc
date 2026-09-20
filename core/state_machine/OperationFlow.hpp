@@ -17,6 +17,7 @@ namespace application
         void RegisterFaultHandler(state_machine::FaultNotifier& notifier);
         void UnregisterFaultHandler();
         state_machine::FaultCode LastFaultCode() const;
+        bool HasPendingFault() const;
 
         bool IsEnableAllowed(const state_machine::Ready& ready) const;
         state_machine::Enabled BuildEnabled();

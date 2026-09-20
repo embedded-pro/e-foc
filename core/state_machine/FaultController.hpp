@@ -2,6 +2,7 @@
 
 #include "core/state_machine/FaultNotifier.hpp"
 #include "infra/util/Function.hpp"
+#include <optional>
 
 namespace application
 {
@@ -16,7 +17,7 @@ namespace application
         void Unregister();
 
         void LatchFromInterrupt(state_machine::FaultCode code);
-        bool TakePendingFault();
+        std::optional<state_machine::FaultCode> TakePendingFault();
 
         void EnterFault();
         bool CanClear() const;
@@ -26,12 +27,10 @@ namespace application
 
         bool IsLatched() const;
         bool IsRecorded() const;
-        state_machine::FaultCode PendingCode() const;
+        bool IsPending() const;
 
     private:
         state_machine::FaultNotifier* registeredNotifier{ nullptr };
-        // Set in the faulting context, so it is true from the interrupt onwards; faultRecorded only once the
-        // transition it owes has been taken. The two differ exactly in the window this class exists to cover.
         volatile bool faultLatched{ false };
         volatile bool faultPending{ false };
         volatile state_machine::FaultCode pendingCode{ state_machine::FaultCode::none };

@@ -281,6 +281,49 @@ TEST_F(TestPlatformFaultNotifier, an_enable_is_refused_while_an_interrupt_fault_
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
 }
 
+TEST_F(TestPlatformFaultNotifier, a_calibrate_is_refused_while_an_interrupt_fault_awaits_its_transition)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+
+    auto result = state_machine::CommandResult::ok;
+    sm.CmdCalibrate([&result](state_machine::CommandResult value)
+        {
+            result = value;
+        });
+
+    EXPECT_EQ(state_machine::CommandResult::rejected, result);
+    EXPECT_FALSE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+
+    ExecuteAllActions();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(TestPlatformFaultNotifier, a_fault_awaiting_its_transition_counts_as_pending_async_work)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+
+    EXPECT_TRUE(sm.HasPendingAsyncWork());
+
+    ExecuteAllActions();
+
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
 TEST_F(TestPlatformFaultNotifier, over_voltage_maps_to_overvoltage_fault_code)
 {
     GivenCalibrationInNvm();
