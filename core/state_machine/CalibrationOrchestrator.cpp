@@ -57,6 +57,11 @@ namespace application
         return running || electricalIdent.IsRunning();
     }
 
+    bool CalibrationOrchestrator::HasRunInFlight() const
+    {
+        return running;
+    }
+
     void CalibrationOrchestrator::RunPolePairsStep()
     {
         tracer.Trace() << "[SM] Identifying pole pairs";

@@ -30,6 +30,7 @@ namespace application
 
         void Abort();
         bool IsRunning() const;
+        bool HasRunInFlight() const;
 
     private:
         void RunPolePairsStep();

@@ -30,6 +30,7 @@ namespace application
 
         bool HasValidCalibration() const;
         bool IsRunning() const;
+        bool HasRunInFlight() const;
         void Abort();
 
     private:

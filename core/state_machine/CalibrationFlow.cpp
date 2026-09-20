@@ -175,6 +175,11 @@ namespace application
         return orchestrator.IsRunning();
     }
 
+    bool CalibrationFlow::HasRunInFlight() const
+    {
+        return orchestrator.HasRunInFlight();
+    }
+
     void CalibrationFlow::Abort()
     {
         orchestrator.Abort();

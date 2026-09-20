@@ -62,7 +62,7 @@ namespace application
                     },
                     [](const LifecycleContext& context, const state_machine::Calibrating&, const state_machine::CompleteExternalCalibration& command)
                     {
-                        return !context.pending.Pending() && !context.calibration.IsRunning() && context.calibration.IsPlausibleExternal(command);
+                        return !context.pending.Pending() && !context.calibration.HasRunInFlight() && context.calibration.IsPlausibleExternal(command);
                     }),
                 Machine::InternalRow<state_machine::Calibrating, state_machine::RunCalibrationSequence>(
                     [](LifecycleContext& context, state_machine::Calibrating& calibrating, const state_machine::RunCalibrationSequence&)
