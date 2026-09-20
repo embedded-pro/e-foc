@@ -74,11 +74,12 @@ namespace application
 
     bool OperationFlow::CanClearFault() const
     {
-        if (faultController.CanClear())
-            return true;
+        return faultController.CanClear();
+    }
 
+    void OperationFlow::TraceFaultClearRefused() const
+    {
         env.tracer.Trace() << "[SM] Fault clear refused, retry limit reached; reset required";
-        return false;
     }
 
     state_machine::Ready OperationFlow::ClearFaultToReady()

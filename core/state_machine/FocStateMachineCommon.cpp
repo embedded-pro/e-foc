@@ -104,8 +104,14 @@ namespace application
 
     state_machine::CommandResult FocStateMachineCommon::CmdClearFault()
     {
-        if (!stateMachine.Is<state_machine::Fault>() || !operation.CanClearFault())
+        if (!stateMachine.Is<state_machine::Fault>())
             return state_machine::CommandResult::rejected;
+
+        if (!operation.CanClearFault())
+        {
+            operation.TraceFaultClearRefused();
+            return state_machine::CommandResult::rejected;
+        }
 
         return ToCommandResult(Dispatch(state_machine::ClearFault{}));
     }

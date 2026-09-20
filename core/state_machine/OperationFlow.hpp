@@ -24,6 +24,7 @@ namespace application
 
         state_machine::Fault EnterFault(state_machine::FaultCode code, bool wasActive, state_machine::CommandResult pendingResult = state_machine::CommandResult::abortedByFault);
         bool CanClearFault() const;
+        void TraceFaultClearRefused() const;
         state_machine::Ready ClearFaultToReady();
         state_machine::Idle ClearFaultToIdle();
 

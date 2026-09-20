@@ -106,11 +106,13 @@ queue of events. That is what keeps the lifecycle within the RAM of the 32 KB ta
 
 The queue depth is budgeted, not rounded up: each slot costs a whole `Event`, and overflowing
 it is an assertion failure rather than a dropped event. The deepest run of nested dispatches is
-a calibration sequence whose identification services report inline — one step-changed event per
-`CalibrationStep` plus the alignment result that follows the last one — which peaks at five with
-the four steps defined today. One further slot absorbs a command chained from a completion
-callback, giving the six the machine reserves. Adding a calibration step therefore costs a slot,
-and on the 32 KB targets a slot has to be paid for out of a RAM budget the linker now guards.
+a calibration sequence whose identification services report inline — the three steps the
+orchestrator announces plus the alignment result that follows the last one — which peaks at four.
+The friction-and-inertia step is not among them, because the control mode sets that step directly
+instead of announcing it, and the events that follow the alignment are pushed only once the queue
+has drained again. The remaining slots absorb a command chained from a completion callback, giving
+the six the machine reserves. Adding a calibration step that announces itself therefore costs a
+slot, and on the 32 KB targets a slot has to be paid for out of a RAM budget the linker now guards.
 
 The table is the single source of truth for what the machine accepts:
 

@@ -27,11 +27,13 @@ namespace application
         using StateMachine = LifecycleMachine;
         using StateId = StateMachine::StateId;
 
-        // The deepest run of nested dispatches is a calibration sequence whose identification steps
-        // report inline: one CalibrationStepChanged per step plus the AlignmentSucceeded that follows
-        // the last one. With the four steps of CalibrationStep that peak is 5; the remaining slot
-        // absorbs a command chained from a completion callback. Overflow is a really_assert, and each
-        // slot costs sizeof(Event), so this is budgeted against the 32 KB targets rather than rounded up.
+        // The deepest run of nested dispatches is a calibration sequence whose identification services
+        // report inline: the three steps the orchestrator announces plus the AlignmentSucceeded that
+        // follows the last one, which peaks at four. frictionAndInertia is not among them, because the
+        // mode hook sets that step directly rather than dispatching it, and the events that follow the
+        // alignment are pushed only once the queue has drained. The remaining slots absorb a command
+        // chained from a completion callback. Overflow is a really_assert, and each slot costs
+        // sizeof(Event), so this is budgeted against the 32 KB targets rather than rounded up.
         static constexpr std::size_t eventQueueDepth{ 6 };
 
         ~FocStateMachineCommon() override = default;

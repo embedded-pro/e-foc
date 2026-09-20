@@ -192,13 +192,17 @@ namespace application
                 Machine::Row<state_machine::Fault, state_machine::ClearFault, state_machine::Ready>(
                     [](const LifecycleContext& context, const state_machine::Fault&, const state_machine::ClearFault&)
                     {
-                        return context.calibration.HasValidCalibration();
+                        return context.operation.CanClearFault() && context.calibration.HasValidCalibration();
                     },
                     [](LifecycleContext& context, state_machine::Fault&, const state_machine::ClearFault&)
                     {
                         return context.operation.ClearFaultToReady();
                     }),
-                Machine::Row<state_machine::Fault, state_machine::ClearFault, state_machine::Idle>(nullptr,
+                Machine::Row<state_machine::Fault, state_machine::ClearFault, state_machine::Idle>(
+                    [](const LifecycleContext& context, const state_machine::Fault&, const state_machine::ClearFault&)
+                    {
+                        return context.operation.CanClearFault();
+                    },
                     [](LifecycleContext& context, state_machine::Fault&, const state_machine::ClearFault&)
                     {
                         return context.operation.ClearFaultToIdle();

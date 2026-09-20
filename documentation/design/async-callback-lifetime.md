@@ -130,7 +130,9 @@ The base implementation (`FocStateMachineCommon`) covers:
 - The pending command callback (`PendingCommand::Pending()`)
 - Every NVM operation from the call until its callback, the boot-time check and load included (`NvmActivity::InFlight()`)
 - Active calibration state (`Calibrating` variant)
-- The calibration orchestrator, which reports `electricalIdent.IsRunning()`
+- The calibration orchestrator, from the moment a run starts until it succeeds, fails or is
+  aborted, and for as long as the electrical identification reports itself running. The run
+  covers the alignment step as well, which the electrical identification alone does not see
 
 `OuterLoopStateMachine` overrides to additionally cover:
 - Direct CAN mechanical identification (`mechIdent.IsRunning()`)
