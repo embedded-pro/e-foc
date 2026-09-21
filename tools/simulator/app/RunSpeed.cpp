@@ -1,5 +1,4 @@
 #include "core/foc/instantiations/LowPriorityInterruptImpl.hpp"
-#include "infra/util/WithSharedAccess.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
@@ -8,7 +7,10 @@
 #include "foc/instantiations/FocController.hpp"
 #include "foc/interfaces/Units.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "infra/util/WithSharedAccess.hpp"
 #include "motor_parameters/Jk42bls01X038ed.hpp"
+#include "tools/simulator/adapter/OnlineElectricalRls.hpp"
+#include "tools/simulator/adapter/OnlineMechanicalRls.hpp"
 #include "tools/simulator/app/CalibrationsWiring.hpp"
 #include "tools/simulator/app/Conversions.hpp"
 #include "tools/simulator/app/Defaults.hpp"
@@ -16,8 +18,6 @@
 #include "tools/simulator/view/gui/ControlPanel.hpp"
 #include "tools/simulator/view/gui/Gui.hpp"
 #include "tools/simulator/view/gui/GuiSimulation.hpp"
-#include "tools/simulator/adapter/OnlineElectricalRls.hpp"
-#include "tools/simulator/adapter/OnlineMechanicalRls.hpp"
 #include "tools/simulator/view/gui/ParametersPanel.hpp"
 #include <QObject>
 #include <optional>
