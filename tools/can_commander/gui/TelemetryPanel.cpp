@@ -1,4 +1,6 @@
 #include "tools/can_commander/gui/TelemetryPanel.hpp"
+#include "ui/backend/qt/QtTheme.hpp"
+#include "ui/theme/Theme.hpp"
 #include <QFormLayout>
 #include <QVBoxLayout>
 
@@ -62,7 +64,7 @@ namespace tool
     void TelemetryPanel::OnFaultEvent(FocFaultCode fault)
     {
         faultLabel->setText(FaultCodeName(fault));
-        faultLabel->setStyleSheet("color: red; font-weight: bold;");
+        ui::backend::qt::StyleStatusLabel(*faultLabel, ui::theme::StatusLevel::Fault);
     }
 
     QString TelemetryPanel::MotorStateName(FocMotorState state)
