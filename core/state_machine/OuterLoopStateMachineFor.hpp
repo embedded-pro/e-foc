@@ -21,7 +21,7 @@ namespace application
             state_machine::FaultNotifier& faultNotifier,
             state_machine::TransitionPolicy transitionPolicy,
             const OuterLoopArgs& outerLoopArgs)
-            : OuterLoopStateMachine(terminalAndTracer, hardware, nvm, calibServices)
+            : OuterLoopStateMachine(terminalAndTracer, hardware, nvm, calibServices, outerLoopArgs.maxCurrent)
             , focController(hardware.inverter, hardware.encoder, outerLoopArgs.maxCurrent, outerLoopArgs.baseFrequency, outerLoopArgs.lowPriorityInterrupt, outerLoopArgs.outerLoopFrequency)
             , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
             , onlineElecEstimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)

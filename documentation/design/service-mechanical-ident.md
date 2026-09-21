@@ -30,7 +30,9 @@ date: 2026-04-07
 
 **Is responsible for:**
 - Estimating rotor moment of inertia (J) and viscous friction coefficient (B) while the motor runs in closed-loop speed control
-- Starting and stopping the drive for the duration of the procedure, and commanding the target speed that provides the excitation
+- Starting and stopping the drive for the duration of the procedure, and driving the two-level speed trajectory that provides the excitation
+- Refusing a request whose configuration does not describe a bounded trajectory, and ending a run that leaves the current or speed envelope it was given
+- Reporting an estimate only when it is converged and physically plausible, and reporting absent values otherwise
 - Releasing the drive and discarding the pending completion when the caller aborts, so that a fault is not overwritten by the result of the procedure it interrupted
 - Computing instantaneous electromagnetic torque from the q-axis current and the caller-supplied torque constant
 - Estimating angular acceleration by finite-differencing successive speed measurements obtained from the encoder
@@ -39,7 +41,7 @@ date: 2026-04-07
 - Delivering results through a single completion notification that reports friction and inertia using explicit physical units
 
 **Is NOT responsible for:**
-- Configuring the speed control loop — the loop's tunings and algorithm selection are established before the procedure begins
+- Configuring the speed control loop — the loop's tunings and algorithm selection are established before the procedure begins, and the caller is responsible for the electrical model and provisional mechanics that make those loops able to move the rotor at all (see the State Machine design document)
 - Persisting the returned parameters — the caller decides what to do with them
 - Auto-tuning the speed controller — this service provides the plant parameters that a separate tuning step may consume
 - Measuring electrical parameters (R, L, pole pairs) — those are handled by the Electrical Parameters Identification service
@@ -114,6 +116,9 @@ Two consequences follow from the observer running in the ADC interrupt:
   completion reaches non-volatile memory through the state machine.
 - An abort takes effect immediately — the drive is stopped and the observer released — but the pending
   completion is dropped rather than invoked. The caller that aborted owns the outcome.
+- Because the completion is deferred, an abort and a new run can both happen before the dispatcher gets to
+  it. Each run therefore carries a generation, and a queued completion finishes only the run that queued
+  it; a terminal outcome belonging to an aborted run can never complete the run that followed it.
 
 Each observation reads the encoder once. Reading it twice within a callback samples two different rotor positions and mixes them into a single difference.
 
@@ -124,6 +129,59 @@ Angular acceleration (dω/dt) is obtained from two successive velocity estimates
 ```
 
 The double finite difference amplifies noise; the quality of the acceleration estimate therefore depends on the encoder resolution and sampling rate. Low-resolution encoders or very low speeds produce noisy acceleration estimates and degrade identification accuracy. The caller is advised to command a non-zero target speed of sufficient magnitude to obtain a good signal-to-noise ratio.
+
+### Excitation Trajectory
+
+A single constant speed setpoint is not an excitation. Once the loop has settled on it the regressor reads
+`[1, 0, ω]` with ω constant: the acceleration column is zero, so J is not identified at all, and the
+intercept and speed columns are collinear, so B cannot be separated from the Coulomb term. Every sample
+then adds information in no direction while the forgetting factor keeps inflating the covariance.
+
+The procedure therefore drives a two-level trajectory. It commands the target speed, then alternates
+between the target speed and a lower dwell speed every dwell period until the run ends. Each transition is
+a commanded acceleration, and the rotor spends the whole run above the minimum speed the update gate
+requires, so both the inertia and the friction directions are excited repeatedly.
+
+```text
+speed
+  ω_target ─┐     ┌─────┐     ┌─────┐
+            │     │     │     │     │
+  ω_dwell   └─────┘     └─────┘     └───  …
+            |<-T->|<-T->|<-T->|
+```
+
+### Bounded Envelope
+
+The trajectory is given explicit limits and the run stays inside them:
+
+| Limit    | Meaning                                                                                        |
+|----------|------------------------------------------------------------------------------------------------|
+| current  | The largest phase-current magnitude the run may produce, clamped to what the inverter supports |
+| speed    | The largest rotor speed the run may reach, measured rather than commanded                      |
+| duration | The timeout after which the run ends whether or not it has converged                           |
+
+On the first sample whose phase current exceeds the current envelope in any phase and in either
+direction, or whose measured speed exceeds the speed limit, the run ends and reports absent values.
+
+The power stage is stopped **in the interrupt that observed the sample**, not with the rest of the
+teardown. Deferring it would leave the inverter driving an out-of-envelope current for as long as the
+dispatcher takes to run, which is the one thing the envelope exists to prevent; stopping the inverter
+touches no callback slot, so it is safe from the interrupt, whereas releasing the observer there would
+destroy the closure being executed. Releasing the observer, stopping the drive through the controller and
+delivering the completion therefore stay deferred, as they are for every other way a run ends.
+
+The envelope is evaluated on **every** sample for as long as the drive is live — including samples that
+arrive after a converged one has queued its completion but before the dispatcher has run. A run is only
+over once the drive has been released, so a sample that leaves the envelope in that window still
+invalidates the estimate rather than letting a converged value through.
+
+A configuration that does not describe a usable bounded trajectory — a dwell speed that is not below the
+target speed, a non-positive envelope, a speed limit that is not finite and positive or that sits below
+the target, a timeout that does not outlast one dwell period, a forgetting factor outside (0, 1] — is
+refused through the completion rather than started, as is a request without a positive torque constant or
+pole-pair count. The speed limit in particular must be finite: an infinite bound passes every comparison
+against the target speed while making the run-time check unreachable, which is a bounded trajectory in
+name only.
 
 ### Recursive Least Squares Estimator
 
@@ -188,16 +246,42 @@ A `TimerSingleShot` starts when the procedure begins. When it fires, the current
 - **B** (viscous friction) is the second element of θ; reported as `NewtonMeterSecondPerRadian`.
 - **τ_friction** (Coulomb friction) is the third element of θ; it is observed internally but is not part of the output interface for this version.
 
-If the estimation converges to physically implausible values (negative J, negative B), both outputs are reported as absent. No special "converged" criterion is enforced — the caller is responsible for treating results obtained at very low excitation or very short timeout as unreliable.
+### Acceptance Policy
+
+The procedure and the online estimator described below share one acceptance policy, so a value one of
+them refuses is refused by the other:
+
+| Gate              | Rule                                                                                                                                                        |
+|-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| excitation        | An observation updates the estimator only when the rotor is both moving and accelerating: speed magnitude and acceleration magnitude are each above a floor |
+| informed estimate | At least a minimum number of such observations must have been taken since the estimator was started or seeded                                               |
+| convergence       | The innovation must be below a fixed bound and the covariance trace below a bound scaled to the forgetting factor                                           |
+| plausibility      | J must be finite, strictly positive and below an upper bound; B must be finite, non-negative and below an upper bound                                       |
+
+The covariance bound is expressed relative to the forgetting factor because an RLS that forgets cannot
+drive its covariance below a floor proportional to (1 − λ). A single absolute bound would be structurally
+unreachable for a tracking estimator with a short memory and trivially met by one that never forgets.
+
+The one-shot procedure runs with a forgetting factor close to unity: the plant does not drift within a
+five-second run, and a shorter memory would hold the steady-state covariance above the bound the run has
+to reach.
+
+A run that reaches its timeout without satisfying every gate, or whose final parameter vector falls
+outside the plausibility band, reports both outputs as absent. The caller treats that as a failed
+calibration step.
 
 ### State Machine
 
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
+    Idle --> Idle : EstimateFrictionAndInertia\nwith an unusable configuration\n(onDone(nullopt) fired)
     Idle --> Running : EstimateFrictionAndInertia called
-    Running --> TimedOut : TimerSingleShot fires
-    TimedOut --> Idle : onDone(J, B) or onDone(nullopt) fired
+    Running --> Finishing : TimerSingleShot fires
+    Running --> Finishing : converged observation
+    Running --> Finishing : sample outside the\ncurrent or speed envelope\n(power stage stopped at once)
+    Running --> Idle : Abort (completion dropped)
+    Finishing --> Idle : onDone(J, B) when converged and plausible,\notherwise onDone(nullopt)
 ```
 
 Only one estimation may be in progress at a time. A call to `EstimateFrictionAndInertia` while already Running is rejected immediately (callback invoked with absent values).
@@ -208,17 +292,21 @@ Only one estimation may be in progress at a time. A call to `EstimateFrictionAnd
 
 ### Provided
 
-| Interface                                                               | Purpose                                                                                                                                                              | Contract                                                                                                                         |
-|-------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
-| `EstimateFrictionAndInertia(torqueConstant, polePairs, config, onDone)` | Runs the RLS estimator under active speed control for a configurable duration; delivers `(optional<NewtonMeterSecondPerRadian>, optional<NewtonMeterSecondSquared>)` | Rejected (immediate failure callback) if already Running; fires exactly once; does not stop the speed control loop on completion |
+| Interface                                                               | Purpose                                                                                | Contract                                                                                                                                                  |
+|-------------------------------------------------------------------------|----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `EstimateFrictionAndInertia(torqueConstant, polePairs, config, onDone)` | Runs the RLS estimator under active speed control along a bounded two-level trajectory | Delivers `(optional<NewtonMeterSecondPerRadian>, optional<NewtonMeterSecondSquared>)` exactly once; absent unless the estimate is converged and plausible |
+
+A request is rejected through its own completion, with both values absent, when a run is already in
+flight, when the configuration does not describe a usable bounded trajectory, or when the torque constant
+or pole-pair count is not positive.
 
 ### Required
 
-| Interface            | Purpose                                                                                 | Contract                                                                       |
-|----------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
-| `FocSpeed`           | Commands a target speed setpoint to excite the mechanical dynamics                      | Must already be active and in control of the motor before the procedure begins |
-| `ThreePhaseInverter` | Source of ADC current callbacks that supply the Iq measurement on each computation step | Must not be stopped during the estimation procedure                            |
-| `Encoder`            | Supplies mechanical angle samples for speed and acceleration estimation                 | Must be tracking position at the configured sampling rate                      |
+| Interface            | Purpose                                                                                 | Contract                                                                                                                                                                       |
+|----------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `FocSpeed`           | Commands the two speed setpoints that excite the mechanical dynamics                    | Must already be active and in control of the motor before the procedure begins, with an electrical model and mechanics applied so its gains and current envelope are not inert |
+| `ThreePhaseInverter` | Source of ADC current callbacks that supply the Iq measurement on each computation step | Must not be stopped during the estimation procedure                                                                                                                            |
+| `Encoder`            | Supplies mechanical angle samples for speed and acceleration estimation                 | Must be tracking position at the configured sampling rate                                                                                                                      |
 
 ---
 
@@ -249,14 +337,21 @@ direction on every sample, so $P$ grows as $\lambda^{-n}$. At $\lambda = 0.995$ 
 roughly $5\times10^{21}$ after ten seconds of standstill, and the first sample of real excitation then
 produces an enormous coefficient jump.
 
-The estimator therefore applies an explicit gate: an observation updates the RLS only when $|\dot{\omega}|$ or $|\omega|$ exceeds a minimum. Unexcited observations are skipped entirely, so the covariance is frozen rather than inflated, and the previous coefficients are reported unchanged.
+The estimator therefore applies an explicit gate: an observation updates the RLS only when $|\dot{\omega}|$
+**and** $|\omega|$ both exceed a minimum. Requiring only one of the two admits a rotor held at a constant
+speed, which excites neither the inertia direction (the acceleration column is zero) nor the friction
+direction separately from the intercept (the two columns are collinear) while still inflating $P$ on every
+sample. Unexcited observations are skipped entirely, so the covariance is frozen rather than inflated, and
+the previous coefficients are reported unchanged.
 
-### Plausibility Band
+### Plausibility Band and Update Rate
 
 A finiteness test alone admits values such as $10^{30}$. Before an estimate is published to `CurrentInertia()`
-/ `CurrentFriction()` — and therefore before it can become PID gains — it must be finite and inside a physical
-band: inertia strictly positive and below an upper bound, friction non-negative and below an upper bound. An
-estimate outside the band is discarded and the last accepted pair is retained.
+/ `CurrentFriction()` — and therefore before it can become PID gains — it must pass every gate of the shared
+acceptance policy above: enough exciting observations since the last seed, a converged innovation and
+covariance, and a value inside the physical band. A publication is therefore rate-limited by construction —
+no estimate reaches the accessors during the warm-up that follows a seed, and none reaches them while the
+fit is still moving. An estimate that fails any gate is discarded and the last accepted pair is retained.
 
 ### Seeding and Warm Start
 

@@ -2095,3 +2095,107 @@ TEST_F(FocStateMachinePositionAutoTest, apply_online_estimates_does_not_change_s
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
+
+namespace
+{
+    // Position mode shares the outer-loop calibration path with speed mode; this double proves the shared
+    // path reaches the position cascade too.
+    class RecordingPositionCascade
+        : public foc::PositionCascade
+    {
+    public:
+        using foc::PositionCascade::PositionCascade;
+
+        bool Configure(const foc::MotorModelParameters& parameters) override
+        {
+            ++electricalConfigurations;
+            lastElectrical = parameters;
+            return foc::PositionCascade::Configure(parameters);
+        }
+
+        bool ConfigureMechanics(const foc::MechanicalModelParameters& parameters) override
+        {
+            ++mechanicalConfigurations;
+            lastMechanical = parameters;
+            return foc::PositionCascade::ConfigureMechanics(parameters);
+        }
+
+        std::size_t electricalConfigurations{ 0 };
+        std::size_t mechanicalConfigurations{ 0 };
+        foc::MotorModelParameters lastElectrical{};
+        foc::MechanicalModelParameters lastMechanical{};
+    };
+
+    using RecordingPositionController = foc::FocController<RecordingPositionCascade>;
+
+    class FocStateMachinePositionIdentificationTest
+        : public FocStateMachinePositionCliTest
+    {
+    public:
+        using RecordingStateMachine = application::OuterLoopStateMachineFor<RecordingPositionController, RecordingPositionController>;
+
+        RecordingStateMachine CreateRecordingStateMachine()
+        {
+            return RecordingStateMachine{
+                application::TerminalAndTracer{ terminal, tracer },
+                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                nvmMock,
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
+                faultNotifierMock,
+                state_machine::TransitionPolicy::Cli,
+                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
+            };
+        }
+    };
+}
+
+TEST_F(FocStateMachinePositionIdentificationTest, identification_only_starts_once_the_measured_model_and_a_provisional_plant_are_live)
+{
+    struct Observed
+    {
+        std::size_t electricalConfigurations = 0;
+        std::size_t mechanicalConfigurations = 0;
+        float resistance = 0.0f;
+        float provisionalInertia = 0.0f;
+    } observed;
+
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
+            {
+                cb(std::size_t{ 4 });
+            }));
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)>& cb)
+            {
+                cb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
+            }));
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&, const infra::Function<void(std::optional<foc::Radians>)>& cb)
+            {
+                cb(foc::Radians{ 0.0f });
+            }));
+
+    auto sm = CreateRecordingStateMachine();
+    auto& cascade = sm.GetController();
+
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+        .WillOnce(Invoke([&observed, &cascade](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto& cb)
+            {
+                observed.electricalConfigurations = cascade.electricalConfigurations;
+                observed.mechanicalConfigurations = cascade.mechanicalConfigurations;
+                observed.resistance = cascade.lastElectrical.resistance.Value();
+                observed.provisionalInertia = cascade.lastMechanical.inertia.Value();
+                cb(std::nullopt, std::nullopt);
+            }));
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    EXPECT_EQ(observed.electricalConfigurations, 1u);
+    EXPECT_EQ(observed.mechanicalConfigurations, 1u);
+    EXPECT_NEAR(observed.resistance, 0.5f, 1e-6f);
+    EXPECT_GT(observed.provisionalInertia, 0.0f);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}

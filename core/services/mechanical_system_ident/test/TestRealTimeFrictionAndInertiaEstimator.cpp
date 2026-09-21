@@ -1,9 +1,15 @@
+#include "core/foc/math/FastTrigonometry.hpp"
+#include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
+#include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
 
 namespace
 {
+    constexpr float outerLoopFrequency = 1000.0f;
+    constexpr float torqueConstant = 0.1f;
+
     class TestRealTimeFrictionAndInertiaEstimator
         : public ::testing::Test
     {
@@ -13,6 +19,31 @@ namespace
         foc::PhaseCurrents currents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } };
         foc::RadiansPerSecond speed{ 10.0f };
         foc::Radians angle{ 0.0f };
+
+        float previousSpeed{ 0.0f };
+
+        // Builds the phase currents whose q component, after the estimator's own Clarke/Park at this
+        // electrical angle, carries exactly the requested torque.
+        foc::PhaseCurrents CurrentsProducing(float torque, foc::Radians electricalAngle) const
+        {
+            const auto cosine = foc::FastTrigonometry::Cosine(electricalAngle.Value());
+            const auto sine = foc::FastTrigonometry::Sine(electricalAngle.Value());
+            const foc::ClarkePark transform;
+
+            const auto unitGain = transform.Forward(transform.Inverse(foc::RotatingFrame{ 0.0f, 1.0f }, cosine, sine), cosine, sine).q;
+            const auto phases = transform.Inverse(foc::RotatingFrame{ 0.0f, torque / torqueConstant / unitGain }, cosine, sine);
+
+            return foc::PhaseCurrents{ foc::Ampere{ phases.a }, foc::Ampere{ phases.b }, foc::Ampere{ phases.c } };
+        }
+
+        void FeedConsistentSample(float speedValue, float inertia, float friction, float coulomb)
+        {
+            const auto acceleration = (speedValue - previousSpeed) * outerLoopFrequency;
+            previousSpeed = speedValue;
+
+            const auto torque = coulomb + inertia * acceleration + friction * speedValue;
+            estimator.Update(CurrentsProducing(torque, angle), foc::RadiansPerSecond{ speedValue }, angle);
+        }
     };
 }
 
@@ -147,7 +178,7 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_standstill_run_does_not_publis
     EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
 }
 
-TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_steady_speed_is_excitation_enough_to_keep_publishing)
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_steady_speed_is_not_excitation_enough_to_publish)
 {
     const foc::Radians quadratureAngle{ std::numbers::pi_v<float> / 2.0f };
     const foc::PhaseCurrents driving{ foc::Ampere{ -1.0f }, foc::Ampere{ 0.5f }, foc::Ampere{ 0.5f } };
@@ -155,11 +186,23 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_steady_speed_is_excitation_eno
     estimator.SetTorqueConstant(foc::NewtonMeter{ 0.1f });
     estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
 
-    for (int sample = 0; sample != 200; ++sample)
+    for (int sample = 0; sample != 2000; ++sample)
         estimator.Update(driving, speed, quadratureAngle);
 
-    EXPECT_NE(estimator.CurrentFriction().Value(), 1.0e-4f);
-    EXPECT_GE(estimator.CurrentFriction().Value(), 0.0f);
+    EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 1.0e-4f);
+    EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_short_burst_of_excitation_is_not_enough_to_publish)
+{
+    estimator.SetTorqueConstant(foc::NewtonMeter{ 0.1f });
+    estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
+
+    for (int sample = 0; sample != 8; ++sample)
+        estimator.Update(currents, foc::RadiansPerSecond{ static_cast<float>(sample) * 13.0f }, angle);
+
+    EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 1.0e-4f);
+    EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
 }
 
 TEST_F(TestRealTimeFrictionAndInertiaEstimator, published_online_estimates_stay_inside_the_plausibility_band)
@@ -167,11 +210,27 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, published_online_estimates_stay_
     estimator.SetTorqueConstant(foc::NewtonMeter{ 0.1f });
     estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
 
-    for (int sample = 0; sample != 200; ++sample)
-        estimator.Update(currents, foc::RadiansPerSecond{ static_cast<float>(sample) * 13.0f }, angle);
+    for (int sample = 0; sample != 2000; ++sample)
+        estimator.Update(currents, foc::RadiansPerSecond{ 20.0f + 10.0f * std::sin(static_cast<float>(sample) * 0.05f) }, angle);
 
     EXPECT_GT(estimator.CurrentInertia().Value(), 0.0f);
     EXPECT_LT(estimator.CurrentInertia().Value(), 1.0f);
     EXPECT_GE(estimator.CurrentFriction().Value(), 0.0f);
     EXPECT_LT(estimator.CurrentFriction().Value(), 1.0f);
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_consistently_excited_run_publishes_the_tracked_mechanics)
+{
+    constexpr float trueInertia = 2.0e-4f;
+    constexpr float trueFriction = 1.5e-3f;
+    constexpr float trueCoulomb = 5.0e-3f;
+
+    estimator.SetTorqueConstant(foc::NewtonMeter{ torqueConstant });
+    estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
+
+    for (int sample = 0; sample != 2000; ++sample)
+        FeedConsistentSample(20.0f + 10.0f * std::sin(static_cast<float>(sample) * 0.05f), trueInertia, trueFriction, trueCoulomb);
+
+    EXPECT_NEAR(estimator.CurrentInertia().Value(), trueInertia, trueInertia * 0.2f);
+    EXPECT_NEAR(estimator.CurrentFriction().Value(), trueFriction, trueFriction * 0.2f);
 }

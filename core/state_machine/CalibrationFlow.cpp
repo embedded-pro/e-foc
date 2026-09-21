@@ -1,4 +1,5 @@
 #include "core/state_machine/CalibrationFlow.hpp"
+#include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include <bit>
 
@@ -103,8 +104,9 @@ namespace application
 
     void CalibrationFlow::OnMechanicalParametersIdentified(state_machine::Calibrating& calibrating, const state_machine::MechanicalParametersIdentified& event)
     {
-        if (!event.friction || !event.inertia)
+        if (!event.friction || !event.inertia || !services::IsPlausibleMechanics(event.inertia->Value(), event.friction->Value()))
         {
+            env.tracer.Trace() << "[SM] Mechanical identification produced no usable estimate";
             env.machine.Dispatch(state_machine::CalibrationStepFailed{});
             return;
         }
@@ -145,6 +147,7 @@ namespace application
     {
         const auto& data = calibrating.pendingData;
 
+        env.mode.ProvisionalControlSuperseded();
         env.context.SetData(data);
         env.context.Apply(env.mode.GetFoc(), env.mode.CurrentTunable());
         env.mode.ApplyModeSpecificCalibration(data);
@@ -155,6 +158,7 @@ namespace application
     state_machine::Idle CalibrationFlow::CompletePartial(const state_machine::Calibrating& calibrating)
     {
         env.tracer.Trace() << "[SM] Calibration incomplete for this mode; record kept as partial";
+        env.mode.RestoreControlAfterProvisionalIdentification();
         env.context.SetData(calibrating.pendingData);
         env.pending.CompleteAfterTransition(state_machine::CommandResult::ok);
         return state_machine::Idle{};
@@ -184,5 +188,6 @@ namespace application
     {
         orchestrator.Abort();
         env.mode.AbortModeSpecificServices();
+        env.mode.RestoreControlAfterProvisionalIdentification();
     }
 }

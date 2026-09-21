@@ -45,8 +45,11 @@
         "RealTimeFrictionAndInertiaEstimator::Update",
         "ClarkePark::Forward",
         "RecursiveLeastSquares<float, 3u>::Update",
-        "RealTimeFrictionAndInertiaEstimator::IsPersistentlyExciting",
-        "RealTimeFrictionAndInertiaEstimator::IsPlausible",
+        "IsMechanicallyExciting",
+        "IsPlausibleMechanics",
+        "HasConvergedMechanics",
+        "UncertaintyThresholdFor",
+        "RecursiveLeastSquares<float, 3u>::EvaluateConvergence",
         "IsFiniteValue"
       ]
     },

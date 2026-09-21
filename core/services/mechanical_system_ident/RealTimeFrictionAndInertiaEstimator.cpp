@@ -9,6 +9,7 @@ namespace services
 {
     RealTimeFrictionAndInertiaEstimator::RealTimeFrictionAndInertiaEstimator(float forgettingFactor, hal::Hertz samplingFrequency)
         : samplingFrequency(static_cast<float>(samplingFrequency.Value()))
+        , forgettingFactor(forgettingFactor)
         , rls(std::in_place, 1000.0f, forgettingFactor)
     {
     }
@@ -20,7 +21,7 @@ namespace services
 
         previousSpeed = speed;
 
-        if (!IsPersistentlyExciting(acceleration, speed.Value()))
+        if (!IsMechanicallyExciting(acceleration, speed.Value()))
             return Result{
                 foc::NewtonMeterSecondSquared{ rls->Coefficients().at(1, 0) },
                 foc::NewtonMeterSecondPerRadian{ rls->Coefficients().at(2, 0) },
@@ -33,23 +34,14 @@ namespace services
 
         lastMetrics = rls->Update(regressor, torque);
 
+        if (excitedUpdates != mechanical_estimate::minimumExcitedUpdates)
+            ++excitedUpdates;
+
         return Result{
             foc::NewtonMeterSecondSquared{ rls->Coefficients().at(1, 0) },
             foc::NewtonMeterSecondPerRadian{ rls->Coefficients().at(2, 0) },
             lastMetrics
         };
-    }
-
-    bool RealTimeFrictionAndInertiaEstimator::IsPersistentlyExciting(float acceleration, float speed) const
-    {
-        return std::abs(acceleration) >= minimumAcceleration || std::abs(speed) >= minimumSpeed;
-    }
-
-    bool RealTimeFrictionAndInertiaEstimator::IsPlausible(float inertia, float friction)
-    {
-        return foc::IsFiniteValue(inertia) && foc::IsFiniteValue(friction) &&
-               inertia > minimumInertia && inertia < maximumInertia &&
-               friction >= 0.0f && friction < maximumFriction;
     }
 
     void RealTimeFrictionAndInertiaEstimator::Seed(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction)
@@ -63,6 +55,8 @@ namespace services
         initial.at(1, 0) = inertia.Value();
         initial.at(2, 0) = friction.Value();
         rls->SetCoefficients(initial);
+        lastMetrics = MotorRLS::EstimationMetrics{};
+        excitedUpdates = 0;
     }
 
     void RealTimeFrictionAndInertiaEstimator::SetTorqueConstant(foc::NewtonMeter kt)
@@ -86,7 +80,13 @@ namespace services
     {
         auto result = Update(currentPhases, speed, electricalAngle, torqueConstant);
 
-        if (!IsPlausible(result.inertia.Value(), result.friction.Value()))
+        // Publishing an estimate turns it into speed-loop gains, so it must come from an excited, settled
+        // estimator: enough exciting observations to identify all three columns, and an innovation and
+        // covariance small enough to call the fit settled.
+        if (!HasConvergedMechanics(result.metrics, excitedUpdates, forgettingFactor))
+            return;
+
+        if (!IsPlausibleMechanics(result.inertia.Value(), result.friction.Value()))
             return;
 
         currentInertia = result.inertia;

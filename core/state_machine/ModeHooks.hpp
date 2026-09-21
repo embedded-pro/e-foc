@@ -18,6 +18,12 @@ namespace application
         virtual foc::CurrentLoopTunable& CurrentTunable() = 0;
         virtual void RunPostAlignmentStep(state_machine::Calibrating& calibrating) = 0;
 
+        // Mechanical identification runs the drive under a provisional plant. Whatever ends the run has to
+        // say what becomes of it: a committed calibration supersedes it, anything else must put back the
+        // model the drive held before the run.
+        virtual void ProvisionalControlSuperseded() = 0;
+        virtual void RestoreControlAfterProvisionalIdentification() = 0;
+
         virtual void ApplyModeSpecificCalibration(const services::CalibrationData& data) = 0;
         virtual bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const = 0;
         virtual void PrepareForEnabled() = 0;

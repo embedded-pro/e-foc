@@ -158,6 +158,38 @@ namespace application
         operation.RegisterReadyHandler(onReady);
     }
 
+    void FocStateMachineCommon::MarkProvisionalControlApplied()
+    {
+        provisionalControlApplied = true;
+    }
+
+    // A committed calibration has just been applied over the provisional plant, so there is nothing left to
+    // put back.
+    void FocStateMachineCommon::ProvisionalControlSuperseded()
+    {
+        provisionalControlApplied = false;
+    }
+
+    // A provisional model exists only to make the rotor move during identification. Whatever ends the run
+    // short of a committed calibration must put back the model the drive had before it, so that the loops
+    // are never left tuned for a plant nobody measured.
+    void FocStateMachineCommon::RestoreControlAfterProvisionalIdentification()
+    {
+        if (!provisionalControlApplied)
+            return;
+
+        provisionalControlApplied = false;
+
+        if (calibration.HasValidCalibration())
+        {
+            tracer.Trace() << "[SM] Provisional identification model discarded, previous calibration restored";
+            calibrationContext.Apply(GetFoc(), CurrentTunable());
+            ApplyModeSpecificCalibration(calibrationContext.Data());
+        }
+        else
+            tracer.Trace() << "[SM] Provisional identification model discarded, no calibration held";
+    }
+
     void FocStateMachineCommon::ApplyModeSpecificCalibration(const services::CalibrationData& /*data*/)
     {}
 
@@ -215,9 +247,9 @@ namespace application
         return calibrationContext.EffectiveFluxLinkage(data);
     }
 
-    void FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage)
+    bool FocStateMachineCommon::ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage)
     {
-        calibrationContext.ApplyModel(resistance, inductance, polePairs, bandwidth, fluxLinkage, GetFoc(), CurrentTunable());
+        return calibrationContext.ApplyModel(resistance, inductance, polePairs, bandwidth, fluxLinkage, GetFoc(), CurrentTunable());
     }
 
     state_machine::CommandResult FocStateMachineCommon::ToCommandResult(services::DispatchResult result)

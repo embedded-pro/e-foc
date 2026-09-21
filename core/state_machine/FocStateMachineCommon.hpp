@@ -70,6 +70,10 @@ namespace application
         void RegisterCliIfNeeded(state_machine::TransitionPolicy transitionPolicy);
         void Boot();
 
+        void ProvisionalControlSuperseded() override;
+        void RestoreControlAfterProvisionalIdentification() override;
+        void MarkProvisionalControlApplied();
+
         void ApplyModeSpecificCalibration(const services::CalibrationData& data) override;
         bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const override;
         void PrepareForEnabled() override;
@@ -85,7 +89,7 @@ namespace application
         foc::Volts GetVdc() const;
         const services::CalibrationData& GetCalibration() const;
         foc::Weber EffectiveFluxLinkage(const services::CalibrationData& data) const;
-        void ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage);
+        bool ApplyElectricalModel(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs, float bandwidth, foc::Weber fluxLinkage);
 
     private:
         static state_machine::CommandResult ToCommandResult(services::DispatchResult result);
@@ -105,5 +109,6 @@ namespace application
         StateMachine::WithStorage<eventQueueDepth> stateMachine;
         services::StateMachineTracer<state_machine::State, state_machine::Event> stateMachineTracer;
         CommandRejections commandRejections;
+        bool provisionalControlApplied{ false };
     };
 }

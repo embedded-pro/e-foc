@@ -31,7 +31,8 @@ namespace application
         OuterLoopStateMachine(const TerminalAndTracer& terminalAndTracer,
             const MotorHardware& hardware,
             services::NonVolatileMemory& nvm,
-            const CalibrationServices& calibServices);
+            const CalibrationServices& calibServices,
+            foc::Ampere driveCurrentLimit);
 
         bool HasModeSpecificWorkPending() const override;
         void ApplyModeSpecificCalibration(const services::CalibrationData& data) override;
@@ -59,10 +60,25 @@ namespace application
         virtual services::RealTimeResistanceAndInductanceEstimator& GetOnlineElecEstimator() = 0;
 
     private:
-        void ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth);
+        bool ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth);
+        bool ApplyIdentificationControl(const services::CalibrationData& pending);
+        services::MechanicalParametersIdentification::Config ExcitationConfig() const;
 
         static constexpr float velocityBandwidthRadPerSec = 50.0f;
 
+        // Bounded placeholders that make the loops able to move the rotor during identification. They are
+        // deliberately small so the speed loop leans on its current envelope rather than on a plant nobody
+        // has measured yet, and they are never persisted as calibration.
+        static constexpr float provisionalInertia = 1.0e-4f;
+        static constexpr float provisionalFriction = 0.0f;
+        static constexpr float identificationBandwidthRadPerSec = 20.0f;
+        static constexpr float identificationSpeedMarginFactor = 2.0f;
+        // The speed loop already clamps its reference to the drive envelope; the run aborts a little above
+        // that, so measurement noise at the clamp does not read as a runaway. The service clamps the result
+        // down to what the inverter supports.
+        static constexpr float identificationCurrentMarginFactor = 1.2f;
+
         foc::NewtonMeter mechTorqueConstant;
+        foc::Ampere driveCurrentLimit;
     };
 }

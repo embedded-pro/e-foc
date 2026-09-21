@@ -32,8 +32,8 @@ namespace application
         void SetPendingFluxLinkage(float value);
         void CommitPendingFluxLinkage();
 
-        void Apply(foc::FocBase& foc, foc::CurrentLoopTunable& tunable);
-        void ApplyModel(
+        bool Apply(foc::FocBase& foc, foc::CurrentLoopTunable& tunable);
+        bool ApplyModel(
             foc::Ohm resistance,
             foc::MilliHenry inductance,
             std::size_t polePairs,

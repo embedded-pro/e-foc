@@ -1,8 +1,16 @@
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC optimize("O3", "fast-math")
+#endif
+
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
+#include "core/services/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "numerical/math/CompilerOptimizations.hpp"
+#include <algorithm>
+#include <cmath>
 
 namespace services
 {
@@ -10,24 +18,30 @@ namespace services
         : controller(controller)
         , drive(drive)
         , observable(observable)
+        , inverter(driver)
         , encoder(encoder)
         , samplingPeriod(1.0f / static_cast<float>(driver.BaseFrequency().Value()))
+        , supportedCurrent(driver.MaxCurrentSupported())
     {
     }
 
     void MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone)
     {
-        if (rls.has_value())
+        if (rls.has_value() || !IsUsableIdentificationConfig(config) || !foc::IsFinitePositive(torqueConstant.Value()) || numberOfPolePairs == 0)
         {
             onDone(std::nullopt, std::nullopt);
             return;
         }
+
         this->currentConfig = config;
+        this->currentEnvelope = foc::Ampere{ std::min(config.maxCurrent.Value(), supportedCurrent.Value()) };
         this->onDone = onDone;
         this->previousPosition = encoder.Read().Value();
         this->previousSpeed = 0.0f;
         this->polePairs = static_cast<float>(numberOfPolePairs);
-        this->converged = false;
+        this->excitedUpdates = 0;
+        this->atDwellLevel = false;
+        this->outcome = Outcome::pending;
         ++run;
 
         rls.emplace(1000.0f, config.forgettingFactor);
@@ -41,12 +55,21 @@ namespace services
         controller.EnableSpeedCommand();
         controller.CommandSpeed(config.targetSpeed);
 
+        excitationTimer.Start(config.dwellTime, [this]()
+            {
+                CommandNextExcitationLevel();
+            });
+
         timeoutTimer.Start(config.timeout, [this]()
             {
-                ReleaseDrive();
-                rls.reset();
-                Complete(std::nullopt, std::nullopt);
+                FinishRun();
             });
+    }
+
+    void MechanicalParametersIdentificationImpl::CommandNextExcitationLevel()
+    {
+        atDwellLevel = !atDwellLevel;
+        controller.CommandSpeed(atDwellLevel ? currentConfig.dwellSpeed : currentConfig.targetSpeed);
     }
 
     void MechanicalParametersIdentificationImpl::Abort()
@@ -54,7 +77,7 @@ namespace services
         if (!rls.has_value())
             return;
 
-        timeoutTimer.Cancel();
+        StopExcitation();
         ReleaseDrive();
         rls.reset();
         onDone = nullptr;
@@ -63,6 +86,12 @@ namespace services
     bool MechanicalParametersIdentificationImpl::IsRunning() const
     {
         return rls.has_value();
+    }
+
+    void MechanicalParametersIdentificationImpl::StopExcitation()
+    {
+        timeoutTimer.Cancel();
+        excitationTimer.Cancel();
     }
 
     void MechanicalParametersIdentificationImpl::ReleaseDrive()
@@ -78,46 +107,93 @@ namespace services
             onDone(friction, inertia);
     }
 
+    // The finish is deferred, so an abort and a new run can both happen before it is dispatched. Tagging it
+    // with the run that queued it keeps a terminal outcome from completing the run that followed it.
+    void MechanicalParametersIdentificationImpl::ScheduleFinish()
+    {
+        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
+            [finishingRun = run](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
+            {
+                if (self->run != finishingRun)
+                    return;
+
+                self->FinishRun();
+            },
+            WeakFromThis());
+    }
+
+    void MechanicalParametersIdentificationImpl::FinishRun()
+    {
+        if (!rls.has_value())
+            return;
+
+        StopExcitation();
+        ReleaseDrive();
+
+        const auto& theta = rls->Coefficients();
+        const auto inertia = theta.at(1, 0);
+        const auto friction = theta.at(2, 0);
+        const bool usable = outcome == Outcome::converged && IsPlausibleMechanics(inertia, friction);
+        rls.reset();
+
+        if (usable)
+            Complete(foc::NewtonMeterSecondPerRadian{ friction }, foc::NewtonMeterSecondSquared{ inertia });
+        else
+            Complete(std::nullopt, std::nullopt);
+    }
+
+    OPTIMIZE_FOR_SPEED
     void MechanicalParametersIdentificationImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant)
     {
-        if (converged || !rls.has_value())
+        if (!rls.has_value())
             return;
 
         auto mechanicalPos = encoder.Read().Value();
-        auto electricalAngle = mechanicalPos * polePairs;
-        auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
-
         auto speed = foc::detail::PositionWithWrapAround(mechanicalPos - previousPosition) / samplingPeriod;
         auto acceleration = (speed - previousSpeed) / samplingPeriod;
-        MotorRLS::MakeRegressor(regressor, acceleration, speed);
-
-        torque.at(0, 0) = rotatingFrame.q * torqueConstant.Value();
-
-        auto metrics = rls->Update(regressor, torque);
 
         previousPosition = mechanicalPos;
         previousSpeed = speed;
 
-        if (MotorRLS::EvaluateConvergence(metrics, 1e-4f, 1e-2f) != estimators::State::converged)
+        // Checked on every sample the drive is still live, a converged one included: the run is only over
+        // once the dispatcher has released the drive, so a sample that leaves the envelope in between must
+        // still invalidate the estimate. The power stage is stopped here rather than with the rest of the
+        // teardown, because leaving it driving an out-of-envelope current until the dispatcher runs is what
+        // the envelope exists to prevent. Releasing the observer here would destroy the closure being
+        // executed, so that, and the completion, stay deferred.
+        if (ExceedsInjectionLimit(currentPhases, currentEnvelope) || std::abs(speed) > currentConfig.maxSpeed.Value())
+        {
+            if (outcome != Outcome::outsideEnvelope)
+            {
+                outcome = Outcome::outsideEnvelope;
+                inverter.Stop();
+                ScheduleFinish();
+            }
+
+            return;
+        }
+
+        if (outcome != Outcome::pending)
             return;
 
-        converged = true;
-        timeoutTimer.Cancel();
+        if (!IsMechanicallyExciting(acceleration, speed))
+            return;
 
-        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
-            [convergedRun = run](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
-            {
-                if (!self->rls.has_value() || self->run != convergedRun)
-                    return;
+        auto electricalAngle = mechanicalPos * polePairs;
+        auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
 
-                self->ReleaseDrive();
+        MechanicalRls::MakeRegressor(regressor, acceleration, speed);
+        torque.at(0, 0) = rotatingFrame.q * torqueConstant.Value();
 
-                auto& theta = self->rls->Coefficients();
-                const auto friction = foc::NewtonMeterSecondPerRadian{ theta.at(2, 0) };
-                const auto inertia = foc::NewtonMeterSecondSquared{ theta.at(1, 0) };
-                self->rls.reset();
-                self->Complete(friction, inertia);
-            },
-            WeakFromThis());
+        auto metrics = rls->Update(regressor, torque);
+
+        if (excitedUpdates != mechanical_estimate::minimumExcitedUpdates)
+            ++excitedUpdates;
+
+        if (!HasConvergedMechanics(metrics, excitedUpdates, currentConfig.forgettingFactor))
+            return;
+
+        outcome = Outcome::converged;
+        ScheduleFinish();
     }
 }

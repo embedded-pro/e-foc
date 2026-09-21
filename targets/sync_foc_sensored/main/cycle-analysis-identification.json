@@ -1,0 +1,66 @@
+{
+  "path_name": "ADC ISR -> FOC inner loop -> mechanical identification observer (RLS)",
+  "loop_rates_khz": [20],
+  "path_stages": [
+    {
+      "label": "ISR Entry (exception overhead)",
+      "type": "exception_entry"
+    },
+    {
+      "label": "ADC ISR + Callback Dispatch",
+      "required": false,
+      "patterns": [
+        "Adc0Sequence.*Handler",
+        "InterruptTable::Invoke",
+        "ImmediateInterruptHandler::Invoke",
+        "Runner::OnPhaseCurrents",
+        "ControlLoopMetrics::Record",
+        "ControlLoopMetrics::RecordReentry"
+      ]
+    },
+    {
+      "label": "FOC Inner Loop (Calculate)",
+      "required": false,
+      "patterns": [
+        "SpeedCascade::Calculate",
+        "PositionCascade::Calculate",
+        "CascadeWithSpeedLoop::CalculateInnerLoop",
+        "Clarke::Forward",
+        "Park::Forward",
+        "Park::Inverse",
+        "SpaceVectorModulation::Generate",
+        "SpaceVectorModulation::Clip",
+        "FastTrigonometry::Sine",
+        "FastTrigonometry::Cosine",
+        "PidCurrentController::Compute",
+        "DecoupledPidCurrentController::Compute",
+        "DeadbeatCurrentController::Compute",
+        "SlidingModeCurrentController::Compute",
+        "LimitToModulationCircle",
+        "ToDutyCycles"
+      ]
+    },
+    {
+      "label": "Mechanical Identification Observer (RLS)",
+      "required": false,
+      "patterns": [
+        "MechanicalParametersIdentificationImpl::OnSamplingUpdate",
+        "MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia.*lambda\\(auto:1",
+        "MechanicalParametersIdentificationImpl::ScheduleFinish",
+        "ClarkePark::Forward",
+        "RecursiveLeastSquares<float, 3u>::Update",
+        "RecursiveLeastSquares<float, 3u>::EvaluateConvergence",
+        "ExceedsInjectionLimit",
+        "IsMechanicallyExciting",
+        "HasConvergedMechanics",
+        "UncertaintyThresholdFor",
+        "PositionWithWrapAround",
+        "IsFiniteValue"
+      ]
+    },
+    {
+      "label": "ISR Exit (exception return)",
+      "type": "exception_exit"
+    }
+  ]
+}

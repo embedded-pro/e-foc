@@ -81,9 +81,9 @@ namespace application
         calibrationData.fluxLinkage = pendingFluxLinkage;
     }
 
-    void CalibrationContext::Apply(foc::FocBase& controller, foc::CurrentLoopTunable& tunable)
+    bool CalibrationContext::Apply(foc::FocBase& controller, foc::CurrentLoopTunable& tunable)
     {
-        ApplyModel(
+        return ApplyModel(
             foc::Ohm{ calibrationData.rPhase },
             foc::MilliHenry{ calibrationData.lD },
             calibrationData.polePairs,
@@ -93,7 +93,7 @@ namespace application
             tunable);
     }
 
-    void CalibrationContext::ApplyModel(
+    bool CalibrationContext::ApplyModel(
         foc::Ohm resistance,
         foc::MilliHenry inductance,
         std::size_t polePairs,
@@ -102,7 +102,7 @@ namespace application
         foc::FocBase& controller,
         foc::CurrentLoopTunable& tunable)
     {
-        controller.Configure(foc::MotorModelParameters{
+        const bool configured = controller.Configure(foc::MotorModelParameters{
             resistance,
             inductance,
             fluxLinkage,
@@ -111,6 +111,8 @@ namespace application
             polePairs });
 
         tunable.SetCurrentTunings(CurrentTuningsFor(bandwidth));
+
+        return configured;
     }
 
     foc::Weber CalibrationContext::EffectiveFluxLinkage() const

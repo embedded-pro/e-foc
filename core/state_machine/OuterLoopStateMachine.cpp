@@ -9,14 +9,17 @@ namespace application
         const TerminalAndTracer& terminalAndTracer,
         const MotorHardware& hardware,
         services::NonVolatileMemory& nvm,
-        const CalibrationServices& calibServices)
+        const CalibrationServices& calibServices,
+        foc::Ampere driveCurrentLimit)
         : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices)
         , mechTorqueConstant(calibServices.mechTorqueConstant)
+        , driveCurrentLimit(driveCurrentLimit)
     {}
 
-    void OuterLoopStateMachine::ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth)
+    bool OuterLoopStateMachine::ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth)
     {
-        SpeedTunable().ConfigureMechanics(foc::MechanicalModelParameters{
+        // The cascade owns the current envelope and the outer-loop rate and substitutes them for these placeholders.
+        const bool configured = SpeedTunable().ConfigureMechanics(foc::MechanicalModelParameters{
             inertia,
             friction,
             mechTorqueConstant,
@@ -26,6 +29,8 @@ namespace application
         auto tunings = foc::SpeedLoopTunings{};
         tunings.bandwidth = foc::IsAcceptableSpeedBandwidth(bandwidth) ? bandwidth : velocityBandwidthRadPerSec;
         SpeedTunable().SetSpeedTunings(tunings);
+
+        return configured;
     }
 
     void OuterLoopStateMachine::ApplyModeSpecificCalibration(const services::CalibrationData& data)
@@ -121,15 +126,48 @@ namespace application
         return **ownMechIdent;
     }
 
+    // Identification needs the loops it is about to excite to be live. Until the electrical model measured
+    // moments ago is applied the current loop holds inert gains, and until mechanics are configured the speed
+    // loop holds a zero current envelope, so the commanded trajectory never reaches the rotor.
+    bool OuterLoopStateMachine::ApplyIdentificationControl(const services::CalibrationData& pending)
+    {
+        if (!foc::IsFinitePositive(pending.rPhase) || !foc::IsFiniteValue(pending.lD) || pending.polePairs == 0 || !foc::IsFinitePositive(mechTorqueConstant.Value()))
+            return false;
+
+        // Marked before the first call, not after: applying an electrical model sets the current-loop
+        // tunings whether or not the plant itself was accepted, so from here on there is something to
+        // restore even when this returns false.
+        MarkProvisionalControlApplied();
+
+        if (!ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, pending.currentLoopBandwidth, EffectiveFluxLinkage(pending)))
+            return false;
+
+        return ApplyMechanics(foc::NewtonMeterSecondSquared{ provisionalInertia }, foc::NewtonMeterSecondPerRadian{ provisionalFriction }, identificationBandwidthRadPerSec);
+    }
+
+    services::MechanicalParametersIdentification::Config OuterLoopStateMachine::ExcitationConfig() const
+    {
+        auto config = services::MechanicalParametersIdentification::Config{};
+        config.maxCurrent = foc::Ampere{ driveCurrentLimit.Value() * identificationCurrentMarginFactor };
+        config.maxSpeed = foc::RadiansPerSecond{ config.targetSpeed.Value() * identificationSpeedMarginFactor };
+        return config;
+    }
+
     void OuterLoopStateMachine::RunMechanicalIdentStep(state_machine::Calibrating& calibrating)
     {
+        calibrating.step = state_machine::CalibrationStep::frictionAndInertia;
+        const auto pending = calibrating.pendingData;
+
+        if (!ApplyIdentificationControl(pending))
+        {
+            GetTracer().Trace() << "[SM] Mechanical identification refused: control loops would not move the rotor";
+            Dispatch(state_machine::CalibrationStepFailed{});
+            return;
+        }
+
         GetTracer().Trace() << "[SM] Estimating mechanical parameters";
 
-        calibrating.step = state_machine::CalibrationStep::frictionAndInertia;
-        const auto polePairs = static_cast<std::size_t>(calibrating.pendingData.polePairs);
-        auto config = services::MechanicalParametersIdentification::Config{};
-
-        MechIdentImpl().EstimateFrictionAndInertia(mechTorqueConstant, polePairs, config, [this](auto friction, auto inertia)
+        MechIdentImpl().EstimateFrictionAndInertia(mechTorqueConstant, static_cast<std::size_t>(pending.polePairs), ExcitationConfig(), [this](auto friction, auto inertia)
             {
                 Dispatch(state_machine::MechanicalParametersIdentified{ friction, inertia, velocityBandwidthRadPerSec });
             });
