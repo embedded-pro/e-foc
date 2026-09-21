@@ -1,4 +1,6 @@
 #include "tools/simulator/view/gui/HexagonWidget.hpp"
+#include "ui/backend/qt/QtConversions.hpp"
+#include "ui/theme/Theme.hpp"
 #include <QBrush>
 #include <QColor>
 #include <QFont>
@@ -49,7 +51,6 @@ namespace simulator
         setMinimumHeight(520);
         setMinimumWidth(520);
         setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
-        setStyleSheet("background-color: #0a0a0a;");
 
         connect(&refreshTimer, &QTimer::timeout, this, QOverload<>::of(&QWidget::update));
         refreshTimer.start(refreshIntervalMs);
@@ -108,6 +109,7 @@ namespace simulator
     {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.fillRect(rect(), ui::backend::qt::ToQt(ui::theme::Current().Get(ui::theme::ColorRole::ScopeBackground)));
 
         const auto side = std::min(width(), height()) - 2 * plotMargin;
         if (side <= 0)

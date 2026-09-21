@@ -1,4 +1,6 @@
 #include "tools/can_commander/gui/ConnectionPanel.hpp"
+#include "ui/backend/qt/QtTheme.hpp"
+#include "ui/theme/Theme.hpp"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 
@@ -43,7 +45,7 @@ namespace tool
         layout->addLayout(buttonRow);
 
         statusLabel = new QLabel("Disconnected");
-        statusLabel->setStyleSheet("color: red; font-weight: bold;");
+        ui::backend::qt::StyleStatusLabel(*statusLabel, ui::theme::StatusLevel::Fault);
         layout->addWidget(statusLabel);
 
         connect(refreshButton, &QPushButton::clicked, this, &ConnectionPanel::RefreshInterfaces);
@@ -90,12 +92,12 @@ namespace tool
         if (connected)
         {
             statusLabel->setText("Connected");
-            statusLabel->setStyleSheet("color: green; font-weight: bold;");
+            ui::backend::qt::StyleStatusLabel(*statusLabel, ui::theme::StatusLevel::Ok);
         }
         else
         {
             statusLabel->setText("Disconnected");
-            statusLabel->setStyleSheet("color: red; font-weight: bold;");
+            ui::backend::qt::StyleStatusLabel(*statusLabel, ui::theme::StatusLevel::Fault);
         }
     }
 }

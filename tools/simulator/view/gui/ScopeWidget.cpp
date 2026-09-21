@@ -1,4 +1,6 @@
 #include "tools/simulator/view/gui/ScopeWidget.hpp"
+#include "ui/backend/qt/QtConversions.hpp"
+#include "ui/theme/Theme.hpp"
 #include <QPainter>
 #include <QPen>
 #include <algorithm>
@@ -75,7 +77,6 @@ namespace simulator
         : QWidget(parent)
     {
         setMinimumHeight(250);
-        setStyleSheet("background-color: #0a0a0a;");
 
         for (auto& buf : ringBuffers)
             buf.Resize(ringBufferCapacity);
@@ -231,6 +232,7 @@ namespace simulator
     {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
+        painter.fillRect(rect(), ui::backend::qt::ToQt(ui::theme::Current().Get(ui::theme::ColorRole::ScopeBackground)));
 
         QRectF plotArea(plotMarginLeft, plotMarginTop,
             width() - plotMarginLeft - plotMarginRight,

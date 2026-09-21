@@ -1,4 +1,6 @@
 #include "tools/hardware_bridge/client/gui/CanPanel.hpp"
+#include "ui/backend/qt/QtConversions.hpp"
+#include "ui/theme/Theme.hpp"
 #include <QFont>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -57,7 +59,8 @@ namespace tool
         frameTable->insertRow(row);
 
         auto* dirItem = new QTableWidgetItem(rx ? "RX" : "TX");
-        dirItem->setForeground(rx ? Qt::darkGreen : Qt::darkBlue);
+        dirItem->setForeground(ui::backend::qt::ToQt(ui::theme::Current().Get(
+            rx ? ui::theme::ColorRole::Ok : ui::theme::ColorRole::Accent)));
         frameTable->setItem(row, 0, dirItem);
 
         const double timeS = elapsed.isValid() ? static_cast<double>(elapsed.elapsed()) / 1000.0 : 0.0;

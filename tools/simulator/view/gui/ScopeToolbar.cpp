@@ -1,5 +1,7 @@
 #include "tools/simulator/view/gui/ScopeToolbar.hpp"
 #include "tools/simulator/view/gui/QtOwned.hpp"
+#include "ui/backend/qt/QtTheme.hpp"
+#include "ui/theme/Theme.hpp"
 #include <QHBoxLayout>
 #include <QLabel>
 
@@ -94,17 +96,17 @@ namespace simulator
 
         // Run/Stop
         runStopButton = QtOwned<QPushButton>("Stop", this);
-        runStopButton->setStyleSheet("QPushButton { background-color: #c0392b; color: white; font-weight: bold; padding: 4px 12px; }");
+        ui::backend::qt::StyleButton(*runStopButton, ui::theme::ButtonRole::Stop);
         layout->addWidget(runStopButton);
 
         // Single shot
         singleButton = QtOwned<QPushButton>("Single", this);
-        singleButton->setStyleSheet("QPushButton { background-color: #2980b9; color: white; padding: 4px 8px; }");
+        ui::backend::qt::StyleButton(*singleButton, ui::theme::ButtonRole::Primary);
         layout->addWidget(singleButton);
 
         // Force trigger
         forceTriggerButton = QtOwned<QPushButton>("Force", this);
-        forceTriggerButton->setStyleSheet("QPushButton { background-color: #7f8c8d; color: white; padding: 4px 8px; }");
+        ui::backend::qt::StyleButton(*forceTriggerButton, ui::theme::ButtonRole::Reset);
         layout->addWidget(forceTriggerButton);
 
         layout->addStretch();
@@ -154,12 +156,12 @@ namespace simulator
                 if (nowRunning)
                 {
                     runStopButton->setText("Stop");
-                    runStopButton->setStyleSheet("QPushButton { background-color: #c0392b; color: white; font-weight: bold; padding: 4px 12px; }");
+                    ui::backend::qt::StyleButton(*runStopButton, ui::theme::ButtonRole::Stop);
                 }
                 else
                 {
                     runStopButton->setText("Run");
-                    runStopButton->setStyleSheet("QPushButton { background-color: #27ae60; color: white; font-weight: bold; padding: 4px 12px; }");
+                    ui::backend::qt::StyleButton(*runStopButton, ui::theme::ButtonRole::Start);
                 }
             });
 
@@ -169,7 +171,7 @@ namespace simulator
                 scope.SetRunning(true);
                 triggerModeCombo->setCurrentIndex(2); // Single
                 runStopButton->setText("Stop");
-                runStopButton->setStyleSheet("QPushButton { background-color: #c0392b; color: white; font-weight: bold; padding: 4px 12px; }");
+                ui::backend::qt::StyleButton(*runStopButton, ui::theme::ButtonRole::Stop);
             });
 
         connect(forceTriggerButton, &QPushButton::clicked, this, [this]()

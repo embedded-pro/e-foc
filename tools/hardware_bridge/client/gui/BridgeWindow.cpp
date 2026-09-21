@@ -1,4 +1,6 @@
 #include "tools/hardware_bridge/client/gui/BridgeWindow.hpp"
+#include "ui/backend/qt/QtTheme.hpp"
+#include "ui/theme/Theme.hpp"
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QMessageBox>
@@ -47,7 +49,7 @@ namespace tool
         connLayout->addWidget(disconnectButton);
 
         statusLabel = new QLabel("Disconnected");
-        statusLabel->setStyleSheet("color: red; font-weight: bold;");
+        ui::backend::qt::StyleStatusLabel(*statusLabel, ui::theme::StatusLevel::Fault);
         connLayout->addWidget(statusLabel);
         connLayout->addStretch();
 
@@ -173,18 +175,18 @@ namespace tool
         if (serialConnected && canConnected)
         {
             statusLabel->setText("Connected (Serial + CAN)");
-            statusLabel->setStyleSheet("color: green; font-weight: bold;");
+            ui::backend::qt::StyleStatusLabel(*statusLabel, ui::theme::StatusLevel::Ok);
         }
         else if (serialConnected || canConnected)
         {
             const QString which = serialConnected ? "Serial only" : "CAN only";
             statusLabel->setText(QString("Partially connected (%1)").arg(which));
-            statusLabel->setStyleSheet("color: orange; font-weight: bold;");
+            ui::backend::qt::StyleStatusLabel(*statusLabel, ui::theme::StatusLevel::Warning);
         }
         else
         {
             statusLabel->setText("Disconnected");
-            statusLabel->setStyleSheet("color: red; font-weight: bold;");
+            ui::backend::qt::StyleStatusLabel(*statusLabel, ui::theme::StatusLevel::Fault);
         }
     }
 }

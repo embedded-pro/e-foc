@@ -1,5 +1,7 @@
 #include "tools/can_commander/gui/CommandPanel.hpp"
 #include "core/foc/interfaces/CommandLimits.hpp"
+#include "ui/backend/qt/QtTheme.hpp"
+#include "ui/theme/Theme.hpp"
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -30,7 +32,7 @@ namespace tool
         auto* startButton = new QPushButton("Start Motor");
         auto* stopButton = new QPushButton("Stop Motor");
         auto* estopButton = new QPushButton("EMERGENCY STOP");
-        estopButton->setStyleSheet("background-color: red; color: white; font-weight: bold; padding: 10px;");
+        ui::backend::qt::StyleButton(*estopButton, ui::theme::ButtonRole::EmergencyStop);
 
         controlLayout->addWidget(startButton);
         controlLayout->addWidget(stopButton);
@@ -53,7 +55,7 @@ namespace tool
         modeCombo->addItem("Position", static_cast<int>(can::FocMotorMode::position));
         auto* modeButton = new QPushButton("Set Mode");
         modeLabel = new QLabel("Active: Unknown");
-        modeLabel->setStyleSheet("font-weight: bold; color: #555;");
+        ui::backend::qt::StyleStatusLabel(*modeLabel, ui::theme::StatusLevel::Neutral);
         modeLayout->addWidget(modeCombo);
         modeLayout->addWidget(modeButton);
         modeLayout->addWidget(modeLabel);
