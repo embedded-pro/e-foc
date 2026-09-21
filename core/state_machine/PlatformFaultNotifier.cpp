@@ -52,6 +52,19 @@ namespace state_machine
         this->onFaultSecondary = onFault;
     }
 
+    FaultConditionState PlatformFaultNotifier::ConditionState()
+    {
+        switch (platform.BoardProtectionStatus())
+        {
+            case application::PlatformFactory::BoardProtectionState::clear:
+                return FaultConditionState::clear;
+            case application::PlatformFactory::BoardProtectionState::asserted:
+                return FaultConditionState::asserted;
+            default:
+                return FaultConditionState::unknown;
+        }
+    }
+
     FaultCode PlatformFaultNotifier::ToFaultCode(application::PlatformFactory::BoardProtectionReason reason)
     {
         switch (reason)

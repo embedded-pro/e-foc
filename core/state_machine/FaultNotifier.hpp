@@ -17,6 +17,13 @@ namespace state_machine
         calibrationFailed
     };
 
+    enum class FaultConditionState : uint8_t
+    {
+        clear,
+        asserted,
+        unknown
+    };
+
     class FaultNotifier
     {
     public:
@@ -24,6 +31,8 @@ namespace state_machine
         virtual void Register(const infra::Function<void(FaultCode)>& onImmediate, const infra::Function<void(FaultCode)>& onDeferred) = 0;
 
         virtual void Unregister() = 0;
+
+        virtual FaultConditionState ConditionState() = 0;
     };
 
     class NoOpFaultNotifier
@@ -37,5 +46,10 @@ namespace state_machine
 
         void Unregister() override
         {}
+
+        FaultConditionState ConditionState() override
+        {
+            return FaultConditionState::unknown;
+        }
     };
 }

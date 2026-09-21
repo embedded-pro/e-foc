@@ -77,6 +77,8 @@ namespace tool
                 return "Fault";
             case FocMotorState::calibrating:
                 return "Calibrating";
+            case FocMotorState::partialCalibration:
+                return "Partially calibrated";
             default:
                 return "Unknown";
         }

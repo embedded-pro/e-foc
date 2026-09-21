@@ -101,6 +101,11 @@ namespace application
     void PlatformFactoryImpl::RegisterBoardProtection(const infra::Function<void(BoardProtectionReason)>&)
     {}
 
+    PlatformFactory::BoardProtectionState PlatformFactoryImpl::BoardProtectionStatus()
+    {
+        return PlatformFactory::BoardProtectionState::unknown;
+    }
+
     void PlatformFactoryImpl::Reset()
     {}
 

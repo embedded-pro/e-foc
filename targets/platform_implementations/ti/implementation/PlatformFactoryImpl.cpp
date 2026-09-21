@@ -330,6 +330,11 @@ namespace application
         onFaultCallback = onProtection;
     }
 
+    PlatformFactory::BoardProtectionState PlatformFactoryImpl::BoardProtectionStatus()
+    {
+        return PlatformFactory::BoardProtectionState::unknown;
+    }
+
     void PlatformFactoryImpl::Reset()
     {
         NVIC_SystemReset();

@@ -72,6 +72,7 @@ namespace application
         hal::Eeprom& Eeprom() override;
         drivers::Watchdog& Watchdog() override;
         void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>& onProtection) override;
+        PlatformFactory::BoardProtectionState BoardProtectionStatus() override;
         void Reset() override;
         void ResetFromWatchdogExpiry() override;
         ResetCause GetResetCause() const override;

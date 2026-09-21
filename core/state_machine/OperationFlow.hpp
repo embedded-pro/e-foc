@@ -19,13 +19,15 @@ namespace application
         state_machine::FaultCode LastFaultCode() const;
         bool HasPendingFault() const;
 
-        bool IsEnableAllowed(const state_machine::Ready& ready) const;
+        bool IsEnableAllowed(const state_machine::Ready& ready);
         state_machine::Enabled BuildEnabled();
         state_machine::Ready DisableToReady();
 
         state_machine::Fault EnterFault(state_machine::FaultCode code, bool wasActive, state_machine::CommandResult pendingResult = state_machine::CommandResult::abortedByFault);
-        bool CanClearFault() const;
-        void TraceFaultClearRefused() const;
+        bool IsFaultConditionAsserted() const;
+        ClearRefusal EvaluateClearFault();
+        bool CanClearFault();
+        void TraceFaultClearRefused(ClearRefusal refusal) const;
         state_machine::Ready ClearFaultToReady();
         state_machine::Idle ClearFaultToIdle();
 

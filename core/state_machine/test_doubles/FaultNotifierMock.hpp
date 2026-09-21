@@ -9,8 +9,15 @@ namespace state_machine
         : public FaultNotifier
     {
     public:
+        FaultNotifierMock()
+        {
+            ON_CALL(*this, ConditionState()).WillByDefault(testing::Return(FaultConditionState::unknown));
+            EXPECT_CALL(*this, ConditionState()).Times(testing::AnyNumber());
+        }
+
         MOCK_METHOD(void, Register, (const infra::Function<void(FaultCode)>& onImmediate, const infra::Function<void(FaultCode)>& onDeferred), (override));
         MOCK_METHOD(void, Unregister, (), (override));
+        MOCK_METHOD(FaultConditionState, ConditionState, (), (override));
 
         void StoreHandler(const infra::Function<void(FaultCode)>& immediate, const infra::Function<void(FaultCode)>& deferred)
         {

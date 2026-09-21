@@ -50,21 +50,59 @@ date: 2026-08-21
 
 ### Part A — FOC Motor Message Catalogue
 
-All message type IDs, category ID, scale factors, and error codes are centralised in `FocMotorMessages.hpp`. No other component in `core/can/` or `core/state_machine/` re-defines these constants; all refer to this single source.
+Message type IDs, the category ID, the enums and the scale factors live in `FocMotorMessages.hpp`; the field
+layout of every message — order, width, signedness, scale and unit — lives beside them in
+`FocMotorWireContract.hpp` as a `constexpr` descriptor table. Together these are the authoritative contract
+for category `0x02`, and no other component may restate any part of them. The tables below are checked against
+that table by `TestWireContractDocumentation`, so a change to one that is not made to the other fails the
+build.
 
-The category occupies slot `0x02` (the first application-reserved category ID). Commands occupy message types `0x00–0x7F`; responses occupy `0x80–0xFF`. The category error frame uses the `can-lite` reserved type `0xFE`.
+The category occupies slot `0x02` (the first application-reserved category ID). Commands occupy message types
+`0x00–0x7F`; responses occupy `0x80–0xFF`. The category error frame uses the `can-lite` reserved type `0xFE`.
+
+Every command carries the `can-lite` sequence byte ahead of its fields; responses and telemetry do not. A frame
+whose length is not exactly the length its descriptor states is answered with `invalidPayload` and never
+partially decoded — a payload of another length is a foreign layout, not a tolerable variant of this one. The
+category-error frame on the `can-lite` reserved type `0xFE` carries a descriptor of its own and is held to the
+same exactness, so no decode path in this category escapes it.
+
+The descriptors are the specification and the length authority, not a codec: encoders and decoders are written
+against them by hand. A descriptor edit therefore changes the accepted length and fails the byte-level vectors,
+which is what surfaces the encode or decode change that has to accompany it.
+
+**Contract version.** `focContractVersionMajor.focContractVersionMinor` identifies the contract, and
+`QueryContractVersion` (`0x12`) answers it in `ContractVersionResponse` (`0x92`). A client whose major differs
+from the server's shall report the mismatch and send no further category-`0x02` commands; equal majors are
+compatible. Adding a message is a minor bump; changing any field layout, or the meaning of any enumerator, is
+a major bump.
 
 Physical-to-wire conversions use fixed-point scale factors:
 
-| Quantity   | Wire type | Scale factor | Example                 |
-|------------|-----------|--------------|-------------------------|
-| Current    | int16     | 10           | 1.5 A → 15 wire         |
-| Speed      | int16     | 1            | 300 rad/s → 300 wire    |
-| Position   | int16     | 100          | 3.14 rad → 314 wire     |
-| Voltage    | int16     | 10           | 24.0 V → 240 wire       |
+| Quantity   | Wire type | Scale factor | Example                        |
+|------------|-----------|--------------|--------------------------------|
+| Current    | int16     | 10           | 1.5 A → 15 wire                |
+| Speed      | int16     | 1            | 300 rad/s → 300 wire           |
+| Position   | int16     | 100          | 3.14 rad → 314 wire            |
+| Voltage    | int16     | 10           | 24.0 V → 240 wire              |
 | Bandwidth  | int16     | 1            | closed-loop bandwidth in rad/s |
 | Resistance | int16     | 1000         | 0.5 Ω → 500 wire               |
 | Inductance | int16     | 1000         | 1.0 mH → 1000 wire             |
+| Friction   | int16     | 10000        | 0.001 Nm·s/rad → 10 wire       |
+| Inertia    | int16     | 10000        | 0.001 kg·m² → 10 wire          |
+
+### Deviations from the can-lite reference example
+
+`infra/can-lite` (pinned at `9741ec1`) ships `examples/foc_motor`, which also claims category `0x02` and
+disagrees with this contract. e-foc's definitions are authoritative for this product; the example is
+documentation. Because every decode is length-exact, a frame built from the example is rejected with
+`invalidPayload` rather than misread — visibly, not silently.
+
+| Message / item   | e-foc                               | can-lite example       | Why                                                                                          |
+|------------------|-------------------------------------|------------------------|----------------------------------------------------------------------------------------------|
+| `0x03/0x04/0x05` | one `int16` closed-loop bandwidth   | three `int16` kp/ki/kd | `documentation/requirements/foc/*-controller.yaml` forbid externally supplied per-axis gains |
+| `0x0A`           | `Align`                             | reserved, unused       | alignment is a first-class command here                                                      |
+| `FocMotorState`  | adds `partialCalibration = 4`       | stops at `calibrating` | speed and position modes can hold a partial record                                           |
+| `0x12` / `0x92`  | contract version query and response | absent                 | the example has no versioning                                                                |
 
 ### Part B — FocMotorCategoryServer
 

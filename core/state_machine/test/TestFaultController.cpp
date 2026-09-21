@@ -1,5 +1,6 @@
 #include "TestFocStateMachineHelper.hpp"
 #include "core/state_machine/FaultController.hpp"
+#include "infra/timer/test_helper/ClockFixture.hpp"
 
 namespace
 {
@@ -7,6 +8,7 @@ namespace
 
     class FaultControllerTest
         : public ::testing::Test
+        , public infra::ClockFixture
     {
     public:
         StrictMock<state_machine::FaultNotifierMock> notifier;
@@ -197,4 +199,136 @@ TEST_F(FaultControllerTest, registered_callbacks_are_forwarded_to_notifier)
 
     EXPECT_TRUE(immediateFired);
     EXPECT_TRUE(deferredFired);
+}
+
+namespace
+{
+    class FaultControllerConditionTest
+        : public FaultControllerTest
+    {
+    public:
+        void Condition(state_machine::FaultConditionState state)
+        {
+            EXPECT_CALL(notifier, ConditionState()).WillRepeatedly(Return(state));
+            controller.SampleCondition();
+        }
+
+        void EnterFaultWithCondition(state_machine::FaultConditionState state)
+        {
+            controller.EnterFault();
+            Condition(state);
+        }
+    };
+}
+
+TEST_F(FaultControllerConditionTest, a_clear_is_refused_while_the_condition_reads_asserted)
+{
+    RegisterWithCallbacks();
+    EnterFaultWithCondition(state_machine::FaultConditionState::asserted);
+
+    EXPECT_EQ(application::ClearRefusal::conditionAsserted, controller.EvaluateClear());
+    EXPECT_FALSE(controller.TryClear());
+    EXPECT_TRUE(controller.IsLatched());
+}
+
+TEST_F(FaultControllerConditionTest, a_clear_is_refused_until_the_dwell_has_elapsed_after_deassertion)
+{
+    RegisterWithCallbacks();
+    EnterFaultWithCondition(state_machine::FaultConditionState::asserted);
+    Condition(state_machine::FaultConditionState::clear);
+
+    EXPECT_EQ(application::ClearRefusal::dwellNotElapsed, controller.EvaluateClear());
+
+    ForwardTime(application::FaultController::conditionDwell);
+
+    EXPECT_EQ(application::ClearRefusal::none, controller.EvaluateClear());
+    EXPECT_TRUE(controller.TryClear());
+}
+
+TEST_F(FaultControllerConditionTest, an_asserted_sample_during_the_dwell_restarts_it)
+{
+    RegisterWithCallbacks();
+    EnterFaultWithCondition(state_machine::FaultConditionState::asserted);
+    Condition(state_machine::FaultConditionState::clear);
+
+    ForwardTime(application::FaultController::conditionDwell - std::chrono::milliseconds{ 10 });
+    Condition(state_machine::FaultConditionState::asserted);
+    Condition(state_machine::FaultConditionState::clear);
+    ForwardTime(application::FaultController::conditionDwell - std::chrono::milliseconds{ 10 });
+
+    EXPECT_EQ(application::ClearRefusal::dwellNotElapsed, controller.EvaluateClear());
+
+    ForwardTime(std::chrono::milliseconds{ 10 });
+
+    EXPECT_EQ(application::ClearRefusal::none, controller.EvaluateClear());
+}
+
+TEST_F(FaultControllerConditionTest, a_clear_is_allowed_when_the_platform_cannot_interrogate_the_condition)
+{
+    RegisterWithCallbacks();
+    EnterFaultWithCondition(state_machine::FaultConditionState::unknown);
+
+    EXPECT_EQ(application::ClearRefusal::none, controller.EvaluateClear());
+    EXPECT_TRUE(controller.TryClear());
+}
+
+TEST_F(FaultControllerConditionTest, the_retry_limit_still_refuses_a_clear_whose_condition_reads_clear)
+{
+    RegisterWithCallbacks();
+
+    for (int i = 0; i != 3; ++i)
+    {
+        EnterFaultWithCondition(state_machine::FaultConditionState::asserted);
+        Condition(state_machine::FaultConditionState::clear);
+        ForwardTime(application::FaultController::conditionDwell);
+        EXPECT_TRUE(controller.TryClear());
+    }
+
+    EnterFaultWithCondition(state_machine::FaultConditionState::asserted);
+    Condition(state_machine::FaultConditionState::clear);
+    ForwardTime(application::FaultController::conditionDwell);
+
+    EXPECT_EQ(application::ClearRefusal::retryLimitReached, controller.EvaluateClear());
+    EXPECT_FALSE(controller.TryClear());
+}
+
+TEST_F(FaultControllerConditionTest, the_condition_is_reported_before_the_retry_limit)
+{
+    RegisterWithCallbacks();
+
+    for (int i = 0; i != 3; ++i)
+    {
+        controller.EnterFault();
+        EXPECT_TRUE(controller.TryClear());
+    }
+
+    EnterFaultWithCondition(state_machine::FaultConditionState::asserted);
+
+    EXPECT_EQ(application::ClearRefusal::conditionAsserted, controller.EvaluateClear());
+}
+
+TEST_F(FaultControllerConditionTest, a_controller_without_a_notifier_reports_the_condition_as_unknown)
+{
+    controller.EnterFault();
+    controller.SampleCondition();
+
+    EXPECT_EQ(state_machine::FaultConditionState::unknown, controller.ConditionState());
+    EXPECT_EQ(application::ClearRefusal::none, controller.EvaluateClear());
+}
+
+TEST_F(FaultControllerConditionTest, the_dwell_restarts_at_fault_entry_rather_than_reusing_an_earlier_one)
+{
+    RegisterWithCallbacks();
+
+    Condition(state_machine::FaultConditionState::clear);
+    ForwardTime(application::FaultController::conditionDwell * 2);
+
+    controller.EnterFault();
+    Condition(state_machine::FaultConditionState::clear);
+
+    EXPECT_EQ(application::ClearRefusal::dwellNotElapsed, controller.EvaluateClear());
+
+    ForwardTime(application::FaultController::conditionDwell);
+
+    EXPECT_EQ(application::ClearRefusal::none, controller.EvaluateClear());
 }

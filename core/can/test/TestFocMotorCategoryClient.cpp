@@ -43,6 +43,7 @@ namespace
         MOCK_METHOD(void, OnCategoryError, (uint8_t originCommandId, can::FocMotorCategoryError errorCode), (override));
         MOCK_METHOD(void, OnTelemetryStatus, (const hal::Can::Message& msg), (override));
         MOCK_METHOD(void, OnTelemetryElectrical, (const hal::Can::Message& msg), (override));
+        MOCK_METHOD(void, OnContractVersionResponse, (uint8_t major, uint8_t minor), (override));
     };
 
     class FocMotorCategoryClientTest

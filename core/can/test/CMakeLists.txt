@@ -26,7 +26,11 @@ target_sources(e_foc.can_test PRIVATE
     TestFocMotorCategoryClient.cpp
     TestFocMotorCanBridge.cpp
     TestFocMotorCanClient.cpp
+    TestFocMotorWireContract.cpp
+    TestWireContractDocumentation.cpp
 )
+
+target_compile_definitions(e_foc.can_test PRIVATE E_FOC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 if (EMIL_ENABLE_COVERAGE)
     emil_enable_coverage_for(e_foc.can_test)

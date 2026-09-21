@@ -58,6 +58,11 @@ namespace application
             onBoardProtection = onProtection;
         }
 
+        PlatformFactory::BoardProtectionState BoardProtectionStatus() override
+        {
+            return PlatformFactory::BoardProtectionState::unknown;
+        }
+
         void RaiseBoardProtection(PlatformFactory::BoardProtectionReason reason)
         {
             if (onBoardProtection != nullptr)

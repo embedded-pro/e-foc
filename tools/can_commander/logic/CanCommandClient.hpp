@@ -11,23 +11,8 @@
 
 namespace tool
 {
-    enum class FocMotorState : uint8_t
-    {
-        idle = 0,
-        running = 1,
-        fault = 2,
-        calibrating = 3
-    };
-
-    enum class FocFaultCode : uint8_t
-    {
-        none = 0,
-        overCurrent = 1,
-        overVoltage = 2,
-        underVoltage = 3,
-        overTemperature = 4,
-        sensorFault = 5
-    };
+    using FocMotorState = can::FocMotorState;
+    using FocFaultCode = can::FocFaultCode;
 
     class CanCommandClient;
 
@@ -53,6 +38,7 @@ namespace tool
 
         virtual void OnControlModeAcknowledged(can::FocMotorMode activeMode) = 0;
         virtual void OnCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status) = 0;
+        virtual void OnContractVersion(uint8_t major, uint8_t minor, bool compatible) = 0;
     };
 
     class CanCommandClient
@@ -81,7 +67,7 @@ namespace tool
         void SendSetSpeedBandwidth(float bandwidth);
         void SendSetPositionBandwidth(float bandwidth);
 
-        void RequestData() const;
+        void RequestData();
         void HandleTimeout();
 
     private:
@@ -97,6 +83,7 @@ namespace tool
         void OnCategoryError(uint8_t originCommandId, can::FocMotorCategoryError errorCode) override;
         void OnTelemetryStatus(const hal::Can::Message& msg) override;
         void OnTelemetryElectrical(const hal::Can::Message& msg) override;
+        void OnContractVersionResponse(uint8_t major, uint8_t minor) override;
 
         // CanBusAdapterObserver
         void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) override;

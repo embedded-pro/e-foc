@@ -12,8 +12,8 @@
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/test_doubles/FaultNotifierMock.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
-#include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
 #include "infra/stream/test/StreamMock.hpp"
+#include "infra/timer/test_helper/ClockFixture.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/Terminal.hpp"
 #include <bit>
@@ -48,7 +48,7 @@ namespace
 {
     class ControlModeStateMachineTest
         : public ::testing::Test
-        , public infra::EventDispatcherWithWeakPtrFixture
+        , public infra::ClockFixture
     {
     public:
         StrictMock<infra::StreamWriterMock> streamWriterMock;

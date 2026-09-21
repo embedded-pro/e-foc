@@ -26,6 +26,9 @@ namespace can
         bool SetCurrentBandwidth(float bandwidth);
         bool SetSpeedBandwidth(float bandwidth);
         bool SetPositionBandwidth(float bandwidth);
+        bool QueryContractVersion();
+
+        ContractCompatibility Compatibility() const;
 
         services::CanProtocolClient& ProtocolClient();
         FocMotorCategoryClient& CategoryClient();

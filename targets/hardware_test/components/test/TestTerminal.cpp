@@ -32,6 +32,7 @@ namespace
         MOCK_METHOD(hal::Eeprom&, Eeprom, (), (override));
         MOCK_METHOD(drivers::Watchdog&, Watchdog, (), (override));
         MOCK_METHOD(void, RegisterBoardProtection, (const infra::Function<void(application::PlatformFactory::BoardProtectionReason)>&), (override));
+        MOCK_METHOD(application::PlatformFactory::BoardProtectionState, BoardProtectionStatus, (), (override));
         MOCK_METHOD(application::PlatformDiagnostics&, Diagnostics, (), (override));
         MOCK_METHOD(void, Reset, (), (override));
         MOCK_METHOD(void, ResetFromWatchdogExpiry, (), (override));

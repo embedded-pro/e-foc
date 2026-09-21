@@ -37,10 +37,18 @@ namespace application
         return faultController.IsPending();
     }
 
-    bool OperationFlow::IsEnableAllowed(const state_machine::Ready& ready) const
+    bool OperationFlow::IsEnableAllowed(const state_machine::Ready& ready)
     {
+        faultController.SampleCondition();
+
         if (faultController.IsLatched())
             return false;
+
+        if (IsFaultConditionAsserted())
+        {
+            env.tracer.Trace() << "[SM] Enable rejected: board protection asserted";
+            return false;
+        }
 
         if (!ready.rotorReferenceValid)
             env.tracer.Trace() << "[SM] Enable rejected: rotor reference not established; run alignment";
@@ -69,6 +77,7 @@ namespace application
             env.tracer.Trace() << "[SM] Further fault while faulted; keeping the first code";
 
         faultController.EnterFault();
+        faultController.SampleCondition();
 
         if (wasActive)
             env.mode.GetFocControl().Stop();
@@ -78,14 +87,36 @@ namespace application
         return state_machine::Fault{ lastFaultCode };
     }
 
-    bool OperationFlow::CanClearFault() const
+    bool OperationFlow::IsFaultConditionAsserted() const
     {
-        return faultController.CanClear();
+        return faultController.ConditionState() == state_machine::FaultConditionState::asserted;
     }
 
-    void OperationFlow::TraceFaultClearRefused() const
+    ClearRefusal OperationFlow::EvaluateClearFault()
     {
-        env.tracer.Trace() << "[SM] Fault clear refused, retry limit reached; reset required";
+        faultController.SampleCondition();
+        return faultController.EvaluateClear();
+    }
+
+    bool OperationFlow::CanClearFault()
+    {
+        return EvaluateClearFault() == ClearRefusal::none;
+    }
+
+    void OperationFlow::TraceFaultClearRefused(ClearRefusal refusal) const
+    {
+        switch (refusal)
+        {
+            case ClearRefusal::conditionAsserted:
+                env.tracer.Trace() << "[SM] Fault clear refused: board protection still asserted";
+                break;
+            case ClearRefusal::dwellNotElapsed:
+                env.tracer.Trace() << "[SM] Fault clear refused: board protection has not been clear long enough";
+                break;
+            default:
+                env.tracer.Trace() << "[SM] Fault clear refused, retry limit reached; reset required";
+                break;
+        }
     }
 
     state_machine::Ready OperationFlow::ClearFaultToReady()

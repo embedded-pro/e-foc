@@ -13,6 +13,9 @@ namespace application
         {
             ON_CALL(*this, MaxCurrentSupported()).WillByDefault(testing::Return(foc::Ampere{ defaultMaxCurrent }));
             EXPECT_CALL(*this, MaxCurrentSupported()).Times(testing::AnyNumber());
+
+            ON_CALL(*this, BoardProtectionStatus()).WillByDefault(testing::Return(BoardProtectionState::unknown));
+            EXPECT_CALL(*this, BoardProtectionStatus()).Times(testing::AnyNumber());
         }
 
         static constexpr float defaultMaxCurrent{ 10.0f };
@@ -37,6 +40,7 @@ namespace application
         MOCK_METHOD(application::ResetCause, GetResetCause, (), (const, override));
         MOCK_METHOD(infra::BoundedConstString, FaultStatus, (), (const, override));
         MOCK_METHOD(void, RegisterBoardProtection, (const infra::Function<void(PlatformFactory::BoardProtectionReason)>&), (override));
+        MOCK_METHOD(PlatformFactory::BoardProtectionState, BoardProtectionStatus, (), (override));
 
         MOCK_METHOD(void, ConfigureAdcAndPwm, (hal::Hertz, std::chrono::nanoseconds, SampleAndHold), (override));
         MOCK_METHOD(void, SetEncoderResolution, (uint32_t), (override));

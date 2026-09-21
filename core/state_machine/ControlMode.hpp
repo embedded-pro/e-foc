@@ -102,6 +102,7 @@ namespace state_machine
             case CommandResult::nvmFailed:
                 return can::FocMotorCategoryError::persistenceFailed;
             case CommandResult::abortedByFault:
+            case CommandResult::faultConditionActive:
                 return can::FocMotorCategoryError::abortedByFault;
             case CommandResult::queued:
                 return can::FocMotorCategoryError::busy;
