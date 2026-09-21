@@ -1,11 +1,13 @@
 #pragma once
 
 #include "core/foc/interfaces/Units.hpp"
-#include "tools/simulator/view/gui/HexagonWidget.hpp"
 #include "tools/simulator/view/gui/ScopeToolbar.hpp"
 #include "tools/simulator/view/gui/ScopeWidget.hpp"
+#include "ui/backend/qt/QtPaintedWidget.hpp"
+#include "ui/widgets/HexagonCore.hpp"
 #include <QLabel>
 #include <QString>
+#include <QTimer>
 #include <QWidget>
 #include <span>
 
@@ -34,7 +36,9 @@ namespace simulator
         ScopeToolbar* currentScopeToolbar;
         ScopeWidget* voltageScope;
         ScopeToolbar* voltageScopeToolbar;
-        HexagonWidget* hexagonWidget;
+        ui::widgets::HexagonCore hexagonCore;
+        ui::backend::qt::QtPaintedWidget* hexagonWidget;
+        QTimer hexagonRefreshTimer;
         ScopeWidget* electricalRlsScope{ nullptr };
         ScopeWidget* mechanicalRlsScope{ nullptr };
     };

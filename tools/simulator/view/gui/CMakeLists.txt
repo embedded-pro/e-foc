@@ -34,8 +34,6 @@ target_sources(e_foc.tool.simulator.view.gui PRIVATE
     ScopeWidget.cpp
     ScopeToolbar.hpp
     ScopeToolbar.cpp
-    HexagonWidget.hpp
-    HexagonWidget.cpp
 )
 
 set_target_properties(e_foc.tool.simulator.view.gui PROPERTIES
