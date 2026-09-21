@@ -14,7 +14,6 @@ target_link_libraries(e_foc.tool.hardware_bridge.gui PUBLIC
     ui.backend.qt
     e_foc.tool.hardware_bridge.serial_client
     e_foc.tool.hardware_bridge.can_client
-    e_foc.tool.hardware_bridge.terminal
     services.network_instantiations
 )
 
