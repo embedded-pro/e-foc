@@ -8,7 +8,7 @@ namespace
 
     class FocStateMachineSpeedCliTest
         : public ::testing::Test
-        , public infra::EventDispatcherWithWeakPtrFixture
+        , public infra::ClockFixture
     {
     public:
         using SpeedStateMachine = application::SpeedStateMachine;
@@ -1089,7 +1089,7 @@ namespace
 {
     class FocStateMachineSpeedAutoTest
         : public ::testing::Test
-        , public infra::EventDispatcherWithWeakPtrFixture
+        , public infra::ClockFixture
     {
     public:
         using SpeedAutoStateMachine = application::SpeedStateMachine;

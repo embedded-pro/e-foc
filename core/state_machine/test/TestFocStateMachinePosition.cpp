@@ -7,7 +7,7 @@ namespace
 
     class FocStateMachinePositionCliTest
         : public ::testing::Test
-        , public infra::EventDispatcherWithWeakPtrFixture
+        , public infra::ClockFixture
     {
     public:
         using PositionStateMachine = application::PositionStateMachine;
@@ -637,7 +637,7 @@ namespace
 {
     class FocStateMachinePositionAutoTest
         : public ::testing::Test
-        , public infra::EventDispatcherWithWeakPtrFixture
+        , public infra::ClockFixture
     {
     public:
         using PositionAutoStateMachine = application::PositionStateMachine;

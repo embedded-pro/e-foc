@@ -86,6 +86,8 @@ namespace application
 
     state_machine::CommandResult FocStateMachineCommon::CmdEnable()
     {
+        operation.RefreshFaultCondition();
+
         const auto dispatched = ToCommandResult(Dispatch(state_machine::Enable{}));
 
         if (dispatched != state_machine::CommandResult::ok)
@@ -107,10 +109,13 @@ namespace application
         if (!stateMachine.Is<state_machine::Fault>())
             return state_machine::CommandResult::rejected;
 
-        if (!operation.CanClearFault())
+        operation.RefreshFaultCondition();
+
+        const auto refusal = operation.EvaluateClearFault();
+        if (refusal != application::ClearRefusal::none)
         {
-            operation.TraceFaultClearRefused();
-            return state_machine::CommandResult::rejected;
+            operation.TraceFaultClearRefused(refusal);
+            return refusal == application::ClearRefusal::retryLimitReached ? state_machine::CommandResult::rejected : state_machine::CommandResult::faultConditionActive;
         }
 
         return ToCommandResult(Dispatch(state_machine::ClearFault{}));

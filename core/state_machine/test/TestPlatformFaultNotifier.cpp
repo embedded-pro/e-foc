@@ -6,8 +6,8 @@
 #include "core/state_machine/PlatformFaultNotifier.hpp"
 #include "core/state_machine/TorqueStateMachine.hpp"
 #include "hal/interfaces/test_doubles/SerialCommunicationMock.hpp"
-#include "infra/event/test_helper/EventDispatcherWithWeakPtrFixture.hpp"
 #include "infra/stream/test/StreamMock.hpp"
+#include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include "services/tracer/Tracer.hpp"
 #include <gmock/gmock.h>
@@ -18,7 +18,7 @@ namespace
 
     class TestPlatformFaultNotifier
         : public ::testing::Test
-        , public infra::EventDispatcherWithWeakPtrFixture
+        , public infra::ClockFixture
     {
     public:
         void TearDown() override
@@ -425,4 +425,124 @@ TEST_F(TestPlatformFaultNotifier, unknown_board_protection_reason_maps_to_hardwa
 
     ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
     EXPECT_EQ(std::get<state_machine::Fault>(sm.CurrentState()).code, state_machine::FaultCode::hardwareFault);
+}
+
+TEST_F(TestPlatformFaultNotifier, the_condition_state_is_read_from_the_platform)
+{
+    EXPECT_CALL(platformFactory, BoardProtectionStatus())
+        .WillOnce(Return(application::PlatformFactory::BoardProtectionState::asserted));
+    EXPECT_EQ(state_machine::FaultConditionState::asserted, faultNotifier->ConditionState());
+
+    EXPECT_CALL(platformFactory, BoardProtectionStatus())
+        .WillOnce(Return(application::PlatformFactory::BoardProtectionState::clear));
+    EXPECT_EQ(state_machine::FaultConditionState::clear, faultNotifier->ConditionState());
+
+    EXPECT_CALL(platformFactory, BoardProtectionStatus())
+        .WillOnce(Return(application::PlatformFactory::BoardProtectionState::unknown));
+    EXPECT_EQ(state_machine::FaultConditionState::unknown, faultNotifier->ConditionState());
+}
+
+TEST_F(TestPlatformFaultNotifier, a_fault_clear_is_refused_while_the_platform_reports_the_condition_asserted)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+    EXPECT_CALL(platformFactory, BoardProtectionStatus())
+        .WillRepeatedly(Return(application::PlatformFactory::BoardProtectionState::asserted));
+
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+    ExecuteAllActions();
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    EXPECT_EQ(state_machine::CommandResult::faultConditionActive, sm.CmdClearFault());
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(TestPlatformFaultNotifier, a_fault_clear_is_accepted_once_the_condition_has_read_clear_for_the_dwell)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+
+    auto condition = application::PlatformFactory::BoardProtectionState::asserted;
+    EXPECT_CALL(platformFactory, BoardProtectionStatus())
+        .WillRepeatedly(Invoke([&condition]()
+            {
+                return condition;
+            }));
+
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+    ExecuteAllActions();
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(state_machine::CommandResult::faultConditionActive, sm.CmdClearFault());
+
+    condition = application::PlatformFactory::BoardProtectionState::clear;
+
+    EXPECT_EQ(state_machine::CommandResult::faultConditionActive, sm.CmdClearFault());
+
+    ForwardTime(application::FaultController::conditionDwell);
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdClearFault());
+    EXPECT_FALSE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(TestPlatformFaultNotifier, a_clear_refused_for_an_asserted_condition_does_not_spend_a_retry)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+
+    auto condition = application::PlatformFactory::BoardProtectionState::asserted;
+    EXPECT_CALL(platformFactory, BoardProtectionStatus())
+        .WillRepeatedly(Invoke([&condition]()
+            {
+                return condition;
+            }));
+
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+    ExecuteAllActions();
+
+    for (int i = 0; i != 5; ++i)
+        EXPECT_EQ(state_machine::CommandResult::faultConditionActive, sm.CmdClearFault());
+
+    condition = application::PlatformFactory::BoardProtectionState::clear;
+    ForwardTime(application::FaultController::conditionDwell + application::FaultController::conditionPollInterval);
+
+    EXPECT_EQ(state_machine::CommandResult::ok, sm.CmdClearFault());
+}
+
+TEST_F(TestPlatformFaultNotifier, an_enable_is_refused_while_the_condition_reads_asserted)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+
+    auto condition = application::PlatformFactory::BoardProtectionState::asserted;
+    EXPECT_CALL(platformFactory, BoardProtectionStatus())
+        .WillRepeatedly(Invoke([&condition]()
+            {
+                return condition;
+            }));
+
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+    ExecuteAllActions();
+
+    condition = application::PlatformFactory::BoardProtectionState::clear;
+    ForwardTime(application::FaultController::conditionDwell + application::FaultController::conditionPollInterval);
+    ASSERT_EQ(state_machine::CommandResult::ok, sm.CmdClearFault());
+
+    condition = application::PlatformFactory::BoardProtectionState::asserted;
+
+    EXPECT_EQ(state_machine::CommandResult::rejected, sm.CmdEnable());
+    EXPECT_FALSE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }

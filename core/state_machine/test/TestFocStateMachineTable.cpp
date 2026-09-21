@@ -87,7 +87,7 @@ namespace
 
     class FocStateMachineTableTest
         : public ::testing::Test
-        , public infra::EventDispatcherWithWeakPtrFixture
+        , public infra::ClockFixture
     {
     public:
         bool HasTransition(StateId from, EventId event) const

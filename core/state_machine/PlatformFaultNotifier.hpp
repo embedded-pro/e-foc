@@ -17,6 +17,8 @@ namespace state_machine
         void Unregister() override;
         void RegisterSecondary(const infra::Function<void(FaultCode)>& onFault);
 
+        FaultConditionState ConditionState() override;
+
     private:
         void Notify(FaultCode code);
         static FaultCode ToFaultCode(application::PlatformFactory::BoardProtectionReason reason);

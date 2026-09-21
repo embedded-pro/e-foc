@@ -16,7 +16,7 @@ namespace
 
     class FocStateMachineTorqueCliTest
         : public ::testing::Test
-        , public infra::EventDispatcherWithWeakPtrFixture
+        , public infra::ClockFixture
     {
     public:
         using TestedStateMachine = application::TorqueStateMachine;
@@ -1506,7 +1506,7 @@ namespace
 {
     class FocStateMachineTorqueAutoTest
         : public ::testing::Test
-        , public infra::EventDispatcherWithWeakPtrFixture
+        , public infra::ClockFixture
     {
     public:
         using AutoStateMachine = application::TorqueStateMachine;

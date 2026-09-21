@@ -19,6 +19,8 @@ namespace application
             registeredNotifier->Unregister();
             registeredNotifier = nullptr;
         }
+
+        conditionPollTimer.reset();
     }
 
     void FaultController::LatchFromInterrupt(state_machine::FaultCode code)
@@ -42,20 +44,63 @@ namespace application
     {
         faultLatched = true;
         faultRecorded = true;
+
+        // Polled rather than sampled per command, so that a condition chattering between two operator
+        // commands is still observed; the timer is cancelled by its own destructor if this object dies
+        conditionPollTimer.emplace(conditionPollInterval, [this]()
+            {
+                SampleCondition();
+            });
+    }
+
+    void FaultController::SampleCondition()
+    {
+        const auto sampled = registeredNotifier != nullptr ? registeredNotifier->ConditionState() : state_machine::FaultConditionState::unknown;
+
+        if (sampled == state_machine::FaultConditionState::asserted)
+            conditionClearSince = std::nullopt;
+        else if (sampled == state_machine::FaultConditionState::clear && lastCondition != state_machine::FaultConditionState::clear)
+            conditionClearSince = infra::Now();
+
+        lastCondition = sampled;
+    }
+
+    state_machine::FaultConditionState FaultController::ConditionState() const
+    {
+        return lastCondition;
+    }
+
+    ClearRefusal FaultController::EvaluateClear() const
+    {
+        if (lastCondition == state_machine::FaultConditionState::asserted)
+            return ClearRefusal::conditionAsserted;
+
+        if (lastCondition == state_machine::FaultConditionState::clear && (!conditionClearSince.has_value() || infra::Now() - *conditionClearSince < conditionDwell))
+            return ClearRefusal::dwellNotElapsed;
+
+        if (consecutiveFaultClears >= maxConsecutiveFaultClears)
+            return ClearRefusal::retryLimitReached;
+
+        return ClearRefusal::none;
     }
 
     bool FaultController::CanClear() const
     {
-        return consecutiveFaultClears < maxConsecutiveFaultClears;
+        return EvaluateClear() == ClearRefusal::none;
     }
 
     void FaultController::Clear()
     {
-        really_assert(CanClear());
+        // The budget is the only invariant asserted here: the condition is re-evaluated where the transition
+        // commits, and a condition that re-asserts in that window must refuse the clear, not reset the board
+        really_assert(consecutiveFaultClears < maxConsecutiveFaultClears);
 
         ++consecutiveFaultClears;
         faultLatched = false;
         faultRecorded = false;
+        conditionPollTimer.reset();
+        conditionClearSince = std::nullopt;
+        lastCondition = state_machine::FaultConditionState::unknown;
     }
 
     bool FaultController::TryClear()

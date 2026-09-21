@@ -24,8 +24,11 @@ namespace application
         state_machine::Ready DisableToReady();
 
         state_machine::Fault EnterFault(state_machine::FaultCode code, bool wasActive, state_machine::CommandResult pendingResult = state_machine::CommandResult::abortedByFault);
+        void RefreshFaultCondition();
+        bool IsFaultConditionAsserted() const;
+        ClearRefusal EvaluateClearFault() const;
         bool CanClearFault() const;
-        void TraceFaultClearRefused() const;
+        void TraceFaultClearRefused(ClearRefusal refusal) const;
         state_machine::Ready ClearFaultToReady();
         state_machine::Idle ClearFaultToIdle();
 

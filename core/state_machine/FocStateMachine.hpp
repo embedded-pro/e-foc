@@ -59,6 +59,7 @@ namespace state_machine
         calibrationFailed,
         nvmFailed,
         abortedByFault,
+        faultConditionActive,
         queued
     };
 

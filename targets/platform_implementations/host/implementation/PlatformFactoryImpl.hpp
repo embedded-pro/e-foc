@@ -70,6 +70,16 @@ namespace application
                 onBoardProtection(reason);
         }
 
+        PlatformFactory::BoardProtectionState BoardProtectionStatus() override
+        {
+            return boardProtectionState;
+        }
+
+        void SetBoardProtectionState(PlatformFactory::BoardProtectionState state)
+        {
+            boardProtectionState = state;
+        }
+
         // Implementation of drivers::ThreePhaseInverter
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
@@ -263,5 +273,6 @@ namespace application
         foc::Radians encoderOffset{ 0.0f };
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         infra::Function<void(PlatformFactory::BoardProtectionReason)> onBoardProtection;
+        PlatformFactory::BoardProtectionState boardProtectionState{ PlatformFactory::BoardProtectionState::unknown };
     };
 }

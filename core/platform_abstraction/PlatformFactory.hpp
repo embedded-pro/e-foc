@@ -60,6 +60,13 @@ namespace application
             overTemperature,
         };
 
+        enum class BoardProtectionState : uint8_t
+        {
+            clear,
+            asserted,
+            unknown,
+        };
+
         virtual void ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold) = 0;
         virtual void SetEncoderResolution(uint32_t resolution) = 0;
         virtual void ConfigureCanBus(uint32_t bitRate, bool testMode) = 0;
@@ -81,6 +88,8 @@ namespace application
         virtual drivers::Watchdog& Watchdog() = 0;
 
         virtual void RegisterBoardProtection(const infra::Function<void(BoardProtectionReason)>& onProtection) = 0;
+        // Dispatcher context only; unknown means the platform cannot interrogate the condition, not that it is clear
+        virtual BoardProtectionState BoardProtectionStatus() = 0;
 
         virtual PlatformDiagnostics& Diagnostics() = 0;
 

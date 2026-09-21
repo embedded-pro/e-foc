@@ -135,7 +135,10 @@
     The state machine shall refuse a clear-fault command once three consecutive
     clear-fault commands have been accepted without an intervening successful enable
     and disable cycle, so that a condition which re-faults immediately cannot be
-    cleared indefinitely. A completed disable command shall reset that count.
+    cleared indefinitely. A completed disable command shall reset that count. This
+    budget supplements the hardware verification of REQ-SM-025 and does not replace it;
+    it bounds the platforms that cannot verify, and bounds a condition that clears
+    between attempts on those that can.
 
 - id: REQ-SM-019
   title: A stored alignment offset is not re-applied to the encoder
@@ -196,3 +199,27 @@
     drive back to the stopped state rather than completing. No step shall undo a stop that
     preceded it, so that a fault cannot be followed by an armed bridge that no control loop
     is updating.
+
+- id: REQ-SM-025
+  title: A fault clear verifies the hardware protection condition
+  shall: >
+    The state machine shall refuse a clear-fault command while the platform reports its
+    board-protection condition as asserted, and shall report that refusal distinctly from
+    a refusal on the retry budget, so that an operator can tell a still-faulted board from
+    an exhausted allowance. The retry budget of REQ-SM-018 shall apply in addition to this
+    verification and shall not be consumed by a clear the condition refused. A platform that
+    cannot interrogate its protection hardware shall report the condition as unavailable
+    rather than clear; for such a platform the retry budget remains the only bound, because
+    a fault it raised came from software rather than from a physical condition it could hold.
+
+- id: REQ-SM-026
+  title: A deasserted protection condition shall settle before a clear is accepted
+  shall: >
+    The state machine shall sample the board-protection condition while it holds a fault,
+    on its own schedule rather than only when a command arrives, and shall accept a
+    clear-fault command only once the condition has been observed to leave the asserted
+    state and to have remained clear for the settling interval. Any asserted sample within
+    that interval shall restart it, so that a condition chattering around its threshold
+    cannot be cleared on a single favourable reading. An enable command shall be refused
+    while the condition reads asserted, independently of the fault latch, so that a clear
+    granted during a momentary deassertion cannot arm the bridge on faulted hardware.

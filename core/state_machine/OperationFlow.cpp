@@ -42,6 +42,12 @@ namespace application
         if (faultController.IsLatched())
             return false;
 
+        if (IsFaultConditionAsserted())
+        {
+            env.tracer.Trace() << "[SM] Enable rejected: board protection asserted";
+            return false;
+        }
+
         if (!ready.rotorReferenceValid)
             env.tracer.Trace() << "[SM] Enable rejected: rotor reference not established; run alignment";
 
@@ -69,6 +75,7 @@ namespace application
             env.tracer.Trace() << "[SM] Further fault while faulted; keeping the first code";
 
         faultController.EnterFault();
+        faultController.SampleCondition();
 
         if (wasActive)
             env.mode.GetFocControl().Stop();
@@ -78,14 +85,40 @@ namespace application
         return state_machine::Fault{ lastFaultCode };
     }
 
+    void OperationFlow::RefreshFaultCondition()
+    {
+        faultController.SampleCondition();
+    }
+
+    bool OperationFlow::IsFaultConditionAsserted() const
+    {
+        return faultController.ConditionState() == state_machine::FaultConditionState::asserted;
+    }
+
+    ClearRefusal OperationFlow::EvaluateClearFault() const
+    {
+        return faultController.EvaluateClear();
+    }
+
     bool OperationFlow::CanClearFault() const
     {
         return faultController.CanClear();
     }
 
-    void OperationFlow::TraceFaultClearRefused() const
+    void OperationFlow::TraceFaultClearRefused(ClearRefusal refusal) const
     {
-        env.tracer.Trace() << "[SM] Fault clear refused, retry limit reached; reset required";
+        switch (refusal)
+        {
+            case ClearRefusal::conditionAsserted:
+                env.tracer.Trace() << "[SM] Fault clear refused: board protection still asserted";
+                break;
+            case ClearRefusal::dwellNotElapsed:
+                env.tracer.Trace() << "[SM] Fault clear refused: board protection has not been clear long enough";
+                break;
+            default:
+                env.tracer.Trace() << "[SM] Fault clear refused, retry limit reached; reset required";
+                break;
+        }
     }
 
     state_machine::Ready OperationFlow::ClearFaultToReady()

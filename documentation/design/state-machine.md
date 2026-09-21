@@ -387,12 +387,46 @@ REQ-SM-021 excludes.
 
 A fault is latched. `CmdEnable` is refused while the latch is set, so the only path out of `Fault` is an explicit `CmdClearFault`.
 
-Clearing is bounded. Each `CmdClearFault` increments a counter; once `maxConsecutiveFaultClears` (3) clears
+Clearing is gated twice: on the hardware condition, and on a retry budget. `FaultController::EvaluateClear()`
+reports the first gate that refuses, condition before budget, so the operator is told the physical cause rather
+than the accounting.
+
+**The condition gate.** `PlatformFactory::BoardProtectionStatus()` reports `asserted`, `clear` or `unknown`.
+While a fault is held, `FaultController` polls it every `conditionPollInterval` (50 ms) on the event
+dispatcher — on its own schedule rather than only when a command arrives, because a condition that asserts and
+clears between two operator commands would otherwise never be observed as asserted at all. A clear is accepted
+only once the condition has been seen to leave `asserted` and to have stayed `clear` for `conditionDwell`
+(250 ms); the dwell is stamped on the `asserted → clear` transition, so any asserted sample inside the window
+restarts it and a condition chattering around its threshold cannot be cleared on one favourable reading.
+`IsEnableAllowed` refuses independently while the condition reads `asserted`, so a clear granted during a
+momentary deassertion still cannot arm the bridge.
+
+```
+  asserted ──clear sample──> settling ──dwell elapsed──> ready ──CmdClearFault──> cleared
+      ^                          │
+      └────asserted sample───────┘
+```
+
+`unknown` is the honest answer from a platform that cannot interrogate its protection hardware, and it neither
+blocks a clear nor satisfies the verification — such a platform behaves exactly as it did before the gate
+existed. Reporting `clear` instead would assert a verification the hardware never made, and a fault on those
+platforms comes from software (calibration failure, CAN bus-off, watchdog) rather than from a physical
+condition anything could hold. **Every platform reports `unknown` today**: the TI protection comparators are
+ADC digital comparators on a PWM-triggered ADC, which stops converting once the bridge is stopped, so no
+reading taken while faulted distinguishes a cleared condition from an unevaluated one. The gate is in place and
+tested, and becomes load-bearing as soon as a platform can answer — see REQ-EH-013.
+
+**The budget.** Each accepted `CmdClearFault` increments a counter; once `maxConsecutiveFaultClears` (3) clears
 have happened without an intervening clean run, further clears are refused and a reset is required. The
 counter is reset by `CmdDisable` from `Enabled`, which is the only evidence the state machine has that the
-drive ran and was stopped deliberately rather than by the same condition re-tripping. Without this bound, a
-condition that is still asserted can be cleared and re-enabled indefinitely, re-energising faulted hardware on
-every cycle.
+drive ran and was stopped deliberately rather than by the same condition re-tripping. The budget supplements
+the condition gate rather than replacing it: it bounds the platforms that cannot verify, and it bounds a
+condition that happens to read clear between attempts on those that can. A clear the condition refused does not
+spend from it.
+
+`FaultController::Clear()` asserts on the budget alone. It runs where the transition commits, not where the
+command was issued, and a condition that re-asserts in that window must refuse the clear — asserting on it
+there would reset a board whose hardware is still faulted, turning a fault into a reset loop.
 
 The last fault code is preserved in `LastFaultCode()` and remains readable even after the fault is cleared via `CmdClearFault`. Before any fault has occurred it reads `FaultCode::none`, so a client can distinguish "no fault yet" from a real hardware fault.
 

@@ -63,6 +63,31 @@ On ST the definition is empty, and says so: that target does not drive a bridge 
 to name. Cutting the stage there means clearing `TIM_BDTR_MOE` on whichever advanced-control timer the board
 wires to the gate drivers, and that belongs with the work that makes the target functional.
 
+### Board protection state — `BoardProtectionStatus()`
+
+`PlatformFactory::BoardProtectionStatus()` answers `asserted`, `clear` or `unknown` for the board-protection
+condition, and is what lets the state machine refuse to re-arm a drive whose hardware is still faulted
+(REQ-SM-025, REQ-SM-026). It is a dispatcher-context query — an implementation may read a peripheral status
+register, but nothing calls it from an interrupt, so it need not be interrupt-safe.
+
+`unknown` is a first-class answer, not a failure. A platform reports it whenever it cannot observe the
+condition, and the state machine then falls back to the retry budget alone — which is the behaviour those
+platforms had before the query existed. Reporting `clear` instead would claim a verification the hardware never
+performed, and on a board with no protection comparators the fault being cleared came from software anyway.
+
+Every platform reports `unknown` today:
+
+- **TI** — the protection comparators are ADC digital comparators (`DigitalComparatorConfig`, steps 3 and 4)
+  whose outputs drive the PWM fault inputs. That ADC is triggered by the PWM generator, so once the bridge is
+  stopped it stops converting, the comparators stop evaluating, and no status register distinguishes a cleared
+  condition from an unevaluated one. Answering this honestly needs either a sampling path that survives the
+  bridge stopping — `PowerSupplyVoltage()` already runs on a separately triggered ADC and could verify
+  overvoltage against `BoardCharacteristics::OvervoltageThresholdCounts` — or a software/continuous ADC trigger
+  in `hal-ti` so the comparators keep evaluating. Overcurrent is arguably not observable at all while stopped:
+  no current flows through a disabled bridge.
+- **ST, QEMU** — neither wires board protection, so there is no condition to observe.
+- **host** — settable, so tests can hold the condition asserted across a re-arm attempt.
+
 The capture routine then writes all eight words of the ARM exception stack frame (R0–R3, R12, LR, PC, xPSR) plus
 three Cortex-M fault status registers (CFSR, MMFAR, BFAR) into the persistent region. It also scans the stack
 above the exception frame and records any word whose value falls within the `.text` section as a probable

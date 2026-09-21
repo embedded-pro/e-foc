@@ -153,3 +153,14 @@
     Every platform that links the handler shall provide that definition; it shall not be
     satisfied by a weak fallback, because the fallback is the definition the linker
     settles on when the archive member carrying the real one is never pulled in.
+
+- id: REQ-EH-013
+  title: Board protection state is queryable
+  shall: >
+    Every platform shall expose the current state of its board-protection condition as
+    asserted, clear, or unavailable. The query shall be answerable from the event dispatcher
+    and shall not be required from interrupt context, so that an implementation may read a
+    peripheral status register. A platform shall report unavailable whenever it cannot
+    observe the condition, including where its protection comparators are driven by a
+    peripheral that stops evaluating once the power stage is stopped; reporting clear in
+    that case would assert a verification the hardware has not made.

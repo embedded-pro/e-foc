@@ -102,6 +102,8 @@ namespace state_machine
             case CommandResult::nvmFailed:
                 return can::FocMotorCategoryError::persistenceFailed;
             case CommandResult::abortedByFault:
+            // Until the wire contract carries a distinct code, a refused re-arm reports as the fault that caused it
+            case CommandResult::faultConditionActive:
                 return can::FocMotorCategoryError::abortedByFault;
             case CommandResult::queued:
                 return can::FocMotorCategoryError::busy;
