@@ -1,0 +1,41 @@
+- id: REQ-CAN-001
+  title: One authoritative wire contract for the FOC motor category
+  shall: >
+    The message identifiers, enumerations, scale factors and per-message field layouts of CAN
+    category 0x02 shall be defined once, in core/can, and every producer and consumer of those
+    frames — the category server, the category client, the commander tool and the integration
+    test fixtures — shall derive its encoding and decoding from that definition. No component
+    shall restate an identifier, a field layout, a scale or an enumerator of that category.
+
+- id: REQ-CAN-002
+  title: Payload length is exact
+  shall: >
+    Every decode of a category 0x02 frame shall require the payload to be exactly the length its
+    definition states, counting the sequence byte that commands carry and responses do not. A
+    frame of any other length shall be answered with invalidPayload and shall not be partially
+    decoded, so that a frame built to a different layout of the same identifier is rejected
+    rather than reinterpreted under this one.
+
+- id: REQ-CAN-003
+  title: Contract version is queryable and mismatch is reported
+  shall: >
+    The server shall answer a contract-version query with the major and minor version of the
+    contract it implements, in every lifecycle state. A client whose major version differs from
+    the server's shall report the mismatch to its operator and shall send no further category
+    0x02 command. Adding a message shall increment the minor version; changing any field layout,
+    or the meaning of any enumerator, shall increment the major version.
+
+- id: REQ-CAN-004
+  title: The contract is verified byte for byte and end to end
+  shall: >
+    Every command and every response shall be verified against literal expected bytes, written
+    independently of the helpers that encode and decode them, and the client and the server shall
+    be verified against each other rather than only against their own test doubles, so that a
+    layout both sides state wrongly in the same way is still caught.
+
+- id: REQ-CAN-005
+  title: Deviations from the reference example are documented
+  shall: >
+    Where this contract differs from the can-lite reference example that claims the same category
+    identifier, the difference and its reason shall be recorded in the protocol design document,
+    and the rejection behaviour a frame built to the example receives shall be stated.

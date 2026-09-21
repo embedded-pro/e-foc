@@ -26,6 +26,7 @@ namespace can
         virtual void OnCategoryError(uint8_t originCommandId, FocMotorCategoryError errorCode) = 0;
         virtual void OnTelemetryStatus(const hal::Can::Message& msg) = 0;
         virtual void OnTelemetryElectrical(const hal::Can::Message& msg) = 0;
+        virtual void OnContractVersionResponse(uint8_t major, uint8_t minor) = 0;
     };
 
     class FocMotorCategoryClient
@@ -50,16 +51,19 @@ namespace can
         bool SendSetCurrentBandwidth(uint16_t targetNodeId, float bandwidth);
         bool SendSetSpeedBandwidth(uint16_t targetNodeId, float bandwidth);
         bool SendSetPositionBandwidth(uint16_t targetNodeId, float bandwidth);
+        bool SendQueryContractVersion(uint16_t targetNodeId);
 
     private:
         void HandleSelectControlModeResponse(const hal::Can::Message& data);
         void HandleCategoryError(const hal::Can::Message& data);
         void HandleTelemetryStatus(const hal::Can::Message& data);
         void HandleTelemetryElectrical(const hal::Can::Message& data);
+        void HandleContractVersionResponse(const hal::Can::Message& data);
 
         services::CanMessageHandler<FocMotorCategoryClient> selectControlModeResponse{ focSelectControlModeResponseId, *this, &FocMotorCategoryClient::HandleSelectControlModeResponse };
         services::CanMessageHandler<FocMotorCategoryClient> categoryError{ services::canCategoryErrorResponseMessageTypeId, *this, &FocMotorCategoryClient::HandleCategoryError };
         services::CanMessageHandler<FocMotorCategoryClient> telemetryStatus{ focTelemetryStatusResponseId, *this, &FocMotorCategoryClient::HandleTelemetryStatus };
         services::CanMessageHandler<FocMotorCategoryClient> telemetryElectrical{ focTelemetryElectricalResponseId, *this, &FocMotorCategoryClient::HandleTelemetryElectrical };
+        services::CanMessageHandler<FocMotorCategoryClient> contractVersionResponse{ focContractVersionResponseId, *this, &FocMotorCategoryClient::HandleContractVersionResponse };
     };
 }

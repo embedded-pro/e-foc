@@ -1,6 +1,7 @@
 #include "tools/can_commander/logic/CanCommandClient.hpp"
 #include "can-lite/core/CanFrameCodec.hpp"
 #include "can-lite/core/CanPayload.hpp"
+#include "core/can/FocMotorWireContract.hpp"
 #include <algorithm>
 #include <limits>
 
@@ -183,14 +184,14 @@ namespace tool
 
     void CanCommandClient::DecodeTelemetryStatus(const hal::Can::Message& msg) const
     {
-        if (msg.size() < 6)
+        if (!can::wire::PayloadExact(msg, can::focTelemetryStatusResponseId))
             return;
-        const auto state = static_cast<FocMotorState>(msg[0]);
-        const auto fault = static_cast<FocFaultCode>(msg[1]);
-        const auto speedWire = static_cast<int16_t>((static_cast<uint16_t>(msg[2]) << 8) | msg[3]);
-        const auto posWire = static_cast<int16_t>((static_cast<uint16_t>(msg[4]) << 8) | msg[5]);
-        const float speed = static_cast<float>(speedWire) / can::focSpeedScale;
-        const float position = static_cast<float>(posWire) / can::focPositionScale;
+
+        services::CanPayloadReader reader{ msg };
+        const auto state = static_cast<FocMotorState>(reader.ReadUInt8());
+        const auto fault = static_cast<FocFaultCode>(reader.ReadUInt8());
+        const auto speed = reader.ReadFixed16(can::focSpeedScale);
+        const auto position = reader.ReadFixed16(can::focPositionScale);
 
         NotifyObservers([state, fault](auto& observer)
             {
@@ -211,14 +212,14 @@ namespace tool
 
     void CanCommandClient::DecodeTelemetryElectrical(const hal::Can::Message& msg) const
     {
-        if (msg.size() < 8)
+        if (!can::wire::PayloadExact(msg, can::focTelemetryElectricalResponseId))
             return;
-        const auto voltWire = static_cast<int16_t>((static_cast<uint16_t>(msg[0]) << 8) | msg[1]);
-        const auto iqWire = static_cast<int16_t>((static_cast<uint16_t>(msg[4]) << 8) | msg[5]);
-        const auto idWire = static_cast<int16_t>((static_cast<uint16_t>(msg[6]) << 8) | msg[7]);
-        const float voltage = static_cast<float>(voltWire) / can::focVoltageScale;
-        const float iq = static_cast<float>(iqWire) / can::focCurrentScale;
-        const float id = static_cast<float>(idWire) / can::focCurrentScale;
+
+        services::CanPayloadReader reader{ msg };
+        const auto voltage = reader.ReadFixed16(can::focVoltageScale);
+        reader.Skip(2);
+        const auto iq = reader.ReadFixed16(can::focCurrentScale);
+        const auto id = reader.ReadFixed16(can::focCurrentScale);
 
         NotifyObservers([id, iq](auto& observer)
             {
@@ -277,6 +278,16 @@ namespace tool
     void CanCommandClient::OnTelemetryElectrical(const hal::Can::Message& msg)
     {
         DecodeTelemetryElectrical(msg);
+    }
+
+    void CanCommandClient::OnContractVersionResponse(uint8_t major, uint8_t minor)
+    {
+        const bool compatible = major == can::wire::focContractVersionMajor;
+
+        NotifyObservers([major, minor, compatible](auto& observer)
+            {
+                observer.OnContractVersion(major, minor, compatible);
+            });
     }
 
     void CanCommandClient::OnError(infra::BoundedConstString message)

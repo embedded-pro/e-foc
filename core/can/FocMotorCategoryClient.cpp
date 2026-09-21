@@ -1,5 +1,6 @@
 #include "core/can/FocMotorCategoryClient.hpp"
 #include "can-lite/core/CanPayload.hpp"
+#include "core/can/FocMotorWireContract.hpp"
 
 namespace can
 {
@@ -7,7 +8,7 @@ namespace can
         services::CanSequenceSource& sequenceSource)
         : CanCategoryClient(transport, sequenceSource)
     {
-        AddMessageTypes(selectControlModeResponse, categoryError, telemetryStatus, telemetryElectrical);
+        AddMessageTypes(selectControlModeResponse, categoryError, telemetryStatus, telemetryElectrical, contractVersionResponse);
     }
 
     uint8_t FocMotorCategoryClient::Id() const
@@ -84,12 +85,34 @@ namespace can
         return SendCommand(targetNodeId, focSetPidPositionId, payload);
     }
 
+    bool FocMotorCategoryClient::SendQueryContractVersion(uint16_t targetNodeId)
+    {
+        services::CanPayloadWriter payload;
+        return SendCommand(targetNodeId, focQueryContractVersionId, payload);
+    }
+
+    void FocMotorCategoryClient::HandleContractVersionResponse(const hal::Can::Message& data)
+    {
+        if (!wire::PayloadExact(data, focContractVersionResponseId))
+            return;
+
+        services::CanPayloadReader reader{ data };
+        const auto major = reader.ReadUInt8();
+        const auto minor = reader.ReadUInt8();
+
+        NotifyObservers([major, minor](auto& observer)
+            {
+                observer.OnContractVersionResponse(major, minor);
+            });
+    }
+
     void FocMotorCategoryClient::HandleSelectControlModeResponse(const hal::Can::Message& data)
     {
+        if (!wire::PayloadExact(data, focSelectControlModeResponseId))
+            return;
+
         services::CanPayloadReader reader{ data };
         const auto activeMode = static_cast<FocMotorMode>(reader.ReadUInt8());
-        if (!reader.Valid())
-            return;
         NotifyObservers([activeMode](auto& observer)
             {
                 observer.OnSelectControlModeResponse(activeMode);
@@ -111,6 +134,9 @@ namespace can
 
     void FocMotorCategoryClient::HandleTelemetryStatus(const hal::Can::Message& data)
     {
+        if (!wire::PayloadExact(data, focTelemetryStatusResponseId))
+            return;
+
         NotifyObservers([&data](auto& observer)
             {
                 observer.OnTelemetryStatus(data);
@@ -119,6 +145,9 @@ namespace can
 
     void FocMotorCategoryClient::HandleTelemetryElectrical(const hal::Can::Message& data)
     {
+        if (!wire::PayloadExact(data, focTelemetryElectricalResponseId))
+            return;
+
         NotifyObservers([&data](auto& observer)
             {
                 observer.OnTelemetryElectrical(data);

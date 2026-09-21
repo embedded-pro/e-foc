@@ -1,3 +1,4 @@
+#include "can-lite/core/CanPayload.hpp"
 #include "core/can/FocMotorMessages.hpp"
 #include "cucumber_cpp/Steps.hpp"
 #include "hal/interfaces/Can.hpp"
@@ -11,11 +12,9 @@ namespace
 {
     hal::Can::Message EncodeFixed16BE(float value, int32_t scale)
     {
-        const auto raw = static_cast<int16_t>(value * static_cast<float>(scale));
-        hal::Can::Message msg;
-        msg.push_back(static_cast<uint8_t>(static_cast<uint16_t>(raw) >> 8));
-        msg.push_back(static_cast<uint8_t>(raw & 0xFF));
-        return msg;
+        services::CanPayloadWriter payload;
+        payload.WriteFixed16(value, scale);
+        return payload.Message();
     }
 }
 

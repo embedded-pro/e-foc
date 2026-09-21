@@ -1,4 +1,5 @@
 #include "tools/can_commander/gui/MainWindow.hpp"
+#include "core/can/FocMotorWireContract.hpp"
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMessageBox>
@@ -189,6 +190,18 @@ namespace tool
                 .arg(commandType, 2, 16, QChar('0'))
                 .arg(static_cast<int>(status))
                 .arg(QString::fromUtf8(services::CanAckStatusToString(status))));
+    }
+
+    void MainWindow::OnContractVersion(uint8_t major, uint8_t minor, bool compatible)
+    {
+        if (compatible)
+            logView->appendPlainText(QString("Contract version %1.%2").arg(major).arg(minor));
+        else
+            logView->appendPlainText(QString("ERROR: contract version %1.%2 is incompatible with %3.%4; commands are not safe to send")
+                    .arg(major)
+                    .arg(minor)
+                    .arg(can::wire::focContractVersionMajor)
+                    .arg(can::wire::focContractVersionMinor));
     }
 
     void MainWindow::OnMotorStatusReceived(tool::FocMotorState state, tool::FocFaultCode fault)

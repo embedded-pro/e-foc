@@ -24,6 +24,7 @@ namespace can
     static constexpr uint8_t focSetTorqueSetpointId = 0x0F;
     static constexpr uint8_t focSetSpeedSetpointId = 0x10;
     static constexpr uint8_t focSetPositionSetpointId = 0x11;
+    static constexpr uint8_t focQueryContractVersionId = 0x12;
 
     static constexpr uint8_t focMotorTypeResponseId = 0x80;
     static constexpr uint8_t focElectricalParamsResponseId = 0x86;
@@ -31,6 +32,7 @@ namespace can
     static constexpr uint8_t focTelemetryElectricalResponseId = 0x88;
     static constexpr uint8_t focTelemetryStatusResponseId = 0x89;
     static constexpr uint8_t focSelectControlModeResponseId = 0x8E;
+    static constexpr uint8_t focContractVersionResponseId = 0x92;
 
     enum class FocMotorMode : uint8_t
     {
@@ -77,7 +79,4 @@ namespace can
     static constexpr int32_t focPidScale = 1;
     static constexpr int32_t focFrictionScale = 10000;
     static constexpr int32_t focInertiaScale = 10000;
-
-    static constexpr uint8_t focPidAxisId = 0x00;
-    static constexpr uint8_t focPidAxisIq = 0x01;
 }
