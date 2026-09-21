@@ -3,12 +3,15 @@
 #include "tools/simulator/app/LaunchDialog.hpp"
 #include "tools/simulator/app/RunController.hpp"
 #include "tools/simulator/view/gui/GuiSimulation.hpp"
+#include "ui/backend/qt/QtTheme.hpp"
+#include "ui/theme/Theme.hpp"
 #include <QApplication>
 
 int main(int argc, char* argv[])
 {
     simulator::GuiSimulation::Init();
     QApplication app(argc, argv);
+    ui::backend::qt::ApplyTheme(ui::theme::Instrument());
 
     simulator::LaunchDialog dialog;
     if (dialog.exec() != QDialog::Accepted)

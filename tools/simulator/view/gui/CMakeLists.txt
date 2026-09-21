@@ -7,6 +7,11 @@ target_include_directories(e_foc.tool.simulator.view.gui PUBLIC
 
 target_link_libraries(e_foc.tool.simulator.view.gui PUBLIC
     Qt6::Widgets
+    ui.core
+    ui.theme
+    ui.scope
+    ui.widgets
+    ui.backend.qt
     e_foc.foc.model
     e_foc.foc.interfaces
     e_foc.services.electrical_system_ident
