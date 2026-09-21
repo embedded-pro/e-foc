@@ -4,6 +4,7 @@ add_library(e_foc.integration_tests.steps OBJECT
     CommonSteps.cpp
     ControllerMatrixSteps.cpp
     EepromSteps.cpp
+    FaultSteps.cpp
     HardfaultRecoverySteps.cpp
     MotorControlSteps.cpp
     PlantSteps.cpp

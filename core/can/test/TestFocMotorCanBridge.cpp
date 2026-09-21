@@ -233,7 +233,7 @@ namespace
                     hal::Hertz{ 1000 },
                     lowPriorityInterruptMock });
 
-            bridge.emplace(*motorServer, *coordinator, inverterMock, electricalIdentMock, &mechIdentMock, foc::NewtonMeter{ 0.1f }, nvmMock, config, tracer);
+            bridge.emplace(*motorServer, *coordinator, inverterMock, encoderMock, electricalIdentMock, &mechIdentMock, foc::NewtonMeter{ 0.1f }, nvmMock, config, tracer);
             motorServer->SetAcknowledger(ackSpy);
             ExecuteAllActions();
         }
@@ -312,6 +312,7 @@ namespace
                 EXPECT_CALL(mechIdentMock, Abort()).Times(AnyNumber());
                 EXPECT_CALL(mechIdentMock, IsRunning()).WillRepeatedly(Return(false));
                 EXPECT_CALL(faultNotifierMock, Unregister()).Times(AnyNumber());
+                EXPECT_CALL(encoderMock, Read()).WillRepeatedly(Return(foc::Radians{ 0.0f }));
             } };
 
         StrictMock<hal::CanMock> canMock;
@@ -994,7 +995,7 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_NullMechIdent_ReturnsNotImple
             foc::Ampere{ 10.0f },
             hal::Hertz{ 1000 },
             lowPriorityInterruptMock });
-    bridge.emplace(*motorServer, *coordinator, inverterMock, electricalIdentMock, nullptr, foc::NewtonMeter{ 0.1f }, nvmMock, config, tracer);
+    bridge.emplace(*motorServer, *coordinator, inverterMock, encoderMock, electricalIdentMock, nullptr, foc::NewtonMeter{ 0.1f }, nvmMock, config, tracer);
     motorServer->SetAcknowledger(ackSpy);
     ExecuteAllActions();
     ResetCaptures();
@@ -1305,7 +1306,7 @@ TEST_F(FocMotorCanBridgeTest, Constructor_EmitsTraceMessage)
             hal::Hertz{ 1000 },
             lowPriorityInterruptMock });
 
-    bridge.emplace(*motorServer, *coordinator, inverterMock, electricalIdentMock, &mechIdentMock, foc::NewtonMeter{ 0.1f }, nvmMock, config, tracer);
+    bridge.emplace(*motorServer, *coordinator, inverterMock, encoderMock, electricalIdentMock, &mechIdentMock, foc::NewtonMeter{ 0.1f }, nvmMock, config, tracer);
     motorServer->SetAcknowledger(ackSpy);
     ExecuteAllActions();
 }

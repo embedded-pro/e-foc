@@ -66,7 +66,9 @@ namespace sil
         {
             config.noiseSigmaAmpere = 0.05f;
             config.noiseBiasAmpereA = 0.02f;
-            config.encoderSigmaRadians = 0.001f;
+            // Below the alignment settle threshold of 1 mrad, above which the rotor never
+            // reads as settled and alignment cannot converge.
+            config.encoderSigmaRadians = 0.0002f;
             return true;
         }
 

@@ -103,6 +103,10 @@ namespace application
         services::SetGlobalTracerInstance(terminalAndTracer.tracer);
         ApplyPlantConfig();
         onInitialized();
+        protectionPollTimer.Start(std::chrono::milliseconds(1), [this]()
+            {
+                boardProtection.DeliverPendingProtection();
+            });
         focTimer.Start();
     }
 
@@ -247,7 +251,9 @@ namespace application
     OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz freq, const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
         baseFrequency = freq;
+        onPhaseCurrentsReadyValid = false;
         onPhaseCurrentsReady = onDone;
+        onPhaseCurrentsReadyValid = true;
     }
 
     OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
@@ -258,38 +264,39 @@ namespace application
     void PlatformFactoryImpl::FocTimerIsr()
     {
         model.StepForTest(lastDutyPhases);
-        model.PhaseCurrentsReady(baseFrequency, [this](foc::PhaseCurrents currents)
-            {
-                lastCurrents = currents;
-            });
 
-        boardProtection.Evaluate(lastCurrents, model.EffectiveSupplyVoltage().Value(), model.WindingTemperatureCelsius());
+        // Read the currents back directly rather than re-registering a callback on the model every
+        // tick: that assignment raced Stop() clearing the same infra::Function from the event loop,
+        // and an interrupt invoking a half-written one jumps through a garbage pointer.
+        lastCurrents = model.LastMeasuredCurrents();
 
-        if (!onPhaseCurrentsReady)
-            return;
-
-        if (controlLoopEntered)
+        if (onPhaseCurrentsReadyValid && onPhaseCurrentsReady && !controlLoopEntered)
         {
-            controlLoopMetrics.RecordReentry();
-            return;
+            controlLoopEntered = true;
+            const auto entryCycles = CycleCounter::Now();
+
+            onPhaseCurrentsReady(lastCurrents);
+
+            controlLoopMetrics.Record(CycleCounter::Now() - entryCycles);
+            controlLoopEntered = false;
         }
+        else if (onPhaseCurrentsReadyValid && onPhaseCurrentsReady && controlLoopEntered)
+            controlLoopMetrics.RecordReentry();
 
-        controlLoopEntered = true;
-        const auto entryCycles = CycleCounter::Now();
-
-        onPhaseCurrentsReady(lastCurrents);
-
-        controlLoopMetrics.Record(CycleCounter::Now() - entryCycles);
-        controlLoopEntered = false;
+        // Last in the tick on purpose: a trip stops the drive from inside this interrupt, and
+        // doing that mid-tick would tear down the callback the control loop above still uses.
+        boardProtection.Evaluate(lastCurrents, model.EffectiveSupplyVoltage().Value(), model.WindingTemperatureCelsius());
     }
 
     void PlatformFactoryImpl::Start()
     {
         model.Start();
+        boardProtection.SetArmed(true);
     }
 
     void PlatformFactoryImpl::Stop()
     {
+        boardProtection.SetArmed(false);
         model.Stop();
     }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/interfaces/Units.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
 #include "infra/util/Function.hpp"
@@ -87,5 +88,11 @@ namespace state_machine
 
         virtual void ApplyOnlineEstimates()
         {}
+
+        // Zero unless the mode runs an outer loop that measures it.
+        virtual foc::RadiansPerSecond MeasuredSpeed() const
+        {
+            return foc::RadiansPerSecond{ 0.0f };
+        }
     };
 }

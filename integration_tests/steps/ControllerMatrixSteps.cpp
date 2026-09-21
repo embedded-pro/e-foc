@@ -107,6 +107,20 @@ WHEN(R"(the rotor is aligned)")
         << "Align command rejected";
 }
 
+// These calibration steps are expected to fail, so the command outcome is not asserted; the
+// scenario checks the resulting state instead.
+WHEN(R"(electrical identification is attempted)")
+{
+    auto& fixture = context.Get<Fixture>();
+    fixture.SendCanCommand(can::focMotorCategoryId, can::focIdentifyElectricalId, {}, std::chrono::seconds{ 60 });
+}
+
+WHEN(R"(the rotor alignment is attempted)")
+{
+    auto& fixture = context.Get<Fixture>();
+    fixture.SendCanCommand(can::focMotorCategoryId, can::focAlignId, {}, std::chrono::seconds{ 30 });
+}
+
 namespace
 {
     std::string LoopTraceLabel(const std::string& loop)

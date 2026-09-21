@@ -11,6 +11,19 @@ namespace application
     {
         trips = configuredTrips;
         asserted = false;
+        notified = false;
+        pending = false;
+    }
+
+    void BoardProtectionSimulator::SetArmed(bool isArmed)
+    {
+        armed = isArmed;
+        if (!isArmed)
+        {
+            asserted = false;
+            notified = false;
+            pending = false;
+        }
     }
 
     void BoardProtectionSimulator::Register(const infra::Function<void(PlatformFactory::BoardProtectionReason)>& handler)
@@ -62,18 +75,33 @@ namespace application
     OPTIMIZE_FOR_SPEED void BoardProtectionSimulator::Evaluate(const foc::PhaseCurrents& currents,
         float busVoltageVolts, float windingTemperatureCelsius)
     {
+        if (!armed)
+            return;
+
         auto reason = PlatformFactory::BoardProtectionReason::overCurrent;
         const bool exceeded = Exceeded(currents, busVoltageVolts, windingTemperatureCelsius, reason);
+        asserted = exceeded;
 
-        if (exceeded && !asserted)
+        if (!exceeded)
         {
-            asserted = true;
-            if (onProtection)
-                onProtection(reason);
+            notified = false;
             return;
         }
 
-        if (!exceeded)
-            asserted = false;
+        if (!notified)
+        {
+            pendingReason = reason;
+            pending = true;
+        }
+    }
+
+    void BoardProtectionSimulator::DeliverPendingProtection()
+    {
+        if (!pending || !onProtection)
+            return;
+
+        pending = false;
+        notified = true;
+        onProtection(pendingReason);
     }
 }

@@ -56,7 +56,8 @@ namespace can
         void SendSelectControlModeResponse(FocMotorMode activeMode);
         void SendCategoryError(uint8_t origCommandId, FocMotorCategoryError errorCode);
         void BroadcastFaultStatus(FocFaultCode fault);
-        void BroadcastTelemetryStatus(FocMotorState state, FocFaultCode fault);
+        void BroadcastTelemetryStatus(FocMotorState state, FocFaultCode fault,
+            foc::RadiansPerSecond speed, foc::Radians position);
         void BroadcastElectricalParams(foc::Ohm resistance, foc::MilliHenry inductance, std::size_t polePairs);
         void BroadcastMechanicalParams(foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia);
 

@@ -151,6 +151,61 @@ namespace integration
         return false;
     }
 
+    bool Fixture::WaitForFaultCode(can::FocFaultCode expectedFault, std::chrono::milliseconds timeout)
+    {
+        const hal::Can::Id requestId = MakeId(services::CanPriority::command,
+            can::focMotorCategoryId, can::focRequestTelemetryId, kServerNodeId);
+        const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
+            can::focMotorCategoryId, can::focTelemetryStatusResponseId, kServerNodeId);
+
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (std::chrono::steady_clock::now() < deadline)
+        {
+            hal::Can::Message request;
+            request.push_back(nextSequence++);
+            interactor.SendCanFrame(requestId, request, std::chrono::milliseconds{ 100 });
+
+            hal::Can::Message payload;
+            std::chrono::milliseconds elapsed{ 0 };
+            const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+                deadline - std::chrono::steady_clock::now());
+            if (remaining <= std::chrono::milliseconds{ 0 })
+                break;
+
+            if (WaitForCanFrame(telemetryId, payload, std::min(remaining, std::chrono::milliseconds{ 1000 }), elapsed) && payload.size() >= 2)
+            {
+                if (std::getenv("SIL_VERBOSE") != nullptr)
+                    std::fprintf(stderr, "[Fixture] WaitForFaultCode: got fault=%d expected=%d\n",
+                        static_cast<int>(payload[1]), static_cast<int>(expectedFault));
+                if (static_cast<can::FocFaultCode>(payload[1]) == expectedFault)
+                    return true;
+            }
+
+            usleep(20000);
+        }
+        return false;
+    }
+
+    std::optional<float> Fixture::ReadMeasuredPosition(std::chrono::milliseconds timeout)
+    {
+        const hal::Can::Id requestId = MakeId(services::CanPriority::command,
+            can::focMotorCategoryId, can::focRequestTelemetryId, kServerNodeId);
+        const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
+            can::focMotorCategoryId, can::focTelemetryStatusResponseId, kServerNodeId);
+
+        hal::Can::Message request;
+        request.push_back(nextSequence++);
+        interactor.SendCanFrame(requestId, request, std::chrono::milliseconds{ 100 });
+
+        hal::Can::Message payload;
+        std::chrono::milliseconds elapsed{ 0 };
+        if (!WaitForCanFrame(telemetryId, payload, timeout, elapsed) || payload.size() < 6)
+            return std::nullopt;
+
+        const auto raw = static_cast<int16_t>((static_cast<uint16_t>(payload[4]) << 8) | payload[5]);
+        return static_cast<float>(raw) / static_cast<float>(can::focPositionScale);
+    }
+
     bool Fixture::SelectControlMode(can::FocMotorMode mode, std::chrono::milliseconds timeout)
     {
         hal::Can::Message payload;

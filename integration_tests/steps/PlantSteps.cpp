@@ -91,6 +91,14 @@ GIVEN(R"(a {word} motor plant)", (std::string preset))
     ASSERT_TRUE(sil::TryNamedPlant(preset, setup.plant)) << "Unknown motor plant preset: " << preset;
 }
 
+GIVEN(R"(an {word} phase motor plant)", (std::string phase))
+{
+    RequireSimulatedTarget();
+    auto& setup = context.Get<ScenarioSetup>();
+    ASSERT_TRUE(sil::TryNamedPlant(phase + " phase", setup.plant))
+        << "Unknown motor plant preset: " << phase << " phase";
+}
+
 GIVEN(R"(a motor plant with:)")
 {
     RequireSimulatedTarget();
@@ -135,4 +143,37 @@ WHEN(R"(the target boots)")
 
     auto& fixture = context.Get<Fixture>();
     ASSERT_TRUE(fixture.WaitForCanHeartbeat()) << "CAN stack not ready after boot";
+}
+
+GIVEN(R"(the stored calibration has a {word})", (std::string damage))
+{
+    RequireSimulatedTarget();
+    auto& setup = context.Get<ScenarioSetup>();
+    setup.nvm.includeCalibration = true;
+    setup.nvm.calibration = sil::CompleteCalibration();
+
+    if (damage == "corrupt")
+        setup.nvm.calibrationDamage = sil::RecordDamage::corruptCrc;
+    else if (damage == "wrong")
+        setup.nvm.calibrationDamage = sil::RecordDamage::badMagic;
+    else if (damage == "stale")
+        setup.nvm.calibrationDamage = sil::RecordDamage::staleVersion;
+    else
+        FAIL() << "Unknown kind of damage: " << damage;
+}
+
+GIVEN(R"(the stored configuration has a {word})", (std::string damage))
+{
+    RequireSimulatedTarget();
+    auto& setup = context.Get<ScenarioSetup>();
+    setup.nvm.includeConfig = true;
+
+    if (damage == "corrupt")
+        setup.nvm.configDamage = sil::RecordDamage::corruptCrc;
+    else if (damage == "wrong")
+        setup.nvm.configDamage = sil::RecordDamage::badMagic;
+    else if (damage == "stale")
+        setup.nvm.configDamage = sil::RecordDamage::staleVersion;
+    else
+        FAIL() << "Unknown kind of damage: " << damage;
 }
