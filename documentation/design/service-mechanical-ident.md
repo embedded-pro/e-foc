@@ -326,7 +326,9 @@ The regressor vector is $\phi = [1,\ \dot{\omega},\ \omega]^T$, and the paramete
 
 ### Torque Constant Dependency
 
-The torque constant $k_t$ must be provided before the estimator updates begin. In normal operation the state machine derives it from the calibration NVM record as $\tfrac{3}{2} p \psi_f$ (`core/foc/math/TorqueConstant.hpp`) and supplies it via `SetTorqueConstant()` during the `EnterEnabled` transition; the one-shot procedure receives the same value. A wrong $k_t$ scales every identified $J$ and $B$ by the same factor, which is why it is not a per-target constant. Updates run opportunistically while the FOC controller is active.
+The torque constant $k_t$ must be provided before the estimator updates begin. In normal operation the state machine derives it from the calibration NVM record as $\tfrac{3}{2} p \psi_f$ (`core/foc/math/TorqueConstant.hpp`) and supplies it via `SetTorqueConstant()` during the `EnterEnabled` transition; the one-shot procedure receives the same value.
+
+A wrong $k_t$ scales every identified $J$ and $B$ by the same factor, which is why it is not a per-target constant. Updates run opportunistically while the FOC controller is active.
 
 ### Persistence of Excitation
 

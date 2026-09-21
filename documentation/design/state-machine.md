@@ -254,9 +254,13 @@ sequenceDiagram
 
 After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`. The encoder zero offset is not written back to the encoder at this point; it is established only by the alignment step itself during the calibration sequence.
 
-Every record handed to the NVM is traced first as `[SM] Calibration record: R=… L_mH=… p=… J_uNms2=… B_uNms=…`. Inertia and viscous friction are traced in micro-units because the tracer prints three decimals, which cannot show values around 1e-6 and 1e-5; the same convention applies to the `[EST]` lines and the `[SM] Applying mechanical estimates` line below. The line is what an external observer, the software-in-the-loop suite included, compares against the plant it configured.
+Every record handed to the NVM is traced first as `[SM] Calibration record: R=… L_mH=… p=… J_uNms2=… B_uNms=…`. Inertia and viscous friction are traced in micro-units because the tracer prints three decimals, which cannot show values around 1e-6 and 1e-5; the same convention applies to the `[EST]` lines and the `[SM] Applying mechanical estimates` line below.
 
-The torque constant every mechanical consumer uses — the identification service, the online inertia estimator and the speed-loop gain design — is not configured per target. It is derived from the record as $K_t = \tfrac{3}{2} p \psi_f$ (`core/foc/math/TorqueConstant.hpp`), the factor the plant model itself applies, so a motor whose flux linkage is set with `set_flux_linkage` gets a consistent torque constant without a second number to keep in step (REQ-SM-027).
+The calibration record line is what an external observer, the software-in-the-loop suite included, compares against the plant it configured.
+
+The torque constant every mechanical consumer uses — the identification service, the online inertia estimator and the speed-loop gain design — is not configured per target. It is derived from the record as $K_t = \tfrac{3}{2} p \psi_f$ (`core/foc/math/TorqueConstant.hpp`), the factor the plant model itself applies.
+
+A motor whose flux linkage is set with `set_flux_linkage` therefore gets a consistent torque constant without a second number to keep in step (REQ-SM-027).
 
 ### Making the loops live before mechanical identification
 

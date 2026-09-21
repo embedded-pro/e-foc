@@ -29,7 +29,11 @@ Two complementary offline identification methods are used, one for each paramete
 - **Resistance** — DC voltage step: steady-state V/I gives $R_s$ directly. Accurate for any motor.
 - **Inductance** — HF sinusoidal injection: synchronous demodulation of the current response at the injection frequency extracts Im(Z) and thus $L_s$. Suitable for low-resistance motors where the time-constant method fails.
 
-The reason two separate methods are needed is a fundamental signal-conditioning problem. At the 700 Hz injection frequency the ratio $\omega L_s / R_s$ is 7 for the Anaheim BLY172S-24V-4000 ($R_s = 0.405\,\Omega$, $L_s = 0.64\,\text{mH}$) and 2.4 for the Teknic M-2310P-LN-04K ($R_s = 0.36\,\Omega$, $L_s = 0.20\,\text{mH}$), so resistance is 14 % and 38 % of the impedance; for lower-resistance windings it falls below 5 %, and any small phase error drowns the R signal entirely. The time-constant method (section 4 of version 1.0) likewise fails because $\tau = L_s/R_s$ is 1.6 ms for the Anaheim and 0.56 ms for the Teknic, 16 and 5.6 samples at 10 kHz — too few for threshold-based detection through a filter of comparable length. Each parameter is therefore extracted using the technique that makes it the dominant signal.
+The reason two separate methods are needed is a fundamental signal-conditioning problem. At the 700 Hz injection frequency the ratio $\omega L_s / R_s$ is 7 for the Anaheim BLY172S-24V-4000 ($R_s = 0.405\,\Omega$, $L_s = 0.64\,\text{mH}$) and 2.4 for the Teknic M-2310P-LN-04K ($R_s = 0.36\,\Omega$, $L_s = 0.20\,\text{mH}$), so resistance is 14 % and 38 % of the impedance.
+
+For lower-resistance windings that share falls below 5 %, and any small phase error drowns the R signal entirely. The time-constant method (section 4 of version 1.0) likewise fails because $\tau = L_s/R_s$ is 1.6 ms for the Anaheim and 0.56 ms for the Teknic, 16 and 5.6 samples at 10 kHz — too few for threshold-based detection through a filter of comparable length.
+
+Each parameter is therefore extracted using the technique that makes it the dominant signal.
 
 ---
 
