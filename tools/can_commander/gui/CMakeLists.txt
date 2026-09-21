@@ -9,6 +9,8 @@ target_link_libraries(e_foc.tool.can_commander.gui PUBLIC
     Qt6::Widgets
     ui.core
     ui.theme
+    ui.model
+    ui.shell
     ui.backend.qt
     e_foc.tool.can_commander.adapter
     e_foc.tool.can_commander.logic

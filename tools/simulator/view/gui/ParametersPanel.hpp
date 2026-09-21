@@ -2,10 +2,10 @@
 
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
-#include <QDoubleSpinBox>
-#include <QLabel>
-#include <QPushButton>
+#include "ui/backend/qt/QtFormView.hpp"
+#include "ui/model/FormModel.hpp"
 #include <QWidget>
+#include <array>
 #include <cstddef>
 #include <optional>
 
@@ -32,6 +32,7 @@ namespace simulator
         };
 
         ParametersPanel(const foc::ThreePhaseMotorModel::Parameters& motorParameters, const PidParameters& pidParameters, QWidget* parent = nullptr);
+        ~ParametersPanel() override;
 
         void UpdatePidParameters(const PidParameters& pidParameters);
         void UpdateResistance(foc::Ohm value);
@@ -49,44 +50,34 @@ namespace simulator
         void thermalResetRequested();
 
     private:
+        static constexpr std::size_t maxParameterGroups{ 6 };
+        static constexpr std::size_t maxParameterFields{ 14 };
+        static constexpr std::size_t configGroupCount{ 4 };
+        static constexpr std::size_t configFieldCount{ 14 };
+
+        void BuildParameterSpec(const PidParameters& pidParameters);
+        void BuildConfigurationSpec();
+        void Show(ui::model::FieldId field, double value);
         void EmitNoiseConfig();
         void EmitEncoderNoiseConfig();
         void EmitThermalConfig();
 
-    private:
-        QLabel* resistanceLabel;
-        QLabel* inductanceLabel;
-        QLabel* frictionLabel;
-        QLabel* inertiaLabel;
-        QLabel* polePairsLabel;
-        QLabel* alignmentOffsetLabel;
+        std::array<ui::model::GroupSpec, maxParameterGroups> parameterGroups{};
+        std::array<ui::model::FieldSpec, maxParameterFields> parameterFields{};
+        std::array<ui::model::FieldValue, maxParameterFields> parameterValues{};
+        std::size_t parameterGroupsUsed{ 0 };
+        std::size_t parameterFieldsUsed{ 0 };
+        ui::model::FormSpec parameterSpec{};
+        std::optional<ui::model::FormModel> parameterModel;
 
-        QLabel* currentKpLabel;
-        QLabel* currentKiLabel;
-        QLabel* speedKpLabel = nullptr;
-        QLabel* speedKiLabel = nullptr;
-        QLabel* speedKdLabel = nullptr;
-        QLabel* positionKpLabel = nullptr;
-        QLabel* positionKiLabel = nullptr;
-        QLabel* positionKdLabel = nullptr;
+        std::array<ui::model::GroupSpec, configGroupCount> configGroups{};
+        std::array<ui::model::FieldSpec, configFieldCount> configFields{};
+        std::array<ui::model::FieldValue, configFieldCount> configValues{};
+        std::array<ui::model::ActionSpec, 1> configActions{};
+        ui::model::FormSpec configSpec{};
+        std::optional<ui::model::FormModel> configModel;
 
-        QDoubleSpinBox* sigmaSpin{ nullptr };
-        QDoubleSpinBox* biasASpin{ nullptr };
-        QDoubleSpinBox* biasBSpin{ nullptr };
-        QDoubleSpinBox* biasCSpin{ nullptr };
-
-        QDoubleSpinBox* encoderSigmaSpin{ nullptr };
-        QDoubleSpinBox* encoderBiasSpin{ nullptr };
-
-        QDoubleSpinBox* tAmbientSpin{ nullptr };
-        QDoubleSpinBox* rThSpin{ nullptr };
-        QDoubleSpinBox* cThSpin{ nullptr };
-        QDoubleSpinBox* alphaCuSpin{ nullptr };
-        QDoubleSpinBox* betaFeSpin{ nullptr };
-        QPushButton* resetTempButton{ nullptr };
-
-        QLabel* tWindingLabel{ nullptr };
-        QLabel* rEffLabel{ nullptr };
-        QLabel* lEffLabel{ nullptr };
+        ui::backend::qt::QtFormView* parameterForm{ nullptr };
+        ui::backend::qt::QtFormView* configForm{ nullptr };
     };
 }

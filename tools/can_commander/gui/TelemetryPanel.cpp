@@ -2,11 +2,30 @@
 #include "ui/backend/qt/QtTheme.hpp"
 #include "ui/theme/Theme.hpp"
 #include <QFormLayout>
+#include <QGroupBox>
 #include <QVBoxLayout>
 
 namespace tool
 {
     using namespace services;
+
+    namespace
+    {
+        using ui::model::FieldId;
+        using ui::model::FieldKind;
+        using ui::model::FieldSpec;
+
+        constexpr FieldId idCurrent{ 1 };
+        constexpr FieldId iqCurrent{ 2 };
+        constexpr FieldId speed{ 3 };
+        constexpr FieldId position{ 4 };
+        constexpr FieldId busVoltage{ 5 };
+
+        constexpr FieldSpec ReadOut(FieldId id, std::string_view label, std::string_view suffix, std::uint8_t decimals)
+        {
+            return FieldSpec{ id, ui::model::noGroup, FieldKind::ReadOut, label, suffix, { 0.0, 0.0, 0.0, 0.0, decimals }, {}, {}, {} };
+        }
+    }
 
     TelemetryPanel::TelemetryPanel(QWidget* parent)
         : QWidget(parent)
@@ -21,21 +40,38 @@ namespace tool
         statusLayout->addRow("Fault:", faultLabel);
         layout->addWidget(statusGroup);
 
+        measurementFields = {
+            ReadOut(idCurrent, "Id Current:", " A", 3),
+            ReadOut(iqCurrent, "Iq Current:", " A", 3),
+            ReadOut(speed, "Speed:", " rad/s", 3),
+            ReadOut(position, "Position:", " rad", 4),
+            ReadOut(busVoltage, "Bus Voltage:", " V", 2)
+        };
+
+        measurementSpec = ui::model::FormSpec{ {}, measurementFields, {}, {} };
+        measurementModel.emplace(measurementSpec, measurementValues, std::span<ui::model::TableModel>{});
+
         auto* measureGroup = new QGroupBox("Measurements");
-        auto* measureLayout = new QFormLayout(measureGroup);
-        idCurrentLabel = new QLabel("--- A");
-        iqCurrentLabel = new QLabel("--- A");
-        speedLabel = new QLabel("--- rad/s");
-        positionLabel = new QLabel("--- rad");
-        busVoltageLabel = new QLabel("--- V");
-        measureLayout->addRow("Id Current:", idCurrentLabel);
-        measureLayout->addRow("Iq Current:", iqCurrentLabel);
-        measureLayout->addRow("Speed:", speedLabel);
-        measureLayout->addRow("Position:", positionLabel);
-        measureLayout->addRow("Bus Voltage:", busVoltageLabel);
+        auto* measureLayout = new QVBoxLayout(measureGroup);
+        measurementForm = new ui::backend::qt::QtFormView{ measureGroup };
+        measurementForm->Build(*measurementModel);
+        measureLayout->addWidget(measurementForm);
         layout->addWidget(measureGroup);
 
         layout->addStretch();
+    }
+
+    TelemetryPanel::~TelemetryPanel()
+    {
+        // ~QtFormView resets the callbacks it installed on its FormModel, and that model is a
+        // member which unwinds before ~QWidget deletes its children.
+        delete measurementForm;
+    }
+
+    void TelemetryPanel::Show(FieldId field, double value)
+    {
+        measurementModel->SetNumber(field, value);
+        measurementForm->Refresh(field);
     }
 
     void TelemetryPanel::OnMotorStatus(FocMotorState state, FocFaultCode fault)
@@ -44,21 +80,21 @@ namespace tool
         faultLabel->setText(FaultCodeName(fault));
     }
 
-    void TelemetryPanel::OnCurrentMeasurement(float idCurrent, float iqCurrent)
+    void TelemetryPanel::OnCurrentMeasurement(float idCurrentValue, float iqCurrentValue)
     {
-        idCurrentLabel->setText(QString::number(idCurrent, 'f', 3) + " A");
-        iqCurrentLabel->setText(QString::number(iqCurrent, 'f', 3) + " A");
+        Show(idCurrent, static_cast<double>(idCurrentValue));
+        Show(iqCurrent, static_cast<double>(iqCurrentValue));
     }
 
-    void TelemetryPanel::OnSpeedPosition(float speed, float position)
+    void TelemetryPanel::OnSpeedPosition(float speedValue, float positionValue)
     {
-        speedLabel->setText(QString::number(speed, 'f', 3) + " rad/s");
-        positionLabel->setText(QString::number(position, 'f', 4) + " rad");
+        Show(speed, static_cast<double>(speedValue));
+        Show(position, static_cast<double>(positionValue));
     }
 
     void TelemetryPanel::OnBusVoltage(float voltage)
     {
-        busVoltageLabel->setText(QString::number(voltage, 'f', 2) + " V");
+        Show(busVoltage, static_cast<double>(voltage));
     }
 
     void TelemetryPanel::OnFaultEvent(FocFaultCode fault)
