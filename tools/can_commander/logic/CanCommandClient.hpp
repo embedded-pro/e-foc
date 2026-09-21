@@ -68,7 +68,6 @@ namespace tool
         void SendSetPositionBandwidth(float bandwidth);
 
         void RequestData();
-        bool ContractAccepted() const;
         void HandleTimeout();
 
     private:

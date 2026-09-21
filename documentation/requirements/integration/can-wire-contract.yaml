@@ -2,10 +2,15 @@
   title: One authoritative wire contract for the FOC motor category
   shall: >
     The message identifiers, enumerations, scale factors and per-message field layouts of CAN
-    category 0x02 shall be defined once, in core/can, and every producer and consumer of those
-    frames — the category server, the category client, the commander tool and the integration
-    test fixtures — shall derive its encoding and decoding from that definition. No component
-    shall restate an identifier, a field layout, a scale or an enumerator of that category.
+    category 0x02 shall be defined once, in core/can. No producer or consumer of those frames —
+    the category server, the category client, the commander tool or the integration test
+    fixtures — shall restate an identifier, a scale or an enumerator; each shall reference the
+    single definition. Every decode shall derive its accepted payload length from that
+    definition rather than from a restated constant, and every message layout shall be pinned
+    by the byte-level vectors of REQ-CAN-004, which are what detect a field order or width that
+    has drifted from the definition. Encoding and decoding are written against the definition
+    rather than generated from it: a descriptor edit changes the accepted length and fails the
+    vectors, and the accompanying encode or decode change is made by hand.
 
 - id: REQ-CAN-002
   title: Payload length is exact

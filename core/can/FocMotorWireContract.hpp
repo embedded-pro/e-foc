@@ -1,5 +1,6 @@
 #pragma once
 
+#include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "core/can/FocMotorMessages.hpp"
 #include "hal/interfaces/Can.hpp"
 #include <array>
@@ -86,7 +87,7 @@ namespace can
 
     inline constexpr std::array<FieldDescriptor, 3> electricalParamsFields{ {
         { "resistance", FieldType::fixed16, focResistanceScale, "ohm" },
-        { "inductance", FieldType::fixed16, focInductanceScale, "H" },
+        { "inductance", FieldType::fixed16, focInductanceScale, "mH" },
         { "polePairs", FieldType::uint8, 1, "-" },
     } };
 
@@ -100,6 +101,11 @@ namespace can
         { "maxCurrent", FieldType::fixed16, focCurrentScale, "A" },
         { "iq", FieldType::fixed16, focCurrentScale, "A" },
         { "id", FieldType::fixed16, focCurrentScale, "A" },
+    } };
+
+    inline constexpr std::array<FieldDescriptor, 2> categoryErrorFields{ {
+        { "originCommandId", FieldType::uint8, 1, "-" },
+        { "errorCode", FieldType::uint8, 1, "enum" },
     } };
 
     inline constexpr std::array<FieldDescriptor, 4> telemetryStatusFields{ {
@@ -142,7 +148,7 @@ namespace can
         MakeDescriptor(focQueryContractVersionId, "QueryContractVersion", Direction::command),
     } };
 
-    inline constexpr std::array<MessageDescriptor, 7> focMotorResponses{ {
+    inline constexpr std::array<MessageDescriptor, 8> focMotorResponses{ {
         MakeDescriptor(focMotorTypeResponseId, "MotorTypeResponse", Direction::response, modeFields),
         MakeDescriptor(focElectricalParamsResponseId, "ElectricalParamsResponse", Direction::response, electricalParamsFields),
         MakeDescriptor(focMechanicalParamsResponseId, "MechanicalParamsResponse", Direction::response, mechanicalParamsFields),
@@ -150,6 +156,7 @@ namespace can
         MakeDescriptor(focTelemetryStatusResponseId, "TelemetryStatusResponse", Direction::telemetry, telemetryStatusFields),
         MakeDescriptor(focSelectControlModeResponseId, "SelectControlModeResponse", Direction::response, modeFields),
         MakeDescriptor(focContractVersionResponseId, "ContractVersionResponse", Direction::response, contractVersionFields),
+        MakeDescriptor(services::canCategoryErrorResponseMessageTypeId, "CategoryErrorResponse", Direction::response, categoryErrorFields),
     } };
 
     constexpr std::optional<MessageDescriptor> FindDescriptor(uint8_t id)

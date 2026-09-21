@@ -41,6 +41,8 @@ namespace tool
         void OnCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status) override;
         void OnContractVersion(uint8_t major, uint8_t minor, bool compatible) override;
 
+        void UpdateCommandsEnabled();
+
         void SetupSocketNotifier();
         void TeardownSocketNotifier();
 
@@ -56,5 +58,7 @@ namespace tool
         QTimer timeoutTimer;
         QTimer rxPollTimer;
         QSocketNotifier* socketNotifier = nullptr;
+        bool adapterConnected = false;
+        bool contractCompatible = false;
     };
 }

@@ -166,11 +166,12 @@ namespace can
 
     void FocMotorCategoryClient::HandleCategoryError(const hal::Can::Message& data)
     {
+        if (!PayloadExact(data, services::canCategoryErrorResponseMessageTypeId))
+            return;
+
         services::CanPayloadReader reader{ data };
         const auto originCommandId = reader.ReadUInt8();
         const auto errorCode = static_cast<FocMotorCategoryError>(reader.ReadUInt8());
-        if (!reader.Valid())
-            return;
         NotifyObservers([originCommandId, errorCode](auto& observer)
             {
                 observer.OnCategoryError(originCommandId, errorCode);

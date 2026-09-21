@@ -147,8 +147,11 @@ namespace tool
 
     void MainWindow::OnConnectionChanged(bool connected)
     {
+        adapterConnected = connected;
+        contractCompatible = false;
+
         connectionPanel->OnConnectionChanged(connected);
-        commandPanel->SetCommandsEnabled(false);
+        UpdateCommandsEnabled();
 
         if (connected)
         {
@@ -159,6 +162,11 @@ namespace tool
         {
             TeardownSocketNotifier();
         }
+    }
+
+    void MainWindow::UpdateCommandsEnabled()
+    {
+        commandPanel->SetCommandsEnabled(adapterConnected && contractCompatible);
     }
 
     void MainWindow::OnBusyChanged(bool busy)
@@ -194,7 +202,8 @@ namespace tool
 
     void MainWindow::OnContractVersion(uint8_t major, uint8_t minor, bool compatible)
     {
-        commandPanel->SetCommandsEnabled(compatible);
+        contractCompatible = compatible;
+        UpdateCommandsEnabled();
 
         if (compatible)
             logView->appendPlainText(QString("Contract version %1.%2").arg(major).arg(minor));

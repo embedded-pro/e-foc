@@ -62,7 +62,13 @@ The category occupies slot `0x02` (the first application-reserved category ID). 
 
 Every command carries the `can-lite` sequence byte ahead of its fields; responses and telemetry do not. A frame
 whose length is not exactly the length its descriptor states is answered with `invalidPayload` and never
-partially decoded — a payload of another length is a foreign layout, not a tolerable variant of this one.
+partially decoded — a payload of another length is a foreign layout, not a tolerable variant of this one. The
+category-error frame on the `can-lite` reserved type `0xFE` carries a descriptor of its own and is held to the
+same exactness, so no decode path in this category escapes it.
+
+The descriptors are the specification and the length authority, not a codec: encoders and decoders are written
+against them by hand. A descriptor edit therefore changes the accepted length and fails the byte-level vectors,
+which is what surfaces the encode or decode change that has to accompany it.
 
 **Contract version.** `focContractVersionMajor.focContractVersionMinor` identifies the contract, and
 `QueryContractVersion` (`0x12`) answers it in `ContractVersionResponse` (`0x92`). A client whose major differs
