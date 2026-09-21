@@ -81,8 +81,8 @@ Physical-to-wire conversions use fixed-point scale factors:
 | Bandwidth  | int16     | 1            | closed-loop bandwidth in rad/s |
 | Resistance | int16     | 1000         | 0.5 Ω → 500 wire               |
 | Inductance | int16     | 1000         | 1.0 mH → 1000 wire             |
-| Friction   | int16     | 10000        | 0.001 Nm·s/rad → 10 wire      |
-| Inertia    | int16     | 10000        | 0.001 kg·m² → 10 wire        |
+| Friction   | int16     | 10000        | 0.001 Nm·s/rad → 10 wire       |
+| Inertia    | int16     | 10000        | 0.001 kg·m² → 10 wire          |
 
 ### Deviations from the can-lite reference example
 
@@ -91,12 +91,12 @@ disagrees with this contract. e-foc's definitions are authoritative for this pro
 documentation. Because every decode is length-exact, a frame built from the example is rejected with
 `invalidPayload` rather than misread — visibly, not silently.
 
-| Message / item    | e-foc                                  | can-lite example        | Why                                                                     |
-|-------------------|----------------------------------------|-------------------------|-------------------------------------------------------------------------|
-| `0x03/0x04/0x05`  | one `int16` closed-loop bandwidth      | three `int16` kp/ki/kd  | `documentation/requirements/foc/*-controller.yaml` forbid externally supplied per-axis gains |
-| `0x0A`            | `Align`                                | reserved, unused        | alignment is a first-class command here                                  |
-| `FocMotorState`   | adds `partialCalibration = 4`          | stops at `calibrating`  | speed and position modes can hold a partial record                       |
-| `0x12` / `0x92`   | contract version query and response    | absent                  | the example has no versioning                                            |
+| Message / item   | e-foc                               | can-lite example       | Why                                                                                          |
+|------------------|-------------------------------------|------------------------|----------------------------------------------------------------------------------------------|
+| `0x03/0x04/0x05` | one `int16` closed-loop bandwidth   | three `int16` kp/ki/kd | `documentation/requirements/foc/*-controller.yaml` forbid externally supplied per-axis gains |
+| `0x0A`           | `Align`                             | reserved, unused       | alignment is a first-class command here                                                      |
+| `FocMotorState`  | adds `partialCalibration = 4`       | stops at `calibrating` | speed and position modes can hold a partial record                                           |
+| `0x12` / `0x92`  | contract version query and response | absent                 | the example has no versioning                                                                |
 
 ### Part B — FocMotorCategoryServer
 
