@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QColor>
 #include <QTimer>
 #include <QWidget>
 #include <array>

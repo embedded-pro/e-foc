@@ -5,8 +5,8 @@
 
 namespace simulator
 {
-    GuiSimulation::GuiSimulation(ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
-        const ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
+    GuiSimulation::GuiSimulation(foc::ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
+        const foc::ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
         const ControlPanel::SetpointConfig& setpointConfig, foc::Volts powerSupplyVoltage)
         : gui(model, controller, eventDispatcher, motorParameters, pidParameters, setpointConfig, powerSupplyVoltage)
     {

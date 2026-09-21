@@ -7,18 +7,16 @@
 #include <QObject>
 #include <cstdint>
 
-using namespace foc;
-
 namespace simulator
 {
     class OnlineMechanicalRls
         : public QObject
-        , public ThreePhaseMotorModelObserver
+        , public foc::ThreePhaseMotorModelObserver
     {
         Q_OBJECT
 
     public:
-        OnlineMechanicalRls(ThreePhaseMotorModel& model,
+        OnlineMechanicalRls(foc::ThreePhaseMotorModel& model,
             uint8_t polePairs,
             foc::NewtonMeter torqueConstant,
             hal::Hertz baseFrequency,

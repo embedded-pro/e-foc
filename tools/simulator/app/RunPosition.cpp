@@ -30,7 +30,7 @@ namespace simulator
         const auto vdc = foc::Volts{ defaults::powerSupplyVoltageVolts };
         const auto& motorParams = foc::JK42BLS01_X038ED::parameters;
 
-        ThreePhaseMotorModel model{ motorParams, vdc, baseFrequency, std::optional<std::size_t>{} };
+        foc::ThreePhaseMotorModel model{ motorParams, vdc, baseFrequency, std::optional<std::size_t>{} };
         model.SetLoad(foc::NewtonMeter{ defaults::loadTorqueNm });
 
         infra::WithSharedAccess<foc::LowPriorityInterruptImpl> lowPriorityInterrupt;
