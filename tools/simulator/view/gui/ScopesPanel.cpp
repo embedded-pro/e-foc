@@ -1,5 +1,6 @@
 #include "tools/simulator/view/gui/ScopesPanel.hpp"
 #include "tools/simulator/view/gui/QtOwned.hpp"
+#include "ui/theme/Theme.hpp"
 #include <QColor>
 #include <QFont>
 #include <QGroupBox>
@@ -13,6 +14,7 @@ namespace simulator
     namespace
     {
         constexpr int hexagonMaxHeight = 460;
+        constexpr int hexagonRefreshIntervalMs = 33;
     }
 
     ScopesPanel::ScopesPanel(QWidget* parent)
@@ -34,9 +36,15 @@ namespace simulator
         auto* hexagonOuter = QtOwned<QHBoxLayout>();
         hexagonOuter->setContentsMargins(4, 4, 4, 4);
 
-        hexagonWidget = QtOwned<HexagonWidget>(this);
+        hexagonWidget = QtOwned<ui::backend::qt::QtPaintedWidget>(hexagonCore, this);
+        hexagonWidget->SetBackgroundRole(ui::theme::ColorRole::ScopeBackground);
         hexagonWidget->setMinimumSize(hexagonMaxHeight, hexagonMaxHeight);
         hexagonWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+        // HexagonCore::SetSample deliberately does not request a repaint, so that a 20 kHz sample
+        // path does not drive the display; the host owns the cadence instead.
+        connect(&hexagonRefreshTimer, &QTimer::timeout, hexagonWidget, QOverload<>::of(&QWidget::update));
+        hexagonRefreshTimer.start(hexagonRefreshIntervalMs);
 
         hexagonOuter->addStretch(1);
         hexagonOuter->addWidget(hexagonWidget);
@@ -118,12 +126,12 @@ namespace simulator
 
     void ScopesPanel::SetHexagonSample(float va, float vb, float vc, float vAlpha, float vBeta)
     {
-        hexagonWidget->SetSample(va, vb, vc, vAlpha, vBeta);
+        hexagonCore.SetSample(va, vb, vc, vAlpha, vBeta);
     }
 
     void ScopesPanel::SetDcLink(foc::Volts vdc)
     {
-        hexagonWidget->SetDcLink(vdc);
+        hexagonCore.SetDcLinkVolts(vdc.Value());
     }
 
     void ScopesPanel::SetMode(const QString& label)
@@ -135,7 +143,7 @@ namespace simulator
     {
         currentScope->Clear();
         voltageScope->Clear();
-        hexagonWidget->Clear();
+        hexagonCore.Clear();
         electricalRlsScope->Clear();
         mechanicalRlsScope->Clear();
     }
