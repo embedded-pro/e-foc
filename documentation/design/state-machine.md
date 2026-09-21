@@ -401,7 +401,7 @@ restarts it and a condition chattering around its threshold cannot be cleared on
 `IsEnableAllowed` refuses independently while the condition reads `asserted`, so a clear granted during a
 momentary deassertion still cannot arm the bridge.
 
-```
+```text
   asserted ──clear sample──> settling ──dwell elapsed──> ready ──CmdClearFault──> cleared
       ^                          │
       └────asserted sample───────┘
