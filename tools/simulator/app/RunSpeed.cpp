@@ -16,8 +16,8 @@
 #include "tools/simulator/view/gui/ControlPanel.hpp"
 #include "tools/simulator/view/gui/Gui.hpp"
 #include "tools/simulator/view/gui/GuiSimulation.hpp"
-#include "tools/simulator/view/gui/OnlineElectricalRls.hpp"
-#include "tools/simulator/view/gui/OnlineMechanicalRls.hpp"
+#include "tools/simulator/adapter/OnlineElectricalRls.hpp"
+#include "tools/simulator/adapter/OnlineMechanicalRls.hpp"
 #include "tools/simulator/view/gui/ParametersPanel.hpp"
 #include <QObject>
 #include <optional>

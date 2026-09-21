@@ -14,25 +14,18 @@ target_link_libraries(e_foc.tool.simulator.view.gui PUBLIC
     ui.backend.qt
     e_foc.foc.model
     e_foc.foc.interfaces
-    e_foc.services.electrical_system_ident
-    e_foc.services.mechanical_system_ident
     e_foc.state_machine
     infra.event
 )
 
 target_sources(e_foc.tool.simulator.view.gui PRIVATE
-    CollapsibleGroupBox.hpp
-    CollapsibleGroupBox.cpp
+    QtOwned.hpp
     ControlPanel.hpp
     ControlPanel.cpp
     Gui.hpp
     Gui.cpp
     GuiSimulation.hpp
     GuiSimulation.cpp
-    OnlineElectricalRls.hpp
-    OnlineElectricalRls.cpp
-    OnlineMechanicalRls.hpp
-    OnlineMechanicalRls.cpp
     ParametersPanel.hpp
     ParametersPanel.cpp
     ScopesPanel.hpp

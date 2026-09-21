@@ -1,21 +1,12 @@
 #include "tools/simulator/app/LaunchDialog.hpp"
+#include "tools/simulator/view/gui/QtOwned.hpp"
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QLabel>
 #include <QVBoxLayout>
-#include <memory>
 
 namespace simulator
 {
-    namespace
-    {
-        template<typename T, typename... Args>
-        T* QtOwned(Args&&... args)
-        {
-            return std::make_unique<T>(std::forward<Args>(args)...).release();
-        }
-    }
-
     LaunchDialog::LaunchDialog(QWidget* parent)
         : QDialog(parent)
     {

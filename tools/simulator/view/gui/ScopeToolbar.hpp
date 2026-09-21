@@ -16,14 +16,6 @@ namespace simulator
     public:
         explicit ScopeToolbar(ScopeWidget& scope, QWidget* parent = nullptr);
 
-    signals:
-        void timeDivChanged(float secondsPerDiv);
-        void triggerLevelChanged(float level);
-        void triggerModeChanged(ScopeWidget::TriggerMode mode);
-        void triggerEdgeChanged(ScopeWidget::TriggerEdge edge);
-        void triggerChannelChanged(std::size_t channel);
-        void runningChanged(bool running);
-
     private:
         void SetupUi();
         void ConnectSignals();
