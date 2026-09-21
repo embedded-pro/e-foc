@@ -8,7 +8,7 @@ date: 2026-08-10
 ---
 
 | Field     | Value                                                         |
-|-----------|---------------------------------------------------------------|
+| --------- | ------------------------------------------------------------- |
 | Title     | FOC Plant Models — Discretization and State-Space Foundations |
 | Type      | theory                                                        |
 | Status    | draft                                                         |
@@ -38,22 +38,22 @@ in `documentation/theory/foc.md`.
 
 ## Prerequisites
 
-| Symbol     | Meaning                                       | Unit      |
-|------------|-----------------------------------------------|-----------|
-| $R_s$      | Stator resistance per phase                   | Ω         |
-| $L_s$      | Stator inductance ($L_d = L_q$, surface PMSM) | H         |
-| $\psi_f$   | Permanent magnet flux linkage                 | Wb        |
-| $p$        | Number of pole pairs                          | —         |
-| $\omega_e$ | Electrical angular velocity                   | rad/s     |
-| $K_t$      | Torque constant $= \tfrac{3}{2} p \psi_f$     | N·m/A     |
-| $J$        | Rotor moment of inertia                       | kg·m²     |
-| $B_f$      | Viscous friction coefficient                  | N·m·s/rad |
+| Symbol     | Meaning                                        | Unit      |
+| ---------- | ---------------------------------------------- | --------- |
+| $R_s$      | Stator resistance per phase                    | Ω         |
+| $L_s$      | Stator inductance ($L_d = L_q$, surface PMSM)  | H         |
+| $\psi_f$   | Permanent magnet flux linkage                  | Wb        |
+| $p$        | Number of pole pairs                           | —         |
+| $\omega_e$ | Electrical angular velocity                    | rad/s     |
+| $K_t$      | Torque constant $= \tfrac{3}{2} p \psi_f$      | N·m/A     |
+| $J$        | Rotor moment of inertia                        | kg·m²     |
+| $B_f$      | Viscous friction coefficient                   | N·m·s/rad |
 | $T_L$      | Load torque (disturbance), see the split below | N·m       |
-| $\omega_m$ | Mechanical angular velocity                   | rad/s     |
-| $\theta_m$ | Mechanical rotor angle                        | rad       |
-| $T_s^i$    | Current loop sample period $= 1/20000$ s      | s         |
-| $T_s^o$    | Outer loop sample period $= 1/1000$ s         | s         |
-| $A_d, B_d$ | Discrete-time plant matrices                  | —         |
+| $\omega_m$ | Mechanical angular velocity                    | rad/s     |
+| $\theta_m$ | Mechanical rotor angle                         | rad       |
+| $T_s^i$    | Current loop sample period $= 1/20000$ s       | s         |
+| $T_s^o$    | Outer loop sample period $= 1/1000$ s          | s         |
+| $A_d, B_d$ | Discrete-time plant matrices                   | —         |
 
 ---
 
@@ -233,13 +233,13 @@ graph LR
 
 ## Numerical Properties
 
-| Property             |           Current plant           |           Speed plant           |      Position plant       |
-|----------------------|:---------------------------------:|:-------------------------------:|:-------------------------:|
-| States               |        1 per axis (Id, Iq)        |             1 (ωm)              |        2 (θm, ωm)         |
-| Inputs               |       1 per axis (v'd, v'q)       |             1 (Iq*)             |          1 (Iq*)          |
-| Time constant        |      $L_s/R_s$ (typ. 0.4 ms)      |     $J/B_f$ (typ. 0.1–2 s)      |        Integrating        |
+| Property             | Current plant                     | Speed plant                     | Position plant            |
+| -------------------- | :-------------------------------: | :-----------------------------: | :-----------------------: |
+| States               | 1 per axis (Id, Iq)               | 1 (ωm)                          | 2 (θm, ωm)                |
+| Inputs               | 1 per axis (v'd, v'q)             | 1 (Iq*)                         | 1 (Iq*)                   |
+| Time constant        | $L_s/R_s$ (typ. 0.4 ms)           | $J/B_f$ (typ. 0.1–2 s)          | Integrating               |
 | Discretization error | $< 1\%$ for $R_s T_s / L_s < 0.1$ | $< 1\%$ for $B_f T_s / J < 0.1$ | Row approx valid at 1 kHz |
-| Parameter source     |          Electrical RLS           |         Mechanical RLS          |      Mechanical RLS       |
+| Parameter source     | Electrical RLS                    | Mechanical RLS                  | Mechanical RLS            |
 
 ---
 
