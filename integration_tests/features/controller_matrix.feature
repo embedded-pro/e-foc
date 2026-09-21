@@ -36,7 +36,7 @@ Feature: FOC Controller Algorithm Coverage
     And the rotor is aligned
     Then the speed loop shall be running the <algorithm> algorithm
     When the motor is enabled
-    And a speed setpoint of 20 rps is applied
+    And a speed setpoint of 20 rad/s is applied
     Then the state machine shall be in the running state
     When the motor is disabled
     Then the state machine shall be in the Ready state
@@ -90,8 +90,8 @@ Feature: FOC Controller Algorithm Coverage
 
     Examples:
       | label             | mode     | current   | speed  | position | setpoint                                  |
-      | Deadbeat speed    | speed    | deadbeat  | lqi    | pid      | a speed setpoint of 20 rps is applied     |
-      | Sliding speed     | speed    | sliding   | adrc   | pid      | a speed setpoint of 20 rps is applied     |
+      | Deadbeat speed    | speed    | deadbeat  | lqi    | pid      | a speed setpoint of 20 rad/s is applied     |
+      | Sliding speed     | speed    | sliding   | adrc   | pid      | a speed setpoint of 20 rad/s is applied     |
       | Deadbeat position | position | deadbeat  | pid    | lqr      | a position setpoint of 1.5 rad is applied |
       | Decoupled two-DOF | position | decoupled | twodof | twodof   | a position setpoint of 1.5 rad is applied |
       | Sliding LQI       | position | sliding   | lqi    | lqi      | a position setpoint of 1.5 rad is applied |

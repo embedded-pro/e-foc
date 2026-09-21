@@ -114,6 +114,9 @@ Three channels, all of them the product's own:
 - **Command acknowledgements** carry acceptance or the reason for refusal.
 - **Traces** carry what the firmware decided, most importantly which algorithm each loop ended up
   running, which can differ from what was asked for.
+- **Plant trajectory**, on a simulated target only, carries what the motor actually did, sampled
+  on the control-tick time base, and the tick each command frame was delivered on. This is the
+  channel the performance and disturbance scenarios measure; see the software-in-the-loop design.
 
 Trace output only drains while the target's event loop has work, so an assertion that waits for a
 trace polls telemetry rather than waiting passively. Trace lines are retained across the frames the
@@ -138,6 +141,7 @@ directory holding the target's files, the socket carrying frames, and the captur
 | Telemetry         | Await a state, a fault code, or read the measured position      |
 | Serial capture    | Drain and search the target's trace output                      |
 | Simulation        | Describe the plant and the stored calibration and configuration |
+| Response          | Capture the plant trajectory and measure step and disturbance metrics on it |
 
 ### Required from the system under test
 

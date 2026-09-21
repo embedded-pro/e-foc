@@ -43,3 +43,13 @@
     supported current before that setpoint reaches the current loop. The bound shall apply to the
     magnitude of the (Id, Iq) vector rather than to either axis on its own, and a setpoint outside
     the envelope shall be scaled onto it so that the commanded ratio between the axes is preserved.
+
+- id: REQ-TRQ-007
+  title: Current step-response envelope
+  shall: >
+    With the nominal plant and the default current-loop bandwidth, every current control law shall
+    bring the q-axis current from zero to a 0.5 A setpoint inside a two-percent band of the step
+    within 10 ms, with an overshoot below 50 percent of the step, and with a steady-state error
+    below 0.1 A. The response shall be measured on the plant's own q-axis current at the control
+    rate, and the acceptance limits for each law are the ones recorded in the software-in-the-loop
+    performance scenarios.

@@ -49,3 +49,22 @@
     fixed set of control laws selected at runtime. All laws shall reside simultaneously
     in fixed-size storage held by a variant, and neither selection nor per-sample
     dispatch shall perform any dynamic memory allocation.
+
+- id: REQ-SPD-008
+  title: Speed step-response envelope
+  shall: >
+    With the nominal plant and the default loop bandwidths, every speed control law shall bring
+    the mechanical speed from rest to a 20 rad/s setpoint, and from 20 rad/s to a new setpoint
+    applied while running, inside a two-percent band of the step within 300 ms, with an overshoot
+    below 50 percent of the step, and with a steady-state error below 2 rad/s. The response shall
+    be measured on the plant's own trajectory on the control-tick time base, and the acceptance
+    limits for each law are the ones recorded in the software-in-the-loop performance scenarios.
+
+- id: REQ-SPD-009
+  title: Speed-loop rejection of a shaft torque step
+  shall: >
+    While regulating 20 rad/s against the nominal plant, every speed control law shall keep the
+    speed within 15 rad/s of the setpoint when a 0.002 N·m shaft torque is applied as a step, and
+    shall return the speed to within 0.5 rad/s of the setpoint within 350 ms of the step and hold
+    it there. A law with integral action or an extended-state observer shall show no residual
+    speed error under the sustained torque.

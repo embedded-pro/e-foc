@@ -48,7 +48,7 @@ in `documentation/theory/foc.md`.
 | $K_t$      | Torque constant $= \tfrac{3}{2} p \psi_f$     | N·m/A     |
 | $J$        | Rotor moment of inertia                       | kg·m²     |
 | $B_f$      | Viscous friction coefficient                  | N·m·s/rad |
-| $T_L$      | External load torque (disturbance)            | N·m       |
+| $T_L$      | Load torque (disturbance), see the split below | N·m       |
 | $\omega_m$ | Mechanical angular velocity                   | rad/s     |
 | $\theta_m$ | Mechanical rotor angle                        | rad       |
 | $T_s^i$    | Current loop sample period $= 1/20000$ s      | s         |
@@ -131,6 +131,15 @@ The mechanical rotor dynamics driven by electromagnetic torque:
 
 $$
 J \frac{d\omega_m}{dt} = K_t i_q - B_f \omega_m - T_L
+$$
+
+The simulated plant splits $T_L$ into two terms. A *load* opposes motion whatever its direction, so it
+changes sign with $\omega_m$ and vanishes at rest, like friction. An *external torque* keeps its sign
+whatever the rotor does, like gravity on an arm or a step applied by a test to disturb the loop, and it
+is the term a position controller has to hold against. Both are additive on the right-hand side:
+
+$$
+T_L = T_{load} \cdot \operatorname{sgn}(\omega_m) + T_{ext}
 $$
 
 Treating the current loop as ideal ($i_q \approx i_q^*$), the outer-loop control input is $u = i_q^*$:

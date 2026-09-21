@@ -12,7 +12,7 @@ Feature: Motor Plant Characteristics
     When the target boots
     And the rotor is aligned
     And the motor is enabled
-    And a speed setpoint of 20 rps is applied
+    And a speed setpoint of 20 rad/s is applied
     Then the state machine shall be in the running state
     And the rotor shall turn
 
@@ -38,7 +38,7 @@ Feature: Motor Plant Characteristics
     When the target boots
     And the rotor is aligned
     And the motor is enabled
-    And a speed setpoint of 20 rps is applied
+    And a speed setpoint of 20 rad/s is applied
     Then the state machine shall be in the running state
     And the rotor shall turn
 

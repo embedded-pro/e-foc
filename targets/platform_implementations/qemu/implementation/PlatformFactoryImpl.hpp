@@ -1,6 +1,8 @@
 #pragma once
 
+#include "core/foc/model/PlantResponseRecorder.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
+#include "core/foc/model/TorqueStepScheduler.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/SoftwareWatchdog.hpp"
@@ -23,6 +25,7 @@
 #include "targets/platform_implementations/qemu/implementation/SemihostingEeprom.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingPlantConfig.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingSerial.hpp"
+#include <atomic>
 #include <optional>
 
 namespace application
@@ -157,6 +160,10 @@ namespace application
         };
 
         void FocTimerIsr();
+        foc::PlantResponseSample PlantSampleAt(uint32_t tick) const;
+        void DrainResponseRecords();
+        void PrintResponseRecord(const foc::PlantResponseRecord& record);
+        void StampReceivedFrame(uint32_t tick, const sil::SemihostingCan::Frame& frame);
 
     private:
         static foc::ThreePhaseMotorModel::Parameters MotorParametersFrom(
@@ -186,9 +193,13 @@ namespace application
         NoOpPerformanceTracker performanceTracker;
         BoardProtectionSimulator boardProtection;
         foc::ThreePhaseMotorModel model;
+        foc::PlantResponseRecorder<1024> responseRecorder;
+        foc::TorqueStepScheduler torqueStep;
+        std::atomic<uint32_t> controlTick{ 0 };
         std::optional<SemihostingCanBusAdapter> canBusAdapter;
         infra::TimerRepeating canPollTimer;
         infra::TimerRepeating protectionPollTimer;
+        infra::TimerRepeating responseDrainTimer;
         hal::Hertz baseFrequency;
         volatile bool onPhaseCurrentsReadyValid{ false };
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;

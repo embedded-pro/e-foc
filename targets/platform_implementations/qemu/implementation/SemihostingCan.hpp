@@ -2,6 +2,7 @@
 
 #include "hal/interfaces/Can.hpp"
 #include "infra/util/Function.hpp"
+#include <optional>
 
 namespace sil
 {
@@ -14,7 +15,13 @@ namespace sil
         void SendData(Id id, const Message& data, const infra::Function<void(bool)>& onDone) override;
         void ReceiveData(const infra::Function<void(Id, const Message&)>& onReceived) override;
 
-        void PollIncoming();
+        struct Frame
+        {
+            Id id;
+            Message message;
+        };
+
+        std::optional<Frame> PollIncoming();
 
     private:
         infra::Function<void(Id, const Message&)> receiveCallback;

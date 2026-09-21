@@ -49,16 +49,21 @@ namespace sil
         float supplyVoltageScale;
         uint32_t randomSeed;
 
+        float torqueStepNm;
+        uint32_t torqueStepDelayMs;
+        uint32_t responseSampleRateHz;
+        uint32_t responseMaxSamples;
+
         uint8_t polePairs;
         uint8_t faultFlags;
         uint8_t reserved0;
         uint8_t reserved1;
     };
 
-    static_assert(sizeof(SilPlantConfig) == 112, "SilPlantConfig layout must be free of implicit padding");
+    static_assert(sizeof(SilPlantConfig) == 128, "SilPlantConfig layout must be free of implicit padding");
 
     static constexpr uint32_t plantConfigMagic = 0x504C4E54;
-    static constexpr uint8_t plantConfigLayoutVersion = 1;
+    static constexpr uint8_t plantConfigLayoutVersion = 2;
 
     static constexpr std::size_t plantConfigRecordSize =
         sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t) + sizeof(SilPlantConfig);

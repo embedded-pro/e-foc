@@ -3,9 +3,26 @@
 #endif
 
 #include "targets/platform_implementations/qemu/implementation/PlatformFactoryImpl.hpp"
+#include "infra/util/ReallyAssert.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include <chrono>
+#include <cmath>
 #include <cstdio>
+
+namespace
+{
+    constexpr int kResponseLinesPerDrain = 16;
+
+    long Milli(float value)
+    {
+        return std::lround(value * 1000.0f);
+    }
+
+    long Micro(float value)
+    {
+        return std::lround(value * 1000000.0f);
+    }
+}
 
 namespace application
 {
@@ -82,6 +99,17 @@ namespace application
 
         if (plantConfig->loadTorqueNm != 0.0f)
             model.SetLoad(foc::NewtonMeter{ plantConfig->loadTorqueNm });
+
+        const uint32_t baseHz = BaseFrequencyFrom(plantConfig).Value();
+
+        if (plantConfig->responseSampleRateHz != 0)
+        {
+            really_assert(baseHz % plantConfig->responseSampleRateHz == 0);
+            responseRecorder.Configure(baseHz / plantConfig->responseSampleRateHz, plantConfig->responseMaxSamples);
+        }
+
+        torqueStep.Configure({ plantConfig->torqueStepNm,
+            static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->torqueStepDelayMs) * baseHz / 1000u) });
     }
 
     PlatformFactoryImpl::PlatformFactoryImpl(const foc::ThreePhaseMotorModel::Parameters& motorParams,
@@ -101,6 +129,10 @@ namespace application
         protectionPollTimer.Start(std::chrono::milliseconds(1), [this]()
             {
                 boardProtection.DeliverPendingProtection();
+            });
+        responseDrainTimer.Start(std::chrono::milliseconds(1), [this]()
+            {
+                DrainResponseRecords();
             });
         focTimer.Start();
     }
@@ -233,7 +265,9 @@ namespace application
             diagnostics.AttachCanBus(*canBusAdapter);
             canPollTimer.Start(std::chrono::milliseconds(1), [this]()
                 {
-                    canBusAdapter->PollIncoming();
+                    const uint32_t tick = controlTick.load(std::memory_order_relaxed);
+                    if (const auto frame = canBusAdapter->PollIncoming())
+                        StampReceivedFrame(tick, *frame);
                 });
         }
     }
@@ -257,7 +291,17 @@ namespace application
 
     void PlatformFactoryImpl::FocTimerIsr()
     {
+        const uint32_t tick = controlTick.load(std::memory_order_relaxed) + 1;
+        controlTick.store(tick, std::memory_order_relaxed);
+
+        if (const auto torque = torqueStep.Fire(tick))
+        {
+            model.SetExternalTorque(foc::NewtonMeter{ *torque });
+            responseRecorder.Note(foc::PlantResponseKind::torqueStep, PlantSampleAt(tick));
+        }
+
         model.StepForTest(lastDutyPhases);
+        responseRecorder.Capture(PlantSampleAt(tick));
 
         lastCurrents = model.LastMeasuredCurrents();
 
@@ -280,6 +324,8 @@ namespace application
     void PlatformFactoryImpl::Start()
     {
         model.Start();
+        responseRecorder.Begin();
+        torqueStep.Begin();
         boardProtection.SetArmed(true);
     }
 
@@ -287,6 +333,73 @@ namespace application
     {
         boardProtection.SetArmed(false);
         model.Stop();
+        model.SetExternalTorque(foc::NewtonMeter{ 0.0f });
+        responseRecorder.End();
+    }
+
+    foc::PlantResponseSample PlatformFactoryImpl::PlantSampleAt(uint32_t tick) const
+    {
+        const auto dq = model.LastDqCurrents();
+        return foc::PlantResponseSample{ tick, model.MechanicalSpeed().Value(), model.MechanicalAngle().Value(), dq.q, dq.d, model.ExternalTorque().Value() };
+    }
+
+    void PlatformFactoryImpl::DrainResponseRecords()
+    {
+        bool printed = false;
+
+        for (int i = 0; i != kResponseLinesPerDrain; ++i)
+        {
+            const auto record = responseRecorder.Pop();
+            if (!record)
+                break;
+
+            if (!printed)
+                std::putchar('\n');
+            printed = true;
+
+            PrintResponseRecord(*record);
+        }
+
+        if (printed)
+            std::fflush(stdout);
+    }
+
+    void PlatformFactoryImpl::PrintResponseRecord(const foc::PlantResponseRecord& record)
+    {
+        const auto& sample = record.sample;
+        const auto tick = static_cast<unsigned long>(sample.tick);
+
+        switch (record.kind)
+        {
+            case foc::PlantResponseKind::sample:
+                std::printf("PLANT %lu %ld %ld %ld %ld %ld\n", tick, Milli(sample.omegaMech), Micro(sample.thetaMech), Micro(sample.iq), Micro(sample.id), Micro(sample.externalTorqueNm));
+                break;
+            case foc::PlantResponseKind::began:
+                std::printf("PLANT_START %lu\n", tick);
+                break;
+            case foc::PlantResponseKind::torqueStep:
+                std::printf("PLANT_EVENT %lu torque %ld\n", tick, Micro(sample.externalTorqueNm));
+                break;
+            case foc::PlantResponseKind::stopped:
+                std::printf("PLANT_STOP %lu %lu\n", tick, static_cast<unsigned long>(record.dropped));
+                break;
+        }
+    }
+
+    void PlatformFactoryImpl::StampReceivedFrame(uint32_t tick, const sil::SemihostingCan::Frame& frame)
+    {
+        char hexData[17]{};
+        int pos = 0;
+        for (const uint8_t byte : frame.message)
+        {
+            hexData[pos++] = "0123456789abcdef"[(byte >> 4) & 0xF];
+            hexData[pos++] = "0123456789abcdef"[byte & 0xF];
+        }
+        hexData[pos] = '\0';
+
+        const uint32_t rawId = frame.id.Is11BitId() ? frame.id.Get11BitId() : frame.id.Get29BitId();
+        std::printf("\nCAN_RX_AT %lu %lx %s\n", static_cast<unsigned long>(tick), static_cast<unsigned long>(rawId), hexData);
+        std::fflush(stdout);
     }
 
     hal::Hertz PlatformFactoryImpl::BaseFrequency() const

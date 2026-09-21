@@ -57,6 +57,14 @@ namespace
             plant.ironInductanceCoeff = value;
         else if (key == "encoder_noise_sigma_radians")
             plant.encoderSigmaRadians = value;
+        else if (key == "torque_step_nm")
+            plant.torqueStepNm = value;
+        else if (key == "torque_step_delay_ms")
+            plant.torqueStepDelayMs = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
+        else if (key == "response_sample_rate_hz")
+            plant.responseSampleRateHz = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
+        else if (key == "response_max_samples")
+            plant.responseMaxSamples = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else if (key == "encoder_bias_radians")
             plant.encoderBiasRadians = value;
         else if (key == "over_current_trip_ampere")

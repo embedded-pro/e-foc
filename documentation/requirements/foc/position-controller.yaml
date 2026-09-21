@@ -64,3 +64,22 @@
     advance its integral state. The saturation guard that unwinds the integral compares the limited
     command against the unlimited one, and with such a design the two are equal for every input, so
     the guard cannot fire.
+
+- id: REQ-POS-009
+  title: Position step-response envelope
+  shall: >
+    With the nominal plant and the default loop bandwidths, every position control law shall move
+    the rotor from rest to a 1.5 rad setpoint inside a two-percent band of the step within 450 ms,
+    with an overshoot below 50 percent of the step, and with a steady-state error below 0.2 rad.
+    The response shall be measured on the plant's own trajectory on the control-tick time base,
+    and the acceptance limits for each law are the ones recorded in the software-in-the-loop
+    performance scenarios.
+
+- id: REQ-POS-010
+  title: Position hold against a shaft torque step
+  shall: >
+    While holding 1.5 rad against the nominal plant, every position control law shall keep the
+    rotor within 1.0 rad of the setpoint when a 0.002 N·m shaft torque is applied as a step, and
+    shall return the rotor to within 0.2 rad of the setpoint within 350 ms of the step and hold it
+    there. A law with integral action on the position error shall show no residual position
+    error under the sustained torque.

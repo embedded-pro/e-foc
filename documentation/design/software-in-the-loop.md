@@ -2,7 +2,7 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.0.0
+version: 1.1.0
 component: "software-in-the-loop"
 date: 2026-09-21
 ---
@@ -12,7 +12,7 @@ date: 2026-09-21
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.0.0                       |
+| Version   | 1.1.0                       |
 | Component | software-in-the-loop        |
 | Date      | 2026-09-21                  |
 
@@ -89,6 +89,8 @@ The description covers everything the plant needs:
 | Protection        | Over-current, over-voltage, under-voltage and over-temperature trips          |
 | Fault injection   | Open phase per phase, stuck encoder, supply voltage scaling                   |
 | Reproducibility   | The seed both noise generators start from                                     |
+| Disturbance       | A signed shaft torque and the delay after enabling at which it steps in       |
+| Recording         | The rate at which the plant reports its trajectory, and how many samples      |
 
 When no description is present the firmware falls back to the motor it is built with, so the
 target still boots standalone. A trip threshold of zero disables that protection, which is how a
@@ -224,6 +226,76 @@ Two results are worth recording because they are not obvious:
 Alignment also cannot converge once encoder noise reaches the threshold below which it declares
 the rotor settled, which bounds how noisy an encoder the current calibration tolerates.
 
+### Part G — The plant reports its trajectory
+
+Telemetry cannot time a transient. The status frame is answered on request, so the host samples
+at whatever cadence its round trips allow, tens of milliseconds apart; the speed it carries is
+quantised to whole radians per second; and the host's own clock says nothing about the guest's,
+because the emulated clock counts instructions rather than seconds. A speed loop that settles in
+a few tens of milliseconds is invisible through that window.
+
+The plant therefore reports what it did, itself. Every control tick, once the motor is enabled,
+the plant samples its mechanical speed, its mechanical angle, its d- and q-axis currents and the
+external torque acting on the shaft, decimated to the rate the plant description asks for, and
+stamps each sample with the control-tick count. The tick count is the only time base that means
+anything on this target: it advances exactly once per control period whatever the host is doing.
+
+```mermaid
+sequenceDiagram
+    participant I as Control interrupt
+    participant R as Ring
+    participant E as Event loop
+    participant H as Host
+    I->>R: sample every Nth tick, stamped
+    E->>R: drain a few records per millisecond
+    E-->>H: one text line per record on the trace channel
+    H->>H: parse into a series, check the spacing
+```
+
+Two rules keep this honest. Nothing is printed from the interrupt: samples go into a ring the
+interrupt alone writes, and the event loop alone drains, so the trace channel is written from one
+context as it always was. And the ring never blocks: when it is full the sample is dropped and
+counted, the count is reported when recording stops, and the host also checks that consecutive
+samples are exactly one decimation apart. A gap fails the scenario rather than skewing a metric.
+
+Recording begins on enable, which resets the rotor to rest, and stops when the sample budget in
+the plant description is spent or the motor is disabled. The budget bounds the output so a
+scenario that never reads it cannot fill the pipe and stall the guest; a scenario that measures
+drains continuously while it waits. Marker lines bracket the run: one when recording begins with
+the tick it began on, one when a scheduled torque step fires, one when recording stops. Every
+command frame the target takes from the wire is stamped with the tick it was delivered on, so a
+setpoint changed while running has an onset the host can look up rather than guess.
+
+The measurements themselves are the classical ones and are computed on the host with the
+numerical toolbox's step-response metrics: rise time, settling time into a two-percent band,
+percent overshoot, peak time and steady-state error over the tail of the window. A step is
+normalised before measuring, so a reversal or a step down is the same unit step as a step up. A
+disturbance is measured as the largest excursion from the setpoint and the time of the last
+excursion outside a band around it, which is the same settling computation applied to the
+recovery. Every measurement is also printed as a labelled line, which is how limits are found:
+a scenario is run first with permissive limits, the printed numbers are read, and the limits are
+pinned with a margin. Design intent says where to expect them, roughly two over the loop
+bandwidth for settling with a few percent of overshoot, but the pinned numbers come from the run.
+
+### Part H — Disturbances are described, not poked
+
+The load torque the plant has always carried opposes motion, so it flips sign with the speed and
+vanishes at rest, like friction. That is the right model for a loaded shaft and the wrong one for
+a disturbance: a position loop holding still against it sees only a dither around zero. The
+plant therefore also carries a signed shaft torque, which keeps its sign whatever the rotor does,
+like gravity on an arm.
+
+A scenario schedules that torque in the plant description: a magnitude and a delay after
+enabling. The control tick applies it on the exact tick, notes the tick on the trace, and the
+loop under test has to hold its setpoint against it. Re-enabling re-arms the schedule and
+disabling clears the torque, so every enable starts from the same plant.
+
+Setpoint changes need no such machinery. The product accepts a setpoint while running and while
+ready, and every cascade re-applies its last setpoint on enable. A scenario that applies the
+setpoint before enabling makes enabling the step, with the onset on the tick recording began and
+the rotor known to be at rest. A scenario that applies one while running reads the onset from the
+delivery stamp. The target's command surface is still the product's: nothing was added to it.
+
 ---
 
 ## Scenario Taxonomy
@@ -236,6 +308,8 @@ the rotor settled, which bounds how noisy an encoder the current calibration tol
 | Wiring faults         | A dead motor does not turn; a degraded one does                            |
 | Memory integrity      | Damaged calibration is distrusted; damaged configuration falls to defaults |
 | Board protection      | Trips reach the state machine and are reported                             |
+| Control performance   | Each loop's step response stays inside its settling, overshoot and error envelope, from rest and while running |
+| Disturbance rejection | A shaft torque step while regulating is bounded in excursion and recovered from |
 
 Controller coverage sweeps each loop's algorithms with the other loops held at the baseline, and
 adds a handful of combinations chosen to exercise both kinds of position law: those that produce a
@@ -248,10 +322,13 @@ already provides.
 ## Interfaces
 
 **Provided to scenarios:** a named plant or one described field by field, a stored calibration and
-configuration to boot from, a boot step, the CAN command set, and assertions over telemetry,
-reported algorithms, fault codes and rotor movement.
+configuration to boot from, a scheduled shaft torque, a recording rate and budget, a boot step,
+the CAN command set, a capture step that waits on the plant's own clock, and assertions over
+telemetry, reported algorithms, fault codes, rotor movement, step-response metrics and
+disturbance recovery.
 
 **Required from the target:** that it read its plant description at boot, expose its state, fault
-code, measured speed and position over telemetry, and trace the algorithm each loop is running.
+code, measured speed and position over telemetry, trace the algorithm each loop is running, and,
+when asked to, report the plant's trajectory and the tick each command frame was delivered on.
 
 **Not required:** any test-only command. The target's CAN surface is the product's.

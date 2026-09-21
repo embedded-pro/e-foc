@@ -155,17 +155,19 @@ namespace sil
         receiveCallback = onReceived;
     }
 
-    void SemihostingCan::PollIncoming()
+    std::optional<SemihostingCan::Frame> SemihostingCan::PollIncoming()
     {
         if (!DrainUartIntoLine())
-            return;
+            return std::nullopt;
 
         hal::Can::Id id{ hal::Can::Id::Create11BitId(0) };
         hal::Can::Message msg;
         if (!ParseCanLine(lineBuf, id, msg))
-            return;
+            return std::nullopt;
 
         if (receiveCallback)
             receiveCallback(id, msg);
+
+        return Frame{ id, msg };
     }
 }

@@ -9,6 +9,7 @@ add_library(e_foc.integration_tests.steps OBJECT
     MotorControlSteps.cpp
     PlantSteps.cpp
     ResetCauseSteps.cpp
+    ResponseSteps.cpp
     StateMachineSteps.cpp
     UartSteps.cpp
     WatchdogSteps.cpp

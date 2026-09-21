@@ -31,6 +31,31 @@ namespace foc
         this->load.emplace(load);
     }
 
+    void ThreePhaseMotorModel::SetExternalTorque(foc::NewtonMeter torque)
+    {
+        externalTorque = torque;
+    }
+
+    foc::NewtonMeter ThreePhaseMotorModel::ExternalTorque() const
+    {
+        return externalTorque;
+    }
+
+    foc::RadiansPerSecond ThreePhaseMotorModel::MechanicalSpeed() const
+    {
+        return motorState.omega_mech;
+    }
+
+    foc::Radians ThreePhaseMotorModel::MechanicalAngle() const
+    {
+        return motorState.theta_mech;
+    }
+
+    foc::RotatingFrame ThreePhaseMotorModel::LastDqCurrents() const
+    {
+        return lastDqCurrents;
+    }
+
     void ThreePhaseMotorModel::SetAdcNoise(const NoiseConfig& config)
     {
         currentNoise.config = config;
@@ -330,7 +355,9 @@ namespace foc
         auto loadTorque = load.value_or(foc::NewtonMeter{ 0.0f }).Value();
         auto loadOpposing = (motorState.omega_mech.Value() >= 0.0f) ? loadTorque : -loadTorque;
 
-        auto d_omega_mech_dt = (torqueElec - parameters.B.Value() * motorState.omega_mech.Value() - loadOpposing) / parameters.J.Value();
+        lastDqCurrents = foc::RotatingFrame{ id, iq };
+
+        auto d_omega_mech_dt = (torqueElec - parameters.B.Value() * motorState.omega_mech.Value() - loadOpposing - externalTorque.Value()) / parameters.J.Value();
 
         motorState.omega_mech += foc::RadiansPerSecond{ d_omega_mech_dt * dt };
         motorState.omega = foc::RadiansPerSecond{ parameters.p * motorState.omega_mech.Value() };

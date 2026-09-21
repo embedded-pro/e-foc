@@ -45,6 +45,11 @@ namespace sil
             .supplyVoltageScale = 1.0f,
             .randomSeed = 20260921u,
 
+            .torqueStepNm = 0.0f,
+            .torqueStepDelayMs = 0u,
+            .responseSampleRateHz = 0u,
+            .responseMaxSamples = 0u,
+
             .polePairs = motor.p,
             .faultFlags = 0u,
             .reserved0 = 0u,

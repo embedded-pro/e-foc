@@ -45,7 +45,7 @@ namespace sil
 
         bool FillReadBuffer(int timeoutMs);
 
-        static constexpr std::size_t maxCapturedLines = 4096;
+        static constexpr std::size_t maxCapturedLines = 16384;
 
         std::vector<std::string> capturedLines;
         std::string scenarioDirectory;

@@ -212,3 +212,70 @@ TEST_F(MotorModelTest, observer_finished_not_called_without_iteration_limit)
         model->StepForTest(kNeutralDuty);
     EXPECT_EQ(obs.finishCount, 0);
 }
+
+namespace
+{
+    const foc::PhasePwmDutyCycles kZeroVoltageDuty{
+        hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 }
+    };
+
+    constexpr int kFreeRunSteps = 100;
+}
+
+TEST_F(MotorModelTest, external_torque_defaults_to_zero)
+{
+    EXPECT_FLOAT_EQ(model->ExternalTorque().Value(), 0.0f);
+}
+
+TEST_F(MotorModelTest, free_rotor_without_external_torque_stays_at_rest)
+{
+    for (int i = 0; i != kFreeRunSteps; ++i)
+        model->StepForTest(kZeroVoltageDuty);
+
+    EXPECT_FLOAT_EQ(model->MechanicalSpeed().Value(), 0.0f);
+    EXPECT_FLOAT_EQ(model->MechanicalAngle().Value(), 0.0f);
+}
+
+TEST_F(MotorModelTest, negative_external_torque_accelerates_a_free_rotor)
+{
+    model->SetExternalTorque(foc::NewtonMeter{ -0.001f });
+
+    for (int i = 0; i != kFreeRunSteps; ++i)
+        model->StepForTest(kZeroVoltageDuty);
+
+    EXPECT_GT(model->MechanicalSpeed().Value(), 0.1f);
+    EXPECT_GT(model->MechanicalAngle().Value(), 0.0f);
+}
+
+TEST_F(MotorModelTest, positive_external_torque_drives_a_free_rotor_backwards)
+{
+    model->SetExternalTorque(foc::NewtonMeter{ 0.001f });
+
+    for (int i = 0; i != kFreeRunSteps; ++i)
+        model->StepForTest(kZeroVoltageDuty);
+
+    EXPECT_LT(model->MechanicalSpeed().Value(), -0.1f);
+    EXPECT_LT(model->MechanicalAngle().Value(), 0.0f);
+}
+
+TEST_F(MotorModelTest, external_torque_survives_start)
+{
+    model->SetExternalTorque(foc::NewtonMeter{ 0.002f });
+    model->Start();
+    EXPECT_FLOAT_EQ(model->ExternalTorque().Value(), 0.002f);
+    model->Stop();
+}
+
+TEST_F(MotorModelTest, last_dq_currents_are_zero_before_any_step)
+{
+    EXPECT_FLOAT_EQ(model->LastDqCurrents().d, 0.0f);
+    EXPECT_FLOAT_EQ(model->LastDqCurrents().q, 0.0f);
+}
+
+TEST_F(MotorModelTest, last_dq_currents_follow_a_driven_step)
+{
+    model->StepForTest(kNeutralDuty);
+
+    const auto dq = model->LastDqCurrents();
+    EXPECT_NE(std::abs(dq.d) + std::abs(dq.q), 0.0f);
+}
