@@ -69,17 +69,18 @@
   title: Position step-response envelope
   shall: >
     With the nominal plant and the default loop bandwidths, every position control law shall move
-    the rotor from rest to a 1.5 rad setpoint inside a two-percent band of the step within 450 ms,
-    with an overshoot below 50 percent of the step, and with a steady-state error below 0.2 rad.
-    The response shall be measured on the plant's own trajectory on the control-tick time base,
-    and the acceptance limits for each law are the ones recorded in the software-in-the-loop
-    performance scenarios.
+    the rotor from rest to a 1.5 rad setpoint and enter and then stay inside a 10 percent band of
+    the step within a settling time and with an overshoot no worse than its row: PID 300 ms, 15
+    percent overshoot, steady-state error below 0.15 rad; cascade P 200 ms, 10 percent, 0.05 rad;
+    LQR 250 ms, 45 percent, 0.05 rad; two-DOF 300 ms, 15 percent, 0.15 rad; LQI 300 ms, 30
+    percent, 0.05 rad. The response is measured on the plant's own trajectory on the control-tick
+    time base.
 
 - id: REQ-POS-010
   title: Position hold against a shaft torque step
   shall: >
     While holding 1.5 rad against the nominal plant, every position control law shall keep the
-    rotor within 1.0 rad of the setpoint when a 0.002 N·m shaft torque is applied as a step, and
-    shall return the rotor to within 0.2 rad of the setpoint within 350 ms of the step and hold it
-    there. A law with integral action on the position error shall show no residual position
-    error under the sustained torque.
+    rotor within 0.25 rad of the setpoint when a 0.002 N·m shaft torque is applied as a step, and
+    within 350 ms of the step shall return the rotor to within 0.15 rad of the setpoint and hold
+    it there. The LQI law, which carries integral action on the position error, shall hold within
+    0.2 rad and return to within 0.05 rad.

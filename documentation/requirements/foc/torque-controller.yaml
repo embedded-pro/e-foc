@@ -48,8 +48,7 @@
   title: Current step-response envelope
   shall: >
     With the nominal plant and the default current-loop bandwidth, every current control law shall
-    bring the q-axis current from zero to a 0.5 A setpoint inside a two-percent band of the step
-    within 10 ms, with an overshoot below 50 percent of the step, and with a steady-state error
-    below 0.1 A. The response shall be measured on the plant's own q-axis current at the control
-    rate, and the acceptance limits for each law are the ones recorded in the software-in-the-loop
-    performance scenarios.
+    bring the q-axis current from zero to a 0.5 A setpoint and enter and then stay inside a 10
+    percent band of the step within 3 ms, the deadbeat law within 1 ms, with an overshoot below 30
+    percent and a steady-state error below 0.05 A, measured on the plant's own q-axis current at
+    the control rate.

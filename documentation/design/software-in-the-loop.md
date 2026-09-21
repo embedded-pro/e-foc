@@ -8,7 +8,7 @@ date: 2026-09-21
 ---
 
 | Field     | Value                       |
-| --------- | --------------------------- |
+|-----------|-----------------------------|
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
@@ -81,7 +81,7 @@ a truncated or stale description is rejected rather than half-read.
 The description covers everything the plant needs:
 
 | Group             | Contents                                                                      |
-| ----------------- | ----------------------------------------------------------------------------- |
+|-------------------|-------------------------------------------------------------------------------|
 | Winding and rotor | Resistance, both axis inductances, flux linkage, pole pairs, inertia, damping |
 | Drive             | Supply voltage, control frequency, peak current, load torque                  |
 | Measurement       | Current noise deviation and per-phase bias, encoder noise deviation and bias  |
@@ -320,17 +320,28 @@ regression is still caught while the defects are open.
 - **The LQI position law is unstable on the nominal plant.** Enabled against a 1.5 rad
   setpoint it runs away within a hundred milliseconds, with the speed swinging hundreds of
   radians per second in both directions and the current saturating either way.
+- **The LQI speed law is erratic on a setpoint change while running.** From rest to 20 rad/s it
+  behaves like the other laws, limit cycle included. Stepped from 20 rad/s up to 40 rad/s it
+  overshoots the step almost threefold and keeps swinging by tens of radians per second around
+  a mean that is nonetheless right; reversed from 20 rad/s to -20 rad/s it settled in a few
+  milliseconds in one run and not at all within half a second in the next.
 
 The run also found a harness fault: a line cut by a read timeout was dropped and its tail
 parsed as a line of its own, which showed up as a gap in the sample spacing. The reader now
 keeps a partial line for the next read.
+
+Two runs of the same scenario do not measure exactly the same numbers. The guest is
+deterministic, but the host decides when each command frame reaches it, so the tick on which a
+setpoint or an enable lands relative to the outer loop's phase moves from run to run and the
+transient with it: the same step measured a 40 % overshoot in one run and 43 % in the next.
+The pinned limits carry a margin for that, and a limit that sits on a measured value is wrong.
 
 ---
 
 ## Scenario Taxonomy
 
 | Area                  | What it establishes                                                                                            |
-| --------------------- | -------------------------------------------------------------------------------------------------------------- |
+|-----------------------|----------------------------------------------------------------------------------------------------------------|
 | Control modes         | Torque, speed and position each align, enable, take a setpoint, disable                                        |
 | Controller algorithms | Every algorithm of every loop runs, plus combinations across the loops                                         |
 | Plant characteristics | Control holds up across noise, temperature, load and a different winding                                       |

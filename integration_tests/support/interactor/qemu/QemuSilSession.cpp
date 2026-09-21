@@ -200,8 +200,7 @@ namespace sil
                 continue;
             }
 
-            struct sockaddr_un addr
-            {};
+            struct sockaddr_un addr{};
 
             addr.sun_family = AF_UNIX;
             std::strncpy(addr.sun_path, inPath.c_str(), sizeof(addr.sun_path) - 1);

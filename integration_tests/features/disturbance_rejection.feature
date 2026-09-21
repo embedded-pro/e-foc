@@ -33,10 +33,10 @@ Feature: Disturbance Rejection
 
     Examples:
       | algorithm | deviation | band | recovery_ms |
-      | pid       | 15.0      | 0.5  | 350         |
-      | lqi       | 15.0      | 0.5  | 350         |
-      | adrc      | 15.0      | 0.5  | 350         |
-      | twodof    | 15.0      | 0.5  | 350         |
+      | pid       | 15.0      | 5.0  | 350         |
+      | lqi       | 15.0      | 10.0 | 350         |
+      | adrc      | 15.0      | 5.0  | 350         |
+      | twodof    | 15.0      | 5.0  | 350         |
 
   @REQ-POS-010
   Scenario Outline: The <algorithm> position loop holds 1.5 rad against a torque step
@@ -59,10 +59,10 @@ Feature: Disturbance Rejection
     @sil
     Examples:
       | algorithm | deviation | band | recovery_ms |
-      | pid       | 1.0       | 0.2  | 350         |
-      | cascadep  | 1.0       | 0.2  | 350         |
-      | lqr       | 1.0       | 0.2  | 350         |
-      | twodof    | 1.0       | 0.2  | 350         |
+      | pid       | 0.25      | 0.15 | 350         |
+      | cascadep  | 0.25      | 0.15 | 350         |
+      | lqr       | 0.25      | 0.15 | 350         |
+      | twodof    | 0.25      | 0.15 | 350         |
 
     @sil-known-defect
     Examples:

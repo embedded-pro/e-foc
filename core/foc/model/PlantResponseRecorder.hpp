@@ -39,7 +39,9 @@ namespace foc
     };
 
     // Single producer (the control tick) and single consumer (the event loop). Begin/End only raise
-    // flags so the tick stays the only writer of the ring.
+    // flags so the tick stays the only writer of the ring. Markers never enter the ring: each has
+    // its own slot the tick fills and the consumer empties, so a full ring can drop samples but
+    // never the record that reports the drops.
     template<std::size_t Capacity>
     class PlantResponseRecorder
     {
@@ -57,7 +59,15 @@ namespace foc
         uint32_t Dropped() const;
 
     private:
+        struct MarkerSlot
+        {
+            std::atomic<bool> pending{ false };
+            PlantResponseRecord record{};
+        };
+
         void Push(const PlantResponseRecord& record);
+        void Post(MarkerSlot& slot, const PlantResponseRecord& record);
+        std::optional<PlantResponseRecord> Take(MarkerSlot& slot);
         void ServicePendingMarkers(const PlantResponseSample& sample);
 
     private:
@@ -66,11 +76,14 @@ namespace foc
         std::atomic<uint32_t> tail{ 0 };
         std::atomic<bool> pendingBegin{ false };
         std::atomic<bool> pendingEnd{ false };
+        MarkerSlot began;
+        MarkerSlot event;
+        MarkerSlot stopped;
         uint32_t decimation{ 0 };
         uint32_t maxSamples{ 0 };
         uint32_t emitted{ 0 };
         uint32_t phase{ 0 };
-        uint32_t dropped{ 0 };
+        std::atomic<uint32_t> dropped{ 0 };
         bool armed{ false };
     };
 
@@ -108,15 +121,15 @@ namespace foc
         {
             emitted = 0;
             phase = 0;
-            dropped = 0;
+            dropped.store(0, std::memory_order_relaxed);
             armed = true;
-            Push({ PlantResponseKind::began, 0, sample });
+            Post(began, { PlantResponseKind::began, 0, sample });
         }
 
         if (pendingEnd.exchange(false, std::memory_order_acq_rel) && armed)
         {
             armed = false;
-            Push({ PlantResponseKind::stopped, dropped, sample });
+            Post(stopped, { PlantResponseKind::stopped, dropped.load(std::memory_order_relaxed), sample });
         }
     }
 
@@ -152,7 +165,7 @@ namespace foc
         if (!IsEnabled() || !armed)
             return;
 
-        Push({ kind, 0, sample });
+        Post(event, { kind, 0, sample });
     }
 
     template<std::size_t Capacity>
@@ -163,7 +176,7 @@ namespace foc
 
         if (next == tail.load(std::memory_order_acquire))
         {
-            ++dropped;
+            dropped.fetch_add(1, std::memory_order_relaxed);
             return;
         }
 
@@ -172,21 +185,53 @@ namespace foc
     }
 
     template<std::size_t Capacity>
-    std::optional<PlantResponseRecord> PlantResponseRecorder<Capacity>::Pop()
+    void PlantResponseRecorder<Capacity>::Post(MarkerSlot& slot, const PlantResponseRecord& record)
     {
-        const uint32_t currentTail = tail.load(std::memory_order_relaxed);
+        if (slot.pending.load(std::memory_order_acquire))
+        {
+            dropped.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
 
-        if (currentTail == head.load(std::memory_order_acquire))
+        slot.record = record;
+        slot.pending.store(true, std::memory_order_release);
+    }
+
+    template<std::size_t Capacity>
+    std::optional<PlantResponseRecord> PlantResponseRecorder<Capacity>::Take(MarkerSlot& slot)
+    {
+        if (!slot.pending.load(std::memory_order_acquire))
             return std::nullopt;
 
-        const PlantResponseRecord record = ring[currentTail];
-        tail.store((currentTail + 1) % Capacity, std::memory_order_release);
+        const PlantResponseRecord record = slot.record;
+        slot.pending.store(false, std::memory_order_release);
         return record;
+    }
+
+    template<std::size_t Capacity>
+    std::optional<PlantResponseRecord> PlantResponseRecorder<Capacity>::Pop()
+    {
+        if (auto record = Take(began))
+            return record;
+
+        if (auto record = Take(event))
+            return record;
+
+        const uint32_t currentTail = tail.load(std::memory_order_relaxed);
+
+        if (currentTail != head.load(std::memory_order_acquire))
+        {
+            const PlantResponseRecord record = ring[currentTail];
+            tail.store((currentTail + 1) % Capacity, std::memory_order_release);
+            return record;
+        }
+
+        return Take(stopped);
     }
 
     template<std::size_t Capacity>
     uint32_t PlantResponseRecorder<Capacity>::Dropped() const
     {
-        return dropped;
+        return dropped.load(std::memory_order_relaxed);
     }
 }

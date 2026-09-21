@@ -265,6 +265,7 @@ namespace application
             diagnostics.AttachCanBus(*canBusAdapter);
             canPollTimer.Start(std::chrono::milliseconds(1), [this]()
                 {
+                    // Read before dispatch: the stamp is the response window's onset, so it must not fall after the setpoint took effect.
                     const uint32_t tick = controlTick.load(std::memory_order_relaxed);
                     if (const auto frame = canBusAdapter->PollIncoming())
                         StampReceivedFrame(tick, *frame);

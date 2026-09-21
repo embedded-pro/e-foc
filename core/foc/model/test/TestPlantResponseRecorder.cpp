@@ -100,7 +100,7 @@ TEST_F(PlantResponseRecorderTest, sample_carries_plant_values)
     EXPECT_FLOAT_EQ(records[1].sample.externalTorqueNm, 5.0f);
 }
 
-TEST_F(PlantResponseRecorderTest, note_is_ordered_between_samples)
+TEST_F(PlantResponseRecorderTest, note_is_drained_ahead_of_samples_with_its_own_tick)
 {
     recorder.Configure(1, 0);
     recorder.Begin();
@@ -110,8 +110,11 @@ TEST_F(PlantResponseRecorderTest, note_is_ordered_between_samples)
 
     const auto records = Drain();
     ASSERT_EQ(records.size(), 4u);
-    EXPECT_EQ(records[2].kind, foc::PlantResponseKind::torqueStep);
-    EXPECT_EQ(records[3].kind, foc::PlantResponseKind::sample);
+    EXPECT_EQ(records[0].kind, foc::PlantResponseKind::began);
+    EXPECT_EQ(records[1].kind, foc::PlantResponseKind::torqueStep);
+    EXPECT_EQ(records[1].sample.tick, 1u);
+    EXPECT_EQ(records[2].sample.tick, 0u);
+    EXPECT_EQ(records[3].sample.tick, 1u);
 }
 
 TEST_F(PlantResponseRecorderTest, note_before_begin_is_ignored)
@@ -145,8 +148,7 @@ TEST_F(PlantResponseRecorderTest, full_ring_counts_drops_and_reports_them_on_sto
     for (uint32_t tick = 0; tick != 2 * kCapacity; ++tick)
         recorder.Capture(At(tick));
 
-    const std::size_t pushed = 1 + 2 * kCapacity;
-    EXPECT_EQ(recorder.Dropped(), pushed - (kCapacity - 1));
+    EXPECT_EQ(recorder.Dropped(), 2 * kCapacity - (kCapacity - 1));
 
     Drain();
     recorder.End();
@@ -156,6 +158,47 @@ TEST_F(PlantResponseRecorderTest, full_ring_counts_drops_and_reports_them_on_sto
     ASSERT_EQ(records.size(), 1u);
     EXPECT_EQ(records[0].kind, foc::PlantResponseKind::stopped);
     EXPECT_EQ(records[0].dropped, recorder.Dropped());
+}
+
+TEST_F(PlantResponseRecorderTest, stop_marker_survives_a_full_ring_and_follows_its_samples)
+{
+    recorder.Configure(1, 0);
+    recorder.Begin();
+    for (uint32_t tick = 0; tick != 2 * kCapacity; ++tick)
+        recorder.Capture(At(tick));
+    recorder.End();
+    recorder.Capture(At(100));
+
+    const auto records = Drain();
+    ASSERT_EQ(records.size(), kCapacity + 1);
+    EXPECT_EQ(records.front().kind, foc::PlantResponseKind::began);
+    EXPECT_EQ(records.back().kind, foc::PlantResponseKind::stopped);
+    EXPECT_EQ(records.back().dropped, kCapacity + 1);
+}
+
+TEST_F(PlantResponseRecorderTest, event_marker_survives_a_full_ring)
+{
+    recorder.Configure(1, 0);
+    recorder.Begin();
+    for (uint32_t tick = 0; tick != 2 * kCapacity; ++tick)
+        recorder.Capture(At(tick));
+    recorder.Note(foc::PlantResponseKind::torqueStep, At(50));
+
+    const auto records = Drain();
+    ASSERT_GE(records.size(), 2u);
+    EXPECT_EQ(records[1].kind, foc::PlantResponseKind::torqueStep);
+    EXPECT_EQ(records[1].sample.tick, 50u);
+}
+
+TEST_F(PlantResponseRecorderTest, a_second_event_before_the_first_is_drained_counts_as_dropped)
+{
+    recorder.Configure(1, 0);
+    recorder.Begin();
+    recorder.Capture(At(0));
+    recorder.Note(foc::PlantResponseKind::torqueStep, At(1));
+    recorder.Note(foc::PlantResponseKind::torqueStep, At(2));
+
+    EXPECT_EQ(recorder.Dropped(), 1u);
 }
 
 TEST_F(PlantResponseRecorderTest, begin_again_restarts_the_cap_and_drop_count)

@@ -8,7 +8,7 @@ date: 2026-09-21
 ---
 
 | Field     | Value                      |
-| --------- | -------------------------- |
+|-----------|----------------------------|
 | Title     | Integration Testing Design |
 | Type      | design                     |
 | Status    | accepted                   |
@@ -36,7 +36,7 @@ Scenarios are authored in Gherkin and live in a single directory. A tag decides 
 implements a scenario, and the runner is invoked with that tag.
 
 | Tag                 | Target                                               | Detailed in                                    |
-| ------------------- | ---------------------------------------------------- | ---------------------------------------------- |
+|---------------------|------------------------------------------------------|------------------------------------------------|
 | `@sil`              | Real firmware under an emulator, simulated motor     | `documentation/design/software-in-the-loop.md` |
 | `@sil-protection`   | The same, board-protection scenarios held apart      | The same document, Part E                      |
 | `@sil-known-defect` | The same, performance scenarios a known defect fails | The same document, Part I                      |
@@ -136,7 +136,7 @@ directory holding the target's files, the socket carrying frames, and the captur
 ### Provided to step definitions
 
 | Capability        | Purpose                                                                     |
-| ----------------- | --------------------------------------------------------------------------- |
+|-------------------|-----------------------------------------------------------------------------|
 | Lifecycle         | Start, stop and restart the target                                          |
 | Command transport | Send a category command and await its acknowledgement                       |
 | Telemetry         | Await a state, a fault code, or read the measured position                  |
