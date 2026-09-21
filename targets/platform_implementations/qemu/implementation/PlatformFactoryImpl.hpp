@@ -6,7 +6,6 @@
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/SoftwareWatchdog.hpp"
-#include "hal/cortex_m/EventDispatcherCortex.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
 #include "hal/cortex_m/SystemTickTimerService.hpp"
 #include "hal/interfaces/Gpio.hpp"
@@ -17,6 +16,7 @@
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "services/util/Terminal.hpp"
 #include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
+#include "targets/platform_implementations/cortex_m_common/EventDispatcherCortexWithWeakPtr.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "targets/platform_implementations/qemu/implementation/BoardProtectionSimulator.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuConstants.hpp"
@@ -140,7 +140,7 @@ namespace application
         struct Cortex
         {
             hal::cortex::InterruptTable::WithStorage<64> interruptTable;
-            hal::cortex::EventDispatcherCortex::WithSize<50> eventDispatcher;
+            EventDispatcherCortexWithWeakPtr::WithSize<50> eventDispatcher;
             hal::cortex::SystemTickTimerService systemTick{ kQemuSystemClockHz, std::chrono::milliseconds(1) };
         };
 
@@ -202,6 +202,8 @@ namespace application
         infra::TimerRepeating responseDrainTimer;
         hal::Hertz baseFrequency;
         volatile bool onPhaseCurrentsReadyValid{ false };
+        volatile uint32_t sampleDecimation{ 1 };
+        uint32_t samplePhase{ 0 };
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         foc::PhasePwmDutyCycles lastDutyPhases{};
         foc::PhaseCurrents lastCurrents{};

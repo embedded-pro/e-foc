@@ -221,7 +221,7 @@ namespace
                 application::TerminalAndTracer{ terminal, tracer },
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
-                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
                 faultNotifierMock,
                 state_machine::TransitionPolicy::Cli,
                 application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
@@ -1302,7 +1302,7 @@ namespace
                 application::TerminalAndTracer{ terminal, tracer },
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
-                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
                 faultNotifierMock,
                 state_machine::TransitionPolicy::Auto,
                 application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
@@ -2408,7 +2408,7 @@ namespace
     public:
         using RecordingStateMachine = application::OuterLoopStateMachineFor<RecordingSpeedController, RecordingSpeedController>;
 
-        foc::NewtonMeter torqueConstant{ 0.1f };
+        foc::Weber fluxLinkage{ 0.007f };
 
         using RefusingStateMachine = application::OuterLoopStateMachineFor<RefusingSpeedController, RefusingSpeedController>;
 
@@ -2418,7 +2418,7 @@ namespace
                 application::TerminalAndTracer{ terminal, tracer },
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
-                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), torqueConstant },
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), fluxLinkage },
                 faultNotifierMock,
                 state_machine::TransitionPolicy::Cli,
                 application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
@@ -2431,7 +2431,7 @@ namespace
                 application::TerminalAndTracer{ terminal, tracer },
                 application::MotorHardware{ inverterMock, encoderMock, vdc },
                 nvmMock,
-                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), torqueConstant },
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), fluxLinkage },
                 faultNotifierMock,
                 state_machine::TransitionPolicy::Cli,
                 application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
@@ -2522,7 +2522,7 @@ TEST_F(FocStateMachineSpeedIdentificationTest, identification_is_bounded_by_the_
 
 TEST_F(FocStateMachineSpeedIdentificationTest, identification_never_runs_when_the_speed_loop_cannot_be_configured)
 {
-    torqueConstant = foc::NewtonMeter{ 0.0f };
+    fluxLinkage = foc::Weber{ 0.0f };
 
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();

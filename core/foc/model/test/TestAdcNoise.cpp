@@ -1,6 +1,6 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include "motor_parameters/Jk42bls01X038ed.hpp"
+#include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <array>
 #include <cmath>
 #include <gtest/gtest.h>
@@ -15,7 +15,7 @@ namespace
         infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
 
         foc::ThreePhaseMotorModel model{
-            foc::JK42BLS01_X038ED::parameters,
+            foc::M_2310P_LN_04K::parameters,
             foc::Volts{ 24.0f },
             hal::Hertz{ 100000 },
             std::optional<std::size_t>{}
@@ -90,7 +90,7 @@ TEST_F(TestAdcNoise, nonzero_sigma_increases_variance_over_zero_sigma_baseline)
     const float baseVar = baseSum2 / baselineSize - baseMean * baseMean;
 
     foc::ThreePhaseMotorModel model2{
-        foc::JK42BLS01_X038ED::parameters,
+        foc::M_2310P_LN_04K::parameters,
         foc::Volts{ 24.0f },
         hal::Hertz{ 100000 },
         std::optional<std::size_t>{}

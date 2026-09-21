@@ -18,6 +18,7 @@ namespace application
         void NotifyError(CanError error);
 
         std::optional<sil::SemihostingCan::Frame> PollIncoming();
+        void OnTerminalLine(const infra::Function<void(const char*)>& handler);
 
     private:
         sil::SemihostingCan can;

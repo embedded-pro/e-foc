@@ -1,6 +1,6 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include "motor_parameters/Jk42bls01X038ed.hpp"
+#include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <gtest/gtest.h>
 
 namespace
@@ -12,7 +12,7 @@ namespace
         infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
 
         foc::ThreePhaseMotorModel model{
-            foc::JK42BLS01_X038ED::parameters,
+            foc::M_2310P_LN_04K::parameters,
             foc::Volts{ 24.0f },
             hal::Hertz{ 100000 },
             std::optional<std::size_t>{}
@@ -25,7 +25,7 @@ TEST_F(TestThermalModel, effective_resistance_scales_with_temperature)
     constexpr float testTemp = 125.0f;
     model.SetWindingTemperatureForTest(testTemp);
 
-    const float rBase = foc::JK42BLS01_X038ED::parameters.R.Value();
+    const float rBase = foc::M_2310P_LN_04K::parameters.R.Value();
     const float expectedR = rBase * (1.0f + 0.00393f * (testTemp - 25.0f));
     const float actualR = model.EffectiveResistance().Value();
 

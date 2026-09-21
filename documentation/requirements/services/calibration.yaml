@@ -98,3 +98,34 @@
     inertia and viscous friction are finite and inside the documented physical band. The one-shot
     procedure and the online estimator shall apply the same policy, and an estimate that fails it
     shall be reported as absent rather than persisted.
+
+- id: REQ-CAL-012
+  title: Electrical identification reports the plant it measured
+  shall: >
+    Run against a plant whose parameters are known, the electrical identification command
+    shall report a phase resistance within 5 % and a phase inductance within 20 % of the
+    plant's, and the plant's pole-pair count exactly, for each reference motor, and shall hold
+    a 10 % and 25 % envelope with current measurement noise of 0.05 A standard deviation and
+    0.02 A bias and encoder noise of 0.2 mrad. The comparison is made on the values the command
+    itself broadcasts, not on a test-only readout.
+
+- id: REQ-CAL-013
+  title: The full calibration identifies the mechanical parameters of the plant
+  shall: >
+    Run from a stored calibration whose resistance, inductance, inertia and friction are
+    deliberately wrong by a factor of 1.3, 0.7, 2.0 and 0.5, the full calibration sequence
+    shall store a record whose resistance is within 5 %, inductance within 20 %, inertia within
+    5 % and viscous friction within 10 % of the plant's, with the plant's pole-pair count, for
+    each reference motor. The record shall be traced when it is stored so that the comparison
+    is made on what the motor will run with.
+
+- id: REQ-CAL-014
+  title: Online estimates converge on the plant from a wrong seed
+  shall: >
+    Seeded from a stored calibration whose values are wrong by the factors of REQ-CAL-013 and
+    excited for three seconds by a speed reference alternating between 26 and 52 rad/s every
+    250 ms, the online estimators shall report an inertia within 20 %, a viscous friction within
+    30 % and an inductance within 15 % of the plant's, for each reference motor, and shall hold
+    the same envelope for inertia and friction with a constant shaft torque of 0.01 N·m applied
+    during the excitation. The estimates shall be readable through the product's own terminal
+    command.

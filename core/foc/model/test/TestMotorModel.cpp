@@ -1,7 +1,7 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "infra/util/WithSharedAccess.hpp"
-#include "motor_parameters/Jk42bls01X038ed.hpp"
+#include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <gtest/gtest.h>
 
 namespace
@@ -55,7 +55,7 @@ namespace
 
         infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
         infra::WithSharedAccess<foc::ThreePhaseMotorModel> model{
-            foc::JK42BLS01_X038ED::parameters,
+            foc::M_2310P_LN_04K::parameters,
             foc::Volts{ 24.0f },
             hal::Hertz{ 20000 },
             std::optional<std::size_t>{}
@@ -125,7 +125,7 @@ TEST_F(MotorModelTest, phase_currents_ready_callback_invoked_per_step)
 TEST_F(MotorModelTest, iteration_limit_notifies_finished_and_stops_callback)
 {
     infra::WithSharedAccess<foc::ThreePhaseMotorModel> limitedModel{
-        foc::JK42BLS01_X038ED::parameters,
+        foc::M_2310P_LN_04K::parameters,
         foc::Volts{ 24.0f },
         hal::Hertz{ 20000 },
         std::optional<std::size_t>{ 3 }
@@ -172,13 +172,13 @@ TEST_F(MotorModelTest, set_load_does_not_crash)
 
 TEST_F(MotorModelTest, effective_inductance_d_at_ambient_equals_ld)
 {
-    const float expected = foc::JK42BLS01_X038ED::parameters.Ld.Value();
+    const float expected = foc::M_2310P_LN_04K::parameters.Ld.Value();
     EXPECT_FLOAT_EQ(model->EffectiveInductanceD().Value(), expected);
 }
 
 TEST_F(MotorModelTest, effective_inductance_q_at_ambient_equals_lq)
 {
-    const float expected = foc::JK42BLS01_X038ED::parameters.Lq.Value();
+    const float expected = foc::M_2310P_LN_04K::parameters.Lq.Value();
     EXPECT_FLOAT_EQ(model->EffectiveInductanceQ().Value(), expected);
 }
 
@@ -219,7 +219,7 @@ TEST_F(MotorModelTest, thermal_config_applied_changes_effective_resistance)
     model->SetThermalConfig(cfg);
     model->SetWindingTemperatureForTest(125.0f);
 
-    const float r0 = foc::JK42BLS01_X038ED::parameters.R.Value();
+    const float r0 = foc::M_2310P_LN_04K::parameters.R.Value();
     EXPECT_GT(model->EffectiveResistance().Value(), r0);
 }
 

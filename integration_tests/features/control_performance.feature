@@ -6,19 +6,19 @@ Feature: FOC Control Performance
   motor is enabled, so enabling is the step and the onset is exact.
 
   The limits below are pinned from a characterisation run against the nominal
-  plant with a margin, and each family of laws carries its own row because they
-  are designed to differ: two-DOF trades speed for overshoot, deadbeat settles in
-  a sample, sliding mode keeps a boundary-layer band.
+  plant (the Teknic M-2310P-LN-04K reference motor) with a margin, and each
+  family of laws carries its own row because they are designed to differ:
+  two-DOF trades speed for overshoot, deadbeat settles in a sample, sliding mode
+  keeps a boundary-layer band.
 
-  The duty cycle reaches the inverter in whole percent, so every loop limit-cycles
-  around its setpoint; the @sil rows carry the envelope the product holds today.
-  The @sil-known-defect rows carry the envelope a law should meet and are held
-  out of the default run: the deadbeat and sliding-mode current laws command no
-  voltage after enabling, the decoupled law overshoots more than twofold, the
-  LQI position law is unstable, and the LQI speed law is erratic on a setpoint
-  change while running. See documentation/design/software-in-the-loop.md.
+  The duty cycle reaches the inverter in whole percent, so the current loop
+  ripples around its setpoint by about a tenth of an ampere; the @sil current
+  rows carry the envelope the product holds today and the @sil-known-defect rows
+  the envelope the laws should meet. The LQI speed law overshoots a step from
+  rest more than twofold and is erratic on a change while running, so its rows
+  are held out the same way. See documentation/design/software-in-the-loop.md.
 
-  @sil @REQ-SPD-008
+  @REQ-SPD-008
   Scenario Outline: The <algorithm> speed loop steps from rest to 20 rad/s
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 800 samples
@@ -37,12 +37,17 @@ Feature: FOC Control Performance
     When the motor is disabled
     Then the state machine shall be in the Ready state
 
+    @sil
     Examples:
       | algorithm | band_pct | settle_ms | overshoot_pct | error |
-      | pid       | 30       | 400       | 60            | 1.0   |
-      | lqi       | 50       | 450       | 65            | 1.0   |
-      | adrc      | 30       | 150       | 50            | 1.0   |
-      | twodof    | 40       | 400       | 55            | 1.0   |
+      | pid       | 10       | 60        | 15            | 0.5   |
+      | adrc      | 10       | 80        | 15            | 0.5   |
+      | twodof    | 10       | 60        | 15            | 0.5   |
+
+    @sil-known-defect
+    Examples:
+      | algorithm | band_pct | settle_ms | overshoot_pct | error |
+      | lqi       | 10       | 100       | 20            | 1.0   |
 
   @REQ-SPD-008
   Scenario Outline: The <algorithm> speed loop follows a setpoint change to <target> rad/s while running
@@ -66,20 +71,20 @@ Feature: FOC Control Performance
     @sil
     Examples:
       | algorithm | target | band_pct | settle_ms | overshoot_pct | error |
-      | pid       | 40     | 30       | 100       | 40            | 1.0   |
-      | pid       | -20    | 30       | 100       | 40            | 1.0   |
-      | adrc      | 40     | 30       | 300       | 60            | 1.0   |
-      | adrc      | -20    | 30       | 300       | 60            | 1.0   |
-      | twodof    | 40     | 30       | 100       | 40            | 1.0   |
-      | twodof    | -20    | 30       | 100       | 40            | 1.0   |
+      | pid       | 40     | 10       | 60        | 15            | 0.5   |
+      | pid       | -20    | 10       | 60        | 15            | 0.5   |
+      | adrc      | 40     | 10       | 80        | 15            | 0.5   |
+      | adrc      | -20    | 10       | 80        | 15            | 0.5   |
+      | twodof    | 40     | 10       | 60        | 15            | 0.5   |
+      | twodof    | -20    | 10       | 60        | 15            | 0.5   |
 
     @sil-known-defect
     Examples:
       | algorithm | target | band_pct | settle_ms | overshoot_pct | error |
-      | lqi       | 40     | 30       | 300       | 50            | 1.0   |
-      | lqi       | -20    | 30       | 300       | 50            | 1.0   |
+      | lqi       | 40     | 10       | 100       | 20            | 1.0   |
+      | lqi       | -20    | 10       | 100       | 20            | 1.0   |
 
-  @REQ-POS-009
+  @sil @REQ-POS-009
   Scenario Outline: The <algorithm> position loop steps from rest to 1.5 rad
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 800 samples
@@ -96,20 +101,15 @@ Feature: FOC Control Performance
     And the steady-state position error shall be below <error> rad
     And the response shall have no dropped samples
 
-    @sil
     Examples:
       | algorithm | band_pct | settle_ms | overshoot_pct | error |
-      | pid       | 10       | 300       | 15            | 0.15  |
-      | cascadep  | 10       | 200       | 10            | 0.05  |
-      | lqr       | 10       | 250       | 45            | 0.05  |
-      | twodof    | 10       | 300       | 15            | 0.15  |
+      | pid       | 10       | 200       | 15            | 0.1   |
+      | cascadep  | 10       | 200       | 10            | 0.02  |
+      | lqr       | 10       | 60        | 15            | 0.01  |
+      | lqi       | 10       | 60        | 50            | 0.01  |
+      | twodof    | 10       | 300       | 15            | 0.1   |
 
-    @sil-known-defect
-    Examples:
-      | algorithm | band_pct | settle_ms | overshoot_pct | error |
-      | lqi       | 10       | 300       | 30            | 0.05  |
-
-  @REQ-POS-009
+  @sil @REQ-POS-009
   Scenario Outline: The <algorithm> position loop follows a setpoint change to <target> rad while holding
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 2000 samples
@@ -128,20 +128,15 @@ Feature: FOC Control Performance
     And the steady-state position error shall be below <error> rad
     And the response shall have no dropped samples
 
-    @sil
     Examples:
       | algorithm | target | band_pct | settle_ms | overshoot_pct | error |
-      | pid       | -1.5   | 10       | 300       | 20            | 0.2   |
-      | cascadep  | -1.5   | 10       | 300       | 20            | 0.2   |
-      | lqr       | -1.5   | 10       | 300       | 45            | 0.2   |
-      | twodof    | -1.5   | 10       | 450       | 30            | 0.2   |
+      | pid       | -1.5   | 10       | 200       | 15            | 0.15  |
+      | cascadep  | -1.5   | 10       | 200       | 10            | 0.02  |
+      | lqr       | -1.5   | 10       | 60        | 15            | 0.01  |
+      | lqi       | -1.5   | 10       | 60        | 40            | 0.01  |
+      | twodof    | -1.5   | 10       | 300       | 15            | 0.15  |
 
-    @sil-known-defect
-    Examples:
-      | algorithm | target | band_pct | settle_ms | overshoot_pct | error |
-      | lqi       | -1.5   | 10       | 300       | 30            | 0.05  |
-
-  @sil-known-defect @REQ-TRQ-007
+  @REQ-TRQ-007
   Scenario Outline: The <algorithm> current loop steps from rest to 0.5 A
     Given a nominal motor plant
     And the plant response is recorded at 20000 Hz for up to 400 samples
@@ -158,6 +153,15 @@ Feature: FOC Control Performance
     And the steady-state current error shall be below <error> A
     And the response shall have no dropped samples
 
+    @sil
+    Examples:
+      | algorithm | band_pct | settle_ms | overshoot_pct | error |
+      | pid       | 40       | 12        | 20            | 0.1   |
+      | decoupled | 40       | 12        | 40            | 0.1   |
+      | deadbeat  | 40       | 5         | 20            | 0.1   |
+      | sliding   | 40       | 5         | 70            | 0.1   |
+
+    @sil-known-defect
     Examples:
       | algorithm | band_pct | settle_ms | overshoot_pct | error |
       | pid       | 10       | 3         | 30            | 0.05  |

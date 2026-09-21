@@ -10,6 +10,53 @@ namespace
     {
         return hal::Can::Id::Create29BitId(services::MakeCanId(priority, category, messageType, nodeId));
     }
+
+    int HexValue(char c)
+    {
+        if (c >= '0' && c <= '9')
+            return c - '0';
+        if (c >= 'a' && c <= 'f')
+            return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F')
+            return c - 'A' + 10;
+        return -1;
+    }
+
+    // "CAN_TX <id-hex> <payload-hex>", the form the simulated target prints every frame it sends in.
+    bool ParseTransmittedFrame(const std::string& line, hal::Can::Id expectedId, hal::Can::Message& out)
+    {
+        static const std::string prefix{ "CAN_TX " };
+        if (line.rfind(prefix, 0) != 0)
+            return false;
+
+        const auto idEnd = line.find(' ', prefix.size());
+        if (idEnd == std::string::npos)
+            return false;
+
+        uint32_t rawId = 0;
+        for (std::size_t i = prefix.size(); i < idEnd; ++i)
+        {
+            const int digit = HexValue(line[i]);
+            if (digit < 0)
+                return false;
+            rawId = (rawId << 4) | static_cast<uint32_t>(digit);
+        }
+
+        if (hal::Can::Id::Create29BitId(rawId) != expectedId)
+            return false;
+
+        out.clear();
+        for (std::size_t i = idEnd + 1; i + 1 < line.size() && !out.full(); i += 2)
+        {
+            const int hi = HexValue(line[i]);
+            const int lo = HexValue(line[i + 1]);
+            if (hi < 0 || lo < 0)
+                break;
+            out.push_back(static_cast<uint8_t>((hi << 4) | lo));
+        }
+
+        return true;
+    }
 }
 
 namespace integration
@@ -206,6 +253,25 @@ namespace integration
         return static_cast<float>(raw) / static_cast<float>(can::focPositionScale);
     }
 
+    std::optional<can::FocMotorState> Fixture::ReadMotorState(std::chrono::milliseconds timeout)
+    {
+        const hal::Can::Id requestId = MakeId(services::CanPriority::command,
+            can::focMotorCategoryId, can::focRequestTelemetryId, kServerNodeId);
+        const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
+            can::focMotorCategoryId, can::focTelemetryStatusResponseId, kServerNodeId);
+
+        hal::Can::Message request;
+        request.push_back(nextSequence++);
+        interactor.SendCanFrame(requestId, request, std::chrono::milliseconds{ 100 });
+
+        hal::Can::Message payload;
+        std::chrono::milliseconds elapsed{ 0 };
+        if (!WaitForCanFrame(telemetryId, payload, timeout, elapsed) || payload.empty())
+            return std::nullopt;
+
+        return static_cast<can::FocMotorState>(payload[0]);
+    }
+
     bool Fixture::SelectControlMode(can::FocMotorMode mode, std::chrono::milliseconds timeout)
     {
         hal::Can::Message payload;
@@ -250,5 +316,25 @@ namespace integration
     void Fixture::MarkCanReference()
     {
         canReference = std::chrono::steady_clock::now();
+    }
+
+    std::optional<hal::Can::Message> Fixture::FindCapturedCanFrame(hal::Can::Id id, std::size_t fromLine) const
+    {
+        const auto& lines = interactor.SerialLines();
+        std::optional<hal::Can::Message> found;
+
+        for (std::size_t i = fromLine; i < lines.size(); ++i)
+        {
+            hal::Can::Message payload;
+            if (ParseTransmittedFrame(lines[i], id, payload))
+                found = payload;
+        }
+
+        return found;
+    }
+
+    std::size_t Fixture::CapturedLineCount() const
+    {
+        return interactor.SerialLines().size();
     }
 }

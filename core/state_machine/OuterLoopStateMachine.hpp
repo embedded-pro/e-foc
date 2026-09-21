@@ -60,8 +60,9 @@ namespace application
         virtual services::RealTimeResistanceAndInductanceEstimator& GetOnlineElecEstimator() = 0;
 
     private:
-        bool ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth);
+        bool ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth, foc::NewtonMeter torqueConstant);
         bool ApplyIdentificationControl(const services::CalibrationData& pending);
+        foc::NewtonMeter TorqueConstantFor(const services::CalibrationData& data) const;
         services::MechanicalParametersIdentification::Config ExcitationConfig() const;
 
         static constexpr float velocityBandwidthRadPerSec = 50.0f;
@@ -78,7 +79,6 @@ namespace application
         // down to what the inverter supports.
         static constexpr float identificationCurrentMarginFactor = 1.2f;
 
-        foc::NewtonMeter mechTorqueConstant;
         foc::Ampere driveCurrentLimit;
     };
 }

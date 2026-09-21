@@ -2,7 +2,7 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.1.0
+version: 1.2.0
 component: "software-in-the-loop"
 date: 2026-09-21
 ---
@@ -12,7 +12,7 @@ date: 2026-09-21
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.1.0                       |
+| Version   | 1.2.0                       |
 | Component | software-in-the-loop        |
 | Date      | 2026-09-21                  |
 
@@ -95,6 +95,13 @@ The description covers everything the plant needs:
 When no description is present the firmware falls back to the motor it is built with, so the
 target still boots standalone. A trip threshold of zero disables that protection, which is how a
 scenario opts out of one it is not testing.
+
+The winding and rotor group is filled from one of the two reference motors in `motor_parameters/`
+(the Teknic M-2310P-LN-04K on its 40 V bus is the nominal plant, the Anaheim BLY172S-24V-4000 on
+24 V the other), whose parameters and sources are in the plant theory document. A scenario names
+the motor as a preset; every other preset is a variation on the nominal one. The stored calibration
+a scenario boots from is derived from the same description, so "already calibrated" means
+calibrated to the plant, and a scenario that wants a wrong seed says by how much.
 
 The seed matters more than it looks: the emulated target cannot obtain entropy, so without an
 explicit seed the noise generators are not merely unpredictable, they are unreliable.
@@ -298,33 +305,36 @@ delivery stamp. The target's command surface is still the product's: nothing was
 
 ### Part I — What the measurements found
 
-The first characterisation run measured the product as it is, and three of its findings are
-defects rather than tuning. The scenarios that expose them are kept, with the limits the law
-should meet, under a tag held out of the default run in the same way as the protection
-scenarios; the scenarios in the default run carry the envelope the product holds today, so a
-regression is still caught while the defects are open.
+The first characterisation run measured the product against the parameter set that stood in
+for a motor at the time and reported four findings. Re-measured on the reference motors, after
+the harness faults recorded in Part J were fixed, two of them stand and two were artefacts. The
+scenarios that expose a standing defect are kept, with the limits the law should meet, under a
+tag held out of the default run in the same way as the protection scenarios; the scenarios in
+the default run carry the envelope the product holds today, so a regression is still caught
+while the defects are open.
 
-- **Whole-percent duty resolution.** The duty cycles the modulator hands the inverter are
-  three whole-percent values, and the conversion rounds to the nearest percent. On a 48 V bus
-  into a 73 mΩ winding one step is half a volt and several amperes, so the current loop cannot
-  hold a half-ampere setpoint: it sits at zero until its integrator has wound up a whole step,
-  then saws between adjacent steps. The speed loop above it inherits the ripple as a limit cycle
-  of about a quarter of a 20 rad/s setpoint, although its mean stays within a fraction of a
-  radian per second. Every loop is affected on every platform, because the type is the product
-  interface's. Until the duty carries more resolution, settling into a tight band cannot be
-  required of any loop.
-- **Two current laws command nothing.** With the deadbeat or the sliding-mode law selected, and
-  the firmware confirming the selection, the q-axis current stays at zero for the whole window
-  after enabling while the residual d-axis current decays freely. The decoupled law does drive
-  the motor but overshoots the step more than twofold.
-- **The LQI position law is unstable on the nominal plant.** Enabled against a 1.5 rad
-  setpoint it runs away within a hundred milliseconds, with the speed swinging hundreds of
-  radians per second in both directions and the current saturating either way.
-- **The LQI speed law is erratic on a setpoint change while running.** From rest to 20 rad/s it
-  behaves like the other laws, limit cycle included. Stepped from 20 rad/s up to 40 rad/s it
-  overshoots the step almost threefold and keeps swinging by tens of radians per second around
-  a mean that is nonetheless right; reversed from 20 rad/s to -20 rad/s it settled in a few
-  milliseconds in one run and not at all within half a second in the next.
+- **Whole-percent duty resolution.** The duty cycles the modulator hands the inverter are three
+  whole-percent values, and the conversion rounds to the nearest percent. On a 40 V bus into a
+  0.36 Ω, 0.20 mH winding one step is 0.4 V and about a tenth of an ampere of ripple per control
+  period, so the current loop holds a half-ampere setpoint inside a band of about 30 % of it and
+  cannot settle into a 10 % one. The speed loops above it no longer show a limit cycle worth the
+  name: their tail band is 1–3 % of a 20 rad/s setpoint, and they settle into a 10 % band within
+  10–25 ms with 1–5 % overshoot. The quarter-setpoint limit cycle of the first run was the
+  73 mΩ winding's doing, and the harness's inductance seed. Every loop is affected on every
+  platform, because the type is the product interface's, and a tight current-loop band cannot be
+  required until the duty carries more resolution.
+- **Two current laws command nothing — retracted.** With the inductance seeded correctly the
+  deadbeat law rises within a sample and overshoots 9 %, the sliding-mode law overshoots 50 %
+  into its boundary layer, and the decoupled law 25 %. The zero output was the deadbeat and
+  sliding designs computed for a winding of half a microhenry.
+- **The LQI position law is unstable — retracted.** Same cause. It settles into a 10 % band
+  within 30 ms with 27–40 % overshoot, and holds 1.5 rad against a torque step within 0.011 rad,
+  the tightest of the position laws.
+- **The LQI speed law is erratic — stands, and from rest too.** From rest to 20 rad/s it
+  overshoots 121 % and never settles; stepped to 40 rad/s while running it overshoots 66 % and
+  keeps swinging for the rest of the window; a 0.002 N·m torque step pushes it 26 rad/s off a
+  20 rad/s setpoint, where the other laws move less than 2 rad/s. Its rows are held out under the
+  known-defect tag in all three scenarios.
 
 The run also found a harness fault: a line cut by a read timeout was dropped and its tail
 parsed as a line of its own, which showed up as a gap in the sample spacing. The reader now
@@ -336,20 +346,114 @@ setpoint or an enable lands relative to the outer loop's phase moves from run to
 transient with it: the same step measured a 40 % overshoot in one run and 43 % in the next.
 The pinned limits carry a margin for that, and a limit that sits on a measured value is wrong.
 
+### Part J — The estimators against a known plant
+
+A simulated plant is the one place where an estimator can be marked against the truth: the
+scenario wrote the resistance, inductance, flux linkage, inertia and friction the plant runs
+with, so whatever the firmware identifies can be compared with them, and the comparison is
+made on both reference motors so that a tolerance is not tuned to one winding.
+
+Three product channels carry what the firmware believes, and all three are the product's own:
+
+- The **electrical parameters response** the CAN identification command broadcasts before it
+  acknowledges: resistance, inductance and pole pairs at the wire's resolution of 1 mΩ and 1 µH.
+- The **calibration record** the state machine traces whenever it stores one, `[SM] Calibration
+  record:`. This is the only way the mechanical identification's result is visible on this target:
+  the CAN mechanical command is not wired, and the full sequence that includes it runs from the
+  terminal's `calibrate`, which in the emulator travels on the socket the CAN frames use.
+- The **online estimates** the terminal prints on `estimate_status`, `[EST] Mech:` and
+  `[EST] Elec:`, seeded from the record and updated at the outer-loop rate while the motor runs.
+
+Inertia and friction are traced in micro-units on both trace lines; the tracer prints three
+decimals, and the rotors here weigh a few micro-newton-metre-seconds-squared.
+
+The scenarios cover the offline procedures from a blank calibration and from one deliberately
+wrong by given factors, the online estimators from a wrong seed under a speed reference that
+alternates between two levels (the same shape the identification service uses, because a constant
+speed excites neither inertia nor friction), the same with a constant shaft torque applied while
+the estimators run, and a winding that heats while running. The excitation is paced on the plant's
+own clock, read from its trajectory samples, so it lasts the same guest time on every host.
+
+What the first characterisation found, in the order it was found:
+
+- **The emulated inverter delivered current samples at the control rate whatever rate a
+  procedure asked for.** The identification procedures ask for 10 kHz and demodulate on that
+  assumption, so every sample arriving twice as often made the injection twice the frequency it
+  was analysed at, and the inductance came out doubled on both motors (0.36 mH for a 0.20 mH
+  winding, 1.22 mH for 0.64 mH). The platform now delivers samples at the requested rate, as an
+  ADC trigger divider would, while the plant keeps stepping at the control rate. With that, the
+  resistance identifies within 2 % and the inductance within 15.5 % (Teknic) and 6.5 % (Anaheim),
+  reading low in both cases, which is the ZOH bias the electrical theory document predicts made
+  larger by the whole-percent duty quantising the injection. Pole pairs identify exactly. None of
+  these numbers move under current and encoder noise.
+- **The mechanical identification could never complete on the emulated target.** Its completion
+  is deferred to the event loop against a weak pointer, so that an identification torn down
+  before the completion runs is dropped rather than executed on a dead object. The emulated
+  platform registered only the plain dispatcher, and the weak-pointer dispatcher is a second
+  singleton next to it; scheduling through it dereferenced nothing and hard-faulted inside the
+  control interrupt on the first sample the identification observed. The fault handler then
+  faulted again, so nothing was traced and the target simply went silent. The deferred fault
+  notifications take the same path. The platform now registers a cortex dispatcher that serves
+  both singletons. The hardware platforms should be checked for the same omission. With the
+  dispatcher in place the full calibration from the terminal reaches Ready on both motors and
+  its record is within 0.05 % of the plant's inertia and 2 % of its viscous friction, from a
+  seed that was off by a factor of two and a half; the offline procedure, sampling at the control
+  rate, is as good as the plant it measures.
+- **The stored calibration the scenarios booted from carried the inductance in henry where the
+  record holds millihenry**, so every "already calibrated" run since the plant description was
+  introduced configured its current loop with an inductance a thousand times too small. Part I's
+  numbers were measured that way and are re-measured below.
+- **The torque constant was a per-target constant of 0.1 N·m/A**, two and a half to three times
+  the true value of either reference motor, used by the mechanical identification, the online
+  inertia estimator and the speed-loop gain design alike. It is now derived from the calibration
+  record (REQ-SM-027).
+- **Small mechanical values did not survive the product's own outputs.** The mechanical
+  parameters response on the wire carries inertia and friction as fixed-point with a resolution
+  of 1e-4, so the rotors here (5e-6 to 7e-6 kg·m², 1e-5 N·m·s/rad) encode as zero; that
+  response is not used by the scenarios and changing its scale is a wire-contract change left
+  open. The tracer prints three decimals, so the same values traced as zero; the traces now
+  carry them in micro-units.
+- **The online mechanical estimator does not track.** Seeded with twice the inertia and half the
+  friction and excited for six seconds by a speed reference alternating between 26 and 52 rad/s
+  every quarter second, it published an inertia 26–33 % low and a friction near zero on the
+  Teknic (0.7–1.4 for 15 µN·m·s/rad), and nothing at all on the Anaheim, whose estimates were
+  still the seed at the end. It shares its acceptance policy with the offline procedure, which
+  is accurate to a fraction of a percent, but runs at the 1 kHz outer-loop rate instead of the
+  control rate: there a torque sample and the acceleration it produced sit in different
+  samples on rotors this light, the two-level trajectory leaves viscous friction collinear with
+  the intercept, and the convergence gate (an innovation below 0.1 mN·m) sits under the torque
+  ripple the whole-percent duty produces, so it is met by chance or not at all. A constant shaft
+  torque changes none of this.
+- **The online electrical estimator cannot see the resistance.** Its regressor's resistance
+  column is the d-axis current, which the product regulates to zero, so that direction is
+  never excited and the recursion drifts: after six seconds the resistance read −0.68 Ω for a
+  0.36 Ω winding, −1.63 Ω for 0.405 Ω, and −0.63 Ω on the heated plant it was meant to track.
+  The inductance, driven by the cross-coupling term, moved from its seed toward the plant and
+  past it (+39 % and −17 %). The state machine refuses non-physical estimates when asked to
+  apply them, so none of this reaches the gains, but tracking a warming winding is impossible
+  by construction until the estimator gets a d-axis excitation of its own.
+
+The identification scenarios therefore run the offline procedures in the default set, on both
+motors, and hold the online scenarios out under the known-defect tag with the envelope the
+estimators should meet (REQ-CAL-014).
+
+---
+
 ---
 
 ## Scenario Taxonomy
 
-| Area                  | What it establishes                                                                                            |
-|-----------------------|----------------------------------------------------------------------------------------------------------------|
-| Control modes         | Torque, speed and position each align, enable, take a setpoint, disable                                        |
-| Controller algorithms | Every algorithm of every loop runs, plus combinations across the loops                                         |
-| Plant characteristics | Control holds up across noise, temperature, load and a different winding                                       |
-| Wiring faults         | A dead motor does not turn; a degraded one does                                                                |
-| Memory integrity      | Damaged calibration is distrusted; damaged configuration falls to defaults                                     |
-| Board protection      | Trips reach the state machine and are reported                                                                 |
-| Control performance   | Each loop's step response stays inside its settling, overshoot and error envelope, from rest and while running |
-| Disturbance rejection | A shaft torque step while regulating is bounded in excursion and recovered from                                |
+| Area                     | What it establishes                                                                                               |
+|--------------------------|-------------------------------------------------------------------------------------------------------------------|
+| Control modes            | Torque, speed and position each align, enable, take a setpoint, disable                                           |
+| Controller algorithms    | Every algorithm of every loop runs, plus combinations across the loops                                            |
+| Plant characteristics    | Control holds up across noise, temperature, load and a different winding                                          |
+| Wiring faults            | A dead motor does not turn; a degraded one does                                                                   |
+| Memory integrity         | Damaged calibration is distrusted; damaged configuration falls to defaults                                        |
+| Board protection         | Trips reach the state machine and are reported                                                                    |
+| Control performance      | Each loop's step response stays inside its settling, overshoot and error envelope, from rest and while running    |
+| Disturbance rejection    | A shaft torque step while regulating is bounded in excursion and recovered from                                   |
+| Parameter identification | What the firmware identifies offline, and tracks online, matches the plant it was given, on both reference motors |
 
 Controller coverage sweeps each loop's algorithms with the other loops held at the baseline, and
 adds a handful of combinations chosen to exercise both kinds of position law: those that produce a
@@ -361,14 +465,22 @@ already provides.
 
 ## Interfaces
 
-**Provided to scenarios:** a named plant or one described field by field, a stored calibration and
-configuration to boot from, a scheduled shaft torque, a recording rate and budget, a boot step,
-the CAN command set, a capture step that waits on the plant's own clock, and assertions over
-telemetry, reported algorithms, fault codes, rotor movement, step-response metrics and
-disturbance recovery.
+**Provided to scenarios:** a named plant (one of the reference motors, or a variation on the
+nominal one) or one described field by field, a stored calibration and configuration to boot
+from, a calibration deliberately off by given factors, a scheduled shaft torque, a recording rate
+and budget, a boot step, the CAN command set, the product's terminal commands, a capture step that
+waits on the plant's own clock, and assertions over telemetry, reported algorithms, fault codes,
+rotor movement, step-response metrics, disturbance recovery and identified or tracked parameters.
 
 **Required from the target:** that it read its plant description at boot, expose its state, fault
-code, measured speed and position over telemetry, trace the algorithm each loop is running, and,
-when asked to, report the plant's trajectory and the tick each command frame was delivered on.
+code, measured speed and position over telemetry, trace the algorithm each loop is running, trace
+every calibration record it stores and its online estimates on request, and, when asked to, report
+the plant's trajectory and the tick each command frame was delivered on.
 
-**Not required:** any test-only command. The target's CAN surface is the product's.
+**How a terminal command reaches the emulated target:** on the same socket as the CAN frames. The
+firmware reads that socket line by line; a line with the `CAN_RX` prefix is a frame, any other line
+is handed to the terminal exactly as a serial port would hand it. The terminal answers through the
+tracer, so a step that needs the outcome drains the trace for the line it expects instead of waiting
+for a prompt.
+
+**Not required:** any test-only command. The target's CAN and terminal surfaces are the product's.

@@ -30,7 +30,6 @@ namespace application
         services::ElectricalParametersIdentification& electricalIdent;
         services::MotorAlignment& motorAlignment;
         std::optional<std::reference_wrapper<services::MechanicalParametersIdentification>> mechIdentOverride{ std::nullopt };
-        foc::NewtonMeter mechTorqueConstant{ foc::NewtonMeter{ 0.1f } };
         foc::Weber fluxLinkage{ foc::Weber{ 0.0f } };
     };
 }

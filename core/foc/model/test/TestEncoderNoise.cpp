@@ -1,6 +1,6 @@
-#include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/foc/interfaces/Units.hpp"
-#include "motor_parameters/Jk42bls01X038ed.hpp"
+#include "core/foc/model/ThreePhaseMotorModel.hpp"
+#include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <cmath>
 #include <gtest/gtest.h>
 #include <numbers>
@@ -14,7 +14,7 @@ namespace
     {
     protected:
         foc::ThreePhaseMotorModel model{
-            foc::JK42BLS01_X038ED::parameters,
+            foc::M_2310P_LN_04K::parameters,
             foc::Volts{ 24.0f },
             hal::Hertz{ 100000 },
             std::optional<std::size_t>{}

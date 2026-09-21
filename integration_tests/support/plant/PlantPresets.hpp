@@ -1,26 +1,38 @@
 #pragma once
 
-#include "motor_parameters/Jk42bls01X038ed.hpp"
+#include "motor_parameters/AnaheimBly172s24v4000.hpp"
+#include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include "targets/platform_implementations/qemu/implementation/SilPlantConfig.hpp"
 #include <string>
 
 namespace sil
 {
+    inline void DescribeMotor(SilPlantConfig& config, const foc::ThreePhaseMotorModel::Parameters& motor, foc::Volts supply)
+    {
+        config.statorResistanceOhm = motor.R.Value();
+        config.dAxisInductanceHenry = motor.Ld.Value();
+        config.qAxisInductanceHenry = motor.Lq.Value();
+        config.fluxLinkageWeber = motor.psi_f.Value();
+        config.rotorInertiaKgM2 = motor.J.Value();
+        config.viscousDampingNmSPerRad = motor.B.Value();
+        config.maxSupportedCurrentAmpere = motor.maxSupportedCurrent.Value();
+        config.powerSupplyVoltageVolts = supply.Value();
+        config.polePairs = motor.p;
+    }
+
     inline SilPlantConfig NominalPlant()
     {
-        const auto& motor = foc::JK42BLS01_X038ED::parameters;
-
-        return SilPlantConfig{
-            .statorResistanceOhm = motor.R.Value(),
-            .dAxisInductanceHenry = motor.Ld.Value(),
-            .qAxisInductanceHenry = motor.Lq.Value(),
-            .fluxLinkageWeber = motor.psi_f.Value(),
-            .rotorInertiaKgM2 = motor.J.Value(),
-            .viscousDampingNmSPerRad = motor.B.Value(),
-            .maxSupportedCurrentAmpere = motor.maxSupportedCurrent.Value(),
+        SilPlantConfig config{
+            .statorResistanceOhm = 0.0f,
+            .dAxisInductanceHenry = 0.0f,
+            .qAxisInductanceHenry = 0.0f,
+            .fluxLinkageWeber = 0.0f,
+            .rotorInertiaKgM2 = 0.0f,
+            .viscousDampingNmSPerRad = 0.0f,
+            .maxSupportedCurrentAmpere = 0.0f,
             .loadTorqueNm = 0.0f,
 
-            .powerSupplyVoltageVolts = 48.0f,
+            .powerSupplyVoltageVolts = 0.0f,
             .baseFrequencyHz = 20000u,
 
             .noiseSigmaAmpere = 0.0f,
@@ -50,19 +62,28 @@ namespace sil
             .responseSampleRateHz = 0u,
             .responseMaxSamples = 0u,
 
-            .polePairs = motor.p,
+            .polePairs = 0u,
             .faultFlags = 0u,
             .reserved0 = 0u,
             .reserved1 = 0u,
         };
+
+        DescribeMotor(config, foc::M_2310P_LN_04K::parameters, foc::M_2310P_LN_04K::ratedSupply);
+        return config;
     }
 
     inline bool TryNamedPlant(const std::string& name, SilPlantConfig& config)
     {
         config = NominalPlant();
 
-        if (name == "nominal")
+        if (name == "nominal" || name == "teknic")
             return true;
+
+        if (name == "anaheim")
+        {
+            DescribeMotor(config, foc::BLY172S_24V_4000::parameters, foc::BLY172S_24V_4000::ratedSupply);
+            return true;
+        }
 
         if (name == "noisy")
         {

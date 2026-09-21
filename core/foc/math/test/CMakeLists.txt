@@ -12,4 +12,5 @@ target_sources(e_foc.foc.math_test PRIVATE
     TestDutyConversion.cpp
     TestFastTrigonometry.cpp
     TestParameterValidation.cpp
+    TestTorqueConstant.cpp
 )

@@ -53,25 +53,23 @@
 - id: REQ-SPD-008
   title: Speed step-response envelope
   shall: >
-    With the nominal plant and the default loop bandwidths, every speed control law shall bring
-    the mechanical speed from rest to a 20 rad/s setpoint with the mean of the last quarter of a
-    500 ms window within 1 rad/s of the setpoint, and shall enter and then stay inside a band of
-    the step within a settling time and with an overshoot no worse than its row: PI 30 percent
-    band, 400 ms, 60 percent overshoot; ADRC 30 percent, 150 ms, 50 percent; two-DOF 40 percent,
-    400 ms, 55 percent; LQI 50 percent, 450 ms, 65 percent. A setpoint changed while running, to
-    40 rad/s and to -20 rad/s, shall settle into a 30 percent band of that step within 100 ms with
-    overshoot below 40 percent for PI and two-DOF, and within 300 ms with overshoot below 60
-    percent for ADRC; LQI is excluded from the running changes until its erratic response to
-    them is fixed. The bands are as wide as they are because the duty cycle reaches
-    the inverter in whole percent and every loop limit-cycles around its setpoint; the response is
-    measured on the plant's own trajectory on the control-tick time base.
+    With the nominal plant (the Teknic M-2310P-LN-04K reference motor) and the default loop
+    bandwidths, every speed control law shall bring the mechanical speed from rest to a 20 rad/s
+    setpoint with the mean of the last quarter of a 500 ms window within 0.5 rad/s of the
+    setpoint, and shall enter and then stay inside a 10 percent band of the step within a
+    settling time and with an overshoot no worse than its row: PI 60 ms, 15 percent overshoot;
+    ADRC 80 ms, 15 percent; two-DOF 60 ms, 15 percent. A setpoint changed while running, to
+    40 rad/s and to -20 rad/s, shall meet the same rows. LQI shall meet a 100 ms, 20 percent,
+    1 rad/s row in both cases; that row is held out of the default run until its response, a
+    twofold overshoot from rest and an erratic swing on a running change, is fixed. The response
+    is measured on the plant's own trajectory on the control-tick time base.
 
 - id: REQ-SPD-009
   title: Speed-loop rejection of a shaft torque step
   shall: >
     While regulating 20 rad/s against the nominal plant, every speed control law shall keep the
-    speed within 15 rad/s of the setpoint when a 0.002 N·m shaft torque is applied as a step, and
-    within 350 ms of the step shall return the speed to a band around the setpoint and hold the
-    mean of the window inside it: 5 rad/s for PI, ADRC and two-DOF, 10 rad/s for LQI. The bands
-    reflect the limit cycle the whole-percent duty resolution imposes; the mean speed after the
-    step shall show no residual error beyond that band for any law.
+    speed within 4 rad/s of the setpoint when a 0.002 N·m shaft torque is applied as a step, and
+    within 50 ms of the step shall return the speed to within 2 rad/s of the setpoint and hold
+    the mean of the window inside that band. LQI shall meet the same envelope with 100 ms; that
+    row is held out of the default run until its response, pushed 26 rad/s off the setpoint by
+    a torque the other laws absorb within 2, is fixed.

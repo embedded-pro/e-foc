@@ -163,11 +163,20 @@ namespace sil
         hal::Can::Id id{ hal::Can::Id::Create11BitId(0) };
         hal::Can::Message msg;
         if (!ParseCanLine(lineBuf, id, msg))
+        {
+            if (terminalCallback)
+                terminalCallback(lineBuf);
             return std::nullopt;
+        }
 
         if (receiveCallback)
             receiveCallback(id, msg);
 
         return Frame{ id, msg };
+    }
+
+    void SemihostingCan::OnTerminalLine(const infra::Function<void(const char*)>& handler)
+    {
+        terminalCallback = handler;
     }
 }

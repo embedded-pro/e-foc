@@ -16,6 +16,7 @@ target_sources(e_foc.foc.math INTERFACE
     FastTrigonometry.hpp
     FiniteGuard.hpp
     ParameterValidation.hpp
+    TorqueConstant.hpp
 )
 
 add_subdirectory(test)

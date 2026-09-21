@@ -2,10 +2,13 @@
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "infra/util/ByteRange.hpp"
 #include "infra/util/Crc.hpp"
+#include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <cstring>
 
 namespace
 {
+    constexpr float kMilliPerUnit = 1000.0f;
+
     void WriteUint32(std::vector<uint8_t>& image, std::size_t offset, uint32_t value)
     {
         std::memcpy(image.data() + offset, &value, sizeof(value));
@@ -46,19 +49,21 @@ namespace sil
 {
     services::CalibrationData CompleteCalibration()
     {
+        const auto& motor = foc::M_2310P_LN_04K::parameters;
+
         services::CalibrationData data{};
-        data.rPhase = 0.073f;
-        data.lD = 0.0005f;
-        data.lQ = 0.0005f;
-        data.fluxLinkage = 0.007f;
-        data.inertia = 0.0000075f;
-        data.frictionViscous = 0.00002f;
+        data.rPhase = motor.R.Value();
+        data.lD = motor.Ld.Value() * kMilliPerUnit;
+        data.lQ = motor.Lq.Value() * kMilliPerUnit;
+        data.fluxLinkage = motor.psi_f.Value();
+        data.inertia = motor.J.Value();
+        data.frictionViscous = motor.B.Value();
         data.frictionCoulomb = 0.0f;
         data.currentLoopBandwidth = 2000.0f;
         data.speedLoopBandwidth = 100.0f;
         data.encoderZeroOffset = 0;
         data.encoderDirection = 0;
-        data.polePairs = 4;
+        data.polePairs = motor.p;
         data.stage = services::CalibrationStage::complete;
         return data;
     }

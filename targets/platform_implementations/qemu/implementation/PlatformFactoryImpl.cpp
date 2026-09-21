@@ -263,6 +263,10 @@ namespace application
         {
             canBusAdapter.emplace();
             diagnostics.AttachCanBus(*canBusAdapter);
+            canBusAdapter->OnTerminalLine([this](const char* line)
+                {
+                    serial.Deliver(line);
+                });
             canPollTimer.Start(std::chrono::milliseconds(1), [this]()
                 {
                     // Read before dispatch: the stamp is the response window's onset, so it must not fall after the setpoint took effect.
@@ -278,10 +282,19 @@ namespace application
         return *canBusAdapter;
     }
 
-    OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+    // The plant is always stepped at the control rate; the requested rate only decides how often the
+    // samples are delivered, as an ADC trigger divider would. The identification procedures ask for
+    // 10 kHz and demodulate on that assumption, so handing them every 20 kHz sample doubles the
+    // inductance they measure.
+    OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz frequency, const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
+        const uint32_t requested = frequency.Value();
+        really_assert(requested != 0 && baseFrequency.Value() % requested == 0);
+
         onPhaseCurrentsReadyValid = false;
         onPhaseCurrentsReady = onDone;
+        sampleDecimation = baseFrequency.Value() / requested;
+        samplePhase = 0;
         onPhaseCurrentsReadyValid = true;
     }
 
@@ -306,7 +319,14 @@ namespace application
 
         lastCurrents = model.LastMeasuredCurrents();
 
-        if (onPhaseCurrentsReadyValid && onPhaseCurrentsReady && !controlLoopEntered)
+        const bool sampleDue = ++samplePhase >= sampleDecimation;
+        if (sampleDue)
+            samplePhase = 0;
+
+        if (!sampleDue)
+        {
+        }
+        else if (onPhaseCurrentsReadyValid && onPhaseCurrentsReady && !controlLoopEntered)
         {
             controlLoopEntered = true;
             const auto entryCycles = CycleCounter::Now();

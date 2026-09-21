@@ -23,7 +23,11 @@ namespace sil
 
         std::optional<Frame> PollIncoming();
 
+        // A line without the CAN prefix is a terminal command travelling on the same socket.
+        void OnTerminalLine(const infra::Function<void(const char*)>& handler);
+
     private:
         infra::Function<void(Id, const Message&)> receiveCallback;
+        infra::Function<void(const char*)> terminalCallback;
     };
 }

@@ -117,7 +117,7 @@ namespace
                 application::TerminalAndTracer{ terminal, tracer },
                 application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
                 nvmMock,
-                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
                 faultNotifierMock,
                 config,
                 state_machine::ControlModeStateMachine::OuterLoopArgs{

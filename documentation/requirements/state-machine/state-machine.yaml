@@ -223,3 +223,13 @@
     cannot be cleared on a single favourable reading. An enable command shall be refused
     while the condition reads asserted, independently of the fault latch, so that a clear
     granted during a momentary deassertion cannot arm the bridge on faulted hardware.
+
+- id: REQ-SM-027
+  title: The torque constant is derived from the calibrated flux linkage
+  shall: >
+    The torque constant the state machine hands to mechanical identification, to the online
+    inertia estimator and to the speed-loop gain design shall be derived from the calibration
+    record as three halves of the pole-pair count times the effective flux linkage, never
+    taken from a per-target constant. Mechanical identification shall be refused, as a failed
+    calibration step, when the pending pole pairs or flux linkage do not yield a positive
+    torque constant.

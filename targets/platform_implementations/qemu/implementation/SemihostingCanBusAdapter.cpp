@@ -29,4 +29,9 @@ namespace application
     {
         return can.PollIncoming();
     }
+
+    void SemihostingCanBusAdapter::OnTerminalLine(const infra::Function<void(const char*)>& handler)
+    {
+        can.OnTerminalLine(handler);
+    }
 }

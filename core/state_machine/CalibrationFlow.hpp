@@ -34,6 +34,7 @@ namespace application
         void Abort();
 
     private:
+        void TraceRecord(const services::CalibrationData& data) const;
         void OnSaved(services::NvmStatus status);
 
     private:

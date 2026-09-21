@@ -1,7 +1,20 @@
 #include "core/state_machine/OuterLoopStateMachine.hpp"
 #include "core/foc/math/FiniteGuard.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
+#include "core/foc/math/TorqueConstant.hpp"
 #include <cmath>
+
+namespace
+{
+    // The tracer prints three decimals, which is no resolution at all for inertias around 1e-6 and
+    // frictions around 1e-5; mechanical quantities are therefore traced in micro-units.
+    constexpr float microPerUnit = 1.0e6f;
+
+    float Micro(float value)
+    {
+        return value * microPerUnit;
+    }
+}
 
 namespace application
 {
@@ -12,17 +25,21 @@ namespace application
         const CalibrationServices& calibServices,
         foc::Ampere driveCurrentLimit)
         : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices)
-        , mechTorqueConstant(calibServices.mechTorqueConstant)
         , driveCurrentLimit(driveCurrentLimit)
     {}
 
-    bool OuterLoopStateMachine::ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth)
+    foc::NewtonMeter OuterLoopStateMachine::TorqueConstantFor(const services::CalibrationData& data) const
+    {
+        return foc::TorqueConstantFor(data.polePairs, EffectiveFluxLinkage(data));
+    }
+
+    bool OuterLoopStateMachine::ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth, foc::NewtonMeter torqueConstant)
     {
         // The cascade owns the current envelope and the outer-loop rate and substitutes them for these placeholders.
         const bool configured = SpeedTunable().ConfigureMechanics(foc::MechanicalModelParameters{
             inertia,
             friction,
-            mechTorqueConstant,
+            torqueConstant,
             foc::Ampere{ 0.0f },
             hal::Hertz{ 0 } });
 
@@ -35,7 +52,7 @@ namespace application
 
     void OuterLoopStateMachine::ApplyModeSpecificCalibration(const services::CalibrationData& data)
     {
-        ApplyMechanics(foc::NewtonMeterSecondSquared{ data.inertia }, foc::NewtonMeterSecondPerRadian{ data.frictionViscous }, data.speedLoopBandwidth);
+        ApplyMechanics(foc::NewtonMeterSecondSquared{ data.inertia }, foc::NewtonMeterSecondPerRadian{ data.frictionViscous }, data.speedLoopBandwidth, TorqueConstantFor(data));
 
         GetOnlineMechEstimator().SetInitialEstimate(foc::NewtonMeterSecondSquared{ data.inertia }, foc::NewtonMeterSecondPerRadian{ data.frictionViscous });
         GetOnlineElecEstimator().SetInitialEstimate(foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD });
@@ -48,7 +65,7 @@ namespace application
 
     void OuterLoopStateMachine::PrepareForEnabled()
     {
-        GetOnlineMechEstimator().SetTorqueConstant(mechTorqueConstant);
+        GetOnlineMechEstimator().SetTorqueConstant(TorqueConstantFor(GetCalibration()));
     }
 
     void OuterLoopStateMachine::RegisterModeSpecificCli(services::TerminalWithStorage& terminal)
@@ -62,8 +79,8 @@ namespace application
 
     void OuterLoopStateMachine::TraceOnlineEstimates()
     {
-        GetTracer().Trace() << "[EST] Mech: J=" << GetOnlineMechEstimator().CurrentInertia().Value() << " B=" << GetOnlineMechEstimator().CurrentFriction().Value();
-        GetTracer().Trace() << "[EST] Elec: R=" << GetOnlineElecEstimator().CurrentResistance().Value() << " L=" << GetOnlineElecEstimator().CurrentInductance().Value();
+        GetTracer().Trace() << "[EST] Mech: J_uNms2=" << Micro(GetOnlineMechEstimator().CurrentInertia().Value()) << " B_uNms=" << Micro(GetOnlineMechEstimator().CurrentFriction().Value());
+        GetTracer().Trace() << "[EST] Elec: R=" << GetOnlineElecEstimator().CurrentResistance().Value() << " L_mH=" << GetOnlineElecEstimator().CurrentInductance().Value();
     }
 
     void OuterLoopStateMachine::ApplyOnlineEstimates()
@@ -76,21 +93,21 @@ namespace application
 
         if (!std::isfinite(inertia.Value()) || inertia.Value() <= 0.0f ||
             !std::isfinite(friction.Value()) || friction.Value() <= 0.0f)
-            GetTracer().Trace() << "[SM] Skipping mechanical estimates: non-physical values (J=" << inertia.Value() << " B=" << friction.Value() << ")";
+            GetTracer().Trace() << "[SM] Skipping mechanical estimates: non-physical values (J_uNms2=" << Micro(inertia.Value()) << " B_uNms=" << Micro(friction.Value()) << ")";
         else
         {
-            GetTracer().Trace() << "[SM] Applying mechanical estimates: J=" << inertia.Value() << " B=" << friction.Value();
-            ApplyMechanics(inertia, friction, velocityBandwidthRadPerSec);
+            GetTracer().Trace() << "[SM] Applying mechanical estimates: J_uNms2=" << Micro(inertia.Value()) << " B_uNms=" << Micro(friction.Value());
+            ApplyMechanics(inertia, friction, velocityBandwidthRadPerSec, TorqueConstantFor(GetCalibration()));
         }
 
         const auto resistance = GetOnlineElecEstimator().CurrentResistance();
         const auto inductance = GetOnlineElecEstimator().CurrentInductance();
         if (!std::isfinite(resistance.Value()) || resistance.Value() <= 0.0f ||
             !std::isfinite(inductance.Value()) || inductance.Value() <= 0.0f)
-            GetTracer().Trace() << "[SM] Skipping electrical estimates: non-physical values (R=" << resistance.Value() << " L=" << inductance.Value() << ")";
+            GetTracer().Trace() << "[SM] Skipping electrical estimates: non-physical values (R=" << resistance.Value() << " L_mH=" << inductance.Value() << ")";
         else
         {
-            GetTracer().Trace() << "[SM] Applying electrical estimates: R=" << resistance.Value() << " L=" << inductance.Value();
+            GetTracer().Trace() << "[SM] Applying electrical estimates: R=" << resistance.Value() << " L_mH=" << inductance.Value();
             ApplyElectricalModel(resistance, inductance, GetCalibration().polePairs, GetCalibration().currentLoopBandwidth, EffectiveFluxLinkage(GetCalibration()));
         }
     }
@@ -131,7 +148,9 @@ namespace application
     // loop holds a zero current envelope, so the commanded trajectory never reaches the rotor.
     bool OuterLoopStateMachine::ApplyIdentificationControl(const services::CalibrationData& pending)
     {
-        if (!foc::IsFinitePositive(pending.rPhase) || !foc::IsFiniteValue(pending.lD) || pending.polePairs == 0 || !foc::IsFinitePositive(mechTorqueConstant.Value()))
+        const auto torqueConstant = TorqueConstantFor(pending);
+
+        if (!foc::IsFinitePositive(pending.rPhase) || !foc::IsFiniteValue(pending.lD) || pending.polePairs == 0 || !foc::IsFinitePositive(torqueConstant.Value()))
             return false;
 
         // Marked before the first call, not after: applying an electrical model sets the current-loop
@@ -142,7 +161,7 @@ namespace application
         if (!ApplyElectricalModel(foc::Ohm{ pending.rPhase }, foc::MilliHenry{ pending.lD }, pending.polePairs, pending.currentLoopBandwidth, EffectiveFluxLinkage(pending)))
             return false;
 
-        return ApplyMechanics(foc::NewtonMeterSecondSquared{ provisionalInertia }, foc::NewtonMeterSecondPerRadian{ provisionalFriction }, identificationBandwidthRadPerSec);
+        return ApplyMechanics(foc::NewtonMeterSecondSquared{ provisionalInertia }, foc::NewtonMeterSecondPerRadian{ provisionalFriction }, identificationBandwidthRadPerSec, torqueConstant);
     }
 
     services::MechanicalParametersIdentification::Config OuterLoopStateMachine::ExcitationConfig() const
@@ -167,7 +186,7 @@ namespace application
 
         GetTracer().Trace() << "[SM] Estimating mechanical parameters";
 
-        MechIdentImpl().EstimateFrictionAndInertia(mechTorqueConstant, static_cast<std::size_t>(pending.polePairs), ExcitationConfig(), [this](auto friction, auto inertia)
+        MechIdentImpl().EstimateFrictionAndInertia(TorqueConstantFor(pending), static_cast<std::size_t>(pending.polePairs), ExcitationConfig(), [this](auto friction, auto inertia)
             {
                 Dispatch(state_machine::MechanicalParametersIdentified{ friction, inertia, velocityBandwidthRadPerSec });
             });

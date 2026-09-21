@@ -165,6 +165,8 @@ warnings-as-errors would fail the build.
 
 **SIL performance scenarios**: the plant reports its trajectory as `PLANT` lines on the trace channel (control-tick time base, never printed from the ISR), a shaft torque step is scheduled in the plant description, and `integration_tests/support/response/` measures the step and disturbance metrics with the numerical toolbox (`numerical/math/StepResponseMetrics.hpp`). Every metric assertion prints a `[METRIC]` line; limits are pinned from those lines with a margin, never derived from theory alone.
 
+**Reference motors**: `motor_parameters/` holds the two motors the plant is exercised with (Teknic M-2310P-LN-04K, Anaheim BLY172S-24V-4000), with the sources in `documentation/theory/foc-plant-models.md` "Reference motors". The SIL presets `teknic` and `anaheim` select them; `nominal` is the Teknic. Identification scenarios (`parameter_identification.feature`) compare what the firmware identifies (CAN electrical response, `[SM] Calibration record:` and `[EST]` trace lines, all mechanical values in micro-units) against the plant the scenario configured. In SIL a terminal command is a line without the `CAN_RX` prefix on the same socket; the answer arrives as trace lines, never as a prompt to wait for.
+
 ## Agent routing
 
 - **orchestrator** — first stop for any non-trivial task; triages to specialists

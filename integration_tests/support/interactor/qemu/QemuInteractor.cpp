@@ -61,20 +61,14 @@ namespace sil
         ASSERT_TRUE(session.Restart(elfPath)) << "[QEMU] QEMU session failed to restart";
     }
 
-    bool QemuInteractor::SendCommand(const std::string& command, std::chrono::milliseconds timeout)
+    // A terminal line rides the same socket as CAN frames; the firmware routes every line without the
+    // CAN prefix to its terminal. The terminal answers through the tracer, so a step that needs the
+    // outcome drains the serial lines for the trace it expects rather than waiting here.
+    bool QemuInteractor::SendCommand(const std::string& command, std::chrono::milliseconds)
     {
         if (!session.IsRunning())
             return false;
-        if (!session.SendLine(command))
-            return false;
-        std::string out;
-        const bool ok = session.WaitFor("DONE", out, timeout);
-        if (ok)
-        {
-            lines.push_back(out);
-            lastLine = out;
-        }
-        return ok;
+        return session.SendLine(command);
     }
 
     bool QemuInteractor::DrainSerial(std::chrono::milliseconds timeout)

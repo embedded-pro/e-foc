@@ -2,7 +2,7 @@
 title: "Integration Testing Design"
 type: design
 status: accepted
-version: 1.0.0
+version: 1.1.0
 component: integration-testing
 date: 2026-09-21
 ---
@@ -12,7 +12,7 @@ date: 2026-09-21
 | Title     | Integration Testing Design |
 | Type      | design                     |
 | Status    | accepted                   |
-| Version   | 1.0.0                      |
+| Version   | 1.1.0                      |
 | Component | integration-testing        |
 | Date      | 2026-09-21                 |
 
@@ -39,7 +39,7 @@ implements a scenario, and the runner is invoked with that tag.
 |---------------------|------------------------------------------------------|------------------------------------------------|
 | `@sil`              | Real firmware under an emulator, simulated motor     | `documentation/design/software-in-the-loop.md` |
 | `@sil-protection`   | The same, board-protection scenarios held apart      | The same document, Part E                      |
-| `@sil-known-defect` | The same, performance scenarios a known defect fails | The same document, Part I                      |
+| `@sil-known-defect` | The same, scenarios a known defect fails             | The same document, Parts I and J               |
 | `@hil`              | Real firmware on hardware, over the bridge           | This document                                  |
 
 > Earlier revisions described an in-process host fixture that mocked the platform and drove the
@@ -118,6 +118,13 @@ Three channels, all of them the product's own:
 - **Plant trajectory**, on a simulated target only, carries what the motor actually did, sampled
   on the control-tick time base, and the tick each command frame was delivered on. This is the
   channel the performance and disturbance scenarios measure; see the software-in-the-loop design.
+
+Two of the traces are measurements in their own right: the calibration record the firmware stores
+(`[SM] Calibration record:`) and the online estimates it prints on request (`[EST]`). Inertia and
+friction travel in micro-units on both, because the tracer prints three decimals. The
+identification scenarios compare them, and the CAN electrical-parameters response, against the
+plant the scenario configured; the terminal command that asks for the estimates is the product's
+own, sent on the simulated target through the same socket as the CAN frames.
 
 Trace output only drains while the target's event loop has work, so an assertion that waits for a
 trace polls telemetry rather than waiting passively. Trace lines are retained across the frames the

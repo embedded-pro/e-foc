@@ -6,7 +6,6 @@
 
 namespace simulator::defaults
 {
-    constexpr float powerSupplyVoltageVolts = 24.0f;
     constexpr float maxCurrentAmps = 15.0f;
     constexpr float loadTorqueNm = 0.02f;
     constexpr int timeStepMicroseconds = 10;

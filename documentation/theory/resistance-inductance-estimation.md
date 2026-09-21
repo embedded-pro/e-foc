@@ -2,9 +2,9 @@
 title: "Electrical Parameters Identification — Resistance and Inductance"
 type: theory
 status: approved
-version: 2.0.0
+version: 2.1.0
 component: "service-electrical-ident"
-date: 2026-08-30
+date: 2026-09-21
 ---
 
 | Field     | Value                                          |
@@ -12,9 +12,9 @@ date: 2026-08-30
 | Title     | Electrical Parameters Identification — R and L |
 | Type      | theory                                         |
 | Status    | approved                                       |
-| Version   | 2.0.0                                          |
+| Version   | 2.1.0                                          |
 | Component | service-electrical-ident                       |
-| Date      | 2026-08-30                                     |
+| Date      | 2026-09-21                                     |
 
 ## Overview
 
@@ -29,7 +29,7 @@ Two complementary offline identification methods are used, one for each paramete
 - **Resistance** — DC voltage step: steady-state V/I gives $R_s$ directly. Accurate for any motor.
 - **Inductance** — HF sinusoidal injection: synchronous demodulation of the current response at the injection frequency extracts Im(Z) and thus $L_s$. Suitable for low-resistance motors where the time-constant method fails.
 
-The reason two separate methods are needed is a fundamental signal-conditioning problem: for motors with low $R_s$ (e.g. the JK42BLS01 with $R_s = 0.073\,\Omega$, $L_s = 0.5\,\text{mH}$), the ratio $\omega L_s / R_s$ at any frequency that keeps the rotor stationary ($\geq 100\,\text{Hz}$) is between 21 and 86. This means resistance contributes only 1–5 % of the total current amplitude during AC excitation; any small phase error drowns the R signal entirely. The time-constant method (section 4 of version 1.0) likewise fails because the time constant $\tau = L_s/R_s = 6.85\,\text{ms}$ spans 68.5 samples at 10 kHz — making threshold-based detection sensitive to filter delay and noise. Each parameter is therefore extracted using the technique that makes it the dominant signal.
+The reason two separate methods are needed is a fundamental signal-conditioning problem. At the 700 Hz injection frequency the ratio $\omega L_s / R_s$ is 7 for the Anaheim BLY172S-24V-4000 ($R_s = 0.405\,\Omega$, $L_s = 0.64\,\text{mH}$) and 2.4 for the Teknic M-2310P-LN-04K ($R_s = 0.36\,\Omega$, $L_s = 0.20\,\text{mH}$), so resistance is 14 % and 38 % of the impedance; for lower-resistance windings it falls below 5 %, and any small phase error drowns the R signal entirely. The time-constant method (section 4 of version 1.0) likewise fails because $\tau = L_s/R_s$ is 1.6 ms for the Anaheim and 0.56 ms for the Teknic, 16 and 5.6 samples at 10 kHz — too few for threshold-based detection through a filter of comparable length. Each parameter is therefore extracted using the technique that makes it the dominant signal.
 
 ---
 
@@ -86,11 +86,11 @@ $$
 where $F_{terminal}$ is the winding topology factor above and $I_{ss}$ is the mean of the last 10 %
 of the sample buffer.
 
-**Why this fails for L:** the DC step reveals only the time constant $\tau = L_s/R_s$. For
-$L_s = 0.5\,\text{mH}$, $R_s = 0.073\,\Omega$, $\tau = 6.85\,\text{ms}$, which spans only 68.5
-samples at 10 kHz. A 5-sample moving average and a single-sample crossing threshold cannot resolve
-such a narrow transient accurately. Inductance is therefore obtained by a separate frequency-domain
-method.
+**Why this fails for L:** the DC step reveals only the time constant $\tau = L_s/R_s$. For the
+Anaheim BLY172S ($L_s = 0.64\,\text{mH}$, $R_s = 0.405\,\Omega$) $\tau = 1.58\,\text{ms}$, which
+spans only 16 samples at 10 kHz, and for the Teknic M-2310P ($0.20\,\text{mH}$, $0.36\,\Omega$)
+5.6 samples. A 5-sample moving average and a single-sample crossing threshold cannot resolve such a
+narrow transient accurately. Inductance is therefore obtained by a separate frequency-domain method.
 
 #### DC Step Response
 
@@ -182,14 +182,18 @@ $$
 The fractional error in $L_s$ relative to the continuous-time value scales approximately as
 $R_s T_s / L_s$:
 
-| Motor                                | $R_s T_s / L_s$ | ZOH bias in $L_s$ |
-|--------------------------------------|-----------------|-------------------|
-| JK42BLS01 (terminal)                 | 0.015           | ≈ 0.7 %           |
-| Generic (R=0.5 Ω, L=0.5 mH terminal) | 0.10            | ≈ 5 %             |
+| Motor                                | $R_s T_s / L_s$ | ZOH bias in $L_s$ (estimate) | Measured in SIL |
+|--------------------------------------|-----------------|------------------------------|-----------------|
+| Anaheim BLY172S-24V-4000 (terminal)  | 0.063           | ≈ 3 %                        | −6 %            |
+| Generic (R=0.5 Ω, L=0.5 mH terminal) | 0.10            | ≈ 5 %                        |                 |
+| Teknic M-2310P-LN-04K (terminal)     | 0.18            | ≈ 9 %                        | −15.5 %         |
 
-For the JK42BLS01 the bias is well within calibration tolerance. For higher-resistance motors the
-bias grows; in those cases a correction using the already-measured $R_s$ and $b_d$ can be applied
-post-hoc, but this is not required for the target motor.
+The terminal factor cancels in the ratio, so it is the per-phase $R_s / L_s$ that sets the bias. The
+measured column is the software-in-the-loop identification against the exact plant, whose
+whole-percent duty quantises the 15 % injection and adds to the ZOH term; the estimate reads low in
+both cases. For the Anaheim motor the error is within calibration tolerance; for the Teknic it is not
+negligible. A correction using the already-measured $R_s$ and $b_d$ can be applied post-hoc; it is
+not implemented today.
 
 #### 3.4 ADC Delay Correction
 
@@ -271,7 +275,7 @@ absent.
 - **Assumes rotor stationary.** Any rotor motion during either procedure overlays back-EMF on the measurements.
 - **Assumes magnetic linearity.** Injection current must stay below the saturation onset of the winding.
 - **Assumes $L_d \approx L_q$.** For interior PMSM a separate $L_q$ measurement is required.
-- **ZOH bias** grows with $R_s T_s / L_s$; negligible for the JK42BLS01 but non-trivial for higher-resistance motors.
+- **ZOH bias** grows with $R_s T_s / L_s$: about 3 % for the Anaheim BLY172S and 9 % for the Teknic M-2310P at 10 kHz.
 - **Dead-time** on real hardware distorts the sinusoidal injection; models and simulation are optimistic.
 - **Temperature:** $R_s$ measurement is valid at the moment of identification only.
 

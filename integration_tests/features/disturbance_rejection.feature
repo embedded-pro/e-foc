@@ -9,11 +9,12 @@ Feature: Disturbance Rejection
   millinewton-metres keeps the loop out of current saturation, so the numbers
   measure the control law rather than the current limit.
 
-  The @sil rows carry the envelope the product holds today, limit cycle
-  included; the LQI position row is held out under @sil-known-defect because
-  that law is unstable on the nominal plant.
+  The @sil rows carry the envelope the product holds today on the nominal plant
+  (the Teknic M-2310P-LN-04K reference motor). The LQI speed row is held out
+  under @sil-known-defect: that law is pushed more than a setpoint's worth off
+  20 rad/s by a torque the other laws absorb within two.
 
-  @sil @REQ-SPD-009
+  @REQ-SPD-009
   Scenario Outline: The <algorithm> speed loop rejects a torque step while holding 20 rad/s
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 1200 samples
@@ -31,14 +32,19 @@ Feature: Disturbance Rejection
     And the speed shall recover to within <band> rad/s of the setpoint within <recovery_ms> ms of the torque step
     And the response shall have no dropped samples
 
+    @sil
     Examples:
       | algorithm | deviation | band | recovery_ms |
-      | pid       | 15.0      | 5.0  | 350         |
-      | lqi       | 15.0      | 10.0 | 350         |
-      | adrc      | 15.0      | 5.0  | 350         |
-      | twodof    | 15.0      | 5.0  | 350         |
+      | pid       | 4.0       | 2.0  | 50          |
+      | adrc      | 4.0       | 2.0  | 50          |
+      | twodof    | 4.0       | 2.0  | 50          |
 
-  @REQ-POS-010
+    @sil-known-defect
+    Examples:
+      | algorithm | deviation | band | recovery_ms |
+      | lqi       | 4.0       | 2.0  | 100         |
+
+  @sil @REQ-POS-010
   Scenario Outline: The <algorithm> position loop holds 1.5 rad against a torque step
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 1400 samples
@@ -56,15 +62,10 @@ Feature: Disturbance Rejection
     And the position shall recover to within <band> rad of the setpoint within <recovery_ms> ms of the torque step
     And the response shall have no dropped samples
 
-    @sil
     Examples:
       | algorithm | deviation | band | recovery_ms |
-      | pid       | 0.25      | 0.15 | 350         |
-      | cascadep  | 0.25      | 0.15 | 350         |
-      | lqr       | 0.25      | 0.15 | 350         |
-      | twodof    | 0.25      | 0.15 | 350         |
-
-    @sil-known-defect
-    Examples:
-      | algorithm | deviation | band | recovery_ms |
-      | lqi       | 0.2       | 0.05 | 350         |
+      | pid       | 0.1       | 0.08 | 50          |
+      | cascadep  | 0.1       | 0.08 | 50          |
+      | lqr       | 0.1       | 0.08 | 50          |
+      | lqi       | 0.05      | 0.02 | 50          |
+      | twodof    | 0.1       | 0.08 | 50          |
