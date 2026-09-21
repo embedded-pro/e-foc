@@ -1,4 +1,5 @@
 #include "tools/simulator/view/gui/ScopesPanel.hpp"
+#include "tools/simulator/view/gui/QtOwned.hpp"
 #include <QColor>
 #include <QFont>
 #include <QGroupBox>
@@ -6,19 +7,12 @@
 #include <QLabel>
 #include <QTabWidget>
 #include <QVBoxLayout>
-#include <memory>
 
 namespace simulator
 {
     namespace
     {
         constexpr int hexagonMaxHeight = 460;
-
-        template<typename T, typename... Args>
-        T* QtOwned(Args&&... args)
-        {
-            return std::make_unique<T>(std::forward<Args>(args)...).release();
-        }
     }
 
     ScopesPanel::ScopesPanel(QWidget* parent)

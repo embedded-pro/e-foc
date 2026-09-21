@@ -8,7 +8,7 @@ namespace simulator
     GuiSimulation::GuiSimulation(foc::ThreePhaseMotorModel& model, foc::Controllable& controller, infra::EventDispatcherWithWeakPtr& eventDispatcher,
         const foc::ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
         const ControlPanel::SetpointConfig& setpointConfig, foc::Volts powerSupplyVoltage)
-        : gui(model, controller, eventDispatcher, motorParameters, pidParameters, setpointConfig, powerSupplyVoltage)
+        : gui(model, controller, motorParameters, pidParameters, setpointConfig, powerSupplyVoltage)
     {
         gui.show();
 

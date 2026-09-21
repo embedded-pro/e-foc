@@ -5,6 +5,7 @@ target_link_libraries(e_foc.tool.simulator PUBLIC
     Qt6::Widgets
     e_foc.foc.model
     e_foc.tool.simulator.view.gui
+    e_foc.tool.simulator.adapter
     e_foc.foc.instantiations
     e_foc.services.alignment
     e_foc.services.electrical_system_ident

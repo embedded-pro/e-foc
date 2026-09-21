@@ -1,4 +1,4 @@
-#include "tools/simulator/view/gui/OnlineElectricalRls.hpp"
+#include "tools/simulator/adapter/OnlineElectricalRls.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 
 namespace simulator

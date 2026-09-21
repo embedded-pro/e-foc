@@ -1,10 +1,10 @@
 #include "tools/simulator/view/gui/Gui.hpp"
+#include "tools/simulator/view/gui/QtOwned.hpp"
 #include <QHBoxLayout>
 #include <QScrollArea>
 #include <QVBoxLayout>
 #include <QWidget>
 #include <array>
-#include <memory>
 
 namespace simulator
 {
@@ -14,22 +14,15 @@ namespace simulator
         constexpr int windowHeight = 900;
         constexpr int leftPanelStretch = 2;
         constexpr int rightPanelStretch = 5;
-
-        template<typename T, typename... Args>
-        T* QtOwned(Args&&... args)
-        {
-            return std::make_unique<T>(std::forward<Args>(args)...).release();
-        }
     }
 
-    Gui::Gui(foc::ThreePhaseMotorModel& motorModel, foc::Controllable& motorController, infra::EventDispatcherWithWeakPtr& dispatcher,
+    Gui::Gui(foc::ThreePhaseMotorModel& motorModel, foc::Controllable& motorController,
         const foc::ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
         const ControlPanel::SetpointConfig& setpointConfig, foc::Volts powerSupplyVoltage, QWidget* parent)
         : QMainWindow(parent)
         , foc::ThreePhaseMotorModelObserver(motorModel)
         , model(motorModel)
         , controller(motorController)
-        , eventDispatcher(dispatcher)
     {
         setWindowTitle("e-foc Simulator");
         resize(windowWidth, windowHeight);

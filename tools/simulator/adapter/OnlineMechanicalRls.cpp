@@ -1,4 +1,4 @@
-#include "tools/simulator/view/gui/OnlineMechanicalRls.hpp"
+#include "tools/simulator/adapter/OnlineMechanicalRls.hpp"
 
 namespace simulator
 {

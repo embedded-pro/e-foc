@@ -3,9 +3,8 @@
 #include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
-#include "core/state_machine/FocStateMachine.hpp"
-#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
+#include "core/state_machine/FocStateMachine.hpp"
 #include "tools/simulator/view/gui/ControlPanel.hpp"
 #include "tools/simulator/view/gui/ParametersPanel.hpp"
 #include "tools/simulator/view/gui/ScopesPanel.hpp"
@@ -23,7 +22,7 @@ namespace simulator
         Q_OBJECT
 
     public:
-        Gui(foc::ThreePhaseMotorModel& motorModel, foc::Controllable& motorController, infra::EventDispatcherWithWeakPtr& dispatcher,
+        Gui(foc::ThreePhaseMotorModel& motorModel, foc::Controllable& motorController,
             const foc::ThreePhaseMotorModel::Parameters& motorParameters, const ParametersPanel::PidParameters& pidParameters,
             const ControlPanel::SetpointConfig& setpointConfig, foc::Volts powerSupplyVoltage, QWidget* parent = nullptr);
 
@@ -64,7 +63,6 @@ namespace simulator
     private:
         foc::ThreePhaseMotorModel& model;
         foc::Controllable& controller;
-        infra::EventDispatcherWithWeakPtr& eventDispatcher;
 
         ControlPanel* controlPanel;
         ParametersPanel* parametersPanel;

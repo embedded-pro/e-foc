@@ -1,18 +1,12 @@
 #include "tools/simulator/view/gui/ScopeToolbar.hpp"
+#include "tools/simulator/view/gui/QtOwned.hpp"
 #include <QHBoxLayout>
 #include <QLabel>
-#include <memory>
 
 namespace simulator
 {
     namespace
     {
-        template<typename T, typename... Args>
-        T* QtOwned(Args&&... args)
-        {
-            return std::make_unique<T>(std::forward<Args>(args)...).release();
-        }
-
         struct TimeDivOption
         {
             const char* label;
@@ -124,28 +118,24 @@ namespace simulator
                 {
                     auto seconds = timeDivOptions[static_cast<std::size_t>(index)].seconds;
                     scope.SetTimePerDivision(seconds);
-                    emit timeDivChanged(seconds);
                 }
             });
 
         connect(triggerLevelSpin, &QDoubleSpinBox::valueChanged, this, [this](double value)
             {
                 scope.SetTriggerLevel(static_cast<float>(value));
-                emit triggerLevelChanged(static_cast<float>(value));
             });
 
         connect(triggerModeCombo, &QComboBox::currentIndexChanged, this, [this](int index)
             {
                 auto mode = static_cast<ScopeWidget::TriggerMode>(triggerModeCombo->itemData(index).toInt());
                 scope.SetTriggerMode(mode);
-                emit triggerModeChanged(mode);
             });
 
         connect(triggerEdgeCombo, &QComboBox::currentIndexChanged, this, [this](int index)
             {
                 auto edge = static_cast<ScopeWidget::TriggerEdge>(triggerEdgeCombo->itemData(index).toInt());
                 scope.SetTriggerEdge(edge);
-                emit triggerEdgeChanged(edge);
             });
 
         connect(triggerChannelCombo, &QComboBox::currentIndexChanged, this, [this](int index)
@@ -153,7 +143,6 @@ namespace simulator
                 if (index >= 0)
                 {
                     scope.SetTriggerChannel(static_cast<std::size_t>(index));
-                    emit triggerChannelChanged(static_cast<std::size_t>(index));
                 }
             });
 
@@ -172,8 +161,6 @@ namespace simulator
                     runStopButton->setText("Run");
                     runStopButton->setStyleSheet("QPushButton { background-color: #27ae60; color: white; font-weight: bold; padding: 4px 12px; }");
                 }
-
-                emit runningChanged(nowRunning);
             });
 
         connect(singleButton, &QPushButton::clicked, this, [this]()

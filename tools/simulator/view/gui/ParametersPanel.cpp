@@ -1,23 +1,14 @@
 #include "tools/simulator/view/gui/ParametersPanel.hpp"
+#include "tools/simulator/view/gui/QtOwned.hpp"
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QLabel>
 #include <QString>
 #include <QTabWidget>
 #include <QVBoxLayout>
-#include <memory>
 
 namespace simulator
 {
-    namespace
-    {
-        template<typename T, typename... Args>
-        T* QtOwned(Args&&... args)
-        {
-            return std::make_unique<T>(std::forward<Args>(args)...).release();
-        }
-    }
-
     ParametersPanel::ParametersPanel(const foc::ThreePhaseMotorModel::Parameters& motorParameters, const PidParameters& pidParameters, QWidget* parent)
         : QWidget(parent)
     {
