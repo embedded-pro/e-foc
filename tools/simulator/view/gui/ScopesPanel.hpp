@@ -1,14 +1,17 @@
 #pragma once
 
 #include "core/foc/interfaces/Units.hpp"
-#include "tools/simulator/view/gui/ScopeToolbar.hpp"
+#include "ui/backend/qt/QtFormView.hpp"
 #include "ui/backend/qt/QtPaintedWidget.hpp"
+#include "ui/scope/ScopeController.hpp"
+#include "ui/scope/ScopeControls.hpp"
 #include "ui/scope/ScopeCore.hpp"
 #include "ui/widgets/HexagonCore.hpp"
 #include <QLabel>
 #include <QString>
 #include <QTimer>
 #include <QWidget>
+#include <memory>
 #include <span>
 
 namespace simulator
@@ -20,6 +23,7 @@ namespace simulator
 
     public:
         explicit ScopesPanel(QWidget* parent = nullptr);
+        ~ScopesPanel() override;
 
         void AddCurrentSample(std::span<const float> sample);
         void AddVoltageSample(std::span<const float> sample);
@@ -45,8 +49,14 @@ namespace simulator
         ui::backend::qt::QtPaintedWidget* electricalRlsScope;
         ui::backend::qt::QtPaintedWidget* mechanicalRlsScope;
 
-        ScopeToolbar* currentScopeToolbar;
-        ScopeToolbar* voltageScopeToolbar;
+        ui::scope::ScopeControls currentScopeControls{ 3 };
+        ui::scope::ScopeControls voltageScopeControls{ 3 };
+
+        ui::backend::qt::QtFormView* currentScopeForm;
+        ui::backend::qt::QtFormView* voltageScopeForm;
+
+        std::unique_ptr<ui::scope::ScopeController> currentScopeController;
+        std::unique_ptr<ui::scope::ScopeController> voltageScopeController;
 
         QTimer refreshTimer;
     };

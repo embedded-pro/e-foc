@@ -1,6 +1,7 @@
 #pragma once
 
-#include "tools/hardware_bridge/client/terminal/Vt100Terminal.hpp"
+#include "ui/terminal/AnsiPalette.hpp"
+#include "ui/terminal/Vt100Terminal.hpp"
 #include <QByteArray>
 #include <QColor>
 #include <QKeyEvent>
@@ -30,13 +31,12 @@ namespace tool
 
     private:
         void Render();
-        QColor MapForeground(terminal::Color color) const;
-        QColor MapBackground(terminal::Color color) const;
+        QColor MapForeground(ui::terminal::Color color) const;
+        QColor MapBackground(ui::terminal::Color color) const;
 
-        terminal::Vt100Terminal terminal{ 24, 100 };
+        ui::terminal::Vt100Terminal terminal{ 24, 100 };
         bool inputEnabled{ false };
 
-        const QColor defaultFg{ 0xCC, 0xCC, 0xCC };
-        const QColor defaultBg{ 0x1E, 0x1E, 0x1E };
+        ui::terminal::AnsiPalette ansiPalette;
     };
 }

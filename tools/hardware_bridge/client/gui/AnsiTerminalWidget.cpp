@@ -1,4 +1,5 @@
 #include "tools/hardware_bridge/client/gui/AnsiTerminalWidget.hpp"
+#include "ui/backend/qt/QtConversions.hpp"
 #include <QFont>
 #include <QPalette>
 #include <QScrollBar>
@@ -8,35 +9,6 @@
 #include <QTextDocument>
 #include <algorithm>
 #include <span>
-
-namespace
-{
-    using tool::terminal::Color;
-
-    // Dark-mode ANSI color palette (standard 8 colors).
-    const QColor ansiColors[8] = {
-        { 0x2D, 0x2D, 0x2D }, // Black
-        { 0xE7, 0x4C, 0x3C }, // Red
-        { 0x2E, 0xCC, 0x71 }, // Green
-        { 0xF1, 0xC4, 0x0F }, // Yellow
-        { 0x34, 0x98, 0xDB }, // Blue
-        { 0x9B, 0x59, 0xB6 }, // Magenta
-        { 0x1A, 0xBC, 0x9C }, // Cyan
-        { 0xCC, 0xCC, 0xCC }, // White
-    };
-
-    // Bright variants (SGR 90-97 / 100-107).
-    const QColor ansiBrightColors[8] = {
-        { 0x80, 0x80, 0x80 }, // Bright Black
-        { 0xFF, 0x79, 0x6B }, // Bright Red
-        { 0x5F, 0xF9, 0x67 }, // Bright Green
-        { 0xFF, 0xFF, 0x2B }, // Bright Yellow
-        { 0x6B, 0xC5, 0xFF }, // Bright Blue
-        { 0xFF, 0x92, 0xFF }, // Bright Magenta
-        { 0x5F, 0xFF, 0xEA }, // Bright Cyan
-        { 0xFF, 0xFF, 0xFF }, // Bright White
-    };
-}
 
 namespace tool
 {
@@ -50,60 +22,21 @@ namespace tool
         setMaximumBlockCount(2000);
 
         QPalette p = palette();
-        p.setColor(QPalette::Base, defaultBg);
-        p.setColor(QPalette::Text, defaultFg);
+        p.setColor(QPalette::Base, MapBackground(ui::terminal::Color::Default));
+        p.setColor(QPalette::Text, MapForeground(ui::terminal::Color::Default));
         setPalette(p);
 
         Render();
     }
 
-    QColor AnsiTerminalWidget::MapForeground(terminal::Color color) const
+    QColor AnsiTerminalWidget::MapForeground(ui::terminal::Color color) const
     {
-        switch (color)
-        {
-            case Color::Default:
-                return defaultFg;
-            case Color::Black:
-                return ansiColors[0];
-            case Color::Red:
-                return ansiColors[1];
-            case Color::Green:
-                return ansiColors[2];
-            case Color::Yellow:
-                return ansiColors[3];
-            case Color::Blue:
-                return ansiColors[4];
-            case Color::Magenta:
-                return ansiColors[5];
-            case Color::Cyan:
-                return ansiColors[6];
-            case Color::White:
-                return ansiColors[7];
-            case Color::BrightBlack:
-                return ansiBrightColors[0];
-            case Color::BrightRed:
-                return ansiBrightColors[1];
-            case Color::BrightGreen:
-                return ansiBrightColors[2];
-            case Color::BrightYellow:
-                return ansiBrightColors[3];
-            case Color::BrightBlue:
-                return ansiBrightColors[4];
-            case Color::BrightMagenta:
-                return ansiBrightColors[5];
-            case Color::BrightCyan:
-                return ansiBrightColors[6];
-            case Color::BrightWhite:
-                return ansiBrightColors[7];
-        }
-        return defaultFg;
+        return ui::backend::qt::ToQt(ansiPalette.Foreground(color));
     }
 
-    QColor AnsiTerminalWidget::MapBackground(terminal::Color color) const
+    QColor AnsiTerminalWidget::MapBackground(ui::terminal::Color color) const
     {
-        if (color == Color::Default)
-            return defaultBg;
-        return MapForeground(color);
+        return ui::backend::qt::ToQt(ansiPalette.Background(color));
     }
 
     void AnsiTerminalWidget::AppendData(const QByteArray& bytes)
@@ -128,7 +61,7 @@ namespace tool
     {
         const auto& screen = terminal.Screen();
 
-        auto lastContentColumn = [](const std::vector<terminal::Cell>& row)
+        auto lastContentColumn = [](const std::vector<ui::terminal::Cell>& row)
         {
             for (std::size_t i = row.size(); i > 0; --i)
                 if (row[i - 1].codepoint != U' ')
@@ -144,7 +77,7 @@ namespace tool
             return true;
         };
 
-        std::vector<std::vector<terminal::Cell>> rows;
+        std::vector<std::vector<ui::terminal::Cell>> rows;
         rows.reserve(screen.History().size() + static_cast<std::size_t>(screen.Rows()));
         for (const auto& row : screen.History())
             rows.push_back(row);
@@ -160,7 +93,7 @@ namespace tool
         }
         for (int r = 0; r <= lastRow; ++r)
         {
-            std::vector<terminal::Cell> row;
+            std::vector<ui::terminal::Cell> row;
             row.reserve(static_cast<std::size_t>(screen.Cols()));
             for (int c = 0; c < screen.Cols(); ++c)
                 row.push_back(screen.At(r, c));
@@ -171,7 +104,7 @@ namespace tool
         {
             int start;
             int length;
-            terminal::Rendition rendition;
+            ui::terminal::Rendition rendition;
         };
 
         QString text;

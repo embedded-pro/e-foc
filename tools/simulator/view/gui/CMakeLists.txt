@@ -9,7 +9,9 @@ target_link_libraries(e_foc.tool.simulator.view.gui PUBLIC
     Qt6::Widgets
     ui.core
     ui.theme
+    ui.model
     ui.scope
+    ui.shell
     ui.widgets
     ui.backend.qt
     e_foc.foc.model
@@ -30,8 +32,6 @@ target_sources(e_foc.tool.simulator.view.gui PRIVATE
     ParametersPanel.cpp
     ScopesPanel.hpp
     ScopesPanel.cpp
-    ScopeToolbar.hpp
-    ScopeToolbar.cpp
 )
 
 set_target_properties(e_foc.tool.simulator.view.gui PROPERTIES

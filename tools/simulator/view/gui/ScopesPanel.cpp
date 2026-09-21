@@ -68,8 +68,10 @@ namespace simulator
         currentScopeCore.SetChannelConfig(1, { "Ib", ui::Color{ 255, 165, 0 } });
         currentScopeCore.SetChannelConfig(2, { "Ic", ui::Color{ 0, 200, 80 } });
 
-        currentScopeToolbar = QtOwned<ScopeToolbar>(currentScopeCore, this);
-        phaseSignalsLayout->addWidget(currentScopeToolbar);
+        currentScopeForm = QtOwned<ui::backend::qt::QtFormView>(this);
+        currentScopeForm->Build(currentScopeControls.Model());
+        currentScopeController = std::make_unique<ui::scope::ScopeController>(currentScopeCore, currentScopeControls.Model(), *currentScopeForm);
+        phaseSignalsLayout->addWidget(currentScopeForm);
         phaseSignalsLayout->addWidget(currentScope);
 
         auto* voltagesLabel = QtOwned<QLabel>("Phase Voltages — inverter midpoint (Va, Vb, Vc)", this);
@@ -83,8 +85,10 @@ namespace simulator
         voltageScopeCore.SetChannelConfig(1, { "Vb", ui::Color{ 255, 165, 0 } });
         voltageScopeCore.SetChannelConfig(2, { "Vc", ui::Color{ 0, 200, 80 } });
 
-        voltageScopeToolbar = QtOwned<ScopeToolbar>(voltageScopeCore, this);
-        phaseSignalsLayout->addWidget(voltageScopeToolbar);
+        voltageScopeForm = QtOwned<ui::backend::qt::QtFormView>(this);
+        voltageScopeForm->Build(voltageScopeControls.Model());
+        voltageScopeController = std::make_unique<ui::scope::ScopeController>(voltageScopeCore, voltageScopeControls.Model(), *voltageScopeForm);
+        phaseSignalsLayout->addWidget(voltageScopeForm);
         phaseSignalsLayout->addWidget(voltageScope);
 
         tabs->addTab(phaseTab, "Phase Signals");
@@ -117,6 +121,19 @@ namespace simulator
             connect(&refreshTimer, &QTimer::timeout, painted, QOverload<>::of(&QWidget::update));
 
         refreshTimer.start(refreshIntervalMs);
+    }
+
+    ScopesPanel::~ScopesPanel()
+    {
+        // ~QtFormView resets the callbacks it installed on its FormModel, and those models live in
+        // the ScopeControls members, which unwind before ~QWidget deletes its child widgets. The
+        // forms therefore have to go while their models are still alive. The QtPaintedWidgets need
+        // no such handling: PaintedView clears its host on the way out.
+        currentScopeController.reset();
+        voltageScopeController.reset();
+
+        delete currentScopeForm;
+        delete voltageScopeForm;
     }
 
     void ScopesPanel::AddCurrentSample(std::span<const float> sample)
