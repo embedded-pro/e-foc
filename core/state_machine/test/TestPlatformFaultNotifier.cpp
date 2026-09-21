@@ -546,3 +546,29 @@ TEST_F(TestPlatformFaultNotifier, an_enable_is_refused_while_the_condition_reads
     EXPECT_EQ(state_machine::CommandResult::rejected, sm.CmdEnable());
     EXPECT_FALSE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 }
+
+TEST_F(TestPlatformFaultNotifier, a_condition_that_reasserts_before_the_transition_commits_still_refuses_the_clear)
+{
+    GivenCalibrationInNvm();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(platformFactory, Stop()).Times(AtLeast(1));
+    EXPECT_CALL(platformFactory, BoardProtectionStatus())
+        .WillRepeatedly(Return(application::PlatformFactory::BoardProtectionState::clear));
+
+    platformFactory.RaiseBoardProtection(application::PlatformFactory::BoardProtectionReason::overCurrent);
+    ExecuteAllActions();
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+
+    ForwardTime(application::FaultController::conditionDwell + application::FaultController::conditionPollInterval);
+
+    EXPECT_CALL(platformFactory, BoardProtectionStatus())
+        .WillOnce(Return(application::PlatformFactory::BoardProtectionState::clear))
+        .WillRepeatedly(Return(application::PlatformFactory::BoardProtectionState::asserted));
+
+    sm.CmdClearFault();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}

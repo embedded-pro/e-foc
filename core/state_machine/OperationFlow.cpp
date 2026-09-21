@@ -37,8 +37,10 @@ namespace application
         return faultController.IsPending();
     }
 
-    bool OperationFlow::IsEnableAllowed(const state_machine::Ready& ready) const
+    bool OperationFlow::IsEnableAllowed(const state_machine::Ready& ready)
     {
+        faultController.SampleCondition();
+
         if (faultController.IsLatched())
             return false;
 
@@ -85,24 +87,20 @@ namespace application
         return state_machine::Fault{ lastFaultCode };
     }
 
-    void OperationFlow::RefreshFaultCondition()
-    {
-        faultController.SampleCondition();
-    }
-
     bool OperationFlow::IsFaultConditionAsserted() const
     {
         return faultController.ConditionState() == state_machine::FaultConditionState::asserted;
     }
 
-    ClearRefusal OperationFlow::EvaluateClearFault() const
+    ClearRefusal OperationFlow::EvaluateClearFault()
     {
+        faultController.SampleCondition();
         return faultController.EvaluateClear();
     }
 
-    bool OperationFlow::CanClearFault() const
+    bool OperationFlow::CanClearFault()
     {
-        return faultController.CanClear();
+        return EvaluateClearFault() == ClearRefusal::none;
     }
 
     void OperationFlow::TraceFaultClearRefused(ClearRefusal refusal) const

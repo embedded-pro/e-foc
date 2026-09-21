@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <optional>
 
-namespace can::wire
+namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 1;
     static constexpr uint8_t focContractVersionMinor = 0;
@@ -55,7 +55,6 @@ namespace can::wire
         const FieldDescriptor* fields;
         uint8_t fieldCount;
 
-        // Commands carry the can-lite sequence byte ahead of their fields; responses and telemetry do not
         constexpr bool SequencePrefixed() const
         {
             return direction == Direction::command;
@@ -110,47 +109,47 @@ namespace can::wire
         { "position", FieldType::fixed16, focPositionScale, "rad" },
     } };
 
-    constexpr MessageDescriptor Message(uint8_t id, const char* name, Direction direction)
+    constexpr MessageDescriptor MakeDescriptor(uint8_t id, const char* name, Direction direction)
     {
         return MessageDescriptor{ id, name, direction, nullptr, 0 };
     }
 
     template<std::size_t N>
-    constexpr MessageDescriptor Message(uint8_t id, const char* name, Direction direction, const std::array<FieldDescriptor, N>& fields)
+    constexpr MessageDescriptor MakeDescriptor(uint8_t id, const char* name, Direction direction, const std::array<FieldDescriptor, N>& fields)
     {
         return MessageDescriptor{ id, name, direction, fields.data(), static_cast<uint8_t>(N) };
     }
 
     inline constexpr std::array<MessageDescriptor, 19> focMotorMessages{ {
-        Message(focQueryMotorTypeId, "QueryMotorType", Direction::command),
-        Message(focStartId, "Start", Direction::command),
-        Message(focStopId, "Stop", Direction::command),
-        Message(focSetPidCurrentId, "SetPidCurrent", Direction::command, bandwidthFields),
-        Message(focSetPidSpeedId, "SetPidSpeed", Direction::command, bandwidthFields),
-        Message(focSetPidPositionId, "SetPidPosition", Direction::command, bandwidthFields),
-        Message(focIdentifyElectricalId, "IdentifyElectrical", Direction::command),
-        Message(focIdentifyMechanicalId, "IdentifyMechanical", Direction::command),
-        Message(focRequestTelemetryId, "RequestTelemetry", Direction::command),
-        Message(focSetEncoderResolutionId, "SetEncoderResolution", Direction::command, resolutionFields),
-        Message(focAlignId, "Align", Direction::command),
-        Message(focClearFaultId, "ClearFault", Direction::command),
-        Message(focEmergencyStopId, "EmergencyStop", Direction::command),
-        Message(focConfigureTelemetryRateId, "ConfigureTelemetryRate", Direction::command, telemetryRateFields),
-        Message(focSelectControlModeId, "SelectControlMode", Direction::command, modeFields),
-        Message(focSetTorqueSetpointId, "SetTorqueSetpoint", Direction::command, torqueFields),
-        Message(focSetSpeedSetpointId, "SetSpeedSetpoint", Direction::command, speedFields),
-        Message(focSetPositionSetpointId, "SetPositionSetpoint", Direction::command, positionFields),
-        Message(focQueryContractVersionId, "QueryContractVersion", Direction::command),
+        MakeDescriptor(focQueryMotorTypeId, "QueryMotorType", Direction::command),
+        MakeDescriptor(focStartId, "Start", Direction::command),
+        MakeDescriptor(focStopId, "Stop", Direction::command),
+        MakeDescriptor(focSetPidCurrentId, "SetPidCurrent", Direction::command, bandwidthFields),
+        MakeDescriptor(focSetPidSpeedId, "SetPidSpeed", Direction::command, bandwidthFields),
+        MakeDescriptor(focSetPidPositionId, "SetPidPosition", Direction::command, bandwidthFields),
+        MakeDescriptor(focIdentifyElectricalId, "IdentifyElectrical", Direction::command),
+        MakeDescriptor(focIdentifyMechanicalId, "IdentifyMechanical", Direction::command),
+        MakeDescriptor(focRequestTelemetryId, "RequestTelemetry", Direction::command),
+        MakeDescriptor(focSetEncoderResolutionId, "SetEncoderResolution", Direction::command, resolutionFields),
+        MakeDescriptor(focAlignId, "Align", Direction::command),
+        MakeDescriptor(focClearFaultId, "ClearFault", Direction::command),
+        MakeDescriptor(focEmergencyStopId, "EmergencyStop", Direction::command),
+        MakeDescriptor(focConfigureTelemetryRateId, "ConfigureTelemetryRate", Direction::command, telemetryRateFields),
+        MakeDescriptor(focSelectControlModeId, "SelectControlMode", Direction::command, modeFields),
+        MakeDescriptor(focSetTorqueSetpointId, "SetTorqueSetpoint", Direction::command, torqueFields),
+        MakeDescriptor(focSetSpeedSetpointId, "SetSpeedSetpoint", Direction::command, speedFields),
+        MakeDescriptor(focSetPositionSetpointId, "SetPositionSetpoint", Direction::command, positionFields),
+        MakeDescriptor(focQueryContractVersionId, "QueryContractVersion", Direction::command),
     } };
 
     inline constexpr std::array<MessageDescriptor, 7> focMotorResponses{ {
-        Message(focMotorTypeResponseId, "MotorTypeResponse", Direction::response, modeFields),
-        Message(focElectricalParamsResponseId, "ElectricalParamsResponse", Direction::response, electricalParamsFields),
-        Message(focMechanicalParamsResponseId, "MechanicalParamsResponse", Direction::response, mechanicalParamsFields),
-        Message(focTelemetryElectricalResponseId, "TelemetryElectricalResponse", Direction::telemetry, telemetryElectricalFields),
-        Message(focTelemetryStatusResponseId, "TelemetryStatusResponse", Direction::telemetry, telemetryStatusFields),
-        Message(focSelectControlModeResponseId, "SelectControlModeResponse", Direction::response, modeFields),
-        Message(focContractVersionResponseId, "ContractVersionResponse", Direction::response, contractVersionFields),
+        MakeDescriptor(focMotorTypeResponseId, "MotorTypeResponse", Direction::response, modeFields),
+        MakeDescriptor(focElectricalParamsResponseId, "ElectricalParamsResponse", Direction::response, electricalParamsFields),
+        MakeDescriptor(focMechanicalParamsResponseId, "MechanicalParamsResponse", Direction::response, mechanicalParamsFields),
+        MakeDescriptor(focTelemetryElectricalResponseId, "TelemetryElectricalResponse", Direction::telemetry, telemetryElectricalFields),
+        MakeDescriptor(focTelemetryStatusResponseId, "TelemetryStatusResponse", Direction::telemetry, telemetryStatusFields),
+        MakeDescriptor(focSelectControlModeResponseId, "SelectControlModeResponse", Direction::response, modeFields),
+        MakeDescriptor(focContractVersionResponseId, "ContractVersionResponse", Direction::response, contractVersionFields),
     } };
 
     constexpr std::optional<MessageDescriptor> FindDescriptor(uint8_t id)
@@ -172,7 +171,6 @@ namespace can::wire
         return descriptor.has_value() ? descriptor->PayloadSize() : 0;
     }
 
-    // A payload of any other length is a foreign layout, not a tolerable variant of this one
     inline bool PayloadExact(const hal::Can::Message& data, uint8_t id)
     {
         const auto descriptor = FindDescriptor(id);

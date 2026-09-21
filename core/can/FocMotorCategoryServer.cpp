@@ -46,7 +46,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleStart(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focStartId))
+        if (!PayloadExact(data, focStartId))
         {
             SendCommandAck(focStartId, services::CanAckStatus::invalidPayload);
             return;
@@ -63,7 +63,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleStop(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focStopId))
+        if (!PayloadExact(data, focStopId))
         {
             SendCommandAck(focStopId, services::CanAckStatus::invalidPayload);
             return;
@@ -80,7 +80,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleClearFault(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focClearFaultId))
+        if (!PayloadExact(data, focClearFaultId))
         {
             SendCommandAck(focClearFaultId, services::CanAckStatus::invalidPayload);
             return;
@@ -97,7 +97,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleEmergencyStop(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focEmergencyStopId))
+        if (!PayloadExact(data, focEmergencyStopId))
         {
             SendCommandAck(focEmergencyStopId, services::CanAckStatus::invalidPayload);
             return;
@@ -114,7 +114,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleSelectControlMode(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focSelectControlModeId))
+        if (!PayloadExact(data, focSelectControlModeId))
         {
             SendCommandAck(focSelectControlModeId, services::CanAckStatus::invalidPayload);
             return;
@@ -148,7 +148,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleSetTorqueSetpoint(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focSetTorqueSetpointId))
+        if (!PayloadExact(data, focSetTorqueSetpointId))
         {
             SendCommandAck(focSetTorqueSetpointId, services::CanAckStatus::invalidPayload);
             return;
@@ -172,7 +172,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleSetSpeedSetpoint(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focSetSpeedSetpointId))
+        if (!PayloadExact(data, focSetSpeedSetpointId))
         {
             SendCommandAck(focSetSpeedSetpointId, services::CanAckStatus::invalidPayload);
             return;
@@ -196,7 +196,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleSetPositionSetpoint(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focSetPositionSetpointId))
+        if (!PayloadExact(data, focSetPositionSetpointId))
         {
             SendCommandAck(focSetPositionSetpointId, services::CanAckStatus::invalidPayload);
             return;
@@ -220,7 +220,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleSetPidCurrent(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focSetPidCurrentId))
+        if (!PayloadExact(data, focSetPidCurrentId))
         {
             SendCommandAck(focSetPidCurrentId, services::CanAckStatus::invalidPayload);
             return;
@@ -244,7 +244,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleSetPidSpeed(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focSetPidSpeedId))
+        if (!PayloadExact(data, focSetPidSpeedId))
         {
             SendCommandAck(focSetPidSpeedId, services::CanAckStatus::invalidPayload);
             return;
@@ -268,7 +268,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleSetPidPosition(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focSetPidPositionId))
+        if (!PayloadExact(data, focSetPidPositionId))
         {
             SendCommandAck(focSetPidPositionId, services::CanAckStatus::invalidPayload);
             return;
@@ -292,7 +292,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleAlign(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focAlignId))
+        if (!PayloadExact(data, focAlignId))
         {
             SendCommandAck(focAlignId, services::CanAckStatus::invalidPayload);
             return;
@@ -309,7 +309,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleIdentifyElectrical(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focIdentifyElectricalId))
+        if (!PayloadExact(data, focIdentifyElectricalId))
         {
             SendCommandAck(focIdentifyElectricalId, services::CanAckStatus::invalidPayload);
             return;
@@ -326,7 +326,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleIdentifyMechanical(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focIdentifyMechanicalId))
+        if (!PayloadExact(data, focIdentifyMechanicalId))
         {
             SendCommandAck(focIdentifyMechanicalId, services::CanAckStatus::invalidPayload);
             return;
@@ -343,7 +343,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleRequestTelemetry(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focRequestTelemetryId))
+        if (!PayloadExact(data, focRequestTelemetryId))
         {
             SendCommandAck(focRequestTelemetryId, services::CanAckStatus::invalidPayload);
             return;
@@ -360,7 +360,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleSetEncoderResolution(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focSetEncoderResolutionId))
+        if (!PayloadExact(data, focSetEncoderResolutionId))
         {
             SendCommandAck(focSetEncoderResolutionId, services::CanAckStatus::invalidPayload);
             return;
@@ -384,7 +384,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleQueryMotorType(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focQueryMotorTypeId))
+        if (!PayloadExact(data, focQueryMotorTypeId))
         {
             SendCommandAck(focQueryMotorTypeId, services::CanAckStatus::invalidPayload);
             return;
@@ -395,7 +395,7 @@ namespace can
 
     void FocMotorCategoryServer::HandleConfigureTelemetryRate(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focConfigureTelemetryRateId))
+        if (!PayloadExact(data, focConfigureTelemetryRateId))
         {
             SendCommandAck(focConfigureTelemetryRateId, services::CanAckStatus::invalidPayload);
             return;
@@ -419,15 +419,15 @@ namespace can
 
     void FocMotorCategoryServer::HandleQueryContractVersion(const hal::Can::Message& data)
     {
-        if (!wire::PayloadExact(data, focQueryContractVersionId))
+        if (!PayloadExact(data, focQueryContractVersionId))
         {
             SendCommandAck(focQueryContractVersionId, services::CanAckStatus::invalidPayload);
             return;
         }
 
         services::CanPayloadWriter payload;
-        payload.WriteUInt8(wire::focContractVersionMajor);
-        payload.WriteUInt8(wire::focContractVersionMinor);
+        payload.WriteUInt8(focContractVersionMajor);
+        payload.WriteUInt8(focContractVersionMinor);
         SendResponse(focContractVersionResponseId, payload);
         SendCommandAck(focQueryContractVersionId, services::CanAckStatus::success);
     }

@@ -44,9 +44,9 @@ namespace application
     {
         faultLatched = true;
         faultRecorded = true;
+        lastCondition = state_machine::FaultConditionState::unknown;
+        conditionClearSince = std::nullopt;
 
-        // Polled rather than sampled per command, so that a condition chattering between two operator
-        // commands is still observed; the timer is cancelled by its own destructor if this object dies
         conditionPollTimer.emplace(conditionPollInterval, [this]()
             {
                 SampleCondition();
@@ -91,8 +91,6 @@ namespace application
 
     void FaultController::Clear()
     {
-        // The budget is the only invariant asserted here: the condition is re-evaluated where the transition
-        // commits, and a condition that re-asserts in that window must refuse the clear, not reset the board
         really_assert(consecutiveFaultClears < maxConsecutiveFaultClears);
 
         ++consecutiveFaultClears;

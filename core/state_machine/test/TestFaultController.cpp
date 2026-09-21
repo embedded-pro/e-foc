@@ -315,3 +315,20 @@ TEST_F(FaultControllerConditionTest, a_controller_without_a_notifier_reports_the
     EXPECT_EQ(state_machine::FaultConditionState::unknown, controller.ConditionState());
     EXPECT_EQ(application::ClearRefusal::none, controller.EvaluateClear());
 }
+
+TEST_F(FaultControllerConditionTest, the_dwell_restarts_at_fault_entry_rather_than_reusing_an_earlier_one)
+{
+    RegisterWithCallbacks();
+
+    Condition(state_machine::FaultConditionState::clear);
+    ForwardTime(application::FaultController::conditionDwell * 2);
+
+    controller.EnterFault();
+    Condition(state_machine::FaultConditionState::clear);
+
+    EXPECT_EQ(application::ClearRefusal::dwellNotElapsed, controller.EvaluateClear());
+
+    ForwardTime(application::FaultController::conditionDwell);
+
+    EXPECT_EQ(application::ClearRefusal::none, controller.EvaluateClear());
+}

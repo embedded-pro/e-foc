@@ -508,3 +508,11 @@ graph TD
 | REQ-INT-010    | `core/can/test/TestFocMotorCategoryClient.cpp` — client surfaces ACK/NACK to caller                               |
 | REQ-INT-011    | `core/can/test/TestFocMotorCanBridge.cpp` — stub commands return applicationError                                 |
 | REQ-INT-012    | `core/can/test/TestFocMotorCanBridge.cpp` — tracing decorators are observable                                     |
+| REQ-CAN-001    | `core/can/test/TestWireContractDocumentation.cpp` — documented scales match the contract descriptors              |
+| REQ-CAN-002    | `core/can/test/TestFocMotorWireContract.cpp` — every command rejected one byte short and one byte long            |
+| REQ-CAN-003    | `core/can/test/TestFocMotorWireContract.cpp` — an incompatible major refuses every further category command       |
+| REQ-CAN-004    | `core/can/test/TestFocMotorWireContract.cpp` — literal byte vectors and client-to-server round trips              |
+| REQ-CAN-005    | `documentation/design/service-can.md` — deviations from the can-lite reference example                            |
+| REQ-SM-025     | `core/state_machine/test/TestPlatformFaultNotifier.cpp` — clear refused while the condition reads asserted        |
+| REQ-SM-026     | `core/state_machine/test/TestFaultController.cpp` — dwell restarts on an asserted sample and at fault entry       |
+| REQ-EH-013     | `core/state_machine/test/TestPlatformFaultNotifier.cpp` — condition state is read from the platform               |

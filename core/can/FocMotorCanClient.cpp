@@ -65,6 +65,16 @@ namespace can
         return categoryClient.SendSetPositionBandwidth(nodeId, bandwidth);
     }
 
+    bool FocMotorCanClient::QueryContractVersion()
+    {
+        return categoryClient.SendQueryContractVersion(nodeId);
+    }
+
+    ContractCompatibility FocMotorCanClient::Compatibility() const
+    {
+        return categoryClient.Compatibility();
+    }
+
     services::CanProtocolClient& FocMotorCanClient::ProtocolClient()
     {
         return protocolClient;

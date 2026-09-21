@@ -130,8 +130,10 @@ namespace tool
             SetBusy(false);
     }
 
-    void CanCommandClient::RequestData() const
-    {}
+    void CanCommandClient::RequestData()
+    {
+        focClient.QueryContractVersion();
+    }
 
     void CanCommandClient::HandleTimeout()
     {
@@ -144,6 +146,8 @@ namespace tool
 
     void CanCommandClient::OnServerOnline(uint16_t /*nodeId*/)
     {
+        RequestData();
+
         NotifyObservers([](auto& observer)
             {
                 observer.OnConnectionChanged(true);
@@ -184,7 +188,7 @@ namespace tool
 
     void CanCommandClient::DecodeTelemetryStatus(const hal::Can::Message& msg) const
     {
-        if (!can::wire::PayloadExact(msg, can::focTelemetryStatusResponseId))
+        if (!can::PayloadExact(msg, can::focTelemetryStatusResponseId))
             return;
 
         services::CanPayloadReader reader{ msg };
@@ -212,7 +216,7 @@ namespace tool
 
     void CanCommandClient::DecodeTelemetryElectrical(const hal::Can::Message& msg) const
     {
-        if (!can::wire::PayloadExact(msg, can::focTelemetryElectricalResponseId))
+        if (!can::PayloadExact(msg, can::focTelemetryElectricalResponseId))
             return;
 
         services::CanPayloadReader reader{ msg };
@@ -282,7 +286,7 @@ namespace tool
 
     void CanCommandClient::OnContractVersionResponse(uint8_t major, uint8_t minor)
     {
-        const bool compatible = major == can::wire::focContractVersionMajor;
+        const bool compatible = major == can::focContractVersionMajor;
 
         NotifyObservers([major, minor, compatible](auto& observer)
             {

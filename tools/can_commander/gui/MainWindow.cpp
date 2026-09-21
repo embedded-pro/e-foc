@@ -148,7 +148,7 @@ namespace tool
     void MainWindow::OnConnectionChanged(bool connected)
     {
         connectionPanel->OnConnectionChanged(connected);
-        commandPanel->SetCommandsEnabled(connected);
+        commandPanel->SetCommandsEnabled(false);
 
         if (connected)
         {
@@ -194,14 +194,16 @@ namespace tool
 
     void MainWindow::OnContractVersion(uint8_t major, uint8_t minor, bool compatible)
     {
+        commandPanel->SetCommandsEnabled(compatible);
+
         if (compatible)
             logView->appendPlainText(QString("Contract version %1.%2").arg(major).arg(minor));
         else
-            logView->appendPlainText(QString("ERROR: contract version %1.%2 is incompatible with %3.%4; commands are not safe to send")
+            logView->appendPlainText(QString("ERROR: contract version %1.%2 is incompatible with %3.%4; commands stay disabled")
                     .arg(major)
                     .arg(minor)
-                    .arg(can::wire::focContractVersionMajor)
-                    .arg(can::wire::focContractVersionMinor));
+                    .arg(can::focContractVersionMajor)
+                    .arg(can::focContractVersionMinor));
     }
 
     void MainWindow::OnMotorStatusReceived(tool::FocMotorState state, tool::FocFaultCode fault)

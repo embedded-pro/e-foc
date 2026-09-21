@@ -32,7 +32,6 @@ namespace state_machine
 
         virtual void Unregister() = 0;
 
-        // Dispatcher context only; unknown means the condition cannot be interrogated, not that it is clear
         virtual FaultConditionState ConditionState() = 0;
     };
 

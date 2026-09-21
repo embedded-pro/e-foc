@@ -88,7 +88,6 @@ namespace application
         virtual drivers::Watchdog& Watchdog() = 0;
 
         virtual void RegisterBoardProtection(const infra::Function<void(BoardProtectionReason)>& onProtection) = 0;
-        // Dispatcher context only; unknown means the platform cannot interrogate the condition, not that it is clear
         virtual BoardProtectionState BoardProtectionStatus() = 0;
 
         virtual PlatformDiagnostics& Diagnostics() = 0;

@@ -93,8 +93,6 @@ namespace
         uint8_t sequence{ 0 };
     };
 
-    // The client and the server meet here, over one transport each, so a frame one side builds is the
-    // frame the other side parses; every other test in this tree checks a side against its own mock
     class FocMotorWireContractTest
         : public Test
     {
@@ -161,22 +159,22 @@ namespace
 
 TEST_F(FocMotorWireContractTest, every_descriptor_fits_a_classic_can_frame_and_holds_a_unique_id)
 {
-    for (const auto& descriptor : can::wire::focMotorMessages)
+    for (const auto& descriptor : can::focMotorMessages)
     {
         EXPECT_LE(descriptor.PayloadSize(), 8u) << descriptor.name;
         EXPECT_LE(descriptor.id, 0x7Fu) << descriptor.name;
     }
 
-    for (const auto& descriptor : can::wire::focMotorResponses)
+    for (const auto& descriptor : can::focMotorResponses)
     {
         EXPECT_LE(descriptor.PayloadSize(), 8u) << descriptor.name;
         EXPECT_GE(descriptor.id, 0x80u) << descriptor.name;
     }
 
     std::vector<uint8_t> ids;
-    for (const auto& descriptor : can::wire::focMotorMessages)
+    for (const auto& descriptor : can::focMotorMessages)
         ids.push_back(descriptor.id);
-    for (const auto& descriptor : can::wire::focMotorResponses)
+    for (const auto& descriptor : can::focMotorResponses)
         ids.push_back(descriptor.id);
 
     const auto unique = std::set<uint8_t>{ ids.begin(), ids.end() };
@@ -272,16 +270,14 @@ TEST_F(FocMotorWireContractTest, the_contract_version_round_trips_and_both_ends_
     DeliverToServer();
 
     EXPECT_EQ(can::focContractVersionResponseId, respondedMessageType);
-    EXPECT_EQ(Bytes({ can::wire::focContractVersionMajor, can::wire::focContractVersionMinor }), respondedMessage);
+    EXPECT_EQ(Bytes({ can::focContractVersionMajor, can::focContractVersionMinor }), respondedMessage);
 
-    EXPECT_CALL(clientObserver, OnContractVersionResponse(can::wire::focContractVersionMajor, can::wire::focContractVersionMinor));
+    EXPECT_CALL(clientObserver, OnContractVersionResponse(can::focContractVersionMajor, can::focContractVersionMinor));
     DeliverToClient();
 }
 
 TEST_F(FocMotorWireContractTest, a_can_lite_shaped_gains_frame_is_rejected_rather_than_read_as_a_bandwidth)
 {
-    // The pinned can-lite example encodes kp/ki/kd here; reading its kp as a bandwidth is the failure
-    // this exactness check exists to prevent
     const auto gainsFrame = Bytes({ 0x00, 0x00, 0x64, 0x00, 0x0A, 0x00, 0x01 });
 
     server.HandleMessage(can::focSetPidCurrentId, gainsFrame);
@@ -293,7 +289,7 @@ TEST_F(FocMotorWireContractTest, a_can_lite_shaped_gains_frame_is_rejected_rathe
 
 TEST_F(FocMotorWireContractTest, every_command_is_rejected_one_byte_short_and_one_byte_long)
 {
-    for (const auto& descriptor : can::wire::focMotorMessages)
+    for (const auto& descriptor : can::focMotorMessages)
     {
         const auto size = descriptor.PayloadSize();
 
@@ -314,4 +310,50 @@ TEST_F(FocMotorWireContractTest, every_command_is_rejected_one_byte_short_and_on
         ASSERT_TRUE(ackSpy.last.has_value()) << descriptor.name;
         EXPECT_EQ(services::CanAckStatus::invalidPayload, ackSpy.last->status) << descriptor.name;
     }
+}
+
+TEST_F(FocMotorWireContractTest, sends_are_allowed_before_the_version_is_known)
+{
+    EXPECT_EQ(can::ContractCompatibility::unknown, client.Compatibility());
+    EXPECT_TRUE(client.SendStart(1));
+}
+
+TEST_F(FocMotorWireContractTest, a_matching_major_marks_the_contract_compatible)
+{
+    EXPECT_CALL(clientObserver, OnContractVersionResponse(_, _));
+    client.HandleMessage(can::focContractVersionResponseId,
+        Bytes({ can::focContractVersionMajor, can::focContractVersionMinor }));
+
+    EXPECT_EQ(can::ContractCompatibility::compatible, client.Compatibility());
+    EXPECT_TRUE(client.SendStart(1));
+}
+
+TEST_F(FocMotorWireContractTest, an_incompatible_major_refuses_every_further_category_command)
+{
+    EXPECT_CALL(clientObserver, OnContractVersionResponse(_, _));
+    client.HandleMessage(can::focContractVersionResponseId,
+        Bytes({ static_cast<uint8_t>(can::focContractVersionMajor + 1), 0 }));
+
+    EXPECT_EQ(can::ContractCompatibility::incompatible, client.Compatibility());
+
+    EXPECT_FALSE(client.SendStart(1));
+    EXPECT_FALSE(client.SendStop(1));
+    EXPECT_FALSE(client.SendClearFault(1));
+    EXPECT_FALSE(client.SendEmergencyStop(1));
+    EXPECT_FALSE(client.SendSelectControlMode(1, can::FocMotorMode::speed));
+    EXPECT_FALSE(client.SendSetTorqueSetpoint(1, foc::Ampere{ 1.0f }));
+    EXPECT_FALSE(client.SendSetSpeedSetpoint(1, foc::RadiansPerSecond{ 1.0f }));
+    EXPECT_FALSE(client.SendSetPositionSetpoint(1, foc::Radians{ 1.0f }));
+    EXPECT_FALSE(client.SendSetCurrentBandwidth(1, 100.0f));
+    EXPECT_FALSE(client.SendSetSpeedBandwidth(1, 100.0f));
+    EXPECT_FALSE(client.SendSetPositionBandwidth(1, 100.0f));
+}
+
+TEST_F(FocMotorWireContractTest, the_version_query_itself_survives_an_incompatible_major)
+{
+    EXPECT_CALL(clientObserver, OnContractVersionResponse(_, _));
+    client.HandleMessage(can::focContractVersionResponseId,
+        Bytes({ static_cast<uint8_t>(can::focContractVersionMajor + 1), 0 }));
+
+    EXPECT_TRUE(client.SendQueryContractVersion(1));
 }

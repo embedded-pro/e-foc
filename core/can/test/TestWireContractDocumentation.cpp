@@ -7,8 +7,6 @@
 
 namespace
 {
-    // The design document is the protocol's public face; this test is what stops it drifting from the
-    // descriptor table the code actually decodes with
     std::string DesignDocument()
     {
         std::ifstream file{ std::string{ E_FOC_SOURCE_DIR } + "/documentation/design/service-can.md" };
@@ -102,7 +100,7 @@ TEST(WireContractDocumentation, every_scale_the_contract_uses_is_documented)
         {
             for (uint8_t i = 0; i != descriptor.fieldCount; ++i)
             {
-                if (descriptor.fields[i].type == can::wire::FieldType::fixed16)
+                if (descriptor.fields[i].type == can::FieldType::fixed16)
                 {
                     EXPECT_TRUE(isDocumented(descriptor.fields[i].scale))
                         << descriptor.name << "." << descriptor.fields[i].name;
@@ -111,8 +109,8 @@ TEST(WireContractDocumentation, every_scale_the_contract_uses_is_documented)
         }
     };
 
-    check(can::wire::focMotorMessages);
-    check(can::wire::focMotorResponses);
+    check(can::focMotorMessages);
+    check(can::focMotorResponses);
 }
 
 TEST(WireContractDocumentation, the_documented_version_matches_the_contract)

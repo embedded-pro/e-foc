@@ -86,8 +86,6 @@ namespace application
 
     state_machine::CommandResult FocStateMachineCommon::CmdEnable()
     {
-        operation.RefreshFaultCondition();
-
         const auto dispatched = ToCommandResult(Dispatch(state_machine::Enable{}));
 
         if (dispatched != state_machine::CommandResult::ok)
@@ -108,8 +106,6 @@ namespace application
     {
         if (!stateMachine.Is<state_machine::Fault>())
             return state_machine::CommandResult::rejected;
-
-        operation.RefreshFaultCondition();
 
         const auto refusal = operation.EvaluateClearFault();
         if (refusal != application::ClearRefusal::none)

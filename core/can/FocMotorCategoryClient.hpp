@@ -29,6 +29,13 @@ namespace can
         virtual void OnContractVersionResponse(uint8_t major, uint8_t minor) = 0;
     };
 
+    enum class ContractCompatibility : uint8_t
+    {
+        unknown,
+        compatible,
+        incompatible
+    };
+
     class FocMotorCategoryClient
         : public services::CanCategoryClient
         , public infra::Subject<FocMotorCategoryClientObserver>
@@ -53,7 +60,11 @@ namespace can
         bool SendSetPositionBandwidth(uint16_t targetNodeId, float bandwidth);
         bool SendQueryContractVersion(uint16_t targetNodeId);
 
+        ContractCompatibility Compatibility() const;
+
     private:
+        bool SendsRefused() const;
+
         void HandleSelectControlModeResponse(const hal::Can::Message& data);
         void HandleCategoryError(const hal::Can::Message& data);
         void HandleTelemetryStatus(const hal::Can::Message& data);
@@ -65,5 +76,7 @@ namespace can
         services::CanMessageHandler<FocMotorCategoryClient> telemetryStatus{ focTelemetryStatusResponseId, *this, &FocMotorCategoryClient::HandleTelemetryStatus };
         services::CanMessageHandler<FocMotorCategoryClient> telemetryElectrical{ focTelemetryElectricalResponseId, *this, &FocMotorCategoryClient::HandleTelemetryElectrical };
         services::CanMessageHandler<FocMotorCategoryClient> contractVersionResponse{ focContractVersionResponseId, *this, &FocMotorCategoryClient::HandleContractVersionResponse };
+
+        ContractCompatibility contractCompatibility{ ContractCompatibility::unknown };
     };
 }

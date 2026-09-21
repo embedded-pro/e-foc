@@ -332,8 +332,6 @@ namespace application
 
     PlatformFactory::BoardProtectionState PlatformFactoryImpl::BoardProtectionStatus()
     {
-        // The protection comparators sit on the PWM-triggered ADC, which stops converting once the bridge is
-        // stopped, so no reading taken here distinguishes a cleared condition from an unevaluated one
         return PlatformFactory::BoardProtectionState::unknown;
     }
 

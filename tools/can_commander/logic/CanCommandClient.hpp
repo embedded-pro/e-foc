@@ -11,7 +11,6 @@
 
 namespace tool
 {
-    // The wire contract in core/can owns these; a copy here drifted and rendered partialCalibration as unknown
     using FocMotorState = can::FocMotorState;
     using FocFaultCode = can::FocFaultCode;
 
@@ -68,7 +67,8 @@ namespace tool
         void SendSetSpeedBandwidth(float bandwidth);
         void SendSetPositionBandwidth(float bandwidth);
 
-        void RequestData() const;
+        void RequestData();
+        bool ContractAccepted() const;
         void HandleTimeout();
 
     private:
