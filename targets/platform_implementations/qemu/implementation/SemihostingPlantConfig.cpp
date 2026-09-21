@@ -1,7 +1,7 @@
 #include "targets/platform_implementations/qemu/implementation/SemihostingPlantConfig.hpp"
-#include "targets/platform_implementations/qemu/implementation/SemihostingFile.hpp"
 #include "infra/util/ByteRange.hpp"
 #include "infra/util/Crc.hpp"
+#include "targets/platform_implementations/qemu/implementation/SemihostingFile.hpp"
 #include <array>
 #include <cstring>
 

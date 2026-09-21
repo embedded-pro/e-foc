@@ -131,13 +131,13 @@ directory holding the target's files, the socket carrying frames, and the captur
 
 ### Provided to step definitions
 
-| Capability          | Purpose                                                            |
-|---------------------|--------------------------------------------------------------------|
-| Lifecycle           | Start, stop and restart the target                                  |
-| Command transport   | Send a category command and await its acknowledgement               |
-| Telemetry           | Await a state, a fault code, or read the measured position          |
-| Serial capture      | Drain and search the target's trace output                          |
-| Simulation          | Describe the plant and the stored calibration and configuration     |
+| Capability        | Purpose                                                         |
+|-------------------|-----------------------------------------------------------------|
+| Lifecycle         | Start, stop and restart the target                              |
+| Command transport | Send a category command and await its acknowledgement           |
+| Telemetry         | Await a state, a fault code, or read the measured position      |
+| Serial capture    | Drain and search the target's trace output                      |
+| Simulation        | Describe the plant and the stored calibration and configuration |
 
 ### Required from the system under test
 

@@ -453,13 +453,13 @@ graph TD
 
 ### Integration Boundaries
 
-| Boundary                  | Software-in-the-loop                              | Hardware-in-the-loop          |
-|---------------------------|---------------------------------------------------|-------------------------------|
-| Motor and power stage     | Simulated plant, described per scenario           | Real motor and inverter       |
-| Board protection          | Simulated comparators, armed with the inverter    | Real comparators              |
-| Non-volatile memory       | Host-written image, pre-seeded or deliberately damaged | Real device              |
-| State machine, cascades, calibration, NVM stack, CAN server | Real firmware   | Real firmware                 |
-| Transport                 | CAN frames as text on the emulated UART           | Bridge over serial and CAN    |
+| Boundary                                                    | Software-in-the-loop                                   | Hardware-in-the-loop       |
+|-------------------------------------------------------------|--------------------------------------------------------|----------------------------|
+| Motor and power stage                                       | Simulated plant, described per scenario                | Real motor and inverter    |
+| Board protection                                            | Simulated comparators, armed with the inverter         | Real comparators           |
+| Non-volatile memory                                         | Host-written image, pre-seeded or deliberately damaged | Real device                |
+| State machine, cascades, calibration, NVM stack, CAN server | Real firmware                                          | Real firmware              |
+| Transport                                                   | CAN frames as text on the emulated UART                | Bridge over serial and CAN |
 
 ### Requirements Traceability
 

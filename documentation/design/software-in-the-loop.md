@@ -80,15 +80,15 @@ a truncated or stale description is rejected rather than half-read.
 
 The description covers everything the plant needs:
 
-| Group            | Contents                                                                 |
-|------------------|--------------------------------------------------------------------------|
-| Winding and rotor| Resistance, both axis inductances, flux linkage, pole pairs, inertia, damping |
-| Drive            | Supply voltage, control frequency, peak current, load torque             |
-| Measurement      | Current noise deviation and per-phase bias, encoder noise deviation and bias |
-| Thermal          | Ambient, thermal resistance and capacitance, copper and iron coefficients |
-| Protection       | Over-current, over-voltage, under-voltage and over-temperature trips      |
-| Fault injection  | Open phase per phase, stuck encoder, supply voltage scaling              |
-| Reproducibility  | The seed both noise generators start from                                |
+| Group             | Contents                                                                      |
+|-------------------|-------------------------------------------------------------------------------|
+| Winding and rotor | Resistance, both axis inductances, flux linkage, pole pairs, inertia, damping |
+| Drive             | Supply voltage, control frequency, peak current, load torque                  |
+| Measurement       | Current noise deviation and per-phase bias, encoder noise deviation and bias  |
+| Thermal           | Ambient, thermal resistance and capacitance, copper and iron coefficients     |
+| Protection        | Over-current, over-voltage, under-voltage and over-temperature trips          |
+| Fault injection   | Open phase per phase, stuck encoder, supply voltage scaling                   |
+| Reproducibility   | The seed both noise generators start from                                     |
 
 When no description is present the firmware falls back to the motor it is built with, so the
 target still boots standalone. A trip threshold of zero disables that protection, which is how a
@@ -198,14 +198,14 @@ the rotor settled, which bounds how noisy an encoder the current calibration tol
 
 ## Scenario Taxonomy
 
-| Area                   | What it establishes                                                      |
-|------------------------|--------------------------------------------------------------------------|
-| Control modes          | Torque, speed and position each align, enable, take a setpoint, disable   |
-| Controller algorithms  | Every algorithm of every loop runs, plus combinations across the loops     |
-| Plant characteristics  | Control holds up across noise, temperature, load and a different winding  |
-| Wiring faults          | A dead motor does not turn; a degraded one does                           |
-| Memory integrity       | Damaged calibration is distrusted; damaged configuration falls to defaults |
-| Board protection       | Trips reach the state machine and are reported                            |
+| Area                  | What it establishes                                                        |
+|-----------------------|----------------------------------------------------------------------------|
+| Control modes         | Torque, speed and position each align, enable, take a setpoint, disable    |
+| Controller algorithms | Every algorithm of every loop runs, plus combinations across the loops     |
+| Plant characteristics | Control holds up across noise, temperature, load and a different winding   |
+| Wiring faults         | A dead motor does not turn; a degraded one does                            |
+| Memory integrity      | Damaged calibration is distrusted; damaged configuration falls to defaults |
+| Board protection      | Trips reach the state machine and are reported                             |
 
 Controller coverage sweeps each loop's algorithms with the other loops held at the baseline, and
 adds a handful of combinations chosen to exercise both kinds of position law: those that produce a
