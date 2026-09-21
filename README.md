@@ -178,6 +178,20 @@ The chosen controller assembles the corresponding loops; the main window provide
 tabbed Parameters/Configuration and Phase Signals/RLS Estimates panels around an
 always-visible SVPWM hexagon.
 
+### The shared UI library
+
+The three desktop tools render through [ui-cpp](https://github.com/embedded-pro/ui-cpp),
+fetched at configure time from its `main` branch. A fresh configure re-resolves it, while
+an existing build directory keeps the copy it already has.
+
+| Goal                                            | Flag                                           |
+|-------------------------------------------------|------------------------------------------------|
+| Freeze an existing checkout across reconfigures | `-DFETCHCONTENT_UPDATES_DISCONNECTED=On`       |
+| Build against a local ui-cpp working tree       | `-DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp` |
+
+The second is also what makes bisecting across the two repositories possible: point at a
+local clone and check out the revision under test there.
+
 ### Troubleshooting
 
 | Problem                         | Solution                                                                           |
