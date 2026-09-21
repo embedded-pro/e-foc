@@ -235,7 +235,7 @@ jobs:
           output-dir: docs-pdf
           artifact-name: documentation-pdfs
           requirements-dir: documentation/requirements
-          features-dir: integration_tests/software_in_the_loop/features
+          features-dir: integration_tests/features
           matrix-output: docs-pdf/traceability-matrix.md
           matrix-pdf-output: docs-pdf/e_foc-traceability-matrix-${{ needs.release_please.outputs.tag_name }}.pdf
 

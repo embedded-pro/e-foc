@@ -4,9 +4,9 @@
 #include <chrono>
 #include <cmath>
 #include <gtest/gtest.h>
-#include <unistd.h>
 #include <optional>
 #include <string>
+#include <unistd.h>
 
 using namespace integration;
 

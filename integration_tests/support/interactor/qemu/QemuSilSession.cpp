@@ -1,18 +1,18 @@
 #include "integration_tests/support/interactor/qemu/QemuSilSession.hpp"
 #include <chrono>
+#include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <climits>
 #include <fcntl.h>
 #include <poll.h>
-#include <stdlib.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <string>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/un.h>
-#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
@@ -199,7 +199,9 @@ namespace sil
                 continue;
             }
 
-            struct sockaddr_un addr{};
+            struct sockaddr_un addr
+            {};
+
             addr.sun_family = AF_UNIX;
             std::strncpy(addr.sun_path, inPath.c_str(), sizeof(addr.sun_path) - 1);
 
