@@ -47,6 +47,14 @@ namespace sil
         if (scenarioDirectory.empty())
             return;
 
+        // Under SIL_VERBOSE the plant and NVM images are left behind for inspection.
+        if (SilVerbose())
+        {
+            std::fprintf(stderr, "[QEMU] keeping scenario directory %s\n", scenarioDirectory.c_str());
+            scenarioDirectory.clear();
+            return;
+        }
+
         for (const char* name : { "plant.bin", "eeprom.bin" })
             std::remove((scenarioDirectory + "/" + name).c_str());
 
@@ -97,8 +105,11 @@ namespace sil
         }
         const std::string absoluteElf{ resolvedElf };
 
-        const std::string pidStr = std::to_string(getpid());
-        const std::string inPath = "/tmp/qemu_sil_in_" + pidStr + ".sock";
+        // Unique per session: a run starts many emulators back to back, and a shared socket name
+        // lets a previous session's teardown race the next session's connect.
+        static uint32_t sessionSequence = 0;
+        const std::string inPath = "/tmp/qemu_sil_in_" + std::to_string(getpid()) + "_" +
+                                   std::to_string(sessionSequence++) + ".sock";
         unlink(inPath.c_str());
 
         // in: UNIX socket for serial0 (CMSDK UART) — CAN_RX frames from test.
@@ -293,6 +304,8 @@ namespace sil
                 {
                     if (SilVerbose())
                         std::fprintf(stderr, "[QEMU->host] %s\n", line.c_str());
+                    if (capturedLines.size() < maxCapturedLines)
+                        capturedLines.push_back(line);
                     return true;
                 }
                 line += ch;
@@ -340,6 +353,16 @@ namespace sil
     bool QemuSilSession::IsRunning() const
     {
         return pid >= 0;
+    }
+
+    const std::vector<std::string>& QemuSilSession::CapturedLines() const
+    {
+        return capturedLines;
+    }
+
+    void QemuSilSession::ClearCapturedLines()
+    {
+        capturedLines.clear();
     }
 
     bool QemuSilSession::SendCanFrame(hal::Can::Id id, const hal::Can::Message& data)

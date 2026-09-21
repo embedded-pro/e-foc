@@ -13,31 +13,39 @@ namespace state_machine
         if (current != nullptr)
         {
             const auto algorithm = CurrentAlgorithmFromRaw(configData.currentAlgorithm);
-            if (!algorithm.has_value())
-                configData.currentAlgorithm = static_cast<uint8_t>(current->ActiveCurrentAlgorithm());
-            else if (*algorithm != current->ActiveCurrentAlgorithm() &&
-                     current->SelectCurrentAlgorithm(*algorithm) == foc::SelectResult::invalidAlgorithm)
-                configData.currentAlgorithm = static_cast<uint8_t>(current->ActiveCurrentAlgorithm());
+            if (algorithm.has_value() && *algorithm != current->ActiveCurrentAlgorithm())
+                current->SelectCurrentAlgorithm(*algorithm);
+
+            const auto active = current->ActiveCurrentAlgorithm();
+
+            // Record what is running rather than what was asked for: a design that does not
+            // converge leaves the previous algorithm active, and a stale record would hide that.
+            configData.currentAlgorithm = static_cast<uint8_t>(active);
+            tracer.Trace() << "[SM] Current loop algorithm: " << CurrentAlgorithmName(active);
         }
 
         if (speed != nullptr)
         {
             const auto algorithm = SpeedAlgorithmFromRaw(configData.speedAlgorithm);
-            if (!algorithm.has_value())
-                configData.speedAlgorithm = static_cast<uint8_t>(speed->ActiveSpeedAlgorithm());
-            else if (*algorithm != speed->ActiveSpeedAlgorithm() &&
-                     speed->SelectSpeedAlgorithm(*algorithm) == foc::SelectResult::invalidAlgorithm)
-                configData.speedAlgorithm = static_cast<uint8_t>(speed->ActiveSpeedAlgorithm());
+            if (algorithm.has_value() && *algorithm != speed->ActiveSpeedAlgorithm())
+                speed->SelectSpeedAlgorithm(*algorithm);
+
+            const auto active = speed->ActiveSpeedAlgorithm();
+
+            configData.speedAlgorithm = static_cast<uint8_t>(active);
+            tracer.Trace() << "[SM] Speed loop algorithm: " << SpeedAlgorithmName(active);
         }
 
         if (position != nullptr)
         {
             const auto algorithm = PositionAlgorithmFromRaw(configData.positionAlgorithm);
-            if (!algorithm.has_value())
-                configData.positionAlgorithm = static_cast<uint8_t>(position->ActivePositionAlgorithm());
-            else if (*algorithm != position->ActivePositionAlgorithm() &&
-                     position->SelectPositionAlgorithm(*algorithm) == foc::SelectResult::invalidAlgorithm)
-                configData.positionAlgorithm = static_cast<uint8_t>(position->ActivePositionAlgorithm());
+            if (algorithm.has_value() && *algorithm != position->ActivePositionAlgorithm())
+                position->SelectPositionAlgorithm(*algorithm);
+
+            const auto active = position->ActivePositionAlgorithm();
+
+            configData.positionAlgorithm = static_cast<uint8_t>(active);
+            tracer.Trace() << "[SM] Position loop algorithm: " << PositionAlgorithmName(active);
         }
     }
 

@@ -32,6 +32,11 @@ namespace sil
 
         bool IsRunning() const;
 
+        // Every line the emulator produces is retained, including the firmware traces that the
+        // CAN reader would otherwise discard while scanning for frames.
+        const std::vector<std::string>& CapturedLines() const;
+        void ClearCapturedLines();
+
         bool SendCanFrame(hal::Can::Id id, const hal::Can::Message& data);
         bool WaitForCanFrame(hal::Can::Id expectedId, hal::Can::Message& out,
             std::chrono::milliseconds timeout);
@@ -44,6 +49,9 @@ namespace sil
 
         bool FillReadBuffer(int timeoutMs);
 
+        static constexpr std::size_t maxCapturedLines = 4096;
+
+        std::vector<std::string> capturedLines;
         std::string scenarioDirectory;
         pid_t pid{ -1 };
         int outPipeFd{ -1 };

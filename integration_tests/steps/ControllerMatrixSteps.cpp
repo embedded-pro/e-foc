@@ -106,3 +106,50 @@ WHEN(R"(the rotor is aligned)")
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focAlignId, {}, std::chrono::seconds{ 30 }))
         << "Align command rejected";
 }
+
+namespace
+{
+    std::string LoopTraceLabel(const std::string& loop)
+    {
+        if (loop == "current")
+            return "[SM] Current loop algorithm: ";
+        if (loop == "speed")
+            return "[SM] Speed loop algorithm: ";
+        if (loop == "position")
+            return "[SM] Position loop algorithm: ";
+        return {};
+    }
+}
+
+THEN(R"(the {word} loop shall be running the {word} algorithm)", (std::string loop, std::string algorithm))
+{
+    auto& fixture = context.Get<Fixture>();
+    const auto label = LoopTraceLabel(loop);
+    ASSERT_FALSE(label.empty()) << "Unknown control loop: " << loop;
+
+    // The firmware reports the algorithm that actually took effect, which differs from the one
+    // that was asked for when its design does not converge for this motor. It traces that on
+    // entry to Ready, and its tracer only drains while the event loop has work, so poll telemetry
+    // rather than waiting passively for the line to arrive.
+    std::string reported;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{ 5 };
+    while (reported.empty() && std::chrono::steady_clock::now() < deadline)
+    {
+        fixture.WaitForMotorState(can::FocMotorState::idle, std::chrono::milliseconds{ 200 });
+        fixture.DrainLines(std::chrono::milliseconds{ 100 });
+
+        for (const auto& line : fixture.allLines)
+        {
+            const auto position = line.find(label);
+            if (position != std::string::npos)
+                reported = line.substr(position + label.size());
+        }
+    }
+
+    ASSERT_FALSE(reported.empty()) << "Firmware never reported the active " << loop << " loop algorithm";
+    while (!reported.empty() && (reported.back() == '\r' || reported.back() == ' '))
+        reported.pop_back();
+
+    EXPECT_EQ(reported, algorithm)
+        << "The " << loop << " loop is running " << reported << " rather than the selected " << algorithm;
+}
