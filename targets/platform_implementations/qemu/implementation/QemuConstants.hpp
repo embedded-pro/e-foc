@@ -5,4 +5,8 @@
 namespace application
 {
     inline constexpr uint32_t kQemuSystemClockHz = 25000000u;
+
+    // Used when the software-in-the-loop harness supplies no plant description.
+    inline constexpr uint32_t kDefaultBaseFrequencyHz = 20000u;
+    inline constexpr float kDefaultSupplyVoltageVolts = 48.0f;
 }

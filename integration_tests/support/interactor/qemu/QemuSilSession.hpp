@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 #include <sys/types.h>
+#include <vector>
 
 namespace sil
 {
@@ -15,7 +16,15 @@ namespace sil
         ~QemuSilSession();
 
         bool Start(const std::string& elfPath);
+        bool Restart(const std::string& elfPath);
         void Stop();
+
+        // The emulator runs with this as its working directory, so the firmware reaches its
+        // plant description and NVM image through plain relative names.
+        bool CreateScenarioDirectory();
+        void RemoveScenarioDirectory();
+        const std::string& ScenarioDirectory() const;
+        bool WriteScenarioFile(const std::string& name, const std::vector<uint8_t>& contents) const;
 
         bool SendLine(const std::string& line);
         bool ReadLine(std::string& line, std::chrono::milliseconds timeout);
@@ -35,6 +44,7 @@ namespace sil
 
         bool FillReadBuffer(int timeoutMs);
 
+        std::string scenarioDirectory;
         pid_t pid{ -1 };
         int outPipeFd{ -1 };
         int inSockFd{ -1 };

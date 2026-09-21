@@ -72,14 +72,32 @@ namespace foc
             float biasRadians{ 0.0f };
         };
 
+        struct FaultInjectionConfig
+        {
+            bool openPhaseA{ false };
+            bool openPhaseB{ false };
+            bool openPhaseC{ false };
+            bool encoderStuck{ false };
+            float supplyVoltageScale{ 1.0f };
+
+            bool AnyPhaseOpen() const
+            {
+                return openPhaseA || openPhaseB || openPhaseC;
+            }
+        };
+
         ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency, std::optional<std::size_t> maxIterations, bool selfDriveEnabled = true);
 
         void SetLoad(foc::NewtonMeter load);
         void SetAdcNoise(const NoiseConfig& config);
         void SetEncoderNoise(const EncoderNoiseConfig& config);
         void SetThermalConfig(const ThermalConfig& config);
+        void SetFaultInjection(const FaultInjectionConfig& config);
+        void SetRandomSeed(uint32_t seed);
         void ResetTemperature();
         float WindingTemperatureCelsius() const;
+        foc::PhaseCurrents LastMeasuredCurrents() const;
+        foc::Volts EffectiveSupplyVoltage() const;
         foc::Ohm EffectiveResistance() const;
         foc::Henry EffectiveInductanceD() const;
         foc::Henry EffectiveInductanceQ() const;
@@ -105,6 +123,7 @@ namespace foc
         void RunOneCycle(const foc::PhasePwmDutyCycles& dutyPhases);
         void ScheduleNextCycle();
         float SampleNoise();
+        void ApplyOpenPhases();
 
     private:
         struct MotorState
@@ -141,6 +160,12 @@ namespace foc
             std::normal_distribution<float> distribution{ 0.0f, 1.0f };
         };
 
+        struct FaultInjectionState
+        {
+            FaultInjectionConfig config{};
+            foc::Radians stuckAngle{ 0.0f };
+        };
+
         struct SelfDriveState
         {
             bool driving{ false };
@@ -166,6 +191,7 @@ namespace foc
         CurrentNoiseState currentNoise;
         ThermalState thermal;
         EncoderNoiseState encoderNoise;
+        FaultInjectionState faultInjection;
         SelfDriveState selfDrive;
     };
 }

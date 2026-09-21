@@ -9,17 +9,99 @@
 
 namespace application
 {
+    foc::ThreePhaseMotorModel::Parameters PlatformFactoryImpl::MotorParametersFrom(
+        const std::optional<sil::SilPlantConfig>& config,
+        const foc::ThreePhaseMotorModel::Parameters& fallback)
+    {
+        if (!config.has_value())
+            return fallback;
+
+        return foc::ThreePhaseMotorModel::Parameters{
+            .R = foc::Ohm{ config->statorResistanceOhm },
+            .Ld = foc::Henry{ config->dAxisInductanceHenry },
+            .Lq = foc::Henry{ config->qAxisInductanceHenry },
+            .psi_f = foc::Weber{ config->fluxLinkageWeber },
+            .p = config->polePairs,
+            .J = foc::KilogramMeterSquared{ config->rotorInertiaKgM2 },
+            .B = foc::NewtonMeterSecondPerRadian{ config->viscousDampingNmSPerRad },
+            .maxSupportedCurrent = foc::Ampere{ config->maxSupportedCurrentAmpere },
+        };
+    }
+
+    foc::Volts PlatformFactoryImpl::SupplyVoltageFrom(const std::optional<sil::SilPlantConfig>& config)
+    {
+        return config.has_value() ? foc::Volts{ config->powerSupplyVoltageVolts } : foc::Volts{ kDefaultSupplyVoltageVolts };
+    }
+
+    hal::Hertz PlatformFactoryImpl::BaseFrequencyFrom(const std::optional<sil::SilPlantConfig>& config)
+    {
+        if (!config.has_value() || config->baseFrequencyHz == 0)
+            return hal::Hertz{ kDefaultBaseFrequencyHz };
+
+        return hal::Hertz{ config->baseFrequencyHz };
+    }
+
+    void PlatformFactoryImpl::ApplyPlantConfig()
+    {
+        if (!plantConfig.has_value())
+            return;
+
+        model.SetRandomSeed(plantConfig->randomSeed);
+        model.SetAdcNoise({
+            .sigmaAmpere = plantConfig->noiseSigmaAmpere,
+            .biasAmpereA = plantConfig->noiseBiasAmpereA,
+            .biasAmpereB = plantConfig->noiseBiasAmpereB,
+            .biasAmpereC = plantConfig->noiseBiasAmpereC,
+        });
+        model.SetThermalConfig({
+            .ambientCelsius = plantConfig->ambientCelsius,
+            .thermalResistance = plantConfig->thermalResistance,
+            .thermalCapacitance = plantConfig->thermalCapacitance,
+            .copperTempCoeff = plantConfig->copperTempCoeff,
+            .ironInductanceCoeff = plantConfig->ironInductanceCoeff,
+        });
+        model.SetEncoderNoise({
+            .sigmaRadians = plantConfig->encoderSigmaRadians,
+            .biasRadians = plantConfig->encoderBiasRadians,
+        });
+        model.SetFaultInjection({
+            .openPhaseA = (plantConfig->faultFlags & sil::PlantFaultFlag::openPhaseA) != 0,
+            .openPhaseB = (plantConfig->faultFlags & sil::PlantFaultFlag::openPhaseB) != 0,
+            .openPhaseC = (plantConfig->faultFlags & sil::PlantFaultFlag::openPhaseC) != 0,
+            .encoderStuck = (plantConfig->faultFlags & sil::PlantFaultFlag::encoderStuck) != 0,
+            .supplyVoltageScale = plantConfig->supplyVoltageScale,
+        });
+        model.ResetTemperature();
+
+        boardProtection.Configure({
+            .overCurrentAmpere = plantConfig->overCurrentTripAmpere,
+            .overVoltageVolts = plantConfig->overVoltageTripVolts,
+            .underVoltageVolts = plantConfig->underVoltageTripVolts,
+            .overTemperatureCelsius = plantConfig->overTemperatureTripCelsius,
+        });
+
+        if (plantConfig->loadTorqueNm != 0.0f)
+            model.SetLoad(foc::NewtonMeter{ plantConfig->loadTorqueNm });
+    }
+
     PlatformFactoryImpl::PlatformFactoryImpl(const foc::ThreePhaseMotorModel::Parameters& motorParams,
         const infra::Function<void()>& onInit)
-        : onInitialized(onInit)
+        : plantConfig(LoadSilPlantConfig(sil::plantConfigFileName))
+        , onInitialized(onInit)
+        , focTimer(0x40000000u, 8, kQemuSystemClockHz, BaseFrequencyFrom(plantConfig).Value(), [this]()
+              {
+                  FocTimerIsr();
+              })
         , model(
-              motorParams,
-              foc::Volts{ 48.0f },
-              hal::Hertz{ 20000 },
+              MotorParametersFrom(plantConfig, motorParams),
+              SupplyVoltageFrom(plantConfig),
+              BaseFrequencyFrom(plantConfig),
               std::nullopt,
               false)
+        , baseFrequency(BaseFrequencyFrom(plantConfig))
     {
         services::SetGlobalTracerInstance(terminalAndTracer.tracer);
+        ApplyPlantConfig();
         onInitialized();
         focTimer.Start();
     }
@@ -80,7 +162,7 @@ namespace application
 
     foc::Volts PlatformFactoryImpl::PowerSupplyVoltage()
     {
-        return foc::Volts{ 48.0f };
+        return model.EffectiveSupplyVoltage();
     }
 
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
@@ -98,12 +180,14 @@ namespace application
         return watchdog;
     }
 
-    void PlatformFactoryImpl::RegisterBoardProtection(const infra::Function<void(BoardProtectionReason)>&)
-    {}
+    void PlatformFactoryImpl::RegisterBoardProtection(const infra::Function<void(BoardProtectionReason)>& onProtection)
+    {
+        boardProtection.Register(onProtection);
+    }
 
     PlatformFactory::BoardProtectionState PlatformFactoryImpl::BoardProtectionStatus()
     {
-        return PlatformFactory::BoardProtectionState::unknown;
+        return boardProtection.Status();
     }
 
     void PlatformFactoryImpl::Reset()
@@ -178,6 +262,8 @@ namespace application
             {
                 lastCurrents = currents;
             });
+
+        boardProtection.Evaluate(lastCurrents, model.EffectiveSupplyVoltage().Value(), model.WindingTemperatureCelsius());
 
         if (!onPhaseCurrentsReady)
             return;

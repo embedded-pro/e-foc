@@ -19,4 +19,18 @@ namespace integration
     {
         g_instance = &instance;
     }
+
+    bool TargetInteractor::SupportsSimulatedPlant() const
+    {
+        return false;
+    }
+
+    void TargetInteractor::ConfigurePlant(const std::vector<uint8_t>&)
+    {}
+
+    void TargetInteractor::ConfigureNonVolatileMemory(const std::vector<uint8_t>&)
+    {}
+
+    void TargetInteractor::RestartTarget()
+    {}
 }

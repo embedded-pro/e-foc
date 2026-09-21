@@ -1,5 +1,6 @@
 #include "cucumber_cpp/Steps.hpp"
 #include "integration_tests/support/Fixture.hpp"
+#include "integration_tests/support/ScenarioSetup.hpp"
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
 
 HOOK_BEFORE_ALL(.name = "Setup target")
@@ -16,6 +17,7 @@ HOOK_BEFORE_SCENARIO()
 {
     integration::TargetInteractor::Instance().BeforeScenario();
     context.Emplace<integration::Fixture>();
+    context.Emplace<integration::ScenarioSetup>();
 }
 
 HOOK_AFTER_SCENARIO()

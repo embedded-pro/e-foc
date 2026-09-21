@@ -40,6 +40,8 @@ namespace can
                 return FocFaultCode::overCurrent;
             case state_machine::FaultCode::overvoltage:
                 return FocFaultCode::overVoltage;
+            case state_machine::FaultCode::undervoltage:
+                return FocFaultCode::underVoltage;
             case state_machine::FaultCode::overtemperature:
                 return FocFaultCode::overTemperature;
             case state_machine::FaultCode::encoderLoss:

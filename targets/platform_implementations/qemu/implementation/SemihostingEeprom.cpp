@@ -1,60 +1,6 @@
 #include "targets/platform_implementations/qemu/implementation/SemihostingEeprom.hpp"
-#include "hal/cortex_m/Semihosting.hpp"
+#include "targets/platform_implementations/qemu/implementation/SemihostingFile.hpp"
 #include <cstdint>
-#include <cstring>
-
-namespace
-{
-    constexpr uint32_t kSysOpen = 0x01;
-    constexpr uint32_t kSysClose = 0x02;
-    constexpr uint32_t kSysWrite = 0x05;
-    constexpr uint32_t kSysRead = 0x06;
-
-    constexpr uint32_t kOpenModeRb = 1;
-    constexpr uint32_t kOpenModeWb = 5;
-
-    int FileOpen(const char* path, uint32_t mode)
-    {
-        uint32_t params[3] = {
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(path)),
-            mode,
-            static_cast<uint32_t>(std::strlen(path))
-        };
-        return static_cast<int>(hal::cortex::SemihostingCall(
-            static_cast<hal::cortex::SemihostingOperation>(kSysOpen), params));
-    }
-
-    void FileClose(int handle)
-    {
-        uint32_t param = static_cast<uint32_t>(handle);
-        hal::cortex::SemihostingCall(
-            static_cast<hal::cortex::SemihostingOperation>(kSysClose), &param);
-    }
-
-    // Returns 0 on success (all bytes written), positive = bytes not written.
-    uint32_t FileWrite(int handle, const void* data, uint32_t len)
-    {
-        uint32_t params[3] = {
-            static_cast<uint32_t>(handle),
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(data)),
-            len
-        };
-        return hal::cortex::SemihostingCall(
-            static_cast<hal::cortex::SemihostingOperation>(kSysWrite), params);
-    }
-
-    // Returns 0 on success (all bytes read), positive = bytes not read.
-    uint32_t FileRead(int handle, void* buf, uint32_t len)
-    {
-        uint32_t params[3] = {
-            static_cast<uint32_t>(handle),
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(buf)),
-            len
-        };
-        return hal::cortex::SemihostingCall(
-            static_cast<hal::cortex::SemihostingOperation>(kSysRead), params);
-    }
-}
 
 namespace application
 {
@@ -99,20 +45,20 @@ namespace application
 
     void SemihostingEeprom::LoadFromFile()
     {
-        const int handle = FileOpen(filePath, kOpenModeRb);
+        const int handle = semihosting::FileOpen(filePath, semihosting::OpenMode::readBinary);
         if (handle < 0)
             return;
 
-        FileRead(handle, storage.data(), storageSize);
-        FileClose(handle);
+        semihosting::FileRead(handle, storage.data(), storageSize);
+        semihosting::FileClose(handle);
     }
 
     void SemihostingEeprom::FlushToFile() const
     {
-        const int handle = FileOpen(filePath, kOpenModeWb);
+        const int handle = semihosting::FileOpen(filePath, semihosting::OpenMode::writeBinary);
         if (handle < 0)
             return;
-        FileWrite(handle, storage.data(), storageSize);
-        FileClose(handle);
+        semihosting::FileWrite(handle, storage.data(), storageSize);
+        semihosting::FileClose(handle);
     }
 }

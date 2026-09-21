@@ -16,10 +16,12 @@
 #include "services/util/Terminal.hpp"
 #include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
+#include "targets/platform_implementations/qemu/implementation/BoardProtectionSimulator.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuConstants.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuTimer.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingCanBusAdapter.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingEeprom.hpp"
+#include "targets/platform_implementations/qemu/implementation/SemihostingPlantConfig.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingSerial.hpp"
 #include <optional>
 
@@ -157,6 +159,15 @@ namespace application
         void FocTimerIsr();
 
     private:
+        static foc::ThreePhaseMotorModel::Parameters MotorParametersFrom(
+            const std::optional<sil::SilPlantConfig>& config,
+            const foc::ThreePhaseMotorModel::Parameters& fallback);
+        static foc::Volts SupplyVoltageFrom(const std::optional<sil::SilPlantConfig>& config);
+        static hal::Hertz BaseFrequencyFrom(const std::optional<sil::SilPlantConfig>& config);
+
+        void ApplyPlantConfig();
+
+        const std::optional<sil::SilPlantConfig> plantConfig;
         infra::Function<void()> onInitialized;
         CycleCounter cycleCounter;
         ControlLoopMetrics controlLoopMetrics;
@@ -164,22 +175,21 @@ namespace application
         volatile bool controlLoopEntered{ false };
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         Cortex cortex;
-        QemuTimer focTimer{ 0x40000000u, 8, kQemuSystemClockHz, 20000u, [this]()
-            {
-                FocTimerIsr();
-            } };
+        QemuTimer focTimer;
         SemihostingSerial serial;
         TerminalAndTracerBlock terminalAndTracer{ serial };
-        SemihostingEeprom eeprom{ "/tmp/eeprom.bin" };
+        // Relative: the harness runs the emulator from a per-scenario working directory.
+        SemihostingEeprom eeprom{ "eeprom.bin" };
         SoftwareWatchdog watchdog;
         GpioPinStub operationalPin;
         GpioPinStub warningPin;
         GpioPinStub failurePin;
         NoOpPerformanceTracker performanceTracker;
+        BoardProtectionSimulator boardProtection;
         foc::ThreePhaseMotorModel model;
         std::optional<SemihostingCanBusAdapter> canBusAdapter;
         infra::TimerRepeating canPollTimer;
-        hal::Hertz baseFrequency{ 20000 };
+        hal::Hertz baseFrequency;
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         foc::PhasePwmDutyCycles lastDutyPhases{};
         foc::PhaseCurrents lastCurrents{};

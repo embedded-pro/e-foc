@@ -20,6 +20,8 @@ namespace sil
     {
         lines.clear();
         lastLine.clear();
+        if (!session.CreateScenarioDirectory())
+            GTEST_FAIL() << "[QEMU] could not create the scenario working directory";
         if (!session.Start(elfPath))
         {
             fprintf(stderr, "[QEMU] failed to start %s\n", elfPath.c_str());
@@ -30,6 +32,31 @@ namespace sil
     void QemuInteractor::AfterScenario()
     {
         session.Stop();
+        session.RemoveScenarioDirectory();
+    }
+
+    bool QemuInteractor::SupportsSimulatedPlant() const
+    {
+        return true;
+    }
+
+    void QemuInteractor::ConfigurePlant(const std::vector<uint8_t>& record)
+    {
+        ASSERT_TRUE(session.WriteScenarioFile("plant.bin", record))
+            << "[QEMU] could not write the plant description";
+    }
+
+    void QemuInteractor::ConfigureNonVolatileMemory(const std::vector<uint8_t>& image)
+    {
+        ASSERT_TRUE(session.WriteScenarioFile("eeprom.bin", image))
+            << "[QEMU] could not write the NVM image";
+    }
+
+    void QemuInteractor::RestartTarget()
+    {
+        lines.clear();
+        lastLine.clear();
+        ASSERT_TRUE(session.Restart(elfPath)) << "[QEMU] QEMU session failed to restart";
     }
 
     bool QemuInteractor::SendCommand(const std::string& command, std::chrono::milliseconds timeout)

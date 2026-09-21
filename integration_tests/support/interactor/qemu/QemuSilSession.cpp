@@ -3,13 +3,16 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <climits>
 #include <fcntl.h>
 #include <poll.h>
+#include <stdlib.h>
 #include <signal.h>
 #include <string>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
@@ -27,14 +30,72 @@ namespace sil
     QemuSilSession::~QemuSilSession()
     {
         Stop();
+        RemoveScenarioDirectory();
+    }
+
+    bool QemuSilSession::CreateScenarioDirectory()
+    {
+        RemoveScenarioDirectory();
+
+        static uint32_t sequence = 0;
+        scenarioDirectory = "/tmp/e_foc_sil_" + std::to_string(getpid()) + "_" + std::to_string(sequence++);
+        return ::mkdir(scenarioDirectory.c_str(), 0700) == 0;
+    }
+
+    void QemuSilSession::RemoveScenarioDirectory()
+    {
+        if (scenarioDirectory.empty())
+            return;
+
+        for (const char* name : { "plant.bin", "eeprom.bin" })
+            std::remove((scenarioDirectory + "/" + name).c_str());
+
+        ::rmdir(scenarioDirectory.c_str());
+        scenarioDirectory.clear();
+    }
+
+    const std::string& QemuSilSession::ScenarioDirectory() const
+    {
+        return scenarioDirectory;
+    }
+
+    bool QemuSilSession::WriteScenarioFile(const std::string& name, const std::vector<uint8_t>& contents) const
+    {
+        if (scenarioDirectory.empty())
+            return false;
+
+        const std::string path = scenarioDirectory + "/" + name;
+        std::FILE* file = std::fopen(path.c_str(), "wb");
+        if (file == nullptr)
+            return false;
+
+        const bool written = contents.empty() ||
+                             std::fwrite(contents.data(), 1, contents.size(), file) == contents.size();
+        std::fclose(file);
+        return written;
+    }
+
+    bool QemuSilSession::Restart(const std::string& elfPath)
+    {
+        Stop();
+        return Start(elfPath);
     }
 
     bool QemuSilSession::Start(const std::string& elfPath)
     {
         signal(SIGPIPE, SIG_IGN);
 
-        // Erase the NVM image so every scenario starts with blank calibration.
-        std::remove("/tmp/eeprom.bin");
+        if (scenarioDirectory.empty() && !CreateScenarioDirectory())
+            return false;
+
+        // The child runs from the scenario directory, so a relative ELF path would not resolve.
+        char resolvedElf[PATH_MAX]{};
+        if (realpath(elfPath.c_str(), resolvedElf) == nullptr)
+        {
+            std::fprintf(stderr, "[QEMU] cannot resolve ELF path %s\n", elfPath.c_str());
+            return false;
+        }
+        const std::string absoluteElf{ resolvedElf };
 
         const std::string pidStr = std::to_string(getpid());
         const std::string inPath = "/tmp/qemu_sil_in_" + pidStr + ".sock";
@@ -72,6 +133,9 @@ namespace sil
             dup2(pipefd[1], STDERR_FILENO);
             close(pipefd[1]);
 
+            if (chdir(scenarioDirectory.c_str()) != 0)
+                _exit(1);
+
             const bool gdbMode = (std::getenv("SIL_GDB") != nullptr);
             std::vector<const char*> argv = {
                 "qemu-system-arm",
@@ -85,7 +149,7 @@ namespace sil
                 "-serial",
                 "chardev:in",
                 "-kernel",
-                elfPath.c_str(),
+                absoluteElf.c_str(),
             };
             if (gdbMode)
             {

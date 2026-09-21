@@ -2,8 +2,15 @@ add_library(e_foc.platform_abstraction_qemu)
 emil_build_for(e_foc.platform_abstraction_qemu ALL All BOOL EMIL_BUILD_QEMU)
 
 target_sources(e_foc.platform_abstraction_qemu PRIVATE
+    BoardProtectionSimulator.cpp
+    BoardProtectionSimulator.hpp
     SemihostingEeprom.cpp
     SemihostingEeprom.hpp
+    SemihostingFile.cpp
+    SemihostingFile.hpp
+    SemihostingPlantConfig.cpp
+    SemihostingPlantConfig.hpp
+    SilPlantConfig.hpp
     QemuTimer.cpp
     QemuTimer.hpp
     PlatformFactoryImpl.cpp
