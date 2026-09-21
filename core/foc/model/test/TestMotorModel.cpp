@@ -18,10 +18,25 @@ namespace
             : ThreePhaseMotorModelObserver(model)
         {}
 
-        void Started() override { ++startCount; }
-        void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents, foc::Radians, foc::RadiansPerSecond) override { ++phaseCurrentCount; }
-        void StatorVoltages(foc::ThreePhase, foc::TwoPhase) override { ++statorVoltageCount; }
-        void Finished() override { ++finishCount; }
+        void Started() override
+        {
+            ++startCount;
+        }
+
+        void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents, foc::Radians, foc::RadiansPerSecond) override
+        {
+            ++phaseCurrentCount;
+        }
+
+        void StatorVoltages(foc::ThreePhase, foc::TwoPhase) override
+        {
+            ++statorVoltageCount;
+        }
+
+        void Finished() override
+        {
+            ++finishCount;
+        }
 
         int startCount{};
         int phaseCurrentCount{};
@@ -33,7 +48,10 @@ namespace
         : public ::testing::Test
     {
     protected:
-        void TearDown() override { eventDispatcher.ExecuteAllActions(); }
+        void TearDown() override
+        {
+            eventDispatcher.ExecuteAllActions();
+        }
 
         infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
         infra::WithSharedAccess<foc::ThreePhaseMotorModel> model{

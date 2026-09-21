@@ -8,7 +8,7 @@ date: 2026-09-21
 ---
 
 | Field     | Value                       |
-|-----------|-----------------------------|
+| --------- | --------------------------- |
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
@@ -81,7 +81,7 @@ a truncated or stale description is rejected rather than half-read.
 The description covers everything the plant needs:
 
 | Group             | Contents                                                                      |
-|-------------------|-------------------------------------------------------------------------------|
+| ----------------- | ----------------------------------------------------------------------------- |
 | Winding and rotor | Resistance, both axis inductances, flux linkage, pole pairs, inertia, damping |
 | Drive             | Supply voltage, control frequency, peak current, load torque                  |
 | Measurement       | Current noise deviation and per-phase bias, encoder noise deviation and bias  |
@@ -329,16 +329,16 @@ keeps a partial line for the next read.
 
 ## Scenario Taxonomy
 
-| Area                  | What it establishes                                                        |
-|-----------------------|----------------------------------------------------------------------------|
-| Control modes         | Torque, speed and position each align, enable, take a setpoint, disable    |
-| Controller algorithms | Every algorithm of every loop runs, plus combinations across the loops     |
-| Plant characteristics | Control holds up across noise, temperature, load and a different winding   |
-| Wiring faults         | A dead motor does not turn; a degraded one does                            |
-| Memory integrity      | Damaged calibration is distrusted; damaged configuration falls to defaults |
-| Board protection      | Trips reach the state machine and are reported                             |
+| Area                  | What it establishes                                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Control modes         | Torque, speed and position each align, enable, take a setpoint, disable                                        |
+| Controller algorithms | Every algorithm of every loop runs, plus combinations across the loops                                         |
+| Plant characteristics | Control holds up across noise, temperature, load and a different winding                                       |
+| Wiring faults         | A dead motor does not turn; a degraded one does                                                                |
+| Memory integrity      | Damaged calibration is distrusted; damaged configuration falls to defaults                                     |
+| Board protection      | Trips reach the state machine and are reported                                                                 |
 | Control performance   | Each loop's step response stays inside its settling, overshoot and error envelope, from rest and while running |
-| Disturbance rejection | A shaft torque step while regulating is bounded in excursion and recovered from |
+| Disturbance rejection | A shaft torque step while regulating is bounded in excursion and recovered from                                |
 
 Controller coverage sweeps each loop's algorithms with the other loops held at the baseline, and
 adds a handful of combinations chosen to exercise both kinds of position law: those that produce a

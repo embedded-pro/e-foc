@@ -8,7 +8,7 @@ date: 2026-09-21
 ---
 
 | Field     | Value                      |
-|-----------|----------------------------|
+| --------- | -------------------------- |
 | Title     | Integration Testing Design |
 | Type      | design                     |
 | Status    | accepted                   |
@@ -35,12 +35,12 @@ types.
 Scenarios are authored in Gherkin and live in a single directory. A tag decides which target
 implements a scenario, and the runner is invoked with that tag.
 
-| Tag               | Target                                           | Detailed in                                    |
-|-------------------|--------------------------------------------------|------------------------------------------------|
-| `@sil`            | Real firmware under an emulator, simulated motor | `documentation/design/software-in-the-loop.md` |
-| `@sil-protection` | The same, board-protection scenarios held apart  | The same document, Part E                      |
-| `@sil-known-defect` | The same, performance scenarios a known defect fails | The same document, Part I                  |
-| `@hil`            | Real firmware on hardware, over the bridge       | This document                                  |
+| Tag                 | Target                                               | Detailed in                                    |
+| ------------------- | ---------------------------------------------------- | ---------------------------------------------- |
+| `@sil`              | Real firmware under an emulator, simulated motor     | `documentation/design/software-in-the-loop.md` |
+| `@sil-protection`   | The same, board-protection scenarios held apart      | The same document, Part E                      |
+| `@sil-known-defect` | The same, performance scenarios a known defect fails | The same document, Part I                      |
+| `@hil`              | Real firmware on hardware, over the bridge           | This document                                  |
 
 > Earlier revisions described an in-process host fixture that mocked the platform and drove the
 > state machine directly. No such fixture exists, and none is planned: mocking the platform and
@@ -135,13 +135,13 @@ directory holding the target's files, the socket carrying frames, and the captur
 
 ### Provided to step definitions
 
-| Capability        | Purpose                                                         |
-|-------------------|-----------------------------------------------------------------|
-| Lifecycle         | Start, stop and restart the target                              |
-| Command transport | Send a category command and await its acknowledgement           |
-| Telemetry         | Await a state, a fault code, or read the measured position      |
-| Serial capture    | Drain and search the target's trace output                      |
-| Simulation        | Describe the plant and the stored calibration and configuration |
+| Capability        | Purpose                                                                     |
+| ----------------- | --------------------------------------------------------------------------- |
+| Lifecycle         | Start, stop and restart the target                                          |
+| Command transport | Send a category command and await its acknowledgement                       |
+| Telemetry         | Await a state, a fault code, or read the measured position                  |
+| Serial capture    | Drain and search the target's trace output                                  |
+| Simulation        | Describe the plant and the stored calibration and configuration             |
 | Response          | Capture the plant trajectory and measure step and disturbance metrics on it |
 
 ### Required from the system under test
