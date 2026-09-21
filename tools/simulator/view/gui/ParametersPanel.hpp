@@ -77,6 +77,11 @@ namespace simulator
         ui::model::FormSpec configSpec{};
         std::optional<ui::model::FormModel> configModel;
 
+        // QtFormView installs a field-changed handler in Build and FormModel holds only one, so
+        // the panel keeps that one here and calls it before its own work. A lambda capturing it
+        // by value would exceed Callback's inline capacity.
+        ui::Callback<void(ui::model::FieldId)> applyConfigurationConditions;
+
         ui::backend::qt::QtFormView* parameterForm{ nullptr };
         ui::backend::qt::QtFormView* configForm{ nullptr };
     };

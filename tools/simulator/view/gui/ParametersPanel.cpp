@@ -65,6 +65,21 @@ namespace simulator
             return FieldSpec{ id, group, FieldKind::ReadOut, label, suffix, { 0.0, 0.0, 0.0, 0.0, digits, 0.0, ReadOutStyle::Significant }, {}, {}, {} };
         }
 
+        constexpr std::string_view ambientLabel = "T_ambient (\xC2\xB0"
+                                                  "C):";
+        constexpr std::string_view thermalResistanceLabel = "R_th (\xC2\xB0"
+                                                            "C/W):";
+        constexpr std::string_view thermalCapacitanceLabel = "C_th (J/\xC2\xB0"
+                                                             "C):";
+        constexpr std::string_view copperCoefficientLabel = "\xCE\xB1_Cu (1/\xC2\xB0"
+                                                            "C):";
+        constexpr std::string_view ironCoefficientLabel = "\xCE\xB2_Fe (1/\xC2\xB0"
+                                                          "C):";
+        constexpr std::string_view windingTemperatureLabel = "T_winding (\xC2\xB0"
+                                                             "C):";
+        constexpr std::string_view celsiusSuffix = " \xC2\xB0"
+                                                   "C";
+
         constexpr FieldSpec FixedReadOut(FieldId id, GroupId group, std::string_view label, std::string_view suffix, std::uint8_t decimals)
         {
             return FieldSpec{ id, group, FieldKind::ReadOut, label, suffix, { 0.0, 0.0, 0.0, 0.0, decimals }, {}, {}, {} };
@@ -105,10 +120,17 @@ namespace simulator
         configLayout->addStretch();
         tabs->addTab(configTab, "Configuration");
 
-        // QtFormView installs its own handler in Build, so this replaces it. The configuration
-        // spec declares no conditions, which is the only thing that handler applies.
+        // FormModel carries one field-changed callback and QtFormView installs its own in Build,
+        // so this keeps that one and runs it first rather than displacing it. The configuration
+        // spec declares no conditions today, but a form that grew one would otherwise stop
+        // honouring it with nothing to show why.
+        applyConfigurationConditions = configModel->onFieldChanged;
+
         configModel->onFieldChanged = [this](FieldId changed)
         {
+            if (applyConfigurationConditions)
+                applyConfigurationConditions(changed);
+
             if (changed == sigma || changed == biasA || changed == biasB || changed == biasC)
                 EmitNoiseConfig();
             else if (changed == encoderSigma || changed == encoderBias)
@@ -198,12 +220,12 @@ namespace simulator
             Number(biasA, noiseGroup, "Bias A:", " mA", -500.0, 500.0, 1.0, 0.0, 2),
             Number(biasB, noiseGroup, "Bias B:", " mA", -500.0, 500.0, 1.0, 0.0, 2),
             Number(biasC, noiseGroup, "Bias C:", " mA", -500.0, 500.0, 1.0, 0.0, 2),
-            Number(ambient, thermalGroup, "T_ambient (\xC2\xB0""C):", "", -40.0, 150.0, 1.0, 25.0, 2),
-            Number(thermalResistance, thermalGroup, "R_th (\xC2\xB0""C/W):", "", 0.01, 100.0, 0.1, 2.0, 2),
-            Number(thermalCapacitance, thermalGroup, "C_th (J/\xC2\xB0""C):", "", 0.1, 1000.0, 0.5, 25.0, 2),
-            Number(copperCoefficient, thermalGroup, "\xCE\xB1_Cu (1/\xC2\xB0""C):", "", 0.0, 0.01, 0.0001, 0.00393, 5),
-            Number(ironCoefficient, thermalGroup, "\xCE\xB2_Fe (1/\xC2\xB0""C):", "", -0.001, 0.001, 0.0001, 0.0, 5),
-            FixedReadOut(windingTemperature, liveThermalGroup, "T_winding (\xC2\xB0""C):", " \xC2\xB0""C", 1),
+            Number(ambient, thermalGroup, ambientLabel, "", -40.0, 150.0, 1.0, 25.0, 2),
+            Number(thermalResistance, thermalGroup, thermalResistanceLabel, "", 0.01, 100.0, 0.1, 2.0, 2),
+            Number(thermalCapacitance, thermalGroup, thermalCapacitanceLabel, "", 0.1, 1000.0, 0.5, 25.0, 2),
+            Number(copperCoefficient, thermalGroup, copperCoefficientLabel, "", 0.0, 0.01, 0.0001, 0.00393, 5),
+            Number(ironCoefficient, thermalGroup, ironCoefficientLabel, "", -0.001, 0.001, 0.0001, 0.0, 5),
+            FixedReadOut(windingTemperature, liveThermalGroup, windingTemperatureLabel, celsiusSuffix, 1),
             ReadOut(effectiveResistance, liveThermalGroup, "R(T) (\xCE\xA9):", " \xCE\xA9", 4),
             ReadOut(effectiveInductance, liveThermalGroup, "L_d(T) (mH):", " mH", 4),
             Number(encoderSigma, encoderNoiseGroup, "Sigma:", " mrad", 0.0, 1000.0, 0.5, 0.0, 2),
