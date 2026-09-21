@@ -30,8 +30,6 @@ target_sources(e_foc.tool.simulator.view.gui PRIVATE
     ParametersPanel.cpp
     ScopesPanel.hpp
     ScopesPanel.cpp
-    ScopeWidget.hpp
-    ScopeWidget.cpp
     ScopeToolbar.hpp
     ScopeToolbar.cpp
 )

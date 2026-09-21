@@ -2,8 +2,8 @@
 
 #include "core/foc/interfaces/Units.hpp"
 #include "tools/simulator/view/gui/ScopeToolbar.hpp"
-#include "tools/simulator/view/gui/ScopeWidget.hpp"
 #include "ui/backend/qt/QtPaintedWidget.hpp"
+#include "ui/scope/ScopeCore.hpp"
 #include "ui/widgets/HexagonCore.hpp"
 #include <QLabel>
 #include <QString>
@@ -32,14 +32,22 @@ namespace simulator
 
     private:
         QLabel* modeLabel;
-        ScopeWidget* currentScope;
-        ScopeToolbar* currentScopeToolbar;
-        ScopeWidget* voltageScope;
-        ScopeToolbar* voltageScopeToolbar;
+
         ui::widgets::HexagonCore hexagonCore;
+        ui::scope::ScopeCore currentScopeCore;
+        ui::scope::ScopeCore voltageScopeCore;
+        ui::scope::ScopeCore electricalRlsScopeCore;
+        ui::scope::ScopeCore mechanicalRlsScopeCore;
+
         ui::backend::qt::QtPaintedWidget* hexagonWidget;
-        QTimer hexagonRefreshTimer;
-        ScopeWidget* electricalRlsScope{ nullptr };
-        ScopeWidget* mechanicalRlsScope{ nullptr };
+        ui::backend::qt::QtPaintedWidget* currentScope;
+        ui::backend::qt::QtPaintedWidget* voltageScope;
+        ui::backend::qt::QtPaintedWidget* electricalRlsScope;
+        ui::backend::qt::QtPaintedWidget* mechanicalRlsScope;
+
+        ScopeToolbar* currentScopeToolbar;
+        ScopeToolbar* voltageScopeToolbar;
+
+        QTimer refreshTimer;
     };
 }

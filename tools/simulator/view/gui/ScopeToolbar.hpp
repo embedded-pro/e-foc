@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tools/simulator/view/gui/ScopeWidget.hpp"
+#include "ui/scope/ScopeCore.hpp"
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QPushButton>
@@ -14,14 +14,14 @@ namespace simulator
         Q_OBJECT
 
     public:
-        explicit ScopeToolbar(ScopeWidget& scope, QWidget* parent = nullptr);
+        explicit ScopeToolbar(ui::scope::ScopeCore& scope, QWidget* parent = nullptr);
 
     private:
         void SetupUi();
         void ConnectSignals();
         void PopulateTimeDivOptions();
 
-        ScopeWidget& scope;
+        ui::scope::ScopeCore& scope;
 
         QComboBox* timeDivCombo;
         QDoubleSpinBox* triggerLevelSpin;
