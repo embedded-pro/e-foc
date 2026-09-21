@@ -19,6 +19,8 @@
 
 namespace
 {
+    constexpr const char* kIcountShift = "shift=3";
+
     bool SilVerbose()
     {
         return std::getenv("SIL_VERBOSE") != nullptr;
@@ -158,6 +160,9 @@ namespace sil
                 "-kernel",
                 absoluteElf.c_str(),
             };
+            const char* icountOverride = std::getenv("SIL_ICOUNT");
+            argv.push_back("-icount");
+            argv.push_back(icountOverride != nullptr ? icountOverride : kIcountShift);
             if (gdbMode)
             {
                 argv.push_back("-S");

@@ -120,6 +120,36 @@ sequenceDiagram
     T-->>S: telemetry and traces
 ```
 
+### Part B2 — Emulated time, and why it has to be instruction-counted
+
+By default the emulator's guest clock follows host wall-clock while the guest's instruction
+throughput follows whatever CPU the host happens to give it. The firmware's timers therefore keep
+real time regardless of how much work the emulated core actually completed.
+
+That breaks the control system's own supervision. The control interrupt runs at 20 kHz, and on
+this machine it carries the whole motor plant as well as the control loop, which no emulated core
+of this class completes in a 50 microsecond period. The interrupt then crowds out the 1 kHz outer
+loop, which runs at the lowest priority. The supervisor samples both loops and refuses to feed the
+watchdog when the outer one has not progressed; four consecutive refusals expire the deadline and
+emergency-stop a motor that was running perfectly well.
+
+This is the supervision working correctly on a target that genuinely cannot keep up. It was
+measured, not inferred: every refusal reported the inner loop progressing and the outer loop not,
+in speed and position modes only — the two modes whose supervision requires the outer loop.
+
+The emulator is therefore run with its virtual clock tied to instructions retired rather than to
+host time, at 8 nanoseconds per instruction. That models a core of roughly 125 MHz, at least as
+fast as the slowest target the firmware ships on, so work that fits in the emulator fits on
+hardware. It also makes a run's timing independent of host load, which is what removes the
+flakiness rather than merely reducing it.
+
+> The emulated machine's own clock is 25 MHz and the platform must declare exactly that. The
+> declaration is a divisor used to program the timers, not a statement of capability: declaring a
+> faster core does not execute more instructions, it just makes every firmware timer run
+> proportionally slower than the firmware believes. Declaring 50 MHz, for instance, was measured
+> to halve the rate of the firmware's own clock. Capacity comes from the instruction-counted
+> clock above; the declared value must stay matched to the machine.
+
 ### Part C — Starting from a chosen calibration
 
 Reaching a mode that regulates speed or position requires a complete calibration, including the

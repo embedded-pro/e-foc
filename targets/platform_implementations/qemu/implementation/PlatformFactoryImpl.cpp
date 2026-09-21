@@ -212,9 +212,9 @@ namespace application
         return diagnostics;
     }
 
-    void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz freq, std::chrono::nanoseconds, SampleAndHold)
+    void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz, std::chrono::nanoseconds, SampleAndHold)
     {
-        baseFrequency = freq;
+        const auto freq = baseFrequency;
 
         const auto periodCycles = freq.Value() == 0
                                       ? 0u
@@ -243,9 +243,8 @@ namespace application
         return *canBusAdapter;
     }
 
-    OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz freq, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+    OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
-        baseFrequency = freq;
         onPhaseCurrentsReadyValid = false;
         onPhaseCurrentsReady = onDone;
         onPhaseCurrentsReadyValid = true;
