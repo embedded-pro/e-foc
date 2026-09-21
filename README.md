@@ -181,16 +181,16 @@ always-visible SVPWM hexagon.
 ### The shared UI library
 
 The three desktop tools render through [ui-cpp](https://github.com/embedded-pro/ui-cpp),
-fetched at configure time from its `main` branch. A fresh configure re-resolves it, while
-an existing build directory keeps the copy it already has.
+fetched at configure time and pinned in `CMakeLists.txt` to an exact commit. Consuming a
+newer ui-cpp is a deliberate edit to that pin, reviewed like any other change, rather than
+something a fresh configure does on its own; changing it re-fetches on the next configure.
 
-| Goal                                            | Flag                                           |
-|-------------------------------------------------|------------------------------------------------|
-| Freeze an existing checkout across reconfigures | `-DFETCHCONTENT_UPDATES_DISCONNECTED=On`       |
-| Build against a local ui-cpp working tree       | `-DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp` |
+To build against a local ui-cpp working tree instead of the pinned commit, which is what
+makes bisecting across the two repositories possible:
 
-The second is also what makes bisecting across the two repositories possible: point at a
-local clone and check out the revision under test there.
+```bash
+cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
+```
 
 ### Troubleshooting
 
