@@ -40,7 +40,6 @@ namespace simulator
         hexagonWidget->setMinimumSize(hexagonMaxHeight, hexagonMaxHeight);
         hexagonWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
-
         hexagonOuter->addStretch(1);
         hexagonOuter->addWidget(hexagonWidget);
         hexagonOuter->addStretch(1);
