@@ -91,6 +91,28 @@ endif()
 
 add_subdirectory(infra/numerical-toolbox)
 
+if (NOT E_FOC_EMBEDDED_BUILD)
+    set(UI_BUILD_QT_BACKEND On CACHE BOOL "" FORCE)
+
+    include(FetchContent)
+    FetchContent_Declare(
+        ui
+        GIT_REPOSITORY https://github.com/embedded-pro/ui-cpp.git
+        GIT_TAG        297f8e3af03bc1490d7890666c4e74bbc4776a9b
+    )
+    FetchContent_MakeAvailable(ui)
+
+    # Every tools/ target opts out of warnings-as-error; the ui.* targets are not tools/ targets,
+    # so they would otherwise inherit a policy that is ours and not a dependency's.
+    foreach(fetched
+        ui.core ui.theme ui.model ui.shell ui.charts ui.scope ui.scene ui.widgets
+        ui.terminal ui.backend.recording ui.backend.qt)
+        if (TARGET ${fetched})
+            set_target_properties(${fetched} PROPERTIES COMPILE_WARNING_AS_ERROR Off)
+        endif()
+    endforeach()
+endif()
+
 e_foc_mark_includes_system("${CMAKE_CURRENT_SOURCE_DIR}")
 e_foc_enable_project_warnings()
 

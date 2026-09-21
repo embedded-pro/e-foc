@@ -1,4 +1,6 @@
 #include "tools/hardware_bridge/client/gui/BridgeWindow.hpp"
+#include "ui/backend/qt/QtTheme.hpp"
+#include "ui/theme/Theme.hpp"
 #include <QApplication>
 
 int main(int argc, char* argv[])
@@ -8,6 +10,7 @@ int main(int argc, char* argv[])
 
     QApplication app(argc, argv);
     QApplication::setApplicationName("e-foc Hardware Bridge");
+    ui::backend::qt::ApplyTheme(ui::theme::Instrument());
 
     tool::BridgeWindow window;
     window.show();

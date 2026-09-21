@@ -1,4 +1,6 @@
 #include "tools/can_commander/gui/MainWindow.hpp"
+#include "ui/backend/qt/QtTheme.hpp"
+#include "ui/theme/Theme.hpp"
 #include <QApplication>
 #include <QMessageBox>
 #include <cstdlib>
@@ -18,6 +20,7 @@ int main(int argc, char* argv[])
 
     QApplication app(argc, argv);
     QApplication::setApplicationName("e-foc CAN Commander");
+    ui::backend::qt::ApplyTheme(ui::theme::Instrument());
 
 #if defined(__linux__)
     tool::SocketCanAdapter adapter;

@@ -178,6 +178,20 @@ The chosen controller assembles the corresponding loops; the main window provide
 tabbed Parameters/Configuration and Phase Signals/RLS Estimates panels around an
 always-visible SVPWM hexagon.
 
+### The shared UI library
+
+The three desktop tools render through [ui-cpp](https://github.com/embedded-pro/ui-cpp),
+fetched at configure time and pinned in `CMakeLists.txt` to an exact commit. Consuming a
+newer ui-cpp is a deliberate edit to that pin, reviewed like any other change, rather than
+something a fresh configure does on its own; changing it re-fetches on the next configure.
+
+To build against a local ui-cpp working tree instead of the pinned commit, which is what
+makes bisecting across the two repositories possible:
+
+```bash
+cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
+```
+
 ### Troubleshooting
 
 | Problem                         | Solution                                                                           |
