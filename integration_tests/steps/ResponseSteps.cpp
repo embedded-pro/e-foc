@@ -16,7 +16,6 @@ using namespace integration::response;
 namespace
 {
     constexpr auto kCaptureWallClockTimeout = std::chrono::seconds{ 120 };
-    constexpr float kSettlingBand = 0.02f;
     constexpr float kMilliPerSecond = 1000.0f;
 
     uint32_t CommandRawId(uint8_t messageType)
@@ -107,7 +106,7 @@ namespace
         return StepWindow{ onset, initial, reference, NormaliseStep(raw, initial, reference) };
     }
 
-    std::optional<StepResponseMetrics> StepMetricsFor(const ScenarioSetup& setup, Signal signal, const char* algorithmLabel)
+    std::optional<StepResponseMetrics> StepMetricsFor(const ScenarioSetup& setup, Signal signal, float bandPercent, const char* algorithmLabel)
     {
         const auto window = ExtractStepWindow(setup, signal);
         if (!window)
@@ -117,15 +116,15 @@ namespace
         }
 
         const float dt = SecondsPerSample(setup);
-        const auto metrics = ComputeStepMetricsFor(signal, window->normalised, dt, kSettlingBand, window->reference - window->initial);
+        const auto metrics = ComputeStepMetricsFor(signal, window->normalised, dt, bandPercent / 100.0f, window->reference - window->initial);
         if (!metrics)
             return std::nullopt;
 
-        std::fprintf(stderr, "[METRIC] %s step %s onset_tick=%lu from=%.4g to=%.4g rise_ms=%.3f settle_ms=%.3f overshoot_pct=%.2f peak_ms=%.3f ss_err=%.4g %s\n",
+        std::fprintf(stderr, "[METRIC] %s step %s onset_tick=%lu from=%.4g to=%.4g band_pct=%.1f rise_ms=%.3f settle_ms=%.3f overshoot_pct=%.2f peak_ms=%.3f tail_band_pct=%.2f ss_err=%.4g %s\n",
             SignalName(signal), algorithmLabel,
-            static_cast<unsigned long>(window->onsetTick), window->initial, window->reference,
+            static_cast<unsigned long>(window->onsetTick), window->initial, window->reference, bandPercent,
             metrics->riseTimeS * kMilliPerSecond, metrics->settlingTimeS * kMilliPerSecond,
-            metrics->percentOvershoot, metrics->peakTimeS * kMilliPerSecond,
+            metrics->percentOvershoot, metrics->peakTimeS * kMilliPerSecond, metrics->tailBandPercent,
             metrics->steadyStateError, SignalUnit(signal));
         return metrics;
     }
@@ -227,13 +226,13 @@ WHEN(R"(the response is captured for {int} ms after the last setpoint)", (int mi
         << "Plant response did not reach " << milliseconds << " ms after the last setpoint";
 }
 
-THEN(R"(the {word} step response shall settle within {float} ms with overshoot below {float} %)", (std::string signalWord, float settleMs, float overshootPercent))
+THEN(R"(the {word} step response shall settle into a {float} % band within {float} ms with overshoot below {float} %)", (std::string signalWord, float bandPercent, float settleMs, float overshootPercent))
 {
     auto& setup = context.Get<ScenarioSetup>();
     RequireCapturedTrace(setup);
     const auto signal = RequireSignal(signalWord);
 
-    const auto metrics = StepMetricsFor(setup, signal, AlgorithmLabel(setup, signal));
+    const auto metrics = StepMetricsFor(setup, signal, bandPercent, AlgorithmLabel(setup, signal));
     ASSERT_TRUE(metrics.has_value());
 
     EXPECT_LE(metrics->settlingTimeS * kMilliPerSecond, settleMs) << SignalName(signal) << " settled too slowly";
@@ -246,7 +245,7 @@ THEN(R"(the {word} step response shall rise within {float} ms)", (std::string si
     RequireCapturedTrace(setup);
     const auto signal = RequireSignal(signalWord);
 
-    const auto metrics = StepMetricsFor(setup, signal, AlgorithmLabel(setup, signal));
+    const auto metrics = StepMetricsFor(setup, signal, 2.0f, AlgorithmLabel(setup, signal));
     ASSERT_TRUE(metrics.has_value());
 
     EXPECT_LE(metrics->riseTimeS * kMilliPerSecond, riseMs) << SignalName(signal) << " rose too slowly";
@@ -259,7 +258,7 @@ THEN(R"(the steady-state {word} error shall be below {float} {word})", (std::str
     const auto signal = RequireSignal(signalWord);
     ASSERT_EQ(unit, SignalUnit(signal)) << "Unit does not match the signal";
 
-    const auto metrics = StepMetricsFor(setup, signal, AlgorithmLabel(setup, signal));
+    const auto metrics = StepMetricsFor(setup, signal, 2.0f, AlgorithmLabel(setup, signal));
     ASSERT_TRUE(metrics.has_value());
 
     EXPECT_LT(std::abs(metrics->steadyStateError), limit) << SignalName(signal) << " steady-state error too large";

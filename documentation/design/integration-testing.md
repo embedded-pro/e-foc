@@ -39,6 +39,7 @@ implements a scenario, and the runner is invoked with that tag.
 |-------------------|--------------------------------------------------|------------------------------------------------|
 | `@sil`            | Real firmware under an emulator, simulated motor | `documentation/design/software-in-the-loop.md` |
 | `@sil-protection` | The same, board-protection scenarios held apart  | The same document, Part E                      |
+| `@sil-known-defect` | The same, performance scenarios a known defect fails | The same document, Part I                  |
 | `@hil`            | Real firmware on hardware, over the bridge       | This document                                  |
 
 > Earlier revisions described an in-process host fixture that mocked the platform and drove the

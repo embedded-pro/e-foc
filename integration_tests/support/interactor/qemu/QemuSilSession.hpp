@@ -48,6 +48,7 @@ namespace sil
         static constexpr std::size_t maxCapturedLines = 16384;
 
         std::vector<std::string> capturedLines;
+        std::string partialLine;
         std::string scenarioDirectory;
         pid_t pid{ -1 };
         int outPipeFd{ -1 };

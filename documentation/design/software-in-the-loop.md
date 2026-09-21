@@ -296,6 +296,35 @@ setpoint before enabling makes enabling the step, with the onset on the tick rec
 the rotor known to be at rest. A scenario that applies one while running reads the onset from the
 delivery stamp. The target's command surface is still the product's: nothing was added to it.
 
+### Part I — What the measurements found
+
+The first characterisation run measured the product as it is, and three of its findings are
+defects rather than tuning. The scenarios that expose them are kept, with the limits the law
+should meet, under a tag held out of the default run in the same way as the protection
+scenarios; the scenarios in the default run carry the envelope the product holds today, so a
+regression is still caught while the defects are open.
+
+- **Whole-percent duty resolution.** The duty cycles the modulator hands the inverter are
+  three whole-percent values, and the conversion rounds to the nearest percent. On a 48 V bus
+  into a 73 mΩ winding one step is half a volt and several amperes, so the current loop cannot
+  hold a half-ampere setpoint: it sits at zero until its integrator has wound up a whole step,
+  then saws between adjacent steps. The speed loop above it inherits the ripple as a limit cycle
+  of about a quarter of a 20 rad/s setpoint, although its mean stays within a fraction of a
+  radian per second. Every loop is affected on every platform, because the type is the product
+  interface's. Until the duty carries more resolution, settling into a tight band cannot be
+  required of any loop.
+- **Two current laws command nothing.** With the deadbeat or the sliding-mode law selected, and
+  the firmware confirming the selection, the q-axis current stays at zero for the whole window
+  after enabling while the residual d-axis current decays freely. The decoupled law does drive
+  the motor but overshoots the step more than twofold.
+- **The LQI position law is unstable on the nominal plant.** Enabled against a 1.5 rad
+  setpoint it runs away within a hundred milliseconds, with the speed swinging hundreds of
+  radians per second in both directions and the current saturating either way.
+
+The run also found a harness fault: a line cut by a read timeout was dropped and its tail
+parsed as a line of its own, which showed up as a gap in the sample spacing. The reader now
+keeps a partial line for the next read.
+
 ---
 
 ## Scenario Taxonomy

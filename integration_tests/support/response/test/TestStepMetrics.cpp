@@ -132,3 +132,15 @@ TEST_F(StepMetricsTest, dispatch_by_signal_uses_the_window_of_that_loop)
     EXPECT_TRUE(ComputeStepMetricsFor(Signal::currentQ, normalised, 0.00005f, 0.02f, 0.5f).has_value());
     EXPECT_FALSE(ComputeStepMetricsFor(Signal::speed, normalised, dt, 0.02f, 0.5f).has_value());
 }
+
+TEST_F(StepMetricsTest, tail_band_reports_the_largest_tail_excursion_in_percent)
+{
+    std::vector<float> raw(speedWindowSamples, 20.0f);
+    raw[speedWindowSamples - 10] = 23.0f;
+    raw[10] = 30.0f;
+
+    const auto metrics = ComputeStepMetrics<speedWindowSamples>(NormaliseStep(raw, 0.0f, 20.0f), dt, 0.02f, 20.0f);
+
+    ASSERT_TRUE(metrics.has_value());
+    EXPECT_NEAR(metrics->tailBandPercent, 15.0f, 1e-3f);
+}

@@ -145,7 +145,8 @@ TEST_F(PlantResponseRecorderTest, full_ring_counts_drops_and_reports_them_on_sto
     for (uint32_t tick = 0; tick != 2 * kCapacity; ++tick)
         recorder.Capture(At(tick));
 
-    EXPECT_EQ(recorder.Dropped(), 2 * kCapacity - (kCapacity - 1));
+    const std::size_t pushed = 1 + 2 * kCapacity;
+    EXPECT_EQ(recorder.Dropped(), pushed - (kCapacity - 1));
 
     Drain();
     recorder.End();

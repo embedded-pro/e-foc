@@ -17,6 +17,7 @@ namespace integration::response
         float percentOvershoot;
         float peakTimeS;
         float steadyStateError;
+        float tailBandPercent;
     };
 
     struct DisturbanceResponseMetrics
@@ -33,8 +34,13 @@ namespace integration::response
             return std::nullopt;
 
         math::Vector<float, N> v;
+        float tailBand = 0.0f;
         for (std::size_t i = 0; i != N; ++i)
+        {
             v.at(i, 0) = normalised[i];
+            if (i >= N - N / 4)
+                tailBand = std::max(tailBand, std::abs(normalised[i] - 1.0f));
+        }
 
         return StepResponseMetrics{
             math::RiseTime(v, 1.0f, dtSeconds),
@@ -42,6 +48,7 @@ namespace integration::response
             math::PercentOvershoot(v, 1.0f),
             math::PeakTime(v, dtSeconds),
             math::SteadyStateError(v, 1.0f) * stepMagnitude,
+            100.0f * tailBand,
         };
     }
 
