@@ -5,9 +5,6 @@
 
 namespace sil
 {
-    // Wire contract between the software-in-the-loop harness, which writes the blob, and the
-    // QEMU firmware, which reads it at boot. Kept free of unit types and of any e-foc header so
-    // both sides agree on a byte layout without sharing a build target.
     namespace PlantFaultFlag
     {
         static constexpr uint8_t openPhaseA = 1u << 0;
@@ -16,7 +13,6 @@ namespace sil
         static constexpr uint8_t encoderStuck = 1u << 3;
     }
 
-    // All 4-byte fields precede the byte-sized fields to avoid implicit compiler padding.
     struct SilPlantConfig
     {
         float statorResistanceOhm;
@@ -45,7 +41,6 @@ namespace sil
         float encoderSigmaRadians;
         float encoderBiasRadians;
 
-        // A non-positive trip disables that protection, which is how a scenario opts out of one.
         float overCurrentTripAmpere;
         float overVoltageTripVolts;
         float underVoltageTripVolts;
@@ -65,8 +60,6 @@ namespace sil
     static constexpr uint32_t plantConfigMagic = 0x504C4E54;
     static constexpr uint8_t plantConfigLayoutVersion = 1;
 
-    // Record layout: [magic:4][version:1][crc32:4][data:N], matching the NVM record convention.
-    // The CRC covers the payload only.
     static constexpr std::size_t plantConfigRecordSize =
         sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t) + sizeof(SilPlantConfig);
 

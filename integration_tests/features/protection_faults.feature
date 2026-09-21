@@ -4,12 +4,11 @@ Feature: Board Protection Faults
   inverter, so a trip is raised against a switching drive, reaches the state
   machine, and is reported over CAN telemetry.
 
-  # KNOWN DEFECT: delivering a board protection fault to a running drive locks the firmware up
-  # with an unaligned-access HardFault inside the fault path, which then faults again and
-  # escalates. The path had never been exercised: the QEMU platform's RegisterBoardProtection was
-  # an empty no-op and BoardProtectionStatus always answered 'unknown', and no other platform
-  # raises the protection in a test. These scenarios reproduce it, so they are tagged out of the
-  # default run until the fault path is fixed; run them with -t "@sil-protection".
+  The trip scenarios are tagged @sil-protection and held out of the default run.
+  They reproduce a firmware lockup: delivering a board protection fault to a
+  running drive takes an unaligned-access HardFault inside the fault path, which
+  faults again and escalates. See documentation/design/software-in-the-loop.md.
+
   @sil-protection @REQ-SM-008
   Scenario Outline: A <fault> trip faults the running motor
     Given a nominal motor plant

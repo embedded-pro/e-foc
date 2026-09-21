@@ -5,8 +5,6 @@
 
 namespace integration
 {
-    // Accumulated by the Given steps and applied in one target restart, so a scenario that
-    // describes a plant, a calibration and a set of algorithms still boots the emulator once.
     struct ScenarioSetup
     {
         sil::SilPlantConfig plant{ sil::NominalPlant() };

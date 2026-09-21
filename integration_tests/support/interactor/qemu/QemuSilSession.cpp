@@ -47,7 +47,6 @@ namespace sil
         if (scenarioDirectory.empty())
             return;
 
-        // Under SIL_VERBOSE the plant and NVM images are left behind for inspection.
         if (SilVerbose())
         {
             std::fprintf(stderr, "[QEMU] keeping scenario directory %s\n", scenarioDirectory.c_str());
@@ -96,7 +95,6 @@ namespace sil
         if (scenarioDirectory.empty() && !CreateScenarioDirectory())
             return false;
 
-        // The child runs from the scenario directory, so a relative ELF path would not resolve.
         char resolvedElf[PATH_MAX]{};
         if (realpath(elfPath.c_str(), resolvedElf) == nullptr)
         {
@@ -105,8 +103,6 @@ namespace sil
         }
         const std::string absoluteElf{ resolvedElf };
 
-        // Unique per session: a run starts many emulators back to back, and a shared socket name
-        // lets a previous session's teardown race the next session's connect.
         static uint32_t sessionSequence = 0;
         const std::string inPath = "/tmp/qemu_sil_in_" + std::to_string(getpid()) + "_" +
                                    std::to_string(sessionSequence++) + ".sock";

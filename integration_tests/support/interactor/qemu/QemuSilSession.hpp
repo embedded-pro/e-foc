@@ -19,8 +19,6 @@ namespace sil
         bool Restart(const std::string& elfPath);
         void Stop();
 
-        // The emulator runs with this as its working directory, so the firmware reaches its
-        // plant description and NVM image through plain relative names.
         bool CreateScenarioDirectory();
         void RemoveScenarioDirectory();
         const std::string& ScenarioDirectory() const;
@@ -32,8 +30,6 @@ namespace sil
 
         bool IsRunning() const;
 
-        // Every line the emulator produces is retained, including the firmware traces that the
-        // CAN reader would otherwise discard while scanning for frames.
         const std::vector<std::string>& CapturedLines() const;
         void ClearCapturedLines();
 

@@ -10,7 +10,6 @@ using namespace integration;
 
 namespace
 {
-    // The tokens match the CLI algorithm names documented in the controller-selection design.
     std::optional<uint8_t> CurrentAlgorithmFromName(const std::string& name)
     {
         if (name == "pid")
@@ -107,8 +106,6 @@ WHEN(R"(the rotor is aligned)")
         << "Align command rejected";
 }
 
-// These calibration steps are expected to fail, so the command outcome is not asserted; the
-// scenario checks the resulting state instead.
 WHEN(R"(electrical identification is attempted)")
 {
     auto& fixture = context.Get<Fixture>();
@@ -141,10 +138,6 @@ THEN(R"(the {word} loop shall be running the {word} algorithm)", (std::string lo
     const auto label = LoopTraceLabel(loop);
     ASSERT_FALSE(label.empty()) << "Unknown control loop: " << loop;
 
-    // The firmware reports the algorithm that actually took effect, which differs from the one
-    // that was asked for when its design does not converge for this motor. It traces that on
-    // entry to Ready, and its tracer only drains while the event loop has work, so poll telemetry
-    // rather than waiting passively for the line to arrive.
     std::string reported;
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{ 5 };
     while (reported.empty() && std::chrono::steady_clock::now() < deadline)

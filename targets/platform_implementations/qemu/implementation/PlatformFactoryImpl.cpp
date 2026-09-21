@@ -92,12 +92,7 @@ namespace application
               {
                   FocTimerIsr();
               })
-        , model(
-              MotorParametersFrom(plantConfig, motorParams),
-              SupplyVoltageFrom(plantConfig),
-              BaseFrequencyFrom(plantConfig),
-              std::nullopt,
-              false)
+        , model(MotorParametersFrom(plantConfig, motorParams), SupplyVoltageFrom(plantConfig), BaseFrequencyFrom(plantConfig), std::nullopt, false)
         , baseFrequency(BaseFrequencyFrom(plantConfig))
     {
         services::SetGlobalTracerInstance(terminalAndTracer.tracer);
@@ -265,9 +260,6 @@ namespace application
     {
         model.StepForTest(lastDutyPhases);
 
-        // Read the currents back directly rather than re-registering a callback on the model every
-        // tick: that assignment raced Stop() clearing the same infra::Function from the event loop,
-        // and an interrupt invoking a half-written one jumps through a garbage pointer.
         lastCurrents = model.LastMeasuredCurrents();
 
         if (onPhaseCurrentsReadyValid && onPhaseCurrentsReady && !controlLoopEntered)
@@ -283,8 +275,6 @@ namespace application
         else if (onPhaseCurrentsReadyValid && onPhaseCurrentsReady && controlLoopEntered)
             controlLoopMetrics.RecordReentry();
 
-        // Last in the tick on purpose: a trip stops the drive from inside this interrupt, and
-        // doing that mid-tick would tear down the callback the control loop above still uses.
         boardProtection.Evaluate(lastCurrents, model.EffectiveSupplyVoltage().Value(), model.WindingTemperatureCelsius());
     }
 

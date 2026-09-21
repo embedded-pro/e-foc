@@ -89,7 +89,6 @@ namespace state_machine
         virtual void ApplyOnlineEstimates()
         {}
 
-        // Zero unless the mode runs an outer loop that measures it.
         virtual foc::RadiansPerSecond MeasuredSpeed() const
         {
             return foc::RadiansPerSecond{ 0.0f };

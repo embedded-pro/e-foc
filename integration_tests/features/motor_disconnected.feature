@@ -14,8 +14,6 @@ Feature: Disconnected And Faulty Motor Wiring
     And a speed setpoint of 20 rps is applied
     Then the rotor shall not turn
 
-  # Two remaining phases still produce torque, so a single open phase is a degraded running
-  # condition rather than a dead motor, and nothing in the firmware currently detects it.
   @sil @REQ-SM-008
   Scenario: A motor with one open phase still turns, degraded and undetected
     Given an open phase motor plant

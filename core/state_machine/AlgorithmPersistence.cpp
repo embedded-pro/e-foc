@@ -18,8 +18,6 @@ namespace state_machine
 
             const auto active = current->ActiveCurrentAlgorithm();
 
-            // Record what is running rather than what was asked for: a design that does not
-            // converge leaves the previous algorithm active, and a stale record would hide that.
             configData.currentAlgorithm = static_cast<uint8_t>(active);
             tracer.Trace() << "[SM] Current loop algorithm: " << CurrentAlgorithmName(active);
         }

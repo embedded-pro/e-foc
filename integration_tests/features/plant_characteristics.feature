@@ -42,8 +42,6 @@ Feature: Motor Plant Characteristics
     Then the state machine shall be in the running state
     And the rotor shall turn
 
-  # Alignment declares the rotor settled once it moves less than 1 mrad between samples, so
-  # encoder noise at or above that threshold keeps it from ever converging.
   @sil @REQ-SM-004
   Scenario: Encoder noise above the alignment settle threshold prevents alignment
     Given a motor plant with:

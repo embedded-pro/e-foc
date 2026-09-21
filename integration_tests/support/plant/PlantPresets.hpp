@@ -6,8 +6,6 @@
 
 namespace sil
 {
-    // The nominal plant every scenario starts from: the catalogue motor on a healthy 48 V bus,
-    // noiseless, with protection thresholds generous enough that a well-behaved run never trips.
     inline SilPlantConfig NominalPlant()
     {
         const auto& motor = foc::JK42BLS01_X038ED::parameters;
@@ -54,7 +52,6 @@ namespace sil
         };
     }
 
-    // Named starting points a scenario selects by name and then overrides field by field.
     inline bool TryNamedPlant(const std::string& name, SilPlantConfig& config)
     {
         config = NominalPlant();
@@ -66,8 +63,6 @@ namespace sil
         {
             config.noiseSigmaAmpere = 0.05f;
             config.noiseBiasAmpereA = 0.02f;
-            // Below the alignment settle threshold of 1 mrad, above which the rotor never
-            // reads as settled and alignment cannot converge.
             config.encoderSigmaRadians = 0.0002f;
             return true;
         }

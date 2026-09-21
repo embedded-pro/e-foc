@@ -178,7 +178,6 @@ namespace application
         QemuTimer focTimer;
         SemihostingSerial serial;
         TerminalAndTracerBlock terminalAndTracer{ serial };
-        // Relative: the harness runs the emulator from a per-scenario working directory.
         SemihostingEeprom eeprom{ "eeprom.bin" };
         SoftwareWatchdog watchdog;
         GpioPinStub operationalPin;
@@ -191,9 +190,6 @@ namespace application
         infra::TimerRepeating canPollTimer;
         infra::TimerRepeating protectionPollTimer;
         hal::Hertz baseFrequency;
-        // The control loop callback is reassigned from the event loop while the FOC interrupt may
-        // be about to invoke it. infra::Function is far wider than a word, so the interrupt is
-        // held off the object while it is being written; missing one tick is harmless.
         volatile bool onPhaseCurrentsReadyValid{ false };
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         foc::PhasePwmDutyCycles lastDutyPhases{};

@@ -57,8 +57,6 @@ namespace sil
     {
         lines.clear();
         lastLine.clear();
-        // The firmware traces its restored configuration once per boot; keeping the previous
-        // boot's lines would let an assertion match a stale one.
         session.ClearCapturedLines();
         ASSERT_TRUE(session.Restart(elfPath)) << "[QEMU] QEMU session failed to restart";
     }

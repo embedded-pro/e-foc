@@ -33,7 +33,6 @@ namespace integration
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
         bool WaitForFaultCode(can::FocFaultCode expectedFault,
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
-        // Mechanical angle in radians from the status telemetry frame.
         std::optional<float> ReadMeasuredPosition(
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 2000 });
         bool SelectControlMode(can::FocMotorMode mode,
