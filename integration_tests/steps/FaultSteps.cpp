@@ -84,9 +84,12 @@ THEN(R"(the rotor shall turn)")
     const auto start = fixture.ReadMeasuredPosition();
     ASSERT_TRUE(start.has_value()) << "No position in the status telemetry frame";
 
+    // Telemetry position is quantised to 0.01 rad, so the reading can land exactly on the threshold.
+    constexpr float kMinimumMovement = 0.05f;
+
     float moved = 0.0f;
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{ 5 };
-    while (std::chrono::steady_clock::now() < deadline && moved < 0.05f)
+    while (std::chrono::steady_clock::now() < deadline && moved < kMinimumMovement)
     {
         usleep(200000);
         const auto now = fixture.ReadMeasuredPosition();
@@ -94,5 +97,5 @@ THEN(R"(the rotor shall turn)")
             moved = std::fabs(*now - *start);
     }
 
-    EXPECT_GT(moved, 0.05f) << "The rotor never moved away from " << *start << " rad";
+    EXPECT_GE(moved, kMinimumMovement) << "The rotor never moved away from " << *start << " rad";
 }
