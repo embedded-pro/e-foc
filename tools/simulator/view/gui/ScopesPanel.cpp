@@ -123,6 +123,19 @@ namespace simulator
         refreshTimer.start(refreshIntervalMs);
     }
 
+    ScopesPanel::~ScopesPanel()
+    {
+        // ~QtFormView resets the callbacks it installed on its FormModel, and those models live in
+        // the ScopeControls members, which unwind before ~QWidget deletes its child widgets. The
+        // forms therefore have to go while their models are still alive. The QtPaintedWidgets need
+        // no such handling: PaintedView clears its host on the way out.
+        currentScopeController.reset();
+        voltageScopeController.reset();
+
+        delete currentScopeForm;
+        delete voltageScopeForm;
+    }
+
     void ScopesPanel::AddCurrentSample(std::span<const float> sample)
     {
         currentScopeCore.AddSample(sample);

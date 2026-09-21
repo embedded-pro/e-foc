@@ -23,6 +23,7 @@ namespace simulator
 
     public:
         explicit ScopesPanel(QWidget* parent = nullptr);
+        ~ScopesPanel() override;
 
         void AddCurrentSample(std::span<const float> sample);
         void AddVoltageSample(std::span<const float> sample);
