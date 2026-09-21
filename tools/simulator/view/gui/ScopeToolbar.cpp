@@ -41,7 +41,7 @@ namespace simulator
         constexpr int triggerSpinDecimals = 3;
     }
 
-    ScopeToolbar::ScopeToolbar(ScopeWidget& scope, QWidget* parent)
+    ScopeToolbar::ScopeToolbar(ui::scope::ScopeCore& scope, QWidget* parent)
         : QWidget(parent)
         , scope(scope)
     {
@@ -66,15 +66,15 @@ namespace simulator
         // Trigger mode
         layout->addWidget(QtOwned<QLabel>("Trigger:", this));
         triggerModeCombo = QtOwned<QComboBox>(this);
-        triggerModeCombo->addItem("Auto", static_cast<int>(ScopeWidget::TriggerMode::Auto));
-        triggerModeCombo->addItem("Normal", static_cast<int>(ScopeWidget::TriggerMode::Normal));
-        triggerModeCombo->addItem("Single", static_cast<int>(ScopeWidget::TriggerMode::Single));
+        triggerModeCombo->addItem("Auto", static_cast<int>(ui::scope::TriggerMode::Auto));
+        triggerModeCombo->addItem("Normal", static_cast<int>(ui::scope::TriggerMode::Normal));
+        triggerModeCombo->addItem("Single", static_cast<int>(ui::scope::TriggerMode::Single));
         layout->addWidget(triggerModeCombo);
 
         // Trigger edge
         triggerEdgeCombo = QtOwned<QComboBox>(this);
-        triggerEdgeCombo->addItem("↑ Rising", static_cast<int>(ScopeWidget::TriggerEdge::Rising));
-        triggerEdgeCombo->addItem("↓ Falling", static_cast<int>(ScopeWidget::TriggerEdge::Falling));
+        triggerEdgeCombo->addItem("↑ Rising", static_cast<int>(ui::scope::TriggerEdge::Rising));
+        triggerEdgeCombo->addItem("↓ Falling", static_cast<int>(ui::scope::TriggerEdge::Falling));
         layout->addWidget(triggerEdgeCombo);
 
         // Trigger level
@@ -130,13 +130,13 @@ namespace simulator
 
         connect(triggerModeCombo, &QComboBox::currentIndexChanged, this, [this](int index)
             {
-                auto mode = static_cast<ScopeWidget::TriggerMode>(triggerModeCombo->itemData(index).toInt());
+                auto mode = static_cast<ui::scope::TriggerMode>(triggerModeCombo->itemData(index).toInt());
                 scope.SetTriggerMode(mode);
             });
 
         connect(triggerEdgeCombo, &QComboBox::currentIndexChanged, this, [this](int index)
             {
-                auto edge = static_cast<ScopeWidget::TriggerEdge>(triggerEdgeCombo->itemData(index).toInt());
+                auto edge = static_cast<ui::scope::TriggerEdge>(triggerEdgeCombo->itemData(index).toInt());
                 scope.SetTriggerEdge(edge);
             });
 
@@ -167,7 +167,7 @@ namespace simulator
 
         connect(singleButton, &QPushButton::clicked, this, [this]()
             {
-                scope.SetTriggerMode(ScopeWidget::TriggerMode::Single);
+                scope.SetTriggerMode(ui::scope::TriggerMode::Single);
                 scope.SetRunning(true);
                 triggerModeCombo->setCurrentIndex(2); // Single
                 runStopButton->setText("Stop");

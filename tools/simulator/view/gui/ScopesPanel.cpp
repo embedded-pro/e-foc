@@ -1,7 +1,6 @@
 #include "tools/simulator/view/gui/ScopesPanel.hpp"
 #include "tools/simulator/view/gui/QtOwned.hpp"
 #include "ui/theme/Theme.hpp"
-#include <QColor>
 #include <QFont>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -14,7 +13,7 @@ namespace simulator
     namespace
     {
         constexpr int hexagonMaxHeight = 460;
-        constexpr int hexagonRefreshIntervalMs = 33;
+        constexpr int refreshIntervalMs = 33;
     }
 
     ScopesPanel::ScopesPanel(QWidget* parent)
@@ -41,11 +40,6 @@ namespace simulator
         hexagonWidget->setMinimumSize(hexagonMaxHeight, hexagonMaxHeight);
         hexagonWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
-        // HexagonCore::SetSample deliberately does not request a repaint, so that a 20 kHz sample
-        // path does not drive the display; the host owns the cadence instead.
-        connect(&hexagonRefreshTimer, &QTimer::timeout, hexagonWidget, QOverload<>::of(&QWidget::update));
-        hexagonRefreshTimer.start(hexagonRefreshIntervalMs);
-
         hexagonOuter->addStretch(1);
         hexagonOuter->addWidget(hexagonWidget);
         hexagonOuter->addStretch(1);
@@ -67,13 +61,14 @@ namespace simulator
         currentsLabel->setFont(sectionFont);
         phaseSignalsLayout->addWidget(currentsLabel);
 
-        currentScope = QtOwned<ScopeWidget>(this);
-        currentScope->SetChannelCount(3);
-        currentScope->SetChannelConfig(0, { "Ia", QColor(0, 150, 255) });
-        currentScope->SetChannelConfig(1, { "Ib", QColor(255, 165, 0) });
-        currentScope->SetChannelConfig(2, { "Ic", QColor(0, 200, 80) });
+        currentScope = QtOwned<ui::backend::qt::QtPaintedWidget>(currentScopeCore, this);
+        currentScope->SetBackgroundRole(ui::theme::ColorRole::ScopeBackground);
+        currentScopeCore.SetChannelCount(3);
+        currentScopeCore.SetChannelConfig(0, { "Ia", ui::Color{ 0, 150, 255 } });
+        currentScopeCore.SetChannelConfig(1, { "Ib", ui::Color{ 255, 165, 0 } });
+        currentScopeCore.SetChannelConfig(2, { "Ic", ui::Color{ 0, 200, 80 } });
 
-        currentScopeToolbar = QtOwned<ScopeToolbar>(*currentScope, this);
+        currentScopeToolbar = QtOwned<ScopeToolbar>(currentScopeCore, this);
         phaseSignalsLayout->addWidget(currentScopeToolbar);
         phaseSignalsLayout->addWidget(currentScope);
 
@@ -81,13 +76,14 @@ namespace simulator
         voltagesLabel->setFont(sectionFont);
         phaseSignalsLayout->addWidget(voltagesLabel);
 
-        voltageScope = QtOwned<ScopeWidget>(this);
-        voltageScope->SetChannelCount(3);
-        voltageScope->SetChannelConfig(0, { "Va", QColor(0, 150, 255) });
-        voltageScope->SetChannelConfig(1, { "Vb", QColor(255, 165, 0) });
-        voltageScope->SetChannelConfig(2, { "Vc", QColor(0, 200, 80) });
+        voltageScope = QtOwned<ui::backend::qt::QtPaintedWidget>(voltageScopeCore, this);
+        voltageScope->SetBackgroundRole(ui::theme::ColorRole::ScopeBackground);
+        voltageScopeCore.SetChannelCount(3);
+        voltageScopeCore.SetChannelConfig(0, { "Va", ui::Color{ 0, 150, 255 } });
+        voltageScopeCore.SetChannelConfig(1, { "Vb", ui::Color{ 255, 165, 0 } });
+        voltageScopeCore.SetChannelConfig(2, { "Vc", ui::Color{ 0, 200, 80 } });
 
-        voltageScopeToolbar = QtOwned<ScopeToolbar>(*voltageScope, this);
+        voltageScopeToolbar = QtOwned<ScopeToolbar>(voltageScopeCore, this);
         phaseSignalsLayout->addWidget(voltageScopeToolbar);
         phaseSignalsLayout->addWidget(voltageScope);
 
@@ -97,31 +93,40 @@ namespace simulator
         auto* rlsTab = QtOwned<QWidget>(this);
         auto* rlsLayout = QtOwned<QVBoxLayout>(rlsTab);
 
-        electricalRlsScope = QtOwned<ScopeWidget>(this);
-        electricalRlsScope->SetChannelCount(2);
-        electricalRlsScope->SetChannelConfig(0, { "R\xCC\x82 [\xCE\xA9]", QColor(220, 50, 50) });
-        electricalRlsScope->SetChannelConfig(1, { "L\xCC\x82 [mH]", QColor(0, 220, 220) });
+        electricalRlsScope = QtOwned<ui::backend::qt::QtPaintedWidget>(electricalRlsScopeCore, this);
+        electricalRlsScope->SetBackgroundRole(ui::theme::ColorRole::ScopeBackground);
+        electricalRlsScopeCore.SetChannelCount(2);
+        electricalRlsScopeCore.SetChannelConfig(0, { "R\xCC\x82 [\xCE\xA9]", ui::Color{ 220, 50, 50 } });
+        electricalRlsScopeCore.SetChannelConfig(1, { "L\xCC\x82 [mH]", ui::Color{ 0, 220, 220 } });
         rlsLayout->addWidget(electricalRlsScope);
 
-        mechanicalRlsScope = QtOwned<ScopeWidget>(this);
-        mechanicalRlsScope->SetChannelCount(2);
-        mechanicalRlsScope->SetChannelConfig(0, { "B\xCC\x82 [\xC2\xB5N\xC2\xB7m\xC2\xB7s/rad]", QColor(220, 200, 0) });
-        mechanicalRlsScope->SetChannelConfig(1, { "J\xCC\x82 [\xC2\xB5kg\xC2\xB7m\xC2\xB2]", QColor(0, 200, 80) });
+        mechanicalRlsScope = QtOwned<ui::backend::qt::QtPaintedWidget>(mechanicalRlsScopeCore, this);
+        mechanicalRlsScope->SetBackgroundRole(ui::theme::ColorRole::ScopeBackground);
+        mechanicalRlsScopeCore.SetChannelCount(2);
+        mechanicalRlsScopeCore.SetChannelConfig(0, { "B\xCC\x82 [\xC2\xB5N\xC2\xB7m\xC2\xB7s/rad]", ui::Color{ 220, 200, 0 } });
+        mechanicalRlsScopeCore.SetChannelConfig(1, { "J\xCC\x82 [\xC2\xB5kg\xC2\xB7m\xC2\xB2]", ui::Color{ 0, 200, 80 } });
         rlsLayout->addWidget(mechanicalRlsScope);
 
         tabs->addTab(rlsTab, "RLS Estimates");
 
         layout->addWidget(tabs, 1);
+
+        // Neither HexagonCore::SetSample nor ScopeCore::AddSample requests a repaint, so that a
+        // 20 kHz sample path never drives the display; the host owns the cadence for all five.
+        for (auto* painted : { hexagonWidget, currentScope, voltageScope, electricalRlsScope, mechanicalRlsScope })
+            connect(&refreshTimer, &QTimer::timeout, painted, QOverload<>::of(&QWidget::update));
+
+        refreshTimer.start(refreshIntervalMs);
     }
 
     void ScopesPanel::AddCurrentSample(std::span<const float> sample)
     {
-        currentScope->AddSample(sample);
+        currentScopeCore.AddSample(sample);
     }
 
     void ScopesPanel::AddVoltageSample(std::span<const float> sample)
     {
-        voltageScope->AddSample(sample);
+        voltageScopeCore.AddSample(sample);
     }
 
     void ScopesPanel::SetHexagonSample(float va, float vb, float vc, float vAlpha, float vBeta)
@@ -141,22 +146,22 @@ namespace simulator
 
     void ScopesPanel::Clear()
     {
-        currentScope->Clear();
-        voltageScope->Clear();
+        currentScopeCore.Clear();
+        voltageScopeCore.Clear();
         hexagonCore.Clear();
-        electricalRlsScope->Clear();
-        mechanicalRlsScope->Clear();
+        electricalRlsScopeCore.Clear();
+        mechanicalRlsScopeCore.Clear();
     }
 
     void ScopesPanel::AddElectricalRlsSample(float Rhat, float Lhat)
     {
         const std::array<float, 2> a = { Rhat, Lhat * 1000.0f };
-        electricalRlsScope->AddSample({ a.data(), 2 });
+        electricalRlsScopeCore.AddSample({ a.data(), 2 });
     }
 
     void ScopesPanel::AddMechanicalRlsSample(float Bhat, float Jhat)
     {
         const std::array<float, 2> a = { Bhat * 1.0e6f, Jhat * 1.0e6f };
-        mechanicalRlsScope->AddSample({ a.data(), 2 });
+        mechanicalRlsScopeCore.AddSample({ a.data(), 2 });
     }
 }
