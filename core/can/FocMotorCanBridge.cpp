@@ -8,6 +8,7 @@ namespace can
         FocMotorCategoryServer& server,
         state_machine::ControlModeStateMachine& controlMode,
         const drivers::ThreePhaseInverter& inverter,
+        drivers::Encoder& encoder,
         services::ElectricalParametersIdentification& electricalIdent,
         services::MechanicalParametersIdentification* mechIdent,
         foc::NewtonMeter mechTorqueConstant,
@@ -18,6 +19,7 @@ namespace can
         , server(server)
         , controlMode(controlMode)
         , inverter(inverter)
+        , encoder(encoder)
         , electricalIdent(electricalIdent)
         , mechIdent{ mechIdent }
         , mechTorqueConstant{ mechTorqueConstant }
@@ -40,6 +42,8 @@ namespace can
                 return FocFaultCode::overCurrent;
             case state_machine::FaultCode::overvoltage:
                 return FocFaultCode::overVoltage;
+            case state_machine::FaultCode::undervoltage:
+                return FocFaultCode::underVoltage;
             case state_machine::FaultCode::overtemperature:
                 return FocFaultCode::overTemperature;
             case state_machine::FaultCode::encoderLoss:
@@ -323,7 +327,11 @@ namespace can
                                    ? ToCanFaultCode(controlMode.ActiveStateMachine().LastFaultCode())
                                    : FocFaultCode::none;
 
-        server.BroadcastTelemetryStatus(ToCanMotorState(state, controlMode.ActiveStateMachine().HasPartialCalibration()), faultCode);
+        server.BroadcastTelemetryStatus(
+            ToCanMotorState(state, controlMode.ActiveStateMachine().HasPartialCalibration()),
+            faultCode,
+            controlMode.ActiveStateMachine().MeasuredSpeed(),
+            encoder.Read());
         onDone();
     }
 

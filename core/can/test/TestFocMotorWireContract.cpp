@@ -223,10 +223,20 @@ TEST_F(FocMotorWireContractTest, a_mode_command_is_the_documented_two_bytes)
 
 TEST_F(FocMotorWireContractTest, a_telemetry_status_frame_is_the_documented_six_bytes)
 {
-    server.BroadcastTelemetryStatus(can::FocMotorState::partialCalibration, can::FocFaultCode::overVoltage);
+    server.BroadcastTelemetryStatus(can::FocMotorState::partialCalibration, can::FocFaultCode::overVoltage,
+        foc::RadiansPerSecond{ 0.0f }, foc::Radians{ 0.0f });
 
     EXPECT_EQ(can::focTelemetryStatusResponseId, respondedMessageType);
     EXPECT_EQ(Bytes({ 0x04, 0x02, 0x00, 0x00, 0x00, 0x00 }), respondedMessage);
+}
+
+TEST_F(FocMotorWireContractTest, a_telemetry_status_frame_carries_the_measured_speed_and_position)
+{
+    server.BroadcastTelemetryStatus(can::FocMotorState::running, can::FocFaultCode::none,
+        foc::RadiansPerSecond{ 20.0f }, foc::Radians{ 1.5f });
+
+    EXPECT_EQ(can::focTelemetryStatusResponseId, respondedMessageType);
+    EXPECT_EQ(Bytes({ 0x01, 0x00, 0x00, 0x14, 0x00, 0x96 }), respondedMessage);
 }
 
 TEST_F(FocMotorWireContractTest, every_command_the_client_sends_reaches_the_server_with_its_value_intact)

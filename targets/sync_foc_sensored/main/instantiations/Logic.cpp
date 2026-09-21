@@ -54,7 +54,7 @@ namespace application
                         this->hardware.MaxCurrentSupported(),
                         this->hardware.BaseFrequency(),
                         watchdog.lowPriorityInterrupt });
-                canBridge.emplace(*motorCanServer, *controlMode, this->hardware, electricalIdent, nullptr, foc::NewtonMeter{ motorTorqueConstantNm }, nvm, configData, this->hardware.Tracer());
+                canBridge.emplace(*motorCanServer, *controlMode, this->hardware, this->hardware, electricalIdent, nullptr, foc::NewtonMeter{ motorTorqueConstantNm }, nvm, configData, this->hardware.Tracer());
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
                 watchdog.supervisor.AttachControlMode(*controlMode);
                 platformFaultNotifier->RegisterSecondary([this](state_machine::FaultCode code)

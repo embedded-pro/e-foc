@@ -3,6 +3,7 @@
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
 #include "integration_tests/support/interactor/qemu/QemuSilSession.hpp"
 #include <chrono>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -17,6 +18,11 @@ namespace sil
         void Teardown() override;
         void BeforeScenario() override;
         void AfterScenario() override;
+
+        bool SupportsSimulatedPlant() const override;
+        void ConfigurePlant(const std::vector<uint8_t>& record) override;
+        void ConfigureNonVolatileMemory(const std::vector<uint8_t>& image) override;
+        void RestartTarget() override;
 
         bool SendCommand(const std::string& command, std::chrono::milliseconds timeout) override;
         bool DrainSerial(std::chrono::milliseconds timeout) override;

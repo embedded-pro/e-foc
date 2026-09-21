@@ -432,13 +432,14 @@ namespace can
         SendCommandAck(focQueryContractVersionId, services::CanAckStatus::success);
     }
 
-    void FocMotorCategoryServer::BroadcastTelemetryStatus(FocMotorState state, FocFaultCode fault)
+    void FocMotorCategoryServer::BroadcastTelemetryStatus(FocMotorState state, FocFaultCode fault,
+        foc::RadiansPerSecond speed, foc::Radians position)
     {
         services::CanPayloadWriter payload;
         payload.WriteUInt8(static_cast<uint8_t>(state));
         payload.WriteUInt8(static_cast<uint8_t>(fault));
-        payload.WriteFixed16(0.0f, focSpeedScale);
-        payload.WriteFixed16(0.0f, focPositionScale);
+        payload.WriteFixed16(speed.Value(), focSpeedScale);
+        payload.WriteFixed16(position.Value(), focPositionScale);
         SendTelemetry(focTelemetryStatusResponseId, payload);
     }
 

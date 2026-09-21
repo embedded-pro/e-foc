@@ -1,0 +1,72 @@
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+
+namespace sil
+{
+    namespace PlantFaultFlag
+    {
+        static constexpr uint8_t openPhaseA = 1u << 0;
+        static constexpr uint8_t openPhaseB = 1u << 1;
+        static constexpr uint8_t openPhaseC = 1u << 2;
+        static constexpr uint8_t encoderStuck = 1u << 3;
+    }
+
+    struct SilPlantConfig
+    {
+        float statorResistanceOhm;
+        float dAxisInductanceHenry;
+        float qAxisInductanceHenry;
+        float fluxLinkageWeber;
+        float rotorInertiaKgM2;
+        float viscousDampingNmSPerRad;
+        float maxSupportedCurrentAmpere;
+        float loadTorqueNm;
+
+        float powerSupplyVoltageVolts;
+        uint32_t baseFrequencyHz;
+
+        float noiseSigmaAmpere;
+        float noiseBiasAmpereA;
+        float noiseBiasAmpereB;
+        float noiseBiasAmpereC;
+
+        float ambientCelsius;
+        float thermalResistance;
+        float thermalCapacitance;
+        float copperTempCoeff;
+        float ironInductanceCoeff;
+
+        float encoderSigmaRadians;
+        float encoderBiasRadians;
+
+        float overCurrentTripAmpere;
+        float overVoltageTripVolts;
+        float underVoltageTripVolts;
+        float overTemperatureTripCelsius;
+
+        float supplyVoltageScale;
+        uint32_t randomSeed;
+
+        uint8_t polePairs;
+        uint8_t faultFlags;
+        uint8_t reserved0;
+        uint8_t reserved1;
+    };
+
+    static_assert(sizeof(SilPlantConfig) == 112, "SilPlantConfig layout must be free of implicit padding");
+
+    static constexpr uint32_t plantConfigMagic = 0x504C4E54;
+    static constexpr uint8_t plantConfigLayoutVersion = 1;
+
+    static constexpr std::size_t plantConfigRecordSize =
+        sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t) + sizeof(SilPlantConfig);
+
+    static constexpr std::size_t plantConfigMagicOffset = 0;
+    static constexpr std::size_t plantConfigVersionOffset = sizeof(uint32_t);
+    static constexpr std::size_t plantConfigCrcOffset = plantConfigVersionOffset + sizeof(uint8_t);
+    static constexpr std::size_t plantConfigDataOffset = plantConfigCrcOffset + sizeof(uint32_t);
+
+    static constexpr const char* plantConfigFileName = "plant.bin";
+}

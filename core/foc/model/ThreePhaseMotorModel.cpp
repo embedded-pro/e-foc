@@ -46,6 +46,21 @@ namespace foc
         thermal.config = config;
     }
 
+    void ThreePhaseMotorModel::SetFaultInjection(const FaultInjectionConfig& config)
+    {
+        const bool becameStuck = config.encoderStuck && !faultInjection.config.encoderStuck;
+        faultInjection.config = config;
+
+        if (becameStuck)
+            faultInjection.stuckAngle = motorState.theta_mech;
+    }
+
+    void ThreePhaseMotorModel::SetRandomSeed(uint32_t seed)
+    {
+        currentNoise.engine.seed(seed);
+        encoderNoise.engine.seed(seed ^ 0x9E3779B9u);
+    }
+
     void ThreePhaseMotorModel::ResetTemperature()
     {
         thermal.windingTempCelsius = thermal.config.ambientCelsius;
@@ -54,6 +69,26 @@ namespace foc
     float ThreePhaseMotorModel::WindingTemperatureCelsius() const
     {
         return thermal.windingTempCelsius;
+    }
+
+    foc::PhaseCurrents ThreePhaseMotorModel::LastMeasuredCurrents() const
+    {
+        return { currentNoise.iaLast, currentNoise.ibLast, currentNoise.icLast };
+    }
+
+    foc::Volts ThreePhaseMotorModel::EffectiveSupplyVoltage() const
+    {
+        return foc::Volts{ powerSupplyVoltage.Value() * faultInjection.config.supplyVoltageScale };
+    }
+
+    void ThreePhaseMotorModel::ApplyOpenPhases()
+    {
+        if (faultInjection.config.openPhaseA)
+            motorState.ia = foc::Ampere{ 0.0f };
+        if (faultInjection.config.openPhaseB)
+            motorState.ib = foc::Ampere{ 0.0f };
+        if (faultInjection.config.openPhaseC)
+            motorState.ic = foc::Ampere{ 0.0f };
     }
 
     foc::Ohm ThreePhaseMotorModel::EffectiveResistance() const
@@ -121,9 +156,10 @@ namespace foc
         currentNoise.ibLast = ibNoise;
         currentNoise.icLast = icNoise;
 
-        const auto va = (dutyPhases.a.Value() / percentToFraction - half) * powerSupplyVoltage.Value();
-        const auto vb = (dutyPhases.b.Value() / percentToFraction - half) * powerSupplyVoltage.Value();
-        const auto vc = (dutyPhases.c.Value() / percentToFraction - half) * powerSupplyVoltage.Value();
+        const auto supply = EffectiveSupplyVoltage().Value();
+        const auto va = (dutyPhases.a.Value() / percentToFraction - half) * supply;
+        const auto vb = (dutyPhases.b.Value() / percentToFraction - half) * supply;
+        const auto vc = (dutyPhases.c.Value() / percentToFraction - half) * supply;
         const foc::ThreePhase vAbc{ va, vb, vc };
         const auto vAlphaBeta = clarke.Forward(vAbc);
 
@@ -223,8 +259,9 @@ namespace foc
 
     foc::Radians ThreePhaseMotorModel::Read()
     {
+        const auto angle = faultInjection.config.encoderStuck ? faultInjection.stuckAngle : motorState.theta_mech;
         const float noise = encoderNoise.config.sigmaRadians * encoderNoise.distribution(encoderNoise.engine);
-        return foc::Radians{ detail::PositionWithWrapAround(motorState.theta_mech.Value() + encoderNoise.config.biasRadians + noise) };
+        return foc::Radians{ detail::PositionWithWrapAround(angle.Value() + encoderNoise.config.biasRadians + noise) };
     }
 
     void ThreePhaseMotorModel::Set(foc::Radians value)
@@ -246,9 +283,10 @@ namespace foc
         auto duty_b = dutyPhases.b.Value() / percentToFraction;
         auto duty_c = dutyPhases.c.Value() / percentToFraction;
 
-        auto va = (duty_a - half) * powerSupplyVoltage;
-        auto vb = (duty_b - half) * powerSupplyVoltage;
-        auto vc = (duty_c - half) * powerSupplyVoltage;
+        const auto supply = EffectiveSupplyVoltage();
+        auto va = (duty_a - half) * supply;
+        auto vb = (duty_b - half) * supply;
+        auto vc = (duty_c - half) * supply;
 
         auto cos_theta = foc::FastTrigonometry::Cosine(motorState.theta.Value());
         auto sin_theta = foc::FastTrigonometry::Sine(motorState.theta.Value());
@@ -274,6 +312,15 @@ namespace foc
         motorState.ia = foc::Ampere{ i_abc.a };
         motorState.ib = foc::Ampere{ i_abc.b };
         motorState.ic = foc::Ampere{ i_abc.c };
+
+        ApplyOpenPhases();
+
+        if (faultInjection.config.AnyPhaseOpen())
+        {
+            const auto masked = park.Forward(clarke.Forward(foc::ThreePhase{ motorState.ia.Value(), motorState.ib.Value(), motorState.ic.Value() }), cos_theta, sin_theta);
+            id = masked.d;
+            iq = masked.q;
+        }
 
         const auto pCu = rEff * (motorState.ia.Value() * motorState.ia.Value() + motorState.ib.Value() * motorState.ib.Value() + motorState.ic.Value() * motorState.ic.Value());
         thermal.windingTempCelsius += dt * (pCu - (thermal.windingTempCelsius - thermal.config.ambientCelsius) / thermal.config.thermalResistance) / thermal.config.thermalCapacitance;

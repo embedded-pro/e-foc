@@ -480,9 +480,13 @@ Hardware protection events reach the state machine through `PlatformFaultNotifie
 |-------------------------|-------------------|
 | `overCurrent`           | `overcurrent`     |
 | `overVoltage`           | `overvoltage`     |
+| `underVoltage`          | `undervoltage`    |
 | `overTemperature`       | `overtemperature` |
 
-A protection event raised before the state machine has registered its handler is discarded.
+A protection event raised before the state machine has registered its handler is discarded by the
+state machine. A platform whose protection reflects a *standing* condition rather than an edge is
+expected to re-raise it once a handler exists, so a motor does not enable into a condition the
+board had already detected.
 
 ### Async-Callback State Invariant
 
@@ -777,7 +781,7 @@ sequenceDiagram
 | `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0      | Coulomb friction; currently 0 (not identified)                                                                          |
 | `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0      | Speed loop closed-loop bandwidth; populated only for speed/position modes                                               |
 | `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0      | Current loop closed-loop bandwidth; defaults to 2π·fs/nyquistFactor when zero                                           |
-| `FaultCode`       | —                      | enum (uint8)                   | 7 values | `overcurrent`, `overvoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed` |
+| `FaultCode`       | —                      | enum (uint8)                   | 8 values | `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed` |
 
 `watchdogTimeout` is reserved and not raised by the state machine. A watchdog expiry resets the target
 immediately, so there is no dispatcher turn in which a latched fault code could be read or broadcast; the

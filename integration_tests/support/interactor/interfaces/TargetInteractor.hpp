@@ -2,6 +2,7 @@
 
 #include "hal/interfaces/Can.hpp"
 #include <chrono>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -16,6 +17,11 @@ namespace integration
         virtual void Teardown() = 0;
         virtual void BeforeScenario() = 0;
         virtual void AfterScenario() = 0;
+
+        virtual bool SupportsSimulatedPlant() const;
+        virtual void ConfigurePlant(const std::vector<uint8_t>& record);
+        virtual void ConfigureNonVolatileMemory(const std::vector<uint8_t>& image);
+        virtual void RestartTarget();
 
         virtual bool SendCommand(const std::string& command, std::chrono::milliseconds timeout) = 0;
         virtual bool DrainSerial(std::chrono::milliseconds timeout) = 0;

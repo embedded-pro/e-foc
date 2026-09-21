@@ -409,110 +409,65 @@ These patterns eliminate polling, decouple producers from consumers, and allow t
 
 ## Integration Testing
 
-The integration test suite verifies the cooperative behaviour of three core subsystems:
+Integration testing drives the **real firmware** as a black box over the product's own CAN command
+set. Nothing inside the firmware is mocked or reached into; the suite starts a target, sends
+commands, and asserts on telemetry and traces.
 
-1. **FOC State Machine** — the lifecycle controller (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) that orchestrates calibration services and the FOC control loop.
-2. **Non-Volatile Memory stack** — the chain from the NVM region abstraction through the EEPROM interface to the concrete NVM service. Integration tests use a real in-memory EEPROM stub rather than a mocked NVM service.
-3. **CAN-to-State-Machine bridge** — the observer that translates CAN FOC motor commands into state machine transition commands.
+Two targets implement scenarios, selected by tag:
 
-Platform hardware is mocked by replacing `PlatformFactory` with a `PlatformFactoryMock` that stubs the
-inherited `foc::ThreePhaseInverter` (`PhaseCurrentsReady`, `ThreePhasePwmOutput`, `Start`, `Stop`,
-`BaseFrequency`, `MaxCurrentSupported`) and `foc::Encoder` (`Read`, `Set`, `SetZero`) methods directly. There
-is no separate platform-adapter layer between the factory and the FOC pipeline. EEPROM storage is provided by
-an in-memory stub that satisfies the EEPROM interface and persists data across the lifetime of a single test
-scenario.
+1. **Software-in-the-loop** — the firmware built for an emulated Cortex-M4, running under an
+   emulator against a simulated three-phase motor the firmware itself owns. Only the motor, the
+   power stage and the board protection are simulated, because there is no hardware. The motor is
+   described per scenario and handed to the firmware at boot, and non-volatile memory is pre-seeded
+   so a scenario starts from a chosen calibration and configuration.
+2. **Hardware-in-the-loop** — the same firmware on a real board, reached through the hardware
+   bridge over serial and CAN.
 
-Integration tests run exclusively on the host build. The host event dispatcher simulates the asynchronous callback chains used by NVM and calibration services. All mock instances use strict mock policies; lenient mocking is forbidden.
+Design detail: `documentation/design/integration-testing.md` for the shared structure, and
+`documentation/design/software-in-the-loop.md` for the simulated target.
 
 ```mermaid
 graph TD
-    subgraph "Integration Test Harness"
-        FIF[FOC Integration Fixture]
-        PFM[PlatformFactoryMock]
-        HWM[PlatformFactoryMock + EepromStub]
-        EES[EEPROM Stub]
+    subgraph HARNESS["Test harness"]
+        GHERKIN["Gherkin scenarios"] --> STEPS["Step definitions"]
+        STEPS --> SEAM["Target interactor"]
     end
 
-    subgraph "System Under Test"
-        SM[FOC State Machine]
-        NVM[NVM Stack]
+    subgraph SIL["Software-in-the-loop"]
+        PLANT["Motor plant model"]
+        PROT["Board protection"]
+        FWQ["Firmware, emulated target"]
+        PLANT --> FWQ
+        PROT --> FWQ
     end
 
-    subgraph "Service Mocks"
-        EIM[Electrical Ident Mock]
-        AMK[Alignment Mock]
-        FNM[Fault Notifier Mock]
+    subgraph HIL["Hardware-in-the-loop"]
+        BRIDGE["Hardware bridge"]
+        BOARD["Motor board"]
+        BRIDGE --> BOARD
     end
 
-    subgraph "CAN Integration"
-        MCS[FocMotorCategoryServer]
-        BRG[FocMotorCanBridge]
-    end
-
-    FIF --> PFM
-    FIF --> HWM
-    FIF --> EES
-    FIF --> SM
-    FIF --> NVM
-    FIF --> EIM
-    FIF --> AMK
-    FIF --> FNM
-
-    PFM --> SM
-    NVM --> EES
-    SM --> EIM
-    SM --> AMK
-    FNM --> SM
-
-    MCS --> BRG
-    BRG --> SM
+    SEAM --> SIL
+    SEAM --> HIL
 ```
 
 ### Integration Boundaries
 
-| Boundary                                           | Real Component                                   | Test Double                                                                                                             |
-|----------------------------------------------------|--------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
-| Platform peripherals (PWM, encoder, current sense) | `PlatformFactoryMock` (single GMock)             | Inverter and encoder hot-path methods mocked directly on the factory; default `EXPECT_CALL`s in the fixture constructor |
-| EEPROM storage                                     | In-memory 512-byte array                         | Replaces embedded EEPROM driver                                                                                         |
-| Calibration services                               | Electrical identification mock, alignment mock   | `StrictMock<>` wrapping service interfaces                                                                              |
-| Fault notification                                 | Fault notifier mock                              | `StrictMock<>` wrapping fault notifier                                                                                  |
-| CAN transport                                      | Category server `HandleMessage` invoked directly | Bypasses CAN wire encoding                                                                                              |
-| Terminal / tracer                                  | Stream writer stub                               | No-op for terminal output                                                                                               |
+| Boundary                                                    | Software-in-the-loop                                   | Hardware-in-the-loop       |
+|-------------------------------------------------------------|--------------------------------------------------------|----------------------------|
+| Motor and power stage                                       | Simulated plant, described per scenario                | Real motor and inverter    |
+| Board protection                                            | Simulated comparators, armed with the inverter         | Real comparators           |
+| Non-volatile memory                                         | Host-written image, pre-seeded or deliberately damaged | Real device                |
+| State machine, cascades, calibration, NVM stack, CAN server | Real firmware                                          | Real firmware              |
+| Transport                                                   | CAN frames as text on the emulated UART                | Bridge over serial and CAN |
 
 ### Requirements Traceability
 
-| Requirement ID | Verified by Feature                                                                                               |
-|----------------|-------------------------------------------------------------------------------------------------------------------|
-| REQ-SM-001     | `state_machine_lifecycle.feature` — Motor starts in Idle                                                          |
-| REQ-SM-002     | `state_machine_lifecycle.feature` — Calibration transitions to Calibrating                                        |
-| REQ-SM-003     | `calibration_flow.feature` — step ordering scenarios                                                              |
-| REQ-SM-004     | `calibration_flow.feature` — full calibration reaches Ready                                                       |
-| REQ-SM-005     | `calibration_flow.feature` — pole pairs failure                                                                   |
-| REQ-SM-006     | `state_machine_lifecycle.feature` — Motor enabled from Ready                                                      |
-| REQ-SM-007     | `state_machine_lifecycle.feature` — Motor disabled to Ready                                                       |
-| REQ-SM-008     | `state_machine_lifecycle.feature` — Fault on hardware fault                                                       |
-| REQ-SM-009     | `state_machine_lifecycle.feature` — Fault cleared to Ready (calibration held) or Idle                             |
-| REQ-SM-010     | `state_machine_lifecycle.feature` — Valid NVM boots to Ready                                                      |
-| REQ-SM-011     | `calibration_flow.feature` — calibration data saved to NVM                                                        |
-| REQ-INT-001    | `can_foc_motor.feature` — CAN Start enables motor                                                                 |
-| REQ-INT-002    | `can_foc_motor.feature` — CAN Stop disables motor                                                                 |
-| REQ-INT-003    | `can_foc_motor.feature` — CAN ClearFault clears fault                                                             |
-| REQ-INT-004    | Not scenario-based — routing through the category server is a structural constraint verified by the bridge design |
-| REQ-CM-001     | `can_control_mode.feature` — SelectControlMode transitions the active mode                                        |
-| REQ-CM-002     | `can_control_mode.feature` — SetTorqueSetpoint accepted in torque mode                                            |
-| REQ-CM-003     | `can_control_mode.feature` — SetSpeedSetpoint accepted in speed mode                                              |
-| REQ-CM-004     | `can_control_mode.feature` — SetPositionSetpoint accepted in position mode                                        |
-| REQ-CM-005     | `can_control_mode.feature` — Setpoint rejected when mode does not match                                           |
-| REQ-INT-008    | `core/can/test/TestFocMotorCanClient.cpp` — client sends Start and receives ACK                                   |
-| REQ-INT-009    | `core/can/test/TestFocMotorCategoryClient.cpp` — client sends typed setpoints                                     |
-| REQ-INT-010    | `core/can/test/TestFocMotorCategoryClient.cpp` — client surfaces ACK/NACK to caller                               |
-| REQ-INT-011    | `core/can/test/TestFocMotorCanBridge.cpp` — stub commands return applicationError                                 |
-| REQ-INT-012    | `core/can/test/TestFocMotorCanBridge.cpp` — tracing decorators are observable                                     |
-| REQ-CAN-001    | `core/can/test/TestWireContractDocumentation.cpp` — documented scales match the contract descriptors              |
-| REQ-CAN-002    | `core/can/test/TestFocMotorWireContract.cpp` — every command rejected one byte short and one byte long            |
-| REQ-CAN-003    | `core/can/test/TestFocMotorWireContract.cpp` — an incompatible major refuses every further category command       |
-| REQ-CAN-004    | `core/can/test/TestFocMotorWireContract.cpp` — literal byte vectors and client-to-server round trips              |
-| REQ-CAN-005    | `documentation/design/service-can.md` — deviations from the can-lite reference example                            |
-| REQ-SM-025     | `core/state_machine/test/TestPlatformFaultNotifier.cpp` — clear refused while the condition reads asserted        |
-| REQ-SM-026     | `core/state_machine/test/TestFaultController.cpp` — dwell restarts on an asserted sample and at fault entry       |
-| REQ-EH-013     | `core/state_machine/test/TestPlatformFaultNotifier.cpp` — condition state is read from the platform               |
+Each scenario carries the requirement identifiers it verifies as tags, alongside the tag naming the
+target that implements it. The traceability matrix is generated from those tags at release time by
+reading the feature directory, so the mapping lives with the scenarios rather than in a table here
+that would drift away from them.
+
+Requirements with no scenario are verified by unit tests under the owning library, or are
+structural constraints discharged by design review; the generated matrix reports both.
+

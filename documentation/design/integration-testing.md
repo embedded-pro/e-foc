@@ -1,202 +1,158 @@
 ---
 title: "Integration Testing Design"
 type: design
-status: draft
-version: 0.2.0
+status: accepted
+version: 1.0.0
 component: integration-testing
-date: 2026-04-12
+date: 2026-09-21
 ---
 
 | Field     | Value                      |
 |-----------|----------------------------|
 | Title     | Integration Testing Design |
 | Type      | design                     |
-| Status    | draft                      |
-| Version   | 0.2.0                      |
+| Status    | accepted                   |
+| Version   | 1.0.0                      |
 | Component | integration-testing        |
-| Date      | 2026-04-12                 |
+| Date      | 2026-09-21                 |
 
-> **Note — Design-level document**: This document describes *how the integration tests are implemented*. It expands on the architecture by specifying component responsibilities, data flows, and design decisions that would not be obvious to a reviewer unfamiliar with the system.
+> **Note — Design-level document**: This document describes *how the integration tests are
+> structured*. It expands on the architecture by specifying component responsibilities, data flows,
+> and design decisions that would not be obvious to a reviewer unfamiliar with the system.
 >
-> **Diagrams**: All visuals must be Mermaid fenced code blocks or ASCII art. External image references are **not allowed**.
+> **Diagrams**: All visuals must be Mermaid fenced code blocks or ASCII art. External image
+> references are **not allowed**.
 
 ---
 
 ## Overview
 
-This document covers the design of the `integration_tests/` suite. It references the integration testing architecture in `documentation/architecture/system.md` (section: Integration Testing) for the high-level context and the requirements (`documentation/requirements/`) for the acceptance criteria each scenario verifies.
+The suite is a **black-box driver**. It starts a target running the real firmware, speaks to it
+over the product's own CAN command set, and asserts on the telemetry and traces that come back. It
+does not reach into the firmware, does not mock its components, and knows nothing of its internal
+types.
 
-The test suite uses the **amp-cucumber-cpp-runner v4.0.0** framework. Scenarios are authored in Gherkin (`.feature` files). Step definitions share state through a typed context (`context.Get<FocIntegrationFixture>()`).
+Scenarios are authored in Gherkin and live in a single directory. A tag decides which target
+implements a scenario, and the runner is invoked with that tag.
+
+| Tag               | Target                                           | Detailed in                                    |
+|-------------------|--------------------------------------------------|------------------------------------------------|
+| `@sil`            | Real firmware under an emulator, simulated motor | `documentation/design/software-in-the-loop.md` |
+| `@sil-protection` | The same, board-protection scenarios held apart  | The same document, Part E                      |
+| `@hil`            | Real firmware on hardware, over the bridge       | This document                                  |
+
+> Earlier revisions described an in-process host fixture that mocked the platform and drove the
+> state machine directly. No such fixture exists, and none is planned: mocking the platform and
+> then asserting on the state machine tests the wiring of the test, not the product.
 
 ---
 
 ## Responsibilities
 
 **Is responsible for:**
-- Providing a shared test context (`FocIntegrationFixture`) that owns and wires all system-under-test components for each Cucumber scenario
-- Mocking hardware peripherals (PWM, encoder, current sense) directly via `PlatformFactoryMock`, which implements `PlatformFactory` (and therefore `foc::ThreePhaseInverter` + `foc::Encoder`) with `MOCK_METHOD` for each operation
-- Supplying an in-memory EEPROM stub so the full NVM stack executes synchronously without embedded hardware
-- Enabling step-by-step async callback control for calibration sequence testing
-- Injecting CAN commands directly into the category server to verify state machine transitions independently of CAN transport encoding
+- Starting, stopping and isolating a target for each scenario
+- Presenting one interactor seam so a scenario reads the same whichever target implements it
+- Encoding commands and decoding telemetry on the product's wire format
+- Describing the simulated world a software-in-the-loop target runs in
 
 **Is NOT responsible for:**
-- Testing FOC control algorithm correctness — covered by unit tests in `core/foc/cascade/test/`
-- Testing CAN framing or transport encoding — covered by `can-lite` unit and integration tests
-- Running on an embedded target — host-only suite
-
-### Platform Factory Mock
-
-`PlatformFactoryMock` mocks every pure virtual of `application::PlatformFactory`, including the inverter
-hot-path methods it inherits from `foc::ThreePhaseInverter` (`PhaseCurrentsReady`, `ThreePhasePwmOutput`,
-`Start`, `Stop`, `BaseFrequency`, `MaxCurrentSupported`) and the encoder methods from `foc::Encoder` (`Read`,
-`Set`, `SetZero`), plus the configuration methods (`ConfigureAdcAndPwm`, `SetEncoderResolution`,
-`ConfigureCanBus`, `CanBus`). There are no creator proxies, no per-peripheral wrapper mocks, and no
-`PlatformAdapter`.
-
-The fixture registers standing `EXPECT_CALL` defaults in its constructor:
-
-| Method                                                                         | Default expectation                            |
-|--------------------------------------------------------------------------------|------------------------------------------------|
-| `PhaseCurrentsReady`, `ThreePhasePwmOutput`, `Start`, `Stop`, `Set`, `SetZero` | `Times(AnyNumber())`                           |
-| `BaseFrequency`                                                                | `WillRepeatedly(Return(hal::Hertz{ 10000 }))`  |
-| `Read`                                                                         | `WillRepeatedly(Return(foc::Radians{ 0.0f }))` |
-
-The `EepromStub` (512-byte in-memory array, all `0xFF` at construction, synchronous R/W) is a separate non-mock class owned by the fixture. The NVM regions reference the stub directly.
-
-### FOC Integration Fixture
-
-Central test fixture (`FocIntegrationFixture`) shared across all scenarios via the Cucumber context. Member construction order is declaration order; the key constraint is that the state machine must be constructed after the direct-method expectations are registered on `PlatformFactoryMock`.
-
-Lifecycle of each scenario:
-
-```mermaid
-sequenceDiagram
-    participant Context
-    participant Fixture as FocIntegrationFixture
-    participant PFM as PlatformFactoryMock
-    participant SM as FocStateMachineCommon
-    participant NVM as NonVolatileMemoryImpl
-
-    Context->>Fixture: Emplace (constructor)
-    Fixture->>PFM: EXPECT_CALL PhaseCurrentsReady / ThreePhasePwmOutput / Start / Stop (AnyNumber)
-    Fixture->>PFM: EXPECT_CALL BaseFrequency → 10 kHz (AnyNumber)
-    Fixture->>PFM: EXPECT_CALL Read → 0 rad (AnyNumber)
-    Fixture->>PFM: EXPECT_CALL Set / SetZero (AnyNumber)
-    Note over Fixture,NVM: calibrationRegion / configRegion reference eepromStub directly
-
-    Context->>Fixture: GIVEN step calls ConstructWithInvalidNvm()
-    Fixture->>SM: emplace(TerminalAndTracer, MotorHardware{platformFactory, platformFactory, vdc}, nvm, ...)
-    Fixture->>NVM: IsCalibrationValid(cb)
-    NVM-->>Fixture: cb(false) via event dispatcher
-    Note over Fixture: State machine in Idle
-```
-
-The state machine is always constructed with `TransitionPolicy::Auto` so that test steps can call `CmdCalibrate()`, `CmdEnable()` and `CmdDisable()` directly without going through the terminal CLI.
-
-### State Machine Bridge
-
-`FocMotorStateMachineBridge` implements `FocMotorCategoryServerObserver` and delegates the relevant lifecycle commands to `FocStateMachineBase`:
-
-| CAN observer callback | State machine method |
-|-----------------------|----------------------|
-| `OnStart()`           | `CmdEnable()`        |
-| `OnStop()`            | `CmdDisable()`       |
-| `OnClearFault()`      | `CmdClearFault()`    |
-| All others            | no-op                |
+- Control algorithm correctness in the small — that is what the unit tests under each library cover
+- CAN framing and payload layout — that is the wire contract tests' job
+- Substituting for hardware-in-the-loop, which alone exercises silicon, timing and analogue paths
 
 ---
 
 ## Component Details
 
-### Calibration Flow
+### The interactor seam
 
-The calibration scenario requires step-by-step control of async callbacks. The fixture captures each service callback as a member:
+Everything a scenario needs from a target sits behind one interface: lifecycle, command and
+telemetry transport, and — for a simulated target only — the world the firmware runs in.
+
+```mermaid
+graph TD
+    STEPS["Step definitions"] --> FIXTURE["Scenario fixture"]
+    FIXTURE --> SEAM["Target interactor"]
+    SEAM --> SIL["Emulator interactor"]
+    SEAM --> HIL["Hardware interactor"]
+    SIL --> QEMU["Emulated target"]
+    HIL --> BRIDGE["Hardware bridge"]
+    BRIDGE --> BOARD["Motor board"]
+```
+
+The simulation seam — describe the plant, describe stored memory, restart — defaults to doing
+nothing and to reporting that simulation is unsupported. A hardware target inherits that default,
+and a scenario that configures a plant fails loudly rather than quietly testing something else.
+
+### Scenario lifecycle
+
+Each scenario gets a fresh target. Setup accumulates in the scenario's own state and is applied in
+a single restart, so a scenario that describes a plant, a calibration and a set of algorithms still
+starts the target once rather than once per description.
 
 ```mermaid
 sequenceDiagram
-    participant Step as Gherkin step
-    participant Fixture
-    participant SM as State Machine
-    participant EIM as ElectricalIdentMock
-    participant AMK as AlignmentMock
-
-    Step->>SM: CmdCalibrate()
-    SM->>EIM: EstimateNumberOfPolePairs(_, cb)
-    EIM-->>Fixture: capturedPolePairsCallback = cb
-
-    Step->>Fixture: CompletePolePairsEstimation(7)
-    Fixture->>SM: capturedPolePairsCallback(7)
-    SM->>EIM: EstimateResistanceAndInductance(_, cb)
-    EIM-->>Fixture: capturedRLCallback = cb
-
-    Step->>Fixture: CompleteRLEstimation(R, L)
-    Fixture->>SM: capturedRLCallback(R, L)
-    SM->>AMK: ForceAlignment(polePairs, cfg, cb)
-    AMK-->>Fixture: capturedAlignmentCallback = cb
-
-    Step->>Fixture: CompleteAlignment(offset)
-    Fixture->>SM: capturedAlignmentCallback(offset)
-    SM->>NVM: SaveCalibration(data, cb)
-    Note over NVM: real EEPROM write, completes synchronously
-    SM-->>Step: state == Ready
+    participant R as Runner
+    participant I as Interactor
+    participant T as Target
+    R->>I: before scenario
+    I->>T: start fresh
+    R->>I: describe plant and stored memory
+    R->>I: boot
+    I->>T: restart with those in place
+    R->>T: commands
+    T-->>R: telemetry and traces
+    R->>I: after scenario
+    I->>T: stop and discard
 ```
 
-### CAN Integration
+### Observation
 
-To keep scenarios focused on the state machine response rather than CAN wire encoding, CAN frames are injected via `FocMotorCategoryServer::HandleMessage()` directly. A `CanFrameTransport` backed by a `StrictMock<hal::CanMock>` is still required because the server sends acknowledgement frames via the transport.
+Three channels, all of them the product's own:
 
-```mermaid
-sequenceDiagram
-    participant Step as Gherkin step
-    participant MCS as FocMotorCategoryServer
-    participant BRG as FocMotorStateMachineBridge
-    participant SM as State Machine
+- **Telemetry** carries the lifecycle state, the fault code, and the measured speed and position.
+- **Command acknowledgements** carry acceptance or the reason for refusal.
+- **Traces** carry what the firmware decided, most importantly which algorithm each loop ended up
+  running, which can differ from what was asked for.
 
-    Step->>MCS: HandleMessage(focStartId, data)
-    MCS->>BRG: OnStart()
-    BRG->>SM: CmdEnable()
-    SM-->>Step: CurrentState() == Enabled
-```
+Trace output only drains while the target's event loop has work, so an assertion that waits for a
+trace polls telemetry rather than waiting passively. Trace lines are retained across the frames the
+command path reads, and cleared per scenario and per restart, so an assertion cannot match a line
+from an earlier boot.
+
+### Isolation
+
+Scenarios ran into each other through three shared resources, all now per session: the working
+directory holding the target's files, the socket carrying frames, and the captured output.
 
 ---
 
 ## Interfaces
 
-### Provided to Step Definitions
+### Provided to step definitions
 
-The `FocIntegrationFixture` exposes the following test API consumed by Gherkin step definitions:
+| Capability        | Purpose                                                         |
+|-------------------|-----------------------------------------------------------------|
+| Lifecycle         | Start, stop and restart the target                              |
+| Command transport | Send a category command and await its acknowledgement           |
+| Telemetry         | Await a state, a fault code, or read the measured position      |
+| Serial capture    | Drain and search the target's trace output                      |
+| Simulation        | Describe the plant and the stored calibration and configuration |
 
-| Method                           | Purpose                                                                      |
-|----------------------------------|------------------------------------------------------------------------------|
-| `ConstructWithInvalidNvm()`      | Constructs the state machine with an empty EEPROM — starts in Idle           |
-| `ConstructWithValidNvm(data)`    | Pre-populates EEPROM and constructs the state machine — starts in Ready      |
-| `SetupCalibrationExpectations()` | Arms the pole-pairs estimation mock to capture its callback                  |
-| `CompletePolePairsEstimation(n)` | Fires the captured pole-pairs callback with a success result                 |
-| `CompleteRLEstimation(R, L)`     | Fires the captured R/L callback and arms the alignment mock                  |
-| `CompleteAlignment(offset)`      | Fires the captured alignment callback, triggering NVM save                   |
-| `SetupCanIntegration()`          | Wires the CAN category server and bridge to the state machine                |
-| `InjectCanStart()`               | Injects a CAN Start message via `FocMotorCategoryServer::HandleMessage`      |
-| `InjectCanStop()`                | Injects a CAN Stop message via `FocMotorCategoryServer::HandleMessage`       |
-| `InjectCanClearFault()`          | Injects a CAN ClearFault message via `FocMotorCategoryServer::HandleMessage` |
+### Required from the system under test
 
-### Required from System Under Test
+- A CAN command set covering mode selection, calibration, alignment, enable, disable, setpoints,
+  telemetry requests and fault clearing
+- Telemetry reporting state, fault code, measured speed and measured position
+- Traces naming the algorithm each control loop is running
+- For a simulated target, that it read its plant description at boot
 
-| Component                 | Interface                            | Purpose                                               |
-|---------------------------|--------------------------------------|-------------------------------------------------------|
-| FOC State Machine         | `FocStateMachineBase`                | Lifecycle commands and state inspection               |
-| Non-Volatile Memory       | `NonVolatileMemory`                  | Calibration data load and save for the NVM-boot path  |
-| CAN Category Server       | `FocMotorCategoryServer`             | CAN command dispatch via `HandleMessage`              |
-| Electrical Identification | `ElectricalParametersIdentification` | Controlled via mock in calibration scenarios          |
-| Motor Alignment           | `MotorAlignment`                     | Controlled via mock in calibration scenarios          |
-| Fault Notifier            | `FaultNotifier`                      | Triggered via mock to test hardware-fault transitions |
+No test-only command is added to the product to make the suite work.
 
 ---
 
 ## Feature-to-Requirements Mapping
 
-| Feature file                      | Scenarios                                                                           | Requirements covered                                                                               |
-|-----------------------------------|-------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
-| `state_machine_lifecycle.feature` | Idle on boot, calibration start, enable/disable, fault, fault clear, valid NVM boot | REQ-SM-001..010                                                                                    |
-| `calibration_flow.feature`        | Full calibration success, calibration failure                                       | REQ-SM-003..005, REQ-SM-011                                                                        |
-| `can_foc_motor.feature`           | CAN Start, CAN Stop, CAN ClearFault                                                 | REQ-INT-001..003 (REQ-INT-004 is structural — verified by bridge design, not a dedicated scenario) |
-| `watchdog.feature`                | Supervision off before enable, deadline reported, stalled feed context resets target and reboots reporting the watchdog cause | REQ-EH-008..009, REQ-EH-012, REQ-HIL-011..012                            |
+Each scenario carries the requirement identifiers it verifies as tags alongside its runner tag.
+The traceability matrix is generated from those tags during release, reading the feature directory
+directly, so the mapping lives with the scenarios rather than in this document where it would rot.

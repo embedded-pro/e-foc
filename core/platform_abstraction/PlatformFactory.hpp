@@ -57,6 +57,7 @@ namespace application
         {
             overCurrent,
             overVoltage,
+            underVoltage,
             overTemperature,
         };
 

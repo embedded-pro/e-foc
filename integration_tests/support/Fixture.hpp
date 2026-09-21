@@ -6,6 +6,7 @@
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -30,6 +31,10 @@ namespace integration
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
         bool WaitForMotorState(can::FocMotorState expectedState,
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
+        bool WaitForFaultCode(can::FocFaultCode expectedFault,
+            std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
+        std::optional<float> ReadMeasuredPosition(
+            std::chrono::milliseconds timeout = std::chrono::milliseconds{ 2000 });
         bool SelectControlMode(can::FocMotorMode mode,
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
         bool EnableMotor(

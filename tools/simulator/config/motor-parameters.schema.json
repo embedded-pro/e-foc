@@ -24,7 +24,8 @@
         "flux_linkage_weber",
         "pole_pairs",
         "rotor_inertia_kg_m2",
-        "viscous_damping_nm_s_per_rad"
+        "viscous_damping_nm_s_per_rad",
+        "max_supported_current_ampere"
       ],
       "properties": {
         "stator_resistance_ohm": {
@@ -44,7 +45,7 @@
         },
         "flux_linkage_weber": {
           "type": "number",
-          "description": "Permanent magnet flux linkage (ψf) in Weber",
+          "description": "Permanent magnet flux linkage (\u03c8f) in Weber",
           "exclusiveMinimum": 0
         },
         "pole_pairs": {
@@ -54,13 +55,18 @@
         },
         "rotor_inertia_kg_m2": {
           "type": "number",
-          "description": "Rotor moment of inertia (J) in kg·m²",
+          "description": "Rotor moment of inertia (J) in kg\u00b7m\u00b2",
           "exclusiveMinimum": 0
         },
         "viscous_damping_nm_s_per_rad": {
           "type": "number",
-          "description": "Viscous damping coefficient (B) in N·m·s/rad",
+          "description": "Viscous damping coefficient (B) in N\u00b7m\u00b7s/rad",
           "minimum": 0
+        },
+        "max_supported_current_ampere": {
+          "type": "number",
+          "description": "Peak phase current the inverter reports as supported (I_max) in Amperes",
+          "exclusiveMinimum": 0
         }
       },
       "additionalProperties": false

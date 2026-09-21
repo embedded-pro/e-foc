@@ -10,6 +10,7 @@ namespace state_machine
         none,
         overcurrent,
         overvoltage,
+        undervoltage,
         overtemperature,
         encoderLoss,
         watchdogTimeout,

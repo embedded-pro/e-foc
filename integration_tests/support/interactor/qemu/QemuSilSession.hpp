@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 #include <sys/types.h>
+#include <vector>
 
 namespace sil
 {
@@ -15,13 +16,22 @@ namespace sil
         ~QemuSilSession();
 
         bool Start(const std::string& elfPath);
+        bool Restart(const std::string& elfPath);
         void Stop();
+
+        bool CreateScenarioDirectory();
+        void RemoveScenarioDirectory();
+        const std::string& ScenarioDirectory() const;
+        bool WriteScenarioFile(const std::string& name, const std::vector<uint8_t>& contents) const;
 
         bool SendLine(const std::string& line);
         bool ReadLine(std::string& line, std::chrono::milliseconds timeout);
         bool WaitFor(const std::string& prefix, std::string& line, std::chrono::milliseconds timeout);
 
         bool IsRunning() const;
+
+        const std::vector<std::string>& CapturedLines() const;
+        void ClearCapturedLines();
 
         bool SendCanFrame(hal::Can::Id id, const hal::Can::Message& data);
         bool WaitForCanFrame(hal::Can::Id expectedId, hal::Can::Message& out,
@@ -35,6 +45,10 @@ namespace sil
 
         bool FillReadBuffer(int timeoutMs);
 
+        static constexpr std::size_t maxCapturedLines = 4096;
+
+        std::vector<std::string> capturedLines;
+        std::string scenarioDirectory;
         pid_t pid{ -1 };
         int outPipeFd{ -1 };
         int inSockFd{ -1 };

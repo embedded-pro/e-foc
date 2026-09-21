@@ -24,6 +24,7 @@ namespace can
             FocMotorCategoryServer& server,
             state_machine::ControlModeStateMachine& controlMode,
             const drivers::ThreePhaseInverter& inverter,
+            drivers::Encoder& encoder,
             services::ElectricalParametersIdentification& electricalIdent,
             services::MechanicalParametersIdentification* mechIdent,
             foc::NewtonMeter mechTorqueConstant,
@@ -70,6 +71,7 @@ namespace can
         FocMotorCategoryServer& server;
         state_machine::ControlModeStateMachine& controlMode;
         const drivers::ThreePhaseInverter& inverter;
+        drivers::Encoder& encoder;
         services::ElectricalParametersIdentification& electricalIdent;
         services::MechanicalParametersIdentification* mechIdent;
         foc::NewtonMeter mechTorqueConstant;

@@ -73,6 +73,8 @@ namespace state_machine
                 return FaultCode::overcurrent;
             case application::PlatformFactory::BoardProtectionReason::overVoltage:
                 return FaultCode::overvoltage;
+            case application::PlatformFactory::BoardProtectionReason::underVoltage:
+                return FaultCode::undervoltage;
             case application::PlatformFactory::BoardProtectionReason::overTemperature:
                 return FaultCode::overtemperature;
         }
