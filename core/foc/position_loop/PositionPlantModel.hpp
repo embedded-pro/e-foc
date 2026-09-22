@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/foc/interfaces/MotorModel.hpp"
+#include "core/foc/speed_loop/SpeedPlantModel.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <cmath>
 #include <numbers>
@@ -15,7 +16,6 @@ namespace foc
         static PositionPlantModel FromParameters(const MechanicalModelParameters& parameters);
     };
 
-    float NormalizedEffortWeight(float bandwidth, hal::Hertz samplingFrequency);
     float WeightRatio(float weight, float positionErrorWeight);
 
     ALWAYS_INLINE_HOT float WrappedPositionError(Radians reference, Radians measured)

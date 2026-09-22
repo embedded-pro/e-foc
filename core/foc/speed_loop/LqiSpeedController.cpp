@@ -18,6 +18,7 @@ namespace foc
 
     bool LqiSpeedController::SetTunings(const SpeedLoopTunings& tunings)
     {
+        bandwidth = tunings.bandwidth;
         speedErrorWeight = tunings.speedErrorWeight;
         integralWeight = tunings.integralWeight;
         return Construct();
@@ -74,11 +75,16 @@ namespace foc
             { speedErrorWeight, 0.0f },
             { 0.0f, integralWeight }
         };
-        const math::SquareMatrix<float, 1> inputWeight{ 1.0f };
 
         const auto stateMatrix = SpeedPlant::StateMatrix{ plant.ad };
-        const auto inputMatrix = SpeedPlant::InputMatrix{ plant.bd * parameters.maxCurrent.Value() };
+        const auto normalizedInputGain = plant.bd * parameters.maxCurrent.Value();
+        const auto inputMatrix = SpeedPlant::InputMatrix{ normalizedInputGain };
         const auto model = SpeedPlant::WithFullStateOutput(stateMatrix, inputMatrix);
+
+        const math::SquareMatrix<float, 1> inputWeight{
+            NormalizedEffortWeight(bandwidth, parameters.samplingFrequency) * normalizedInputGain * normalizedInputGain
+        };
+
         lqi = SpeedLqi{ model, stateWeight, inputWeight, 1.0f };
         return true;
     }

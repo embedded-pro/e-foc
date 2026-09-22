@@ -17,6 +17,7 @@ namespace foc
     bool AreMechanicalParametersValid(const MechanicalModelParameters& parameters);
     float OuterSamplePeriod(hal::Hertz samplingFrequency);
     float PlantInputGain(const MechanicalModelParameters& parameters);
+    float NormalizedEffortWeight(float bandwidth, hal::Hertz samplingFrequency);
 
     ALWAYS_INLINE_HOT foc::Ampere LimitToCurrentEnvelope(float current, foc::Ampere maxCurrent)
     {

@@ -14,9 +14,7 @@ Feature: FOC Control Performance
   The duty cycle reaches the inverter in whole percent, so the current loop
   ripples around its setpoint by about a tenth of an ampere; the @sil current
   rows carry the envelope the product holds today and the @sil-known-defect rows
-  the envelope the laws should meet. The LQI speed law overshoots a step from
-  rest more than twofold and is erratic on a change while running, so its rows
-  are held out the same way. See documentation/design/software-in-the-loop.md.
+  the envelope the laws should meet. See documentation/design/software-in-the-loop.md.
 
   @REQ-SPD-008
   Scenario Outline: The <algorithm> speed loop steps from rest to 20 rad/s
@@ -43,11 +41,7 @@ Feature: FOC Control Performance
       | pid       | 10       | 60        | 15            | 0.5   |
       | adrc      | 10       | 80        | 15            | 0.5   |
       | twodof    | 10       | 60        | 15            | 0.5   |
-
-    @sil-known-defect
-    Examples:
-      | algorithm | band_pct | settle_ms | overshoot_pct | error |
-      | lqi       | 10       | 100       | 20            | 1.0   |
+      | lqi       | 10       | 60        | 15            | 0.5   |
 
   @REQ-SPD-008
   Scenario Outline: The <algorithm> speed loop follows a setpoint change to <target> rad/s while running
@@ -77,12 +71,8 @@ Feature: FOC Control Performance
       | adrc      | -20    | 10       | 80        | 15            | 0.5   |
       | twodof    | 40     | 10       | 60        | 15            | 0.5   |
       | twodof    | -20    | 10       | 60        | 15            | 0.5   |
-
-    @sil-known-defect
-    Examples:
-      | algorithm | target | band_pct | settle_ms | overshoot_pct | error |
-      | lqi       | 40     | 10       | 100       | 20            | 1.0   |
-      | lqi       | -20    | 10       | 100       | 20            | 1.0   |
+      | lqi       | 40     | 10       | 60        | 15            | 0.5   |
+      | lqi       | -20    | 10       | 60        | 15            | 0.5   |
 
   @sil @REQ-POS-009
   Scenario Outline: The <algorithm> position loop steps from rest to 1.5 rad
