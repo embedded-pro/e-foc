@@ -48,6 +48,7 @@
         "MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia.*lambda\\(auto:1",
         "MechanicalParametersIdentificationImpl::ScheduleFinish",
         "ClarkePark::Forward",
+        "RecursiveLeastSquares<float, 3u>::MakeRegressor",
         "RecursiveLeastSquares<float, 3u>::Update",
         "RecursiveLeastSquares<float, 3u>::EvaluateConvergence",
         "ExceedsInjectionLimit",
