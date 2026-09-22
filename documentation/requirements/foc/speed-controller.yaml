@@ -76,4 +76,9 @@
     within 50 ms of the step shall return the speed to within 2 rad/s of the setpoint and hold
     the mean of the window inside that band. LQI shall meet the same envelope with 100 ms; that
     row is held out of the default run until its response, pushed 26 rad/s off the setpoint by
-    a torque the other laws absorb within 2, is fixed.
+    a torque the other laws absorb within 2, is fixed. The envelope shall hold for a torque of
+    either sign, since a disturbance that assists the rotor unwinds the loop as surely as one
+    that opposes it. Where the step demands more current than the drive is allowed to deliver,
+    every law shall still return to its setpoint once the steady-state demand fits inside the
+    limit again, so that a recovery running through a saturated command unwinds rather than
+    latching the integrator.
