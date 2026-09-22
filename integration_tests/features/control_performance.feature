@@ -23,10 +23,18 @@ Feature: FOC Control Performance
   The current loop carries only one setpoint-change row where the outer loops
   carry eight. A command sent while the motor runs is delivered about half a
   second of guest time after enable, which at 20 kHz is ten thousand samples of
-  recording before the window even opens: one such row costs roughly thirty times
+  recording before the window even opens: one such row costs roughly fifty times
   the trace of a current scenario measured from rest. One row is enough to show
   the loop reverses cleanly with its integrator already loaded, and the outer
   loops cover the same ground far more cheaply.
+
+  Its sample budget is sized for that delivery and not for the window it
+  measures. The host decides when a command frame reaches the guest, so the tick
+  the setpoint lands on moves from run to run, and a budget that merely covers
+  the usual delay runs out on the run that takes longer: a second of recording
+  leaves about half of it spare, where six hundred milliseconds did not. The
+  outer loops never meet this because a thousand samples per second buys them
+  two full seconds of the same budget.
 
   That row carries twice the steady-state error and half again the overshoot of
   the rows measured from rest. Half a second of torque leaves the rotor turning,
@@ -198,7 +206,7 @@ Feature: FOC Control Performance
   @REQ-TRQ-007
   Scenario Outline: The <algorithm> current loop follows a setpoint change to <target> A while running
     Given a nominal motor plant
-    And the plant response is recorded at 20000 Hz for up to 12000 samples
+    And the plant response is recorded at 20000 Hz for up to 20000 samples
     And the motor is already calibrated
     And the motor boots in torque mode
     And the current loop runs the <algorithm> algorithm
