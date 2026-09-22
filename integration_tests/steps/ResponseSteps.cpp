@@ -251,6 +251,18 @@ THEN(R"(the {word} step response shall rise within {float} ms)", (std::string si
     EXPECT_LE(metrics->riseTimeS * kMilliPerSecond, riseMs) << SignalName(signal) << " rose too slowly";
 }
 
+THEN(R"(the {word} response tail shall stay within {float} % of the setpoint)", (std::string signalWord, float tailPercent))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    RequireCapturedTrace(setup);
+    const auto signal = RequireSignal(signalWord);
+
+    const auto metrics = StepMetricsFor(setup, signal, 2.0f, AlgorithmLabel(setup, signal));
+    ASSERT_TRUE(metrics.has_value());
+
+    EXPECT_LE(metrics->tailBandPercent, tailPercent) << SignalName(signal) << " keeps rippling outside its tail band";
+}
+
 THEN(R"(the steady-state {word} error shall be below {float} {word})", (std::string signalWord, float limit, std::string unit))
 {
     auto& setup = context.Get<ScenarioSetup>();

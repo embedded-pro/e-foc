@@ -61,8 +61,12 @@
     ADRC 80 ms, 15 percent; two-DOF 60 ms, 15 percent. A setpoint changed while running, to
     40 rad/s and to -20 rad/s, shall meet the same rows. LQI shall meet a 100 ms, 20 percent,
     1 rad/s row in both cases; that row is held out of the default run until its response, a
-    twofold overshoot from rest and an erratic swing on a running change, is fixed. The response
-    is measured on the plant's own trajectory on the control-tick time base.
+    twofold overshoot from rest and an erratic swing on a running change, is fixed. Each law's
+    rise time from a tenth to nine tenths of the step, and the band its tail still ripples in
+    over the last quarter of the window, shall also be bounded by the row it carries; both
+    bounds are permissive until a characterisation run pins them, so that a loop which never
+    rises or never stops ringing fails while the measured envelope is still being established.
+    The response is measured on the plant's own trajectory on the control-tick time base.
 
 - id: REQ-SPD-009
   title: Speed-loop rejection of a shaft torque step

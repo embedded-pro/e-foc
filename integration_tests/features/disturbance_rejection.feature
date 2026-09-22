@@ -13,10 +13,10 @@ Feature: Disturbance Rejection
   (the Teknic M-2310P-LN-04K reference motor).
 
   @REQ-SPD-009
-  Scenario Outline: The <algorithm> speed loop rejects a torque step while holding 20 rad/s
+  Scenario Outline: The <algorithm> speed loop rejects a <torque> Nm torque step while holding 20 rad/s
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 1200 samples
-    And a torque step of 0.002 Nm applied 300 ms after enable
+    And a torque step of <torque> Nm applied 300 ms after enable
     And the motor is already calibrated
     And the motor boots in speed mode
     And the speed loop runs the <algorithm> algorithm
@@ -32,17 +32,21 @@ Feature: Disturbance Rejection
 
     @sil
     Examples:
-      | algorithm | deviation | band | recovery_ms |
-      | pid       | 4.0       | 2.0  | 50          |
-      | adrc      | 4.0       | 2.0  | 50          |
-      | twodof    | 4.0       | 2.0  | 50          |
-      | lqi       | 4.0       | 2.0  | 50          |
+      | algorithm | torque | deviation | band | recovery_ms |
+      | pid       | 0.002  | 4.0       | 2.0  | 50          |
+      | pid       | -0.002 | 4.0       | 2.0  | 50          |
+      | adrc      | 0.002  | 4.0       | 2.0  | 50          |
+      | adrc      | -0.002 | 4.0       | 2.0  | 50          |
+      | twodof    | 0.002  | 4.0       | 2.0  | 50          |
+      | twodof    | -0.002 | 4.0       | 2.0  | 50          |
+      | lqi       | 0.002  | 4.0       | 2.0  | 50          |
+      | lqi       | -0.002 | 4.0       | 2.0  | 50          |
 
   @sil @REQ-POS-010
-  Scenario Outline: The <algorithm> position loop holds 1.5 rad against a torque step
+  Scenario Outline: The <algorithm> position loop holds 1.5 rad against a <torque> Nm torque step
     Given a nominal motor plant
     And the plant response is recorded at 1000 Hz for up to 1400 samples
-    And a torque step of 0.002 Nm applied 500 ms after enable
+    And a torque step of <torque> Nm applied 500 ms after enable
     And the motor is already calibrated
     And the motor boots in position mode
     And the position loop runs the <algorithm> algorithm
@@ -57,9 +61,14 @@ Feature: Disturbance Rejection
     And the response shall have no dropped samples
 
     Examples:
-      | algorithm | deviation | band | recovery_ms |
-      | pid       | 0.1       | 0.08 | 50          |
-      | cascadep  | 0.1       | 0.08 | 50          |
-      | lqr       | 0.1       | 0.08 | 50          |
-      | lqi       | 0.05      | 0.02 | 50          |
-      | twodof    | 0.1       | 0.08 | 50          |
+      | algorithm | torque | deviation | band | recovery_ms |
+      | pid       | 0.002  | 0.1       | 0.08 | 50          |
+      | pid       | -0.002 | 0.1       | 0.08 | 50          |
+      | cascadep  | 0.002  | 0.1       | 0.08 | 50          |
+      | cascadep  | -0.002 | 0.1       | 0.08 | 50          |
+      | lqr       | 0.002  | 0.1       | 0.08 | 50          |
+      | lqr       | -0.002 | 0.1       | 0.08 | 50          |
+      | lqi       | 0.002  | 0.05      | 0.02 | 50          |
+      | lqi       | -0.002 | 0.05      | 0.02 | 50          |
+      | twodof    | 0.002  | 0.1       | 0.08 | 50          |
+      | twodof    | -0.002 | 0.1       | 0.08 | 50          |
