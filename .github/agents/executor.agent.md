@@ -19,7 +19,7 @@ Implement code. Follow all constraints in AGENTS.md without exception.
 3. **Find patterns** — search `core/foc/` for existing patterns; follow them exactly
 4. **Red** — write failing tests first in `test/Test{ComponentName}.cpp` for every behavior
 5. **Green** — implement minimum production code to pass tests, one file at a time
-6. **Hot-path** — add `#pragma GCC optimize` + `OPTIMIZE_FOR_SPEED` to all hot-path code
+6. **Hot-path** — add a scoped (`push_options`/`pop_options`) `#pragma GCC optimize` + `OPTIMIZE_FOR_SPEED` to all hot-path code
 7. **Refactor** — clean up while keeping all tests green
 8. **CMake** — update `CMakeLists.txt` if new files added
 9. **Docs** — update `documentation/` for every algorithm or procedure added/changed

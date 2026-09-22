@@ -1,7 +1,3 @@
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC optimize("O3", "fast-math")
-#endif
-
 #include "targets/platform_implementations/qemu/implementation/SemihostingSerial.hpp"
 #include "infra/util/ByteRange.hpp"
 #include <cstdint>

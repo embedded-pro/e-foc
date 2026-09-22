@@ -38,16 +38,26 @@ currents or duty cycles — see REQ-PERF-003. Sensor and power-stage failures ar
 to catch. `foc::IsFiniteValue` exists for configuration-time and outer-loop checks only
 (`CurrentPlantModel::IsUsable`, the mechanical estimator's plausibility band); it is not for `Calculate()`.
 
-Required in every hot-path file:
+Required in every hot-path file: scope `#pragma GCC optimize` to the hot function(s) with `push_options`/`pop_options` — an unscoped file-wide pragma silently applies fast-math to every function in the translation unit, including config/validation code that must not get it.
 
 ```cpp
+#include "numerical/math/CompilerOptimizations.hpp"
+
 #if defined(__GNUC__) || defined(__clang__)
+#pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
 #endif
-#include "numerical/math/CompilerOptimizations.hpp"
+OPTIMIZE_FOR_SPEED
+ReturnType Calculate(...)
+{
+    ...
+}
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC pop_options
+#endif
 ```
 
-`OPTIMIZE_FOR_SPEED` on `Calculate()`, `Compute()`, and other hot-path methods.
+`OPTIMIZE_FOR_SPEED` alone is enough when the hot method is the only thing in the file that plausibly needs it — skip the pragma bracket in that case.
 
 ## FOC theory — correctness
 
@@ -196,7 +206,7 @@ Before finalizing any plan or implementation, verify:
 - [ ] No virtual dispatch in `Calculate()` hot path
 - [ ] No blocking calls or heap reachable from `Calculate()`
 - [ ] `FastTrigonometry` used — not raw `sin`/`cos`
-- [ ] `#pragma GCC optimize("O3","fast-math")` present (guarded); `OPTIMIZE_FOR_SPEED` on hot-path methods
+- [ ] `#pragma GCC optimize("O3","fast-math")` present (guarded) and scoped to the hot function(s) with `push_options`/`pop_options` — never file-wide; `OPTIMIZE_FOR_SPEED` on hot-path methods
 
 **FOC theory**
 - [ ] Clarke: `Iα=(2/3)·(Ia−(Ib+Ic)/2)`, `Iβ=(Ib−Ic)/√3`; Park: `Id=Iα·cos(θ)+Iβ·sin(θ)`, `Iq=−Iα·sin(θ)+Iβ·cos(θ)`

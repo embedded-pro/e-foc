@@ -1,7 +1,3 @@
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC optimize("O3", "fast-math")
-#endif
-
 #include "core/foc/current_loop/DeadbeatCurrentController.hpp"
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
 #include "numerical/controllers/implementations/DeadbeatControl.hpp"

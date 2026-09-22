@@ -1,7 +1,3 @@
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC optimize("O3", "fast-math")
-#endif
-
 #include "core/foc/speed_loop/LqiSpeedController.hpp"
 #include "core/foc/speed_loop/SpeedPlantModel.hpp"
 #include "numerical/math/LinearTimeInvariant.hpp"
@@ -32,6 +28,10 @@ namespace foc
         lqi.Reset();
     }
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3", "fast-math")
+#endif
     OPTIMIZE_FOR_SPEED
     foc::Ampere LqiSpeedController::Compute(const SpeedControlContext& context)
     {
@@ -51,6 +51,9 @@ namespace foc
 
         return LimitToCurrentEnvelope(control * parameters.maxCurrent.Value(), parameters.maxCurrent);
     }
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC pop_options
+#endif
 
     LqiSpeedController::SpeedLqi LqiSpeedController::Inert()
     {

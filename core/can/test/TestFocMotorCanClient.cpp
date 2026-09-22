@@ -1,5 +1,3 @@
-#pragma GCC optimize("O3", "fast-math")
-
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "can-lite/core/test/CanMock.hpp"
 #include "core/can/FocMotorCanClient.hpp"

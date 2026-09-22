@@ -1,7 +1,3 @@
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC optimize("O3", "fast-math")
-#endif
-
 #include "core/foc/speed_loop/SpeedControllerSelector.hpp"
 #include "core/foc/speed_loop/SpeedPlantModel.hpp"
 

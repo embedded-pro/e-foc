@@ -1,7 +1,3 @@
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC optimize("O3", "fast-math")
-#endif
-
 #include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/DutyConversion.hpp"
@@ -20,6 +16,10 @@ namespace foc
         previousAngleValid = false;
     }
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3", "fast-math")
+#endif
     OPTIMIZE_FOR_SPEED
     float SpeedDifferentiator::Measure()
     {
@@ -34,6 +34,9 @@ namespace foc
         previousAngle = currentAngle;
         return speed;
     }
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC pop_options
+#endif
 
     void EstimatorChannel::SetMechanical(OnlineMechanicalEstimator& estimator)
     {
@@ -148,6 +151,10 @@ namespace foc
         return speedLoop.Active();
     }
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3", "fast-math")
+#endif
     OPTIMIZE_FOR_SPEED
     PhasePwmDutyCycles CascadeWithSpeedLoop::CalculateInnerLoop(const PhaseCurrents& currentPhases, const Radians& position)
     {
@@ -177,12 +184,19 @@ namespace foc
 
         return ToDutyCycles(output);
     }
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC pop_options
+#endif
 
     void CascadeWithSpeedLoop::SetSpeedReference(RadiansPerSecond reference)
     {
         speedReference = reference.Value();
     }
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3", "fast-math")
+#endif
     OPTIMIZE_FOR_SPEED
     float CascadeWithSpeedLoop::MeasureMechanicalSpeed()
     {
@@ -202,6 +216,9 @@ namespace foc
     {
         lastSpeedLoopOutput = current;
     }
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC pop_options
+#endif
 
     float CascadeWithSpeedLoop::CurrentMechanicalAngle() const
     {

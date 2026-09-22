@@ -1,7 +1,3 @@
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC optimize("O3", "fast-math")
-#endif
-
 #include "core/foc/speed_loop/PidSpeedController.hpp"
 #include "core/foc/speed_loop/SpeedPlantModel.hpp"
 
@@ -24,6 +20,10 @@ namespace foc
         speedPid.Reset();
     }
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3", "fast-math")
+#endif
     OPTIMIZE_FOR_SPEED
     foc::Ampere PidSpeedController::Compute(const SpeedControlContext& context)
     {
@@ -31,6 +31,9 @@ namespace foc
 
         return LimitToCurrentEnvelope(speedPid.Process(context.measured.Value()) * parameters.maxCurrent.Value(), parameters.maxCurrent);
     }
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC pop_options
+#endif
 
     bool PidSpeedController::ApplyGains()
     {

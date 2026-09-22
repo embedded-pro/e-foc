@@ -1,5 +1,3 @@
-#pragma GCC optimize("O3", "fast-math")
-
 #include "can-lite/core/CanFrameCodec.hpp"
 #include "can-lite/core/CanFrameTransport.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"

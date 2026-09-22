@@ -1,7 +1,3 @@
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC optimize("O3", "fast-math")
-#endif
-
 #include "core/supervision/SupervisedInverter.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 
@@ -17,12 +13,19 @@ namespace supervision
         inverter.PhaseCurrentsReady(baseFrequency, onDone);
     }
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3", "fast-math")
+#endif
     OPTIMIZE_FOR_SPEED
     void SupervisedInverter::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
         inverter.ThreePhasePwmOutput(dutyPhases);
         progress.Signal();
     }
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC pop_options
+#endif
 
     void SupervisedInverter::Start()
     {

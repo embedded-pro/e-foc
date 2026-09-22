@@ -43,7 +43,7 @@ End with: total C/W/S counts + **APPROVE** or **REQUEST CHANGES**.
 - No virtual dispatch in `Calculate()` hot path
 - No blocking calls or heap reachable from `Calculate()`
 - Trig uses `FastTrigonometry` — not raw `sin`/`cos`
-- `#pragma GCC optimize("O3","fast-math")` present (guarded); `OPTIMIZE_FOR_SPEED` on hot-path methods
+- `#pragma GCC optimize("O3","fast-math")` present (guarded) and scoped to the hot function(s) with `push_options`/`pop_options` — never file-wide; `OPTIMIZE_FOR_SPEED` on hot-path methods
 
 **FOC theory**:
 - Clarke: `Iα=(2/3)·(Ia−(Ib+Ic)/2)`, `Iβ=(Ib−Ic)/√3`
