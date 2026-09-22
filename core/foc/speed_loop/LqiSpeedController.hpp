@@ -24,6 +24,7 @@ namespace foc
         bool Construct();
 
         MechanicalModelParameters parameters{};
+        float bandwidth{ SpeedLoopTunings{}.bandwidth };
         float speedErrorWeight{ SpeedLoopTunings{}.speedErrorWeight };
         float integralWeight{ SpeedLoopTunings{}.integralWeight };
         SpeedLqi lqi{ Inert() };

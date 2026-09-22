@@ -13,6 +13,16 @@ namespace
             foc::NewtonMeter{ 0.05f }, foc::Ampere{ 10.0f }, hal::Hertz{ 1000 } };
     }
 
+    // Teknic M-2310P-LN-04K (motor_parameters/TeknicM2310pLn04k.hpp), the reference motor the
+    // @sil-known-defect envelope was characterised against: small inertia gives a much larger
+    // normalized input gain (Kt/J * Ts * Imax) than ValidParameters() above, which is what exposes
+    // an unscaled LQR effort weight.
+    foc::MechanicalModelParameters ReferenceMotorParameters()
+    {
+        return { foc::NewtonMeterSecondSquared{ 7.06e-6f }, foc::NewtonMeterSecondPerRadian{ 1.5e-5f },
+            foc::NewtonMeter{ 0.0384f }, foc::Ampere{ 20.0f }, hal::Hertz{ 1000 } };
+    }
+
     class TestLqiSpeedController
         : public ::testing::Test
     {
@@ -41,6 +51,27 @@ namespace
             {
                 auto current = controller.Compute({ foc::RadiansPerSecond{ speed }, foc::RadiansPerSecond{ reference } });
                 speed = plant.ad * speed + plant.bd * current.Value();
+                peak = std::max(peak, speed);
+            }
+
+            return peak / reference - 1.0f;
+        }
+
+        // A real current loop never reacts within the same sample it was commanded; a design with
+        // no margin against that one-sample lag rings instead of settling (the @sil-known-defect
+        // failure mode: documentation/design/software-in-the-loop.md Part I).
+        float RelativeOvershootWithOneSampleActuationDelay(const foc::MechanicalModelParameters& parameters, float reference, std::size_t steps)
+        {
+            const auto plant = foc::SpeedPlantModel::FromParameters(parameters);
+            float speed{ 0.0f };
+            float peak{ 0.0f };
+            float pendingCurrent{ 0.0f };
+
+            for (std::size_t step = 0; step != steps; ++step)
+            {
+                auto current = controller.Compute({ foc::RadiansPerSecond{ speed }, foc::RadiansPerSecond{ reference } });
+                speed = plant.ad * speed + plant.bd * pendingCurrent;
+                pendingCurrent = current.Value();
                 peak = std::max(peak, speed);
             }
 
@@ -126,6 +157,16 @@ TEST_F(TestLqiSpeedController, a_saturating_step_overshoots_no_more_than_a_linea
     const auto linear = RelativeOvershoot(1.0f, 5000);
 
     EXPECT_LE(saturated, linear + 1.0e-3f);
+}
+
+TEST_F(TestLqiSpeedController, a_step_from_rest_stays_bounded_with_one_sample_of_actuation_delay)
+{
+    const auto parameters = ReferenceMotorParameters();
+    controller.Configure(parameters);
+
+    const auto overshoot = RelativeOvershootWithOneSampleActuationDelay(parameters, 20.0f, 800);
+
+    EXPECT_LT(overshoot, 0.5f);
 }
 
 TEST_F(TestLqiSpeedController, reset_clears_the_integrator)

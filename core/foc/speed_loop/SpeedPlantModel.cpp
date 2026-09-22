@@ -1,6 +1,7 @@
 #include "core/foc/speed_loop/SpeedPlantModel.hpp"
 #include "core/foc/interfaces/MotorModel.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
+#include <algorithm>
 #include <hal/synchronous_interfaces/SynchronousPwm.hpp>
 
 namespace foc
@@ -33,5 +34,12 @@ namespace foc
         const auto ad = 1.0f - parameters.viscousFriction.Value() * samplePeriod / parameters.inertia.Value();
 
         return { ad, PlantInputGain(parameters) * samplePeriod };
+    }
+
+    float NormalizedEffortWeight(float bandwidth, hal::Hertz samplingFrequency)
+    {
+        const auto bandwidthPerSample = std::clamp(bandwidth * OuterSamplePeriod(samplingFrequency), 1e-3f, 0.5f);
+
+        return 1.0f / (bandwidthPerSample * bandwidthPerSample);
     }
 }

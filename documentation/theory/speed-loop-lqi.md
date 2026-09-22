@@ -101,7 +101,17 @@ explicit performance cost.
 - $q_\omega$: speed error penalty — tighter tracking, higher control effort.
 - $q_I$: integral state penalty — faster integrator wind-down, less overshoot.
 - $R$: input penalty — directly caps the $i_q^*$ command.
-- Starting point: $q_\omega = 1$, $q_I = 0.1$, $R = 1/I_{q,max}^2$.
+- Starting point: $q_\omega = 1$, $q_I = 0.1$.
+- $R$ must scale with the plant's own normalized input gain squared, $b^2 = (K_t T_s^o I_{q,max} / J)^2$,
+  not a flat constant: a fixed $R$ is only the right order of magnitude when $b$ is $O(1)$, but $b$
+  varies by orders of magnitude across motors (small-inertia, high-torque-constant motors give a
+  large $b$). `LqiSpeedController` derives it as
+  `R = NormalizedEffortWeight(bandwidth, samplingFrequency) * b^2`, reusing the same bandwidth-to-effort
+  mapping the position-loop LQI/LQR controllers use (`core/foc/speed_loop/SpeedPlantModel.hpp`). Leaving
+  $R$ unscaled by $b^2$ produced an effectively deadbeat gain with no margin against the always-present
+  loop delay of a real (non-ideal) current loop — the root cause of the LQI speed law's
+  `@sil-known-defect` overshoot and poor disturbance rejection
+  (`documentation/design/software-in-the-loop.md` Part I).
 
 **Gain computation** runs once at configuration time off the hot path using the `DARE` solver from
 the numerical toolbox. The 1 kHz handler executes only the dot product.
