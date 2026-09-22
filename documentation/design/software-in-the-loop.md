@@ -229,9 +229,22 @@ Two results are worth recording because they are not obvious:
   Its torque follows the currents that actually flow, so masking the phases is enough.
 - A motor with **one open phase** still turns. Two phases can produce torque, so this is a
   degraded running condition rather than a dead motor, and nothing in the firmware detects it.
+- A **stuck encoder** passes alignment rather than failing it. Alignment declares the rotor
+  settled once its reading stops changing for a run of samples, and a reading frozen at one
+  value satisfies that on the first run it sees, more convincingly than a real rotor ever
+  does. The drive therefore takes its reference from a reading that means nothing and enables
+  on it. Nothing afterwards compares the reading against the current being pushed into the
+  winding, so a loop regulating that reading holds a position that cannot move while the
+  rotor is free to turn. The scenario pair in the wiring-fault feature records both halves:
+  the default-run scenario asserts what the product does today, that the drive runs and
+  reports a rotor which never moves, and the held-out scenario carries what it should do,
+  which is to report a sensor fault. The fault code for that already exists and is carried on
+  the wire; nothing raises it.
 
 Alignment also cannot converge once encoder noise reaches the threshold below which it declares
-the rotor settled, which bounds how noisy an encoder the current calibration tolerates.
+the rotor settled, which bounds how noisy an encoder the current calibration tolerates. A frozen
+reading and a noisy one therefore fail in opposite directions: the noisy encoder never settles
+and refuses to align, the frozen one settles at once and aligns against nothing.
 
 ### Part G — The plant reports its trajectory
 

@@ -129,6 +129,14 @@ GIVEN(R"(an {word} phase motor plant)", (std::string phase))
         << "Unknown motor plant preset: " << phase << " phase";
 }
 
+GIVEN(R"(a stuck encoder motor plant)")
+{
+    RequireSimulatedTarget();
+    auto& setup = context.Get<ScenarioSetup>();
+    ASSERT_TRUE(sil::TryNamedPlant("stuck encoder", setup.plant)) << "Unknown motor plant preset: stuck encoder";
+    setup.plantName = "stuck encoder";
+}
+
 GIVEN(R"(a motor plant with:)")
 {
     RequireSimulatedTarget();
