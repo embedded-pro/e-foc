@@ -87,7 +87,7 @@ The description covers everything the plant needs:
 | Measurement       | Current noise deviation and per-phase bias, encoder noise deviation and bias  |
 | Thermal           | Ambient, thermal resistance and capacitance, copper and iron coefficients     |
 | Protection        | Over-current, over-voltage, under-voltage and over-temperature trips          |
-| Fault injection   | Open phase per phase, stuck encoder, supply voltage scaling                   |
+| Fault injection   | Open phase per phase, stuck encoder, when it freezes, supply voltage scaling  |
 | Reproducibility   | The seed both noise generators start from                                     |
 | Disturbance       | A signed shaft torque and the delay after enabling at which it steps in       |
 | Recording         | The rate at which the plant reports its trajectory, and how many samples      |
@@ -240,6 +240,17 @@ Two results are worth recording because they are not obvious:
   reports a rotor which never moves, and the held-out scenario carries what it should do,
   which is to report a sensor fault. The fault code for that already exists and is carried on
   the wire; nothing raises it.
+
+An encoder can also be told to freeze a set time after the motor is enabled rather than to have
+been dead all along, scheduled the same way as the shaft torque of Part H and on the same
+guest-time base. The two describe different failures and are worth keeping apart: an encoder
+already stuck when the drive aligns corrupts the reference the drive takes, while one that
+freezes afterwards leaves a valid reference and stops reporting against it. The delay is carried
+in hundredths of a second, in a byte the plant description already held in reserve, so a
+description written before the freeze existed still reads as one that never freezes and the
+record neither grew nor changed version. What freezes is what the firmware reads; the plant goes
+on reporting its own trajectory truthfully, which is what lets a scenario see the rotor moving
+while the drive does not.
 
 Alignment also cannot converge once encoder noise reaches the threshold below which it declares
 the rotor settled, which bounds how noisy an encoder the current calibration tolerates. A frozen

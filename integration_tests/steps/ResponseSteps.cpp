@@ -197,6 +197,18 @@ GIVEN(R"(a torque step of {float} Nm applied {int} ms after enable)", (float tor
     setup.plant.torqueStepDelayMs = static_cast<uint32_t>(delayMs);
 }
 
+GIVEN(R"(the encoder freezes {int} ms after enable)", (int delayMs))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    ASSERT_TRUE(TargetInteractor::Instance().SupportsSimulatedPlant()) << "Freezing the encoder needs a simulated target";
+    ASSERT_FALSE(setup.booted) << "The encoder freeze must be scheduled before the target boots";
+    ASSERT_GT(delayMs, 0) << "A zero delay is how a scenario says the encoder never freezes while running";
+    ASSERT_EQ(delayMs % 10, 0) << "The freeze delay is carried in centiseconds and must be a whole number of them";
+    ASSERT_LE(delayMs, 2550) << "The freeze delay must fit in the byte the plant record carries it in";
+
+    setup.plant.encoderFreezeDelayCentiseconds = static_cast<uint8_t>(delayMs / 10);
+}
+
 WHEN(R"(the response is captured for {int} ms after enable)", (int milliseconds))
 {
     auto& setup = context.Get<ScenarioSetup>();

@@ -45,6 +45,33 @@ Feature: Disconnected And Faulty Motor Wiring
     Then the state machine shall be in the running state
     And the rotor shall not turn
 
+  @sil @REQ-SM-008
+  Scenario: An encoder that freezes while running does not fault the drive
+    Given a nominal motor plant
+    And the plant response is recorded at 1000 Hz for up to 800 samples
+    And the encoder freezes 200 ms after enable
+    And the motor is already calibrated
+    And the motor boots in speed mode
+    When the target boots
+    And the rotor is aligned
+    When a speed setpoint of 20 rad/s is applied
+    And the motor is enabled
+    And the response is captured for 550 ms after enable
+    Then the state machine shall be in the running state
+    And the response shall have no dropped samples
+
+  @sil-known-defect @REQ-SM-008
+  Scenario: An encoder that freezes while running shall be detected as a sensor fault
+    Given a nominal motor plant
+    And the encoder freezes 200 ms after enable
+    And the motor is already calibrated
+    And the motor boots in speed mode
+    When the target boots
+    And the rotor is aligned
+    And the motor is enabled
+    And a speed setpoint of 20 rad/s is applied
+    Then the state machine shall report an sensor fault
+
   @sil-known-defect @REQ-SM-008
   Scenario: A stuck encoder shall be detected as a sensor fault
     Given a stuck encoder motor plant

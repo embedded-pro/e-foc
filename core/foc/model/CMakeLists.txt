@@ -5,6 +5,7 @@ target_include_directories(e_foc.foc.model PUBLIC
 )
 
 target_sources(e_foc.foc.model PRIVATE
+    EncoderFreezeScheduler.hpp
     PlantResponseRecorder.hpp
     ThreePhaseMotorModel.cpp
     ThreePhaseMotorModel.hpp

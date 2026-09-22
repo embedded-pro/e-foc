@@ -64,7 +64,7 @@ namespace sil
 
             .polePairs = 0u,
             .faultFlags = 0u,
-            .reserved0 = 0u,
+            .encoderFreezeDelayCentiseconds = 0u,
             .reserved1 = 0u,
         };
 
