@@ -2,9 +2,9 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.2.0
+version: 1.3.0
 component: "software-in-the-loop"
-date: 2026-09-21
+date: 2026-09-22
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-09-21
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.2.0                       |
+| Version   | 1.3.0                       |
 | Component | software-in-the-loop        |
-| Date      | 2026-09-21                  |
+| Date      | 2026-09-22                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -276,7 +276,11 @@ setpoint changed while running has an onset the host can look up rather than gue
 The measurements themselves are the classical ones and are computed on the host with the
 numerical toolbox's step-response metrics: rise time, settling time into a two-percent band,
 percent overshoot, peak time and steady-state error over the tail of the window. A step is
-normalised before measuring, so a reversal or a step down is the same unit step as a step up. A
+normalised before measuring, so a reversal or a step down is the same unit step as a step up.
+Settling time, overshoot, steady-state error, rise time and the band the tail still ripples in
+are each bounded by the row the scenario carries. Peak time is printed and not asserted: a law
+that does not overshoot has its largest sample wherever the tail ripple happened to peak, so a
+bound on it would measure the duty quantisation rather than the law. A
 disturbance is measured as the largest excursion from the setpoint and the time of the last
 excursion outside a band around it, which is the same settling computation applied to the
 recovery. Every measurement is also printed as a labelled line, which is how limits are found:
@@ -456,6 +460,7 @@ estimators should meet (REQ-CAL-014).
 | Memory integrity         | Damaged calibration is distrusted; damaged configuration falls to defaults                                        |
 | Board protection         | Trips reach the state machine and are reported                                                                    |
 | Control performance      | Each loop's step response stays inside its settling, overshoot and error envelope, from rest and while running    |
+| Control robustness       | The same response measured on a noisy, hot, loaded or differently wound plant, and the law reported still running |
 | Disturbance rejection    | A shaft torque step while regulating is bounded in excursion and recovered from                                   |
 | Parameter identification | What the firmware identifies offline, and tracks online, matches the plant it was given, on both reference motors |
 

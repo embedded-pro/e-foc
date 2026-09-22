@@ -111,3 +111,16 @@
     via the CLI (active_algorithms command) and shall reflect the algorithm that
     is currently dispatched in the ISR, not the value most recently requested or
     persisted.
+
+- id: REQ-CTRL-014
+  title: Control laws stay bounded on plants other than the nominal one
+  shall: >
+    Every speed and position control law shall reach its setpoint and stay near it on a plant
+    that is not the one its limits were characterised against: a noisy encoder and current
+    measurement, a winding held near its thermal limit, a mechanically loaded shaft, and the
+    second reference motor (the Anaheim BLY172S-24V-4000 on its 24 V bus). A law selected by
+    state feedback shall additionally be the law the firmware reports as running, so that a
+    design which did not converge for that motor is caught rather than silently leaving the
+    previous law in place and measuring it instead. The envelope on those plants is permissive
+    until a characterisation run pins it, and bounds a law that fails to reach its setpoint,
+    rings without settling, or holds far from it.
