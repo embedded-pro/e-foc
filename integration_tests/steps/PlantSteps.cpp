@@ -11,6 +11,27 @@ using namespace integration;
 
 namespace
 {
+    constexpr float kMilliPerUnit = 1000.0f;
+
+    bool ScaleStoredCalibration(services::CalibrationData& calibration, const std::string& quantity, float factor)
+    {
+        if (quantity == "resistance")
+            calibration.rPhase *= factor;
+        else if (quantity == "inductance")
+        {
+            calibration.lD *= factor;
+            calibration.lQ *= factor;
+        }
+        else if (quantity == "inertia")
+            calibration.inertia *= factor;
+        else if (quantity == "friction")
+            calibration.frictionViscous *= factor;
+        else
+            return false;
+
+        return true;
+    }
+
     bool ApplyPlantOverride(sil::SilPlantConfig& plant, const std::string& key, const std::string& rawValue)
     {
         const float value = std::strtof(rawValue.c_str(), nullptr);
@@ -57,6 +78,14 @@ namespace
             plant.ironInductanceCoeff = value;
         else if (key == "encoder_noise_sigma_radians")
             plant.encoderSigmaRadians = value;
+        else if (key == "torque_step_nm")
+            plant.torqueStepNm = value;
+        else if (key == "torque_step_delay_ms")
+            plant.torqueStepDelayMs = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
+        else if (key == "response_sample_rate_hz")
+            plant.responseSampleRateHz = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
+        else if (key == "response_max_samples")
+            plant.responseMaxSamples = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else if (key == "encoder_bias_radians")
             plant.encoderBiasRadians = value;
         else if (key == "over_current_trip_ampere")
@@ -89,6 +118,7 @@ GIVEN(R"(a {word} motor plant)", (std::string preset))
     RequireSimulatedTarget();
     auto& setup = context.Get<ScenarioSetup>();
     ASSERT_TRUE(sil::TryNamedPlant(preset, setup.plant)) << "Unknown motor plant preset: " << preset;
+    setup.plantName = preset;
 }
 
 GIVEN(R"(an {word} phase motor plant)", (std::string phase))
@@ -122,11 +152,28 @@ GIVEN(R"(the motor is already calibrated)")
     setup.nvm.calibration = sil::CompleteCalibration();
     setup.nvm.calibration.polePairs = setup.plant.polePairs;
     setup.nvm.calibration.rPhase = setup.plant.statorResistanceOhm;
-    setup.nvm.calibration.lD = setup.plant.dAxisInductanceHenry;
-    setup.nvm.calibration.lQ = setup.plant.qAxisInductanceHenry;
+    // The calibration record carries inductance in millihenry; the plant record in henry.
+    setup.nvm.calibration.lD = setup.plant.dAxisInductanceHenry * kMilliPerUnit;
+    setup.nvm.calibration.lQ = setup.plant.qAxisInductanceHenry * kMilliPerUnit;
     setup.nvm.calibration.fluxLinkage = setup.plant.fluxLinkageWeber;
     setup.nvm.calibration.inertia = setup.plant.rotorInertiaKgM2;
     setup.nvm.calibration.frictionViscous = setup.plant.viscousDampingNmSPerRad;
+}
+
+GIVEN(R"(the stored calibration is off by:)")
+{
+    RequireSimulatedTarget();
+    auto& setup = context.Get<ScenarioSetup>();
+    ASSERT_TRUE(setup.nvm.includeCalibration) << "Seed the calibration first (the motor is already calibrated)";
+    ASSERT_TRUE(dataTable.has_value()) << "This step needs a table of quantities and factors";
+
+    for (const auto& row : dataTable->rows)
+    {
+        ASSERT_EQ(row.cells.size(), 2u) << "Each row needs a quantity and a factor";
+        const float factor = std::strtof(row.cells[1].value.c_str(), nullptr);
+        ASSERT_TRUE(ScaleStoredCalibration(setup.nvm.calibration, row.cells[0].value, factor))
+            << "Unknown calibration quantity: " << row.cells[0].value;
+    }
 }
 
 WHEN(R"(the target boots)")

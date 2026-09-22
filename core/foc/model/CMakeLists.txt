@@ -5,8 +5,10 @@ target_include_directories(e_foc.foc.model PUBLIC
 )
 
 target_sources(e_foc.foc.model PRIVATE
+    PlantResponseRecorder.hpp
     ThreePhaseMotorModel.cpp
     ThreePhaseMotorModel.hpp
+    TorqueStepScheduler.hpp
 )
 
 target_link_libraries(e_foc.foc.model PUBLIC

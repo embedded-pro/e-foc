@@ -1,4 +1,5 @@
 #include "core/can/FocMotorCanBridge.hpp"
+#include "core/foc/math/TorqueConstant.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include <cmath>
 
@@ -11,7 +12,6 @@ namespace can
         drivers::Encoder& encoder,
         services::ElectricalParametersIdentification& electricalIdent,
         services::MechanicalParametersIdentification* mechIdent,
-        foc::NewtonMeter mechTorqueConstant,
         services::NonVolatileMemory& nvm,
         services::ConfigData configData,
         services::Tracer& tracer)
@@ -22,7 +22,6 @@ namespace can
         , encoder(encoder)
         , electricalIdent(electricalIdent)
         , mechIdent{ mechIdent }
-        , mechTorqueConstant{ mechTorqueConstant }
         , nvm(nvm)
         , configData(configData)
     {
@@ -300,7 +299,7 @@ namespace can
         pendingMechIdentDoneCallback = onDone;
 
         mechIdent->EstimateFrictionAndInertia(
-            mechTorqueConstant,
+            foc::TorqueConstantFor(cal->polePairs, controlMode.ActiveFluxLinkage()),
             static_cast<std::size_t>(cal->polePairs),
             {},
             [this](std::optional<foc::NewtonMeterSecondPerRadian> friction,

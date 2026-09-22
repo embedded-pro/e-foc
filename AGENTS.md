@@ -159,9 +159,21 @@ Clang has no `-Wmaybe-uninitialized`: the `windows` preset builds with
 `toolchain-clang-x86_64-pc-windows-msvc.cmake`, where the flag would raise `-Wunknown-warning-option` and
 warnings-as-errors would fail the build.
 
-**Features**: all scenarios live in `integration_tests/features/`, tagged by the runner that implements them: `@sil` for the QEMU software-in-the-loop runner, `@hil` for hardware. `@sil-protection` holds the board-protection scenarios, which are kept out of the default run because they reproduce a firmware lockup — see `documentation/design/software-in-the-loop.md`. The `defaults` test preset excludes the `hardware|integration` labels, so `ctest --preset host` does **not** run the integration suite; invoke it directly, as the SIL command block above does.
+**Features**: all scenarios live in `integration_tests/features/`, tagged by the runner that implements them: `@sil` for the QEMU software-in-the-loop runner, `@hil` for hardware. The `defaults` test preset excludes the `hardware|integration` labels, so `ctest --preset host` does **not** run the integration suite; invoke it directly, as the SIL command block above does.
+
+`@sil-protection` holds the board-protection scenarios, which are kept out of the default run because they reproduce a firmware lockup, and `@sil-known-defect` holds the performance and identification scenarios whose law or estimator does not meet its envelope today; both are documented in `documentation/design/software-in-the-loop.md`.
 
 **Software-in-the-loop**: the motor plant is an input to the target, not a constant. The harness writes a plant description and an NVM image into a per-scenario working directory the emulator runs from, so the firmware reads both by relative name. Design: `documentation/design/software-in-the-loop.md`. `SIL_VERBOSE=1` traces both directions and keeps the scenario directory; `SIL_GDB=1` starts the emulator halted with a GDB stub on port 1234.
+
+**SIL performance scenarios**: the plant reports its trajectory as `PLANT` lines on the trace channel (control-tick time base, never printed from the ISR), a shaft torque step is scheduled in the plant description, and `integration_tests/support/response/` measures the step and disturbance metrics with the numerical toolbox (`numerical/math/StepResponseMetrics.hpp`).
+
+Every metric assertion prints a `[METRIC]` line; limits are pinned from those lines with a margin, never derived from theory alone.
+
+**Reference motors**: `motor_parameters/` holds the two motors the plant is exercised with (Teknic M-2310P-LN-04K, Anaheim BLY172S-24V-4000), with the sources in `documentation/theory/foc-plant-models.md` "Reference motors". The SIL presets `teknic` and `anaheim` select them; `nominal` is the Teknic.
+
+**Identification scenarios** (`parameter_identification.feature`) compare what the firmware identifies (CAN electrical response, `[SM] Calibration record:` and `[EST]` trace lines, all mechanical values in micro-units) against the plant the scenario configured.
+
+**SIL terminal**: a terminal command is a line without the `CAN_RX` prefix on the same socket as the CAN frames; the answer arrives as trace lines, never as a prompt to wait for.
 
 ## Agent routing
 

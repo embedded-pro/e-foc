@@ -2,9 +2,9 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.2.0
+version: 0.3.0
 component: state-machine
-date: 2026-09-20
+date: 2026-09-21
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-09-20
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.2.0                      |
+| Version   | 0.3.0                      |
 | Component | state-machine              |
-| Date      | 2026-09-20                 |
+| Date      | 2026-09-21                 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -254,6 +254,14 @@ sequenceDiagram
 
 After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`. The encoder zero offset is not written back to the encoder at this point; it is established only by the alignment step itself during the calibration sequence.
 
+Every record handed to the NVM is traced first as `[SM] Calibration record: R=… L_mH=… p=… J_uNms2=… B_uNms=…`. Inertia and viscous friction are traced in micro-units because the tracer prints three decimals, which cannot show values around 1e-6 and 1e-5; the same convention applies to the `[EST]` lines and the `[SM] Applying mechanical estimates` line below.
+
+The calibration record line is what an external observer, the software-in-the-loop suite included, compares against the plant it configured.
+
+The torque constant every mechanical consumer uses — the identification service, the online inertia estimator and the speed-loop gain design — is not configured per target. It is derived from the record as $K_t = \tfrac{3}{2} p \psi_f$ (`core/foc/math/TorqueConstant.hpp`), the factor the plant model itself applies.
+
+A motor whose flux linkage is set with `set_flux_linkage` therefore gets a consistent torque constant without a second number to keep in step (REQ-SM-027).
+
 ### Making the loops live before mechanical identification
 
 Mechanical identification is the only calibration step that asks the drive to *move*: it commands a speed
@@ -275,8 +283,10 @@ Before starting identification the state machine therefore applies, to the live 
    deliberately low speed-loop bandwidth. It is a stand-in that lets the speed loop act within its current
    envelope, not a measurement, and it is never persisted or reported as calibration.
 
-Both are checked. If the pending electrical record is not usable, if the configured torque constant is not
-positive, or if either configuration call is refused by the controller, identification is **not started**:
+Both are checked. If the pending electrical record is not usable, if the torque constant derived from the
+pending pole pairs and effective flux linkage ($K_t = \tfrac{3}{2} p \psi_f$, the same factor the plant
+model applies) is not positive, or if either configuration call is refused by the controller, identification
+is **not started**:
 the step fails and the machine enters `Fault`. A run that cannot move the rotor is a failed calibration, not
 a run that silently produces nothing.
 
@@ -624,7 +634,7 @@ sequenceDiagram
     SM->>ME: SetInitialEstimate(J_cal, B_cal)
     SM->>EE: SetInitialEstimate(R_cal, Ld_cal)
 
-    SM->>ME: SetTorqueConstant(kt) [on entering Enabled]
+    SM->>ME: SetTorqueConstant(3/2·p·ψf from the record) [on entering Enabled]
     note over ME,EE: Estimators update opportunistically at outer-loop rate\nwhile FOC controller is running
 ```
 
@@ -636,7 +646,7 @@ The electrical estimator is seeded using `lD` (d-axis inductance), as the underl
 
 When `ApplyOnlineEstimates()` is called while in `Enabled` state:
 1. Current inertia and friction estimates are read from the mechanical estimator
-2. Speed PID gains are recomputed using the bandwidth-based derivation from `speed-loop-controllers.md`: $k_p = 2 J \omega_{bw} / K_t$, $k_i = B_f \omega_{bw} / K_t$, where $J$ is the estimated inertia, $B_f$ the viscous friction, and $K_t$ the torque constant
+2. Speed PID gains are recomputed using the bandwidth-based derivation from `speed-loop-controllers.md`: $k_p = 2 J \omega_{bw} / K_t$, $k_i = B_f \omega_{bw} / K_t$, where $J$ is the estimated inertia, $B_f$ the viscous friction, and $K_t = \tfrac{3}{2} p \psi_f$ the torque constant derived from the calibration record
 3. Current resistance and inductance estimates are read from the electrical estimator
 4. Current PID gains are recomputed from the bandwidth-based tuning rule
 
@@ -647,7 +657,7 @@ If called from any state other than `Enabled`, the call is silently ignored.
 | Command           | Short | Description                                           |
 |-------------------|-------|-------------------------------------------------------|
 | `apply_estimates` | `ae`  | Apply online estimates to speed and current PID gains |
-| `estimate_status` | `es`  | Print current J, B, R, Ld values to the tracer        |
+| `estimate_status` | `es`  | Print current J, B (micro-units), R, Ld to the tracer |
 
 ### Control Mode Selection (`ControlModeStateMachine`)
 
@@ -763,7 +773,7 @@ sequenceDiagram
 | `Encoder`                                  | Rotor position sensor; zero point established by the alignment step                   | Read-only from the state machine's perspective; `SetZero()` is called by `MotorAlignment` during calibration, never by the state machine itself |
 | `TerminalWithStorage`                      | Serial command interface for CLI-mode transition policy                               | Commands registered in constructor; terminal must outlive the state machine                                                                     |
 | `Tracer`                                   | Debug trace output for lifecycle events                                               | All state transitions and calibration steps are traced                                                                                          |
-| `RealTimeFrictionAndInertiaEstimator`      | Online RLS estimator for rotor inertia and viscous friction (speed/position only)     | Seeded from calibration data; torque constant set on entering `Enabled`; updates run while FOC outer loop is active                             |
+| `RealTimeFrictionAndInertiaEstimator`      | Online RLS estimator for rotor inertia and viscous friction (speed/position only)     | Seeded from calibration data; torque constant 3/2·p·ψf from the record set on entering `Enabled`; updates run while FOC outer loop is active    |
 | `RealTimeResistanceAndInductanceEstimator` | Online RLS estimator for phase resistance and d-axis inductance (speed/position only) | Assumes non-salient motor (Ld ≈ Lq); seeded using `lD` from calibration                                                                         |
 
 ---

@@ -89,6 +89,11 @@ namespace foc
         ThreePhaseMotorModel(const Parameters& params, foc::Volts powerSupplyVoltage, hal::Hertz baseFrequency, std::optional<std::size_t> maxIterations, bool selfDriveEnabled = true);
 
         void SetLoad(foc::NewtonMeter load);
+        void SetExternalTorque(foc::NewtonMeter torque);
+        foc::NewtonMeter ExternalTorque() const;
+        foc::RadiansPerSecond MechanicalSpeed() const;
+        foc::Radians MechanicalAngle() const;
+        foc::RotatingFrame LastDqCurrents() const;
         void SetAdcNoise(const NoiseConfig& config);
         void SetEncoderNoise(const EncoderNoiseConfig& config);
         void SetThermalConfig(const ThermalConfig& config);
@@ -185,6 +190,8 @@ namespace foc
         bool running{ false };
         const bool selfDriveEnabled;
         std::optional<foc::NewtonMeter> load;
+        foc::NewtonMeter externalTorque{ 0.0f };
+        foc::RotatingFrame lastDqCurrents{};
         const std::optional<std::size_t> maxIterations;
         std::optional<std::size_t> counter;
 

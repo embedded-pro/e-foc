@@ -8,7 +8,7 @@
 #include "foc/interfaces/Units.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "infra/util/WithSharedAccess.hpp"
-#include "motor_parameters/Jk42bls01X038ed.hpp"
+#include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include "tools/simulator/adapter/OnlineElectricalRls.hpp"
 #include "tools/simulator/adapter/OnlineMechanicalRls.hpp"
 #include "tools/simulator/app/CalibrationsWiring.hpp"
@@ -29,8 +29,8 @@ namespace simulator
         infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
 
         const auto baseFrequency = defaults::BaseFrequency();
-        const auto vdc = foc::Volts{ defaults::powerSupplyVoltageVolts };
-        const auto& motorParams = foc::JK42BLS01_X038ED::parameters;
+        const auto vdc = foc::M_2310P_LN_04K::ratedSupply;
+        const auto& motorParams = foc::M_2310P_LN_04K::parameters;
 
         infra::WithSharedAccess<foc::ThreePhaseMotorModel> model{ motorParams, vdc, baseFrequency, std::optional<std::size_t>{} };
         model->SetLoad(foc::NewtonMeter{ defaults::loadTorqueNm });

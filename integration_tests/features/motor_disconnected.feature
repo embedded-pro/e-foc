@@ -11,7 +11,7 @@ Feature: Disconnected And Faulty Motor Wiring
     When the target boots
     And the rotor is aligned
     And the motor is enabled
-    And a speed setpoint of 20 rps is applied
+    And a speed setpoint of 20 rad/s is applied
     Then the rotor shall not turn
 
   @sil @REQ-SM-008
@@ -22,7 +22,7 @@ Feature: Disconnected And Faulty Motor Wiring
     When the target boots
     And the rotor is aligned
     And the motor is enabled
-    And a speed setpoint of 20 rps is applied
+    And a speed setpoint of 20 rad/s is applied
     Then the rotor shall turn
 
   @sil @REQ-SM-006
@@ -33,5 +33,5 @@ Feature: Disconnected And Faulty Motor Wiring
     When the target boots
     And the rotor is aligned
     And the motor is enabled
-    And a speed setpoint of 20 rps is applied
+    And a speed setpoint of 20 rad/s is applied
     Then the rotor shall turn

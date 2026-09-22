@@ -1,7 +1,7 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "infra/util/WithSharedAccess.hpp"
-#include "motor_parameters/Jk42bls01X038ed.hpp"
+#include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <gtest/gtest.h>
 
 namespace
@@ -18,10 +18,25 @@ namespace
             : ThreePhaseMotorModelObserver(model)
         {}
 
-        void Started() override { ++startCount; }
-        void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents, foc::Radians, foc::RadiansPerSecond) override { ++phaseCurrentCount; }
-        void StatorVoltages(foc::ThreePhase, foc::TwoPhase) override { ++statorVoltageCount; }
-        void Finished() override { ++finishCount; }
+        void Started() override
+        {
+            ++startCount;
+        }
+
+        void PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents, foc::Radians, foc::RadiansPerSecond) override
+        {
+            ++phaseCurrentCount;
+        }
+
+        void StatorVoltages(foc::ThreePhase, foc::TwoPhase) override
+        {
+            ++statorVoltageCount;
+        }
+
+        void Finished() override
+        {
+            ++finishCount;
+        }
 
         int startCount{};
         int phaseCurrentCount{};
@@ -33,11 +48,14 @@ namespace
         : public ::testing::Test
     {
     protected:
-        void TearDown() override { eventDispatcher.ExecuteAllActions(); }
+        void TearDown() override
+        {
+            eventDispatcher.ExecuteAllActions();
+        }
 
         infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
         infra::WithSharedAccess<foc::ThreePhaseMotorModel> model{
-            foc::JK42BLS01_X038ED::parameters,
+            foc::M_2310P_LN_04K::parameters,
             foc::Volts{ 24.0f },
             hal::Hertz{ 20000 },
             std::optional<std::size_t>{}
@@ -107,7 +125,7 @@ TEST_F(MotorModelTest, phase_currents_ready_callback_invoked_per_step)
 TEST_F(MotorModelTest, iteration_limit_notifies_finished_and_stops_callback)
 {
     infra::WithSharedAccess<foc::ThreePhaseMotorModel> limitedModel{
-        foc::JK42BLS01_X038ED::parameters,
+        foc::M_2310P_LN_04K::parameters,
         foc::Volts{ 24.0f },
         hal::Hertz{ 20000 },
         std::optional<std::size_t>{ 3 }
@@ -154,13 +172,13 @@ TEST_F(MotorModelTest, set_load_does_not_crash)
 
 TEST_F(MotorModelTest, effective_inductance_d_at_ambient_equals_ld)
 {
-    const float expected = foc::JK42BLS01_X038ED::parameters.Ld.Value();
+    const float expected = foc::M_2310P_LN_04K::parameters.Ld.Value();
     EXPECT_FLOAT_EQ(model->EffectiveInductanceD().Value(), expected);
 }
 
 TEST_F(MotorModelTest, effective_inductance_q_at_ambient_equals_lq)
 {
-    const float expected = foc::JK42BLS01_X038ED::parameters.Lq.Value();
+    const float expected = foc::M_2310P_LN_04K::parameters.Lq.Value();
     EXPECT_FLOAT_EQ(model->EffectiveInductanceQ().Value(), expected);
 }
 
@@ -201,7 +219,7 @@ TEST_F(MotorModelTest, thermal_config_applied_changes_effective_resistance)
     model->SetThermalConfig(cfg);
     model->SetWindingTemperatureForTest(125.0f);
 
-    const float r0 = foc::JK42BLS01_X038ED::parameters.R.Value();
+    const float r0 = foc::M_2310P_LN_04K::parameters.R.Value();
     EXPECT_GT(model->EffectiveResistance().Value(), r0);
 }
 
@@ -211,4 +229,71 @@ TEST_F(MotorModelTest, observer_finished_not_called_without_iteration_limit)
     for (int i = 0; i < 100; ++i)
         model->StepForTest(kNeutralDuty);
     EXPECT_EQ(obs.finishCount, 0);
+}
+
+namespace
+{
+    const foc::PhasePwmDutyCycles kZeroVoltageDuty{
+        hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 }
+    };
+
+    constexpr int kFreeRunSteps = 100;
+}
+
+TEST_F(MotorModelTest, external_torque_defaults_to_zero)
+{
+    EXPECT_FLOAT_EQ(model->ExternalTorque().Value(), 0.0f);
+}
+
+TEST_F(MotorModelTest, free_rotor_without_external_torque_stays_at_rest)
+{
+    for (int i = 0; i != kFreeRunSteps; ++i)
+        model->StepForTest(kZeroVoltageDuty);
+
+    EXPECT_FLOAT_EQ(model->MechanicalSpeed().Value(), 0.0f);
+    EXPECT_FLOAT_EQ(model->MechanicalAngle().Value(), 0.0f);
+}
+
+TEST_F(MotorModelTest, negative_external_torque_accelerates_a_free_rotor)
+{
+    model->SetExternalTorque(foc::NewtonMeter{ -0.001f });
+
+    for (int i = 0; i != kFreeRunSteps; ++i)
+        model->StepForTest(kZeroVoltageDuty);
+
+    EXPECT_GT(model->MechanicalSpeed().Value(), 0.1f);
+    EXPECT_GT(model->MechanicalAngle().Value(), 0.0f);
+}
+
+TEST_F(MotorModelTest, positive_external_torque_drives_a_free_rotor_backwards)
+{
+    model->SetExternalTorque(foc::NewtonMeter{ 0.001f });
+
+    for (int i = 0; i != kFreeRunSteps; ++i)
+        model->StepForTest(kZeroVoltageDuty);
+
+    EXPECT_LT(model->MechanicalSpeed().Value(), -0.1f);
+    EXPECT_LT(model->MechanicalAngle().Value(), 0.0f);
+}
+
+TEST_F(MotorModelTest, external_torque_survives_start)
+{
+    model->SetExternalTorque(foc::NewtonMeter{ 0.002f });
+    model->Start();
+    EXPECT_FLOAT_EQ(model->ExternalTorque().Value(), 0.002f);
+    model->Stop();
+}
+
+TEST_F(MotorModelTest, last_dq_currents_are_zero_before_any_step)
+{
+    EXPECT_FLOAT_EQ(model->LastDqCurrents().d, 0.0f);
+    EXPECT_FLOAT_EQ(model->LastDqCurrents().q, 0.0f);
+}
+
+TEST_F(MotorModelTest, last_dq_currents_follow_a_driven_step)
+{
+    model->StepForTest(kNeutralDuty);
+
+    const auto dq = model->LastDqCurrents();
+    EXPECT_NE(std::abs(dq.d) + std::abs(dq.q), 0.0f);
 }

@@ -1,0 +1,14 @@
+{
+  "$schema": "./motor-parameters.schema.json",
+  "model": "BLY172S_24V_4000",
+  "parameters": {
+    "stator_resistance_ohm": 0.405,
+    "d_axis_inductance_henry": 0.00064,
+    "q_axis_inductance_henry": 0.00064,
+    "flux_linkage_weber": 0.00544,
+    "pole_pairs": 4,
+    "rotor_inertia_kg_m2": 4.8e-6,
+    "viscous_damping_nm_s_per_rad": 1.0e-5,
+    "max_supported_current_ampere": 10.0
+  }
+}

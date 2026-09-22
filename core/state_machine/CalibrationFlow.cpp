@@ -2,6 +2,12 @@
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include <bit>
+#include <cstdint>
+
+namespace
+{
+    constexpr float microPerUnit = 1.0e6f;
+}
 
 namespace application
 {
@@ -123,6 +129,8 @@ namespace application
                                             ? services::CalibrationStage::complete
                                             : services::CalibrationStage::none;
 
+        TraceRecord(calibrating.pendingData);
+
         really_assert(saveCompletion == nullptr);
         saveCompletion = env.machine.CompletionWith<void(services::NvmStatus)>([](services::NvmStatus status)
             {
@@ -133,6 +141,17 @@ namespace application
             {
                 OnSaved(status);
             });
+    }
+
+    // Inertia and friction are traced in micro-units: the tracer prints three decimals, which cannot show
+    // values around 1e-6 and 1e-5.
+    void CalibrationFlow::TraceRecord(const services::CalibrationData& data) const
+    {
+        env.tracer.Trace() << "[SM] Calibration record: R=" << data.rPhase
+                           << " L_mH=" << data.lD
+                           << " p=" << static_cast<uint32_t>(data.polePairs)
+                           << " J_uNms2=" << data.inertia * microPerUnit
+                           << " B_uNms=" << data.frictionViscous * microPerUnit;
     }
 
     void CalibrationFlow::OnSaved(services::NvmStatus status)

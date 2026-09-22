@@ -225,7 +225,7 @@ namespace
                 application::TerminalAndTracer{ terminal, tracer },
                 application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
                 nvmMock,
-                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
                 faultNotifierMock,
                 config,
                 state_machine::ControlModeStateMachine::OuterLoopArgs{
@@ -233,7 +233,7 @@ namespace
                     hal::Hertz{ 1000 },
                     lowPriorityInterruptMock });
 
-            bridge.emplace(*motorServer, *coordinator, inverterMock, encoderMock, electricalIdentMock, &mechIdentMock, foc::NewtonMeter{ 0.1f }, nvmMock, config, tracer);
+            bridge.emplace(*motorServer, *coordinator, inverterMock, encoderMock, electricalIdentMock, &mechIdentMock, nvmMock, config, tracer);
             motorServer->SetAcknowledger(ackSpy);
             ExecuteAllActions();
         }
@@ -988,14 +988,14 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_NullMechIdent_ReturnsNotImple
         application::TerminalAndTracer{ terminal, tracer },
         application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
         nvmMock,
-        application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
+        application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
         faultNotifierMock,
         config,
         state_machine::ControlModeStateMachine::OuterLoopArgs{
             foc::Ampere{ 10.0f },
             hal::Hertz{ 1000 },
             lowPriorityInterruptMock });
-    bridge.emplace(*motorServer, *coordinator, inverterMock, encoderMock, electricalIdentMock, nullptr, foc::NewtonMeter{ 0.1f }, nvmMock, config, tracer);
+    bridge.emplace(*motorServer, *coordinator, inverterMock, encoderMock, electricalIdentMock, nullptr, nvmMock, config, tracer);
     motorServer->SetAcknowledger(ackSpy);
     ExecuteAllActions();
     ResetCaptures();
@@ -1298,7 +1298,7 @@ TEST_F(FocMotorCanBridgeTest, Constructor_EmitsTraceMessage)
         application::TerminalAndTracer{ terminal, tracer },
         application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
         nvmMock,
-        application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
+        application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
         faultNotifierMock,
         config,
         state_machine::ControlModeStateMachine::OuterLoopArgs{
@@ -1306,7 +1306,7 @@ TEST_F(FocMotorCanBridgeTest, Constructor_EmitsTraceMessage)
             hal::Hertz{ 1000 },
             lowPriorityInterruptMock });
 
-    bridge.emplace(*motorServer, *coordinator, inverterMock, encoderMock, electricalIdentMock, &mechIdentMock, foc::NewtonMeter{ 0.1f }, nvmMock, config, tracer);
+    bridge.emplace(*motorServer, *coordinator, inverterMock, encoderMock, electricalIdentMock, &mechIdentMock, nvmMock, config, tracer);
     motorServer->SetAcknowledger(ackSpy);
     ExecuteAllActions();
 }

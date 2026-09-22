@@ -157,7 +157,7 @@ namespace
                 application::TerminalAndTracer{ terminal, tracer },
                 application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
                 nvmMock,
-                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock) },
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
                 faultNotifierMock,
                 config,
                 TestedControlMode::OuterLoopArgs{
@@ -492,7 +492,7 @@ namespace
                 application::TerminalAndTracer{ terminal, tracer },
                 application::MotorHardware{ inverterMock, encoderMock, foc::Volts{ 24.0f } },
                 nvmMock,
-                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::NewtonMeter{ 0.1f }, fluxLinkage },
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), fluxLinkage },
                 faultNotifierMock,
                 config,
                 TestedControlMode::OuterLoopArgs{
@@ -1682,7 +1682,7 @@ TEST_F(ControlModeStateMachineCliTest, EstimateStatus_Prints_The_Active_Mode_Est
 
     const auto output = OutputOf("es");
 
-    EXPECT_THAT(output, HasSubstr("[EST] Mech: J="));
+    EXPECT_THAT(output, HasSubstr("[EST] Mech: J_uNms2="));
     EXPECT_THAT(output, HasSubstr("[EST] Elec: R="));
 }
 

@@ -3,6 +3,8 @@
 #endif
 
 #include "targets/platform_implementations/qemu/implementation/SemihostingSerial.hpp"
+#include "infra/util/ByteRange.hpp"
+#include <cstdint>
 #include <cstdio>
 
 extern "C"
@@ -31,5 +33,15 @@ namespace application
     void SemihostingSerial::ReceiveData(infra::Function<void(infra::ConstByteRange)> dataReceived)
     {
         onReceived = dataReceived;
+    }
+
+    void SemihostingSerial::Deliver(const char* line)
+    {
+        if (!onReceived)
+            return;
+
+        static const uint8_t enter = '\r';
+        onReceived(infra::MakeStringByteRange(line));
+        onReceived(infra::MakeConstByteRange(enter));
     }
 }

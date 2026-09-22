@@ -43,3 +43,18 @@
     supported current before that setpoint reaches the current loop. The bound shall apply to the
     magnitude of the (Id, Iq) vector rather than to either axis on its own, and a setpoint outside
     the envelope shall be scaled onto it so that the commanded ratio between the axes is preserved.
+
+- id: REQ-TRQ-007
+  title: Current step-response envelope
+  shall: >
+    With the nominal plant (the Teknic M-2310P-LN-04K reference motor) and the default
+    current-loop bandwidth, every current control law shall bring the q-axis current from zero to
+    a 0.5 A setpoint and enter and then stay inside a 40 percent band of the step within 12 ms
+    for PI and the decoupled law and 5 ms for deadbeat and sliding mode, with an overshoot below
+    20 percent for PI and deadbeat, 40 percent for the decoupled law and 70 percent for sliding
+    mode, and a steady-state error below 0.1 A, measured on the plant's own q-axis current at the
+    control rate. The band is as wide as it is because the duty reaches the
+    inverter in whole percent and the current ripples by about a tenth of an ampere around the
+    setpoint; the envelope the laws should meet, a 10 percent band within 3 ms (1 ms for
+    deadbeat) with 30 percent overshoot and 0.05 A error, is held out of the default run until
+    the duty carries more resolution.

@@ -3,7 +3,7 @@
 #include <optional>
 
 #ifdef E_FOC_QEMU_TARGET
-#include "motor_parameters/Jk42bls01X038ed.hpp"
+#include "motor_parameters/TeknicM2310pLn04k.hpp"
 #endif
 
 int main()
@@ -12,7 +12,7 @@ int main()
 
     static application::PlatformFactoryImpl hardware(
 #ifdef E_FOC_QEMU_TARGET
-        foc::JK42BLS01_X038ED::parameters,
+        foc::M_2310P_LN_04K::parameters,
 #endif
         [&]()
         {

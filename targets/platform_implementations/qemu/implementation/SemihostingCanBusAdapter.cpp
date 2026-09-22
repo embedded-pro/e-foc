@@ -25,8 +25,13 @@ namespace application
             onError(error);
     }
 
-    void SemihostingCanBusAdapter::PollIncoming()
+    std::optional<sil::SemihostingCan::Frame> SemihostingCanBusAdapter::PollIncoming()
     {
-        can.PollIncoming();
+        return can.PollIncoming();
+    }
+
+    void SemihostingCanBusAdapter::OnTerminalLine(const infra::Function<void(const char*)>& handler)
+    {
+        can.OnTerminalLine(handler);
     }
 }

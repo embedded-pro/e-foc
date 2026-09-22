@@ -2,9 +2,9 @@
 title: "Service: Mechanical Parameters Identification"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: service-mechanical-ident
-date: 2026-04-07
+date: 2026-09-21
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-04-07
 | Title     | Service: Mechanical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.1.0                                         |
+| Version   | 0.2.0                                         |
 | Component | service-mechanical-ident                      |
-| Date      | 2026-04-07                                    |
+| Date      | 2026-09-21                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -320,13 +320,15 @@ The mechanical equation of motion for the motor shaft is:
 
 $$T_e = J \cdot \dot{\omega} + B \cdot \omega + \tau_c$$
 
-The electromagnetic torque is approximated as $T_e = I_q \cdot k_t$, where $k_t$ is the torque constant (supplied by the calibration data). Angular acceleration $\dot{\omega}$ is derived from a finite difference of successive speed measurements scaled by the sampling frequency.
+The electromagnetic torque is approximated as $T_e = I_q \cdot k_t$, where $k_t = \tfrac{3}{2} p \psi_f$ is derived from the calibration record's pole pairs and flux linkage. Angular acceleration $\dot{\omega}$ is derived from a finite difference of successive speed measurements scaled by the sampling frequency.
 
 The regressor vector is $\phi = [1,\ \dot{\omega},\ \omega]^T$, and the parameter vector is $\theta = [\tau_c,\ J,\ B]^T$. The scalar output is $T_e$. An RLS algorithm with a forgetting factor of 0.995 updates $\theta$ each outer-loop period.
 
 ### Torque Constant Dependency
 
-The torque constant $k_t$ must be provided before the estimator updates begin. In normal operation the state machine supplies $k_t$ from the calibration NVM record via `SetTorqueConstant()` during the `EnterEnabled` transition; updates run opportunistically while the FOC controller is active.
+The torque constant $k_t$ must be provided before the estimator updates begin. In normal operation the state machine derives it from the calibration NVM record as $\tfrac{3}{2} p \psi_f$ (`core/foc/math/TorqueConstant.hpp`) and supplies it via `SetTorqueConstant()` during the `EnterEnabled` transition; the one-shot procedure receives the same value.
+
+A wrong $k_t$ scales every identified $J$ and $B$ by the same factor, which is why it is not a per-target constant. Updates run opportunistically while the FOC controller is active.
 
 ### Persistence of Excitation
 

@@ -1,6 +1,6 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include "motor_parameters/Jk42bls01X038ed.hpp"
+#include "motor_parameters/TeknicM2310pLn04k.hpp"
 #include <cmath>
 #include <gtest/gtest.h>
 #include <optional>
@@ -27,7 +27,7 @@ namespace
         infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
 
         foc::ThreePhaseMotorModel model{
-            foc::JK42BLS01_X038ED::parameters,
+            foc::M_2310P_LN_04K::parameters,
             foc::Volts{ 24.0f },
             hal::Hertz{ 20000 },
             std::optional<std::size_t>{},
@@ -106,7 +106,7 @@ TEST_F(TestFaultInjection, a_sagging_supply_produces_less_current_than_a_healthy
     const auto healthy = std::abs(model.LastMeasuredCurrents().a.Value());
 
     foc::ThreePhaseMotorModel sagging{
-        foc::JK42BLS01_X038ED::parameters,
+        foc::M_2310P_LN_04K::parameters,
         foc::Volts{ 24.0f },
         hal::Hertz{ 20000 },
         std::optional<std::size_t>{},
@@ -129,7 +129,7 @@ TEST_F(TestFaultInjection, the_same_seed_reproduces_the_same_noise_sequence)
     auto run = [&noise, &duty](uint32_t seed)
     {
         foc::ThreePhaseMotorModel model{
-            foc::JK42BLS01_X038ED::parameters,
+            foc::M_2310P_LN_04K::parameters,
             foc::Volts{ 24.0f },
             hal::Hertz{ 20000 },
             std::optional<std::size_t>{},

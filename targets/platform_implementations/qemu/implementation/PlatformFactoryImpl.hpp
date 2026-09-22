@@ -1,10 +1,11 @@
 #pragma once
 
+#include "core/foc/model/PlantResponseRecorder.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
+#include "core/foc/model/TorqueStepScheduler.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/SoftwareWatchdog.hpp"
-#include "hal/cortex_m/EventDispatcherCortex.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
 #include "hal/cortex_m/SystemTickTimerService.hpp"
 #include "hal/interfaces/Gpio.hpp"
@@ -15,6 +16,7 @@
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "services/util/Terminal.hpp"
 #include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
+#include "targets/platform_implementations/cortex_m_common/EventDispatcherCortexWithWeakPtr.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "targets/platform_implementations/qemu/implementation/BoardProtectionSimulator.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuConstants.hpp"
@@ -23,6 +25,7 @@
 #include "targets/platform_implementations/qemu/implementation/SemihostingEeprom.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingPlantConfig.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingSerial.hpp"
+#include <atomic>
 #include <optional>
 
 namespace application
@@ -137,7 +140,7 @@ namespace application
         struct Cortex
         {
             hal::cortex::InterruptTable::WithStorage<64> interruptTable;
-            hal::cortex::EventDispatcherCortex::WithSize<50> eventDispatcher;
+            EventDispatcherCortexWithWeakPtr::WithSize<50> eventDispatcher;
             hal::cortex::SystemTickTimerService systemTick{ kQemuSystemClockHz, std::chrono::milliseconds(1) };
         };
 
@@ -157,6 +160,10 @@ namespace application
         };
 
         void FocTimerIsr();
+        foc::PlantResponseSample PlantSampleAt(uint32_t tick) const;
+        void DrainResponseRecords();
+        void PrintResponseRecord(const foc::PlantResponseRecord& record);
+        void StampReceivedFrame(uint32_t tick, const sil::SemihostingCan::Frame& frame);
 
     private:
         static foc::ThreePhaseMotorModel::Parameters MotorParametersFrom(
@@ -186,11 +193,17 @@ namespace application
         NoOpPerformanceTracker performanceTracker;
         BoardProtectionSimulator boardProtection;
         foc::ThreePhaseMotorModel model;
+        foc::PlantResponseRecorder<1024> responseRecorder;
+        foc::TorqueStepScheduler torqueStep;
+        std::atomic<uint32_t> controlTick{ 0 };
         std::optional<SemihostingCanBusAdapter> canBusAdapter;
         infra::TimerRepeating canPollTimer;
         infra::TimerRepeating protectionPollTimer;
+        infra::TimerRepeating responseDrainTimer;
         hal::Hertz baseFrequency;
         volatile bool onPhaseCurrentsReadyValid{ false };
+        volatile uint32_t sampleDecimation{ 1 };
+        uint32_t samplePhase{ 0 };
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         foc::PhasePwmDutyCycles lastDutyPhases{};
         foc::PhaseCurrents lastCurrents{};

@@ -27,7 +27,6 @@ namespace can
             drivers::Encoder& encoder,
             services::ElectricalParametersIdentification& electricalIdent,
             services::MechanicalParametersIdentification* mechIdent,
-            foc::NewtonMeter mechTorqueConstant,
             services::NonVolatileMemory& nvm,
             services::ConfigData configData,
             services::Tracer& tracer);
@@ -74,7 +73,6 @@ namespace can
         drivers::Encoder& encoder;
         services::ElectricalParametersIdentification& electricalIdent;
         services::MechanicalParametersIdentification* mechIdent;
-        foc::NewtonMeter mechTorqueConstant;
         services::NonVolatileMemory& nvm;
         services::ConfigData configData;
 

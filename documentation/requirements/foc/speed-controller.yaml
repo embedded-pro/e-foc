@@ -49,3 +49,27 @@
     fixed set of control laws selected at runtime. All laws shall reside simultaneously
     in fixed-size storage held by a variant, and neither selection nor per-sample
     dispatch shall perform any dynamic memory allocation.
+
+- id: REQ-SPD-008
+  title: Speed step-response envelope
+  shall: >
+    With the nominal plant (the Teknic M-2310P-LN-04K reference motor) and the default loop
+    bandwidths, every speed control law shall bring the mechanical speed from rest to a 20 rad/s
+    setpoint with the mean of the last quarter of a 500 ms window within 0.5 rad/s of the
+    setpoint, and shall enter and then stay inside a 10 percent band of the step within a
+    settling time and with an overshoot no worse than its row: PI 60 ms, 15 percent overshoot;
+    ADRC 80 ms, 15 percent; two-DOF 60 ms, 15 percent. A setpoint changed while running, to
+    40 rad/s and to -20 rad/s, shall meet the same rows. LQI shall meet a 100 ms, 20 percent,
+    1 rad/s row in both cases; that row is held out of the default run until its response, a
+    twofold overshoot from rest and an erratic swing on a running change, is fixed. The response
+    is measured on the plant's own trajectory on the control-tick time base.
+
+- id: REQ-SPD-009
+  title: Speed-loop rejection of a shaft torque step
+  shall: >
+    While regulating 20 rad/s against the nominal plant, every speed control law shall keep the
+    speed within 4 rad/s of the setpoint when a 0.002 N·m shaft torque is applied as a step, and
+    within 50 ms of the step shall return the speed to within 2 rad/s of the setpoint and hold
+    the mean of the window inside that band. LQI shall meet the same envelope with 100 ms; that
+    row is held out of the default run until its response, pushed 26 rad/s off the setpoint by
+    a torque the other laws absorb within 2, is fixed.

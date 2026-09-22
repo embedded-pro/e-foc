@@ -162,11 +162,28 @@ TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_o
     EXPECT_GT(result.fitQuality, 0.9f);
 }
 
-TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_of_zoh_for_jk42bls01)
+TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_of_zoh_for_the_anaheim_bly172s)
 {
-    // JK42BLS01 terminal values (wye): R_phase=0.073Ω → R_terminal=0.1095Ω; L_phase=0.5mH → L_terminal=0.75mH.
-    const float rTerminal = 0.073f * 1.5f;
-    const float lTerminalMH = 0.5f * 1.5f;
+    // Anaheim BLY172S-24V-4000 terminal values (wye): R_phase=0.405Ω → R_terminal=0.6075Ω; L_phase=0.64mH → L_terminal=0.96mH.
+    const float rTerminal = 0.405f * 1.5f;
+    const float lTerminalMH = 0.64f * 1.5f;
+
+    services::SinusoidalInductanceEstimator::Config config{
+        hal::Hertz{ 700 }, hal::Percent{ 15 }, 5, 20, 1, services::WindingConfiguration::Wye
+    };
+
+    auto [result, expectedL] = RunPlantSimulation(driverMock, estimator, config, rTerminal, lTerminalMH);
+
+    ASSERT_TRUE(result.inductance.has_value());
+    EXPECT_NEAR(result.inductance->Value(), expectedL, expectedL * 0.01f);
+    EXPECT_GT(result.fitQuality, 0.9f);
+}
+
+TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_of_zoh_for_the_teknic_m2310p)
+{
+    // Teknic M-2310P-LN-04K terminal values (wye): R_phase=0.36Ω → R_terminal=0.54Ω; L_phase=0.20mH → L_terminal=0.30mH.
+    const float rTerminal = 0.36f * 1.5f;
+    const float lTerminalMH = 0.20f * 1.5f;
 
     services::SinusoidalInductanceEstimator::Config config{
         hal::Hertz{ 700 }, hal::Percent{ 15 }, 5, 20, 1, services::WindingConfiguration::Wye
@@ -181,8 +198,8 @@ TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_o
 
 TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_of_zoh_at_alternative_frequency)
 {
-    const float rTerminal = 0.073f * 1.5f;
-    const float lTerminalMH = 0.5f * 1.5f;
+    const float rTerminal = 0.405f * 1.5f;
+    const float lTerminalMH = 0.64f * 1.5f;
 
     services::SinusoidalInductanceEstimator::Config config{
         hal::Hertz{ 500 }, hal::Percent{ 15 }, 5, 20, 1, services::WindingConfiguration::Wye

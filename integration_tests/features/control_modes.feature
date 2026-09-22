@@ -20,5 +20,5 @@ Feature: FOC Control Modes Against a Simulated Plant
     Examples:
       | label    | mode     | setpoint                                     |
       | Torque   | torque   | a torque setpoint of 0.5 A is applied        |
-      | Speed    | speed    | a speed setpoint of 20 rps is applied        |
+      | Speed    | speed    | a speed setpoint of 20 rad/s is applied        |
       | Position | position | a position setpoint of 1.5 rad is applied    |

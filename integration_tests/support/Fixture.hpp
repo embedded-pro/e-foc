@@ -5,6 +5,7 @@
 #include "hal/interfaces/Can.hpp"
 #include "integration_tests/support/interactor/interfaces/TargetInteractor.hpp"
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -35,6 +36,8 @@ namespace integration
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
         std::optional<float> ReadMeasuredPosition(
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 2000 });
+        std::optional<can::FocMotorState> ReadMotorState(
+            std::chrono::milliseconds timeout = std::chrono::milliseconds{ 2000 });
         bool SelectControlMode(can::FocMotorMode mode,
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
         bool EnableMotor(
@@ -49,6 +52,11 @@ namespace integration
 
         void StartCanCapture();
         void MarkCanReference();
+
+        // Frames the target sent while another wait was consuming the serial stream stay in the captured
+        // lines; this finds the last one with the given id, from the line index the caller marked.
+        std::optional<hal::Can::Message> FindCapturedCanFrame(hal::Can::Id id, std::size_t fromLine) const;
+        std::size_t CapturedLineCount() const;
 
         std::string lastResponse;
         std::vector<std::string> allLines;

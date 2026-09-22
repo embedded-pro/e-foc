@@ -2,7 +2,7 @@
 title: "Integration Testing Design"
 type: design
 status: accepted
-version: 1.0.0
+version: 1.1.0
 component: integration-testing
 date: 2026-09-21
 ---
@@ -12,7 +12,7 @@ date: 2026-09-21
 | Title     | Integration Testing Design |
 | Type      | design                     |
 | Status    | accepted                   |
-| Version   | 1.0.0                      |
+| Version   | 1.1.0                      |
 | Component | integration-testing        |
 | Date      | 2026-09-21                 |
 
@@ -35,11 +35,12 @@ types.
 Scenarios are authored in Gherkin and live in a single directory. A tag decides which target
 implements a scenario, and the runner is invoked with that tag.
 
-| Tag               | Target                                           | Detailed in                                    |
-|-------------------|--------------------------------------------------|------------------------------------------------|
-| `@sil`            | Real firmware under an emulator, simulated motor | `documentation/design/software-in-the-loop.md` |
-| `@sil-protection` | The same, board-protection scenarios held apart  | The same document, Part E                      |
-| `@hil`            | Real firmware on hardware, over the bridge       | This document                                  |
+| Tag                 | Target                                           | Detailed in                                    |
+|---------------------|--------------------------------------------------|------------------------------------------------|
+| `@sil`              | Real firmware under an emulator, simulated motor | `documentation/design/software-in-the-loop.md` |
+| `@sil-protection`   | The same, board-protection scenarios held apart  | The same document, Part E                      |
+| `@sil-known-defect` | The same, scenarios a known defect fails         | The same document, Parts I and J               |
+| `@hil`              | Real firmware on hardware, over the bridge       | This document                                  |
 
 > Earlier revisions described an in-process host fixture that mocked the platform and drove the
 > state machine directly. No such fixture exists, and none is planned: mocking the platform and
@@ -114,6 +115,16 @@ Three channels, all of them the product's own:
 - **Command acknowledgements** carry acceptance or the reason for refusal.
 - **Traces** carry what the firmware decided, most importantly which algorithm each loop ended up
   running, which can differ from what was asked for.
+- **Plant trajectory**, on a simulated target only, carries what the motor actually did, sampled
+  on the control-tick time base, and the tick each command frame was delivered on. This is the
+  channel the performance and disturbance scenarios measure; see the software-in-the-loop design.
+
+Two of the traces are measurements in their own right: the calibration record the firmware stores
+(`[SM] Calibration record:`) and the online estimates it prints on request (`[EST]`). Inertia and
+friction travel in micro-units on both, because the tracer prints three decimals. The
+identification scenarios compare them, and the CAN electrical-parameters response, against the
+plant the scenario configured; the terminal command that asks for the estimates is the product's
+own, sent on the simulated target through the same socket as the CAN frames.
 
 Trace output only drains while the target's event loop has work, so an assertion that waits for a
 trace polls telemetry rather than waiting passively. Trace lines are retained across the frames the
@@ -131,13 +142,14 @@ directory holding the target's files, the socket carrying frames, and the captur
 
 ### Provided to step definitions
 
-| Capability        | Purpose                                                         |
-|-------------------|-----------------------------------------------------------------|
-| Lifecycle         | Start, stop and restart the target                              |
-| Command transport | Send a category command and await its acknowledgement           |
-| Telemetry         | Await a state, a fault code, or read the measured position      |
-| Serial capture    | Drain and search the target's trace output                      |
-| Simulation        | Describe the plant and the stored calibration and configuration |
+| Capability        | Purpose                                                                     |
+|-------------------|-----------------------------------------------------------------------------|
+| Lifecycle         | Start, stop and restart the target                                          |
+| Command transport | Send a category command and await its acknowledgement                       |
+| Telemetry         | Await a state, a fault code, or read the measured position                  |
+| Serial capture    | Drain and search the target's trace output                                  |
+| Simulation        | Describe the plant and the stored calibration and configuration             |
+| Response          | Capture the plant trajectory and measure step and disturbance metrics on it |
 
 ### Required from the system under test
 

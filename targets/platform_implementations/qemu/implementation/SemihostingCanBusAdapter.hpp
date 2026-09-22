@@ -3,6 +3,7 @@
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "infra/util/Function.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingCan.hpp"
+#include <optional>
 
 namespace application
 {
@@ -16,7 +17,8 @@ namespace application
 
         void NotifyError(CanError error);
 
-        void PollIncoming();
+        std::optional<sil::SemihostingCan::Frame> PollIncoming();
+        void OnTerminalLine(const infra::Function<void(const char*)>& handler);
 
     private:
         sil::SemihostingCan can;

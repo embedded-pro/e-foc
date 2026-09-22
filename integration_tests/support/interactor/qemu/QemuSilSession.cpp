@@ -293,7 +293,10 @@ namespace sil
         if (outPipeFd < 0)
             return false;
 
-        line.clear();
+        // A line cut by a timeout is kept for the next call; dropping it would lose the
+        // frame or sample it belonged to and leave its tail to be parsed as a line of its own.
+        line = std::move(partialLine);
+        partialLine.clear();
         const auto deadline = std::chrono::steady_clock::now() + timeout;
 
         while (true)
@@ -315,13 +318,17 @@ namespace sil
 
             const auto remaining = deadline - std::chrono::steady_clock::now();
             if (remaining <= std::chrono::milliseconds{ 0 })
-                return false;
+                break;
 
             const int ms = static_cast<int>(
                 std::chrono::duration_cast<std::chrono::milliseconds>(remaining).count());
             if (!FillReadBuffer(ms))
-                return false;
+                break;
         }
+
+        partialLine = std::move(line);
+        line.clear();
+        return false;
     }
 
     bool QemuSilSession::WaitFor(const std::string& prefix, std::string& line, std::chrono::milliseconds timeout)
@@ -365,6 +372,7 @@ namespace sil
     void QemuSilSession::ClearCapturedLines()
     {
         capturedLines.clear();
+        partialLine.clear();
     }
 
     bool QemuSilSession::SendCanFrame(hal::Can::Id id, const hal::Can::Message& data)
