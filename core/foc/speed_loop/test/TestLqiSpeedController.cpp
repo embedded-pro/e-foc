@@ -83,6 +83,28 @@ TEST_F(TestLqiSpeedController, output_stays_inside_the_current_envelope)
     EXPECT_NEAR(output.Value(), ValidParameters().maxCurrent.Value(), tolerance);
 }
 
+TEST_F(TestLqiSpeedController, output_stays_inside_the_current_envelope_in_the_negative_direction)
+{
+    controller.Configure(ValidParameters());
+
+    auto output = controller.Compute({ foc::RadiansPerSecond{ 0.0f }, foc::RadiansPerSecond{ -1.0e6f } });
+
+    EXPECT_NEAR(output.Value(), -ValidParameters().maxCurrent.Value(), tolerance);
+}
+
+TEST_F(TestLqiSpeedController, a_reference_reversal_after_positive_saturation_recovers_within_one_sample)
+{
+    controller.Configure(ValidParameters());
+
+    const foc::SpeedControlContext saturating{ foc::RadiansPerSecond{ 0.0f }, foc::RadiansPerSecond{ 1.0e4f } };
+    for (std::size_t step = 0; step != 200; ++step)
+        controller.Compute(saturating);
+
+    auto output = controller.Compute({ foc::RadiansPerSecond{ 0.0f }, foc::RadiansPerSecond{ -1.0e4f } });
+
+    EXPECT_LT(output.Value(), 0.0f);
+}
+
 TEST_F(TestLqiSpeedController, saturation_freezes_the_integrator)
 {
     controller.Configure(ValidParameters());
