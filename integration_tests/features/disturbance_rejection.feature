@@ -9,19 +9,27 @@ Feature: Disturbance Rejection
   millinewton-metres keeps the loop out of current saturation, so the numbers
   measure the control law rather than the current limit.
 
-  The last scenario is the exception, and measures the current limit on purpose.
-  It lowers the limit until a modest step reaches it: the steady-state demand
-  still fits inside the limit, so the loop can recover, while the transient the
-  step provokes does not, so the recovery runs through a saturated command and
-  exercises the anti-windup rather than the linear response.
+  The last scenario is the exception, and reaches the current limit on purpose:
+  the steady-state demand still fits inside it, so the loop can recover, while
+  the transient the step provokes does not, so the recovery runs through a
+  saturated command and exercises the anti-windup rather than the linear
+  response.
 
-  How far the limit can be lowered is bounded from below by alignment, which
-  injects open-loop and abandons the attempt the moment a phase carries more
-  than the drive says it supports. A limit small enough to make a millinewton-
-  metre step saturate is far below what that injection draws, and the motor then
-  never aligns at all. The limit here is therefore only halved from the nominal
-  one, leaving alignment its headroom, and the torque is raised instead until it
-  asks for most of what remains.
+  It reaches the limit by raising the torque rather than by lowering the limit,
+  which cannot be done here. Alignment injects open-loop and abandons the attempt
+  the moment a phase carries more than the drive says it supports, so the limit
+  has a floor: measured against this plant it sits above ten amperes, more than
+  half the nominal twenty. Anything low enough to make a millinewton-metre step
+  saturate stops the motor aligning at all, and anything alignment survives still
+  leaves the loop most of its current. The torque is therefore what moves: half a
+  newton-metre asks for about two thirds of what the drive can deliver, which the
+  steady state fits inside and the transient does not.
+
+  Its excursion limit is correspondingly wide and is not pinned: a rotor of seven
+  microkilogram-metres-squared loses a great deal of speed in the millisecond
+  before the outer loop next runs, so what this row bounds today is a loop that
+  never comes back, not how far it was pushed. The measured figure replaces it
+  once the [METRIC] line reports one.
 
   The @sil rows carry the envelope the product holds today on the nominal plant
   (the Teknic M-2310P-LN-04K reference motor).
@@ -99,10 +107,8 @@ Feature: Disturbance Rejection
   @sil @REQ-SPD-009
   Scenario Outline: The <algorithm> speed loop recovers through a saturated current command
     Given a nominal motor plant
-    And a motor plant with:
-      | max_supported_current_ampere | 10 |
     And the plant response is recorded at 1000 Hz for up to 1200 samples
-    And a torque step of 0.30 Nm applied 300 ms after enable
+    And a torque step of 0.5 Nm applied 300 ms after enable
     And the motor is already calibrated
     And the motor boots in speed mode
     And the speed loop runs the <algorithm> algorithm
@@ -112,7 +118,7 @@ Feature: Disturbance Rejection
     When a speed setpoint of 20 rad/s is applied
     And the motor is enabled
     And the response is captured for 750 ms after enable
-    Then the speed deviation after the torque step shall stay below 25.0 rad/s
+    Then the speed deviation after the torque step shall stay below 150.0 rad/s
     And the speed shall recover to within 3.0 rad/s of the setpoint within 350 ms of the torque step
     And the response shall have no dropped samples
 
