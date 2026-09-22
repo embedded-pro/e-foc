@@ -27,7 +27,7 @@ namespace foc
         void Enable() override;
         void Disable() override;
         hal::Hertz OuterLoopFrequency() const override;
-        PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override;
+        PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) final;
 
         void EnableSpeedCommand() override;
         void DisableSpeedCommand() override;

@@ -205,17 +205,29 @@ result = a * b + c;
 // Becomes: vfma.f32 s0, s1, s2  (1 cycle, full precision)
 ```
 
-### 8. Per-File Optimisation Pragmas
+### 8. Per-Function Optimisation Pragmas
 
-For performance-critical translation units (FOC implementations, SVM, transforms):
+For performance-critical hot-path functions (FOC implementations, SVM, transforms), bracket only the
+hot function(s) with `push_options`/`pop_options` — never apply the pragma unscoped for the whole file.
+An unscoped `#pragma GCC optimize("O3", "fast-math")` silently applies finite-math assumptions to every
+function in the translation unit, including config-time validation or finiteness checks that must keep
+their real NaN/Inf semantics:
 
 ```cpp
 #if defined(__GNUC__) || defined(__clang__)
+#pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
+#endif
+ReturnType HotFunction(...)
+{
+    // ...
+}
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC pop_options
 #endif
 ```
 
-Place at the top of the `.cpp` file, before any includes that define affected functions.
+Place the bracket immediately around the hot function's definition, not at the top of the file.
 
 ### 9. Per-Function Attributes
 
@@ -244,10 +256,14 @@ set(CMAKE_CXX_FLAGS_DEBUG "-Og -g" CACHE STRING "Debug flags" FORCE)
 `-Og` provides: basic inlining, dead-code elimination, register allocation — while keeping full
 debuggability (variable inspection, correct stack trace).
 
-**Solution 2 — File-level pragma** (when specific files must remain fast even at -O0):
+**Solution 2 — Scoped pragma** (when a specific function must remain fast even at -O0, bracketed with
+`push_options`/`pop_options` so the rest of the file still builds at the configured optimisation level):
 
 ```cpp
+#pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
+void CriticalFunction() { /* ... */ }
+#pragma GCC pop_options
 ```
 
 **Solution 3 — Function attribute** (for a single bottleneck function):

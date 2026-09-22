@@ -1,7 +1,3 @@
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC optimize("O3", "fast-math")
-#endif
-
 #include "core/foc/cascade/TorqueCascade.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/DutyConversion.hpp"
@@ -91,6 +87,10 @@ namespace foc
         return currentLoop;
     }
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3", "fast-math")
+#endif
     OPTIMIZE_FOR_SPEED
     PhasePwmDutyCycles TorqueCascade::Calculate(const PhaseCurrents& currentPhases, Radians& position)
     {
@@ -125,4 +125,7 @@ namespace foc
         previousMechanicalAngle = mechanicalAngle;
         return speedFilter.Filter(sampled);
     }
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC pop_options
+#endif
 }

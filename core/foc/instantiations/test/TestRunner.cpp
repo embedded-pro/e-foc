@@ -42,7 +42,7 @@ TEST_F(TestRunner, ConstructionRegistersPhaseCurrentsCallback)
 {
     EXPECT_CALL(inverterMock, PhaseCurrentsReady(hal::Hertz{ 20000 }, _)).Times(2);
 
-    foc::Runner runner{ inverterMock, encoderMock, focMock };
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     testing::InSequence seq;
     EXPECT_CALL(inverterMock, Stop());
@@ -51,7 +51,7 @@ TEST_F(TestRunner, ConstructionRegistersPhaseCurrentsCallback)
 
 TEST_F(TestRunner, EnableStartsFocThenInverter)
 {
-    foc::Runner runner{ inverterMock, encoderMock, focMock };
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     testing::InSequence seq;
     EXPECT_CALL(focMock, Enable());
@@ -64,7 +64,7 @@ TEST_F(TestRunner, EnableStartsFocThenInverter)
 
 TEST_F(TestRunner, DisableStopsInverterThenFoc)
 {
-    foc::Runner runner{ inverterMock, encoderMock, focMock };
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     testing::InSequence seq;
     EXPECT_CALL(inverterMock, Stop());
@@ -77,7 +77,7 @@ TEST_F(TestRunner, DisableStopsInverterThenFoc)
 
 TEST_F(TestRunner, PhaseCurrentsCallbackReadsEncoderCalculatesFocAndOutputsPwm)
 {
-    foc::Runner runner{ inverterMock, encoderMock, focMock };
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     const foc::PhaseCurrents testCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } };
     const foc::PhasePwmDutyCycles expectedDuties{ hal::Percent{ 60 }, hal::Percent{ 30 }, hal::Percent{ 10 } };
@@ -99,7 +99,7 @@ TEST_F(TestRunner, PhaseCurrentsCallbackReadsEncoderCalculatesFocAndOutputsPwm)
 
 TEST_F(TestRunner, DestructorCallsDisable)
 {
-    auto runner = std::make_unique<foc::Runner>(inverterMock, encoderMock, focMock);
+    auto runner = std::make_unique<foc::Runner<foc::FocTorqueMock>>(inverterMock, encoderMock, focMock);
 
     testing::InSequence seq;
     EXPECT_CALL(inverterMock, Stop());
@@ -110,7 +110,7 @@ TEST_F(TestRunner, DestructorCallsDisable)
 
 TEST_F(TestRunner, MultipleEnableDisableCyclesWork)
 {
-    foc::Runner runner{ inverterMock, encoderMock, focMock };
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     EXPECT_CALL(focMock, Enable()).Times(2);
     EXPECT_CALL(inverterMock, Start()).Times(2);
@@ -125,7 +125,7 @@ TEST_F(TestRunner, MultipleEnableDisableCyclesWork)
 
 TEST_F(TestRunner, AStopWhileThePhaseCurrentsSlotIsTakenNeverStartsTheInverter)
 {
-    foc::Runner runner{ inverterMock, encoderMock, focMock };
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     EXPECT_CALL(inverterMock, PhaseCurrentsReady(_, _))
         .WillOnce([this, &runner](hal::Hertz, const infra::Function<void(foc::PhaseCurrents)>& onDone)
@@ -148,7 +148,7 @@ TEST_F(TestRunner, AStopWhileThePhaseCurrentsSlotIsTakenNeverStartsTheInverter)
 
 TEST_F(TestRunner, AStopWhileTheControlLawIsEnabledNeverStartsTheInverter)
 {
-    foc::Runner runner{ inverterMock, encoderMock, focMock };
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     EXPECT_CALL(focMock, Enable())
         .WillOnce([&runner]()
@@ -166,7 +166,7 @@ TEST_F(TestRunner, AStopWhileTheControlLawIsEnabledNeverStartsTheInverter)
 
 TEST_F(TestRunner, AStopWhileTheInverterStartsLeavesTheBridgeStopped)
 {
-    foc::Runner runner{ inverterMock, encoderMock, focMock };
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     EXPECT_CALL(focMock, Enable());
     EXPECT_CALL(inverterMock, Start())
@@ -185,7 +185,7 @@ TEST_F(TestRunner, AStopWhileTheInverterStartsLeavesTheBridgeStopped)
 
 TEST_F(TestRunner, ALateCallbackAfterDisableDoesNotDriveThePwm)
 {
-    foc::Runner runner{ inverterMock, encoderMock, focMock };
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     EXPECT_CALL(focMock, Enable());
     EXPECT_CALL(inverterMock, Start());
@@ -200,7 +200,7 @@ TEST_F(TestRunner, ALateCallbackAfterDisableDoesNotDriveThePwm)
 
 TEST_F(TestRunner, ACallbackBeforeEnableDoesNotDriveThePwm)
 {
-    foc::Runner runner{ inverterMock, encoderMock, focMock };
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     EXPECT_CALL(inverterMock, Stop());
     EXPECT_CALL(focMock, Disable());
@@ -210,7 +210,7 @@ TEST_F(TestRunner, ACallbackBeforeEnableDoesNotDriveThePwm)
 
 TEST_F(TestRunner, PhaseCurrentsAreDispatchedToTheControlLaw)
 {
-    foc::Runner runner{ inverterMock, encoderMock, focMock };
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     EXPECT_CALL(focMock, Enable());
     EXPECT_CALL(inverterMock, Start());
@@ -228,7 +228,7 @@ TEST_F(TestRunner, PhaseCurrentsAreDispatchedToTheControlLaw)
 
 TEST_F(TestRunner, DisableReleasesThePhaseCurrentsSlot)
 {
-    foc::Runner runner{ inverterMock, encoderMock, focMock };
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     EXPECT_CALL(focMock, Enable());
     EXPECT_CALL(inverterMock, Start());
@@ -243,7 +243,7 @@ TEST_F(TestRunner, DisableReleasesThePhaseCurrentsSlot)
 
 TEST_F(TestRunner, RegisteredObserverSeesThePhaseCurrentsAfterTheDutiesAreWritten)
 {
-    foc::Runner runner{ inverterMock, encoderMock, focMock };
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     EXPECT_CALL(focMock, Enable());
     EXPECT_CALL(inverterMock, Start());
@@ -276,7 +276,7 @@ TEST_F(TestRunner, RegisteredObserverSeesThePhaseCurrentsAfterTheDutiesAreWritte
 
 TEST_F(TestRunner, UnregisteredObserverIsNotCalled)
 {
-    foc::Runner runner{ inverterMock, encoderMock, focMock };
+    foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     EXPECT_CALL(focMock, Enable());
     EXPECT_CALL(inverterMock, Start());

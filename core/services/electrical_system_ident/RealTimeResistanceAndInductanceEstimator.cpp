@@ -1,9 +1,5 @@
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC optimize("O3", "fast-math")
-#endif
-
 namespace services
 {
     RealTimeResistanceAndInductanceEstimator::RealTimeResistanceAndInductanceEstimator(
@@ -17,6 +13,10 @@ namespace services
     // Regressor: phi = [Id,  (dId/dt - we*Iq)]
     // Target: theta = [R, L]^T
     // Assumes non-salient motor (Ld = Lq). Uses Ld for seeding and reporting.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3", "fast-math")
+#endif
     void RealTimeResistanceAndInductanceEstimator::ComputeEstimate(
         foc::Volts vd,
         foc::Ampere id,
@@ -47,6 +47,9 @@ namespace services
         currentResistance = foc::Ohm{ rls.Coefficients().at(0, 0) };
         currentInductance = foc::MilliHenry{ rls.Coefficients().at(1, 0) * 1000.0f };
     }
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC pop_options
+#endif
 
     void RealTimeResistanceAndInductanceEstimator::Seed(foc::Ohm resistance, foc::MilliHenry inductance)
     {

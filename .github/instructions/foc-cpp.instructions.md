@@ -32,11 +32,20 @@ The `Calculate()` method runs at 20 kHz in interrupt context. Every cycle matter
 - Target: <=4500 cycles at 120 MHz for the 20 kHz inner loop (75% of the 6000-cycle period); the 1 kHz outer loop budget is 20000 cycles
 - Use `FastTrigonometry` (from `core/foc/math/FastTrigonometry.hpp`) or lookup tables — not raw `sin`/`cos` in hot paths
 
-Every implementation file with hot-path code MUST include:
+Every implementation file with hot-path code MUST scope `#pragma GCC optimize` to the hot function(s) with `push_options`/`pop_options` — never apply it file-wide, since that silently forces fast-math onto unrelated config/validation code in the same translation unit:
 
 ```cpp
 #if defined(__GNUC__) || defined(__clang__)
+#pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
+#endif
+OPTIMIZE_FOR_SPEED
+ReturnType Calculate(...)
+{
+    ...
+}
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC pop_options
 #endif
 ```
 

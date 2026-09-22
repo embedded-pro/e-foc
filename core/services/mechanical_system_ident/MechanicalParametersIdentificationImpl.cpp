@@ -1,7 +1,3 @@
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC optimize("O3", "fast-math")
-#endif
-
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/AngleWrap.hpp"
@@ -142,6 +138,10 @@ namespace services
             Complete(std::nullopt, std::nullopt);
     }
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3", "fast-math")
+#endif
     OPTIMIZE_FOR_SPEED
     void MechanicalParametersIdentificationImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant)
     {
@@ -196,4 +196,7 @@ namespace services
         outcome = Outcome::converged;
         ScheduleFinish();
     }
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC pop_options
+#endif
 }

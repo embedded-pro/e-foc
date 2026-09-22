@@ -1,11 +1,11 @@
-add_library(e_foc.foc.instantiations ${EMIL_EXCLUDE_FROM_ALL})
+add_library(e_foc.foc.instantiations INTERFACE ${EMIL_EXCLUDE_FROM_ALL})
 
-target_include_directories(e_foc.foc.instantiations PUBLIC
+target_include_directories(e_foc.foc.instantiations INTERFACE
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../../>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 
-target_link_libraries(e_foc.foc.instantiations PUBLIC
+target_link_libraries(e_foc.foc.instantiations INTERFACE
     e_foc.foc.cascade
     e_foc.platform_abstraction.interfaces
     infra.event
@@ -14,7 +14,6 @@ target_link_libraries(e_foc.foc.instantiations PUBLIC
 target_sources(e_foc.foc.instantiations PRIVATE
     FocController.hpp
     LowPriorityInterruptImpl.hpp
-    Runner.cpp
     Runner.hpp
 )
 

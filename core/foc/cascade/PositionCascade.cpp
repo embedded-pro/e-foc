@@ -1,7 +1,3 @@
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC optimize("O3", "fast-math")
-#endif
-
 #include "core/foc/cascade/PositionCascade.hpp"
 
 namespace foc
@@ -136,6 +132,10 @@ namespace foc
         return outerLoopFrequency;
     }
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3", "fast-math")
+#endif
     OPTIMIZE_FOR_SPEED
     void PositionCascade::LowPriorityHandler()
     {
@@ -169,4 +169,7 @@ namespace foc
     {
         return CalculateInnerLoop(currentPhases, position);
     }
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC pop_options
+#endif
 }

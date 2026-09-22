@@ -1,7 +1,3 @@
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC optimize("O3", "fast-math")
-#endif
-
 #include "targets/platform_implementations/qemu/implementation/PlatformFactoryImpl.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "services/tracer/GlobalTracer.hpp"
@@ -303,6 +299,10 @@ namespace application
         lastDutyPhases = dutyPhases;
     }
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3", "fast-math")
+#endif
     void PlatformFactoryImpl::FocTimerIsr()
     {
         const uint32_t tick = controlTick.load(std::memory_order_relaxed) + 1;
@@ -341,6 +341,9 @@ namespace application
 
         boardProtection.Evaluate(lastCurrents, model.EffectiveSupplyVoltage().Value(), model.WindingTemperatureCelsius());
     }
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC pop_options
+#endif
 
     void PlatformFactoryImpl::Start()
     {

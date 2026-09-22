@@ -127,7 +127,7 @@ TEST_F(FaultControllerTest, clearing_leaves_a_pending_fault_for_its_own_transiti
     controller.EnterFault();
 
     controller.LatchFromInterrupt(state_machine::FaultCode::overvoltage);
-    controller.Clear();
+    EXPECT_TRUE(controller.TryClear());
 
     EXPECT_TRUE(controller.IsPending());
     EXPECT_EQ(controller.TakePendingFault(), state_machine::FaultCode::overvoltage);
@@ -143,7 +143,7 @@ TEST_F(FaultControllerTest, entering_the_fault_marks_it_recorded_and_clearing_un
     controller.EnterFault();
     EXPECT_TRUE(controller.IsRecorded());
 
-    controller.Clear();
+    EXPECT_TRUE(controller.TryClear());
     EXPECT_FALSE(controller.IsRecorded());
 }
 
