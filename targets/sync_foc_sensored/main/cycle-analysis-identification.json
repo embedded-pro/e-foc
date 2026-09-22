@@ -13,7 +13,7 @@
         "Adc0Sequence.*Handler",
         "InterruptTable::Invoke",
         "ImmediateInterruptHandler::Invoke",
-        "Runner::OnPhaseCurrents",
+        "Runner.*::OnPhaseCurrents",
         "ControlLoopMetrics::Record",
         "ControlLoopMetrics::RecordReentry"
       ]
