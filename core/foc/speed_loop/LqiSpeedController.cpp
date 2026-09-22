@@ -78,10 +78,6 @@ namespace foc
         const auto inputMatrix = SpeedPlant::InputMatrix{ normalizedInputGain };
         const auto model = SpeedPlant::WithFullStateOutput(stateMatrix, inputMatrix);
 
-        // R must scale with the plant's own input gain squared: a fixed R=1 is only the right
-        // order of magnitude when that gain is O(1). Here it embeds Kt/J, Ts and maxCurrent and
-        // can run two to three orders of magnitude larger, which left unscaled produced an
-        // effectively deadbeat design with no margin against real (non-ideal) loop delay.
         const math::SquareMatrix<float, 1> inputWeight{
             NormalizedEffortWeight(bandwidth, parameters.samplingFrequency) * normalizedInputGain * normalizedInputGain
         };

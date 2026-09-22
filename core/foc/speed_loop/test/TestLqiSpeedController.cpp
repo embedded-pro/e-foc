@@ -13,10 +13,6 @@ namespace
             foc::NewtonMeter{ 0.05f }, foc::Ampere{ 10.0f }, hal::Hertz{ 1000 } };
     }
 
-    // Teknic M-2310P-LN-04K (motor_parameters/TeknicM2310pLn04k.hpp), the reference motor the
-    // @sil-known-defect envelope was characterised against: small inertia gives a much larger
-    // normalized input gain (Kt/J * Ts * Imax) than ValidParameters() above, which is what exposes
-    // an unscaled LQR effort weight.
     foc::MechanicalModelParameters ReferenceMotorParameters()
     {
         return { foc::NewtonMeterSecondSquared{ 7.06e-6f }, foc::NewtonMeterSecondPerRadian{ 1.5e-5f },
@@ -57,9 +53,6 @@ namespace
             return peak / reference - 1.0f;
         }
 
-        // A real current loop never reacts within the same sample it was commanded; a design with
-        // no margin against that one-sample lag rings instead of settling (the @sil-known-defect
-        // failure mode: documentation/design/software-in-the-loop.md Part I).
         float RelativeOvershootWithOneSampleActuationDelay(const foc::MechanicalModelParameters& parameters, float reference, std::size_t steps)
         {
             const auto plant = foc::SpeedPlantModel::FromParameters(parameters);
