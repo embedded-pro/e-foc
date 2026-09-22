@@ -1,4 +1,5 @@
 #include "core/state_machine/OperationFlow.hpp"
+#include "infra/util/ReallyAssert.hpp"
 
 namespace application
 {
@@ -121,14 +122,14 @@ namespace application
 
     state_machine::Ready OperationFlow::ClearFaultToReady()
     {
-        faultController.Clear();
+        really_assert(faultController.TryClear());
         env.tracer.Trace() << "[SM] Fault cleared";
         return calibration.ReadyState();
     }
 
     state_machine::Idle OperationFlow::ClearFaultToIdle()
     {
-        faultController.Clear();
+        really_assert(faultController.TryClear());
         env.tracer.Trace() << "[SM] Fault cleared";
         return state_machine::Idle{};
     }

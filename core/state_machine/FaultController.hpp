@@ -39,7 +39,6 @@ namespace application
         ClearRefusal EvaluateClear() const;
 
         bool CanClear() const;
-        void Clear();
         bool TryClear();
         void ResetClearCount();
 
@@ -48,6 +47,8 @@ namespace application
         bool IsPending() const;
 
     private:
+        void Clear();
+
         state_machine::FaultNotifier* registeredNotifier{ nullptr };
         volatile bool faultLatched{ false };
         volatile bool faultPending{ false };
