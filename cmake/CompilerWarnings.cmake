@@ -14,4 +14,17 @@ function(e_foc_enable_project_warnings)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         add_compile_options(-Wno-maybe-uninitialized)
     endif()
+
+    # The windows preset's Clang enables a much broader diagnostic set than -Wall -Wextra ask
+    # for (confirmed: plain -Wall -Wextra alone produces none of these on the same source with
+    # this Clang). Every GTEST_TEST_F expansion then reports pre-C++20 "library compatibility"
+    # style warnings against gnu++20 code that never targets C++98/pre-C++17, at a volume (tens
+    # of thousands of lines across the test suite) that risks tripping CI's log-size limits
+    # independent of any real defect. None of these bear on correctness here.
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        add_compile_options(-Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-c++20-compat
+                             -Wno-pre-c++14-compat -Wno-pre-c++17-compat -Wno-pre-c++20-compat
+                             -Wno-global-constructors -Wno-exit-time-destructors -Wno-weak-vtables
+                             -Wno-padded)
+    endif()
 endfunction()
