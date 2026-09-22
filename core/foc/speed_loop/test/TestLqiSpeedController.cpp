@@ -91,6 +91,21 @@ TEST_F(TestLqiSpeedController, positive_error_produces_positive_current)
     EXPECT_GT(output.Value(), 0.0f);
 }
 
+TEST_F(TestLqiSpeedController, higher_bandwidth_produces_a_stronger_response)
+{
+    const auto parameters = ValidParameters();
+    controller.Configure(parameters);
+    auto slow = controller.Compute({ foc::RadiansPerSecond{ 0.0f }, foc::RadiansPerSecond{ 1.0f } });
+
+    foc::LqiSpeedController fast;
+    fast.Configure(parameters);
+    fast.SetTunings({ 2.0f * foc::SpeedLoopTunings{}.bandwidth, foc::SpeedLoopTunings{}.speedErrorWeight,
+        foc::SpeedLoopTunings{}.integralWeight, foc::SpeedLoopTunings{}.observerBandwidthRatio,
+        foc::SpeedLoopTunings{}.referenceTimeConstant });
+
+    EXPECT_GT(fast.Compute({ foc::RadiansPerSecond{ 0.0f }, foc::RadiansPerSecond{ 1.0f } }).Value(), slow.Value());
+}
+
 TEST_F(TestLqiSpeedController, integral_action_removes_steady_state_error)
 {
     controller.Configure(ValidParameters());
