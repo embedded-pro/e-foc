@@ -385,6 +385,27 @@ recording because the asymmetry was not expected:
   loops are, has not been established. The two rows are held back until it is, rather than
   loosened to fit the measurement or tagged against a defect nobody has confirmed.
 
+The same run, once a disturbance was made large enough to reach the current limit, found a
+second thing:
+
+- **Two speed laws do not come back from a saturating disturbance.** A shaft torque of half a
+  newton-metre asks for about thirteen of the twenty amperes the drive allows, so the current to
+  reject it is there, and the transient that gets there clamps on the way. ADRC and LQI are
+  thrown 205 to 238 rad/s off a 20 rad/s setpoint and return to within a few hundredths of it.
+  PI and two-DOF are thrown further, to about 317, and then stop 10.44 rad/s short, having
+  surrendered more than half the setpoint to a disturbance they had the current to reject. The
+  two that recover carry the default-run rows; the two that do not are held out under the
+  known-defect tag with the envelope the other two meet. The scenario that found this is the only
+  one in the suite that reaches the current limit at all: every other disturbance is kept small
+  on purpose so that it measures the control law rather than the limiter.
+
+How far the limit can be lowered to provoke that is itself bounded, which is worth recording
+because it is not obvious: alignment injects open-loop and abandons the attempt the moment a
+phase carries more than the drive says it supports, so the limit cannot be dropped below what
+that injection draws. On the nominal plant it is above ten amperes, more than half the nominal
+twenty. A limit low enough to make a millinewton-metre step saturate stops the motor aligning
+at all, so a scenario that wants saturation raises the torque rather than lowering the limit.
+
 The run also found a harness fault: a line cut by a read timeout was dropped and its tail
 parsed as a line of its own, which showed up as a gap in the sample spacing. The reader now
 keeps a partial line for the next read.

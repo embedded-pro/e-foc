@@ -82,4 +82,8 @@
     that opposes it. Where the step demands more current than the drive is allowed to deliver,
     every law shall still return to its setpoint once the steady-state demand fits inside the
     limit again, so that a recovery running through a saturated command unwinds rather than
-    latching the integrator.
+    latching the integrator: against a 0.5 N·m step, which asks for about thirteen of the twenty
+    amperes allowed, the speed shall stay within 300 rad/s of the setpoint and return to within
+    3 rad/s of it within 350 ms. ADRC and LQI meet that row. The PI and two-DOF rows are held out
+    of the default run until they do: both settle 10.44 rad/s below the setpoint, surrendering
+    more than half of it to a disturbance they had the current to reject.
