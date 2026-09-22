@@ -405,7 +405,6 @@ NVM persistence, and CLI/CAN interface — is documented in `documentation/desig
 - **Assumes**: The electrical rotor angle $\theta_e$ is accurately known (from encoder + alignment offset).
   Angle errors directly degrade torque production and can cause instability.
 - **Does not handle**: Flux weakening above base speed (field weakening via non-zero $i_d$).
-- **Does not handle**: Parameter adaptation (online $R_s$, $L_s$ estimation during operation).
 - **Does not handle**: Sensorless operation (this implementation uses an encoder for $\theta_e$).
 
 ## References
