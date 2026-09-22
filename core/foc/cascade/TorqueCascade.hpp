@@ -22,7 +22,7 @@ namespace foc
         CurrentAlgorithm ActiveCurrentAlgorithm() const override;
         void Enable() override;
         void Disable() override;
-        PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override final;
+        PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) final;
 
         CurrentControllerSelector& CurrentLoop();
 

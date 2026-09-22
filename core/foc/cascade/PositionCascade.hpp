@@ -30,7 +30,7 @@ namespace foc
         void SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator) override;
         void Enable() override;
         void Disable() override;
-        PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) override final;
+        PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) final;
 
         void EnableSpeedCommand() override;
         void DisableSpeedCommand() override;
