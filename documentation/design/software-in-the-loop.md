@@ -307,11 +307,11 @@ delivery stamp. The target's command surface is still the product's: nothing was
 
 The first characterisation run measured the product against the parameter set that stood in
 for a motor at the time and reported four findings. Re-measured on the reference motors, after
-the harness faults recorded in Part J were fixed, two of them stand and two were artefacts. The
-scenarios that expose a standing defect are kept, with the limits the law should meet, under a
-tag held out of the default run in the same way as the protection scenarios; the scenarios in
-the default run carry the envelope the product holds today, so a regression is still caught
-while the defects are open.
+the harness faults recorded in Part J were fixed, two of them were artefacts, one stands, and one
+was a real defect that has since been fixed. A scenario that exposes a standing defect is kept,
+with the limits the law should meet, under a tag held out of the default run in the same way as
+the protection scenarios; the scenarios in the default run carry the envelope the product holds
+today, so a regression is still caught while the defect is open.
 
 - **Whole-percent duty resolution.** The duty cycles the modulator hands the inverter are three
   whole-percent values, and the conversion rounds to the nearest percent. On a 40 V bus into a
@@ -330,11 +330,15 @@ while the defects are open.
 - **The LQI position law is unstable — retracted.** Same cause. It settles into a 10 % band
   within 30 ms with 27–40 % overshoot, and holds 1.5 rad against a torque step within 0.011 rad,
   the tightest of the position laws.
-- **The LQI speed law is erratic — stands, and from rest too.** From rest to 20 rad/s it
-  overshoots 121 % and never settles; stepped to 40 rad/s while running it overshoots 66 % and
-  keeps swinging for the rest of the window; a 0.002 N·m torque step pushes it 26 rad/s off a
-  20 rad/s setpoint, where the other laws move less than 2 rad/s. Its rows are held out under the
-  known-defect tag in all three scenarios.
+- **The LQI speed law was erratic — fixed.** From rest to 20 rad/s it overshot 121 % and never
+  settled; stepped to 40 rad/s while running it overshot 66 % and kept swinging for the rest of
+  the window; a 0.002 N·m torque step pushed it 26 rad/s off a 20 rad/s setpoint, where the other
+  laws move less than 2 rad/s. The cause was `LqiSpeedController` never scaling its LQR effort
+  weight to the plant's own input gain: the fixed weight sized a design with no margin against a
+  real current loop's one-sample delay (`documentation/theory/speed-loop-lqi.md`). Rescaled to the
+  plant's input gain and the requested bandwidth, it settles into a 10 % band within 16–19 ms with
+  2–4 % overshoot in both step scenarios, and the same torque step moves it about 1.2 rad/s off
+  setpoint. Its rows carry the same envelope as the other speed laws now.
 
 The run also found a harness fault: a line cut by a read timeout was dropped and its tail
 parsed as a line of its own, which showed up as a gap in the sample spacing. The reader now

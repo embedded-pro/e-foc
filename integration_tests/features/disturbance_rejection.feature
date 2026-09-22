@@ -10,9 +10,7 @@ Feature: Disturbance Rejection
   measure the control law rather than the current limit.
 
   The @sil rows carry the envelope the product holds today on the nominal plant
-  (the Teknic M-2310P-LN-04K reference motor). The LQI speed row is held out
-  under @sil-known-defect: that law is pushed more than a setpoint's worth off
-  20 rad/s by a torque the other laws absorb within two.
+  (the Teknic M-2310P-LN-04K reference motor).
 
   @REQ-SPD-009
   Scenario Outline: The <algorithm> speed loop rejects a torque step while holding 20 rad/s
@@ -38,11 +36,7 @@ Feature: Disturbance Rejection
       | pid       | 4.0       | 2.0  | 50          |
       | adrc      | 4.0       | 2.0  | 50          |
       | twodof    | 4.0       | 2.0  | 50          |
-
-    @sil-known-defect
-    Examples:
-      | algorithm | deviation | band | recovery_ms |
-      | lqi       | 4.0       | 2.0  | 100         |
+      | lqi       | 4.0       | 2.0  | 50          |
 
   @sil @REQ-POS-010
   Scenario Outline: The <algorithm> position loop holds 1.5 rad against a torque step
