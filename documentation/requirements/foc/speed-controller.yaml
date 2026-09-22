@@ -63,7 +63,8 @@
     1 rad/s row in both cases; that row is held out of the default run until its response, a
     twofold overshoot from rest and an erratic swing on a running change, is fixed. Each law's
     rise time from a tenth to nine tenths of the step, and the band its tail still ripples in
-    over the last quarter of the window, shall also be bounded by the row it carries; both
+    over the last quarter of the window, measured as a percentage of that step rather than of
+    the setpoint it ends at, shall also be bounded by the row it carries; both
     bounds are permissive until a characterisation run pins them, so that a loop which never
     rises or never stops ringing fails while the measured envelope is still being established.
     The response is measured on the plant's own trajectory on the control-tick time base.

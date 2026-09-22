@@ -57,7 +57,9 @@ Feature: Disconnected And Faulty Motor Wiring
     When a speed setpoint of 20 rad/s is applied
     And the motor is enabled
     And the response is captured for 550 ms after enable
-    Then the state machine shall be in the running state
+    Then the encoder shall have frozen during the response
+    And the state machine shall be in the running state
+    And the rotor shall not turn
     And the response shall have no dropped samples
 
   @sil-known-defect @REQ-SM-008
@@ -70,7 +72,7 @@ Feature: Disconnected And Faulty Motor Wiring
     And the rotor is aligned
     And the motor is enabled
     And a speed setpoint of 20 rad/s is applied
-    Then the state machine shall report an sensor fault
+    Then the state machine shall report a sensor fault
 
   @sil-known-defect @REQ-SM-008
   Scenario: A stuck encoder shall be detected as a sensor fault
@@ -81,7 +83,7 @@ Feature: Disconnected And Faulty Motor Wiring
     And the rotor is aligned
     And the motor is enabled
     And a speed setpoint of 20 rad/s is applied
-    Then the state machine shall report an sensor fault
+    Then the state machine shall report a sensor fault
 
   @sil @REQ-SM-006
   Scenario: A healthy motor turns when commanded

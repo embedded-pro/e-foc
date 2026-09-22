@@ -32,7 +32,7 @@ Feature: Control Robustness Against Off-Nominal Plants
     And the response is captured for 550 ms after enable
     Then the speed step response shall settle into a 10 % band within <settle_ms> ms with overshoot below <overshoot_pct> %
     And the speed step response shall rise within 400 ms
-    And the speed response tail shall stay within <tail_pct> % of the setpoint
+    And the speed response tail shall stay within <tail_pct> % of the step
     And the steady-state speed error shall be below <error> rad/s
     And the response shall have no dropped samples
 
@@ -56,7 +56,7 @@ Feature: Control Robustness Against Off-Nominal Plants
     And the response is captured for 550 ms after enable
     Then the position step response shall settle into a 10 % band within <settle_ms> ms with overshoot below <overshoot_pct> %
     And the position step response shall rise within 400 ms
-    And the position response tail shall stay within <tail_pct> % of the setpoint
+    And the position response tail shall stay within <tail_pct> % of the step
     And the steady-state position error shall be below <error> rad
     And the response shall have no dropped samples
 
@@ -81,7 +81,7 @@ Feature: Control Robustness Against Off-Nominal Plants
     And the motor is enabled
     And the response is captured for 550 ms after enable
     Then the speed step response shall settle into a 10 % band within 300 ms with overshoot below 60 %
-    And the speed response tail shall stay within 40 % of the setpoint
+    And the speed response tail shall stay within 40 % of the step
     And the steady-state speed error shall be below 2.0 rad/s
     And the response shall have no dropped samples
 
@@ -105,7 +105,7 @@ Feature: Control Robustness Against Off-Nominal Plants
     And the motor is enabled
     And the response is captured for 550 ms after enable
     Then the position step response shall settle into a 10 % band within 400 ms with overshoot below 60 %
-    And the position response tail shall stay within 40 % of the setpoint
+    And the position response tail shall stay within 40 % of the step
     And the steady-state position error shall be below 0.3 rad
     And the response shall have no dropped samples
 

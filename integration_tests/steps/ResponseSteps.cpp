@@ -263,7 +263,7 @@ THEN(R"(the {word} step response shall rise within {float} ms)", (std::string si
     EXPECT_LE(metrics->riseTimeS * kMilliPerSecond, riseMs) << SignalName(signal) << " rose too slowly";
 }
 
-THEN(R"(the {word} response tail shall stay within {float} % of the setpoint)", (std::string signalWord, float tailPercent))
+THEN(R"(the {word} response tail shall stay within {float} % of the step)", (std::string signalWord, float tailPercent))
 {
     auto& setup = context.Get<ScenarioSetup>();
     RequireCapturedTrace(setup);
@@ -322,4 +322,16 @@ THEN(R"(the response shall have no dropped samples)")
 
     EXPECT_EQ(setup.trace.Dropped(), 0u) << "The recorder dropped samples";
     EXPECT_EQ(setup.trace.Gaps(), 0u) << "The captured samples are not uniformly spaced";
+}
+
+THEN(R"(the encoder shall have frozen during the response)")
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    FeedNewLines(setup);
+
+    const auto onset = setup.trace.EventTick("encoder_freeze");
+    ASSERT_TRUE(onset.has_value()) << "The encoder freeze was scheduled but never fired";
+
+    ASSERT_TRUE(setup.trace.StartTick().has_value()) << "No PLANT_START marker: was the plant response recorded?";
+    EXPECT_GT(*onset, *setup.trace.StartTick()) << "The encoder froze on the tick recording began, not while the motor ran";
 }

@@ -28,7 +28,7 @@ namespace
     }
 }
 
-THEN(R"(the state machine shall report an {word} fault)", (std::string fault))
+THEN(R"(the state machine shall report an? {word} fault)", (std::string fault))
 {
     auto& fixture = context.Get<Fixture>();
     const auto expected = FaultCodeFromName(fault);

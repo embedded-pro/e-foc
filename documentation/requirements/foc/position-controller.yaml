@@ -76,7 +76,8 @@
     cascade P 200 ms, 10 percent, 0.02 rad; LQR 60 ms, 15 percent, 0.01 rad; LQI 60 ms, 50 percent
     from rest and 40 percent on the change, 0.01 rad; two-DOF 300 ms, 15 percent, 0.1 rad from
     rest and 0.15 rad on the change. Each law's rise time from a tenth to nine tenths of the
-    step, and the band its tail still ripples in over the last quarter of the window, shall also
+    step, and the band its tail still ripples in over the last quarter of the window, measured as
+    a percentage of that step rather than of the setpoint it ends at, shall also
     be bounded by the row it carries; both bounds are permissive until a characterisation run
     pins them, so that a loop which never rises or never stops ringing fails while the measured
     envelope is still being established. The response is measured on the plant's own trajectory

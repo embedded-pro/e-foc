@@ -16,7 +16,17 @@ Feature: FOC Control Performance
   permissive, catching only a loop that never rises or never stops ringing,
   until a characterisation run reports what the laws actually measure. Peak time
   is printed on the [METRIC] line but not asserted, because a law that does not
-  overshoot peaks wherever its tail ripple happened to be largest.
+  overshoot peaks wherever its tail ripple happened to be largest. The tail band
+  is a percentage of the step, not of the setpoint the step ends at; the two are
+  the same from rest and differ on a change made while running.
+
+  The current loop carries only one setpoint-change row where the outer loops
+  carry eight. A command sent while the motor runs is delivered about half a
+  second of guest time after enable, which at 20 kHz is ten thousand samples of
+  recording before the window even opens: one such row costs roughly thirty times
+  the trace of a current scenario measured from rest. One row is enough to show
+  the loop reverses cleanly with its integrator already loaded, and the outer
+  loops cover the same ground far more cheaply.
 
   The duty cycle reaches the inverter in whole percent, so the current loop
   ripples around its setpoint by about a tenth of an ampere; the @sil current
@@ -38,7 +48,7 @@ Feature: FOC Control Performance
     And the response is captured for 550 ms after enable
     Then the speed step response shall settle into a <band_pct> % band within <settle_ms> ms with overshoot below <overshoot_pct> %
     And the speed step response shall rise within <rise_ms> ms
-    And the speed response tail shall stay within <tail_pct> % of the setpoint
+    And the speed response tail shall stay within <tail_pct> % of the step
     And the steady-state speed error shall be below <error> rad/s
     And the response shall have no dropped samples
     When the motor is disabled
@@ -69,7 +79,7 @@ Feature: FOC Control Performance
     And the response is captured for 550 ms after the last setpoint
     Then the speed step response shall settle into a <band_pct> % band within <settle_ms> ms with overshoot below <overshoot_pct> %
     And the speed step response shall rise within <rise_ms> ms
-    And the speed response tail shall stay within <tail_pct> % of the setpoint
+    And the speed response tail shall stay within <tail_pct> % of the step
     And the steady-state speed error shall be below <error> rad/s
     And the response shall have no dropped samples
 
@@ -100,7 +110,7 @@ Feature: FOC Control Performance
     And the response is captured for 550 ms after enable
     Then the position step response shall settle into a <band_pct> % band within <settle_ms> ms with overshoot below <overshoot_pct> %
     And the position step response shall rise within <rise_ms> ms
-    And the position response tail shall stay within <tail_pct> % of the setpoint
+    And the position response tail shall stay within <tail_pct> % of the step
     And the steady-state position error shall be below <error> rad
     And the response shall have no dropped samples
 
@@ -129,7 +139,7 @@ Feature: FOC Control Performance
     And the response is captured for 550 ms after the last setpoint
     Then the position step response shall settle into a <band_pct> % band within <settle_ms> ms with overshoot below <overshoot_pct> %
     And the position step response shall rise within <rise_ms> ms
-    And the position response tail shall stay within <tail_pct> % of the setpoint
+    And the position response tail shall stay within <tail_pct> % of the step
     And the steady-state position error shall be below <error> rad
     And the response shall have no dropped samples
 
@@ -156,7 +166,7 @@ Feature: FOC Control Performance
     And the response is captured for 15 ms after enable
     Then the current step response shall settle into a <band_pct> % band within <settle_ms> ms with overshoot below <overshoot_pct> %
     And the current step response shall rise within <rise_ms> ms
-    And the current response tail shall stay within <tail_pct> % of the setpoint
+    And the current response tail shall stay within <tail_pct> % of the step
     And the steady-state current error shall be below <error> A
     And the response shall have no dropped samples
 
@@ -179,7 +189,7 @@ Feature: FOC Control Performance
   @REQ-TRQ-007
   Scenario Outline: The <algorithm> current loop follows a setpoint change to <target> A while running
     Given a nominal motor plant
-    And the plant response is recorded at 20000 Hz for up to 800 samples
+    And the plant response is recorded at 20000 Hz for up to 12000 samples
     And the motor is already calibrated
     And the motor boots in torque mode
     And the current loop runs the <algorithm> algorithm
@@ -193,7 +203,7 @@ Feature: FOC Control Performance
     And the response is captured for 15 ms after the last setpoint
     Then the current step response shall settle into a <band_pct> % band within <settle_ms> ms with overshoot below <overshoot_pct> %
     And the current step response shall rise within <rise_ms> ms
-    And the current response tail shall stay within <tail_pct> % of the setpoint
+    And the current response tail shall stay within <tail_pct> % of the step
     And the steady-state current error shall be below <error> A
     And the response shall have no dropped samples
 
@@ -201,10 +211,3 @@ Feature: FOC Control Performance
     Examples:
       | algorithm | target | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
       | pid       | -0.5   | 40       | 12        | 20            | 12      | 60       | 0.1   |
-      | pid       | 0.2    | 40       | 12        | 20            | 12      | 60       | 0.1   |
-      | decoupled | -0.5   | 40       | 12        | 40            | 12      | 60       | 0.1   |
-      | decoupled | 0.2    | 40       | 12        | 40            | 12      | 60       | 0.1   |
-      | deadbeat  | -0.5   | 40       | 5         | 20            | 12      | 60       | 0.1   |
-      | deadbeat  | 0.2    | 40       | 5         | 20            | 12      | 60       | 0.1   |
-      | sliding   | -0.5   | 40       | 5         | 70            | 12      | 60       | 0.1   |
-      | sliding   | 0.2    | 40       | 5         | 70            | 12      | 60       | 0.1   |

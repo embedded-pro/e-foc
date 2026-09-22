@@ -302,7 +302,10 @@ numerical toolbox's step-response metrics: rise time, settling time into a two-p
 percent overshoot, peak time and steady-state error over the tail of the window. A step is
 normalised before measuring, so a reversal or a step down is the same unit step as a step up.
 Settling time, overshoot, steady-state error, rise time and the band the tail still ripples in
-are each bounded by the row the scenario carries. Peak time is printed and not asserted: a law
+are each bounded by the row the scenario carries. Because the step is normalised first, the tail
+band is a percentage of the step rather than of the setpoint the step ends at; the two coincide
+from rest and differ on a change made while running, where the step is the distance moved and
+not the setpoint reached. Peak time is printed and not asserted: a law
 that does not overshoot has its largest sample wherever the tail ripple happened to peak, so a
 bound on it would measure the duty quantisation rather than the law. A
 disturbance is measured as the largest excursion from the setpoint and the time of the last
@@ -367,6 +370,20 @@ today, so a regression is still caught while the defect is open.
   plant's input gain and the requested bandwidth, it settles into a 10 % band within 16–19 ms with
   2–4 % overshoot in both step scenarios, and the same torque step moves it about 1.2 rad/s off
   setpoint. Its rows carry the same envelope as the other speed laws now.
+
+A later run, the first to apply a disturbance of either sign, found one more thing and is worth
+recording because the asymmetry was not expected:
+
+- **Two position laws reject a torque better in one direction than the other.** Against a
+  negative torque the PID position loop took 106 ms to return inside the band its positive row
+  meets in 50, and the two-DOF loop was pushed 0.1008 rad off a limit of 0.1. The other three
+  laws met the same envelope whichever way the torque pushed. The two that did not are the two
+  that hold their setpoint with a standing error of some 0.055 rad, which is already most of the
+  0.08 rad band the recovery is measured inside, so a disturbance pushing away from the setpoint
+  begins the measurement near the edge of the band rather than in the middle of it. That is an
+  explanation and not yet a diagnosis: whether the limits are wrong for one direction, or the
+  loops are, has not been established. The two rows are held back until it is, rather than
+  loosened to fit the measurement or tagged against a defect nobody has confirmed.
 
 The run also found a harness fault: a line cut by a read timeout was dropped and its tail
 parsed as a line of its own, which showed up as a gap in the sample spacing. The reader now
