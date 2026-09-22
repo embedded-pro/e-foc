@@ -45,7 +45,7 @@ namespace foc
         }
 
     private:
-        Runner runner;
+        Runner<FocImpl> runner;
     };
 
     using FocTorqueController = FocController<TorqueCascade>;

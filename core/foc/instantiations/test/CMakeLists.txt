@@ -11,6 +11,7 @@ target_link_libraries(e_foc.foc.instantiations_test PUBLIC
 )
 
 target_sources(e_foc.foc.instantiations_test PRIVATE
+    TestFocController.cpp
     TestLowPriorityInterruptImpl.cpp
     TestRunner.cpp
 )

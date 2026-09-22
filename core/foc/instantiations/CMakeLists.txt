@@ -14,7 +14,6 @@ target_link_libraries(e_foc.foc.instantiations PUBLIC
 target_sources(e_foc.foc.instantiations PRIVATE
     FocController.hpp
     LowPriorityInterruptImpl.hpp
-    Runner.cpp
     Runner.hpp
 )
 
