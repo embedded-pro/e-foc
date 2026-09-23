@@ -289,6 +289,18 @@ context as it always was. And the ring never blocks: when it is full the sample 
 counted, the count is reported when recording stops, and the host also checks that consecutive
 samples are exactly one decimation apart. A gap fails the scenario rather than skewing a metric.
 
+Between them those two rules set a ceiling on how long a recording can run, and it is worth
+stating because it is not the budget and it bites only the fast ones. The interrupt produces at
+the recording rate; the event loop empties a fixed number of records on each of its ticks. A
+recording asking for less than that drains as fast as it fills and can run until its budget is
+spent. A recording asking for more is safe only while the ring absorbs the difference, and then
+begins dropping: at the control rate itself that is roughly a quarter of a second, a few thousand
+samples. A scenario measuring a transient from rest never notices, because it records for a few
+tens of milliseconds. One measuring a transient that begins half a second after enabling cannot
+be run at the control rate at all, whatever budget it is given, and has to record at a rate the
+event loop can keep up with instead — which lengthens the span its fixed-size window covers, and
+so the capture that waits for that window.
+
 Recording begins on enable, which resets the rotor to rest, and stops when the sample budget in
 the plant description is spent or the motor is disabled. The budget bounds the output so a
 scenario that never reads it cannot fill the pipe and stall the guest; a scenario that measures

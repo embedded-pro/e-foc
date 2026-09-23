@@ -21,20 +21,21 @@ Feature: FOC Control Performance
   the same from rest and differ on a change made while running.
 
   The current loop carries only one setpoint-change row where the outer loops
-  carry eight. A command sent while the motor runs is delivered about half a
-  second of guest time after enable, which at 20 kHz is ten thousand samples of
-  recording before the window even opens: one such row costs roughly fifty times
-  the trace of a current scenario measured from rest. One row is enough to show
-  the loop reverses cleanly with its integrator already loaded, and the outer
-  loops cover the same ground far more cheaply.
+  carry eight, and records it far more slowly than it records a step from rest.
+  A command sent while the motor runs is delivered about half a second of guest
+  time after enable, so the recording has to run that long before the window it
+  measures even opens, and the rate it can run at is bounded: the interrupt
+  writes one sample per tick into a ring of a thousand, the event loop empties
+  sixteen of them every millisecond, and a recording that produces more than it
+  drains is only safe for as long as the ring can absorb the difference. At the
+  control rate that is about a quarter of a second, which is ample for a step
+  measured from rest and nowhere near enough for one measured half a second in.
 
-  Its sample budget is sized for that delivery and not for the window it
-  measures. The host decides when a command frame reaches the guest, so the tick
-  the setpoint lands on moves from run to run, and a budget that merely covers
-  the usual delay runs out on the run that takes longer: a second of recording
-  leaves about half of it spare, where six hundred milliseconds did not. The
-  outer loops never meet this because a thousand samples per second buys them
-  two full seconds of the same budget.
+  A quarter of the control rate produces well under what the loop drains, so the
+  recording is bounded by its own budget rather than by the ring. The window is
+  a fixed number of samples, so a slower rate stretches the time it covers and
+  the capture after the setpoint has to stretch with it; the resolution left is
+  a fifth of a millisecond, against a transient that rises in under two.
 
   That row carries twice the steady-state error and half again the overshoot of
   the rows measured from rest. Half a second of torque leaves the rotor turning,
@@ -206,7 +207,7 @@ Feature: FOC Control Performance
   @REQ-TRQ-007
   Scenario Outline: The <algorithm> current loop follows a setpoint change to <target> A while running
     Given a nominal motor plant
-    And the plant response is recorded at 20000 Hz for up to 20000 samples
+    And the plant response is recorded at 5000 Hz for up to 10000 samples
     And the motor is already calibrated
     And the motor boots in torque mode
     And the current loop runs the <algorithm> algorithm
@@ -217,7 +218,7 @@ Feature: FOC Control Performance
     And the motor is enabled
     And the response is captured for 15 ms after enable
     And a torque setpoint of <target> A is applied
-    And the response is captured for 15 ms after the last setpoint
+    And the response is captured for 60 ms after the last setpoint
     Then the current step response shall settle into a <band_pct> % band within <settle_ms> ms with overshoot below <overshoot_pct> %
     And the current step response shall rise within <rise_ms> ms
     And the current response tail shall stay within <tail_pct> % of the step
