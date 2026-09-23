@@ -125,5 +125,9 @@
     cross product of every law against every plant is not required: the plants vary what the
     baseline law must survive, the second motor varies what every law must be designed against,
     and running both dimensions together would multiply the scenarios without separating those
-    two questions. The envelope is permissive until a characterisation run pins it, and bounds a
+    two questions. Each law's rise time and the band its tail ripples in shall be
+    bounded as well as its settling, its overshoot and its standing error, and no law shall be
+    measured on the second motor without its rise time being one of them. The rise and tail
+    bounds are twice the worst value repeated runs measured; the remaining bounds stay wide
+    enough to cover a whole group of rows rather than to describe any one of them, and catch a
     law that fails to reach its setpoint, rings without settling, or holds far from it.

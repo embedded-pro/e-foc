@@ -2,9 +2,9 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.3.0
+version: 1.4.0
 component: "software-in-the-loop"
-date: 2026-09-22
+date: 2026-09-23
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-09-22
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.3.0                       |
+| Version   | 1.4.0                       |
 | Component | software-in-the-loop        |
-| Date      | 2026-09-22                  |
+| Date      | 2026-09-23                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -327,6 +327,14 @@ a scenario is run first with permissive limits, the printed numbers are read, an
 pinned with a margin. Design intent says where to expect them, roughly two over the loop
 bandwidth for settling with a few percent of overshoot, but the pinned numbers come from the run.
 
+One run is not enough to pin from. The same scenario does not measure quite the same numbers
+twice, and two machines running it agree less closely still, so a bound is taken from the worst
+value several repeated runs report and set at twice that, and the rows are then checked against a
+run on the integration machine before they are trusted. A bound sitting on a measured value fails
+the next time the measurement moves, and a bound sitting far above every measured value fails
+nothing at all; twice the worst of a repeated run is the compromise the suite uses. What the
+spread actually is, and why it exists at all against a deterministic guest, is in Part I.
+
 ### Part H — Disturbances are described, not poked
 
 The load torque the plant has always carried opposes motion, so it flips sign with the speed and
@@ -422,11 +430,34 @@ The run also found a harness fault: a line cut by a read timeout was dropped and
 parsed as a line of its own, which showed up as a gap in the sample spacing. The reader now
 keeps a partial line for the next read.
 
-Two runs of the same scenario do not measure exactly the same numbers. The guest is
-deterministic, but the host decides when each command frame reaches it, so the tick on which a
-setpoint or an enable lands relative to the outer loop's phase moves from run to run and the
-transient with it: the same step measured a 40 % overshoot in one run and 43 % in the next.
-The pinned limits carry a margin for that, and a limit that sits on a measured value is wrong.
+Two runs of the same scenario do not measure exactly the same numbers, and how far they differ
+has now been measured rather than assumed. Six consecutive runs of the default set passed every
+scenario in every run — six hundred and seventy-two executions with no failure of any kind, so
+the suite itself does not flake — and yet only a fifth of the measurements taken from rest
+repeated exactly across all six, and none of the measurements taken from a setpoint changed while
+running did. The guest is deterministic; the host decides when each command frame reaches it, so
+the tick a setpoint or an enable lands on, relative to the outer loop's phase, moves between runs
+and the transient moves with it. The onset of one mid-run change moved by a sixth of a second of
+guest time across the six.
+
+What moves is small on most rows and not on all of them. Rise times moved by at most five
+milliseconds and tail bands by about a point, while one measurement moved far further: the
+current loop's reversal ripples in a band eleven points wide from run to run, between 20 and 31
+percent of its step. Two machines agree less closely again. The same reversal's overshoot has
+measured between 9 and 13 percent on a development machine and between 10 and 15 percent on the
+integration machine, so the range either one sees alone understates the range the scenario has.
+
+That is what sets the margin on a pinned limit, and it is why the rise and tail bounds are twice
+the worst of six runs rather than a tighter multiple of one. It leaves the widest spread yet
+measured several times over, and room for a machine nobody has measured on. Tightening those
+bounds towards the measurement would buy a sensitivity the suite cannot support, and the first
+thing it would catch is the harness rather than a control law.
+
+The two runs made to check the pinned bounds bear that out immediately: three of their
+measurements came in above the worst of the six the bounds were set from, the largest a tail band
+a fifth higher than anything those six had shown. Every bound still had more than 46 percent of
+itself to spare. A limit pinned to the measurement, or even to a third above it, would have been
+red on the run that was meant to confirm it.
 
 ### Part J — The estimators against a known plant
 
