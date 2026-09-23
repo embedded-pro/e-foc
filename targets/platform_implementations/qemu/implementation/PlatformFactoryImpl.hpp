@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/model/EncoderFreezeScheduler.hpp"
 #include "core/foc/model/PlantResponseRecorder.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/foc/model/TorqueStepScheduler.hpp"
@@ -195,6 +196,8 @@ namespace application
         foc::ThreePhaseMotorModel model;
         foc::PlantResponseRecorder<1024> responseRecorder;
         foc::TorqueStepScheduler torqueStep;
+        foc::EncoderFreezeScheduler encoderFreeze;
+        foc::ThreePhaseMotorModel::FaultInjectionConfig bootFaultInjection{};
         std::atomic<uint32_t> controlTick{ 0 };
         std::optional<SemihostingCanBusAdapter> canBusAdapter;
         infra::TimerRepeating canPollTimer;

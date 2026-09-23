@@ -77,13 +77,14 @@ namespace application
             .sigmaRadians = plantConfig->encoderSigmaRadians,
             .biasRadians = plantConfig->encoderBiasRadians,
         });
-        model.SetFaultInjection({
+        bootFaultInjection = {
             .openPhaseA = (plantConfig->faultFlags & sil::PlantFaultFlag::openPhaseA) != 0,
             .openPhaseB = (plantConfig->faultFlags & sil::PlantFaultFlag::openPhaseB) != 0,
             .openPhaseC = (plantConfig->faultFlags & sil::PlantFaultFlag::openPhaseC) != 0,
             .encoderStuck = (plantConfig->faultFlags & sil::PlantFaultFlag::encoderStuck) != 0,
             .supplyVoltageScale = plantConfig->supplyVoltageScale,
-        });
+        };
+        model.SetFaultInjection(bootFaultInjection);
         model.ResetTemperature();
 
         boardProtection.Configure({
@@ -106,6 +107,10 @@ namespace application
 
         torqueStep.Configure({ plantConfig->torqueStepNm,
             static_cast<uint32_t>(static_cast<uint64_t>(plantConfig->torqueStepDelayMs) * baseHz / 1000u) });
+
+        // The delay is carried in centiseconds because it reuses a byte the record already had.
+        encoderFreeze.Configure(static_cast<uint32_t>(
+            static_cast<uint64_t>(plantConfig->encoderFreezeDelayCentiseconds) * 10u * baseHz / 1000u));
     }
 
     PlatformFactoryImpl::PlatformFactoryImpl(const foc::ThreePhaseMotorModel::Parameters& motorParams,
@@ -314,6 +319,14 @@ namespace application
             responseRecorder.Note(foc::PlantResponseKind::torqueStep, PlantSampleAt(tick));
         }
 
+        if (encoderFreeze.Fire(tick))
+        {
+            auto frozen = bootFaultInjection;
+            frozen.encoderStuck = true;
+            model.SetFaultInjection(frozen);
+            responseRecorder.Note(foc::PlantResponseKind::encoderFreeze, PlantSampleAt(tick));
+        }
+
         model.StepForTest(lastDutyPhases);
         responseRecorder.Capture(PlantSampleAt(tick));
 
@@ -350,6 +363,7 @@ namespace application
         model.Start();
         responseRecorder.Begin();
         torqueStep.Begin();
+        encoderFreeze.Begin();
         boardProtection.SetArmed(true);
     }
 
@@ -358,6 +372,7 @@ namespace application
         boardProtection.SetArmed(false);
         model.Stop();
         model.SetExternalTorque(foc::NewtonMeter{ 0.0f });
+        model.SetFaultInjection(bootFaultInjection);
         responseRecorder.End();
     }
 
@@ -403,6 +418,9 @@ namespace application
                 break;
             case foc::PlantResponseKind::torqueStep:
                 std::printf("PLANT_EVENT %lu torque %ld\n", tick, Micro(sample.externalTorqueNm));
+                break;
+            case foc::PlantResponseKind::encoderFreeze:
+                std::printf("PLANT_EVENT %lu encoder_freeze %ld\n", tick, Micro(sample.thetaMech));
                 break;
             case foc::PlantResponseKind::stopped:
                 std::printf("PLANT_STOP %lu %lu\n", tick, static_cast<unsigned long>(record.dropped));

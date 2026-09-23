@@ -24,6 +24,7 @@ namespace foc
         sample,
         began,
         torqueStep,
+        encoderFreeze,
         stopped
     };
 

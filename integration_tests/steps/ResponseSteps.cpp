@@ -197,6 +197,18 @@ GIVEN(R"(a torque step of {float} Nm applied {int} ms after enable)", (float tor
     setup.plant.torqueStepDelayMs = static_cast<uint32_t>(delayMs);
 }
 
+GIVEN(R"(the encoder freezes {int} ms after enable)", (int delayMs))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    ASSERT_TRUE(TargetInteractor::Instance().SupportsSimulatedPlant()) << "Freezing the encoder needs a simulated target";
+    ASSERT_FALSE(setup.booted) << "The encoder freeze must be scheduled before the target boots";
+    ASSERT_GT(delayMs, 0) << "A zero delay is how a scenario says the encoder never freezes while running";
+    ASSERT_EQ(delayMs % 10, 0) << "The freeze delay is carried in centiseconds and must be a whole number of them";
+    ASSERT_LE(delayMs, 2550) << "The freeze delay must fit in the byte the plant record carries it in";
+
+    setup.plant.encoderFreezeDelayCentiseconds = static_cast<uint8_t>(delayMs / 10);
+}
+
 WHEN(R"(the response is captured for {int} ms after enable)", (int milliseconds))
 {
     auto& setup = context.Get<ScenarioSetup>();
@@ -251,6 +263,18 @@ THEN(R"(the {word} step response shall rise within {float} ms)", (std::string si
     EXPECT_LE(metrics->riseTimeS * kMilliPerSecond, riseMs) << SignalName(signal) << " rose too slowly";
 }
 
+THEN(R"(the {word} response tail shall stay within {float} % of the step)", (std::string signalWord, float tailPercent))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    RequireCapturedTrace(setup);
+    const auto signal = RequireSignal(signalWord);
+
+    const auto metrics = StepMetricsFor(setup, signal, 2.0f, AlgorithmLabel(setup, signal));
+    ASSERT_TRUE(metrics.has_value());
+
+    EXPECT_LE(metrics->tailBandPercent, tailPercent) << SignalName(signal) << " keeps rippling outside its tail band";
+}
+
 THEN(R"(the steady-state {word} error shall be below {float} {word})", (std::string signalWord, float limit, std::string unit))
 {
     auto& setup = context.Get<ScenarioSetup>();
@@ -298,4 +322,16 @@ THEN(R"(the response shall have no dropped samples)")
 
     EXPECT_EQ(setup.trace.Dropped(), 0u) << "The recorder dropped samples";
     EXPECT_EQ(setup.trace.Gaps(), 0u) << "The captured samples are not uniformly spaced";
+}
+
+THEN(R"(the encoder shall have frozen during the response)")
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    FeedNewLines(setup);
+
+    const auto onset = setup.trace.EventTick("encoder_freeze");
+    ASSERT_TRUE(onset.has_value()) << "The encoder freeze was scheduled but never fired";
+
+    ASSERT_TRUE(setup.trace.StartTick().has_value()) << "No PLANT_START marker: was the plant response recorded?";
+    EXPECT_GT(*onset, *setup.trace.StartTick()) << "The encoder froze on the tick recording began, not while the motor ran";
 }

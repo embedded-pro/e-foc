@@ -2,9 +2,9 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.2.0
+version: 1.3.0
 component: "software-in-the-loop"
-date: 2026-09-21
+date: 2026-09-22
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-09-21
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.2.0                       |
+| Version   | 1.3.0                       |
 | Component | software-in-the-loop        |
-| Date      | 2026-09-21                  |
+| Date      | 2026-09-22                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -87,7 +87,7 @@ The description covers everything the plant needs:
 | Measurement       | Current noise deviation and per-phase bias, encoder noise deviation and bias  |
 | Thermal           | Ambient, thermal resistance and capacitance, copper and iron coefficients     |
 | Protection        | Over-current, over-voltage, under-voltage and over-temperature trips          |
-| Fault injection   | Open phase per phase, stuck encoder, supply voltage scaling                   |
+| Fault injection   | Open phase per phase, stuck encoder, when it freezes, supply voltage scaling  |
 | Reproducibility   | The seed both noise generators start from                                     |
 | Disturbance       | A signed shaft torque and the delay after enabling at which it steps in       |
 | Recording         | The rate at which the plant reports its trajectory, and how many samples      |
@@ -229,9 +229,33 @@ Two results are worth recording because they are not obvious:
   Its torque follows the currents that actually flow, so masking the phases is enough.
 - A motor with **one open phase** still turns. Two phases can produce torque, so this is a
   degraded running condition rather than a dead motor, and nothing in the firmware detects it.
+- A **stuck encoder** passes alignment rather than failing it. Alignment declares the rotor
+  settled once its reading stops changing for a run of samples, and a reading frozen at one
+  value satisfies that on the first run it sees, more convincingly than a real rotor ever
+  does. The drive therefore takes its reference from a reading that means nothing and enables
+  on it. Nothing afterwards compares the reading against the current being pushed into the
+  winding, so a loop regulating that reading holds a position that cannot move while the
+  rotor is free to turn. The scenario pair in the wiring-fault feature records both halves:
+  the default-run scenario asserts what the product does today, that the drive runs and
+  reports a rotor which never moves, and the held-out scenario carries what it should do,
+  which is to report a sensor fault. The fault code for that already exists and is carried on
+  the wire; nothing raises it.
+
+An encoder can also be told to freeze a set time after the motor is enabled rather than to have
+been dead all along, scheduled the same way as the shaft torque of Part H and on the same
+guest-time base. The two describe different failures and are worth keeping apart: an encoder
+already stuck when the drive aligns corrupts the reference the drive takes, while one that
+freezes afterwards leaves a valid reference and stops reporting against it. The delay is carried
+in hundredths of a second, in a byte the plant description already held in reserve, so a
+description written before the freeze existed still reads as one that never freezes and the
+record neither grew nor changed version. What freezes is what the firmware reads; the plant goes
+on reporting its own trajectory truthfully, which is what lets a scenario see the rotor moving
+while the drive does not.
 
 Alignment also cannot converge once encoder noise reaches the threshold below which it declares
-the rotor settled, which bounds how noisy an encoder the current calibration tolerates.
+the rotor settled, which bounds how noisy an encoder the current calibration tolerates. A frozen
+reading and a noisy one therefore fail in opposite directions: the noisy encoder never settles
+and refuses to align, the frozen one settles at once and aligns against nothing.
 
 ### Part G — The plant reports its trajectory
 
@@ -265,6 +289,18 @@ context as it always was. And the ring never blocks: when it is full the sample 
 counted, the count is reported when recording stops, and the host also checks that consecutive
 samples are exactly one decimation apart. A gap fails the scenario rather than skewing a metric.
 
+Between them those two rules set a ceiling on how long a recording can run, and it is worth
+stating because it is not the budget and it bites only the fast ones. The interrupt produces at
+the recording rate; the event loop empties a fixed number of records on each of its ticks. A
+recording asking for less than that drains as fast as it fills and can run until its budget is
+spent. A recording asking for more is safe only while the ring absorbs the difference, and then
+begins dropping: at the control rate itself that is roughly a quarter of a second, a few thousand
+samples. A scenario measuring a transient from rest never notices, because it records for a few
+tens of milliseconds. One measuring a transient that begins half a second after enabling cannot
+be run at the control rate at all, whatever budget it is given, and has to record at a rate the
+event loop can keep up with instead — which lengthens the span its fixed-size window covers, and
+so the capture that waits for that window.
+
 Recording begins on enable, which resets the rotor to rest, and stops when the sample budget in
 the plant description is spent or the motor is disabled. The budget bounds the output so a
 scenario that never reads it cannot fill the pipe and stall the guest; a scenario that measures
@@ -276,7 +312,14 @@ setpoint changed while running has an onset the host can look up rather than gue
 The measurements themselves are the classical ones and are computed on the host with the
 numerical toolbox's step-response metrics: rise time, settling time into a two-percent band,
 percent overshoot, peak time and steady-state error over the tail of the window. A step is
-normalised before measuring, so a reversal or a step down is the same unit step as a step up. A
+normalised before measuring, so a reversal or a step down is the same unit step as a step up.
+Settling time, overshoot, steady-state error, rise time and the band the tail still ripples in
+are each bounded by the row the scenario carries. Because the step is normalised first, the tail
+band is a percentage of the step rather than of the setpoint the step ends at; the two coincide
+from rest and differ on a change made while running, where the step is the distance moved and
+not the setpoint reached. Peak time is printed and not asserted: a law
+that does not overshoot has its largest sample wherever the tail ripple happened to peak, so a
+bound on it would measure the duty quantisation rather than the law. A
 disturbance is measured as the largest excursion from the setpoint and the time of the last
 excursion outside a band around it, which is the same settling computation applied to the
 recovery. Every measurement is also printed as a labelled line, which is how limits are found:
@@ -339,6 +382,41 @@ today, so a regression is still caught while the defect is open.
   plant's input gain and the requested bandwidth, it settles into a 10 % band within 16–19 ms with
   2–4 % overshoot in both step scenarios, and the same torque step moves it about 1.2 rad/s off
   setpoint. Its rows carry the same envelope as the other speed laws now.
+
+A later run, the first to apply a disturbance of either sign, found one more thing and is worth
+recording because the asymmetry was not expected:
+
+- **Two position laws reject a torque better in one direction than the other.** Against a
+  negative torque the PID position loop took 106 ms to return inside the band its positive row
+  meets in 50, and the two-DOF loop was pushed 0.1008 rad off a limit of 0.1. The other three
+  laws met the same envelope whichever way the torque pushed. The two that did not are the two
+  that hold their setpoint with a standing error of some 0.055 rad, which is already most of the
+  0.08 rad band the recovery is measured inside, so a disturbance pushing away from the setpoint
+  begins the measurement near the edge of the band rather than in the middle of it. That is an
+  explanation and not yet a diagnosis: whether the limits are wrong for one direction, or the
+  loops are, has not been established. The two rows are held back until it is, rather than
+  loosened to fit the measurement or tagged against a defect nobody has confirmed.
+
+The same run, once a disturbance was made large enough to reach the current limit, found a
+second thing:
+
+- **Two speed laws do not come back from a saturating disturbance.** A shaft torque of half a
+  newton-metre asks for about thirteen of the twenty amperes the drive allows, so the current to
+  reject it is there, and the transient that gets there clamps on the way. ADRC and LQI are
+  thrown 205 to 238 rad/s off a 20 rad/s setpoint and return to within a few hundredths of it.
+  PI and two-DOF are thrown further, to about 317, and then stop 10.44 rad/s short, having
+  surrendered more than half the setpoint to a disturbance they had the current to reject. The
+  two that recover carry the default-run rows; the two that do not are held out under the
+  known-defect tag with the envelope the other two meet. The scenario that found this is the only
+  one in the suite that reaches the current limit at all: every other disturbance is kept small
+  on purpose so that it measures the control law rather than the limiter.
+
+How far the limit can be lowered to provoke that is itself bounded, which is worth recording
+because it is not obvious: alignment injects open-loop and abandons the attempt the moment a
+phase carries more than the drive says it supports, so the limit cannot be dropped below what
+that injection draws. On the nominal plant it is above ten amperes, more than half the nominal
+twenty. A limit low enough to make a millinewton-metre step saturate stops the motor aligning
+at all, so a scenario that wants saturation raises the torque rather than lowering the limit.
 
 The run also found a harness fault: a line cut by a read timeout was dropped and its tail
 parsed as a line of its own, which showed up as a gap in the sample spacing. The reader now
@@ -456,6 +534,7 @@ estimators should meet (REQ-CAL-014).
 | Memory integrity         | Damaged calibration is distrusted; damaged configuration falls to defaults                                        |
 | Board protection         | Trips reach the state machine and are reported                                                                    |
 | Control performance      | Each loop's step response stays inside its settling, overshoot and error envelope, from rest and while running    |
+| Control robustness       | The same response measured on a noisy, hot, loaded or differently wound plant, and the law reported still running |
 | Disturbance rejection    | A shaft torque step while regulating is bounded in excursion and recovered from                                   |
 | Parameter identification | What the firmware identifies offline, and tracks online, matches the plant it was given, on both reference motors |
 
