@@ -32,9 +32,15 @@ namespace simulator
         void mechanicalEstimatesChanged(float Bhat, float Jhat);
 
     private:
+        static constexpr uint32_t estimatorWindowFrequencyHz{ 1000 };
+
         uint8_t polePairs;
         [[no_unique_address]] foc::Clarke clarke;
         [[no_unique_address]] foc::Park park;
         services::RealTimeFrictionAndInertiaEstimator estimator;
+        uint32_t samplesPerWindow;
+        uint32_t samplesInWindow{ 0 };
+        float sumIq{ 0.0f };
+        float sumSpeed{ 0.0f };
     };
 }
