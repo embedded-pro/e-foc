@@ -78,10 +78,11 @@
     rest and 0.15 rad on the change. Each law's rise time from a tenth to nine tenths of the
     step, and the band its tail still ripples in over the last quarter of the window, measured as
     a percentage of that step rather than of the setpoint it ends at, shall also
-    be bounded by the row it carries; both bounds are permissive until a characterisation run
-    pins them, so that a loop which never rises or never stops ringing fails while the measured
-    envelope is still being established. The response is measured on the plant's own trajectory
-    on the control-tick time base.
+    be bounded by the row it carries. Each of those bounds is set at twice the worst
+    value repeated runs of its row measured, rounded up to the figure the row carries, and the row
+    fails when a measurement exceeds that figure; the margin is there so that the spread between
+    one run and the next cannot reach it. The response is measured on
+    the plant's own trajectory on the control-tick time base.
 
 - id: REQ-POS-010
   title: Position hold against a shaft torque step
