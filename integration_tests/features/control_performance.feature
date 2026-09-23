@@ -12,13 +12,17 @@ Feature: FOC Control Performance
   two-DOF trades speed for overshoot, deadbeat settles in a sample, sliding mode
   keeps a boundary-layer band.
 
-  The rise_ms and tail_pct columns are not pinned yet: they are deliberately
-  permissive, catching only a loop that never rises or never stops ringing,
-  until a characterisation run reports what the laws actually measure. Peak time
-  is printed on the [METRIC] line but not asserted, because a law that does not
-  overshoot peaks wherever its tail ripple happened to be largest. The tail band
-  is a percentage of the step, not of the setpoint the step ends at; the two are
-  the same from rest and differ on a change made while running.
+  The rise_ms and tail_pct columns were left permissive when they were added and
+  are now pinned, each to twice the worst value six repeated runs of this suite
+  measured for its row, rounded up. Twice rather than closer because a run
+  reproduces its own numbers but not another run's: a setpoint change made while
+  running is timed from a command the host delivers, so the tick it lands on
+  moves, and the machine that runs continuous integration does not measure quite
+  what a development machine measures. Peak time is printed on the [METRIC] line
+  but not asserted, because a law that does not overshoot peaks wherever its tail
+  ripple happened to be largest. The tail band is a percentage of the step, not
+  of the setpoint the step ends at; the two are the same from rest and differ on
+  a change made while running.
 
   The current loop carries only one setpoint-change row where the outer loops
   carry eight, and records it far more slowly than it records a step from rest.
@@ -37,14 +41,14 @@ Feature: FOC Control Performance
   the capture after the setpoint has to stretch with it; the resolution left is
   a fifth of a millisecond, against a transient that rises in under two.
 
-  That row carries twice the steady-state error and half again the overshoot of
-  the rows measured from rest. Half a second of torque leaves the rotor turning,
-  so holding a reversed current against the back-EMF it now generates needs a
-  duty the inverter can only approximate in whole percent: the standing error
-  lands near a quarter of the setpoint rather than a tenth of it, and the
-  overshoot near 21 percent where the same law from rest overshoots 9. That is
-  the same duty resolution the band on these rows is already wide for, measured
-  at a harder operating point.
+  That row is a PI row, and it carries the same standing error the PI row from
+  rest does, for the same reason: half a second of torque leaves the rotor
+  turning, and holding a reversed current against the back-EMF it generates is
+  a ramp a PI without feedforward can only follow with an offset, here about a
+  fifth of the setpoint. Its limits were pinned while the duty still reached the
+  inverter in whole percent, when the overshoot wandered between 9 and 15
+  percent and the tail band between 20 and 31; with the duty in Q16 the row
+  measures no overshoot and a tail band near 11 percent, well inside both.
 
   The duty cycle reaches the inverter as a fraction, not in whole percent, so the
   current loops settle into a 10 % band. The PID row is the exception, and it is
@@ -53,7 +57,10 @@ Feature: FOC Control Performance
   ramps at about 70 V/s. A PI tracks a ramp with a standing error of the ramp rate
   over its integral gain, R times the loop bandwidth, which is 0.08-0.1 A here:
   the loop never reaches 90 % of the step, so its rise limit is the window. The
-  decoupled law feeds the back-EMF forward and meets the tight envelope. See
+  decoupled law feeds the back-EMF forward and meets the tight envelope. Their
+  rise and tail limits follow the same twice-the-worst rule as the outer loops;
+  measured from rest the current rows repeat to the digit from run to run, so
+  the figures they are twice of are exact. See
   documentation/design/software-in-the-loop.md.
 
   @REQ-SPD-008
@@ -80,10 +87,10 @@ Feature: FOC Control Performance
     @sil
     Examples:
       | algorithm | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
-      | pid       | 10       | 60        | 15            | 400     | 25       | 0.5   |
-      | adrc      | 10       | 80        | 15            | 400     | 25       | 0.5   |
-      | twodof    | 10       | 60        | 15            | 400     | 25       | 0.5   |
-      | lqi       | 10       | 60        | 15            | 400     | 25       | 0.5   |
+      | pid       | 10       | 60        | 15            | 20      | 6        | 0.5   |
+      | adrc      | 10       | 80        | 15            | 50      | 6        | 0.5   |
+      | twodof    | 10       | 60        | 15            | 30      | 6        | 0.5   |
+      | lqi       | 10       | 60        | 15            | 25      | 6        | 0.5   |
 
   @REQ-SPD-008
   Scenario Outline: The <algorithm> speed loop follows a setpoint change to <target> rad/s while running
@@ -109,14 +116,14 @@ Feature: FOC Control Performance
     @sil
     Examples:
       | algorithm | target | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
-      | pid       | 40     | 10       | 60        | 15            | 400     | 25       | 0.5   |
-      | pid       | -20    | 10       | 60        | 15            | 400     | 25       | 0.5   |
-      | adrc      | 40     | 10       | 80        | 15            | 400     | 25       | 0.5   |
-      | adrc      | -20    | 10       | 80        | 15            | 400     | 25       | 0.5   |
-      | twodof    | 40     | 10       | 60        | 15            | 400     | 25       | 0.5   |
-      | twodof    | -20    | 10       | 60        | 15            | 400     | 25       | 0.5   |
-      | lqi       | 40     | 10       | 60        | 15            | 400     | 25       | 0.5   |
-      | lqi       | -20    | 10       | 60        | 15            | 400     | 25       | 0.5   |
+      | pid       | 40     | 10       | 60        | 15            | 25      | 5        | 0.5   |
+      | pid       | -20    | 10       | 60        | 15            | 20      | 4        | 0.5   |
+      | adrc      | 40     | 10       | 80        | 15            | 50      | 6        | 0.5   |
+      | adrc      | -20    | 10       | 80        | 15            | 40      | 4        | 0.5   |
+      | twodof    | 40     | 10       | 60        | 15            | 40      | 6        | 0.5   |
+      | twodof    | -20    | 10       | 60        | 15            | 30      | 4        | 0.5   |
+      | lqi       | 40     | 10       | 60        | 15            | 35      | 6        | 0.5   |
+      | lqi       | -20    | 10       | 60        | 15            | 30      | 4        | 0.5   |
 
   @sil @REQ-POS-009
   Scenario Outline: The <algorithm> position loop steps from rest to 1.5 rad
@@ -139,11 +146,11 @@ Feature: FOC Control Performance
 
     Examples:
       | algorithm | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
-      | pid       | 10       | 200       | 15            | 400     | 25       | 0.1   |
-      | cascadep  | 10       | 200       | 10            | 400     | 25       | 0.02  |
-      | lqr       | 10       | 60        | 15            | 400     | 25       | 0.01  |
-      | lqi       | 10       | 60        | 50            | 400     | 25       | 0.01  |
-      | twodof    | 10       | 300       | 15            | 400     | 25       | 0.1   |
+      | pid       | 10       | 200       | 15            | 185     | 8        | 0.1   |
+      | cascadep  | 10       | 200       | 10            | 210     | 1        | 0.02  |
+      | lqr       | 10       | 60        | 15            | 30      | 1        | 0.01  |
+      | lqi       | 10       | 60        | 50            | 10      | 1        | 0.01  |
+      | twodof    | 10       | 300       | 15            | 310     | 8        | 0.1   |
 
   @sil @REQ-POS-009
   Scenario Outline: The <algorithm> position loop follows a setpoint change to <target> rad while holding
@@ -168,11 +175,11 @@ Feature: FOC Control Performance
 
     Examples:
       | algorithm | target | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
-      | pid       | -1.5   | 10       | 200       | 15            | 400     | 25       | 0.15  |
-      | cascadep  | -1.5   | 10       | 200       | 10            | 400     | 25       | 0.02  |
-      | lqr       | -1.5   | 10       | 60        | 15            | 400     | 25       | 0.01  |
-      | lqi       | -1.5   | 10       | 60        | 40            | 400     | 25       | 0.01  |
-      | twodof    | -1.5   | 10       | 300       | 15            | 400     | 25       | 0.15  |
+      | pid       | -1.5   | 10       | 200       | 15            | 195     | 6        | 0.15  |
+      | cascadep  | -1.5   | 10       | 200       | 10            | 210     | 1        | 0.02  |
+      | lqr       | -1.5   | 10       | 60        | 15            | 30      | 1        | 0.01  |
+      | lqi       | -1.5   | 10       | 60        | 40            | 15      | 1        | 0.01  |
+      | twodof    | -1.5   | 10       | 300       | 15            | 320     | 6        | 0.15  |
 
   @REQ-TRQ-007
   Scenario Outline: The <algorithm> current loop steps from rest to 0.5 A
@@ -196,10 +203,10 @@ Feature: FOC Control Performance
     @sil
     Examples:
       | algorithm | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
-      | pid       | 25       | 3         | 30            | 15      | 25       | 0.12  |
-      | decoupled | 10       | 3         | 30            | 2       | 10       | 0.05  |
-      | deadbeat  | 10       | 1         | 30            | 1       | 10       | 0.05  |
-      | sliding   | 10       | 3         | 30            | 2       | 10       | 0.05  |
+      | pid       | 25       | 3         | 30            | 15      | 35       | 0.12  |
+      | decoupled | 10       | 3         | 30            | 4       | 1        | 0.05  |
+      | deadbeat  | 10       | 1         | 30            | 1       | 7        | 0.05  |
+      | sliding   | 10       | 3         | 30            | 1       | 13       | 0.05  |
 
   @REQ-TRQ-007
   Scenario Outline: The <algorithm> current loop follows a setpoint change to <target> A while running
@@ -225,4 +232,4 @@ Feature: FOC Control Performance
     @sil
     Examples:
       | algorithm | target | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
-      | pid       | -0.5   | 40       | 12        | 30            | 12      | 60       | 0.2   |
+      | pid       | -0.5   | 40       | 12        | 30            | 6       | 65       | 0.2   |
