@@ -158,7 +158,7 @@ $$
 | Steady-state position error | Non-zero under constant velocity reference for the P design; removed by the integral term |
 | Steady-state error at rest  | Zero (no steady velocity → no position error)                                             |
 | Requires J, Bf              | No                                                                                        |
-| Tuning knobs                | 1 ($K_p = \omega_{bw}^p$); the integral zero and reference weight are design constants     |
+| Tuning knobs                | 1 ($K_p = \omega_{bw}^p$); the integral zero and reference weight are design constants    |
 
 ---
 
