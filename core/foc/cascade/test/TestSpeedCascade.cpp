@@ -99,7 +99,7 @@ namespace
 
     void ExpectOffCentreDuty(const foc::PhasePwmDutyCycles& duty)
     {
-        EXPECT_TRUE(DutiesDiffer(duty, foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } }));
+        EXPECT_TRUE(DutiesDiffer(duty, foc::PhasePwmDutyCycles{ hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f } }));
     }
 
     struct SpeedCascadeUnderTest
@@ -250,17 +250,24 @@ TEST_F(TestSpeedCascade, consecutive_calls_update_speed_estimation)
 {
     constexpr float step{ 0.00005f };
 
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
     focSpeed->SetCurrentTunings(UnsaturatedCurrentTunings());
     focSpeed->Enable();
     focSpeed->SetPoint(foc::RadiansPerSecond{ 0.0f });
 
-    foc::Radians start{ 0.0f };
-    focSpeed->Calculate(ZeroCurrents(), start);
-    lowPriorityInterruptMock.TriggerHandler();
+    // The outer loop differences the angle latched when the window closes, so each position is held a full window
+    for (const auto angle : { 0.0f, step })
+    {
+        for (uint32_t tick = 0; tick != prescaler; ++tick)
+        {
+            foc::Radians held{ angle };
+            focSpeed->Calculate(ZeroCurrents(), held);
+        }
 
-    foc::Radians advanced{ step };
-    focSpeed->Calculate(ZeroCurrents(), advanced);
-    lowPriorityInterruptMock.TriggerHandler();
+        lowPriorityInterruptMock.TriggerHandler();
+    }
 
     foc::Radians moved{ step };
     auto movingRotor = focSpeed->Calculate(ZeroCurrents(), moved);
@@ -410,8 +417,8 @@ TEST_F(TestSpeedCascade, registered_online_estimators_are_fed_from_the_outer_loo
     focSpeed->Enable();
     focSpeed->SetPoint(foc::RadiansPerSecond{ 10.0f });
 
-    EXPECT_CALL(mechanicalEstimator, Update(_, _, _));
-    EXPECT_CALL(electricalEstimator, Update(_, _, _, _));
+    EXPECT_CALL(mechanicalEstimator, Update(_));
+    EXPECT_CALL(electricalEstimator, Update(_));
 
     foc::Radians position{ 0.0f };
     focSpeed->Calculate(ZeroCurrents(), position);
@@ -449,4 +456,30 @@ TEST_F(TestSpeedCascade, disable_speed_command_produces_bounded_duty)
 TEST_F(TestSpeedCascade, speed_command_frequency_equals_outer_loop_frequency)
 {
     EXPECT_EQ(focSpeed->SpeedCommandFrequency().Value(), focSpeed->OuterLoopFrequency().Value());
+}
+
+TEST_F(TestSpeedCascade, the_observed_motion_carries_the_window_speed_and_the_reference)
+{
+    constexpr float step{ 0.001f };
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 12.0f });
+
+    for (const auto angle : { 0.0f, step })
+    {
+        for (uint32_t tick = 0; tick != prescaler; ++tick)
+        {
+            foc::Radians held{ angle };
+            focSpeed->Calculate(ZeroCurrents(), held);
+        }
+
+        lowPriorityInterruptMock.TriggerHandler();
+    }
+
+    const auto observation = focSpeed->ObserveMotion();
+    EXPECT_NEAR(observation.measuredSpeed.Value(), step * static_cast<float>(lowPriorityFrequency.Value()), 1e-3f);
+    EXPECT_NEAR(observation.demandedSpeed.Value(), 12.0f, 1e-6f);
+    EXPECT_NEAR(observation.positionError.Value(), 0.0f, 1e-6f);
 }

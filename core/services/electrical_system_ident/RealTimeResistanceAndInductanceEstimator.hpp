@@ -3,6 +3,7 @@
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "numerical/estimators/online/RecursiveLeastSquares.hpp"
+#include <optional>
 
 namespace services
 {
@@ -12,8 +13,9 @@ namespace services
         : public foc::OnlineElectricalEstimator
     {
     public:
-        static constexpr float defaultForgettingFactor = 0.998f;
-        static constexpr float persistenceOfExcitationThreshold = 1e-6f;
+        static constexpr float defaultForgettingFactor = 0.999f;
+        static constexpr float minimumDirectCurrent = 0.05f;
+        static constexpr uint16_t minimumUpdates = 200;
 
         explicit RealTimeResistanceAndInductanceEstimator(float forgettingFactor, hal::Hertz samplingFrequency);
 
@@ -22,7 +24,7 @@ namespace services
         // OnlineElectricalEstimator
         void SetInitialEstimate(foc::Ohm resistance, foc::MilliHenry inductance) override;
 
-        void Update(foc::Volts vd, foc::Ampere id, foc::Ampere iq, foc::RadiansPerSecond electricalSpeed) override;
+        void Update(const foc::ElectricalWindow& window) override;
 
         foc::Ohm CurrentResistance() const override;
         foc::MilliHenry CurrentInductance() const override;
@@ -30,11 +32,15 @@ namespace services
     private:
         using ElecRLS = estimators::RecursiveLeastSquares<float, 2>;
 
-        void ComputeEstimate(foc::Volts vd, foc::Ampere id, foc::Ampere iq, foc::RadiansPerSecond electricalSpeed);
+        void ComputeEstimate(const foc::ElectricalWindow& window);
+        void Publish();
 
-        ElecRLS rls;
-        float samplingPeriod;
-        float previousId{ 0.0f };
+        float forgettingFactor;
+        std::optional<ElecRLS> rls;
+        float samplingFrequency;
+        float previousIdAtEnd{ 0.0f };
+        bool primed{ false };
+        uint16_t updates{ 0 };
 
         foc::Ohm currentResistance{ 0.0f };
         foc::MilliHenry currentInductance{ 0.0f };

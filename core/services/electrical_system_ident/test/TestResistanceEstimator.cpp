@@ -1,6 +1,7 @@
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/electrical_system_ident/ResistanceEstimator.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
+#include <cmath>
 #include <gmock/gmock.h>
 #include <optional>
 
@@ -10,9 +11,9 @@ namespace
 
     MATCHER_P(PhasePwmDutyCyclesEq, expected, "")
     {
-        return arg.a.Value() == expected.a.Value() &&
-               arg.b.Value() == expected.b.Value() &&
-               arg.c.Value() == expected.c.Value();
+        return std::abs(arg.a.Value() - expected.a.Value()) < 1e-3f &&
+               std::abs(arg.b.Value() - expected.b.Value()) < 1e-3f &&
+               std::abs(arg.c.Value() - expected.c.Value()) < 1e-3f;
     }
 
     class ResistanceEstimatorTest
@@ -34,7 +35,7 @@ TEST_F(ResistanceEstimatorTest, start_applies_test_voltage_and_registers_blank_c
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, _));
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(foc::PhasePwmDutyCycles{
-                                hal::Percent{ 15 }, hal::Percent{ 1 }, hal::Percent{ 1 } })));
+                                hal::FractionalPercent{ 15.0f }, hal::FractionalPercent{ 1.0f }, hal::FractionalPercent{ 1.0f } })));
     EXPECT_CALL(driverMock, Stop());
 
     estimator.Start(config, [](auto) {});
@@ -54,7 +55,7 @@ TEST_F(ResistanceEstimatorTest, registers_sampling_callback_after_settle_time)
                 driverMock.StorePhaseCurrentsCallback(cb);
             });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(foc::PhasePwmDutyCycles{
-                                hal::Percent{ 20 }, hal::Percent{ 1 }, hal::Percent{ 1 } })));
+                                hal::FractionalPercent{ 20.0f }, hal::FractionalPercent{ 1.0f }, hal::FractionalPercent{ 1.0f } })));
     EXPECT_CALL(driverMock, Stop());
 
     estimator.Start(config, [](auto) {});

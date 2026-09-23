@@ -136,17 +136,18 @@ $$
 N_{eff} = \frac{1}{1 - \lambda}
 $$
 
-With $\lambda = 0.995$ — the value `RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor`
-carries — $N_{eff} = 200$ samples. This allows the estimator to track slow parameter variations
-(e.g. bearing wear increasing $B$) without diverging from the current plant.
-
-**Trade-off**: smaller $\lambda$ → faster tracking, higher noise sensitivity. At $\lambda = 0.995$
-and 1 kHz update rate, the effective window is 200 ms — appropriate for slowly varying mechanical
-parameters.
+With $\lambda = 0.9995$ — the value `RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor`
+carries — $N_{eff} = 2000$ samples, two seconds at the 1 kHz outer-loop rate. The memory has to span
+more than one level of the excitation: within a single plateau the intercept and the speed column
+are collinear, so a memory shorter than a plateau (the 200 ms that $\lambda = 0.995$ gave against a
+250 ms dwell) can never separate $B$ from $\tau_0$, and the online friction estimate wandered around
+zero.
 
 A forgetting factor also inflates the covariance in any direction the regressor does not excite, by
-$\lambda^{-1}$ per update. Updates are therefore gated on excitation rather than run unconditionally;
-see `documentation/design/service-mechanical-ident.md` § *Persistence of Excitation*.
+$\lambda^{-1}$ per update. A plateau still informs $B$ and $\tau_0$ but not $J$, so the online
+estimator takes plateau samples only while the covariance trace stays under a ceiling, and
+accelerating samples always; see `documentation/design/service-mechanical-ident.md`
+§ *Persistence of Excitation*.
 
 ### 4. Torque and Kinematics Estimation
 
@@ -174,9 +175,36 @@ $$
 The double finite difference amplifies measurement noise. A low-pass filter (e.g. moving average) on
 $\omega$ before differentiation reduces this effect at the cost of bandwidth.
 
+#### 4.1 The online form: window averages, not samples
+
+At the 20 kHz control rate a single sample of $i_q$ and a second difference of the encoder describe
+the same instant closely enough. At the 1 kHz outer-loop rate they do not. The speed difference
+$\omega[n] - \omega[n-1]$ of two window-mean speeds is a triangular average of the acceleration
+centred one outer sample *earlier* than the instantaneous current $i_q[n]$ it used to be regressed
+against. With the speed loop's transients decaying at $\sigma \approx 400$ rad/s that misalignment
+scales the identified inertia by about $e^{-\sigma T} \approx 0.67$ — the 26–33 % low reading the SIL
+first measured.
+
+The online estimator therefore regresses quantities the control interrupt integrates over each outer
+period $T$. With $\bar\omega_k = (\theta_k - \theta_{k-1})/T$ the window-mean speed and $\bar i_{q,k}$
+the window-mean current (trapezoidal over the interrupt's samples), the momentum balance integrated
+across two windows gives, to second order,
+
+$$
+\boxed{K_T\,\frac{\bar i_{q,k} + \bar i_{q,k-1}}{2} = J\,\frac{\bar\omega_k - \bar\omega_{k-1}}{T}
++ B\,\frac{\bar\omega_k + \bar\omega_{k-1}}{2} + \tau_0}
+$$
+
+Both sides now describe the same span, and the switching ripple is averaged out rather than sampled.
+Two details keep the window honest. The angle is latched *by the interrupt* at the window boundary:
+the outer loop can start a tick late, and differencing the angle it finds then measured 19- or
+21-tick spans as if they were 20, an acceleration noise of some 2000 rad/s² that biased $J$ toward
+zero exactly as the misalignment did. And the regression runs in milli-newton-metres against
+micro-unit $J$ and $B$, so its three columns are of order one on these rotors.
+
 ### 5. Convergence Criteria
 
-The algorithm has converged to reliable estimates when:
+The offline identification has converged to reliable estimates when:
 
 1. **Innovation is small**: $|e[n]| = |\tau_e[n] - \mathbf{\phi}[n]^T\hat{\mathbf{\theta}}[n]| < \epsilon_e$
 
@@ -191,6 +219,15 @@ The two thresholds in use: $\epsilon_e = 10^{-4}$ and $\epsilon_K = 10^{-2}$.
 
 The gain trace criterion is a proxy for $\mathrm{tr}(\mathbf{P}[n])$ shrinking, which proves that
 $\hat{\mathbf{\theta}}[n]$ has converged to a minimum-variance estimate given the data.
+
+Both procedures also require the observations to have included enough accelerating samples and to
+span more than one speed (a quarter of the fastest seen), which is what identifies $J$ and separates
+$B$ from $\tau_0$ respectively.
+
+The online estimator does not use the instantaneous innovation: 0.1 mN·m sits under the torque ripple
+any real drive has, so it was met by chance. It publishes once it has taken a thousand observations
+and its exponentially averaged residual power is under 1 % of the averaged output power — the fit
+explains the torque it sees.
 
 ### 6. Observability Requirement
 
@@ -253,8 +290,8 @@ graph TD
 |--------------------------------|---------------------------------------------------------------------------------------|
 | Parameter vector size          | 3: $[J,\ B,\ \tau_0]^T$                                                               |
 | Covariance matrix              | $3\times 3$ symmetric positive definite                                               |
-| Forgetting factor              | $\lambda = 0.995$                                                                     |
-| Effective window               | $N_{eff} = 1/(1-\lambda) = 200$ samples                                               |
+| Forgetting factor (online)     | $\lambda = 0.9995$                                                                    |
+| Effective window (online)      | $N_{eff} = 1/(1-\lambda) = 2000$ outer-loop samples                                   |
 | Convergence check $\epsilon_e$ | $10^{-4}$ (innovation threshold)                                                      |
 | Convergence check $\epsilon_K$ | $10^{-2}$ (gain trace threshold)                                                      |
 | RLS per-step cost              | $O(n^2) = O(9)$ — 9 multiply-add ops for $n=3$                                        |

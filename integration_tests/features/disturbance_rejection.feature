@@ -30,27 +30,23 @@ Feature: Disturbance Rejection
   before the outer loop next runs, and the laws that recover are thrown 205 to
   238 rad/s off a 20 rad/s setpoint before they catch it.
 
-  Only ADRC and LQI run in the default set, because only they come back. A step
-  this size asks for about thirteen of the twenty amperes the drive allows, so
-  holding it is within reach, and those two return to the setpoint within a few
-  hundredths of a second. PID and two-DOF do not: both end the window 10.44 rad/s
-  below the setpoint, having given up more than half of it to a disturbance they
-  had the current to reject. Their rows carry the envelope the other two meet and
-  are held out of the default run until they meet it.
+  A step this size asks for about thirteen of the twenty amperes the drive
+  allows, so holding it is within reach, and every speed law returns to the
+  setpoint within the window. PID and two-DOF once ended it 10.44 rad/s short:
+  their PI placed its integral zero at a tenth of the loop bandwidth, and the
+  slow closed-loop pole that left (about 10 rad/s) needed half a second to work
+  the disturbance off. The zero now sits at a quarter of the bandwidth.
 
-  The @sil rows carry the envelope the product holds today on the nominal plant
-  (the Teknic M-2310P-LN-04K reference motor).
+  The rows carry the envelope the product holds on the nominal plant (the Teknic
+  M-2310P-LN-04K reference motor).
 
-  The position rows run a torque of either sign, except for PID and two-DOF,
-  which carry only the positive one. Measured against a negative torque those
-  two miss the envelope the positive torque meets: PID takes 106 ms to recover
-  where the row allows 50, and two-DOF is pushed 0.1008 rad off a 0.1 rad limit.
-  Both are the laws that hold 1.5 rad with a standing error of some 0.055 rad,
-  which is already most of the 0.08 rad band the recovery is measured against, so
-  a disturbance pushing further from the setpoint starts the measurement close to
-  its edge. Whether that makes the limits wrong for one direction or the loops
-  wrong is not yet established, so the rows are withheld rather than loosened to
-  fit or tagged as a defect that has not been confirmed.
+  The position rows run a torque of either sign. PID and two-DOF once carried
+  only the positive one, because their PI placed its integral zero at a
+  twentieth of the position bandwidth: a step left a tail decaying over a
+  second, still some 0.055 rad over the setpoint when the torque arrived, and a
+  torque pushing the same way crossed the band. The zero now sits at a fifth of
+  the bandwidth, with the proportional term weighting the reference at three
+  quarters so that the zero does not overshoot the step.
 
   @REQ-SPD-009
   Scenario Outline: The <algorithm> speed loop rejects a <torque> Nm torque step while holding 20 rad/s
@@ -103,6 +99,7 @@ Feature: Disturbance Rejection
     Examples:
       | algorithm | torque | deviation | band | recovery_ms |
       | pid       | 0.002  | 0.1       | 0.08 | 50          |
+      | pid       | -0.002 | 0.1       | 0.08 | 50          |
       | cascadep  | 0.002  | 0.1       | 0.08 | 50          |
       | cascadep  | -0.002 | 0.1       | 0.08 | 50          |
       | lqr       | 0.002  | 0.1       | 0.08 | 50          |
@@ -110,6 +107,7 @@ Feature: Disturbance Rejection
       | lqi       | 0.002  | 0.05      | 0.02 | 50          |
       | lqi       | -0.002 | 0.05      | 0.02 | 50          |
       | twodof    | 0.002  | 0.1       | 0.08 | 50          |
+      | twodof    | -0.002 | 0.1       | 0.08 | 50          |
 
   @REQ-SPD-009
   Scenario Outline: The <algorithm> speed loop recovers through a saturated current command
@@ -132,11 +130,7 @@ Feature: Disturbance Rejection
     @sil
     Examples:
       | algorithm |
-      | adrc      |
-      | lqi       |
-
-    @sil-known-defect
-    Examples:
-      | algorithm |
       | pid       |
+      | adrc      |
       | twodof    |
+      | lqi       |

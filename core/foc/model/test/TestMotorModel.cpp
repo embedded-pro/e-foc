@@ -1,13 +1,16 @@
+#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
+#include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include "motor_parameters/TeknicM2310pLn04k.hpp"
+#include <cmath>
 #include <gtest/gtest.h>
 
 namespace
 {
     const foc::PhasePwmDutyCycles kNeutralDuty{
-        hal::Percent{ 60 }, hal::Percent{ 50 }, hal::Percent{ 40 }
+        hal::FractionalPercent{ 60.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 40.0f }
     };
 
     class RecordingObserver
@@ -234,7 +237,7 @@ TEST_F(MotorModelTest, observer_finished_not_called_without_iteration_limit)
 namespace
 {
     const foc::PhasePwmDutyCycles kZeroVoltageDuty{
-        hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 }
+        hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f }
     };
 
     constexpr int kFreeRunSteps = 100;
@@ -296,4 +299,23 @@ TEST_F(MotorModelTest, last_dq_currents_follow_a_driven_step)
 
     const auto dq = model->LastDqCurrents();
     EXPECT_NE(std::abs(dq.d) + std::abs(dq.q), 0.0f);
+}
+
+TEST_F(MotorModelTest, the_phase_currents_read_back_in_the_frame_the_rotor_has_reached)
+{
+    const foc::ClarkePark transform;
+    model->SetExternalTorque(foc::NewtonMeter{ -0.05f });
+
+    for (int step = 0; step != 4000; ++step)
+        model->StepForTest(kZeroVoltageDuty);
+
+    const auto electricalAngle = static_cast<float>(foc::M_2310P_LN_04K::parameters.p) * model->MechanicalAngle().Value();
+    const auto phases = model->LastMeasuredCurrents();
+    const auto dq = transform.Forward(foc::ThreePhase{ phases.a.Value(), phases.b.Value(), phases.c.Value() },
+        foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
+    const auto modelled = model->LastDqCurrents();
+
+    ASSERT_GT(std::abs(model->MechanicalSpeed().Value()), 5.0f);
+    EXPECT_NEAR(dq.d, modelled.d, 1e-3f * std::hypot(modelled.d, modelled.q));
+    EXPECT_NEAR(dq.q, modelled.q, 1e-3f * std::hypot(modelled.d, modelled.q));
 }

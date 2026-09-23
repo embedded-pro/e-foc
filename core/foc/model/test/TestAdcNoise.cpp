@@ -50,9 +50,9 @@ namespace
     void DriveModelCycles(foc::ThreePhaseMotorModel& model, int cycles)
     {
         const foc::PhasePwmDutyCycles duty{
-            hal::Percent{ 60 },
-            hal::Percent{ 50 },
-            hal::Percent{ 40 }
+            hal::FractionalPercent{ 60.0f },
+            hal::FractionalPercent{ 50.0f },
+            hal::FractionalPercent{ 40.0f }
         };
         for (int i = 0; i < cycles; ++i)
             model.StepForTest(duty);
@@ -99,7 +99,7 @@ TEST_F(TestAdcNoise, nonzero_sigma_increases_variance_over_zero_sigma_baseline)
     model2.SetAdcNoise(foc::ThreePhaseMotorModel::NoiseConfig{ .sigmaAmpere = sigma });
 
     CurrentCollector noisyCollector{ model2 };
-    const foc::PhasePwmDutyCycles duty{ hal::Percent{ 60 }, hal::Percent{ 50 }, hal::Percent{ 40 } };
+    const foc::PhasePwmDutyCycles duty{ hal::FractionalPercent{ 60.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 40.0f } };
     for (int i = 0; i < cycles; ++i)
         model2.StepForTest(duty);
 

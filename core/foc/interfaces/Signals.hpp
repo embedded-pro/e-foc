@@ -14,9 +14,9 @@ namespace foc
 
     struct PhasePwmDutyCycles
     {
-        hal::Percent a;
-        hal::Percent b;
-        hal::Percent c;
+        hal::FractionalPercent a;
+        hal::FractionalPercent b;
+        hal::FractionalPercent c;
     };
 
     struct ThreePhase

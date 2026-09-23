@@ -60,9 +60,9 @@ namespace services
                     FailMeasurement();
             });
         driver.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{
-            hal::Percent{ activeConfig.testVoltagePercent.Value() },
-            hal::Percent{ neutralDuty },
-            hal::Percent{ neutralDuty } });
+            hal::FractionalPercent{ static_cast<float>(activeConfig.testVoltagePercent.Value()) },
+            hal::FractionalPercent{ static_cast<float>(neutralDuty) },
+            hal::FractionalPercent{ static_cast<float>(neutralDuty) } });
 
         StartSampleWatchdog();
         settleTimer.Start(activeConfig.settleTime, [this]()

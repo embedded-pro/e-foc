@@ -2,8 +2,10 @@
 
 #include "core/foc/current_loop/CurrentControllerSelector.hpp"
 #include "core/foc/interfaces/Execution.hpp"
+#include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Signals.hpp"
+#include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/speed_loop/SpeedControllerSelector.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
@@ -27,11 +29,87 @@ namespace foc
 
     struct EstimatorSnapshot
     {
-        PhaseCurrents phaseCurrents{};
-        float electricalAngle{ 0.0f };
-        float measuredId{ 0.0f };
-        float measuredIq{ 0.0f };
-        float normalizedVd{ 0.0f };
+        float meanIq{ 0.0f };
+        float meanId{ 0.0f };
+        float idAtEnd{ 0.0f };
+        float meanNormalizedVd{ 0.0f };
+        float meanElectricalSpeedTimesIq{ 0.0f };
+    };
+
+    // Integrates over one outer-loop period what the interrupt sees tick by tick. The voltage paired with a
+    // current sample is the one applied during the tick that produced it, i.e. the previous tick's command.
+    class EstimatorWindowAccumulator
+    {
+    public:
+        explicit EstimatorWindowAccumulator(hal::Hertz tickFrequency);
+
+        void Restart();
+
+        // The voltage applied over the tick just ended was fixed in the stator while the rotor turned, so in the
+        // rotor frame it arrives advanced by half that rotation; and the rotation itself, not the outer loop's
+        // last speed, is what the cross-coupling term integrates while the rotor accelerates.
+        ALWAYS_INLINE_HOT void Accumulate(RotatingFrame measured, RotatingFrame normalizedVoltage, float mechanicalAngle, float polePairs)
+        {
+            const auto electricalRotation = rotationPrimed ? detail::PositionWithWrapAround(mechanicalAngle - previousMechanicalAngle) * polePairs : 0.0f;
+            previousMechanicalAngle = mechanicalAngle;
+            rotationPrimed = true;
+
+            const auto meanIq = 0.5f * (measured.q + previousIq);
+
+            iqSum += meanIq;
+            idSum += 0.5f * (measured.d + previousId);
+            vdSum += previousNormalizedVoltage.d + 0.5f * electricalRotation * previousNormalizedVoltage.q;
+            rotationTimesIqSum += electricalRotation * meanIq;
+
+            previousIq = measured.q;
+            previousId = measured.d;
+            previousNormalizedVoltage = normalizedVoltage;
+            ++ticks;
+        }
+
+        ALWAYS_INLINE_HOT EstimatorSnapshot Close()
+        {
+            const auto inverseTicks = ticks != 0 ? 1.0f / static_cast<float>(ticks) : 0.0f;
+            const EstimatorSnapshot snapshot{ iqSum * inverseTicks, idSum * inverseTicks, previousId, vdSum * inverseTicks, rotationTimesIqSum * inverseTicks * tickFrequency };
+
+            iqSum = 0.0f;
+            idSum = 0.0f;
+            vdSum = 0.0f;
+            rotationTimesIqSum = 0.0f;
+            ticks = 0;
+
+            return snapshot;
+        }
+
+    private:
+        float iqSum{ 0.0f };
+        float idSum{ 0.0f };
+        float vdSum{ 0.0f };
+        float rotationTimesIqSum{ 0.0f };
+        float previousIq{ 0.0f };
+        float previousId{ 0.0f };
+        RotatingFrame previousNormalizedVoltage{};
+        float previousMechanicalAngle{ 0.0f };
+        bool rotationPrimed{ false };
+        float tickFrequency{ 0.0f };
+        uint32_t ticks{ 0 };
+    };
+
+    // A square wave on the d-axis current reference: it produces no torque on a non-salient machine, and it
+    // is the only excitation that makes the winding resistance observable while the d axis is regulated to zero
+    class DirectAxisExcitation
+    {
+    public:
+        DirectAxisExcitation(Ampere amplitude, hal::Hertz frequency, hal::Hertz outerLoopFrequency);
+
+        void Restart();
+        float Advance();
+
+    private:
+        float amplitude;
+        uint32_t halfPeriodSamples;
+        uint32_t sample{ 0 };
+        bool positive{ true };
     };
 
     class EstimatorChannel
@@ -47,8 +125,9 @@ namespace foc
 
         void SetMechanical(OnlineMechanicalEstimator& estimator);
         void SetElectrical(OnlineElectricalEstimator& estimator);
+        bool HasElectrical() const;
         void UpdateMechanical(float mechanicalSpeed);
-        void UpdateElectrical(float electricalSpeed, float vdcInvScale);
+        void UpdateElectrical(float vdcInvScale);
 
     private:
         ALWAYS_INLINE_HOT const EstimatorSnapshot& Acquire()
@@ -90,11 +169,19 @@ namespace foc
             return currentAngle;
         }
 
+        // The outer loop may start a tick after the window closed; differencing the angle it finds then would
+        // measure a 19- or 21-tick span as if it were the nominal period
+        ALWAYS_INLINE_HOT void CloseWindow()
+        {
+            windowAngle = currentAngle;
+        }
+
         float Measure();
 
     private:
         float samplePeriod;
         volatile float currentAngle{ 0.0f };
+        volatile float windowAngle{ 0.0f };
         float previousAngle{ 0.0f };
         bool previousAngleValid{ false };
     };
@@ -124,13 +211,15 @@ namespace foc
         float MeasureMechanicalSpeed();
 
         float CurrentMechanicalAngle() const;
+        MotionObservation ObserveSpeedLoopMotion() const;
         float PolePairs() const;
         LowPriorityInterrupt& GetLowPriorityInterrupt();
 
         void SetOnlineMechanicalEstimatorImpl(OnlineMechanicalEstimator& estimator);
         void SetOnlineElectricalEstimatorImpl(OnlineElectricalEstimator& estimator);
         void UpdateOnlineMechanicalEstimator(float mechanicalSpeed);
-        void UpdateOnlineElectricalEstimator(float electricalSpeed);
+        void UpdateOnlineElectricalEstimator();
+        void SetDirectAxisExcitation(Ampere amplitude, hal::Hertz frequency);
 
     private:
         [[no_unique_address]] Park park;
@@ -143,7 +232,10 @@ namespace foc
         hal::Hertz outerLoopFrequency;
         SpeedDifferentiator speedDifferentiator;
         volatile float lastSpeedLoopOutput{ 0.0f };
+        volatile float directCurrentReference{ 0.0f };
         volatile float lastElectricalSpeed{ 0.0f };
+        volatile float lastMechanicalSpeed{ 0.0f };
+        volatile float lastMeanIq{ 0.0f };
         volatile float speedReference{ 0.0f };
         uint32_t prescaler;
         uint32_t triggerCounter{ 0 };
@@ -152,5 +244,7 @@ namespace foc
         volatile bool enabled{ false };
 
         EstimatorChannel estimators;
+        EstimatorWindowAccumulator estimatorWindow;
+        DirectAxisExcitation directAxisExcitation;
     };
 }

@@ -16,6 +16,8 @@ target_link_libraries(e_foc.supervision PUBLIC
 target_sources(e_foc.supervision PRIVATE
     ControlHealth.hpp
     ControlHealth.cpp
+    EncoderPlausibilityMonitor.hpp
+    EncoderPlausibilityMonitor.cpp
     SupervisedInverter.hpp
     SupervisedInverter.cpp
     SupervisedLowPriorityInterrupt.hpp

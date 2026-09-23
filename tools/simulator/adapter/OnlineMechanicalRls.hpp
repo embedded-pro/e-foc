@@ -3,6 +3,7 @@
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
+#include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include <QObject>
 #include <cstdint>
@@ -32,6 +33,8 @@ namespace simulator
 
     private:
         uint8_t polePairs;
+        [[no_unique_address]] foc::Clarke clarke;
+        [[no_unique_address]] foc::Park park;
         services::RealTimeFrictionAndInertiaEstimator estimator;
     };
 }

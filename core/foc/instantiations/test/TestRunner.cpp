@@ -80,7 +80,7 @@ TEST_F(TestRunner, PhaseCurrentsCallbackReadsEncoderCalculatesFocAndOutputsPwm)
     foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     const foc::PhaseCurrents testCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } };
-    const foc::PhasePwmDutyCycles expectedDuties{ hal::Percent{ 60 }, hal::Percent{ 30 }, hal::Percent{ 10 } };
+    const foc::PhasePwmDutyCycles expectedDuties{ hal::FractionalPercent{ 60.0f }, hal::FractionalPercent{ 30.0f }, hal::FractionalPercent{ 10.0f } };
 
     {
         testing::InSequence seq;
@@ -217,7 +217,7 @@ TEST_F(TestRunner, PhaseCurrentsAreDispatchedToTheControlLaw)
     runner.Enable();
 
     EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
-    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } }));
+    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f } }));
     EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
 
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
@@ -259,7 +259,7 @@ TEST_F(TestRunner, RegisteredObserverSeesThePhaseCurrentsAfterTheDutiesAreWritte
         });
 
     EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
-    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } }));
+    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f } }));
     EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_)).WillOnce([&](const foc::PhasePwmDutyCycles&)
         {
             dutiesWritten = true;
@@ -290,7 +290,7 @@ TEST_F(TestRunner, UnregisteredObserverIsNotCalled)
     runner.UnregisterPhaseCurrentsObserver();
 
     EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
-    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } }));
+    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f } }));
     EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
 
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });

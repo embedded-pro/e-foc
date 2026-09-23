@@ -36,6 +36,8 @@ namespace integration
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
         std::optional<float> ReadMeasuredPosition(
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 2000 });
+        std::optional<float> ReadMeasuredSpeed(
+            std::chrono::milliseconds timeout = std::chrono::milliseconds{ 2000 });
         std::optional<can::FocMotorState> ReadMotorState(
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 2000 });
         bool SelectControlMode(can::FocMotorMode mode,

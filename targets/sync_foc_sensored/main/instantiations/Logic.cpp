@@ -22,6 +22,10 @@ namespace application
         , motorAlignment{ hardware, hardware }
         , platformFaultNotifier{ hardware }
         , watchdog{ hardware, hardware.Tracer() }
+        , encoderPlausibility{ hardware, hardware.MaxCurrentSupported(), [this]()
+            {
+                platformFaultNotifier->Raise(state_machine::FaultCode::encoderLoss);
+            } }
     {
         hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shorter);
 
@@ -57,6 +61,11 @@ namespace application
                 canBridge.emplace(*motorCanServer, *controlMode, this->hardware, this->hardware, electricalIdent, nullptr, nvm, configData, this->hardware.Tracer());
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
                 watchdog.supervisor.AttachControlMode(*controlMode);
+                encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&
+                    {
+                        return controlMode->ActiveStateMachine();
+                    });
+                encoderPlausibility.Enable({});
                 platformFaultNotifier->RegisterSecondary([this](state_machine::FaultCode code)
                     {
                         infra::EventDispatcherWithWeakPtr::Instance().Schedule([this, code]()

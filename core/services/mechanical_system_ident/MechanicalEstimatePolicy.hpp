@@ -21,8 +21,9 @@ namespace services
         inline constexpr float uncertaintyBudgetFactor{ 20.0f };
         inline constexpr float minimumUncertaintyThreshold{ 1e-3f };
 
-        inline constexpr float minimumAcceleration{ 1.0f };
+        inline constexpr float minimumAcceleration{ 20.0f };
         inline constexpr float minimumSpeed{ 0.5f };
+        inline constexpr float minimumSpeedSpan{ 0.25f };
 
         inline constexpr uint16_t minimumExcitedUpdates{ 64 };
     }
@@ -36,13 +37,50 @@ namespace services
                friction >= 0.0f && friction < mechanical_estimate::maximumFriction;
     }
 
-    // Rotation alone leaves the intercept and the speed column collinear and the acceleration column at zero,
-    // so a constant speed identifies neither inertia nor viscous friction while still inflating the covariance.
-    inline bool IsMechanicallyExciting(float acceleration, float speed)
+    // At standstill every column but the intercept is zero, so the observation carries nothing
+    inline bool IsMechanicallyObservable(float speed)
     {
-        return std::abs(acceleration) >= mechanical_estimate::minimumAcceleration &&
-               std::abs(speed) >= mechanical_estimate::minimumSpeed;
+        return std::abs(speed) >= mechanical_estimate::minimumSpeed;
     }
+
+    // Inertia is identified only while the rotor accelerates, and viscous friction only apart from the intercept
+    // once the observations span more than one speed. Steady samples used to be refused altogether, which left
+    // friction to whatever acceleration ripple the duty quantisation happened to put on a plateau.
+    class MechanicalExcitation
+    {
+    public:
+        void Restart()
+        {
+            *this = MechanicalExcitation{};
+        }
+
+        void Count(float acceleration, float speed)
+        {
+            if (std::abs(acceleration) >= mechanical_estimate::minimumAcceleration && accelerating != mechanical_estimate::minimumExcitedUpdates)
+                ++accelerating;
+
+            const auto magnitude = std::abs(speed);
+            slowest = seen ? std::min(slowest, magnitude) : magnitude;
+            fastest = seen ? std::max(fastest, magnitude) : magnitude;
+            seen = true;
+        }
+
+        uint16_t AcceleratingObservations() const
+        {
+            return accelerating;
+        }
+
+        bool HasSpannedDistinctSpeeds() const
+        {
+            return seen && fastest - slowest >= mechanical_estimate::minimumSpeedSpan * fastest;
+        }
+
+    private:
+        uint16_t accelerating{ 0 };
+        float slowest{ 0.0f };
+        float fastest{ 0.0f };
+        bool seen{ false };
+    };
 
     // An RLS that forgets cannot drive its covariance below a floor proportional to (1 - lambda), so a fixed
     // bound would be unreachable for a tracking estimator and trivially met by one that never forgets.
@@ -51,9 +89,9 @@ namespace services
         return std::max(mechanical_estimate::uncertaintyBudgetFactor * (1.0f - forgettingFactor), mechanical_estimate::minimumUncertaintyThreshold);
     }
 
-    inline bool HasConvergedMechanics(const MechanicalRls::EstimationMetrics& metrics, uint16_t excitedUpdates, float forgettingFactor)
+    inline bool HasConvergedMechanics(const MechanicalRls::EstimationMetrics& metrics, const MechanicalExcitation& excitation, float forgettingFactor)
     {
-        return excitedUpdates >= mechanical_estimate::minimumExcitedUpdates &&
+        return excitation.AcceleratingObservations() >= mechanical_estimate::minimumExcitedUpdates && excitation.HasSpannedDistinctSpeeds() &&
                MechanicalRls::EvaluateConvergence(metrics, mechanical_estimate::innovationThreshold, UncertaintyThresholdFor(forgettingFactor)) == estimators::State::converged;
     }
 }

@@ -11,9 +11,9 @@ namespace
 
     MATCHER_P(PhasePwmDutyCyclesEq, expected, "")
     {
-        return arg.a.Value() == expected.a.Value() &&
-               arg.b.Value() == expected.b.Value() &&
-               arg.c.Value() == expected.c.Value();
+        return std::abs(arg.a.Value() - expected.a.Value()) < 1e-3f &&
+               std::abs(arg.b.Value() - expected.b.Value()) < 1e-3f &&
+               std::abs(arg.c.Value() - expected.c.Value()) < 1e-3f;
     }
 
     [[maybe_unused]] float SimulateRLModelCurrent(float voltage, float resistance, float inductance, float time)

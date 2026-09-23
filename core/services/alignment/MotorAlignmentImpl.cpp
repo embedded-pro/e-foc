@@ -7,10 +7,10 @@ namespace
     foc::PhasePwmDutyCycles NormalizedDutyCycles(foc::ThreePhase voltages)
     {
         auto offset = 50.0f;
-        auto dutyA = static_cast<uint8_t>(std::clamp(offset + voltages.a * 50.0f, 0.0f, 100.0f));
-        auto dutyB = static_cast<uint8_t>(std::clamp(offset + voltages.b * 50.0f, 0.0f, 100.0f));
-        auto dutyC = static_cast<uint8_t>(std::clamp(offset + voltages.c * 50.0f, 0.0f, 100.0f));
-        return foc::PhasePwmDutyCycles{ hal::Percent{ dutyA }, hal::Percent{ dutyB }, hal::Percent{ dutyC } };
+        auto dutyA = std::clamp(offset + voltages.a * 50.0f, 0.0f, 100.0f);
+        auto dutyB = std::clamp(offset + voltages.b * 50.0f, 0.0f, 100.0f);
+        auto dutyC = std::clamp(offset + voltages.c * 50.0f, 0.0f, 100.0f);
+        return foc::PhasePwmDutyCycles{ hal::FractionalPercent{ dutyA }, hal::FractionalPercent{ dutyB }, hal::FractionalPercent{ dutyC } };
     }
 }
 

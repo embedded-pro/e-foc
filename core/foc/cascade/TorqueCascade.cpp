@@ -25,6 +25,8 @@ namespace foc
         enabled = true;
         speedFilter.Reset();
         previousAngleValid = false;
+        lastElectricalSpeed = 0.0f;
+        lastIq = 0.0f;
         SetPoint(lastSetPoint);
     }
 
@@ -82,6 +84,13 @@ namespace foc
         currentLoop.SetTunings(tunings);
     }
 
+    MotionObservation TorqueCascade::ObserveMotion() const
+    {
+        const auto mechanicalSpeed = polePairs > 0.0f ? lastElectricalSpeed / polePairs : 0.0f;
+
+        return { RadiansPerSecond{ mechanicalSpeed }, Ampere{ lastIq }, RadiansPerSecond{ 0.0f }, Radians{ 0.0f } };
+    }
+
     CurrentControllerSelector& TorqueCascade::CurrentLoop()
     {
         return currentLoop;
@@ -105,7 +114,10 @@ namespace foc
         auto sinTheta = FastTrigonometry::Sine(electricalAngle);
 
         auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
-        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ lastSetPoint.first.Value(), lastSetPoint.second.Value() }, MeasureElectricalSpeed(mechanicalAngle) });
+        const auto electricalSpeed = MeasureElectricalSpeed(mechanicalAngle);
+        lastElectricalSpeed = electricalSpeed;
+        lastIq = idAndIq.q;
+        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ lastSetPoint.first.Value(), lastSetPoint.second.Value() }, electricalSpeed });
         auto output = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
 
         return ToDutyCycles(output);

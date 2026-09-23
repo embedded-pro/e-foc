@@ -223,7 +223,7 @@ namespace application
     {
     }
 
-    void PlatformFactoryImpl::ThreeChannelsPwmStub::Start(hal::Percent, hal::Percent, hal::Percent)
+    void PlatformFactoryImpl::ThreeChannelsPwmStub::Start(hal::FractionalPercent, hal::FractionalPercent, hal::FractionalPercent)
     {
     }
 

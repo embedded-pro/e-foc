@@ -29,6 +29,11 @@ namespace state_machine
             onFaultSecondary(code);
     }
 
+    void PlatformFaultNotifier::Raise(FaultCode code)
+    {
+        Notify(code);
+    }
+
     void PlatformFaultNotifier::Register(const infra::Function<void(FaultCode)>& onImmediate, const infra::Function<void(FaultCode)>& onDeferred)
     {
         onFaultImmediate = onImmediate;

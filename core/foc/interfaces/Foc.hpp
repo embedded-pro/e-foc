@@ -11,10 +11,22 @@ namespace foc
 {
     using IdAndIqPoint = std::pair<Ampere, Ampere>;
 
+    // What the drive measures and what it is asking the rotor to do, for supervision and telemetry;
+    // written by the control interrupts and read from the event loop
+    struct MotionObservation
+    {
+        RadiansPerSecond measuredSpeed{ 0.0f };
+        Ampere measuredTorqueCurrent{ 0.0f };
+        RadiansPerSecond demandedSpeed{ 0.0f };
+        Radians positionError{ 0.0f };
+    };
+
     class FocBase
     {
     public:
         virtual ~FocBase() = default;
+
+        virtual MotionObservation ObserveMotion() const = 0;
 
         virtual bool Configure(const MotorModelParameters& parameters) = 0;
         virtual void Enable() = 0;

@@ -23,8 +23,8 @@ namespace simulator
         const foc::RotatingFrame idq = park.Forward(iAlphaBeta, cosTheta, sinTheta);
         const foc::RotatingFrame vdq = park.Forward(lastVAlphaBeta, cosTheta, sinTheta);
 
-        estimator.Update(foc::Volts{ vdq.d }, foc::Ampere{ idq.d }, foc::Ampere{ idq.q },
-            foc::RadiansPerSecond{ static_cast<float>(polePairs) * omegaMech.Value() });
+        const float electricalSpeed = static_cast<float>(polePairs) * omegaMech.Value();
+        estimator.Update(foc::ElectricalWindow{ foc::Volts{ vdq.d }, foc::Ampere{ idq.d }, foc::Ampere{ idq.d }, electricalSpeed * idq.q });
 
         emit electricalEstimatesChanged(estimator.CurrentResistance().Value(),
             estimator.CurrentInductance().Value() * 0.001f);

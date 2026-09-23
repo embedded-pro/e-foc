@@ -38,6 +38,7 @@ namespace foc
         }
 
         MotorModelParameters parameters{};
+        float bandwidth{ CurrentLoopTunings{}.bandwidth };
         float switchingGain{ CurrentLoopTunings{}.switchingGain };
         float boundaryLayer{ CurrentLoopTunings{}.boundaryLayer };
         float normalizationScale{ 0.0f };

@@ -2,6 +2,7 @@
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include <array>
+#include <cmath>
 #include <gmock/gmock.h>
 #include <optional>
 
@@ -11,9 +12,9 @@ namespace
 
     MATCHER_P(PhasePwmDutyCyclesEq, expected, "")
     {
-        return arg.a.Value() == expected.a.Value() &&
-               arg.b.Value() == expected.b.Value() &&
-               arg.c.Value() == expected.c.Value();
+        return std::abs(arg.a.Value() - expected.a.Value()) < 1e-3f &&
+               std::abs(arg.b.Value() - expected.b.Value()) < 1e-3f &&
+               std::abs(arg.c.Value() - expected.c.Value()) < 1e-3f;
     }
 
     class MotorAlignmentTest
@@ -34,9 +35,9 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ConfiguresCorrectPwmDutyCycles)
     std::size_t polePairs = 7;
 
     foc::PhasePwmDutyCycles expectedPwm{
-        hal::Percent{ 60 },
-        hal::Percent{ 45 },
-        hal::Percent{ 45 }
+        hal::FractionalPercent{ 60.0f },
+        hal::FractionalPercent{ 45.0f },
+        hal::FractionalPercent{ 45.0f }
     };
 
     EXPECT_CALL(encoderMock, Read()).Times(1);
@@ -219,9 +220,9 @@ TEST_F(MotorAlignmentTest, ForceAlignment_WithCustomVoltagePercent)
     std::size_t polePairs = 7;
 
     foc::PhasePwmDutyCycles expectedPwm{
-        hal::Percent{ 65 },
-        hal::Percent{ 42 },
-        hal::Percent{ 42 }
+        hal::FractionalPercent{ 65.0f },
+        hal::FractionalPercent{ 42.5f },
+        hal::FractionalPercent{ 42.5f }
     };
 
     EXPECT_CALL(encoderMock, Read()).Times(1);
@@ -576,10 +577,16 @@ TEST_F(MotorAlignmentTest, AbortCancelsTimeoutSoCallbackDoesNotFireAfterTimeout)
     EXPECT_CALL(driverMock, Stop()).Times(2);
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
-        .WillOnce([this](auto, const auto& cb) { driverMock.StorePhaseCurrentsCallback(cb); });
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
 
     bool fired = false;
-    alignment.ForceAlignment(7, config, [&fired](auto) { fired = true; });
+    alignment.ForceAlignment(7, config, [&fired](auto)
+        {
+            fired = true;
+        });
 
     alignment.Abort();
     EXPECT_FALSE(fired);

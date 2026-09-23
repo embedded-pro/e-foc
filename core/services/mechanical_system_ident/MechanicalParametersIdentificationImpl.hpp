@@ -56,7 +56,7 @@ namespace services
         float previousPosition{ 0.0f };
         float previousSpeed{ 0.0f };
         float polePairs{ 1.0f };
-        uint16_t excitedUpdates{ 0 };
+        MechanicalExcitation excitation;
         bool atDwellLevel{ false };
         [[no_unique_address]] foc::ClarkePark transform;
         infra::TimerSingleShot timeoutTimer;

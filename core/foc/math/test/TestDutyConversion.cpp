@@ -51,6 +51,15 @@ TEST_F(TestDutyConversion, a_normalised_output_maps_onto_the_percent_range)
     EXPECT_EQ(duties.c.Value(), 100);
 }
 
+TEST_F(TestDutyConversion, a_normalised_output_keeps_sub_percent_resolution)
+{
+    const auto duties = foc::ToDutyCycles(Modulated{ 0.5004f, 0.12345f, 0.9999f });
+
+    EXPECT_NEAR(duties.a.Value(), 50.04f, 1e-4f);
+    EXPECT_NEAR(duties.b.Value(), 12.345f, 1e-4f);
+    EXPECT_NEAR(duties.c.Value(), 99.99f, 1e-4f);
+}
+
 TEST_F(TestDutyConversion, an_output_beyond_the_range_is_clamped_rather_than_wrapped)
 {
     const auto duties = foc::ToDutyCycles(Modulated{ -5.0f, 1.5f, 0.25f });
@@ -61,7 +70,7 @@ TEST_F(TestDutyConversion, an_output_beyond_the_range_is_clamped_rather_than_wra
 }
 
 // Holds only where NaN survives; the embedded build drops this branch under -ffinite-math-only
-TEST_F(TestDutyConversion, a_nan_modulation_lands_on_zero_duty_rather_than_an_undefined_cast)
+TEST_F(TestDutyConversion, a_nan_modulation_lands_on_zero_duty)
 {
     const auto duties = foc::ToDutyCycles(Modulated{ Nan(), Nan(), Nan() });
 

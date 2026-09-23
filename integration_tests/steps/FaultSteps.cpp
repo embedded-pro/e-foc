@@ -77,6 +77,24 @@ THEN(R"(the rotor shall not turn)")
         << "The rotor moved from " << *start << " rad to " << *end << " rad";
 }
 
+THEN(R"(the reported speed shall settle within {float} rad\/s of {float} rad\/s)", (float tolerance, float expected))
+{
+    auto& fixture = context.Get<Fixture>();
+
+    std::optional<float> reported;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{ 5 };
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        reported = fixture.ReadMeasuredSpeed();
+        if (reported.has_value() && std::fabs(*reported - expected) <= tolerance)
+            break;
+        usleep(100000);
+    }
+
+    ASSERT_TRUE(reported.has_value()) << "No speed in the status telemetry frame";
+    EXPECT_NEAR(*reported, expected, tolerance) << "The telemetry speed never settled at the setpoint";
+}
+
 THEN(R"(the rotor shall turn)")
 {
     auto& fixture = context.Get<Fixture>();

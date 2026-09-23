@@ -123,7 +123,7 @@ TEST_F(TestTorqueCascade, enable_disable_cycle)
     focTorque->SetPoint({ foc::Ampere{ 0.0f }, foc::Ampere{ 1.0f } });
     focTorque->SetCurrentTunings(foc::CurrentLoopTunings{});
 
-    foc::PhasePwmDutyCycles wound{ hal::Percent{ 0 }, hal::Percent{ 0 }, hal::Percent{ 0 } };
+    foc::PhasePwmDutyCycles wound{ hal::FractionalPercent{ 0.0f }, hal::FractionalPercent{ 0.0f }, hal::FractionalPercent{ 0.0f } };
     for (int sample = 0; sample != 50; ++sample)
     {
         foc::Radians position{ 0.2f };
@@ -234,7 +234,7 @@ TEST_F(TestTorqueCascade, a_spinning_rotor_drives_the_back_emf_feedforward)
     // Torque mode has no outer loop, so the cascade must derive speed from the angle it is handed
     constexpr float mechanicalStepPerSample = 0.01f;
     float angle = 0.0f;
-    foc::PhasePwmDutyCycles result{ hal::Percent{ 0 }, hal::Percent{ 0 }, hal::Percent{ 0 } };
+    foc::PhasePwmDutyCycles result{ hal::FractionalPercent{ 0.0f }, hal::FractionalPercent{ 0.0f }, hal::FractionalPercent{ 0.0f } };
 
     for (int sample = 0; sample != 200; ++sample)
     {
@@ -308,9 +308,9 @@ TEST_F(TestTorqueCascade, a_setpoint_outside_the_envelope_is_scaled_onto_it)
     const auto expected = focTorque->Calculate(
         foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } }, atLimit);
 
-    EXPECT_EQ(expected.a.Value(), clamped.a.Value());
-    EXPECT_EQ(expected.b.Value(), clamped.b.Value());
-    EXPECT_EQ(expected.c.Value(), clamped.c.Value());
+    EXPECT_NEAR(expected.a.Value(), clamped.a.Value(), 1e-3f);
+    EXPECT_NEAR(expected.b.Value(), clamped.b.Value(), 1e-3f);
+    EXPECT_NEAR(expected.c.Value(), clamped.c.Value(), 1e-3f);
 }
 
 TEST_F(TestTorqueCascade, the_envelope_bounds_the_current_vector_not_each_axis)
@@ -328,7 +328,23 @@ TEST_F(TestTorqueCascade, the_envelope_bounds_the_current_vector_not_each_axis)
     const auto expected = focTorque->Calculate(
         foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } }, reference);
 
-    EXPECT_EQ(expected.a.Value(), clamped.a.Value());
-    EXPECT_EQ(expected.b.Value(), clamped.b.Value());
-    EXPECT_EQ(expected.c.Value(), clamped.c.Value());
+    EXPECT_NEAR(expected.a.Value(), clamped.a.Value(), 1e-3f);
+    EXPECT_NEAR(expected.b.Value(), clamped.b.Value(), 1e-3f);
+    EXPECT_NEAR(expected.c.Value(), clamped.c.Value(), 1e-3f);
+}
+
+TEST_F(TestTorqueCascade, the_observed_motion_carries_the_measured_speed_and_demands_none)
+{
+    constexpr float step{ 0.0005f };
+
+    for (int tick = 0; tick != 400; ++tick)
+    {
+        foc::Radians position{ static_cast<float>(tick) * step };
+        focTorque->Calculate(ZeroCurrents(), position);
+    }
+
+    const auto observation = focTorque->ObserveMotion();
+    EXPECT_NEAR(observation.measuredSpeed.Value(), step * 20000.0f, 0.05f * step * 20000.0f);
+    EXPECT_NEAR(observation.demandedSpeed.Value(), 0.0f, 1e-6f);
+    EXPECT_NEAR(observation.positionError.Value(), 0.0f, 1e-6f);
 }

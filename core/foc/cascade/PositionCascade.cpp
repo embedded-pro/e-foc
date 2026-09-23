@@ -1,4 +1,5 @@
 #include "core/foc/cascade/PositionCascade.hpp"
+#include "core/foc/position_loop/PositionPlantModel.hpp"
 
 namespace foc
 {
@@ -132,6 +133,14 @@ namespace foc
         return outerLoopFrequency;
     }
 
+    MotionObservation PositionCascade::ObserveMotion() const
+    {
+        auto observation = ObserveSpeedLoopMotion();
+        observation.positionError = Radians{ WrappedPositionError(lastPositionSetPoint, Radians{ CurrentMechanicalAngle() }) };
+
+        return observation;
+    }
+
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
@@ -146,7 +155,7 @@ namespace foc
             SetSpeedReference(speedCommand);
             RunSpeedLoop(mechanicalSpeed);
             UpdateOnlineMechanicalEstimator(mechanicalSpeed);
-            UpdateOnlineElectricalEstimator(mechanicalSpeed * PolePairs());
+            UpdateOnlineElectricalEstimator();
             return;
         }
 
@@ -161,7 +170,7 @@ namespace foc
             SetDirectCurrentReference(command.value);
 
         UpdateOnlineMechanicalEstimator(mechanicalSpeed);
-        UpdateOnlineElectricalEstimator(mechanicalSpeed * PolePairs());
+        UpdateOnlineElectricalEstimator();
     }
 
     OPTIMIZE_FOR_SPEED

@@ -118,19 +118,19 @@ namespace foc
 
     foc::Ohm ThreePhaseMotorModel::EffectiveResistance() const
     {
-        const float deltaT = thermal.windingTempCelsius - thermal.config.ambientCelsius;
+        const float deltaT = thermal.windingTempCelsius - thermal.config.referenceCelsius;
         return foc::Ohm{ parameters.R.Value() * (1.0f + thermal.config.copperTempCoeff * deltaT) };
     }
 
     foc::Henry ThreePhaseMotorModel::EffectiveInductanceD() const
     {
-        const float deltaT = thermal.windingTempCelsius - thermal.config.ambientCelsius;
+        const float deltaT = thermal.windingTempCelsius - thermal.config.referenceCelsius;
         return foc::Henry{ parameters.Ld.Value() * (1.0f - thermal.config.ironInductanceCoeff * deltaT) };
     }
 
     foc::Henry ThreePhaseMotorModel::EffectiveInductanceQ() const
     {
-        const float deltaT = thermal.windingTempCelsius - thermal.config.ambientCelsius;
+        const float deltaT = thermal.windingTempCelsius - thermal.config.referenceCelsius;
         return foc::Henry{ parameters.Lq.Value() * (1.0f - thermal.config.ironInductanceCoeff * deltaT) };
     }
 
@@ -249,7 +249,7 @@ namespace foc
         motorState.omega = foc::RadiansPerSecond{ 0.0f };
         motorState.omega_mech = foc::RadiansPerSecond{ 0.0f };
         ResetTemperature();
-        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 49 }, hal::Percent{ 51 } };
+        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 49.0f }, hal::FractionalPercent{ 51.0f } };
 
         NotifyObservers([](auto& observer)
             {
@@ -268,7 +268,7 @@ namespace foc
         motorState.ia = foc::Ampere{ 0.0f };
         motorState.ib = foc::Ampere{ 0.0f };
         motorState.ic = foc::Ampere{ 0.0f };
-        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } };
+        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f } };
         onCurrentPhasesReady = nullptr;
     }
 
@@ -313,10 +313,19 @@ namespace foc
         auto vb = (duty_b - half) * supply;
         auto vc = (duty_c - half) * supply;
 
+        // The dq equations below already carry the coupling the rotating frame produces, so the currents they
+        // integrate are expressed in the frame at the end of the step and go back to abc at that angle; converting
+        // them at the starting angle and re-reading them at the next one counted the frame rotation twice. The
+        // inverter's voltage is fixed in the stator for the whole step, so the rotor sees it at the mid-step angle.
+        const auto stepRotation = motorState.omega.Value() * dt;
         auto cos_theta = foc::FastTrigonometry::Cosine(motorState.theta.Value());
         auto sin_theta = foc::FastTrigonometry::Sine(motorState.theta.Value());
+        const auto midAngle = motorState.theta.Value() + 0.5f * stepRotation;
+        const auto endAngle = motorState.theta.Value() + stepRotation;
+        const auto cos_end = foc::FastTrigonometry::Cosine(endAngle);
+        const auto sin_end = foc::FastTrigonometry::Sine(endAngle);
 
-        auto v_dq = park.Forward(clarke.Forward(foc::ThreePhase{ va.Value(), vb.Value(), vc.Value() }), cos_theta, sin_theta);
+        auto v_dq = park.Forward(clarke.Forward(foc::ThreePhase{ va.Value(), vb.Value(), vc.Value() }), foc::FastTrigonometry::Cosine(midAngle), foc::FastTrigonometry::Sine(midAngle));
         auto i_dq = park.Forward(clarke.Forward(foc::ThreePhase{ motorState.ia.Value(), motorState.ib.Value(), motorState.ic.Value() }), cos_theta, sin_theta);
 
         auto id = i_dq.d;
@@ -332,7 +341,7 @@ namespace foc
         id += dId_dt * dt;
         iq += dIq_dt * dt;
 
-        auto i_abc = clarke.Inverse(park.Inverse(foc::RotatingFrame{ id, iq }, cos_theta, sin_theta));
+        auto i_abc = clarke.Inverse(park.Inverse(foc::RotatingFrame{ id, iq }, cos_end, sin_end));
 
         motorState.ia = foc::Ampere{ i_abc.a };
         motorState.ib = foc::Ampere{ i_abc.b };
@@ -342,7 +351,7 @@ namespace foc
 
         if (faultInjection.config.AnyPhaseOpen())
         {
-            const auto masked = park.Forward(clarke.Forward(foc::ThreePhase{ motorState.ia.Value(), motorState.ib.Value(), motorState.ic.Value() }), cos_theta, sin_theta);
+            const auto masked = park.Forward(clarke.Forward(foc::ThreePhase{ motorState.ia.Value(), motorState.ib.Value(), motorState.ic.Value() }), cos_end, sin_end);
             id = masked.d;
             iq = masked.q;
         }

@@ -322,7 +322,7 @@ $$T_e = J \cdot \dot{\omega} + B \cdot \omega + \tau_c$$
 
 The electromagnetic torque is approximated as $T_e = I_q \cdot k_t$, where $k_t = \tfrac{3}{2} p \psi_f$ is derived from the calibration record's pole pairs and flux linkage. Angular acceleration $\dot{\omega}$ is derived from a finite difference of successive speed measurements scaled by the sampling frequency.
 
-The regressor vector is $\phi = [1,\ \dot{\omega},\ \omega]^T$, and the parameter vector is $\theta = [\tau_c,\ J,\ B]^T$. The scalar output is $T_e$. An RLS algorithm with a forgetting factor of 0.995 updates $\theta$ each outer-loop period.
+The regressor vector is $\phi = [1,\ \dot{\omega},\ \omega]^T$, and the parameter vector is $\theta = [\tau_c,\ J,\ B]^T$. The scalar output is $T_e$. An RLS algorithm with a forgetting factor of 0.9995 updates $\theta$ each outer-loop period from window averages the control interrupt accumulates.
 
 ### Torque Constant Dependency
 
@@ -339,19 +339,35 @@ direction on every sample, so $P$ grows as $\lambda^{-n}$. At $\lambda = 0.995$ 
 roughly $5\times10^{21}$ after ten seconds of standstill, and the first sample of real excitation then
 produces an enormous coefficient jump.
 
-The estimator therefore applies an explicit gate: an observation updates the RLS only when $|\dot{\omega}|$
-**and** $|\omega|$ both exceed a minimum. Requiring only one of the two admits a rotor held at a constant
-speed, which excites neither the inertia direction (the acceleration column is zero) nor the friction
-direction separately from the intercept (the two columns are collinear) while still inflating $P$ on every
-sample. Unexcited observations are skipped entirely, so the covariance is frozen rather than inflated, and
-the previous coefficients are reported unchanged.
+Standstill observations (below a minimum speed) are therefore skipped entirely, so the covariance is frozen
+rather than inflated and the previous coefficients are reported unchanged.
+
+A rotor held at a constant speed is a different case. It excites neither the inertia direction nor, on its
+own, the friction direction separately from the intercept, but a trajectory that holds *two* speeds is
+exactly what separates friction from the intercept. An earlier gate refused every sample whose
+acceleration was under 1 rad/s², which removed those plateaus; the offline friction estimate stayed
+accurate only because whole-percent duty ripple put a spurious acceleration on each plateau sample and let
+it through. With the duty carried as a fraction the ripple vanished, the plateaus were refused, and the
+friction the full calibration identified moved 19–27 % off the plant.
+
+Both procedures now take every sample above the minimum speed, and count separately what the estimate
+needs before it may be published: at least 64 samples accelerating faster than 20 rad/s² (inertia), and
+observations spanning more than a quarter of the fastest speed seen (friction apart from the intercept).
+The shared `MechanicalExcitation` tracks both. The online estimator, which runs indefinitely, admits a
+non-accelerating sample only while the covariance trace is under a ceiling, so a long constant-speed run
+cannot inflate the inertia direction without bound; the offline run is bounded by its timeout and its
+trajectory re-excites every dwell.
 
 ### Plausibility Band and Update Rate
 
 A finiteness test alone admits values such as $10^{30}$. Before an estimate is published to `CurrentInertia()`
 / `CurrentFriction()` — and therefore before it can become PID gains — it must pass every gate of the shared
-acceptance policy above: enough exciting observations since the last seed, a converged innovation and
-covariance, and a value inside the physical band. A publication is therefore rate-limited by construction —
+acceptance policy above: enough accelerating observations and a span of speeds since the last seed, a
+settled fit, and a value inside the physical band. The offline procedure judges the fit by its innovation
+and covariance; the online estimator, which runs on outer-loop window averages (see
+`documentation/theory/friction-inertia-estimation.md` §4.1), by an averaged residual power under 1 % of the
+averaged output power, because an instantaneous innovation of 0.1 mN·m sits under any real drive's torque
+ripple. A publication is therefore rate-limited by construction —
 no estimate reaches the accessors during the warm-up that follows a seed, and none reaches them while the
 fit is still moving. An estimate that fails any gate is discarded and the last accepted pair is retained.
 
@@ -365,7 +381,7 @@ estimates are physically meaningless during the initial operating period.
 
 ### Forgetting Factor
 
-The forgetting factor $\lambda = 0.995$ applies an exponential weight decay to past observations, enabling the estimator to track gradual mechanical changes over the motor lifetime (bearing wear increases friction; load changes affect effective inertia).
+The online forgetting factor $\lambda = 0.9995$ applies an exponential weight decay to past observations, enabling the estimator to track gradual mechanical changes over the motor lifetime (bearing wear increases friction; load changes affect effective inertia).
 
 ### Estimate Consumption
 

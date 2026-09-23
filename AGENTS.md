@@ -171,7 +171,7 @@ warnings-as-errors would fail the build.
 
 **Features**: all scenarios live in `integration_tests/features/`, tagged by the runner that implements them: `@sil` for the QEMU software-in-the-loop runner, `@hil` for hardware. The `defaults` test preset excludes the `hardware|integration` labels, so `ctest --preset host` does **not** run the integration suite; invoke it directly, as the SIL command block above does.
 
-`@sil-protection` holds the board-protection scenarios, which are kept out of the default run because they reproduce a firmware lockup, and `@sil-known-defect` holds the performance and identification scenarios whose law or estimator does not meet its envelope today; both are documented in `documentation/design/software-in-the-loop.md`.
+Every SIL scenario runs under `@sil`; there is no held-out tag. A scenario that exposes a defect is fixed at the root cause, not parked: `documentation/design/software-in-the-loop.md` Parts E, F, I and J record what each former hold-out was and what fixed it.
 
 **Software-in-the-loop**: the motor plant is an input to the target, not a constant. The harness writes a plant description and an NVM image into a per-scenario working directory the emulator runs from, so the firmware reads both by relative name. Design: `documentation/design/software-in-the-loop.md`. `SIL_VERBOSE=1` traces both directions and keeps the scenario directory; `SIL_GDB=1` starts the emulator halted with a GDB stub on port 1234.
 

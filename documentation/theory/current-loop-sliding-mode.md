@@ -74,38 +74,38 @@ $$
 
 The surface $s = 0$ is the desired zero-error manifold.
 
-**Discrete equivalent control**: The voltage that would maintain $s[k+1] = 0$. With the plant
-$i[k+1] = A_d^i i[k] + B_d^i u[k]$ the error propagates as
-$e[k+1] = A_d^i e[k] + B_d^i u[k] + (A_d^i - 1) i^*[k]$, so holding the surface needs the error
-term *and* the voltage that sustains the reference itself:
+**Equivalent control and the reaching law**: The error propagates as
+$e[k+1] = A_d^i e[k] + B_d^i u[k] + (A_d^i - 1) i^*[k]$. The law chooses its voltage so that the
+error obeys the exponential reaching law
 
 $$
-\boxed{u_{eq}[k] = -\frac{A_d^i}{B_d^i} \cdot e[k] + \frac{1 - A_d^i}{B_d^i} \cdot i^*[k]}
+e[k+1] = \lambda\, e[k] - K_{sw}\,\mathrm{sat}\!\left(\frac{e[k]}{\phi}\right),
+\qquad \lambda = e^{-\omega_{bw} T_s}
 $$
 
-Because $B_d^i = (1 - A_d^i)/R_s$, the second term is exactly $R_s i^*[k]$ — the resistive drop
-the reference current requires. Omitting it leaves a standing error
-$e_\infty = (A_d^i - 1) i^* / (1 + K_{sw}/\phi)$, which this controller has no integral action to
-remove.
-
-**Switching control**: Drives the state onto the surface:
+which needs
 
 $$
-u_{sw}[k] = -\frac{K_{sw}}{B_d^i} \cdot \mathrm{sat}\!\left(\frac{e[k]}{\phi}\right)
+\boxed{u[k] = -\frac{A_d^i - \lambda}{B_d^i}\, e[k] - \frac{K_{sw}}{B_d^i}\,\mathrm{sat}\!\left(\frac{e[k]}{\phi}\right) + \frac{1 - A_d^i}{B_d^i}\, i^*[k]}
 $$
 
-where $\mathrm{sat}(x) = \mathrm{clamp}(x,-1,1)$. The boundary layer $\phi > 0$ replaces the
-discontinuous sign function with saturation to prevent chattering. Both terms carry a leading minus
-sign because the error is measured as $i - i^*$: a current below its reference gives $e < 0$ and
-must command a *positive* voltage.
+where $\mathrm{sat}(x) = \mathrm{clamp}(x,-1,1)$. Because $B_d^i = (1 - A_d^i)/R_s$, the last term is
+exactly $R_s i^*[k]$ — the resistive drop the reference current requires. All terms carry a leading
+minus sign on the error because it is measured as $i - i^*$: a current below its reference gives
+$e < 0$ and must command a *positive* voltage. The boundary layer $\phi > 0$ replaces the
+discontinuous sign function with saturation to prevent chattering.
 
-**Total control law**:
-
-$$
-u[k] = u_{eq}[k] + u_{sw}[k]
-$$
+The toolbox's `SlidingModeControl` computes its equivalent term as $-(S B)^{-1} S A\, e$, i.e. it
+cancels whatever the state matrix it is given predicts. It is handed $A_d^i - \lambda$, not
+$A_d^i$. Handing it $A_d^i$ — the form this law shipped with — makes the equivalent term deadbeat:
+it drives the next error to zero on its own, and the switching term then pushes the error
+$K_{sw}$ past zero every time it leaves the boundary layer. From rest a step of $\phi$ overshot by
+$K_{sw}/\phi$, 40 % with the shipped defaults, and oscillated with ratio $-K_{sw}/\phi$ after that;
+the SIL measured 46–50 % on a 0.5 A step.
 
 **Parameter choices**:
+- $\lambda$ follows the current-loop bandwidth, so large steps approach the surface at the loop's
+  own rate rather than at the fixed $K_{sw}$ per sample.
 - $K_{sw}$: must exceed the worst-case disturbance. Because $u_{sw}$ is obtained by dividing by
   $B_d^i$, the gain carries the same unit as the sliding surface (A). Sizing it so the switching
   term commands at most 30% of the maximum phase voltage $V_{dc}/\sqrt{3}$ gives the starting point:
@@ -113,18 +113,12 @@ $$
 - $\phi$: boundary layer width (A). Typical: $0.1$–$0.5$ A. Smaller gives tighter tracking but
   more high-frequency actuation.
 
-**Discrete stability constraint** — this bounds both parameters together and is not optional. Inside
-the boundary layer $\mathrm{sat}(e/\phi) = e/\phi$, so the equivalent term cancels the plant pole
-and the closed-loop error obeys
-
-$$
-e[k+1] = -\frac{K_{sw}}{\phi}\, e[k]
-$$
-
-The error therefore contracts **only if $K_{sw} < \phi$**. A ratio at or above unity makes the
-discrete loop diverge no matter how the equivalent term is computed, so the sizing rule above must be
-capped by this constraint. The shipped defaults are $K_{sw} = 0.2$ A and $\phi = 0.5$ A, a ratio of
-$0.4$.
+**Discrete stability constraint** — this bounds the parameters together and is not optional. Inside
+the boundary layer the error obeys $e[k+1] = (\lambda - K_{sw}/\phi)\, e[k]$. It contracts
+monotonically, without crossing the surface, when $0 \le \lambda - K_{sw}/\phi < 1$, i.e.
+$K_{sw} \le \lambda\,\phi$; it still converges, alternating in sign, while $K_{sw} < (1 + \lambda)\,\phi$.
+The shipped defaults are $K_{sw} = 0.2$ A and $\phi = 0.5$ A; at the default bandwidth
+$\lambda \approx 0.73$, so the ratio $0.4$ leaves a monotonic approach.
 
 **Robustness**: Insensitive to $R_s/L_s$ mismatch as long as mismatch is bounded by $K_{sw}$.
 Covers $\pm 50\%$ thermal variation in $R_s$ and the initial RLS convergence transient.

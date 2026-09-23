@@ -115,7 +115,7 @@ The observer interface provides callbacks for:
 - `OnSetPidCurrent`, `OnSetPidSpeed`, `OnSetPidPosition` — receive a bandwidth parameter parsed from the CAN frame and forward to the corresponding `TrySet*Bandwidth` on `ControlModeStateMachine`.
 - `OnIdentifyElectrical` — calls `CmdReserveExternalCalibration()` before starting estimation; `invalidState` if rejected; on estimation success calls `CmdCompleteExternalCalibration()` and broadcasts `focElectricalParamsResponseId`.
 - `OnIdentifyMechanical` — calls `ActiveCalibrationData()` to obtain pole pairs and guard the state in one step; `invalidState` if not in `Ready`; on success broadcasts `focMechanicalParamsResponseId`.
-- `OnRequestTelemetry` — broadcasts current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`. Position is read from the encoder; speed is reported as zero unless the active mode runs an outer loop that measures it.
+- `OnRequestTelemetry` — broadcasts current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`. Position is read from the encoder; speed is the active mode's `ObserveMotion().measuredSpeed` — the outer loop's window speed in speed and position mode, the interrupt's filtered speed in torque mode (REQ-INT-014).
 - `OnSetEncoderResolution`, `OnConfigureTelemetryRate` — validate payload, update and persist `ConfigData` via `NonVolatileMemory`.
 
 ### Part C — FocMotorCategoryClient
