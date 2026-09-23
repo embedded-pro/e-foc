@@ -96,7 +96,9 @@ When a speed-reference position law is active, the speed setpoint consumed by th
 
 The inner loop is functionally identical to the FOC Torque Control design document: Clarke, Park, d-axis PID, q-axis PID, inverse Park, and SVM. It runs independently at 20 kHz and reads its Iq setpoint from the value most recently written by the middle loop.
 
-The d-axis setpoint is always 0 A.
+The d-axis setpoint is 0 A, except while an online electrical estimator is attached: the cascade then
+adds a ±2.5 % of maxCurrent, 10 Hz square wave so the winding resistance stays observable (see
+`service-electrical-ident.md`, Excitation).
 
 ### Enable and Disable
 
@@ -149,19 +151,19 @@ This ordering guarantees that the Iq setpoint used by the inner loop is always t
 
 ## Data Model
 
-| Entity              | Field        | Type / Unit              | Range                | Notes                                                               |
-|---------------------|--------------|--------------------------|----------------------|---------------------------------------------------------------------|
-| Position setpoint   | θ_sp         | Radians (float)          | Application-defined  | Not wrapped — application must supply single-turn-compatible target |
-| Actual position     | θm           | Radians (float)          | [0, 2π)              | Mechanical angle from encoder                                       |
-| Position PID output | ω_sp         | RadiansPerSecond (float) | [−bw·π, +bw·π] rad/s | Clamped speed setpoint; saturation = one speed-loop bandwidth per π rad of error |
-| Estimated speed     | ω            | RadiansPerSecond (float) | computed from Δθ/Δt  | Finite difference with ±π wrap correction                           |
-| Speed PID output    | Iq_sp        | Ampere (float)           | ± maxCurrent         | Written to inner loop                                               |
-| d-axis setpoint     | Id_sp        | Ampere (float)           | 0 A fixed            | SPMSM maximum torque per ampere                                     |
-| Previous angle      | θm_prev      | Radians (float)          | [0, 2π)              | Saved each outer cycle for speed estimator                          |
-| Outer loop period   | Δt           | Seconds (float)          | 1 / outer_frequency  | Constant after construction                                         |
-| Pole pairs          | P            | Integer (unsigned)       | ≥ 1                  | Motor property                                                      |
-| Max current         | maxCurrent   | Ampere (float)           | > 0                  | Upper bound on Iq setpoint from speed PID                           |
-| Speed clamp         | ± bandwidth·π rad/s | RadiansPerSecond (float) | derived from speed-loop bandwidth | Position PID output saturation; determines approach speed cap |
+| Entity              | Field               | Type / Unit              | Range                                    | Notes                                                                            |
+|---------------------|---------------------|--------------------------|------------------------------------------|----------------------------------------------------------------------------------|
+| Position setpoint   | θ_sp                | Radians (float)          | Application-defined                      | Not wrapped — application must supply single-turn-compatible target              |
+| Actual position     | θm                  | Radians (float)          | [0, 2π)                                  | Mechanical angle from encoder                                                    |
+| Position PID output | ω_sp                | RadiansPerSecond (float) | [−bw·π, +bw·π] rad/s                     | Clamped speed setpoint; saturation = one speed-loop bandwidth per π rad of error |
+| Estimated speed     | ω                   | RadiansPerSecond (float) | computed from Δθ/Δt                      | Finite difference with ±π wrap correction                                        |
+| Speed PID output    | Iq_sp               | Ampere (float)           | ± maxCurrent                             | Written to inner loop                                                            |
+| d-axis setpoint     | Id_sp               | Ampere (float)           | 0 A; ±2.5 % Imax at 10 Hz with estimator | SPMSM maximum torque per ampere                                                  |
+| Previous angle      | θm_prev             | Radians (float)          | [0, 2π)                                  | Saved each outer cycle for speed estimator                                       |
+| Outer loop period   | Δt                  | Seconds (float)          | 1 / outer_frequency                      | Constant after construction                                                      |
+| Pole pairs          | P                   | Integer (unsigned)       | ≥ 1                                      | Motor property                                                                   |
+| Max current         | maxCurrent          | Ampere (float)           | > 0                                      | Upper bound on Iq setpoint from speed PID                                        |
+| Speed clamp         | ± bandwidth·π rad/s | RadiansPerSecond (float) | derived from speed-loop bandwidth        | Position PID output saturation; determines approach speed cap                    |
 
 ---
 
