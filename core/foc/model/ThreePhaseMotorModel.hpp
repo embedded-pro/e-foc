@@ -177,7 +177,7 @@ namespace foc
         {
             bool driving{ false };
             bool cycleScheduled{ false };
-            foc::PhasePwmDutyCycles pendingDuties{ hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f } };
+            foc::PhasePwmDutyCycles pendingDuties{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) };
         };
 
         Parameters parameters;

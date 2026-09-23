@@ -1,18 +1,7 @@
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/services/InjectionCurrentLimit.hpp"
+#include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include <cmath>
-
-namespace
-{
-    foc::PhasePwmDutyCycles NormalizedDutyCycles(foc::ThreePhase voltages)
-    {
-        auto offset = 50.0f;
-        auto dutyA = std::clamp(offset + voltages.a * 50.0f, 0.0f, 100.0f);
-        auto dutyB = std::clamp(offset + voltages.b * 50.0f, 0.0f, 100.0f);
-        auto dutyC = std::clamp(offset + voltages.c * 50.0f, 0.0f, 100.0f);
-        return foc::PhasePwmDutyCycles{ hal::FractionalPercent{ dutyA }, hal::FractionalPercent{ dutyB }, hal::FractionalPercent{ dutyC } };
-    }
-}
 
 namespace services
 {
@@ -47,11 +36,11 @@ namespace services
 
     void MotorAlignmentImpl::ApplyAlignmentVoltage()
     {
-        auto voltage = static_cast<float>(alignmentConfig.testVoltagePercent.Value()) / 100.0f;
+        auto voltage = foc::DutyFraction(alignmentConfig.testVoltage);
         auto electricalAngle = alignmentAngle;
 
         driver.Stop();
-        driver.ThreePhasePwmOutput(NormalizedDutyCycles(
+        driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, std::cos(electricalAngle), std::sin(electricalAngle))));
 
         driver.PhaseCurrentsReady(alignmentConfig.samplingFrequency, [this](auto currents)

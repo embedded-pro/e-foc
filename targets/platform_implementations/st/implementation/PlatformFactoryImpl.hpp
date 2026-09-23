@@ -126,7 +126,7 @@ namespace application
             // Implementation of hal::ThreeChannelsPwm
             void SetBaseFrequency(hal::Hertz baseFrequency) override;
             void Stop() override;
-            void Start(hal::FractionalPercent dutyCycle1, hal::FractionalPercent dutyCycle2, hal::FractionalPercent dutyCycle3) override;
+            void Start(hal::DutyCycle dutyCycle1, hal::DutyCycle dutyCycle2, hal::DutyCycle dutyCycle3) override;
         };
 
         class SynchronousQuadratureEncoderStub

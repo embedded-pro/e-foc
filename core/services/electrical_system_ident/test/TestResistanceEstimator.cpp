@@ -9,11 +9,17 @@ namespace
 {
     using namespace testing;
 
+    // Duties built from floats and from percentages may round to neighbouring Q16 steps
+    bool WithinOneStep(hal::DutyCycle actual, hal::DutyCycle expected)
+    {
+        return (actual.Value() > expected.Value() ? actual.Value() - expected.Value() : expected.Value() - actual.Value()) <= 1;
+    }
+
     MATCHER_P(PhasePwmDutyCyclesEq, expected, "")
     {
-        return std::abs(arg.a.Value() - expected.a.Value()) < 1e-3f &&
-               std::abs(arg.b.Value() - expected.b.Value()) < 1e-3f &&
-               std::abs(arg.c.Value() - expected.c.Value()) < 1e-3f;
+        return WithinOneStep(arg.a, expected.a) &&
+               WithinOneStep(arg.b, expected.b) &&
+               WithinOneStep(arg.c, expected.c);
     }
 
     class ResistanceEstimatorTest
@@ -30,12 +36,12 @@ namespace
 TEST_F(ResistanceEstimatorTest, start_applies_test_voltage_and_registers_blank_callback)
 {
     services::ResistanceEstimator::Config config{
-        hal::Percent{ 15 }, std::chrono::seconds{ 1 }, services::WindingConfiguration::Wye
+        hal::DutyCycle::FromPercent(15), std::chrono::seconds{ 1 }, services::WindingConfiguration::Wye
     };
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, _));
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(foc::PhasePwmDutyCycles{
-                                hal::FractionalPercent{ 15.0f }, hal::FractionalPercent{ 1.0f }, hal::FractionalPercent{ 1.0f } })));
+                                hal::DutyCycle::FromPercent(15), hal::DutyCycle::FromPercent(1), hal::DutyCycle::FromPercent(1) })));
     EXPECT_CALL(driverMock, Stop());
 
     estimator.Start(config, [](auto) {});
@@ -44,7 +50,7 @@ TEST_F(ResistanceEstimatorTest, start_applies_test_voltage_and_registers_blank_c
 TEST_F(ResistanceEstimatorTest, registers_sampling_callback_after_settle_time)
 {
     services::ResistanceEstimator::Config config{
-        hal::Percent{ 20 }, std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye,
+        hal::DutyCycle::FromPercent(20), std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye,
         std::chrono::seconds{ 1 }
     };
 
@@ -55,7 +61,7 @@ TEST_F(ResistanceEstimatorTest, registers_sampling_callback_after_settle_time)
                 driverMock.StorePhaseCurrentsCallback(cb);
             });
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(foc::PhasePwmDutyCycles{
-                                hal::FractionalPercent{ 20.0f }, hal::FractionalPercent{ 1.0f }, hal::FractionalPercent{ 1.0f } })));
+                                hal::DutyCycle::FromPercent(20), hal::DutyCycle::FromPercent(1), hal::DutyCycle::FromPercent(1) })));
     EXPECT_CALL(driverMock, Stop());
 
     estimator.Start(config, [](auto) {});
@@ -65,7 +71,7 @@ TEST_F(ResistanceEstimatorTest, registers_sampling_callback_after_settle_time)
 TEST_F(ResistanceEstimatorTest, recovers_resistance_from_settled_current)
 {
     services::ResistanceEstimator::Config config{
-        hal::Percent{ 15 }, std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
+        hal::DutyCycle::FromPercent(15), std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
     };
 
     const float testVoltage = 0.14f * vdc.Value();
@@ -101,7 +107,7 @@ TEST_F(ResistanceEstimatorTest, recovers_resistance_from_settled_current)
 TEST_F(ResistanceEstimatorTest, returns_no_resistance_for_zero_current)
 {
     services::ResistanceEstimator::Config config{
-        hal::Percent{ 10 }, std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
+        hal::DutyCycle::FromPercent(10), std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
     };
 
     services::ResistanceEstimator::Result result{ foc::Ohm{ 1.0f } };
@@ -132,7 +138,7 @@ TEST_F(ResistanceEstimatorTest, returns_no_resistance_for_zero_current)
 TEST_F(ResistanceEstimatorTest, an_overcurrent_sample_while_settling_aborts_with_an_empty_result)
 {
     services::ResistanceEstimator::Config config{
-        hal::Percent{ 15 }, std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
+        hal::DutyCycle::FromPercent(15), std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
     };
 
     std::optional<services::ResistanceEstimator::Result> result;
@@ -167,7 +173,7 @@ TEST_F(ResistanceEstimatorTest, an_overcurrent_sample_while_settling_aborts_with
 TEST_F(ResistanceEstimatorTest, an_overcurrent_sample_while_measuring_aborts_with_an_empty_result)
 {
     services::ResistanceEstimator::Config config{
-        hal::Percent{ 15 }, std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
+        hal::DutyCycle::FromPercent(15), std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
     };
 
     std::optional<services::ResistanceEstimator::Result> result;
@@ -201,7 +207,7 @@ TEST_F(ResistanceEstimatorTest, an_overcurrent_sample_while_measuring_aborts_wit
 TEST_F(ResistanceEstimatorTest, recovers_resistance_for_low_resistance_motor)
 {
     services::ResistanceEstimator::Config config{
-        hal::Percent{ 15 }, std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
+        hal::DutyCycle::FromPercent(15), std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
     };
 
     const float testVoltage = 0.14f * vdc.Value();
@@ -237,7 +243,7 @@ TEST_F(ResistanceEstimatorTest, recovers_resistance_for_low_resistance_motor)
 TEST_F(ResistanceEstimatorTest, no_sample_timeout_aborts_if_no_adc_callback_after_settle)
 {
     services::ResistanceEstimator::Config config{
-        hal::Percent{ 15 }, std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye,
+        hal::DutyCycle::FromPercent(15), std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye,
         std::chrono::milliseconds{ 100 }
     };
 
@@ -267,7 +273,7 @@ TEST_F(ResistanceEstimatorTest, no_sample_timeout_aborts_if_no_adc_callback_afte
 TEST_F(ResistanceEstimatorTest, sample_watchdog_fires_once_samples_stop_arriving)
 {
     services::ResistanceEstimator::Config config{
-        hal::Percent{ 15 }, std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye,
+        hal::DutyCycle::FromPercent(15), std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye,
         std::chrono::milliseconds{ 100 }
     };
 
@@ -301,7 +307,7 @@ TEST_F(ResistanceEstimatorTest, sample_watchdog_fires_once_samples_stop_arriving
 TEST_F(ResistanceEstimatorTest, no_sample_timeout_fires_during_settle_if_no_adc_callback)
 {
     services::ResistanceEstimator::Config config{
-        hal::Percent{ 15 }, std::chrono::seconds{ 2 }, services::WindingConfiguration::Wye,
+        hal::DutyCycle::FromPercent(15), std::chrono::seconds{ 2 }, services::WindingConfiguration::Wye,
         std::chrono::milliseconds{ 100 }
     };
 
@@ -329,7 +335,7 @@ TEST_F(ResistanceEstimatorTest, no_sample_timeout_fires_during_settle_if_no_adc_
 TEST_F(ResistanceEstimatorTest, destructor_stops_driver_when_destroyed_while_active)
 {
     services::ResistanceEstimator::Config config{
-        hal::Percent{ 15 }, std::chrono::seconds{ 2 }, services::WindingConfiguration::Wye,
+        hal::DutyCycle::FromPercent(15), std::chrono::seconds{ 2 }, services::WindingConfiguration::Wye,
         std::chrono::seconds{ 5 }
     };
 

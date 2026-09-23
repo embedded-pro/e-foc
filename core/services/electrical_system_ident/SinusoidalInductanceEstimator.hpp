@@ -17,7 +17,7 @@ namespace services
         struct Config
         {
             hal::Hertz injectionFrequency{ 700 };
-            hal::Percent injectionVoltagePercent{ 15 };
+            hal::DutyCycle injectionVoltage{ hal::DutyCycle::FromPercent(15) };
             std::size_t warmupPeriods{ 5 };
             std::size_t measurementPeriods{ 20 };
             std::size_t voltageToCurrentDelaySamples{ 1 };

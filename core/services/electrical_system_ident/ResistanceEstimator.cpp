@@ -1,4 +1,5 @@
 #include "core/services/electrical_system_ident/ResistanceEstimator.hpp"
+#include "core/foc/math/DutyConversion.hpp"
 #include "core/services/InjectionCurrentLimit.hpp"
 #include <numeric>
 
@@ -60,9 +61,9 @@ namespace services
                     FailMeasurement();
             });
         driver.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{
-            hal::FractionalPercent{ static_cast<float>(activeConfig.testVoltagePercent.Value()) },
-            hal::FractionalPercent{ static_cast<float>(neutralDuty) },
-            hal::FractionalPercent{ static_cast<float>(neutralDuty) } });
+            activeConfig.testVoltage,
+            neutralDuty,
+            neutralDuty });
 
         StartSampleWatchdog();
         settleTimer.Start(activeConfig.settleTime, [this]()
@@ -148,8 +149,8 @@ namespace services
             return;
         }
 
-        const auto appliedDuty = static_cast<float>(activeConfig.testVoltagePercent.Value() - neutralDuty);
-        const float terminalVoltage = appliedDuty * vdc.Value() / 100.0f;
+        const auto appliedDuty = foc::DutyFraction(activeConfig.testVoltage) - foc::DutyFraction(neutralDuty);
+        const float terminalVoltage = appliedDuty * vdc.Value();
         const float terminalFactor = activeConfig.windingConfig == WindingConfiguration::Delta
                                          ? deltaTerminalFactor
                                          : wyeTerminalFactor;

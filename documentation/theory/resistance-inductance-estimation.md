@@ -265,7 +265,7 @@ absent.
 | Property              | DC Step (R)                               | HF Sinusoidal (L)                                    |
 |-----------------------|-------------------------------------------|------------------------------------------------------|
 | Sampling rate         | 10 kHz                                    | 10 kHz                                               |
-| Excitation            | Differential DC step (testVoltagePercent) | Alpha-axis sine at $f_{inj}$ (default 700 Hz)        |
+| Excitation            | Differential DC step (testVoltage)        | Alpha-axis sine at $f_{inj}$ (default 700 Hz)        |
 | Working memory        | 5-sample deque + 123-sample buffer        | 3 floats (Goertzel state) + sumSquared + sampleCount |
 | Settling required     | $\geq 5\tau$ before R is valid            | warmupPeriods full cycles (rotor transient decay)    |
 | Result quality gate   | $I_{ss} > 0$                              | fitQuality $\geq 0.5$                                |

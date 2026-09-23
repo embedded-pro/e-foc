@@ -1,12 +1,18 @@
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/foc/interfaces/test_doubles/OnlineEstimatorsMock.hpp"
+#include "core/foc/math/DutyConversion.hpp"
 #include <gmock/gmock.h>
 #include <numbers>
 
 namespace
 {
     using namespace testing;
+
+    float DutyPercent(hal::DutyCycle duty)
+    {
+        return 100.0f * foc::DutyFraction(duty);
+    }
 
     constexpr uint32_t baseFrequencyValue = 20000;
     const hal::Hertz baseFrequency{ baseFrequencyValue };
@@ -71,35 +77,35 @@ namespace
 
     void ExpectValidDuty(const foc::PhasePwmDutyCycles& duty)
     {
-        EXPECT_LE(duty.a.Value(), 100);
-        EXPECT_LE(duty.b.Value(), 100);
-        EXPECT_LE(duty.c.Value(), 100);
+        EXPECT_LE(DutyPercent(duty.a), 100);
+        EXPECT_LE(DutyPercent(duty.b), 100);
+        EXPECT_LE(DutyPercent(duty.c), 100);
     }
 
     void ExpectCentredDuty(const foc::PhasePwmDutyCycles& duty)
     {
-        EXPECT_NEAR(duty.a.Value(), 50, tolerance);
-        EXPECT_NEAR(duty.b.Value(), 50, tolerance);
-        EXPECT_NEAR(duty.c.Value(), 50, tolerance);
+        EXPECT_NEAR(DutyPercent(duty.a), 50, tolerance);
+        EXPECT_NEAR(DutyPercent(duty.b), 50, tolerance);
+        EXPECT_NEAR(DutyPercent(duty.c), 50, tolerance);
     }
 
     void ExpectSameDuty(const foc::PhasePwmDutyCycles& duty, const foc::PhasePwmDutyCycles& expected)
     {
-        EXPECT_EQ(duty.a.Value(), expected.a.Value());
-        EXPECT_EQ(duty.b.Value(), expected.b.Value());
-        EXPECT_EQ(duty.c.Value(), expected.c.Value());
+        EXPECT_EQ(DutyPercent(duty.a), DutyPercent(expected.a));
+        EXPECT_EQ(DutyPercent(duty.b), DutyPercent(expected.b));
+        EXPECT_EQ(DutyPercent(duty.c), DutyPercent(expected.c));
     }
 
     bool DutiesDiffer(const foc::PhasePwmDutyCycles& left, const foc::PhasePwmDutyCycles& right)
     {
-        return left.a.Value() != right.a.Value() ||
-               left.b.Value() != right.b.Value() ||
-               left.c.Value() != right.c.Value();
+        return DutyPercent(left.a) != DutyPercent(right.a) ||
+               DutyPercent(left.b) != DutyPercent(right.b) ||
+               DutyPercent(left.c) != DutyPercent(right.c);
     }
 
     void ExpectOffCentreDuty(const foc::PhasePwmDutyCycles& duty)
     {
-        EXPECT_TRUE(DutiesDiffer(duty, foc::PhasePwmDutyCycles{ hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f } }));
+        EXPECT_TRUE(DutiesDiffer(duty, foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) }));
     }
 
     struct SpeedCascadeUnderTest
@@ -239,9 +245,9 @@ TEST_F(TestSpeedCascade, different_positions_produce_different_outputs)
     foc::Radians position2{ 1.0f };
     auto result2 = focSpeed->Calculate(ZeroCurrents(), position2);
 
-    bool anyDifferent = (result1.a.Value() != result2.a.Value()) ||
-                        (result1.b.Value() != result2.b.Value()) ||
-                        (result1.c.Value() != result2.c.Value());
+    bool anyDifferent = (DutyPercent(result1.a) != DutyPercent(result2.a)) ||
+                        (DutyPercent(result1.b) != DutyPercent(result2.b)) ||
+                        (DutyPercent(result1.c) != DutyPercent(result2.c));
 
     EXPECT_TRUE(anyDifferent);
 }

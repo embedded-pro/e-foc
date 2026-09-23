@@ -373,9 +373,11 @@ every scenario in the suite now runs in the default set.
   0.20 mH winding one step is 0.4 V and about a tenth of an ampere of ripple per control period,
   so the current loop held a half-ampere setpoint inside a band of about 30 % of it and could
   not settle into a 10 % one. The hardware was no better: the TI driver computed its compare
-  value as `load × duty / 100` in integers. The PWM interfaces now take
-  `hal::FractionalPercent`, a float on the same scale, through the infrastructure library and
-  both hardware abstraction layers, and the TI and ST drivers round the compare value from it;
+  value as `load × duty / 100` in integers. The PWM interfaces now take `hal::DutyCycle`, an
+  integer Q16 fraction of the period (65536 is 100 %), through the infrastructure library and
+  both hardware abstraction layers — integer so that no driver needs floating point, and Q16 so
+  that its conversion to counts is a multiply and a shift, never a division, in the interrupt.
+  Each driver rounds its compare value with the same `DutyCycle::ToCounts` helper;
   the TI platform also clocks its PWM at half the system clock rather than an eighth, so a
   20 kHz centre-aligned period spans 1500 counts on the 120 MHz part (0.07 % a count) instead
   of 375. The deadbeat law now settles into a 10 % band within a sample with under 5 %

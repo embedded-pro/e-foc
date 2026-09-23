@@ -22,11 +22,11 @@ namespace services
 
         struct ResistanceAndInductanceConfig
         {
-            hal::Percent testVoltagePercent{ 15 };
+            hal::DutyCycle testVoltage{ hal::DutyCycle::FromPercent(15) };
             infra::Duration settleTime{ std::chrono::seconds{ 2 } };
             WindingConfiguration windingConfig{ WindingConfiguration::Wye };
             hal::Hertz injectionFrequency{ 700 };
-            hal::Percent injectionVoltagePercent{ 15 };
+            hal::DutyCycle injectionVoltage{ hal::DutyCycle::FromPercent(15) };
             std::size_t warmupPeriods{ 5 };
             std::size_t measurementPeriods{ 20 };
             std::size_t voltageToCurrentDelaySamples{ 1 };
@@ -41,7 +41,7 @@ namespace services
 
         struct PolePairsConfig
         {
-            hal::Percent testVoltagePercent{ 10 };
+            hal::DutyCycle testVoltage{ hal::DutyCycle::FromPercent(10) };
             std::size_t electricalRevolutions{ 5 };
             infra::Duration settleTimeBetweenSteps{ std::chrono::milliseconds{ 50 } };
         };

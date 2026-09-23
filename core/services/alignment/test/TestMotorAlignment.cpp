@@ -10,11 +10,17 @@ namespace
 {
     using namespace testing;
 
+    // Duties built from floats and from percentages may round to neighbouring Q16 steps
+    bool WithinOneStep(hal::DutyCycle actual, hal::DutyCycle expected)
+    {
+        return (actual.Value() > expected.Value() ? actual.Value() - expected.Value() : expected.Value() - actual.Value()) <= 1;
+    }
+
     MATCHER_P(PhasePwmDutyCyclesEq, expected, "")
     {
-        return std::abs(arg.a.Value() - expected.a.Value()) < 1e-3f &&
-               std::abs(arg.b.Value() - expected.b.Value()) < 1e-3f &&
-               std::abs(arg.c.Value() - expected.c.Value()) < 1e-3f;
+        return WithinOneStep(arg.a, expected.a) &&
+               WithinOneStep(arg.b, expected.b) &&
+               WithinOneStep(arg.c, expected.c);
     }
 
     class MotorAlignmentTest
@@ -31,13 +37,13 @@ namespace
 TEST_F(MotorAlignmentTest, ForceAlignment_ConfiguresCorrectPwmDutyCycles)
 {
     services::MotorAlignmentImpl::AlignmentConfig config;
-    config.testVoltagePercent = hal::Percent{ 20 };
+    config.testVoltage = hal::DutyCycle::FromPercent(20);
     std::size_t polePairs = 7;
 
     foc::PhasePwmDutyCycles expectedPwm{
-        hal::FractionalPercent{ 60.0f },
-        hal::FractionalPercent{ 45.0f },
-        hal::FractionalPercent{ 45.0f }
+        hal::DutyCycle::FromPercent(60),
+        hal::DutyCycle::FromPercent(45),
+        hal::DutyCycle::FromPercent(45)
     };
 
     EXPECT_CALL(encoderMock, Read()).Times(1);
@@ -61,7 +67,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ConfiguresCorrectPwmDutyCycles)
 TEST_F(MotorAlignmentTest, ForceAlignment_ReturnsNulloptWhenTimeoutOccurs)
 {
     services::MotorAlignmentImpl::AlignmentConfig config;
-    config.testVoltagePercent = hal::Percent{ 20 };
+    config.testVoltage = hal::DutyCycle::FromPercent(20);
     config.maxSamples = 10;
     config.settledThreshold = foc::Radians{ 0.001f };
     config.settledCount = 5;
@@ -98,7 +104,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ReturnsNulloptWhenTimeoutOccurs)
 TEST_F(MotorAlignmentTest, ForceAlignment_ConvergesWhenPositionStable)
 {
     services::MotorAlignmentImpl::AlignmentConfig config;
-    config.testVoltagePercent = hal::Percent{ 20 };
+    config.testVoltage = hal::DutyCycle::FromPercent(20);
     config.maxSamples = 100;
     config.settledThreshold = foc::Radians{ 0.001f };
     config.settledCount = 5;
@@ -140,7 +146,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ConvergesWhenPositionStable)
 TEST_F(MotorAlignmentTest, ForceAlignment_CalculatesCorrectOffsetForDifferentPolePairs)
 {
     services::MotorAlignmentImpl::AlignmentConfig config;
-    config.testVoltagePercent = hal::Percent{ 20 };
+    config.testVoltage = hal::DutyCycle::FromPercent(20);
     config.settledThreshold = foc::Radians{ 0.001f };
     config.settledCount = 3;
     std::size_t polePairs = 4;
@@ -175,7 +181,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_CalculatesCorrectOffsetForDifferentPol
 TEST_F(MotorAlignmentTest, ForceAlignment_ResetsCounterWhenPositionChanges)
 {
     services::MotorAlignmentImpl::AlignmentConfig config;
-    config.testVoltagePercent = hal::Percent{ 20 };
+    config.testVoltage = hal::DutyCycle::FromPercent(20);
     config.maxSamples = 100;
     config.settledThreshold = foc::Radians{ 0.001f };
     config.settledCount = 5;
@@ -216,13 +222,13 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ResetsCounterWhenPositionChanges)
 TEST_F(MotorAlignmentTest, ForceAlignment_WithCustomVoltagePercent)
 {
     services::MotorAlignmentImpl::AlignmentConfig config;
-    config.testVoltagePercent = hal::Percent{ 30 };
+    config.testVoltage = hal::DutyCycle::FromPercent(30);
     std::size_t polePairs = 7;
 
     foc::PhasePwmDutyCycles expectedPwm{
-        hal::FractionalPercent{ 65.0f },
-        hal::FractionalPercent{ 42.5f },
-        hal::FractionalPercent{ 42.5f }
+        hal::DutyCycle::FromPercent(65),
+        hal::DutyCycle{ hal::DutyCycle::fullScale * 425 / 1000 },
+        hal::DutyCycle{ hal::DutyCycle::fullScale * 425 / 1000 }
     };
 
     EXPECT_CALL(encoderMock, Read()).Times(1);
@@ -246,7 +252,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_WithCustomVoltagePercent)
 TEST_F(MotorAlignmentTest, ForceAlignment_WithCustomSamplingFrequency)
 {
     services::MotorAlignmentImpl::AlignmentConfig config;
-    config.testVoltagePercent = hal::Percent{ 20 };
+    config.testVoltage = hal::DutyCycle::FromPercent(20);
     config.samplingFrequency = hal::Hertz{ 2000 };
     std::size_t polePairs = 7;
 
@@ -346,7 +352,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_WithZeroPosition)
 TEST_F(MotorAlignmentTest, ForceAlignment_AbortsWhenTheInjectedCurrentExceedsTheInverterLimit)
 {
     services::MotorAlignmentImpl::AlignmentConfig config;
-    config.testVoltagePercent = hal::Percent{ 20 };
+    config.testVoltage = hal::DutyCycle::FromPercent(20);
     config.maxSamples = 100;
     config.settledThreshold = foc::Radians{ 0.001f };
     config.settledCount = 5;
@@ -379,7 +385,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_AbortsWhenTheInjectedCurrentExceedsThe
 TEST_F(MotorAlignmentTest, ForceAlignment_AbortsOnOvercurrentInAnyPhaseAndInEitherDirection)
 {
     services::MotorAlignmentImpl::AlignmentConfig config;
-    config.testVoltagePercent = hal::Percent{ 20 };
+    config.testVoltage = hal::DutyCycle::FromPercent(20);
     config.maxSamples = 100;
     config.settledThreshold = foc::Radians{ 0.001f };
     config.settledCount = 5;
@@ -425,7 +431,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_AbortsOnOvercurrentInAnyPhaseAndInEith
 TEST_F(MotorAlignmentTest, ForceAlignment_ContinuesWhileTheInjectedCurrentStaysWithinTheLimit)
 {
     services::MotorAlignmentImpl::AlignmentConfig config;
-    config.testVoltagePercent = hal::Percent{ 20 };
+    config.testVoltage = hal::DutyCycle::FromPercent(20);
     config.maxSamples = 100;
     config.settledThreshold = foc::Radians{ 0.001f };
     config.settledCount = 5;

@@ -1,5 +1,6 @@
 #include "core/foc/instantiations/Runner.hpp"
 #include "core/foc/interfaces/test_doubles/FocMock.hpp"
+#include "core/foc/math/DutyConversion.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -10,9 +11,14 @@ namespace
     using testing::_;
     using testing::Return;
 
+    float DutyPercent(hal::DutyCycle duty)
+    {
+        return 100.0f * foc::DutyFraction(duty);
+    }
+
     MATCHER_P(DutiesEqual, expected, "")
     {
-        return arg.a.Value() == expected.a.Value() && arg.b.Value() == expected.b.Value() && arg.c.Value() == expected.c.Value();
+        return DutyPercent(arg.a) == DutyPercent(expected.a) && DutyPercent(arg.b) == DutyPercent(expected.b) && DutyPercent(arg.c) == DutyPercent(expected.c);
     }
 
     class TestRunner
@@ -80,7 +86,7 @@ TEST_F(TestRunner, PhaseCurrentsCallbackReadsEncoderCalculatesFocAndOutputsPwm)
     foc::Runner<foc::FocTorqueMock> runner{ inverterMock, encoderMock, focMock };
 
     const foc::PhaseCurrents testCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } };
-    const foc::PhasePwmDutyCycles expectedDuties{ hal::FractionalPercent{ 60.0f }, hal::FractionalPercent{ 30.0f }, hal::FractionalPercent{ 10.0f } };
+    const foc::PhasePwmDutyCycles expectedDuties{ hal::DutyCycle::FromPercent(60), hal::DutyCycle::FromPercent(30), hal::DutyCycle::FromPercent(10) };
 
     {
         testing::InSequence seq;
@@ -217,7 +223,7 @@ TEST_F(TestRunner, PhaseCurrentsAreDispatchedToTheControlLaw)
     runner.Enable();
 
     EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
-    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f } }));
+    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) }));
     EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
 
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
@@ -259,7 +265,7 @@ TEST_F(TestRunner, RegisteredObserverSeesThePhaseCurrentsAfterTheDutiesAreWritte
         });
 
     EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
-    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f } }));
+    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) }));
     EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_)).WillOnce([&](const foc::PhasePwmDutyCycles&)
         {
             dutiesWritten = true;
@@ -290,7 +296,7 @@ TEST_F(TestRunner, UnregisteredObserverIsNotCalled)
     runner.UnregisterPhaseCurrentsObserver();
 
     EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
-    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f } }));
+    EXPECT_CALL(focMock, Calculate(_, _)).WillOnce(Return(foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) }));
     EXPECT_CALL(inverterMock, ThreePhasePwmOutput(_));
 
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });

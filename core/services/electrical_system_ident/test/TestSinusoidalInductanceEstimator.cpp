@@ -1,4 +1,5 @@
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
+#include "core/foc/math/DutyConversion.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/electrical_system_ident/SinusoidalInductanceEstimator.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
@@ -45,7 +46,7 @@ namespace
         const float omegaExact = twoPi * fs / static_cast<float>(samplesPerPeriod);
         const float phaseInc = omegaExact / fs; // = 2π / samplesPerPeriod
 
-        const float vNorm = static_cast<float>(config.injectionVoltagePercent.Value()) / 100.0f;
+        const float vNorm = foc::DutyFraction(config.injectionVoltage);
         const float vTermAmp = vNorm * 0.75f * vdc;
         const auto totalSamples = (config.warmupPeriods + config.measurementPeriods) * samplesPerPeriod;
 
@@ -115,7 +116,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, start_registers_phase_current_callback
 TEST_F(SinusoidalInductanceEstimatorTest, zero_current_response_returns_no_inductance)
 {
     services::SinusoidalInductanceEstimator::Config config{
-        hal::Hertz{ 700 }, hal::Percent{ 15 }, 2, 5, 1, services::WindingConfiguration::Wye
+        hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 2, 5, 1, services::WindingConfiguration::Wye
     };
 
     const float fInj = static_cast<float>(config.injectionFrequency.Value());
@@ -152,7 +153,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_o
     const float lTerminalMH = 0.75f;
 
     services::SinusoidalInductanceEstimator::Config config{
-        hal::Hertz{ 700 }, hal::Percent{ 15 }, 5, 20, 1, services::WindingConfiguration::Wye
+        hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 5, 20, 1, services::WindingConfiguration::Wye
     };
 
     auto [result, expectedL] = RunPlantSimulation(driverMock, estimator, config, rTerminal, lTerminalMH);
@@ -169,7 +170,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_o
     const float lTerminalMH = 0.64f * 1.5f;
 
     services::SinusoidalInductanceEstimator::Config config{
-        hal::Hertz{ 700 }, hal::Percent{ 15 }, 5, 20, 1, services::WindingConfiguration::Wye
+        hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 5, 20, 1, services::WindingConfiguration::Wye
     };
 
     auto [result, expectedL] = RunPlantSimulation(driverMock, estimator, config, rTerminal, lTerminalMH);
@@ -186,7 +187,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_o
     const float lTerminalMH = 0.20f * 1.5f;
 
     services::SinusoidalInductanceEstimator::Config config{
-        hal::Hertz{ 700 }, hal::Percent{ 15 }, 5, 20, 1, services::WindingConfiguration::Wye
+        hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 5, 20, 1, services::WindingConfiguration::Wye
     };
 
     auto [result, expectedL] = RunPlantSimulation(driverMock, estimator, config, rTerminal, lTerminalMH);
@@ -202,7 +203,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_o
     const float lTerminalMH = 0.64f * 1.5f;
 
     services::SinusoidalInductanceEstimator::Config config{
-        hal::Hertz{ 500 }, hal::Percent{ 15 }, 5, 20, 1, services::WindingConfiguration::Wye
+        hal::Hertz{ 500 }, hal::DutyCycle::FromPercent(15), 5, 20, 1, services::WindingConfiguration::Wye
     };
 
     auto [result, expectedL] = RunPlantSimulation(driverMock, estimator, config, rTerminal, lTerminalMH);
@@ -215,7 +216,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, fitQuality_drops_for_unexpected_signal
 {
     // If the current is a DC offset instead of a sinusoid at f_inj, coherence should be low.
     services::SinusoidalInductanceEstimator::Config config{
-        hal::Hertz{ 700 }, hal::Percent{ 15 }, 2, 5, 1, services::WindingConfiguration::Wye
+        hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 2, 5, 1, services::WindingConfiguration::Wye
     };
 
     const float fInj = static_cast<float>(config.injectionFrequency.Value());
@@ -267,7 +268,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, negative_zimag_returns_nullopt_inducta
     // zImag <= 0.0f branch: feed a signal that produces negative imaginary impedance.
     // With the correction rotation, a negative-phase sinusoid (or reversed sign) produces zImag <= 0.
     services::SinusoidalInductanceEstimator::Config config{
-        hal::Hertz{ 700 }, hal::Percent{ 15 }, 2, 5, 0, services::WindingConfiguration::Wye
+        hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 2, 5, 0, services::WindingConfiguration::Wye
     };
 
     const float fInj = static_cast<float>(config.injectionFrequency.Value());
@@ -309,7 +310,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, negative_zimag_returns_nullopt_inducta
 TEST_F(SinusoidalInductanceEstimatorTest, overcurrent_on_first_sample_stops_driver_and_returns_empty_result)
 {
     services::SinusoidalInductanceEstimator::Config config{
-        hal::Hertz{ 700 }, hal::Percent{ 15 }, 2, 5, 1, services::WindingConfiguration::Wye
+        hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 2, 5, 1, services::WindingConfiguration::Wye
     };
 
     services::SinusoidalInductanceEstimator::Result result{ foc::MilliHenry{ 99.0f }, 1.0f };
@@ -339,7 +340,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, overcurrent_on_first_sample_stops_driv
 TEST_F(SinusoidalInductanceEstimatorTest, overcurrent_on_phase_b_also_aborts)
 {
     services::SinusoidalInductanceEstimator::Config config{
-        hal::Hertz{ 700 }, hal::Percent{ 15 }, 2, 5, 1, services::WindingConfiguration::Wye
+        hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 2, 5, 1, services::WindingConfiguration::Wye
     };
 
     services::SinusoidalInductanceEstimator::Result result{ foc::MilliHenry{ 99.0f }, 1.0f };
@@ -376,7 +377,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, delta_winding_recovers_inductance_corr
     const float lTerminalMH = 0.75f;
 
     services::SinusoidalInductanceEstimator::Config config{
-        hal::Hertz{ 700 }, hal::Percent{ 15 }, 5, 20, 1, services::WindingConfiguration::Delta
+        hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 5, 20, 1, services::WindingConfiguration::Delta
     };
 
     auto [result, expectedL] = RunPlantSimulation(driverMock, estimator, config, rTerminal, lTerminalMH);
@@ -412,7 +413,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, no_sample_timeout_fires_if_no_adc_call
 TEST_F(SinusoidalInductanceEstimatorTest, sample_watchdog_fires_once_samples_stop_arriving)
 {
     services::SinusoidalInductanceEstimator::Config config{
-        hal::Hertz{ 700 }, hal::Percent{ 15 }, 2, 5, 1, services::WindingConfiguration::Wye
+        hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 2, 5, 1, services::WindingConfiguration::Wye
     };
 
     constexpr std::size_t samplesSent = 3;

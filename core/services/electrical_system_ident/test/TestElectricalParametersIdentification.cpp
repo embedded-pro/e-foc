@@ -9,11 +9,17 @@ namespace
 {
     using namespace testing;
 
+    // Duties built from floats and from percentages may round to neighbouring Q16 steps
+    [[maybe_unused]] bool WithinOneStep(hal::DutyCycle actual, hal::DutyCycle expected)
+    {
+        return (actual.Value() > expected.Value() ? actual.Value() - expected.Value() : expected.Value() - actual.Value()) <= 1;
+    }
+
     MATCHER_P(PhasePwmDutyCyclesEq, expected, "")
     {
-        return std::abs(arg.a.Value() - expected.a.Value()) < 1e-3f &&
-               std::abs(arg.b.Value() - expected.b.Value()) < 1e-3f &&
-               std::abs(arg.c.Value() - expected.c.Value()) < 1e-3f;
+        return WithinOneStep(arg.a, expected.a) &&
+               WithinOneStep(arg.b, expected.b) &&
+               WithinOneStep(arg.c, expected.c);
     }
 
     [[maybe_unused]] float SimulateRLModelCurrent(float voltage, float resistance, float inductance, float time)
@@ -49,7 +55,7 @@ namespace
 TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_initializes_encoder_and_applies_voltages)
 {
     services::ElectricalParametersIdentification::PolePairsConfig config{
-        hal::Percent{ 20 },
+        hal::DutyCycle::FromPercent(20),
         5,
         std::chrono::milliseconds{ 50 }
     };
@@ -66,7 +72,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_ini
 TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_calculates_correct_pole_pairs_for_4_pole_motor)
 {
     services::ElectricalParametersIdentification::PolePairsConfig config{
-        hal::Percent{ 20 },
+        hal::DutyCycle::FromPercent(20),
         5,
         std::chrono::milliseconds{ 50 }
     };
@@ -104,7 +110,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_cal
 TEST_F(ElectricalParametersIdentificationTest, an_overcurrent_sample_aborts_the_pole_pairs_sweep)
 {
     services::ElectricalParametersIdentification::PolePairsConfig config{
-        hal::Percent{ 20 },
+        hal::DutyCycle::FromPercent(20),
         5,
         std::chrono::milliseconds{ 50 }
     };
@@ -150,7 +156,7 @@ TEST_F(ElectricalParametersIdentificationTest, an_overcurrent_sample_aborts_the_
 TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_calculates_correct_pole_pairs_for_6_pole_motor)
 {
     services::ElectricalParametersIdentification::PolePairsConfig config{
-        hal::Percent{ 20 },
+        hal::DutyCycle::FromPercent(20),
         5,
         std::chrono::milliseconds{ 50 }
     };
@@ -188,7 +194,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_cal
 TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_returns_nullopt_for_insufficient_rotation)
 {
     services::ElectricalParametersIdentification::PolePairsConfig config{
-        hal::Percent{ 20 },
+        hal::DutyCycle::FromPercent(20),
         5,
         std::chrono::milliseconds{ 50 }
     };
@@ -218,7 +224,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_ret
 TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_with_different_electrical_revolutions)
 {
     services::ElectricalParametersIdentification::PolePairsConfig config{
-        hal::Percent{ 20 },
+        hal::DutyCycle::FromPercent(20),
         10,
         std::chrono::milliseconds{ 50 }
     };
@@ -256,7 +262,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_wit
 TEST_F(ElectricalParametersIdentificationTest, concurrent_rl_estimate_is_rejected_immediately)
 {
     services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
-        hal::Percent{ 15 }, std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
+        hal::DutyCycle::FromPercent(15), std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
     };
 
     struct RlResult
@@ -286,7 +292,7 @@ TEST_F(ElectricalParametersIdentificationTest, concurrent_rl_estimate_is_rejecte
 TEST_F(ElectricalParametersIdentificationTest, concurrent_pole_pairs_estimate_is_rejected_immediately)
 {
     services::ElectricalParametersIdentification::PolePairsConfig config{
-        hal::Percent{ 20 }, 5, std::chrono::milliseconds{ 50 }
+        hal::DutyCycle::FromPercent(20), 5, std::chrono::milliseconds{ 50 }
     };
 
     struct PpResult
@@ -315,7 +321,7 @@ TEST_F(ElectricalParametersIdentificationTest, concurrent_pole_pairs_estimate_is
 TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_with_8_pole_motor)
 {
     services::ElectricalParametersIdentification::PolePairsConfig config{
-        hal::Percent{ 20 },
+        hal::DutyCycle::FromPercent(20),
         5,
         std::chrono::milliseconds{ 50 }
     };
@@ -353,7 +359,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_wit
 TEST_F(ElectricalParametersIdentificationTest, estimate_rl_resistance_fails_calls_done_with_empty_result)
 {
     services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
-        hal::Percent{ 15 }, std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
+        hal::DutyCycle::FromPercent(15), std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
     };
 
     bool doneCalled = false;
@@ -390,11 +396,11 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_rl_resistance_fails_call
 TEST_F(ElectricalParametersIdentificationTest, estimate_rl_resistance_succeeds_then_inductance_completes_with_result)
 {
     services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
-        .testVoltagePercent = hal::Percent{ 15 },
+        .testVoltage = hal::DutyCycle::FromPercent(15),
         .settleTime = std::chrono::milliseconds{ 100 },
         .windingConfig = services::WindingConfiguration::Wye,
         .injectionFrequency = hal::Hertz{ 700 },
-        .injectionVoltagePercent = hal::Percent{ 15 },
+        .injectionVoltage = hal::DutyCycle::FromPercent(15),
         .warmupPeriods = 2,
         .measurementPeriods = 5,
         .voltageToCurrentDelaySamples = 1
@@ -447,7 +453,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_rl_resistance_succeeds_t
 TEST_F(ElectricalParametersIdentificationTest, estimate_rl_allows_second_call_after_first_completes)
 {
     services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
-        hal::Percent{ 15 }, std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
+        hal::DutyCycle::FromPercent(15), std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
     };
 
     std::size_t callCount = 0;
@@ -487,7 +493,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_rl_allows_second_call_af
 TEST_F(ElectricalParametersIdentificationTest, abort_stops_the_pole_pairs_sweep_and_drops_the_completion)
 {
     services::ElectricalParametersIdentification::PolePairsConfig config{
-        hal::Percent{ 20 },
+        hal::DutyCycle::FromPercent(20),
         5,
         std::chrono::milliseconds{ 50 }
     };
@@ -556,7 +562,7 @@ TEST_F(ElectricalParametersIdentificationTest, is_running_returns_false_initiall
 TEST_F(ElectricalParametersIdentificationTest, is_running_returns_true_during_rl_estimation)
 {
     services::ElectricalParametersIdentification::ResistanceAndInductanceConfig config{
-        hal::Percent{ 15 }, std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
+        hal::DutyCycle::FromPercent(15), std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
     };
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_)).Times(::testing::AnyNumber());

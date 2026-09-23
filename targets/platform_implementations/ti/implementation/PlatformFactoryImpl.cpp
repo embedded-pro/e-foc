@@ -286,7 +286,7 @@ namespace application
     {
         WithPwm([](auto& pwm)
             {
-                pwm.Start(hal::FractionalPercent{ 1.0f }, hal::FractionalPercent{ 1.0f }, hal::FractionalPercent{ 1.0f });
+                pwm.Start(hal::DutyCycle::FromPercent(1), hal::DutyCycle::FromPercent(1), hal::DutyCycle::FromPercent(1));
             });
     }
 

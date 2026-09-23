@@ -36,9 +36,9 @@ TEST_F(TestThermalModel, temperature_rises_when_current_flows)
 {
     constexpr int cycles = 10000;
     const foc::PhasePwmDutyCycles duty{
-        hal::FractionalPercent{ 75.0f },
-        hal::FractionalPercent{ 50.0f },
-        hal::FractionalPercent{ 25.0f }
+        hal::DutyCycle::FromPercent(75),
+        hal::DutyCycle::FromPercent(50),
+        hal::DutyCycle::FromPercent(25)
     };
     for (int i = 0; i < cycles; ++i)
         model.StepForTest(duty);

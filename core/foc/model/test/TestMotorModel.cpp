@@ -10,7 +10,7 @@
 namespace
 {
     const foc::PhasePwmDutyCycles kNeutralDuty{
-        hal::FractionalPercent{ 60.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 40.0f }
+        hal::DutyCycle::FromPercent(60), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(40)
     };
 
     class RecordingObserver
@@ -237,7 +237,7 @@ TEST_F(MotorModelTest, observer_finished_not_called_without_iteration_limit)
 namespace
 {
     const foc::PhasePwmDutyCycles kZeroVoltageDuty{
-        hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f }
+        hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50)
     };
 
     constexpr int kFreeRunSteps = 100;

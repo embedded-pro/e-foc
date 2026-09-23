@@ -1,4 +1,5 @@
 #include "core/services/electrical_system_ident/SinusoidalInductanceEstimator.hpp"
+#include "core/foc/math/DutyConversion.hpp"
 #include "core/services/InjectionCurrentLimit.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "numerical/math/Math.hpp"
@@ -54,7 +55,7 @@ namespace services
         omega = twoPi * fs / static_cast<float>(samplesPerPeriod);
         phaseIncrement = omega / fs;
         injectionPhase = 0.0f;
-        injectionAmplitude = static_cast<float>(activeConfig.injectionVoltagePercent.Value()) / 100.0f;
+        injectionAmplitude = foc::DutyFraction(activeConfig.injectionVoltage);
         vTerminalAmplitude = injectionAmplitude * 0.75f * vdc.Value();
         terminalFactor = activeConfig.windingConfig == WindingConfiguration::Delta
                              ? deltaTerminalFactor

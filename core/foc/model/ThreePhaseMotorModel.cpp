@@ -1,6 +1,7 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/AngleWrap.hpp"
+#include "core/foc/math/DutyConversion.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
@@ -12,7 +13,6 @@ namespace foc
     {
         constexpr float two_pi = 2.0f * std::numbers::pi_v<float>;
         constexpr float half = 0.5f;
-        constexpr float percentToFraction = 100.0f;
         constexpr float torqueConstant = 1.5f;
 
     }
@@ -182,9 +182,9 @@ namespace foc
         currentNoise.icLast = icNoise;
 
         const auto supply = EffectiveSupplyVoltage().Value();
-        const auto va = (dutyPhases.a.Value() / percentToFraction - half) * supply;
-        const auto vb = (dutyPhases.b.Value() / percentToFraction - half) * supply;
-        const auto vc = (dutyPhases.c.Value() / percentToFraction - half) * supply;
+        const auto va = (foc::DutyFraction(dutyPhases.a) - half) * supply;
+        const auto vb = (foc::DutyFraction(dutyPhases.b) - half) * supply;
+        const auto vc = (foc::DutyFraction(dutyPhases.c) - half) * supply;
         const foc::ThreePhase vAbc{ va, vb, vc };
         const auto vAlphaBeta = clarke.Forward(vAbc);
 
@@ -249,7 +249,7 @@ namespace foc
         motorState.omega = foc::RadiansPerSecond{ 0.0f };
         motorState.omega_mech = foc::RadiansPerSecond{ 0.0f };
         ResetTemperature();
-        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 49.0f }, hal::FractionalPercent{ 51.0f } };
+        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(49), hal::DutyCycle::FromPercent(51) };
 
         NotifyObservers([](auto& observer)
             {
@@ -268,7 +268,7 @@ namespace foc
         motorState.ia = foc::Ampere{ 0.0f };
         motorState.ib = foc::Ampere{ 0.0f };
         motorState.ic = foc::Ampere{ 0.0f };
-        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f }, hal::FractionalPercent{ 50.0f } };
+        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) };
         onCurrentPhasesReady = nullptr;
     }
 
@@ -304,9 +304,9 @@ namespace foc
     void ThreePhaseMotorModel::Model(const foc::PhasePwmDutyCycles& dutyPhases)
     {
         auto dt = 1.0f / static_cast<float>(baseFrequency.Value());
-        auto duty_a = dutyPhases.a.Value() / percentToFraction;
-        auto duty_b = dutyPhases.b.Value() / percentToFraction;
-        auto duty_c = dutyPhases.c.Value() / percentToFraction;
+        auto duty_a = foc::DutyFraction(dutyPhases.a);
+        auto duty_b = foc::DutyFraction(dutyPhases.b);
+        auto duty_c = foc::DutyFraction(dutyPhases.c);
 
         const auto supply = EffectiveSupplyVoltage();
         auto va = (duty_a - half) * supply;
