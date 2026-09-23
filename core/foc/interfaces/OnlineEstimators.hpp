@@ -5,8 +5,6 @@
 
 namespace foc
 {
-    // Averages over one outer-loop period, accumulated by the control interrupt, so the regression sees what
-    // the plant integrated rather than one instantaneous sample of it
     struct MechanicalWindow
     {
         Ampere meanIq;

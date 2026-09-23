@@ -37,15 +37,11 @@ namespace services
                friction >= 0.0f && friction < mechanical_estimate::maximumFriction;
     }
 
-    // At standstill every column but the intercept is zero, so the observation carries nothing
     inline bool IsMechanicallyObservable(float speed)
     {
         return std::abs(speed) >= mechanical_estimate::minimumSpeed;
     }
 
-    // Inertia is identified only while the rotor accelerates, and viscous friction only apart from the intercept
-    // once the observations span more than one speed. Steady samples used to be refused altogether, which left
-    // friction to whatever acceleration ripple the duty quantisation happened to put on a plateau.
     class MechanicalExcitation
     {
     public:

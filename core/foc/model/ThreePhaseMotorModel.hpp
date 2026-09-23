@@ -64,7 +64,6 @@ namespace foc
             float thermalCapacitance{ 25.0f };
             float copperTempCoeff{ 0.00393f };
             float ironInductanceCoeff{ 0.0f };
-            // The winding temperature the nameplate resistance and inductance were measured at
             float referenceCelsius{ 25.0f };
         };
 

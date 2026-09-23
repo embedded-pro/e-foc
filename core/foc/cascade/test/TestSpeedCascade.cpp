@@ -263,7 +263,6 @@ TEST_F(TestSpeedCascade, consecutive_calls_update_speed_estimation)
     focSpeed->Enable();
     focSpeed->SetPoint(foc::RadiansPerSecond{ 0.0f });
 
-    // The outer loop differences the angle latched when the window closes, so each position is held a full window
     for (const auto angle : { 0.0f, step })
     {
         for (uint32_t tick = 0; tick != prescaler; ++tick)
@@ -488,4 +487,31 @@ TEST_F(TestSpeedCascade, the_observed_motion_carries_the_window_speed_and_the_re
     EXPECT_NEAR(observation.measuredSpeed.Value(), step * static_cast<float>(lowPriorityFrequency.Value()), 1e-3f);
     EXPECT_NEAR(observation.demandedSpeed.Value(), 12.0f, 1e-6f);
     EXPECT_NEAR(observation.positionError.Value(), 0.0f, 1e-6f);
+}
+
+TEST_F(TestSpeedCascade, a_disabled_cascade_observes_no_motion)
+{
+    constexpr float step{ 0.001f };
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 12.0f });
+
+    for (const auto angle : { 0.0f, step })
+    {
+        for (uint32_t tick = 0; tick != prescaler; ++tick)
+        {
+            foc::Radians held{ angle };
+            focSpeed->Calculate(ZeroCurrents(), held);
+        }
+
+        lowPriorityInterruptMock.TriggerHandler();
+    }
+
+    focSpeed->Disable();
+
+    const auto observation = focSpeed->ObserveMotion();
+    EXPECT_NEAR(observation.measuredSpeed.Value(), 0.0f, 1e-6f);
+    EXPECT_NEAR(observation.measuredTorqueCurrent.Value(), 0.0f, 1e-6f);
 }

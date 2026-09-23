@@ -9,9 +9,6 @@
 
 namespace supervision
 {
-    // A drive pushing torque current while it asks the rotor to move expects the encoder to move with it. A
-    // reading that stays put for a whole window means the encoder has stopped reporting (or the rotor is
-    // locked); either way the loop is regulating a position that no longer tracks the shaft. See REQ-SM-028.
     class EncoderPlausibilityMonitor
     {
     public:

@@ -55,6 +55,7 @@ namespace application
 
     void PlatformFactoryImpl::Run()
     {
+        eventDispatcher.Run();
     }
 
     services::Tracer& PlatformFactoryImpl::Tracer()

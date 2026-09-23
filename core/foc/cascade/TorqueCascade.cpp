@@ -33,6 +33,8 @@ namespace foc
     void TorqueCascade::Disable()
     {
         enabled = false;
+        lastElectricalSpeed = 0.0f;
+        lastIq = 0.0f;
     }
 
     SelectResult TorqueCascade::SelectCurrentAlgorithm(CurrentAlgorithm algorithm)

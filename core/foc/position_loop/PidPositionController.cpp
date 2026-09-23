@@ -32,7 +32,6 @@ namespace foc
     PositionOutput PidPositionController::Compute(const PositionControlContext& context)
     {
         const auto error = WrappedPositionError(context.reference, context.measured);
-        // Before the first sample the rotor is taken as settled where it stands, so the whole error is a reference step
         const auto referenceStep = primed ? WrappedPositionError(context.reference, Radians{ previousReference }) : error;
         const auto measuredStep = primed ? WrappedPositionError(context.measured, Radians{ previousMeasured }) : 0.0f;
 

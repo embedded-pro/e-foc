@@ -180,6 +180,9 @@ namespace foc
     void CascadeWithSpeedLoop::DisableSpeedLoop()
     {
         enabled = false;
+        lastElectricalSpeed = 0.0f;
+        lastMechanicalSpeed = 0.0f;
+        lastMeanIq = 0.0f;
     }
 
     SelectResult CascadeWithSpeedLoop::SelectCurrentAlgorithmImpl(CurrentAlgorithm algorithm)

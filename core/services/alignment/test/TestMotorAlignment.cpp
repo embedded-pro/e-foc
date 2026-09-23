@@ -10,7 +10,6 @@ namespace
 {
     using namespace testing;
 
-    // Duties built from floats and from percentages may round to neighbouring Q16 steps
     bool WithinOneStep(hal::DutyCycle actual, hal::DutyCycle expected)
     {
         return (actual.Value() > expected.Value() ? actual.Value() - expected.Value() : expected.Value() - actual.Value()) <= 1;

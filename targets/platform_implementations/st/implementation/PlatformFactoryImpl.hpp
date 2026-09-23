@@ -12,6 +12,7 @@
 #include "hal/interfaces/Pwm.hpp"
 #include "hal/interfaces/SerialCommunication.hpp"
 #include "hal/synchronous_interfaces/SynchronousQuadratureEncoder.hpp"
+#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
@@ -219,6 +220,7 @@ namespace application
         };
 
     private:
+        infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
         infra::Function<void()> onInitialized;
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         static constexpr uint32_t timerId = 1;

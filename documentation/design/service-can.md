@@ -312,7 +312,7 @@ graph LR
 | Ident re-entrancy       | A second identification command while one is in-flight returns `busy` via `SendCategoryError`              |
 | NVM re-entrancy         | A second config-persist command while one is in-flight returns `busy` via `SendCategoryError`              |
 | Mechanical ident        | `mechIdent` is optional (nullable pointer); if absent, `OnIdentifyMechanical` returns `notImplemented`     |
-| Telemetry speed/pos     | `focTelemetryStatusResponseId` frames encode zero for speed and position (live readings not yet available) |
+| Telemetry speed/pos     | Speed is the active mode's `ObserveMotion().measuredSpeed`, zero while disabled; position is the encoder   |
 
 ---
 

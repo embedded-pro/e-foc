@@ -16,8 +16,6 @@ namespace foc
     {
         const auto percent = [](float normalized)
         {
-            // std::clamp would pass NaN on to the PWM; -ffinite-math-only drops this branch, so the real
-            // guarantee is that configuration boundaries reject non-finite values (REQ-PERF-003)
             const auto bounded = normalized > 0.0f ? (normalized < 1.0f ? normalized : 1.0f) : 0.0f;
 
             return hal::DutyCycle{ static_cast<uint32_t>(bounded * static_cast<float>(hal::DutyCycle::fullScale) + 0.5f) };

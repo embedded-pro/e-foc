@@ -9,8 +9,6 @@ namespace services
 {
     namespace
     {
-        // The online regression runs in milli-newton-metres against micro-unit inertia and friction, so the three
-        // columns are of order one on the rotors this drive is sized for and float keeps its precision
         constexpr float outputScale{ 1e3f };
         constexpr float parameterScale{ 1e6f };
         constexpr float columnScale{ outputScale / parameterScale };
@@ -105,8 +103,6 @@ namespace services
         outputPower = 0.0f;
     }
 
-    // Window averages obey the momentum balance exactly when the torque is averaged over the same span the
-    // speed difference covers: J (w_k - w_k-1) / T = kt (i_k + i_k-1) / 2 - B (w_k + w_k-1) / 2 - tau
     void RealTimeFrictionAndInertiaEstimator::Update(const foc::MechanicalWindow& window)
     {
         const auto speed = window.meanSpeed.Value();
@@ -144,8 +140,6 @@ namespace services
         PublishOnlineEstimate();
     }
 
-    // A plateau still separates friction from the intercept, but says nothing about inertia; letting it in
-    // unconditionally would inflate that direction of the covariance without bound on a long constant-speed run
     bool RealTimeFrictionAndInertiaEstimator::IsOnlineObservationInformative(float acceleration, float speed) const
     {
         if (!IsMechanicallyObservable(speed))
@@ -154,9 +148,6 @@ namespace services
         return std::abs(acceleration) >= mechanical_estimate::minimumAcceleration || onlineMetrics.uncertainty <= onlineCovarianceCeiling;
     }
 
-    // Publishing an estimate turns it into speed-loop gains, so it waits for a fit that has seen acceleration
-    // (inertia), more than one speed (friction apart from the intercept), and whose residual is a small
-    // fraction of the torque it explains
     bool RealTimeFrictionAndInertiaEstimator::HasOnlineEstimateSettled() const
     {
         return onlineUpdates >= onlineMinimumUpdates &&

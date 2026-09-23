@@ -29,7 +29,6 @@ namespace
         : public ::testing::Test
     {
     public:
-        // Sub-stepped plant with one sample of actuation delay, the way the current loop delivers the command
         TorqueStepResponse RejectTorqueStep(const foc::MechanicalModelParameters& parameters, float reference, float torque, float band)
         {
             constexpr std::size_t substeps{ 20 };

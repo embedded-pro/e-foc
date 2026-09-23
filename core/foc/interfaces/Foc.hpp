@@ -11,8 +11,6 @@ namespace foc
 {
     using IdAndIqPoint = std::pair<Ampere, Ampere>;
 
-    // What the drive measures and what it is asking the rotor to do, for supervision and telemetry;
-    // written by the control interrupts and read from the event loop
     struct MotionObservation
     {
         RadiansPerSecond measuredSpeed{ 0.0f };

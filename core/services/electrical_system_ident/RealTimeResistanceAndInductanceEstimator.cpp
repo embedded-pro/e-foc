@@ -18,10 +18,6 @@ namespace services
         , samplingFrequency{ static_cast<float>(samplingFrequency.Value()) }
     {}
 
-    // The d-axis voltage equation integrated over one window needs no derivative of a sampled current:
-    //   mean(vd) = R mean(id) + L (id_end - id_start) / T - L mean(we iq)
-    // Regressor: phi = [mean(id), (id_end - id_start) / T - mean(we iq)] in A and A/ms; theta = [R (Ohm), L (mH)]
-    // The resistance column is excited only by a d-axis current, which the cascade injects for this purpose.
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")

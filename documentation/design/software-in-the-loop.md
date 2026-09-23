@@ -539,9 +539,9 @@ What the first characterisation found, in the order it was found:
   control interrupt on the first sample the identification observed. The fault handler then
   faulted again, so nothing was traced and the target simply went silent. The deferred fault
   notifications take the same path. The platform now registers a cortex dispatcher that serves
-  both singletons. Of the hardware platforms, the TI one registers the weak-pointer dispatcher;
-  the ST one is a stub that registers no dispatcher at all and would fail the same way once it
-  drives a motor. With the
+  both singletons. Both hardware platforms register the weak-pointer dispatcher and run it from
+  `Run()`; the ST one, still a stub that builds no application, used to register none and return
+  from `Run()`. With the
   dispatcher in place the full calibration from the terminal reaches Ready on both motors and
   its record is within 0.05 % of the plant's inertia and 2 % of its viscous friction, from a
   seed that was off by a factor of two and a half; the offline procedure, sampling at the control

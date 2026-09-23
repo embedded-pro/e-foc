@@ -12,8 +12,6 @@ namespace
         float quadratureCurrent{ 0.05f };
     };
 
-    // Regulates the d-axis current of a winding onto a square wave, the command landing one control tick late,
-    // integrated in fine steps, and accumulates the window averages the control interrupt would publish
     class WindowedWindingRun
     {
     public:

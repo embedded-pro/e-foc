@@ -313,10 +313,6 @@ namespace foc
         auto vb = (duty_b - half) * supply;
         auto vc = (duty_c - half) * supply;
 
-        // The dq equations below already carry the coupling the rotating frame produces, so the currents they
-        // integrate are expressed in the frame at the end of the step and go back to abc at that angle; converting
-        // them at the starting angle and re-reading them at the next one counted the frame rotation twice. The
-        // inverter's voltage is fixed in the stator for the whole step, so the rotor sees it at the mid-step angle.
         const auto stepRotation = motorState.omega.Value() * dt;
         auto cos_theta = foc::FastTrigonometry::Cosine(motorState.theta.Value());
         auto sin_theta = foc::FastTrigonometry::Sine(motorState.theta.Value());

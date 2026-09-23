@@ -45,8 +45,6 @@ namespace
         float shaftTorque{ 0.0f };
     };
 
-    // Drives a rotor with a proportional speed loop whose current lands one outer sample late, integrated in
-    // fine steps, and hands the estimator the window averages the control interrupt would accumulate
     class WindowedRotorRun
     {
     public:

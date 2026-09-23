@@ -36,8 +36,6 @@ namespace foc
         float meanElectricalSpeedTimesIq{ 0.0f };
     };
 
-    // Integrates over one outer-loop period what the interrupt sees tick by tick. The voltage paired with a
-    // current sample is the one applied during the tick that produced it, i.e. the previous tick's command.
     class EstimatorWindowAccumulator
     {
     public:
@@ -45,9 +43,6 @@ namespace foc
 
         void Restart();
 
-        // The voltage applied over the tick just ended was fixed in the stator while the rotor turned, so in the
-        // rotor frame it arrives advanced by half that rotation; and the rotation itself, not the outer loop's
-        // last speed, is what the cross-coupling term integrates while the rotor accelerates.
         ALWAYS_INLINE_HOT void Accumulate(RotatingFrame measured, RotatingFrame normalizedVoltage, float mechanicalAngle, float polePairs)
         {
             const auto electricalRotation = rotationPrimed ? detail::PositionWithWrapAround(mechanicalAngle - previousMechanicalAngle) * polePairs : 0.0f;
@@ -95,8 +90,6 @@ namespace foc
         uint32_t ticks{ 0 };
     };
 
-    // A square wave on the d-axis current reference: it produces no torque on a non-salient machine, and it
-    // is the only excitation that makes the winding resistance observable while the d axis is regulated to zero
     class DirectAxisExcitation
     {
     public:
@@ -169,8 +162,6 @@ namespace foc
             return currentAngle;
         }
 
-        // The outer loop may start a tick after the window closed; differencing the angle it finds then would
-        // measure a 19- or 21-tick span as if it were the nominal period
         ALWAYS_INLINE_HOT void CloseWindow()
         {
             windowAngle = currentAngle;

@@ -50,10 +50,6 @@ namespace foc
         normalizationScale = NormalizationScale(parameters.busVoltage);
         equilibriumGain = (1.0f - plant.ad) / plant.bd;
 
-        // The toolbox's equivalent control cancels whatever part of the next error the state matrix predicts.
-        // Handing it ad would zero the error in one sample and leave the switching term to throw it K_sw past
-        // zero; handing it ad - reachingPole leaves s[k+1] = reachingPole s[k] - K_sw sat(s[k] / phi), the
-        // exponential reaching law, which approaches the surface at the loop bandwidth without crossing it
         const auto reachingPole = std::exp(-bandwidth * SamplePeriod(parameters.samplingFrequency));
         const auto stateMatrix = ScalarSlidingMode::PlantType::StateMatrix{ plant.ad - reachingPole };
         const auto inputMatrix = ScalarSlidingMode::PlantType::InputMatrix{ plant.bd };

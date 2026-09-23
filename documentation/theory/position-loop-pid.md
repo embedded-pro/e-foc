@@ -117,10 +117,10 @@ Without wrapping, a $+3.1$ rad reference reached from $-3.1$ rad would command a
 ### Integral zero and reference weighting
 
 The integral zero sits at a fifth of the position bandwidth, $K_i = 0.2\,\omega_{bw}^p K_p$, and the
-proportional term acts on $b\,	heta^* - 	heta$ with $b = 0.75$ rather than on the error:
+proportional term acts on $b\,\theta^* - \theta$ with $b = 0.75$ rather than on the error:
 
 $$
-\omega_m^*[k] = \omega_m^*[k-1] + K_p\left(b\,\Delta	heta^*[k] - \Delta	heta_m[k]ight) + K_i T_s^o\, e_	heta[k]
+\omega_m^*[k] = \omega_m^*[k-1] + K_p\left(b\,\Delta\theta^*[k] - \Delta\theta_m[k]\right) + K_i T_s^o\, e_\theta[k]
 $$
 
 in the velocity form the implementation uses, with every difference wrapped as the error is.
@@ -136,7 +136,7 @@ torque step pushing the same way as that tail starts its excursion already most 
 Moving the zero up to $\omega_{bw}^p/5$ alone shortens the tail but makes it larger, because the zero
 also lies in the reference path. Weighting the reference in the proportional term takes the zero out
 of the reference path without touching disturbance rejection, which sees the full $K_p$ through
-$\Delta	heta_m$. With $b = 0.75$ a 1.5 rad step overshoots by well under 1 % and is within 0.01 rad
+$\Delta\theta_m$. With $b = 0.75$ a 1.5 rad step overshoots by well under 1 % and is within 0.01 rad
 of the setpoint 450 ms after the step.
 
 ### Output Limiting

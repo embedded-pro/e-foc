@@ -354,3 +354,21 @@ TEST_F(TestTorqueCascade, the_observed_motion_carries_the_measured_speed_and_dem
     EXPECT_NEAR(observation.demandedSpeed.Value(), 0.0f, 1e-6f);
     EXPECT_NEAR(observation.positionError.Value(), 0.0f, 1e-6f);
 }
+
+TEST_F(TestTorqueCascade, a_disabled_cascade_observes_no_motion)
+{
+    constexpr float step{ 0.0005f };
+
+    focTorque->Enable();
+    for (int tick = 0; tick != 400; ++tick)
+    {
+        foc::Radians position{ static_cast<float>(tick) * step };
+        focTorque->Calculate(ZeroCurrents(), position);
+    }
+
+    focTorque->Disable();
+
+    const auto observation = focTorque->ObserveMotion();
+    EXPECT_NEAR(observation.measuredSpeed.Value(), 0.0f, 1e-6f);
+    EXPECT_NEAR(observation.measuredTorqueCurrent.Value(), 0.0f, 1e-6f);
+}
