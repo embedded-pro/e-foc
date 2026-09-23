@@ -456,8 +456,8 @@ thing it would catch is the harness rather than a control law.
 The two runs made to check the pinned bounds bear that out immediately: three of their
 measurements came in above the worst of the six the bounds were set from, the largest a tail band
 a fifth higher than anything those six had shown. Every bound still had more than 46 percent of
-itself to spare. A limit pinned to the measurement, or even to a third above it, would have been
-red on the run that was meant to confirm it.
+itself to spare, and a bound pinned to the measurement itself would have been red on all three,
+on the very run that was meant to confirm it.
 
 ### Part J — The estimators against a known plant
 
