@@ -18,7 +18,7 @@ namespace application
         , boot(environment, calibration)
         , operation(environment, calibration)
         , context{ *this, calibration, maintenance, boot, operation, pendingCommand }
-        , stateMachine(context, FocLifecycleTable::Rows())
+        , stateMachine(context, FocLifecycleTable::Table())
         , stateMachineTracer(stateMachine, tracer)
         , commandRejections(stateMachine)
     {
