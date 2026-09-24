@@ -31,10 +31,10 @@ bandwidth — the closed-loop position bandwidth equals $K_p$ directly. No param
 required.
 
 The law is a **PI**, not the pure P this chapter derives. The derivation below is the P design the
-cascade shipped with and still the way to read the proportional path; the integral term was added on
-top of it, weighted by the ratio of the integral weight to the position-error weight, and removes
-the standing error the P design leaves under a constant velocity reference. When the integral weight
-is zero the law reduces exactly to the P controller derived here.
+cascade shipped with and still the way to read the proportional path; the integral term removes the
+standing error the P design leaves under a constant velocity reference. Its zero and the weight the
+proportional term gives the reference are fixed by the design in *Integral zero and reference
+weighting* below, not by the loop tunings.
 
 Operates exclusively in the **1 kHz outer handler**.
 
@@ -114,6 +114,31 @@ $$
 Without wrapping, a $+3.1$ rad reference reached from $-3.1$ rad would command a $6.2$ rad
 (354°) rotation through the long arc instead of the $0.08$ rad short arc.
 
+### Integral zero and reference weighting
+
+The integral zero sits at a fifth of the position bandwidth, $K_i = 0.2\,\omega_{bw}^p K_p$, and the
+proportional term acts on $b\,\theta^* - \theta$ with $b = 0.75$ rather than on the error:
+
+$$
+\omega_m^*[k] = \omega_m^*[k-1] + K_p\left(b\,\Delta\theta^*[k] - \Delta\theta_m[k]\right) + K_i T_s^o\, e_\theta[k]
+$$
+
+in the velocity form the implementation uses, with every difference wrapped as the error is.
+
+The zero used to sit at the integral weight times the bandwidth, a twentieth of it with the default
+weight. That places a slow closed-loop pole just beside the zero, and the pair leaves a tail whose
+size is the residue of that pole: under an ideal speed loop at $\omega_{bw}^p = 18.85$ rad/s the
+poles fall at $-0.995$ and $-17.9$ rad/s against a zero at $-0.94$, and a 1.5 rad step keeps some
+0.089 rad of overshoot that decays over a second — 0.055 rad is still there half a second later. A
+torque step pushing the same way as that tail starts its excursion already most of the way across a
+0.08 rad recovery band.
+
+Moving the zero up to $\omega_{bw}^p/5$ alone shortens the tail but makes it larger, because the zero
+also lies in the reference path. Weighting the reference in the proportional term takes the zero out
+of the reference path without touching disturbance rejection, which sees the full $K_p$ through
+$\Delta\theta_m$. With $b = 0.75$ a 1.5 rad step overshoots by well under 1 % and is within 0.01 rad
+of the setpoint 450 ms after the step.
+
 ### Output Limiting
 
 The speed reference is clamped to $\pm\omega_{m,max}$ to prevent demanding speeds beyond the
@@ -133,7 +158,7 @@ $$
 | Steady-state position error | Non-zero under constant velocity reference for the P design; removed by the integral term |
 | Steady-state error at rest  | Zero (no steady velocity → no position error)                                             |
 | Requires J, Bf              | No                                                                                        |
-| Tuning knobs                | 2 ($K_p = \omega_{bw}^p$, and the integral weight relative to the position-error weight)  |
+| Tuning knobs                | 1 ($K_p = \omega_{bw}^p$); the integral zero and reference weight are design constants    |
 
 ---
 

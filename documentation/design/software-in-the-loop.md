@@ -92,6 +92,10 @@ The description covers everything the plant needs:
 | Disturbance       | A signed shaft torque and the delay after enabling at which it steps in       |
 | Recording         | The rate at which the plant reports its trajectory, and how many samples      |
 
+The thermal group's resistance and inductance coefficients act from the temperature the
+nameplate values were measured at (25 °C), not from the ambient, so a plant described with a hot
+ambient starts with a hot winding.
+
 When no description is present the firmware falls back to the motor it is built with, so the
 target still boots standalone. A trip threshold of zero disables that protection, which is how a
 scenario opts out of one it is not testing.
@@ -212,11 +216,19 @@ A condition already standing when the state machine registers its handler is sti
 edge that passes before anyone is listening would otherwise be lost, and the motor would enable
 into a fault the board had already detected.
 
-> **Known defect.** Delivering a board protection fault to a running drive currently locks the
-> firmware up: the fault path takes an unaligned-access exception, which faults again and
-> escalates. The path had never been exercised, because the emulated platform ignored protection
-> registration entirely and reported its state as unknown, and no other platform raises it under
-> test. The scenarios that reproduce it are kept, tagged apart from the default run.
+Delivering a board protection fault to a running drive used to lock the firmware up, and the
+scenarios that reproduced it were held out of the default run. The fault path defers the state
+transition through the weak-pointer event dispatcher, and the emulated platform registered only the
+plain one, so the call ran on a singleton that did not exist. On this machine address zero is
+writable memory holding the vector table, and the dispatcher's push index sits at offset twelve —
+the HardFault vector. The atomic increment advanced that vector from `0x22dd` to `0x22de`, clearing
+its Thumb bit; the next store, through a "storage" pointer that was really a code address, took an
+unaligned-access fault; and the escalation to HardFault jumped through a vector that could not be
+executed. QEMU reported exactly that: a lockup, unable to escalate to HardFault, at `0x22de`.
+Registering a dispatcher that serves both singletons (Part J) fixed it; the scenarios were then
+found to fail for a second, unrelated reason — two of their thresholds no longer sat on the far
+side of the nominal plant after the reference motors replaced the 48 V stand-in — and run in the
+default set with those rows corrected.
 
 ### Part F — Wiring faults
 
@@ -233,13 +245,14 @@ Two results are worth recording because they are not obvious:
   settled once its reading stops changing for a run of samples, and a reading frozen at one
   value satisfies that on the first run it sees, more convincingly than a real rotor ever
   does. The drive therefore takes its reference from a reading that means nothing and enables
-  on it. Nothing afterwards compares the reading against the current being pushed into the
-  winding, so a loop regulating that reading holds a position that cannot move while the
-  rotor is free to turn. The scenario pair in the wiring-fault feature records both halves:
-  the default-run scenario asserts what the product does today, that the drive runs and
-  reports a rotor which never moves, and the held-out scenario carries what it should do,
-  which is to report a sensor fault. The fault code for that already exists and is carried on
-  the wire; nothing raises it.
+  on it. What exposes it is the first request for motion: the loop pushes torque current and
+  the reading does not move. The encoder plausibility monitor (REQ-SM-028) watches for exactly
+  that from the event loop — measured torque current above a fraction of the limit, a demanded
+  speed or an unclosed position error, and a reading still inside a small excursion for a
+  whole window — and raises the sensor fault the wire already carried but nothing used to
+  raise. A disconnected motor carries no current and is not misreported; a position held
+  against a load demands no motion and is not reported either; a mechanically locked rotor is
+  indistinguishable and is reported the same way.
 
 An encoder can also be told to freeze a set time after the motor is enabled rather than to have
 been dead all along, scheduled the same way as the shaft torque of Part H and on the same
@@ -358,22 +371,38 @@ delivery stamp. The target's command surface is still the product's: nothing was
 
 The first characterisation run measured the product against the parameter set that stood in
 for a motor at the time and reported four findings. Re-measured on the reference motors, after
-the harness faults recorded in Part J were fixed, two of them were artefacts, one stands, and one
-was a real defect that has since been fixed. A scenario that exposes a standing defect is kept,
-with the limits the law should meet, under a tag held out of the default run in the same way as
-the protection scenarios; the scenarios in the default run carry the envelope the product holds
-today, so a regression is still caught while the defect is open.
+the harness faults recorded in Part J were fixed, two of them were artefacts and two were real
+defects. Later runs found more. Each real defect was root-caused and fixed rather than parked:
+every scenario in the suite now runs in the default set.
 
-- **Whole-percent duty resolution.** The duty cycles the modulator hands the inverter are three
-  whole-percent values, and the conversion rounds to the nearest percent. On a 40 V bus into a
-  0.36 Ω, 0.20 mH winding one step is 0.4 V and about a tenth of an ampere of ripple per control
-  period, so the current loop holds a half-ampere setpoint inside a band of about 30 % of it and
-  cannot settle into a 10 % one. The speed loops above it no longer show a limit cycle worth the
-  name: their tail band is 1–3 % of a 20 rad/s setpoint, and they settle into a 10 % band within
-  10–25 ms with 1–5 % overshoot. The quarter-setpoint limit cycle of the first run was the
-  73 mΩ winding's doing, and the harness's inductance seed. Every loop is affected on every
-  platform, because the type is the product interface's, and a tight current-loop band cannot be
-  required until the duty carries more resolution.
+- **Whole-percent duty resolution — fixed.** The duty cycles the modulator handed the inverter
+  were `hal::Percent`, a whole-percent `uint8_t` from the infrastructure library's PWM
+  interfaces, and the conversion rounded to the nearest percent. On a 40 V bus into a 0.36 Ω,
+  0.20 mH winding one step is 0.4 V and about a tenth of an ampere of ripple per control period,
+  so the current loop held a half-ampere setpoint inside a band of about 30 % of it and could
+  not settle into a 10 % one. The hardware was no better: the TI driver computed its compare
+  value as `load × duty / 100` in integers. The PWM interfaces now take `hal::DutyCycle`, an
+  integer Q16 fraction of the period (65536 is 100 %), through the infrastructure library and
+  both hardware abstraction layers — integer so that no driver needs floating point, and Q16 so
+  that its conversion to counts is a multiply and a shift, never a division, in the interrupt.
+  Each driver rounds its compare value with the same `DutyCycle::ToCounts` helper;
+  the TI platform also clocks its PWM at half the system clock rather than an eighth, so a
+  20 kHz centre-aligned period spans 1500 counts on the 120 MHz part (0.07 % a count) instead
+  of 375. The deadbeat law now settles into a 10 % band within a sample with under 5 %
+  overshoot, the decoupled law within 1.7 ms with none, and the speed laws' tail band fell to
+  0.4 % of a 20 rad/s setpoint.
+- **The sliding-mode current law overshot by design — fixed.** Its equivalent control drove the
+  next error to zero on its own, and the switching term then threw the error `K_sw` past zero
+  every time it left the boundary layer: 40 % of a step with the shipped gains, measured at
+  46–50 %. It now uses the exponential reaching law at the loop bandwidth
+  (`documentation/theory/current-loop-sliding-mode.md`) and settles into a 10 % band within
+  0.2 ms without overshoot.
+- **The PID current law keeps a standing error on an accelerating rotor — by design.** A
+  torque step accelerates the free rotor at some 2700 rad/s², so the back-EMF ramps at about
+  70 V/s, and a PI tracks a ramp with an error of the ramp rate over its integral gain: 0.08 A
+  of a 0.5 A step here. Whole-percent dither used to hide some of it. The law has no back-EMF
+  feedforward by construction; the decoupled law does, and meets the tight envelope. The PID
+  row carries the envelope the law can meet.
 - **Two current laws command nothing — retracted.** With the inductance seeded correctly the
   deadbeat law rises within a sample and overshoots 9 %, the sliding-mode law overshoots 50 %
   into its boundary layer, and the decoupled law 25 %. The zero output was the deadbeat and
@@ -394,30 +423,33 @@ today, so a regression is still caught while the defect is open.
 A later run, the first to apply a disturbance of either sign, found one more thing and is worth
 recording because the asymmetry was not expected:
 
-- **Two position laws reject a torque better in one direction than the other.** Against a
-  negative torque the PID position loop took 106 ms to return inside the band its positive row
-  meets in 50, and the two-DOF loop was pushed 0.1008 rad off a limit of 0.1. The other three
-  laws met the same envelope whichever way the torque pushed. The two that did not are the two
-  that hold their setpoint with a standing error of some 0.055 rad, which is already most of the
-  0.08 rad band the recovery is measured inside, so a disturbance pushing away from the setpoint
-  begins the measurement near the edge of the band rather than in the middle of it. That is an
-  explanation and not yet a diagnosis: whether the limits are wrong for one direction, or the
-  loops are, has not been established. The two rows are held back until it is, rather than
-  loosened to fit the measurement or tagged against a defect nobody has confirmed.
+- **Two position laws rejected a torque better in one direction than the other — fixed.**
+  Against a negative torque the PID position loop took 106 ms to return inside the band its
+  positive row meets in 50, and the two-DOF loop was pushed 0.1008 rad off a limit of 0.1. The
+  "standing error" of some 0.055 rad both showed was not one: their PI placed its integral zero
+  at a twentieth of the position bandwidth, which leaves a slow closed-loop pole beside the zero
+  and a tail of some 0.089 rad decaying over a second. Half a second after a 1.5 rad step it was
+  still 0.055 rad over the setpoint, and a torque pushing the same way crossed the band. The zero
+  now sits at a fifth of the bandwidth, and the proportional term weights the reference at three
+  quarters so that the zero does not overshoot the step
+  (`documentation/theory/position-loop-pid.md`). Both laws now settle a 1.5 rad step within
+  0.5 % and are pushed under 0.03 rad by the torque step of either sign.
 
 The same run, once a disturbance was made large enough to reach the current limit, found a
 second thing:
 
-- **Two speed laws do not come back from a saturating disturbance.** A shaft torque of half a
-  newton-metre asks for about thirteen of the twenty amperes the drive allows, so the current to
-  reject it is there, and the transient that gets there clamps on the way. ADRC and LQI are
-  thrown 205 to 238 rad/s off a 20 rad/s setpoint and return to within a few hundredths of it.
-  PI and two-DOF are thrown further, to about 317, and then stop 10.44 rad/s short, having
-  surrendered more than half the setpoint to a disturbance they had the current to reject. The
-  two that recover carry the default-run rows; the two that do not are held out under the
-  known-defect tag with the envelope the other two meet. The scenario that found this is the only
-  one in the suite that reaches the current limit at all: every other disturbance is kept small
-  on purpose so that it measures the control law rather than the limiter.
+- **Two speed laws did not come back from a saturating disturbance — fixed.** A shaft torque of
+  half a newton-metre asks for about thirteen of the twenty amperes the drive allows, so the
+  current to reject it is there. ADRC and LQI were thrown 205 to 238 rad/s off a 20 rad/s
+  setpoint and returned; PI and two-DOF were thrown to about 317 and ended the window
+  10.44 rad/s short. There was no windup — the velocity-form PI never reached its clamp. The PI
+  placed its integral zero at a tenth of the speed bandwidth, which leaves a slow closed-loop
+  pole near 10 rad/s, and the tail mean of that pole's decay over the last quarter of the window
+  predicts 10.7 rad/s. The zero now sits at a quarter of the bandwidth
+  (`documentation/theory/speed-loop-pi.md`): both laws are thrown about 295 rad/s off and are
+  back inside 3 rad/s 175 ms later, and a step from rest overshoots by about 10 %. The scenario
+  is the only one in the suite that reaches the current limit at all: every other disturbance
+  is kept small on purpose so that it measures the control law rather than the limiter.
 
 How far the limit can be lowered to provoke that is itself bounded, which is worth recording
 because it is not obvious: alignment injects open-loop and abandons the attempt the moment a
@@ -507,7 +539,9 @@ What the first characterisation found, in the order it was found:
   control interrupt on the first sample the identification observed. The fault handler then
   faulted again, so nothing was traced and the target simply went silent. The deferred fault
   notifications take the same path. The platform now registers a cortex dispatcher that serves
-  both singletons. The hardware platforms should be checked for the same omission. With the
+  both singletons. Both hardware platforms register the weak-pointer dispatcher and run it from
+  `Run()`; the ST one, still a stub that builds no application, used to register none and return
+  from `Run()`. With the
   dispatcher in place the full calibration from the terminal reaches Ready on both motors and
   its record is within 0.05 % of the plant's inertia and 2 % of its viscous friction, from a
   seed that was off by a factor of two and a half; the offline procedure, sampling at the control
@@ -526,29 +560,63 @@ What the first characterisation found, in the order it was found:
   response is not used by the scenarios and changing its scale is a wire-contract change left
   open. The tracer prints three decimals, so the same values traced as zero; the traces now
   carry them in micro-units.
-- **The online mechanical estimator does not track.** Seeded with twice the inertia and half the
+- **The online mechanical estimator did not track.** Seeded with twice the inertia and half the
   friction and excited for six seconds by a speed reference alternating between 26 and 52 rad/s
   every quarter second, it published an inertia 26–33 % low and a friction near zero on the
-  Teknic (0.7–1.4 for 15 µN·m·s/rad), and nothing at all on the Anaheim, whose estimates were
-  still the seed at the end. It shares its acceptance policy with the offline procedure, which
-  is accurate to a fraction of a percent, but runs at the 1 kHz outer-loop rate instead of the
-  control rate: there a torque sample and the acceleration it produced sit in different
-  samples on rotors this light, the two-level trajectory leaves viscous friction collinear with
-  the intercept, and the convergence gate (an innovation below 0.1 mN·m) sits under the torque
-  ripple the whole-percent duty produces, so it is met by chance or not at all. A constant shaft
-  torque changes none of this.
-- **The online electrical estimator cannot see the resistance.** Its regressor's resistance
-  column is the d-axis current, which the product regulates to zero, so that direction is
-  never excited and the recursion drifts: after six seconds the resistance read −0.68 Ω for a
-  0.36 Ω winding, −1.63 Ω for 0.405 Ω, and −0.63 Ω on the heated plant it was meant to track.
-  The inductance, driven by the cross-coupling term, moved from its seed toward the plant and
-  past it (+39 % and −17 %). The state machine refuses non-physical estimates when asked to
-  apply them, so none of this reaches the gains, but tracking a warming winding is impossible
-  by construction until the estimator gets a d-axis excitation of its own.
+  Teknic, and nothing at all on the Anaheim. It regressed an instantaneous current sample against
+  the second difference of two window-mean speeds, which is centred an outer sample earlier; with
+  the speed loop's transients decaying at some 400 rad/s that alone scaled the inertia by about
+  two thirds. Its 200 ms memory was shorter than one 250 ms dwell, so within its window friction
+  was collinear with the intercept. Its excitation gate was met by duty ripple on every plateau,
+  and its convergence gate — an innovation under 0.1 mN·m — sat under that same ripple and was
+  met by chance. It now regresses the momentum balance over window averages the control interrupt
+  accumulates (theory: `friction-inertia-estimation.md` §4.1) with a two-second memory, and
+  publishes once its averaged residual is under 1 % of the torque it explains.
 
-The identification scenarios therefore run the offline procedures in the default set, on both
-motors, and hold the online scenarios out under the known-defect tag with the envelope the
-estimators should meet (REQ-CAL-014).
+  Fixing that exposed a platform-independent timing fault: the outer loop measured speed by
+  differencing whatever angle it found when it ran, and it runs up to a tick after the window
+  closes, so windows of 19 and 21 ticks were divided by 20. The jitter — some 2000 rad/s² of
+  acceleration noise — biased the inertia low by errors in the regressor, and it also reached the
+  speed loop. The interrupt now latches the angle at the window boundary. Both reference motors
+  then identify inertia within 4 % and friction within 8 %, and a constant 0.01 N·m shaft torque
+  lands in the intercept (10.0 mN·m) instead of the friction.
+
+- **The online electrical estimator could not see the resistance.** Its regressor's resistance
+  column was the d-axis current, which the product regulates to zero, so that direction was
+  never excited and the recursion drifted: −0.68 Ω for a 0.36 Ω winding, −1.63 Ω for 0.405 Ω. It
+  also paired each current with the voltage commanded on the same tick, which contains the PI's
+  own −Kp·id and pulled the resistance negative by about Kp, and it differentiated two
+  instantaneous currents a millisecond apart. The cascades now carry a d-axis square wave while
+  the estimator is attached (±2.5 % of the current limit at 10 Hz, no torque on a non-salient
+  machine), and the estimator regresses the integrated d-axis equation over window averages that
+  pair each current with the voltage applied while it formed (`service-electrical-ident.md`).
+  The resistance then reads 0.360 Ω and 0.405 Ω.
+
+- **The plant counted the frame rotation twice.** With the resistance fixed the Anaheim
+  inductance still read 48 % high, and the window residuals were exactly −L·ωe·iq through every
+  speed transition. The plant integrates the dq equations — which already carry the ±ωL coupling
+  the rotating frame produces — then converted the new currents back to phase currents at the
+  angle the step *started* from, and the next step read them at the new angle: the rotation was
+  applied twice and the plant's cross-coupling was doubled. Every scenario since the plant model
+  was introduced ran against that doubled coupling. The currents now return to phase quantities
+  at the angle the step ends on, and the inverter's stator-fixed voltage is read at mid-step. The
+  inductance then reads 0.191 mH and 0.636 mH.
+
+- **The heated winding could not be tracked as described.** The plant scaled its resistance from
+  its ambient temperature, and the "hot" preset set the ambient to 90 °C, so its winding
+  resistance stayed at the 25 °C nameplate value while the scenario compared against the value at
+  90 °C. The thermal model now carries the temperature the nameplate values were measured at, and
+  the heated winding reads 0.453 Ω against 0.452 Ω.
+
+- **The offline friction depended on the duty ripple.** With the duty carried as a fraction the
+  full calibration's friction moved 19–27 % off the plant. Its excitation gate refused every
+  sample accelerating slower than 1 rad/s², which on a clean plateau is every sample, and the
+  plateaus are what separate friction from the intercept; only the whole-percent ripple had let
+  them through. Both procedures now take every sample above standstill and require a span of
+  speeds before publishing (`service-mechanical-ident.md` § *Persistence of Excitation*).
+
+Every identification scenario, offline and online, runs in the default set on both motors
+(REQ-CAL-012 to REQ-CAL-014).
 
 ---
 
@@ -561,7 +629,7 @@ estimators should meet (REQ-CAL-014).
 | Control modes            | Torque, speed and position each align, enable, take a setpoint, disable                                           |
 | Controller algorithms    | Every algorithm of every loop runs, plus combinations across the loops                                            |
 | Plant characteristics    | Control holds up across noise, temperature, load and a different winding                                          |
-| Wiring faults            | A dead motor does not turn; a degraded one does                                                                   |
+| Wiring faults            | A dead motor does not turn; a degraded one does; a stuck or frozen encoder is reported as a sensor fault          |
 | Memory integrity         | Damaged calibration is distrusted; damaged configuration falls to defaults                                        |
 | Board protection         | Trips reach the state machine and are reported                                                                    |
 | Control performance      | Each loop's step response stays inside its settling, overshoot and error envelope, from rest and while running    |

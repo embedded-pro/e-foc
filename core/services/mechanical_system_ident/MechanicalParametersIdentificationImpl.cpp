@@ -35,7 +35,7 @@ namespace services
         this->previousPosition = encoder.Read().Value();
         this->previousSpeed = 0.0f;
         this->polePairs = static_cast<float>(numberOfPolePairs);
-        this->excitedUpdates = 0;
+        this->excitation.Restart();
         this->atDwellLevel = false;
         this->outcome = Outcome::pending;
         ++run;
@@ -176,7 +176,7 @@ namespace services
         if (outcome != Outcome::pending)
             return;
 
-        if (!IsMechanicallyExciting(acceleration, speed))
+        if (!IsMechanicallyObservable(speed))
             return;
 
         auto electricalAngle = mechanicalPos * polePairs;
@@ -186,11 +186,9 @@ namespace services
         torque.at(0, 0) = rotatingFrame.q * torqueConstant.Value();
 
         auto metrics = rls->Update(regressor, torque);
+        excitation.Count(acceleration, speed);
 
-        if (excitedUpdates != mechanical_estimate::minimumExcitedUpdates)
-            ++excitedUpdates;
-
-        if (!HasConvergedMechanics(metrics, excitedUpdates, currentConfig.forgettingFactor))
+        if (!HasConvergedMechanics(metrics, excitation, currentConfig.forgettingFactor))
             return;
 
         outcome = Outcome::converged;

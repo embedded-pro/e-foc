@@ -401,7 +401,7 @@ namespace application
         if (!dutyC.has_value())
             return { error, "invalid value for phase C. It should be a float between 1 and 99." };
 
-        hardware.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{ hal::Percent{ *dutyA }, hal::Percent{ *dutyB }, hal::Percent{ *dutyC } });
+        hardware.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(*dutyA), hal::DutyCycle::FromPercent(*dutyB), hal::DutyCycle::FromPercent(*dutyC) });
 
         return { success };
     }

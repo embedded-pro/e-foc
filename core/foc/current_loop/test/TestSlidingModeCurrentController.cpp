@@ -1,4 +1,5 @@
 #include "core/foc/current_loop/SlidingModeCurrentController.hpp"
+#include <algorithm>
 #include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
@@ -29,6 +30,11 @@ namespace
         return (1.0f - Ad()) / resistance;
     }
 
+    float ReachingPole()
+    {
+        return std::exp(-foc::CurrentLoopTunings{}.bandwidth * samplePeriod);
+    }
+
     float Normalized(float physicalVoltage)
     {
         return physicalVoltage * std::numbers::sqrt3_v<float> / busVoltage;
@@ -39,7 +45,7 @@ namespace
         const float error = measured - reference;
         const float saturated = std::clamp(error / boundaryLayer, -1.0f, 1.0f);
 
-        return Normalized((-(Ad() * error + switchingGain * saturated) + (1.0f - Ad()) * reference) / Bd());
+        return Normalized((-((Ad() - ReachingPole()) * error + switchingGain * saturated) + (1.0f - Ad()) * reference) / Bd());
     }
 
     class TestSlidingModeCurrentController
@@ -58,6 +64,22 @@ namespace
             }
 
             return current;
+        }
+
+        float PeakCurrentAfterStep(float reference, int steps)
+        {
+            const float denormalize = busVoltage / std::numbers::sqrt3_v<float>;
+            float current = 0.0f;
+            float peak = 0.0f;
+
+            for (int step = 0; step != steps; ++step)
+            {
+                auto output = controller.Compute({ { current, 0.0f }, { reference, 0.0f }, 0.0f });
+                current = Ad() * current + Bd() * output.d * denormalize;
+                peak = std::max(peak, current);
+            }
+
+            return peak;
         }
 
         foc::SlidingModeCurrentController controller;
@@ -180,4 +202,23 @@ TEST_F(TestSlidingModeCurrentController, the_cross_coupling_term_follows_the_mea
     const auto withD = controller.Compute({ { measuredD, 0.0f }, { measuredD, 0.0f }, electricalSpeed });
 
     EXPECT_NEAR(electricalSpeed * inductanceInHenry * Normalized(1.0f) * measuredD, withD.q - withoutD.q, tolerance);
+}
+
+TEST_F(TestSlidingModeCurrentController, a_step_from_rest_approaches_the_surface_without_overshoot)
+{
+    controller.Configure(ValidParameters());
+
+    EXPECT_LE(PeakCurrentAfterStep(0.5f, 200), 0.5f * 1.001f);
+}
+
+TEST_F(TestSlidingModeCurrentController, a_step_from_rest_enters_a_ten_percent_band_within_ten_samples)
+{
+    const float denormalize = busVoltage / std::numbers::sqrt3_v<float>;
+    float current = 0.0f;
+    controller.Configure(ValidParameters());
+
+    for (int step = 0; step != 10; ++step)
+        current = Ad() * current + Bd() * controller.Compute({ { current, 0.0f }, { 0.5f, 0.0f }, 0.0f }).d * denormalize;
+
+    EXPECT_NEAR(current, 0.5f, 0.1f * 0.5f);
 }

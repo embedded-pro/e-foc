@@ -301,13 +301,37 @@ The d-axis voltage equation for a non-salient PMSM is:
 
 $$V_d = R \cdot I_d + L \cdot \left(\frac{dI_d}{dt} - \omega_e \cdot I_q\right)$$
 
-The regressor vector is $\phi = [I_d,\ (dI_d/dt - \omega_e I_q)]^T$, and the parameter vector is
-$\theta = [R,\ L]^T$. An RLS algorithm with forgetting factor 0.998 updates $\theta$ each
-outer-loop period (1 kHz).
+Integrated over one outer-loop period $T$ it needs no derivative of a sampled current:
 
-### Persistence-of-Excitation Gate
+$$\overline{V_d} = R\,\overline{I_d} + L\left(\frac{I_{d,end} - I_{d,start}}{T} - \overline{\omega_e I_q}\right)$$
 
-The RLS update is skipped when $|\phi|^2 < 10^{-6}$ to prevent covariance blow-up at standstill.
+The regressor vector is $\phi = [\overline{I_d},\ (\Delta I_d / T - \overline{\omega_e I_q})]^T$ in amperes and
+amperes per millisecond, and the parameter vector is $\theta = [R,\ L]^T$ in ohms and millihenries. An RLS
+algorithm with forgetting factor 0.999 updates $\theta$ once per outer-loop period (1 kHz).
+
+The averages are accumulated by the control interrupt, tick by tick, and published with each window:
+
+- $\overline{V_d}$ pairs each current sample with the voltage *applied during the tick that produced it* —
+  the previous tick's command, not the one just computed from that same sample. Regressing the same-tick
+  command put the PI's own $-K_p I_d$ into the output and pulled the resistance negative, by about $K_p$.
+- The applied vector is fixed in the stator for the tick while the rotor turns through $\Delta\theta_e$, so
+  in the rotor frame it arrives advanced by half that angle: $V_d$ is taken as $v_d + \tfrac{1}{2}\Delta\theta_e v_q$.
+- $\overline{\omega_e I_q}$ integrates the rotation each tick actually made, $\Delta\theta_e\,\overline{I_q}/T_s$,
+  rather than the outer loop's last speed, which lags an accelerating rotor.
+
+### Excitation
+
+The product regulates $I_d$ to zero, so the resistance column is never excited on its own: the recursion
+drifted, read $-0.68\ \Omega$ for a $0.36\ \Omega$ winding, and could not by construction track a warming
+one. The speed and position cascades therefore add a d-axis square wave to the current reference while the
+estimator is attached: $\pm 2.5\,\%$ of the drive's current limit at 10 Hz. It produces no torque on a
+non-salient machine and a copper loss proportional to its square. An update is taken only while
+$|\overline{I_d}|$ exceeds 50 mA, so an amplitude of zero switches both the injection and resistance
+tracking off.
+
+### Publication
+
+Estimates are published after 200 updates since the last seed, and only when both are finite and positive.
 
 ### Seeding
 

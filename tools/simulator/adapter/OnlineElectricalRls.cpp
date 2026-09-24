@@ -7,11 +7,17 @@ namespace simulator
         : QObject(parent)
         , foc::ThreePhaseMotorModelObserver(model)
         , polePairs(polePairs)
-        , estimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, baseFrequency)
+        , estimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, hal::Hertz{ estimatorWindowFrequencyHz })
+        , samplesPerWindow(baseFrequency.Value() / estimatorWindowFrequencyHz)
     {}
 
     void OnlineElectricalRls::Started()
-    {}
+    {
+        samplesInWindow = 0;
+        sumVd = 0.0f;
+        sumId = 0.0f;
+        sumSpeedTimesIq = 0.0f;
+    }
 
     void OnlineElectricalRls::PhaseCurrentsWithMechanicalAngle(foc::PhaseCurrents currents, foc::Radians thetaMech, foc::RadiansPerSecond omegaMech)
     {
@@ -23,8 +29,16 @@ namespace simulator
         const foc::RotatingFrame idq = park.Forward(iAlphaBeta, cosTheta, sinTheta);
         const foc::RotatingFrame vdq = park.Forward(lastVAlphaBeta, cosTheta, sinTheta);
 
-        estimator.Update(foc::Volts{ vdq.d }, foc::Ampere{ idq.d }, foc::Ampere{ idq.q },
-            foc::RadiansPerSecond{ static_cast<float>(polePairs) * omegaMech.Value() });
+        sumVd += vdq.d;
+        sumId += idq.d;
+        sumSpeedTimesIq += static_cast<float>(polePairs) * omegaMech.Value() * idq.q;
+
+        if (++samplesInWindow < samplesPerWindow)
+            return;
+
+        const float count = static_cast<float>(samplesInWindow);
+        estimator.Update(foc::ElectricalWindow{ foc::Volts{ sumVd / count }, foc::Ampere{ sumId / count }, foc::Ampere{ idq.d }, sumSpeedTimesIq / count });
+        Started();
 
         emit electricalEstimatesChanged(estimator.CurrentResistance().Value(),
             estimator.CurrentInductance().Value() * 0.001f);

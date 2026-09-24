@@ -17,6 +17,8 @@ namespace state_machine
         void Unregister() override;
         void RegisterSecondary(const infra::Function<void(FaultCode)>& onFault);
 
+        void Raise(FaultCode code);
+
         FaultConditionState ConditionState() override;
 
     private:

@@ -19,6 +19,7 @@
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/PlatformFaultNotifier.hpp"
 #include "core/supervision/ControlHealth.hpp"
+#include "core/supervision/EncoderPlausibilityMonitor.hpp"
 #include "core/supervision/SupervisedInverter.hpp"
 #include "core/supervision/SupervisedLowPriorityInterrupt.hpp"
 #include "core/supervision/WatchdogSupervisor.hpp"
@@ -69,6 +70,7 @@ namespace application
         services::MotorAlignmentImpl motorAlignment;
         infra::WithSharedAccess<state_machine::PlatformFaultNotifier> platformFaultNotifier;
         WatchdogSupervision watchdog;
+        supervision::EncoderPlausibilityMonitor encoderPlausibility;
         services::ConfigData configData;
 
         std::optional<services::TracingCan> tracingCan;

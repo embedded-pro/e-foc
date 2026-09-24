@@ -16,7 +16,7 @@ namespace services
     public:
         struct Config
         {
-            hal::Percent testVoltagePercent{ 15 };
+            hal::DutyCycle testVoltage{ hal::DutyCycle::FromPercent(15) };
             infra::Duration settleTime{ std::chrono::seconds{ 2 } };
             WindingConfiguration windingConfig{ WindingConfiguration::Wye };
             infra::Duration noSampleTimeout{ std::chrono::milliseconds{ 100 } };
@@ -42,7 +42,7 @@ namespace services
         void StartSampleWatchdog();
         void FailMeasurement();
 
-        static constexpr uint8_t neutralDuty = 1;
+        static constexpr hal::DutyCycle neutralDuty{ hal::DutyCycle::FromPercent(1) };
         static constexpr float wyeTerminalFactor = 1.5f;
         static constexpr float deltaTerminalFactor = 0.5f;
         static constexpr std::size_t averageFilterSize = 5;

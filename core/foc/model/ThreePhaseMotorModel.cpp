@@ -1,6 +1,7 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/AngleWrap.hpp"
+#include "core/foc/math/DutyConversion.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
@@ -12,7 +13,6 @@ namespace foc
     {
         constexpr float two_pi = 2.0f * std::numbers::pi_v<float>;
         constexpr float half = 0.5f;
-        constexpr float percentToFraction = 100.0f;
         constexpr float torqueConstant = 1.5f;
 
     }
@@ -118,19 +118,19 @@ namespace foc
 
     foc::Ohm ThreePhaseMotorModel::EffectiveResistance() const
     {
-        const float deltaT = thermal.windingTempCelsius - thermal.config.ambientCelsius;
+        const float deltaT = thermal.windingTempCelsius - thermal.config.referenceCelsius;
         return foc::Ohm{ parameters.R.Value() * (1.0f + thermal.config.copperTempCoeff * deltaT) };
     }
 
     foc::Henry ThreePhaseMotorModel::EffectiveInductanceD() const
     {
-        const float deltaT = thermal.windingTempCelsius - thermal.config.ambientCelsius;
+        const float deltaT = thermal.windingTempCelsius - thermal.config.referenceCelsius;
         return foc::Henry{ parameters.Ld.Value() * (1.0f - thermal.config.ironInductanceCoeff * deltaT) };
     }
 
     foc::Henry ThreePhaseMotorModel::EffectiveInductanceQ() const
     {
-        const float deltaT = thermal.windingTempCelsius - thermal.config.ambientCelsius;
+        const float deltaT = thermal.windingTempCelsius - thermal.config.referenceCelsius;
         return foc::Henry{ parameters.Lq.Value() * (1.0f - thermal.config.ironInductanceCoeff * deltaT) };
     }
 
@@ -182,9 +182,9 @@ namespace foc
         currentNoise.icLast = icNoise;
 
         const auto supply = EffectiveSupplyVoltage().Value();
-        const auto va = (dutyPhases.a.Value() / percentToFraction - half) * supply;
-        const auto vb = (dutyPhases.b.Value() / percentToFraction - half) * supply;
-        const auto vc = (dutyPhases.c.Value() / percentToFraction - half) * supply;
+        const auto va = (foc::DutyFraction(dutyPhases.a) - half) * supply;
+        const auto vb = (foc::DutyFraction(dutyPhases.b) - half) * supply;
+        const auto vc = (foc::DutyFraction(dutyPhases.c) - half) * supply;
         const foc::ThreePhase vAbc{ va, vb, vc };
         const auto vAlphaBeta = clarke.Forward(vAbc);
 
@@ -249,7 +249,7 @@ namespace foc
         motorState.omega = foc::RadiansPerSecond{ 0.0f };
         motorState.omega_mech = foc::RadiansPerSecond{ 0.0f };
         ResetTemperature();
-        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 49 }, hal::Percent{ 51 } };
+        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(49), hal::DutyCycle::FromPercent(51) };
 
         NotifyObservers([](auto& observer)
             {
@@ -268,7 +268,7 @@ namespace foc
         motorState.ia = foc::Ampere{ 0.0f };
         motorState.ib = foc::Ampere{ 0.0f };
         motorState.ic = foc::Ampere{ 0.0f };
-        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } };
+        selfDrive.pendingDuties = foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) };
         onCurrentPhasesReady = nullptr;
     }
 
@@ -304,19 +304,24 @@ namespace foc
     void ThreePhaseMotorModel::Model(const foc::PhasePwmDutyCycles& dutyPhases)
     {
         auto dt = 1.0f / static_cast<float>(baseFrequency.Value());
-        auto duty_a = dutyPhases.a.Value() / percentToFraction;
-        auto duty_b = dutyPhases.b.Value() / percentToFraction;
-        auto duty_c = dutyPhases.c.Value() / percentToFraction;
+        auto duty_a = foc::DutyFraction(dutyPhases.a);
+        auto duty_b = foc::DutyFraction(dutyPhases.b);
+        auto duty_c = foc::DutyFraction(dutyPhases.c);
 
         const auto supply = EffectiveSupplyVoltage();
         auto va = (duty_a - half) * supply;
         auto vb = (duty_b - half) * supply;
         auto vc = (duty_c - half) * supply;
 
+        const auto stepRotation = motorState.omega.Value() * dt;
         auto cos_theta = foc::FastTrigonometry::Cosine(motorState.theta.Value());
         auto sin_theta = foc::FastTrigonometry::Sine(motorState.theta.Value());
+        const auto midAngle = motorState.theta.Value() + 0.5f * stepRotation;
+        const auto endAngle = motorState.theta.Value() + stepRotation;
+        const auto cos_end = foc::FastTrigonometry::Cosine(endAngle);
+        const auto sin_end = foc::FastTrigonometry::Sine(endAngle);
 
-        auto v_dq = park.Forward(clarke.Forward(foc::ThreePhase{ va.Value(), vb.Value(), vc.Value() }), cos_theta, sin_theta);
+        auto v_dq = park.Forward(clarke.Forward(foc::ThreePhase{ va.Value(), vb.Value(), vc.Value() }), foc::FastTrigonometry::Cosine(midAngle), foc::FastTrigonometry::Sine(midAngle));
         auto i_dq = park.Forward(clarke.Forward(foc::ThreePhase{ motorState.ia.Value(), motorState.ib.Value(), motorState.ic.Value() }), cos_theta, sin_theta);
 
         auto id = i_dq.d;
@@ -332,7 +337,7 @@ namespace foc
         id += dId_dt * dt;
         iq += dIq_dt * dt;
 
-        auto i_abc = clarke.Inverse(park.Inverse(foc::RotatingFrame{ id, iq }, cos_theta, sin_theta));
+        auto i_abc = clarke.Inverse(park.Inverse(foc::RotatingFrame{ id, iq }, cos_end, sin_end));
 
         motorState.ia = foc::Ampere{ i_abc.a };
         motorState.ib = foc::Ampere{ i_abc.b };
@@ -342,7 +347,7 @@ namespace foc
 
         if (faultInjection.config.AnyPhaseOpen())
         {
-            const auto masked = park.Forward(clarke.Forward(foc::ThreePhase{ motorState.ia.Value(), motorState.ib.Value(), motorState.ic.Value() }), cos_theta, sin_theta);
+            const auto masked = park.Forward(clarke.Forward(foc::ThreePhase{ motorState.ia.Value(), motorState.ib.Value(), motorState.ic.Value() }), cos_end, sin_end);
             id = masked.d;
             iq = masked.q;
         }

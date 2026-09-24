@@ -41,25 +41,27 @@ Feature: FOC Control Performance
   the capture after the setpoint has to stretch with it; the resolution left is
   a fifth of a millisecond, against a transient that rises in under two.
 
-  That row carries about twice the steady-state error of the rows measured from
-  rest, and an overshoot that will not sit still. Half a second of torque leaves
-  the rotor turning, so holding a reversed current against the back-EMF it now
-  generates needs a duty the inverter can only approximate in whole percent: the
-  standing error lands near a quarter of the setpoint rather than a tenth of it,
-  and the overshoot, a steady 8.5 percent when the same law starts from rest,
-  wanders between 9 and 15 percent. That is the same duty resolution the band on
-  these rows is already wide for, measured at a harder operating point.
+  That row is a PI row, and it carries the same standing error the PI row from
+  rest does, for the same reason: half a second of torque leaves the rotor
+  turning, and holding a reversed current against the back-EMF it generates is
+  a ramp a PI without feedforward can only follow with an offset, here about a
+  fifth of the setpoint. Its limits were pinned while the duty still reached the
+  inverter in whole percent, when the overshoot wandered between 9 and 15
+  percent and the tail band between 20 and 31; with the duty in Q16 the row
+  measures no overshoot and a tail band near 11 percent, well inside both.
 
-  Its tail band moves further than any other measurement here: eleven points,
-  between 20 and 31 percent, across runs that differ in nothing but when the
-  command arrived. Twice the worst of those is 62, and its limit is rounded up
-  past that to 65, so that a spread already this wide cannot spend the margin the
-  limit exists to provide.
-
-  The duty cycle reaches the inverter in whole percent, so the current loop
-  ripples around its setpoint by about a tenth of an ampere; the @sil current
-  rows carry the envelope the product holds today and the @sil-known-defect rows
-  the envelope the laws should meet. See documentation/design/software-in-the-loop.md.
+  The duty cycle reaches the inverter as a fraction, not in whole percent, so the
+  current loops settle into a 10 % band. The PID row is the exception, and it is
+  the law rather than the drive: a plain PI has no back-EMF feedforward, and the
+  step accelerates a free rotor at some 2700 rad/s², so the back-EMF it fights
+  ramps at about 70 V/s. A PI tracks a ramp with a standing error of the ramp rate
+  over its integral gain, R times the loop bandwidth, which is 0.08-0.1 A here:
+  the loop never reaches 90 % of the step, so its rise limit is the window. The
+  decoupled law feeds the back-EMF forward and meets the tight envelope. Their
+  rise and tail limits follow the same twice-the-worst rule as the outer loops;
+  measured from rest the current rows repeat to the digit from run to run, so
+  the figures they are twice of are exact. See
+  documentation/design/software-in-the-loop.md.
 
   @REQ-SPD-008
   Scenario Outline: The <algorithm> speed loop steps from rest to 20 rad/s
@@ -201,18 +203,10 @@ Feature: FOC Control Performance
     @sil
     Examples:
       | algorithm | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
-      | pid       | 40       | 12        | 20            | 2.5     | 60       | 0.1   |
-      | decoupled | 40       | 12        | 40            | 2.5     | 50       | 0.1   |
-      | deadbeat  | 40       | 5         | 20            | 1       | 30       | 0.1   |
-      | sliding   | 40       | 5         | 70            | 1       | 40       | 0.1   |
-
-    @sil-known-defect
-    Examples:
-      | algorithm | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
-      | pid       | 10       | 3         | 30            | 2       | 10       | 0.05  |
-      | decoupled | 10       | 3         | 30            | 2       | 10       | 0.05  |
-      | deadbeat  | 10       | 1         | 30            | 1       | 10       | 0.05  |
-      | sliding   | 10       | 3         | 30            | 2       | 10       | 0.05  |
+      | pid       | 25       | 3         | 30            | 15      | 35       | 0.12  |
+      | decoupled | 10       | 3         | 30            | 4       | 1        | 0.05  |
+      | deadbeat  | 10       | 1         | 30            | 1       | 7        | 0.05  |
+      | sliding   | 10       | 3         | 30            | 1       | 13       | 0.05  |
 
   @REQ-TRQ-007
   Scenario Outline: The <algorithm> current loop follows a setpoint change to <target> A while running

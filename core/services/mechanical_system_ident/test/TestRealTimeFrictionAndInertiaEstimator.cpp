@@ -35,15 +35,55 @@ namespace
 
             return foc::PhaseCurrents{ foc::Ampere{ phases.a }, foc::Ampere{ phases.b }, foc::Ampere{ phases.c } };
         }
+    };
 
-        void FeedConsistentSample(float speedValue, float inertia, float friction, float coulomb)
+    struct ReferenceRotor
+    {
+        float inertia{ 7.06e-6f };
+        float friction{ 1.5e-5f };
+        float torqueConstant{ 0.0384f };
+        float shaftTorque{ 0.0f };
+    };
+
+    class WindowedRotorRun
+    {
+    public:
+        WindowedRotorRun(const ReferenceRotor& rotor, services::RealTimeFrictionAndInertiaEstimator& estimator)
+            : rotor{ rotor }
+            , estimator{ estimator }
+        {}
+
+        void Run(float lowSpeed, float highSpeed, int samplesPerLevel, int samples)
         {
-            const auto acceleration = (speedValue - previousSpeed) * outerLoopFrequency;
-            previousSpeed = speedValue;
+            constexpr int substeps{ 20 };
+            constexpr float dt{ 1.0f / outerLoopFrequency / substeps };
+            const float gain{ 2.0f * rotor.inertia * 200.0f / rotor.torqueConstant };
 
-            const auto torque = coulomb + inertia * acceleration + friction * speedValue;
-            estimator.Update(CurrentsProducing(torque, angle), foc::RadiansPerSecond{ speedValue }, angle);
+            for (int sample = 0; sample != samples; ++sample)
+            {
+                const auto reference = (sample / samplesPerLevel) % 2 == 0 ? lowSpeed : highSpeed;
+                const auto current = pendingCurrent;
+                pendingCurrent = gain * (reference - measuredSpeed) + rotor.friction * reference / rotor.torqueConstant;
+
+                const auto startAngle = angle;
+                for (int substep = 0; substep != substeps; ++substep)
+                {
+                    speed += (rotor.torqueConstant * current - rotor.friction * speed - rotor.shaftTorque) / rotor.inertia * dt;
+                    angle += speed * dt;
+                }
+
+                measuredSpeed = (angle - startAngle) * outerLoopFrequency;
+                estimator.Update(foc::MechanicalWindow{ foc::Ampere{ current }, foc::RadiansPerSecond{ measuredSpeed } });
+            }
         }
+
+    private:
+        ReferenceRotor rotor;
+        services::RealTimeFrictionAndInertiaEstimator& estimator;
+        float pendingCurrent{ 0.0f };
+        float speed{ 0.0f };
+        float angle{ 0.0f };
+        float measuredSpeed{ 0.0f };
     };
 }
 
@@ -95,46 +135,6 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, set_initial_estimate_stores_valu
     EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 0.001f);
 }
 
-TEST_F(TestRealTimeFrictionAndInertiaEstimator, three_param_update_produces_finite_estimates)
-{
-    estimator.SetTorqueConstant(foc::NewtonMeter{ 0.1f });
-
-    estimator.Update(currents, speed, angle);
-    estimator.Update(currents, foc::RadiansPerSecond{ 15.0f }, angle);
-
-    EXPECT_TRUE(std::isfinite(estimator.CurrentInertia().Value()));
-    EXPECT_TRUE(std::isfinite(estimator.CurrentFriction().Value()));
-}
-
-TEST_F(TestRealTimeFrictionAndInertiaEstimator, set_torque_constant_affects_update)
-{
-    estimator.SetTorqueConstant(foc::NewtonMeter{ 0.05f });
-    estimator.Update(currents, speed, angle);
-
-    EXPECT_TRUE(std::isfinite(estimator.CurrentInertia().Value()));
-}
-
-TEST_F(TestRealTimeFrictionAndInertiaEstimator, set_initial_estimate_seeds_rls_so_values_persist_under_no_excitation)
-{
-    // Arrange: seed with known values.
-    estimator.SetTorqueConstant(foc::NewtonMeter{ 0.1f });
-    estimator.SetInitialEstimate(
-        foc::NewtonMeterSecondSquared{ 0.01f },
-        foc::NewtonMeterSecondPerRadian{ 0.005f });
-
-    // Act: update with zero-current and constant-speed data.
-    // With Iq=0, electromagnetic torque=0, so output=0.
-    // With constant speed (acc=0), regressor=[1,0,0], prediction=theta[0]=0 (coulomb).
-    // RLS error=0 → theta unchanged → seeded values should persist.
-    foc::PhaseCurrents zeroCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
-    estimator.Update(zeroCurrents, foc::RadiansPerSecond{ 0.0f }, foc::Radians{ 0.0f });
-    estimator.Update(zeroCurrents, foc::RadiansPerSecond{ 0.0f }, foc::Radians{ 0.0f });
-
-    // Assert: estimates remain near seeded values, not the zero-initialised RLS default.
-    EXPECT_NEAR(estimator.CurrentInertia().Value(), 0.01f, 0.005f);
-    EXPECT_NEAR(estimator.CurrentFriction().Value(), 0.005f, 0.003f);
-}
-
 TEST_F(TestRealTimeFrictionAndInertiaEstimator, standstill_observations_leave_the_coefficients_untouched)
 {
     foc::NewtonMeter torque{ 0.1f };
@@ -169,10 +169,8 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_standstill_run_does_not_publis
     estimator.SetTorqueConstant(foc::NewtonMeter{ 0.1f });
     estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
 
-    const foc::PhaseCurrents idle{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
-
     for (int sample = 0; sample != 2000; ++sample)
-        estimator.Update(idle, foc::RadiansPerSecond{ 0.0f }, angle);
+        estimator.Update(foc::MechanicalWindow{ foc::Ampere{ 0.0f }, foc::RadiansPerSecond{ 0.0f } });
 
     EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 1.0e-4f);
     EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
@@ -180,14 +178,11 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_standstill_run_does_not_publis
 
 TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_steady_speed_is_not_excitation_enough_to_publish)
 {
-    const foc::Radians quadratureAngle{ std::numbers::pi_v<float> / 2.0f };
-    const foc::PhaseCurrents driving{ foc::Ampere{ -1.0f }, foc::Ampere{ 0.5f }, foc::Ampere{ 0.5f } };
-
     estimator.SetTorqueConstant(foc::NewtonMeter{ 0.1f });
     estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
 
-    for (int sample = 0; sample != 2000; ++sample)
-        estimator.Update(driving, speed, quadratureAngle);
+    for (int sample = 0; sample != 5000; ++sample)
+        estimator.Update(foc::MechanicalWindow{ foc::Ampere{ 0.5f }, speed });
 
     EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 1.0e-4f);
     EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
@@ -199,38 +194,46 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_short_burst_of_excitation_is_n
     estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
 
     for (int sample = 0; sample != 8; ++sample)
-        estimator.Update(currents, foc::RadiansPerSecond{ static_cast<float>(sample) * 13.0f }, angle);
+        estimator.Update(foc::MechanicalWindow{ foc::Ampere{ 1.0f }, foc::RadiansPerSecond{ static_cast<float>(sample) * 13.0f } });
 
     EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 1.0e-4f);
     EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
 }
 
-TEST_F(TestRealTimeFrictionAndInertiaEstimator, published_online_estimates_stay_inside_the_plausibility_band)
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_two_level_speed_reference_identifies_the_reference_rotor_from_a_wrong_seed)
 {
-    estimator.SetTorqueConstant(foc::NewtonMeter{ 0.1f });
-    estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
+    const ReferenceRotor rotor;
+    estimator.SetTorqueConstant(foc::NewtonMeter{ rotor.torqueConstant });
+    estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 2.0f * rotor.inertia }, foc::NewtonMeterSecondPerRadian{ 0.5f * rotor.friction });
 
-    for (int sample = 0; sample != 2000; ++sample)
-        estimator.Update(currents, foc::RadiansPerSecond{ 20.0f + 10.0f * std::sin(static_cast<float>(sample) * 0.05f) }, angle);
+    WindowedRotorRun{ rotor, estimator }.Run(26.0f, 52.0f, 250, 6000);
 
-    EXPECT_GT(estimator.CurrentInertia().Value(), 0.0f);
-    EXPECT_LT(estimator.CurrentInertia().Value(), 1.0f);
-    EXPECT_GE(estimator.CurrentFriction().Value(), 0.0f);
-    EXPECT_LT(estimator.CurrentFriction().Value(), 1.0f);
+    EXPECT_NEAR(estimator.CurrentInertia().Value(), rotor.inertia, 0.05f * rotor.inertia);
+    EXPECT_NEAR(estimator.CurrentFriction().Value(), rotor.friction, 0.1f * rotor.friction);
 }
 
-TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_consistently_excited_run_publishes_the_tracked_mechanics)
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_constant_shaft_torque_is_absorbed_by_the_intercept)
 {
-    constexpr float trueInertia = 2.0e-4f;
-    constexpr float trueFriction = 1.5e-3f;
-    constexpr float trueCoulomb = 5.0e-3f;
+    ReferenceRotor rotor;
+    rotor.shaftTorque = 0.01f;
+    estimator.SetTorqueConstant(foc::NewtonMeter{ rotor.torqueConstant });
+    estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 2.0f * rotor.inertia }, foc::NewtonMeterSecondPerRadian{ 0.5f * rotor.friction });
 
-    estimator.SetTorqueConstant(foc::NewtonMeter{ torqueConstant });
+    WindowedRotorRun{ rotor, estimator }.Run(26.0f, 52.0f, 250, 6000);
+
+    EXPECT_NEAR(estimator.CurrentInertia().Value(), rotor.inertia, 0.05f * rotor.inertia);
+    EXPECT_NEAR(estimator.CurrentFriction().Value(), rotor.friction, 0.1f * rotor.friction);
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, reseeding_restarts_the_online_fit_from_the_new_seed)
+{
+    const ReferenceRotor rotor;
+    estimator.SetTorqueConstant(foc::NewtonMeter{ rotor.torqueConstant });
+    estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 2.0f * rotor.inertia }, foc::NewtonMeterSecondPerRadian{ 0.5f * rotor.friction });
+    WindowedRotorRun{ rotor, estimator }.Run(26.0f, 52.0f, 250, 3000);
+
     estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
 
-    for (int sample = 0; sample != 2000; ++sample)
-        FeedConsistentSample(20.0f + 10.0f * std::sin(static_cast<float>(sample) * 0.05f), trueInertia, trueFriction, trueCoulomb);
-
-    EXPECT_NEAR(estimator.CurrentInertia().Value(), trueInertia, trueInertia * 0.2f);
-    EXPECT_NEAR(estimator.CurrentFriction().Value(), trueFriction, trueFriction * 0.2f);
+    EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 1.0e-4f);
+    EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
 }

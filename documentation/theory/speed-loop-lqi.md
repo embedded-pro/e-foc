@@ -109,9 +109,8 @@ explicit performance cost.
   `R = NormalizedEffortWeight(bandwidth, samplingFrequency) * b^2`, reusing the same bandwidth-to-effort
   mapping the position-loop LQI/LQR controllers use (`core/foc/speed_loop/SpeedPlantModel.hpp`). Leaving
   $R$ unscaled by $b^2$ produced an effectively deadbeat gain with no margin against the always-present
-  loop delay of a real (non-ideal) current loop — the root cause of the LQI speed law's
-  `@sil-known-defect` overshoot and poor disturbance rejection
-  (`documentation/design/software-in-the-loop.md` Part I).
+  loop delay of a real (non-ideal) current loop — the root cause of the LQI speed law's former
+  overshoot and poor disturbance rejection (`documentation/design/software-in-the-loop.md` Part I).
 
 **Gain computation** runs once at configuration time off the hot path using the `DARE` solver from
 the numerical toolbox. The 1 kHz handler executes only the dot product.

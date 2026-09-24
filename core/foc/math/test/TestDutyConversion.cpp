@@ -5,6 +5,11 @@
 
 namespace
 {
+    float DutyPercent(hal::DutyCycle duty)
+    {
+        return 100.0f * foc::DutyFraction(duty);
+    }
+
     struct Modulated
     {
         float a;
@@ -46,35 +51,54 @@ TEST_F(TestDutyConversion, a_normalised_output_maps_onto_the_percent_range)
 {
     const auto duties = foc::ToDutyCycles(Modulated{ 0.0f, 0.5f, 1.0f });
 
-    EXPECT_EQ(duties.a.Value(), 0);
-    EXPECT_EQ(duties.b.Value(), 50);
-    EXPECT_EQ(duties.c.Value(), 100);
+    EXPECT_EQ(DutyPercent(duties.a), 0);
+    EXPECT_EQ(DutyPercent(duties.b), 50);
+    EXPECT_EQ(DutyPercent(duties.c), 100);
+}
+
+TEST_F(TestDutyConversion, a_normalised_output_rounds_to_the_nearest_q16_step)
+{
+    const auto duties = foc::ToDutyCycles(Modulated{ 0.5004f, 0.12345f, 0.9999f });
+
+    EXPECT_EQ(duties.a.Value(), 32794u);
+    EXPECT_EQ(duties.b.Value(), 8090u);
+    EXPECT_EQ(duties.c.Value(), 65529u);
+}
+
+TEST_F(TestDutyConversion, a_normalised_output_keeps_sub_percent_resolution)
+{
+    const auto duties = foc::ToDutyCycles(Modulated{ 0.5004f, 0.12345f, 0.9999f });
+
+    constexpr float oneStepInPercent = 100.0f / static_cast<float>(hal::DutyCycle::fullScale);
+    EXPECT_NEAR(DutyPercent(duties.a), 50.04f, oneStepInPercent);
+    EXPECT_NEAR(DutyPercent(duties.b), 12.345f, oneStepInPercent);
+    EXPECT_NEAR(DutyPercent(duties.c), 99.99f, oneStepInPercent);
 }
 
 TEST_F(TestDutyConversion, an_output_beyond_the_range_is_clamped_rather_than_wrapped)
 {
     const auto duties = foc::ToDutyCycles(Modulated{ -5.0f, 1.5f, 0.25f });
 
-    EXPECT_EQ(duties.a.Value(), 0);
-    EXPECT_EQ(duties.b.Value(), 100);
-    EXPECT_EQ(duties.c.Value(), 25);
+    EXPECT_EQ(DutyPercent(duties.a), 0);
+    EXPECT_EQ(DutyPercent(duties.b), 100);
+    EXPECT_EQ(DutyPercent(duties.c), 25);
 }
 
 // Holds only where NaN survives; the embedded build drops this branch under -ffinite-math-only
-TEST_F(TestDutyConversion, a_nan_modulation_lands_on_zero_duty_rather_than_an_undefined_cast)
+TEST_F(TestDutyConversion, a_nan_modulation_lands_on_zero_duty)
 {
     const auto duties = foc::ToDutyCycles(Modulated{ Nan(), Nan(), Nan() });
 
-    EXPECT_EQ(duties.a.Value(), 0);
-    EXPECT_EQ(duties.b.Value(), 0);
-    EXPECT_EQ(duties.c.Value(), 0);
+    EXPECT_EQ(DutyPercent(duties.a), 0);
+    EXPECT_EQ(DutyPercent(duties.b), 0);
+    EXPECT_EQ(DutyPercent(duties.c), 0);
 }
 
 TEST_F(TestDutyConversion, an_infinite_modulation_saturates_to_a_defined_endpoint)
 {
     const auto duties = foc::ToDutyCycles(Modulated{ Inf(), -Inf(), 0.5f });
 
-    EXPECT_EQ(duties.a.Value(), 100);
-    EXPECT_EQ(duties.b.Value(), 0);
-    EXPECT_EQ(duties.c.Value(), 50);
+    EXPECT_EQ(DutyPercent(duties.a), 100);
+    EXPECT_EQ(DutyPercent(duties.b), 0);
+    EXPECT_EQ(DutyPercent(duties.c), 50);
 }

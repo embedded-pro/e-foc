@@ -6,12 +6,11 @@ Feature: Parameter Identification Against a Known Plant
   measured runs with a margin; the calibration record and the online estimates
   are read from the product's own trace and CAN response.
 
-  The offline procedures hold their envelopes on both motors. The online
-  estimators do not: the mechanical estimator publishes an inertia a third low
-  on one motor and nothing at all on the other, and the electrical estimator
-  cannot observe the resistance with the product's zero d-axis current, so those
-  scenarios carry the envelope the estimators should meet and are held out of
-  the default run under the known-defect tag. See Part J of
+  The offline procedures and the online estimators hold their envelopes on both
+  motors. The online estimators regress window averages the control interrupt
+  accumulates over each outer-loop period, and the resistance is observable
+  because the speed and position cascades carry a small d-axis square wave while
+  the electrical estimator runs. See Part J of
   documentation/design/software-in-the-loop.md.
 
   @sil @REQ-CAL-012
@@ -71,7 +70,7 @@ Feature: Parameter Identification Against a Known Plant
       | teknic  |
       | anaheim |
 
-  @sil-known-defect @REQ-CAL-014
+  @sil @REQ-CAL-014
   Scenario Outline: The online estimators converge from a wrong seed under excitation (<motor>)
     Given a <motor> motor plant
     And the plant response is recorded at 100 Hz for up to 2000 samples
@@ -96,7 +95,7 @@ Feature: Parameter Identification Against a Known Plant
       | teknic  |
       | anaheim |
 
-  @sil-known-defect @REQ-CAL-014
+  @sil @REQ-CAL-014
   Scenario Outline: The online resistance estimate follows the plant (<motor>)
     Given a <motor> motor plant
     And the plant response is recorded at 100 Hz for up to 2000 samples
@@ -116,7 +115,7 @@ Feature: Parameter Identification Against a Known Plant
       | teknic  |
       | anaheim |
 
-  @sil-known-defect @REQ-CAL-014
+  @sil @REQ-CAL-014
   Scenario Outline: A constant shaft torque does not bias the online mechanical estimates (<motor>)
     Given a <motor> motor plant
     And the plant response is recorded at 100 Hz for up to 2000 samples
@@ -139,7 +138,7 @@ Feature: Parameter Identification Against a Known Plant
       | teknic  |
       | anaheim |
 
-  @sil-known-defect @REQ-CAL-014
+  @sil @REQ-CAL-014
   Scenario: Winding heating is tracked by the online resistance estimate
     Given a hot motor plant
     And the plant response is recorded at 100 Hz for up to 2000 samples

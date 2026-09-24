@@ -64,6 +64,7 @@ namespace foc
             float thermalCapacitance{ 25.0f };
             float copperTempCoeff{ 0.00393f };
             float ironInductanceCoeff{ 0.0f };
+            float referenceCelsius{ 25.0f };
         };
 
         struct EncoderNoiseConfig
@@ -175,7 +176,7 @@ namespace foc
         {
             bool driving{ false };
             bool cycleScheduled{ false };
-            foc::PhasePwmDutyCycles pendingDuties{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } };
+            foc::PhasePwmDutyCycles pendingDuties{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) };
         };
 
         Parameters parameters;

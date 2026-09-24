@@ -92,7 +92,9 @@ by −2π; if it is less than −π, it is shifted by +2π. This produces a sign
 
 The speed PID receives the speed error (setpoint minus estimate) and produces the Iq setpoint. Its output is clamped to ± maxCurrent (in Ampere), which directly limits the peak torque the motor can apply while tracking the speed command. This clamp is the primary over-current protection for the speed-control mode.
 
-The d-axis setpoint remains 0 A throughout.
+The d-axis setpoint is 0 A, except while an online electrical estimator is attached: the cascade then
+adds a ±2.5 % of maxCurrent, 10 Hz square wave so the winding resistance stays observable (see
+`service-electrical-ident.md`, Excitation).
 
 ### LowPriorityInterrupt — Outer Loop Scheduling
 
@@ -121,18 +123,19 @@ stateDiagram-v2
 
 ### Provided
 
-| Interface                    | Purpose                                                                                | Contract                                                                                                                                                                                    |
-|------------------------------|----------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Configure                    | Supplies the motor model, including the pole-pair count used for the electrical angle. | Must be called before the first `Calculate()`. Must not be changed while Enabled.                                                                                                           |
-| Enable                       | Arms all three PIDs and resets their integrator state.                                 | Safe to call repeatedly. Speed setpoint is preserved.                                                                                                                                       |
-| Disable                      | Disarms all PIDs and forces zero duty cycle output.                                    | Safe to call from any context.                                                                                                                                                              |
-| SetCurrentTunings            | Sets the current loop closed-loop bandwidth.                                           | Gains are derived from the motor model and normalised internally. Takes effect on the next `Calculate()`.                                                                                   |
-| SetSpeedTunings              | Sets the speed loop closed-loop bandwidth.                                             | Gains are derived from the mechanical model supplied through `ConfigureMechanics()`. Output is clamped to ± maxCurrent.                                                                     |
-| SetPoint                     | Sets the speed setpoint in radians per second.                                         | Written atomically; used on the next outer-loop cycle.                                                                                                                                      |
-| Calculate                    | Executes the inner 20 kHz FOC torque loop for one cycle.                               | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                                                                                                      |
-| OuterLoopFrequency           | Returns the configured outer-loop frequency in Hz.                                     | Pure query; no side effects. Can be called before Enable.                                                                                                                                   |
-| SetOnlineMechanicalEstimator | Attaches an online mechanical parameter estimator (optional).                          | If attached, the estimator is updated automatically on each outer-loop cycle. No separate estimator Enable/Disable interface is defined here; detach or omit the estimator to stop updates. |
-| SetOnlineElectricalEstimator | Attaches an online electrical parameter estimator (optional).                          | If attached, the estimator is updated automatically on each outer-loop cycle using reconstructed Vd from inner-loop cached state. Assumes non-salient motor (Ld ≈ Lq).                      |
+| Interface                    | Purpose                                                                                | Contract                                                                                                                                                                                                                                      |
+|------------------------------|----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Configure                    | Supplies the motor model, including the pole-pair count used for the electrical angle. | Must be called before the first `Calculate()`. Must not be changed while Enabled.                                                                                                                                                             |
+| Enable                       | Arms all three PIDs and resets their integrator state.                                 | Safe to call repeatedly. Speed setpoint is preserved.                                                                                                                                                                                         |
+| Disable                      | Disarms all PIDs and forces zero duty cycle output.                                    | Safe to call from any context.                                                                                                                                                                                                                |
+| SetCurrentTunings            | Sets the current loop closed-loop bandwidth.                                           | Gains are derived from the motor model and normalised internally. Takes effect on the next `Calculate()`.                                                                                                                                     |
+| SetSpeedTunings              | Sets the speed loop closed-loop bandwidth.                                             | Gains are derived from the mechanical model supplied through `ConfigureMechanics()`. Output is clamped to ± maxCurrent.                                                                                                                       |
+| SetPoint                     | Sets the speed setpoint in radians per second.                                         | Written atomically; used on the next outer-loop cycle.                                                                                                                                                                                        |
+| Calculate                    | Executes the inner 20 kHz FOC torque loop for one cycle.                               | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                                                                                                                                                        |
+| OuterLoopFrequency           | Returns the configured outer-loop frequency in Hz.                                     | Pure query; no side effects. Can be called before Enable.                                                                                                                                                                                     |
+| SetOnlineMechanicalEstimator | Attaches an online mechanical parameter estimator (optional).                          | If attached, the estimator is updated automatically on each outer-loop cycle. No separate estimator Enable/Disable interface is defined here; detach or omit the estimator to stop updates.                                                   |
+| SetOnlineElectricalEstimator | Attaches an online electrical parameter estimator (optional).                          | If attached, the estimator is updated each outer-loop cycle from window averages the inner loop accumulates, and a d-axis square wave is added to the current reference so the resistance is observable. Assumes non-salient motor (Ld ≈ Lq). |
+| ObserveMotion                | Reports the window speed, window-mean q-axis current and speed reference.              | Written by the control interrupts, read from the event loop; feeds telemetry (REQ-INT-014) and the encoder plausibility monitor (REQ-SM-028).                                                                                                 |
 
 ### Required
 
@@ -144,16 +147,16 @@ stateDiagram-v2
 
 ## Data Model
 
-| Entity            | Field      | Type / Unit              | Range               | Notes                                                    |
-|-------------------|------------|--------------------------|---------------------|----------------------------------------------------------|
-| Speed setpoint    | ω_sp       | RadiansPerSecond (float) | ± mechanical max    | Written by application; applied on next outer-loop tick  |
-| Estimated speed   | ω          | RadiansPerSecond (float) | computed from Δθ/Δt | Computed each outer-loop cycle                           |
-| Speed PID output  | Iq_sp      | Ampere (float)           | ± maxCurrent        | Written to inner loop; clamped by speed PID output limit |
-| d-axis setpoint   | Id_sp      | Ampere (float)           | 0 A fixed           | SPMSM maximum torque per ampere                          |
-| Previous angle    | θm_prev    | Radians (float)          | [0, 2π)             | Saved each outer cycle for finite-difference estimator   |
-| Outer loop period | Δt         | Seconds (float)          | 1 / outer_frequency | Constant after construction                              |
-| Pole pairs        | P          | Integer (unsigned)       | ≥ 1                 | Motor property                                           |
-| Max current       | maxCurrent | Ampere (float)           | > 0                 | Upper bound on Iq setpoint from speed PID                |
+| Entity            | Field      | Type / Unit              | Range                                    | Notes                                                    |
+|-------------------|------------|--------------------------|------------------------------------------|----------------------------------------------------------|
+| Speed setpoint    | ω_sp       | RadiansPerSecond (float) | ± mechanical max                         | Written by application; applied on next outer-loop tick  |
+| Estimated speed   | ω          | RadiansPerSecond (float) | computed from Δθ/Δt                      | Computed each outer-loop cycle                           |
+| Speed PID output  | Iq_sp      | Ampere (float)           | ± maxCurrent                             | Written to inner loop; clamped by speed PID output limit |
+| d-axis setpoint   | Id_sp      | Ampere (float)           | 0 A; ±2.5 % Imax at 10 Hz with estimator | SPMSM maximum torque per ampere                          |
+| Previous angle    | θm_prev    | Radians (float)          | [0, 2π)                                  | Saved each outer cycle for finite-difference estimator   |
+| Outer loop period | Δt         | Seconds (float)          | 1 / outer_frequency                      | Constant after construction                              |
+| Pole pairs        | P          | Integer (unsigned)       | ≥ 1                                      | Motor property                                           |
+| Max current       | maxCurrent | Ampere (float)           | > 0                                      | Upper bound on Iq setpoint from speed PID                |
 
 ---
 

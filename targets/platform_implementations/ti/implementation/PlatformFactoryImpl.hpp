@@ -165,7 +165,7 @@ namespace application
 
         struct AsyncPwmConfig
         {
-            hal::tiva::Pwm::Config::ClockDivisor clockDivisor{ hal::tiva::Pwm::Config::ClockDivisor::divisor8 };
+            hal::tiva::Pwm::Config::ClockDivisor clockDivisor{ hal::tiva::Pwm::Config::ClockDivisor::divisor2 };
             hal::tiva::Pwm::Config::Control controlConfig{ hal::tiva::Pwm::Config::Control::Mode::centerAligned, hal::tiva::Pwm::Config::Control::UpdateMode::globally, false };
             hal::tiva::Pwm::Config::DeadTime deadTimeConfig{ hal::tiva::Pwm::CalculateDeadTimeCycles(1000ns, clockDivisor), hal::tiva::Pwm::CalculateDeadTimeCycles(1000ns, clockDivisor) };
 
@@ -184,7 +184,7 @@ namespace application
 
         struct SyncPwmConfig
         {
-            hal::tiva::SynchronousPwm::Config::ClockDivisor clockDivisor{ hal::tiva::SynchronousPwm::Config::ClockDivisor::divisor8 };
+            hal::tiva::SynchronousPwm::Config::ClockDivisor clockDivisor{ hal::tiva::SynchronousPwm::Config::ClockDivisor::divisor2 };
             hal::tiva::SynchronousPwm::Config::Control controlConfig{ hal::tiva::SynchronousPwm::Config::Control::Mode::centerAligned, hal::tiva::SynchronousPwm::Config::Control::UpdateMode::globally, false };
             hal::tiva::SynchronousPwm::Config::DeadTime deadTimeConfig{ hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(1000ns, clockDivisor), hal::tiva::SynchronousPwm::CalculateDeadTimeCycles(1000ns, clockDivisor) };
             hal::tiva::SynchronousPwm::Config pwmConfig{ false, false, controlConfig, clockDivisor, std::make_optional(deadTimeConfig) };

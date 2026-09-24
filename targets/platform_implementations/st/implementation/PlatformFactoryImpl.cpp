@@ -55,6 +55,7 @@ namespace application
 
     void PlatformFactoryImpl::Run()
     {
+        eventDispatcher.Run();
     }
 
     services::Tracer& PlatformFactoryImpl::Tracer()
@@ -267,7 +268,7 @@ namespace application
     {
     }
 
-    void PlatformFactoryImpl::ThreeChannelsPwmStub::Start(hal::Percent, hal::Percent, hal::Percent)
+    void PlatformFactoryImpl::ThreeChannelsPwmStub::Start(hal::DutyCycle, hal::DutyCycle, hal::DutyCycle)
     {
     }
 

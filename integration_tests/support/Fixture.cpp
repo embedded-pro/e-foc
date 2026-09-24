@@ -253,6 +253,26 @@ namespace integration
         return static_cast<float>(raw) / static_cast<float>(can::focPositionScale);
     }
 
+    std::optional<float> Fixture::ReadMeasuredSpeed(std::chrono::milliseconds timeout)
+    {
+        const hal::Can::Id requestId = MakeId(services::CanPriority::command,
+            can::focMotorCategoryId, can::focRequestTelemetryId, kServerNodeId);
+        const hal::Can::Id telemetryId = MakeId(services::CanPriority::telemetry,
+            can::focMotorCategoryId, can::focTelemetryStatusResponseId, kServerNodeId);
+
+        hal::Can::Message request;
+        request.push_back(nextSequence++);
+        interactor.SendCanFrame(requestId, request, std::chrono::milliseconds{ 100 });
+
+        hal::Can::Message payload;
+        std::chrono::milliseconds elapsed{ 0 };
+        if (!WaitForCanFrame(telemetryId, payload, timeout, elapsed) || payload.size() < 4)
+            return std::nullopt;
+
+        const auto raw = static_cast<int16_t>((static_cast<uint16_t>(payload[2]) << 8) | payload[3]);
+        return static_cast<float>(raw) / static_cast<float>(can::focSpeedScale);
+    }
+
     std::optional<can::FocMotorState> Fixture::ReadMotorState(std::chrono::milliseconds timeout)
     {
         const hal::Can::Id requestId = MakeId(services::CanPriority::command,

@@ -115,7 +115,7 @@ The observer interface provides callbacks for:
 - `OnSetPidCurrent`, `OnSetPidSpeed`, `OnSetPidPosition` — receive a bandwidth parameter parsed from the CAN frame and forward to the corresponding `TrySet*Bandwidth` on `ControlModeStateMachine`.
 - `OnIdentifyElectrical` — calls `CmdReserveExternalCalibration()` before starting estimation; `invalidState` if rejected; on estimation success calls `CmdCompleteExternalCalibration()` and broadcasts `focElectricalParamsResponseId`.
 - `OnIdentifyMechanical` — calls `ActiveCalibrationData()` to obtain pole pairs and guard the state in one step; `invalidState` if not in `Ready`; on success broadcasts `focMechanicalParamsResponseId`.
-- `OnRequestTelemetry` — broadcasts current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`. Position is read from the encoder; speed is reported as zero unless the active mode runs an outer loop that measures it.
+- `OnRequestTelemetry` — broadcasts current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`. Position is read from the encoder; speed is the active mode's `ObserveMotion().measuredSpeed` — the outer loop's window speed in speed and position mode, the interrupt's filtered speed in torque mode (REQ-INT-014).
 - `OnSetEncoderResolution`, `OnConfigureTelemetryRate` — validate payload, update and persist `ConfigData` via `NonVolatileMemory`.
 
 ### Part C — FocMotorCategoryClient
@@ -303,16 +303,16 @@ graph LR
 
 ## Constraints & Limitations
 
-| Constraint              | Value / Description                                                                                        |
-|-------------------------|------------------------------------------------------------------------------------------------------------|
-| No heap                 | All objects are value members or statically allocated; `infra::Function` for callbacks                     |
-| One observer per server | `CanCategoryServer` uses `infra::Subject<Observer>` — only one bridge may attach at a time                 |
-| Setpoint range          | Torque: bounded by inverter `MaxCurrentSupported`; speed: 1000 rad/s; position: ±2π rad                    |
-| Sequence byte           | Server handlers always skip the first byte (sequence number) before reading payload fields                 |
-| Ident re-entrancy       | A second identification command while one is in-flight returns `busy` via `SendCategoryError`              |
-| NVM re-entrancy         | A second config-persist command while one is in-flight returns `busy` via `SendCategoryError`              |
-| Mechanical ident        | `mechIdent` is optional (nullable pointer); if absent, `OnIdentifyMechanical` returns `notImplemented`     |
-| Telemetry speed/pos     | `focTelemetryStatusResponseId` frames encode zero for speed and position (live readings not yet available) |
+| Constraint              | Value / Description                                                                                      |
+|-------------------------|----------------------------------------------------------------------------------------------------------|
+| No heap                 | All objects are value members or statically allocated; `infra::Function` for callbacks                   |
+| One observer per server | `CanCategoryServer` uses `infra::Subject<Observer>` — only one bridge may attach at a time               |
+| Setpoint range          | Torque: bounded by inverter `MaxCurrentSupported`; speed: 1000 rad/s; position: ±2π rad                  |
+| Sequence byte           | Server handlers always skip the first byte (sequence number) before reading payload fields               |
+| Ident re-entrancy       | A second identification command while one is in-flight returns `busy` via `SendCategoryError`            |
+| NVM re-entrancy         | A second config-persist command while one is in-flight returns `busy` via `SendCategoryError`            |
+| Mechanical ident        | `mechIdent` is optional (nullable pointer); if absent, `OnIdentifyMechanical` returns `notImplemented`   |
+| Telemetry speed/pos     | Speed is the active mode's `ObserveMotion().measuredSpeed`, zero while disabled; position is the encoder |
 
 ---
 

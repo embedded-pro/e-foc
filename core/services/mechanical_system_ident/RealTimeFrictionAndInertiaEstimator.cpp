@@ -7,10 +7,24 @@
 
 namespace services
 {
+    namespace
+    {
+        constexpr float outputScale{ 1e3f };
+        constexpr float parameterScale{ 1e6f };
+        constexpr float columnScale{ outputScale / parameterScale };
+
+        constexpr float onlineInitialCovariance{ 1e4f };
+        constexpr float onlineCovarianceCeiling{ 1e5f };
+        constexpr uint16_t onlineMinimumUpdates{ 1000 };
+        constexpr float residualAveragingWeight{ 1e-3f };
+        constexpr float settledResidualRatio{ 0.1f };
+    }
+
     RealTimeFrictionAndInertiaEstimator::RealTimeFrictionAndInertiaEstimator(float forgettingFactor, hal::Hertz samplingFrequency)
         : samplingFrequency(static_cast<float>(samplingFrequency.Value()))
         , forgettingFactor(forgettingFactor)
         , rls(std::in_place, 1000.0f, forgettingFactor)
+        , onlineRls(std::in_place, onlineInitialCovariance, forgettingFactor)
     {
     }
 
@@ -21,7 +35,7 @@ namespace services
 
         previousSpeed = speed;
 
-        if (!IsMechanicallyExciting(acceleration, speed.Value()))
+        if (!IsMechanicallyObservable(speed.Value()))
             return Result{
                 foc::NewtonMeterSecondSquared{ rls->Coefficients().at(1, 0) },
                 foc::NewtonMeterSecondPerRadian{ rls->Coefficients().at(2, 0) },
@@ -33,9 +47,7 @@ namespace services
         torque.at(0, 0) = rotatingFrame.q * targetTorque.Value();
 
         lastMetrics = rls->Update(regressor, torque);
-
-        if (excitedUpdates != mechanical_estimate::minimumExcitedUpdates)
-            ++excitedUpdates;
+        excitation.Count(acceleration, speed.Value());
 
         return Result{
             foc::NewtonMeterSecondSquared{ rls->Coefficients().at(1, 0) },
@@ -56,7 +68,7 @@ namespace services
         initial.at(2, 0) = friction.Value();
         rls->SetCoefficients(initial);
         lastMetrics = MotorRLS::EstimationMetrics{};
-        excitedUpdates = 0;
+        excitation.Restart();
     }
 
     void RealTimeFrictionAndInertiaEstimator::SetTorqueConstant(foc::NewtonMeter kt)
@@ -71,26 +83,92 @@ namespace services
         currentInertia = inertia;
         currentFriction = friction;
         Seed(inertia, friction);
+        ReseedOnline();
     }
 
-    void RealTimeFrictionAndInertiaEstimator::Update(
-        foc::PhaseCurrents currentPhases,
-        foc::RadiansPerSecond speed,
-        foc::Radians electricalAngle)
+    void RealTimeFrictionAndInertiaEstimator::ReseedOnline()
     {
-        auto result = Update(currentPhases, speed, electricalAngle, torqueConstant);
+        onlineRls.emplace(onlineInitialCovariance, forgettingFactor);
 
-        // Publishing an estimate turns it into speed-loop gains, so it must come from an excited, settled
-        // estimator: enough exciting observations to identify all three columns, and an innovation and
-        // covariance small enough to call the fit settled.
-        if (!HasConvergedMechanics(result.metrics, excitedUpdates, forgettingFactor))
+        MotorRLS::CoefficientsMatrix initial{};
+        initial.at(1, 0) = currentInertia.Value() * parameterScale;
+        initial.at(2, 0) = currentFriction.Value() * parameterScale;
+        onlineRls->SetCoefficients(initial);
+
+        onlineMetrics = MotorRLS::EstimationMetrics{};
+        onlinePrimed = false;
+        onlineUpdates = 0;
+        onlineExcitation.Restart();
+        residualPower = 0.0f;
+        outputPower = 0.0f;
+    }
+
+    void RealTimeFrictionAndInertiaEstimator::Update(const foc::MechanicalWindow& window)
+    {
+        const auto speed = window.meanSpeed.Value();
+        const auto iq = window.meanIq.Value();
+
+        if (!onlinePrimed)
+        {
+            previousWindowSpeed = speed;
+            previousWindowIq = iq;
+            onlinePrimed = true;
+            return;
+        }
+
+        const auto acceleration = (speed - previousWindowSpeed) * samplingFrequency;
+        const auto midSpeed = 0.5f * (speed + previousWindowSpeed);
+        const auto midIq = 0.5f * (iq + previousWindowIq);
+        previousWindowSpeed = speed;
+        previousWindowIq = iq;
+
+        if (!IsOnlineObservationInformative(acceleration, midSpeed))
             return;
 
-        if (!IsPlausibleMechanics(result.inertia.Value(), result.friction.Value()))
+        MotorRLS::MakeRegressor(onlineRegressor, acceleration * columnScale, midSpeed * columnScale);
+        math::Matrix<float, 1, 1> output;
+        output.at(0, 0) = torqueConstant.Value() * midIq * outputScale;
+
+        onlineMetrics = onlineRls->Update(onlineRegressor, output);
+        residualPower += residualAveragingWeight * (onlineMetrics.residual * onlineMetrics.residual - residualPower);
+        outputPower += residualAveragingWeight * (output.at(0, 0) * output.at(0, 0) - outputPower);
+
+        onlineExcitation.Count(acceleration, midSpeed);
+        if (onlineUpdates != onlineMinimumUpdates)
+            ++onlineUpdates;
+
+        PublishOnlineEstimate();
+    }
+
+    bool RealTimeFrictionAndInertiaEstimator::IsOnlineObservationInformative(float acceleration, float speed) const
+    {
+        if (!IsMechanicallyObservable(speed))
+            return false;
+
+        return std::abs(acceleration) >= mechanical_estimate::minimumAcceleration || onlineMetrics.uncertainty <= onlineCovarianceCeiling;
+    }
+
+    bool RealTimeFrictionAndInertiaEstimator::HasOnlineEstimateSettled() const
+    {
+        return onlineUpdates >= onlineMinimumUpdates &&
+               onlineExcitation.AcceleratingObservations() >= mechanical_estimate::minimumExcitedUpdates &&
+               onlineExcitation.HasSpannedDistinctSpeeds() &&
+               residualPower <= settledResidualRatio * settledResidualRatio * outputPower;
+    }
+
+    void RealTimeFrictionAndInertiaEstimator::PublishOnlineEstimate()
+    {
+        if (!HasOnlineEstimateSettled())
             return;
 
-        currentInertia = result.inertia;
-        currentFriction = result.friction;
+        const auto inertia = onlineRls->Coefficients().at(1, 0) / parameterScale;
+        const auto friction = onlineRls->Coefficients().at(2, 0) / parameterScale;
+
+        if (!IsPlausibleMechanics(inertia, friction))
+            return;
+
+        currentInertia = foc::NewtonMeterSecondSquared{ inertia };
+        currentFriction = foc::NewtonMeterSecondPerRadian{ friction };
     }
 
     foc::NewtonMeterSecondSquared RealTimeFrictionAndInertiaEstimator::CurrentInertia() const

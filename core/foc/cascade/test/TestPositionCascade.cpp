@@ -2,6 +2,8 @@
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/foc/interfaces/test_doubles/OnlineEstimatorsMock.hpp"
+#include "core/foc/math/DutyConversion.hpp"
+#include "core/foc/position_loop/PidPositionController.hpp"
 #include "numerical/math/Tolerance.hpp"
 #include <gmock/gmock.h>
 #include <numbers>
@@ -9,6 +11,11 @@
 namespace
 {
     using namespace testing;
+
+    float DutyPercent(hal::DutyCycle duty)
+    {
+        return 100.0f * foc::DutyFraction(duty);
+    }
 
     constexpr uint32_t baseFrequencyValue = 20000;
     const hal::Hertz baseFrequency{ baseFrequencyValue };
@@ -74,34 +81,34 @@ namespace
         return { foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } };
     }
 
-    const foc::PhasePwmDutyCycles centredDuty{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } };
+    const foc::PhasePwmDutyCycles centredDuty{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) };
 
     void ExpectValidDuty(const foc::PhasePwmDutyCycles& duty)
     {
-        EXPECT_LE(duty.a.Value(), 100);
-        EXPECT_LE(duty.b.Value(), 100);
-        EXPECT_LE(duty.c.Value(), 100);
+        EXPECT_LE(DutyPercent(duty.a), 100);
+        EXPECT_LE(DutyPercent(duty.b), 100);
+        EXPECT_LE(DutyPercent(duty.c), 100);
     }
 
     void ExpectCentredDuty(const foc::PhasePwmDutyCycles& duty)
     {
-        EXPECT_NEAR(duty.a.Value(), 50, tolerance);
-        EXPECT_NEAR(duty.b.Value(), 50, tolerance);
-        EXPECT_NEAR(duty.c.Value(), 50, tolerance);
+        EXPECT_NEAR(DutyPercent(duty.a), 50, tolerance);
+        EXPECT_NEAR(DutyPercent(duty.b), 50, tolerance);
+        EXPECT_NEAR(DutyPercent(duty.c), 50, tolerance);
     }
 
     void ExpectSameDuty(const foc::PhasePwmDutyCycles& duty, const foc::PhasePwmDutyCycles& expected)
     {
-        EXPECT_EQ(duty.a.Value(), expected.a.Value());
-        EXPECT_EQ(duty.b.Value(), expected.b.Value());
-        EXPECT_EQ(duty.c.Value(), expected.c.Value());
+        EXPECT_NEAR(DutyPercent(duty.a), DutyPercent(expected.a), 0.01f);
+        EXPECT_NEAR(DutyPercent(duty.b), DutyPercent(expected.b), 0.01f);
+        EXPECT_NEAR(DutyPercent(duty.c), DutyPercent(expected.c), 0.01f);
     }
 
     bool DutiesDiffer(const foc::PhasePwmDutyCycles& left, const foc::PhasePwmDutyCycles& right)
     {
-        return left.a.Value() != right.a.Value() ||
-               left.b.Value() != right.b.Value() ||
-               left.c.Value() != right.c.Value();
+        return DutyPercent(left.a) != DutyPercent(right.a) ||
+               DutyPercent(left.b) != DutyPercent(right.b) ||
+               DutyPercent(left.c) != DutyPercent(right.c);
     }
 
     void ExpectOffCentreDuty(const foc::PhasePwmDutyCycles& duty)
@@ -239,9 +246,9 @@ TEST_F(TestPositionCascade, different_positions_produce_different_outputs)
     foc::Radians position2{ 1.0f };
     auto result2 = focPosition->Calculate(ZeroCurrents(), position2);
 
-    bool anyDifferent = (result1.a.Value() != result2.a.Value()) ||
-                        (result1.b.Value() != result2.b.Value()) ||
-                        (result1.c.Value() != result2.c.Value());
+    bool anyDifferent = (DutyPercent(result1.a) != DutyPercent(result2.a)) ||
+                        (DutyPercent(result1.b) != DutyPercent(result2.b)) ||
+                        (DutyPercent(result1.c) != DutyPercent(result2.c));
 
     EXPECT_TRUE(anyDifferent);
 }
@@ -262,7 +269,9 @@ TEST_F(TestPositionCascade, position_pid_drives_speed_reference)
     speedCascade.SetCurrentTunings(UnsaturatedCurrentTunings());
     speedCascade.SetSpeedTunings(foc::SpeedLoopTunings{});
     speedCascade.Enable();
-    speedCascade.SetPoint(foc::RadiansPerSecond{ positionError * foc::PositionLoopTunings{}.bandwidth });
+    constexpr float bandwidth{ foc::PositionLoopTunings{}.bandwidth };
+    const float firstSampleGain{ foc::PidPositionController::referenceWeight + foc::PidPositionController::integralZeroRatio * bandwidth / static_cast<float>(lowPriorityFrequency.Value()) };
+    speedCascade.SetPoint(foc::RadiansPerSecond{ positionError * bandwidth * firstSampleGain });
 
     foc::Radians start{ 0.0f };
     speedCascade.Calculate(ZeroCurrents(), start);
@@ -314,9 +323,9 @@ TEST_F(TestPositionCascade, at_target_position_output_is_near_center)
     foc::Radians position{ 0.0f };
     auto result = focPosition->Calculate(ZeroCurrents(), position);
 
-    EXPECT_NEAR(result.a.Value(), 50, tolerance);
-    EXPECT_NEAR(result.b.Value(), 50, tolerance);
-    EXPECT_NEAR(result.c.Value(), 50, tolerance);
+    EXPECT_NEAR(DutyPercent(result.a), 50, tolerance);
+    EXPECT_NEAR(DutyPercent(result.b), 50, tolerance);
+    EXPECT_NEAR(DutyPercent(result.c), 50, tolerance);
 }
 
 TEST_F(TestPositionCascade, prescaler_triggers_low_priority_interrupt)
@@ -488,8 +497,8 @@ TEST_F(TestPositionCascade, registered_online_estimators_are_fed_from_the_outer_
     focPosition->Enable();
     focPosition->SetPoint(foc::Radians{ 0.5f });
 
-    EXPECT_CALL(mechanicalEstimator, Update(_, _, _));
-    EXPECT_CALL(electricalEstimator, Update(_, _, _, _));
+    EXPECT_CALL(mechanicalEstimator, Update(_));
+    EXPECT_CALL(electricalEstimator, Update(_));
 
     foc::Radians position{ 0.0f };
     focPosition->Calculate(ZeroCurrents(), position);
@@ -573,4 +582,21 @@ TEST_F(TestPositionCascade, speed_command_produces_non_centred_duty_at_nonzero_s
     auto atTarget = focPosition->Calculate(ZeroCurrents(), fourth);
 
     EXPECT_TRUE(DutiesDiffer(withSpeed, atTarget));
+}
+
+TEST_F(TestPositionCascade, the_observed_motion_carries_the_position_error_left_to_close)
+{
+    const uint32_t prescaler = baseFrequency.Value() / lowPriorityFrequency.Value();
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 1.0f });
+
+    for (uint32_t tick = 0; tick != prescaler; ++tick)
+    {
+        foc::Radians held{ 0.25f };
+        focPosition->Calculate(ZeroCurrents(), held);
+    }
+
+    EXPECT_NEAR(focPosition->ObserveMotion().positionError.Value(), 0.75f, 1e-5f);
 }

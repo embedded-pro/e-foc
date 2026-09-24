@@ -1,5 +1,6 @@
 #include "core/foc/current_loop/SlidingModeCurrentController.hpp"
 #include "core/foc/current_loop/CurrentPlantModel.hpp"
+#include <cmath>
 
 namespace foc
 {
@@ -11,6 +12,7 @@ namespace foc
 
     bool SlidingModeCurrentController::SetTunings(const CurrentLoopTunings& tunings)
     {
+        bandwidth = tunings.bandwidth;
         switchingGain = tunings.switchingGain;
         boundaryLayer = tunings.boundaryLayer;
         return Construct();
@@ -48,7 +50,8 @@ namespace foc
         normalizationScale = NormalizationScale(parameters.busVoltage);
         equilibriumGain = (1.0f - plant.ad) / plant.bd;
 
-        const auto stateMatrix = ScalarSlidingMode::PlantType::StateMatrix{ plant.ad };
+        const auto reachingPole = std::exp(-bandwidth * SamplePeriod(parameters.samplingFrequency));
+        const auto stateMatrix = ScalarSlidingMode::PlantType::StateMatrix{ plant.ad - reachingPole };
         const auto inputMatrix = ScalarSlidingMode::PlantType::InputMatrix{ plant.bd };
         const auto plantNew = ScalarSlidingMode::PlantType::WithFullStateOutput(stateMatrix, inputMatrix);
         const auto surfaceMatrix = ScalarSlidingMode::SurfaceMatrix{ 1.0f };

@@ -233,3 +233,17 @@
     taken from a per-target constant. Mechanical identification shall be refused, as a failed
     calibration step, when the pending pole pairs or flux linkage do not yield a positive
     torque constant.
+
+- id: REQ-SM-028
+  title: An encoder that does not follow the torque it is asked to produce raises a sensor fault
+  shall: >
+    While the drive is Enabled, a supervisor running outside the control interrupts shall
+    compare what the drive asks of the rotor with what the encoder reports. When the measured
+    torque-producing current exceeds a configured fraction of the drive's current limit, and
+    the drive demands motion — a speed reference, or a position error it has not closed, above
+    configured thresholds — while the encoder reading stays within a configured excursion for
+    a whole configured window, the supervisor shall raise FaultCode::encoderLoss through the
+    fault notifier, exactly as a board protection trip is raised. A drive that is not Enabled,
+    that carries no current, or that holds its position against a load shall not be reported.
+    A mechanically locked rotor meets the same condition and is reported the same way. The
+    check shall not run in the 20 kHz control interrupt (REQ-PERF-003).

@@ -49,6 +49,11 @@ namespace application
             return focController;
         }
 
+        foc::MotionObservation ObserveMotion() const override
+        {
+            return focController.ObserveMotion();
+        }
+
     protected:
         foc::FocBase& GetFoc() override
         {

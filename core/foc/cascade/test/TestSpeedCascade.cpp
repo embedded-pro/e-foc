@@ -1,12 +1,18 @@
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/foc/interfaces/test_doubles/OnlineEstimatorsMock.hpp"
+#include "core/foc/math/DutyConversion.hpp"
 #include <gmock/gmock.h>
 #include <numbers>
 
 namespace
 {
     using namespace testing;
+
+    float DutyPercent(hal::DutyCycle duty)
+    {
+        return 100.0f * foc::DutyFraction(duty);
+    }
 
     constexpr uint32_t baseFrequencyValue = 20000;
     const hal::Hertz baseFrequency{ baseFrequencyValue };
@@ -71,35 +77,35 @@ namespace
 
     void ExpectValidDuty(const foc::PhasePwmDutyCycles& duty)
     {
-        EXPECT_LE(duty.a.Value(), 100);
-        EXPECT_LE(duty.b.Value(), 100);
-        EXPECT_LE(duty.c.Value(), 100);
+        EXPECT_LE(DutyPercent(duty.a), 100);
+        EXPECT_LE(DutyPercent(duty.b), 100);
+        EXPECT_LE(DutyPercent(duty.c), 100);
     }
 
     void ExpectCentredDuty(const foc::PhasePwmDutyCycles& duty)
     {
-        EXPECT_NEAR(duty.a.Value(), 50, tolerance);
-        EXPECT_NEAR(duty.b.Value(), 50, tolerance);
-        EXPECT_NEAR(duty.c.Value(), 50, tolerance);
+        EXPECT_NEAR(DutyPercent(duty.a), 50, tolerance);
+        EXPECT_NEAR(DutyPercent(duty.b), 50, tolerance);
+        EXPECT_NEAR(DutyPercent(duty.c), 50, tolerance);
     }
 
     void ExpectSameDuty(const foc::PhasePwmDutyCycles& duty, const foc::PhasePwmDutyCycles& expected)
     {
-        EXPECT_EQ(duty.a.Value(), expected.a.Value());
-        EXPECT_EQ(duty.b.Value(), expected.b.Value());
-        EXPECT_EQ(duty.c.Value(), expected.c.Value());
+        EXPECT_EQ(DutyPercent(duty.a), DutyPercent(expected.a));
+        EXPECT_EQ(DutyPercent(duty.b), DutyPercent(expected.b));
+        EXPECT_EQ(DutyPercent(duty.c), DutyPercent(expected.c));
     }
 
     bool DutiesDiffer(const foc::PhasePwmDutyCycles& left, const foc::PhasePwmDutyCycles& right)
     {
-        return left.a.Value() != right.a.Value() ||
-               left.b.Value() != right.b.Value() ||
-               left.c.Value() != right.c.Value();
+        return DutyPercent(left.a) != DutyPercent(right.a) ||
+               DutyPercent(left.b) != DutyPercent(right.b) ||
+               DutyPercent(left.c) != DutyPercent(right.c);
     }
 
     void ExpectOffCentreDuty(const foc::PhasePwmDutyCycles& duty)
     {
-        EXPECT_TRUE(DutiesDiffer(duty, foc::PhasePwmDutyCycles{ hal::Percent{ 50 }, hal::Percent{ 50 }, hal::Percent{ 50 } }));
+        EXPECT_TRUE(DutiesDiffer(duty, foc::PhasePwmDutyCycles{ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) }));
     }
 
     struct SpeedCascadeUnderTest
@@ -239,9 +245,9 @@ TEST_F(TestSpeedCascade, different_positions_produce_different_outputs)
     foc::Radians position2{ 1.0f };
     auto result2 = focSpeed->Calculate(ZeroCurrents(), position2);
 
-    bool anyDifferent = (result1.a.Value() != result2.a.Value()) ||
-                        (result1.b.Value() != result2.b.Value()) ||
-                        (result1.c.Value() != result2.c.Value());
+    bool anyDifferent = (DutyPercent(result1.a) != DutyPercent(result2.a)) ||
+                        (DutyPercent(result1.b) != DutyPercent(result2.b)) ||
+                        (DutyPercent(result1.c) != DutyPercent(result2.c));
 
     EXPECT_TRUE(anyDifferent);
 }
@@ -250,17 +256,23 @@ TEST_F(TestSpeedCascade, consecutive_calls_update_speed_estimation)
 {
     constexpr float step{ 0.00005f };
 
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
     focSpeed->SetCurrentTunings(UnsaturatedCurrentTunings());
     focSpeed->Enable();
     focSpeed->SetPoint(foc::RadiansPerSecond{ 0.0f });
 
-    foc::Radians start{ 0.0f };
-    focSpeed->Calculate(ZeroCurrents(), start);
-    lowPriorityInterruptMock.TriggerHandler();
+    for (const auto angle : { 0.0f, step })
+    {
+        for (uint32_t tick = 0; tick != prescaler; ++tick)
+        {
+            foc::Radians held{ angle };
+            focSpeed->Calculate(ZeroCurrents(), held);
+        }
 
-    foc::Radians advanced{ step };
-    focSpeed->Calculate(ZeroCurrents(), advanced);
-    lowPriorityInterruptMock.TriggerHandler();
+        lowPriorityInterruptMock.TriggerHandler();
+    }
 
     foc::Radians moved{ step };
     auto movingRotor = focSpeed->Calculate(ZeroCurrents(), moved);
@@ -410,8 +422,8 @@ TEST_F(TestSpeedCascade, registered_online_estimators_are_fed_from_the_outer_loo
     focSpeed->Enable();
     focSpeed->SetPoint(foc::RadiansPerSecond{ 10.0f });
 
-    EXPECT_CALL(mechanicalEstimator, Update(_, _, _));
-    EXPECT_CALL(electricalEstimator, Update(_, _, _, _));
+    EXPECT_CALL(mechanicalEstimator, Update(_));
+    EXPECT_CALL(electricalEstimator, Update(_));
 
     foc::Radians position{ 0.0f };
     focSpeed->Calculate(ZeroCurrents(), position);
@@ -449,4 +461,57 @@ TEST_F(TestSpeedCascade, disable_speed_command_produces_bounded_duty)
 TEST_F(TestSpeedCascade, speed_command_frequency_equals_outer_loop_frequency)
 {
     EXPECT_EQ(focSpeed->SpeedCommandFrequency().Value(), focSpeed->OuterLoopFrequency().Value());
+}
+
+TEST_F(TestSpeedCascade, the_observed_motion_carries_the_window_speed_and_the_reference)
+{
+    constexpr float step{ 0.001f };
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 12.0f });
+
+    for (const auto angle : { 0.0f, step })
+    {
+        for (uint32_t tick = 0; tick != prescaler; ++tick)
+        {
+            foc::Radians held{ angle };
+            focSpeed->Calculate(ZeroCurrents(), held);
+        }
+
+        lowPriorityInterruptMock.TriggerHandler();
+    }
+
+    const auto observation = focSpeed->ObserveMotion();
+    EXPECT_NEAR(observation.measuredSpeed.Value(), step * static_cast<float>(lowPriorityFrequency.Value()), 1e-3f);
+    EXPECT_NEAR(observation.demandedSpeed.Value(), 12.0f, 1e-6f);
+    EXPECT_NEAR(observation.positionError.Value(), 0.0f, 1e-6f);
+}
+
+TEST_F(TestSpeedCascade, a_disabled_cascade_observes_no_motion)
+{
+    constexpr float step{ 0.001f };
+    const uint32_t prescaler = baseFrequencyValue / lowPriorityFrequency.Value();
+    EXPECT_CALL(lowPriorityInterruptMock, Trigger()).Times(testing::AnyNumber());
+
+    focSpeed->Enable();
+    focSpeed->SetPoint(foc::RadiansPerSecond{ 12.0f });
+
+    for (const auto angle : { 0.0f, step })
+    {
+        for (uint32_t tick = 0; tick != prescaler; ++tick)
+        {
+            foc::Radians held{ angle };
+            focSpeed->Calculate(ZeroCurrents(), held);
+        }
+
+        lowPriorityInterruptMock.TriggerHandler();
+    }
+
+    focSpeed->Disable();
+
+    const auto observation = focSpeed->ObserveMotion();
+    EXPECT_NEAR(observation.measuredSpeed.Value(), 0.0f, 1e-6f);
+    EXPECT_NEAR(observation.measuredTorqueCurrent.Value(), 0.0f, 1e-6f);
 }

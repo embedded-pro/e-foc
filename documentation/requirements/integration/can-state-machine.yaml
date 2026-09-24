@@ -109,3 +109,11 @@
     synchronous and shall not depend on any prior CAN command. FaultCode values are
     mapped as follows: overcurrent→overCurrent, overvoltage→overVoltage,
     overtemperature→overTemperature, encoderLoss→sensorFault; all other codes→none.
+
+- id: REQ-INT-014
+  title: Telemetry reports the measured mechanical speed
+  shall: >
+    The speed field of the telemetry status frame shall carry the mechanical speed the active
+    control mode measures: the outer loop's window speed in speed and position mode, and the
+    control interrupt's filtered speed in torque mode. It shall read zero only when the rotor
+    is at rest or no mode has measured it since the drive was last enabled.

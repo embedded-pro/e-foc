@@ -16,7 +16,7 @@ namespace services
 
         struct AlignmentConfig
         {
-            hal::Percent testVoltagePercent{ 20 };
+            hal::DutyCycle testVoltage{ hal::DutyCycle::FromPercent(20) };
             hal::Hertz samplingFrequency{ 1000 };
             std::size_t maxSamples{ 500 };
             foc::Radians settledThreshold{ 0.001f };

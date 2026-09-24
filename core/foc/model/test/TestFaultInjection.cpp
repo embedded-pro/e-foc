@@ -16,9 +16,9 @@ namespace
         void DriveCycles(int cycles)
         {
             const foc::PhasePwmDutyCycles duty{
-                hal::Percent{ 60 },
-                hal::Percent{ 50 },
-                hal::Percent{ 40 }
+                hal::DutyCycle::FromPercent(60),
+                hal::DutyCycle::FromPercent(50),
+                hal::DutyCycle::FromPercent(40)
             };
             for (int i = 0; i < cycles; ++i)
                 model.StepForTest(duty);
@@ -114,7 +114,7 @@ TEST_F(TestFaultInjection, a_sagging_supply_produces_less_current_than_a_healthy
     };
     sagging.SetFaultInjection({ .supplyVoltageScale = 0.25f });
     sagging.Start();
-    const foc::PhasePwmDutyCycles duty{ hal::Percent{ 60 }, hal::Percent{ 50 }, hal::Percent{ 40 } };
+    const foc::PhasePwmDutyCycles duty{ hal::DutyCycle::FromPercent(60), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(40) };
     for (int i = 0; i < 50; ++i)
         sagging.StepForTest(duty);
 
@@ -124,7 +124,7 @@ TEST_F(TestFaultInjection, a_sagging_supply_produces_less_current_than_a_healthy
 TEST_F(TestFaultInjection, the_same_seed_reproduces_the_same_noise_sequence)
 {
     const foc::ThreePhaseMotorModel::NoiseConfig noise{ .sigmaAmpere = 0.5f };
-    const foc::PhasePwmDutyCycles duty{ hal::Percent{ 60 }, hal::Percent{ 50 }, hal::Percent{ 40 } };
+    const foc::PhasePwmDutyCycles duty{ hal::DutyCycle::FromPercent(60), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(40) };
 
     auto run = [&noise, &duty](uint32_t seed)
     {

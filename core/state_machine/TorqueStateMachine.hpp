@@ -20,6 +20,8 @@ namespace application
         foc::FocTorque& GetController();
         const foc::FocTorque& GetController() const;
 
+        foc::MotionObservation ObserveMotion() const override;
+
     protected:
         foc::FocBase& GetFoc() override;
         foc::Controllable& GetFocControl() override;

@@ -6,18 +6,21 @@
 
 namespace foc
 {
+    inline float DutyFraction(hal::DutyCycle duty)
+    {
+        return static_cast<float>(duty.Value()) * (1.0f / static_cast<float>(hal::DutyCycle::fullScale));
+    }
+
     template<typename Modulated>
     ALWAYS_INLINE_HOT PhasePwmDutyCycles ToDutyCycles(const Modulated& output)
     {
-        const auto percent = [](float normalized)
+        const auto toDutyCycle = [](float normalized)
         {
-            // std::clamp would pass NaN into an undefined cast; -ffinite-math-only drops this branch, so
-            // the real guarantee is that configuration boundaries reject non-finite values (REQ-PERF-003)
             const auto bounded = normalized > 0.0f ? (normalized < 1.0f ? normalized : 1.0f) : 0.0f;
 
-            return hal::Percent{ static_cast<uint8_t>(bounded * 100.0f + 0.5f) };
+            return hal::DutyCycle{ static_cast<uint32_t>(bounded * static_cast<float>(hal::DutyCycle::fullScale) + 0.5f) };
         };
 
-        return PhasePwmDutyCycles{ percent(output.a), percent(output.b), percent(output.c) };
+        return PhasePwmDutyCycles{ toDutyCycle(output.a), toDutyCycle(output.b), toDutyCycle(output.c) };
     }
 }

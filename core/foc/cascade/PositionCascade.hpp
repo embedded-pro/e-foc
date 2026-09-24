@@ -31,6 +31,7 @@ namespace foc
         void Enable() override;
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) final;
+        MotionObservation ObserveMotion() const override;
 
         void EnableSpeedCommand() override;
         void DisableSpeedCommand() override;

@@ -23,6 +23,7 @@ namespace foc
         void Enable() override;
         void Disable() override;
         PhasePwmDutyCycles Calculate(const PhaseCurrents& currentPhases, Radians& position) final;
+        MotionObservation ObserveMotion() const override;
 
         CurrentControllerSelector& CurrentLoop();
 
@@ -43,5 +44,7 @@ namespace foc
         filters::passive::ExponentialMovingAverage<float> speedFilter{ 1.0f };
         float previousMechanicalAngle{ 0.0f };
         bool previousAngleValid{ false };
+        volatile float lastElectricalSpeed{ 0.0f };
+        volatile float lastIq{ 0.0f };
     };
 }

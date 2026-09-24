@@ -112,7 +112,7 @@ equilibrium ($\delta = \pi$). In practice, static friction and motor winding asy
 rotor from remaining at the unstable equilibrium, so the procedure reliably converges for
 surface-mounted PMSM and BLDC motors. For interior PMSM motors with significant magnetic saliency,
 a rotor that is already near the unstable equilibrium and is held by static friction may require the
-`settledThreshold` to be tightened and the `testVoltagePercent` to be increased to ensure movement.
+`settledThreshold` to be tightened and the `testVoltage` to be increased to ensure movement.
 
 The field is maintained continuously at a constant duty cycle until the rotor is detected as settled.
 No stepping or sweeping is performed.

@@ -91,11 +91,16 @@ namespace foc
         RunSpeedLoop(mechanicalSpeed);
 
         UpdateOnlineMechanicalEstimator(mechanicalSpeed);
-        UpdateOnlineElectricalEstimator(mechanicalSpeed * PolePairs());
+        UpdateOnlineElectricalEstimator();
     }
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC pop_options
 #endif
+
+    MotionObservation SpeedCascade::ObserveMotion() const
+    {
+        return ObserveSpeedLoopMotion();
+    }
 
     hal::Hertz SpeedCascade::OuterLoopFrequency() const
     {

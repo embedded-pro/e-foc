@@ -43,7 +43,7 @@ namespace foc
         const auto inertia = parameters.inertia.Value();
         const auto scale = 1.0f / parameters.maxCurrent.Value();
         const auto kp = 2.0f * inertia * bandwidth / parameters.torqueConstant.Value();
-        const auto integralZero = std::max(parameters.viscousFriction.Value() / inertia, bandwidth / 10.0f);
+        const auto integralZero = std::max(parameters.viscousFriction.Value() / inertia, bandwidth / 4.0f);
         const auto ki = kp * integralZero * OuterSamplePeriod(parameters.samplingFrequency);
 
         speedPid.SetTunings({ kp * scale, ki * scale, 0.0f });

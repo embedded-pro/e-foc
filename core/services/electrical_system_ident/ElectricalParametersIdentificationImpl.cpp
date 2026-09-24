@@ -1,5 +1,6 @@
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/foc/math/DutyConversion.hpp"
 #include "core/services/InjectionCurrentLimit.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include <cmath>
@@ -37,7 +38,7 @@ namespace services
         pendingResult = ResistanceInductanceResult{};
 
         resistanceEstimator.Start(
-            ResistanceEstimator::Config{ config.testVoltagePercent, config.settleTime, config.windingConfig },
+            ResistanceEstimator::Config{ config.testVoltage, config.settleTime, config.windingConfig },
             [this](auto result)
             {
                 OnResistanceDone(result);
@@ -58,7 +59,7 @@ namespace services
         inductanceEstimator.Start(
             SinusoidalInductanceEstimator::Config{
                 rlConfig.injectionFrequency,
-                rlConfig.injectionVoltagePercent,
+                rlConfig.injectionVoltage,
                 rlConfig.warmupPeriods,
                 rlConfig.measurementPeriods,
                 rlConfig.voltageToCurrentDelaySamples,
@@ -146,7 +147,7 @@ namespace services
     void ElectricalParametersIdentificationImpl::RunPolePairLogic()
     {
         const float electricalAngle = static_cast<float>(currentSampleIndex) * anglePerStep;
-        const float voltage = static_cast<float>(polePairsConfig.testVoltagePercent.Value()) / 100.0f;
+        const float voltage = foc::DutyFraction(polePairsConfig.testVoltage);
 
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, std::cos(electricalAngle), std::sin(electricalAngle))));
