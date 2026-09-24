@@ -4,13 +4,12 @@
 #include "core/state_machine/MaintenanceFlow.hpp"
 #include "core/state_machine/OperationFlow.hpp"
 #include "core/state_machine/PendingCommand.hpp"
+#include "services/fsm/StateMachineDefinition.hpp"
 
 namespace application
 {
     namespace
     {
-        using Machine = LifecycleMachine;
-
         bool WasActive(const state_machine::State& state)
         {
             return std::holds_alternative<state_machine::Enabled>(state) || std::holds_alternative<state_machine::Calibrating>(state);
@@ -318,10 +317,28 @@ namespace application
         };
     }
 
-    LifecycleMachine::Table FocLifecycleTable::Rows()
+    constexpr std::array<LifecycleMachine::Transition, 45> FocLifecycleTable::Rows()
     {
-        static constexpr auto rows = services::JoinRows(CalibrationRows(), CalibrationCompletionRows(), OperationRows(), SafetyRows(), MaintenanceRows(), BootRows());
-        return infra::MakeRange(rows);
+        return services::JoinRows(CalibrationRows(), CalibrationCompletionRows(), OperationRows(), SafetyRows(), MaintenanceRows(), BootRows());
+    }
+
+    constexpr LifecycleMachine::Rules FocLifecycleTable::Rules()
+    {
+        return LifecycleMachine::Rules{}
+            .Allow<state_machine::Idle, state_machine::Calibrating, state_machine::Idle>()
+            .Allow<state_machine::Ready, state_machine::Calibrating, state_machine::Enabled, state_machine::Idle>()
+            .Allow<state_machine::Calibrating, state_machine::Ready, state_machine::Idle>()
+            .Allow<state_machine::Enabled, state_machine::Ready, state_machine::Idle>()
+            .Allow<state_machine::Fault, state_machine::Ready, state_machine::Idle>()
+            .AllowFromAny<state_machine::Fault>()
+            .Forbid<state_machine::Idle, state_machine::Enabled>()
+            .Forbid<state_machine::Calibrating, state_machine::Enabled>()
+            .Forbid<state_machine::Fault, state_machine::Enabled, state_machine::Calibrating>();
+    }
+
+    services::ValidatedTable<LifecycleMachine> FocLifecycleTable::Table()
+    {
+        return services::Validated<FocLifecycleTable>();
     }
 
     template<class S>

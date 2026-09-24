@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/state_machine/LifecycleContext.hpp"
+#include "services/fsm/ValidatedTable.hpp"
 #include <array>
 
 namespace application
@@ -8,7 +9,12 @@ namespace application
     class FocLifecycleTable
     {
     public:
-        static LifecycleMachine::Table Rows();
+        using Machine = LifecycleMachine;
+        using Initial = state_machine::Idle;
+
+        static services::ValidatedTable<LifecycleMachine> Table();
+        static constexpr std::array<LifecycleMachine::Transition, 45> Rows();
+        static constexpr LifecycleMachine::Rules Rules();
         static void RegisterEnteredHooks(LifecycleMachine& machine);
 
     private:

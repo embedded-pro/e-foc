@@ -121,11 +121,18 @@ The table is the single source of truth for what the machine accepts:
 - An event whose rows exist but whose guards all refuse it is **rejected** in the same way;
   the guard is where conditions such as "asynchronous work is outstanding" or "the rotor
   reference is not established" live.
-- Before the machine starts, the table is checked for consistency: duplicate rows, rows
-  that can never be selected because an unguarded row precedes them, and states that no
-  sequence of rows reaches from `Idle` all refuse to start the machine. A malformed
-  lifecycle therefore fails at boot on the host, in the unit tests, rather than on the
-  motor.
+- The table is checked when the firmware is compiled, not when it runs: the machine can only
+  be constructed from `services::Validated<FocLifecycleTable>()`, which evaluates the table with
+  `static_assert`. Duplicate rows, rows that can never be selected because an unguarded row
+  precedes them, states that no sequence of rows reaches from `Idle`, events that no row
+  handles, states that no row leaves, and rows from any state that can never fire all stop the
+  build, naming the offending row. A malformed lifecycle therefore never produces a binary.
+- `FocLifecycleTable::Rules()` declares which state changes the lifecycle may make, separately
+  from the rows: `Idle` → `Calibrating` or `Idle`; `Ready` → `Calibrating`, `Enabled` or
+  `Idle`; `Calibrating`, `Enabled` and `Fault` → `Ready` or `Idle`; and any state → `Fault`.
+  `Enabled` is forbidden from every state except `Ready`, and `Fault` never leads straight
+  back to `Calibrating`. A row that makes any other transition, or an allowed transition that
+  no row makes, is a compile error.
 
 Events are handled to completion. An event dispatched while another is being handled, for
 instance a service that completes synchronously inside the action that started it, or a
