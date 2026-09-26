@@ -31,9 +31,6 @@ target_sources(e_foc.platform_abstraction PRIVATE
     PlatformFactory.hpp
     PlatformFactory.cpp
     QuadratureEncoderDecorator.hpp
-    SoftwareWatchdog.hpp
-    SoftwareWatchdog.cpp
-    WatchdogPlaceholder.hpp
 )
 add_subdirectory(test)
 add_subdirectory(test_doubles)

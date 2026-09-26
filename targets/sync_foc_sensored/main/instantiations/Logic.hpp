@@ -18,11 +18,7 @@
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/PlatformFaultNotifier.hpp"
-#include "core/supervision/ControlHealth.hpp"
 #include "core/supervision/EncoderPlausibilityMonitor.hpp"
-#include "core/supervision/SupervisedInverter.hpp"
-#include "core/supervision/SupervisedLowPriorityInterrupt.hpp"
-#include "core/supervision/WatchdogSupervisor.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include "services/peripheral/DebugLed.hpp"
 #include <optional>
@@ -42,21 +38,8 @@ namespace application
         static constexpr uint32_t controlLoopFrequencyHz = 20000;
         static constexpr uint32_t pwmDeadTimeNs = 500;
         static constexpr float motorFluxLinkageWb = 0.007f;
-        static constexpr uint32_t watchdogDeadlineMs = 50;
-        static constexpr uint32_t watchdogStartupGraceMs = 2000;
-        static constexpr uint32_t watchdogEvaluationsPerDeadline = 4;
 
         using ControlMode = state_machine::ControlModeStateMachine;
-
-        struct WatchdogSupervision
-        {
-            WatchdogSupervision(application::PlatformFactory& hardware, services::Tracer& tracer);
-
-            supervision::ControlHealth health;
-            supervision::SupervisedInverter inverter;
-            supervision::SupervisedLowPriorityInterrupt lowPriorityInterrupt;
-            supervision::WatchdogSupervisor supervisor;
-        };
 
         application::PlatformFactory& hardware;
         services::DebugLed debugLed;
@@ -69,7 +52,6 @@ namespace application
         services::ElectricalParametersIdentificationImpl electricalIdent;
         services::MotorAlignmentImpl motorAlignment;
         infra::WithSharedAccess<state_machine::PlatformFaultNotifier> platformFaultNotifier;
-        WatchdogSupervision watchdog;
         supervision::EncoderPlausibilityMonitor encoderPlausibility;
         services::ConfigData configData;
 

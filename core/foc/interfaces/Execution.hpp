@@ -2,29 +2,9 @@
 
 #include "core/foc/interfaces/Signals.hpp"
 #include "infra/util/Function.hpp"
-#include "numerical/math/CompilerOptimizations.hpp"
-#include <atomic>
 
 namespace foc
 {
-    class ProgressSignal
-    {
-    public:
-        // Signal is callable from any context including interrupts; TakeProgress runs on the event loop only
-        ALWAYS_INLINE_HOT void Signal()
-        {
-            progressed.store(true);
-        }
-
-        bool TakeProgress()
-        {
-            return progressed.exchange(false);
-        }
-
-    private:
-        std::atomic<bool> progressed{ false };
-    };
-
     class LowPriorityInterrupt
     {
     public:

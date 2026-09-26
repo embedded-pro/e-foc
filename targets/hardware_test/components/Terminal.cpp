@@ -86,7 +86,6 @@ namespace application
         , systemClock{ hardware.SystemClock() }
         , foc{ hardware.MaxCurrentSupported(), hal::Hertz{ 1000 }, hardware.LowPriorityInterrupt() }
         , eeprom{ hardware.Eeprom() }
-        , watchdogSupervision{ hardware.Watchdog() }
     {
         terminal.AddCommand({ { "enc", "e", "Read encoder. stop. Ex: enc" },
             [this](const auto&)
@@ -202,16 +201,10 @@ namespace application
                 this->terminal.ProcessResult(ForceHardfault());
             } });
 
-        terminal.AddCommand({ { "watchdog", "wd", "Report watchdog state, or enable it with [deadline_ms [50; 10000]]. Ex: watchdog 1000" },
-            [this](const auto& param)
-            {
-                this->terminal.ProcessResult(ConfigureWatchdog(param));
-            } });
-
-        terminal.AddCommand({ { "watchdog_stall", "wds", "Stop feeding the watchdog to validate stall detection. Ex: watchdog_stall" },
+        terminal.AddCommand({ { "watchdog_stall", "wds", "Stall the event loop so the watchdog resets the target. Ex: watchdog_stall" },
             [this](const auto&)
             {
-                this->terminal.ProcessResult(StallWatchdog());
+                this->terminal.ProcessResult(StallEventLoop());
             } });
 
         terminal.AddCommand({ { "ident", "i", "Estimate R and L (DC step + HF sinusoidal injection). Ex: ident" },
@@ -668,64 +661,18 @@ namespace application
         return { services::TerminalWithStorage::Status::success };
     }
 
-    TerminalInteractor::StatusWithMessage TerminalInteractor::ConfigureWatchdog(const infra::BoundedConstString& param)
+    TerminalInteractor::StatusWithMessage TerminalInteractor::StallEventLoop()
     {
-        infra::Tokenizer tokenizer(param, ' ');
-
-        if (tokenizer.Size() == 0)
-        {
-            ReportWatchdogState();
-            return { success };
-        }
-
-        if (tokenizer.Size() != 1)
-            return { error, "invalid number of arguments" };
-
-        if (watchdogSupervision.watchdog.IsEnabled())
-            return { error, "watchdog already enabled" };
-
-        auto deadlineMs = ParseInput<uint32_t>(tokenizer.Token(0), minimumWatchdogDeadlineMs, maximumWatchdogDeadlineMs);
-        if (!deadlineMs.has_value())
-            return { error, "invalid value for deadline_ms. It should be an integer between 50 and 10000." };
-
-        watchdogSupervision.watchdog.Enable(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::milliseconds(*deadlineMs)), [this]()
+        tracer.Trace() << "[WDT] stalling event loop";
+        eventLoopStallTimer.Start(eventLoopStallDelay, []()
             {
-                OnWatchdogDeadlineMissed();
+                volatile bool stalled{ true };
+                while (stalled)
+                {
+                    // Never returns, so the dispatcher stops making progress
+                }
             });
-
-        watchdogSupervision.feedTimer.Start(std::chrono::milliseconds(*deadlineMs / watchdogFeedsPerDeadline), [this]()
-            {
-                watchdogSupervision.watchdog.Feed();
-            });
-
-        ReportWatchdogState();
         return { success };
-    }
-
-    TerminalInteractor::StatusWithMessage TerminalInteractor::StallWatchdog()
-    {
-        if (!watchdogSupervision.watchdog.IsEnabled())
-            return { error, "watchdog not enabled" };
-
-        watchdogSupervision.feedTimer.Cancel();
-        tracer.Trace() << "[WDT] feeding stopped";
-        return { success };
-    }
-
-    void TerminalInteractor::ReportWatchdogState()
-    {
-        if (watchdogSupervision.watchdog.IsEnabled())
-            tracer.Trace() << "[WDT] enabled deadline=" << static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(watchdogSupervision.watchdog.Deadline()).count()) << "ms";
-        else
-            tracer.Trace() << "[WDT] disabled";
-    }
-
-    void TerminalInteractor::OnWatchdogDeadlineMissed()
-    {
-        hardware.Stop();
-        watchdogSupervision.feedTimer.Cancel();
-        tracer.Trace() << "[WDT] deadline missed, power stage stopped";
-        hardware.ResetFromWatchdogExpiry();
     }
 
     void TerminalInteractor::RunIdent()

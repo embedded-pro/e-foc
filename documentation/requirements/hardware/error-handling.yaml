@@ -67,82 +67,41 @@
     at minimum the faulting PC address.
 
 - id: REQ-EH-008
-  title: Watchdog abstraction present on every platform
+  title: The event dispatcher is supervised by the MCU watchdog on every MCU platform
   shall: >
-    The platform abstraction shall define a watchdog port and every platform
-    implementation shall provide it, so that no target can be built without
-    one. The port shall allow the application to enable supervision once with
-    an explicit deadline, to signal progress from any execution context
-    including interrupt context, and to read back whether supervision is
-    active and which deadline is being held. The port shall offer no way to
-    disable supervision once it has been enabled. A target that has no
-    watchdog to drive shall satisfy the port with a placeholder that reports
-    supervision as disabled, so that a query for supervision state is
-    answered truthfully on every platform.
+    Every MCU platform shall run its event dispatcher under supervision of the
+    MCU watchdog peripheral, starting when the dispatcher is constructed. The
+    watchdog shall be refreshed from its early-warning interrupt only while the
+    dispatcher makes progress, where an early warning that finds the same
+    action still executing since the previous early warning counts as no
+    progress. Supervision shall offer no way to be disabled, suspended or
+    reconfigured by the application. The early-warning interrupt shall run at
+    the lowest interrupt priority wherever the hardware allows it, so that an
+    interrupt handler that never returns starves it and the hardware resets
+    the target.
 
 - id: REQ-EH-009
   title: Watchdog expiry brings the power stage to a safe state
   shall: >
-    When a supervised execution context stops signalling progress, the
-    watchdog shall report the missed deadline to the application within two
-    deadline periods, and the application shall stop the power stage before
-    the target resets. On a target whose watchdog is backed by MCU hardware,
-    a stall of the event loop itself shall cut the power stage from the
-    watchdog interrupt and reset the target, without calling the application
-    handler from interrupt context; and a stall that also stops the watchdog
-    interrupt shall reset the target from hardware, with the reset cause on
-    the subsequent boot reported as Watchdog.
-
-- id: REQ-EH-010
-  title: Watchdog servicing requires every expected execution context
-  shall: >
-    The application shall service the watchdog only when every execution
-    context that the current lifecycle state and control mode expect has made
-    progress since the previous evaluation. While the drive is Enabled the
-    inner control loop shall be expected in every control mode, and the outer
-    loop shall additionally be expected in speed and position mode, so that
-    inner-loop progress alone shall not service the watchdog in those modes.
-    While the drive is stopped, calibrating or faulted, and in torque mode
-    which has no outer loop, no control-loop progress shall be expected, so
-    that a healthy drive shall not be reset for the absence of a heartbeat its
-    current state cannot produce.
-
-- id: REQ-EH-011
-  title: Startup is graced within an explicit bound, never exempted
-  shall: >
-    The production application shall enable watchdog supervision as it is
-    constructed and before the asynchronous configuration load completes. Until
-    the lifecycle state machine exists the evaluation shall expect no control
-    loop and shall service the watchdog, for an explicitly bounded number of
-    evaluations only. A startup that has not completed within that bound shall
-    stop servicing the watchdog, so that a hung boot reaches a safe state and
-    resets by the same path as any other stall. Supervision shall never be
-    disabled or suspended to accommodate startup or calibration.
+    When an event dispatcher action has not returned within the expiration
+    timeout, the watchdog early-warning interrupt shall cut the power stage
+    directly, depending on no driver state, and shall then stop refreshing the
+    watchdog so that the hardware resets the target within one further
+    early-warning period. No application code shall run from that interrupt.
 
 - id: REQ-EH-012
-  title: A software-detected watchdog expiry is reported after reboot
+  title: A watchdog reset is reported after reboot
   shall: >
-    When the application detects a missed watchdog deadline, it shall stop the
-    drive and the power stage before resetting, and shall record the expiry in
-    storage that survives the reset. On a Cortex-M target the subsequent boot
-    shall report the reset cause as Watchdog rather than Software, and that
-    record shall be independent of any hard fault capture held in the same
-    region, so that neither overwrites the other.
-
-- id: REQ-HIL-011
-  title: Watchdog state is observable over the CLI
-  shall: >
-    The hardware_test CLI shall report watchdog supervision as disabled
-    before it is enabled, and after the "watchdog <deadline_ms>" command
-    shall report supervision as enabled together with the deadline it is
-    holding.
+    A reset caused by the watchdog shall be reported as reset cause Watchdog on
+    the subsequent boot, read from the MCU's own reset-cause register, so that
+    no record has to be written before the reset.
 
 - id: REQ-HIL-012
-  title: A deliberately stalled feed context resets the target
+  title: A deliberately stalled event loop resets the target
   shall: >
-    When the "watchdog_stall" CLI command stops the supervised feed context,
-    the device shall stop the power stage, reset, and report watchdog
-    supervision as disabled again on the subsequent boot.
+    When the "watchdog_stall" CLI command schedules an event dispatcher action
+    that never returns, the device shall cut the power stage, reset, and report
+    the reset cause as Watchdog on the subsequent boot.
 
 - id: REQ-EH-007
   title: The hard fault handler cuts the power stage first

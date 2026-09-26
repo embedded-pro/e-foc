@@ -139,16 +139,15 @@ By default the emulator's guest clock follows host wall-clock while the guest's 
 throughput follows whatever CPU the host happens to give it. The firmware's timers therefore keep
 real time regardless of how much work the emulated core actually completed.
 
-That breaks the control system's own supervision. The control interrupt runs at 20 kHz, and on
-this machine it carries the whole motor plant as well as the control loop, which no emulated core
-of this class completes in a 50 microsecond period. The interrupt then crowds out the 1 kHz outer
-loop, which runs at the lowest priority. The supervisor samples both loops and refuses to feed the
-watchdog when the outer one has not progressed; four consecutive refusals expire the deadline and
-emergency-stop a motor that was running perfectly well.
+That breaks the control system. The control interrupt runs at 20 kHz, and on this machine it
+carries the whole motor plant as well as the control loop, which no emulated core of this class
+completes in a 50 microsecond period. The interrupt then crowds out the 1 kHz outer loop, which runs
+at the lowest priority, and the speed and position loops stop tracking a motor that was running
+perfectly well.
 
-This is the supervision working correctly on a target that genuinely cannot keep up. It was
-measured, not inferred: every refusal reported the inner loop progressing and the outer loop not,
-in speed and position modes only — the two modes whose supervision requires the outer loop.
+This is the firmware behaving correctly on a target that genuinely cannot keep up. It was
+measured, not inferred: the inner loop kept running while the outer loop starved, in speed and
+position modes only — the two modes that have an outer loop.
 
 The emulator is therefore run with its virtual clock tied to instructions retired rather than to
 host time, at 8 nanoseconds per instruction. That models a core of roughly 125 MHz, at least as

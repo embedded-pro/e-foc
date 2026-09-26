@@ -27,6 +27,4 @@ namespace application
             __asm volatile("sev");
         }
     };
-
-    using EventDispatcherCortexWithWeakPtr = infra::EventDispatcherWithWeakPtrConnector<EventDispatcherCortexWithWeakPtrWorker>;
 }

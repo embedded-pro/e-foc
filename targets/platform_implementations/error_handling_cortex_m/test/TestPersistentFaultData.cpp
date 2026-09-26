@@ -37,52 +37,6 @@ TEST_F(TestPersistentFaultData, size_is_exactly_1024_bytes)
     static_assert(sizeof(application::PersistentFaultData) == 1024);
 }
 
-TEST_F(TestPersistentFaultData, no_watchdog_expiry_is_recorded_by_default)
-{
-    EXPECT_FALSE(faultData.TakeWatchdogExpiry());
-}
-
-TEST_F(TestPersistentFaultData, a_recorded_watchdog_expiry_is_read_once)
-{
-    faultData.RecordWatchdogExpiry();
-
-    EXPECT_TRUE(faultData.TakeWatchdogExpiry());
-    EXPECT_FALSE(faultData.TakeWatchdogExpiry());
-}
-
-TEST_F(TestPersistentFaultData, a_watchdog_expiry_survives_a_hard_fault_record_written_after_it)
-{
-    faultData.RecordWatchdogExpiry();
-
-    faultData.magic = 0u;
-    faultData.pc = 0x08001234u;
-    faultData.magic = application::PersistentFaultData::kMagicValid;
-
-    EXPECT_TRUE(faultData.IsValid());
-    EXPECT_TRUE(faultData.TakeWatchdogExpiry());
-}
-
-TEST_F(TestPersistentFaultData, invalidating_a_hard_fault_record_leaves_the_watchdog_expiry_intact)
-{
-    faultData.magic = application::PersistentFaultData::kMagicValid;
-    faultData.RecordWatchdogExpiry();
-
-    faultData.Invalidate();
-
-    EXPECT_FALSE(faultData.IsValid());
-    EXPECT_TRUE(faultData.TakeWatchdogExpiry());
-}
-
-TEST_F(TestPersistentFaultData, taking_the_watchdog_expiry_leaves_a_hard_fault_record_intact)
-{
-    faultData.magic = application::PersistentFaultData::kMagicValid;
-    faultData.RecordWatchdogExpiry();
-
-    ASSERT_TRUE(faultData.TakeWatchdogExpiry());
-
-    EXPECT_TRUE(faultData.IsValid());
-}
-
 TEST(TestFormatFaultData, format_fault_data_includes_register_names)
 {
     application::PersistentFaultData data{};

@@ -207,11 +207,6 @@ namespace application
         return eeprom;
     }
 
-    drivers::Watchdog& PlatformFactoryImpl::Watchdog()
-    {
-        return watchdog;
-    }
-
     void PlatformFactoryImpl::RegisterBoardProtection(const infra::Function<void(BoardProtectionReason)>& onProtection)
     {
         boardProtection.Register(onProtection);
@@ -224,11 +219,6 @@ namespace application
 
     void PlatformFactoryImpl::Reset()
     {}
-
-    void PlatformFactoryImpl::ResetFromWatchdogExpiry()
-    {
-        Reset();
-    }
 
     ResetCause PlatformFactoryImpl::GetResetCause() const
     {

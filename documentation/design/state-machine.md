@@ -800,10 +800,10 @@ sequenceDiagram
 | `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0      | Current loop closed-loop bandwidth; defaults to 2π·fs/nyquistFactor when zero                                           |
 | `FaultCode`       | —                      | enum (uint8)                   | 8 values | `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed` |
 
-`watchdogTimeout` is reserved and not raised by the state machine. A watchdog expiry resets the target
-immediately, so there is no dispatcher turn in which a latched fault code could be read or broadcast; the
-expiry is reported after reboot through `ResetCause::watchdog` instead. The watchdog's miss handler reaches
-the state machine only through `CmdEmergencyStop()`, which stops the drive without latching a fault. See
+`watchdogTimeout` is reserved and not raised by the state machine. A watchdog expiry cuts the power stage
+from the watchdog interrupt and the hardware resets the target, so there is no dispatcher turn in which a
+latched fault code could be read or broadcast; the expiry is reported after reboot through
+`ResetCause::watchdog` instead. The watchdog does not reach the state machine at all. See
 [Watchdog Design](watchdog.md).
 
 ---

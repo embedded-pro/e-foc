@@ -45,5 +45,7 @@ target_link_libraries(e_foc.platform_abstraction_qemu PUBLIC
     hal.qemu.syscalls
     hal.qemu.sync
     hal.qemu.cortex
+    hal.qemu.async
+    services.util.watchdog
     e_foc.platform_abstraction_cortex_m_common
 )

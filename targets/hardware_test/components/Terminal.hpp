@@ -42,17 +42,13 @@ namespace application
         StatusWithMessage GetResetCauseStatus();
         StatusWithMessage GetFaultStatus();
         StatusWithMessage ForceHardfault();
-        StatusWithMessage ConfigureWatchdog(const infra::BoundedConstString& param);
-        StatusWithMessage StallWatchdog();
-        void ReportWatchdogState();
-        void OnWatchdogDeadlineMissed();
+        StatusWithMessage StallEventLoop();
         void RunIdent();
         void RunAlign();
 
     private:
-        static constexpr uint32_t minimumWatchdogDeadlineMs = 50;
-        static constexpr uint32_t maximumWatchdogDeadlineMs = 10000;
-        static constexpr uint32_t watchdogFeedsPerDeadline = 4;
+        // Leaves the command's response and trace time to reach the host before the event loop stops
+        static constexpr infra::Duration eventLoopStallDelay{ std::chrono::milliseconds(100) };
         static constexpr std::size_t averageSampleSize = 100;
         using QueueOfPhaseCurrents = infra::BoundedDeque<foc::PhaseCurrents>::WithMaxSize<averageSampleSize>;
 
@@ -80,16 +76,6 @@ namespace application
             PlatformFactory::SampleAndHold sampleAndHold{ PlatformFactory::SampleAndHold::shortest };
         };
 
-        struct WatchdogSupervision
-        {
-            explicit WatchdogSupervision(drivers::Watchdog& watchdog)
-                : watchdog{ watchdog }
-            {}
-
-            drivers::Watchdog& watchdog;
-            infra::TimerRepeating feedTimer;
-        };
-
     private:
         const infra::BoundedVector<infra::BoundedConstString>::WithMaxSize<5> acceptedAdcValues{ { "shortest", "shorter", "medium", "longer", "longest" } };
 
@@ -109,7 +95,7 @@ namespace application
         std::optional<std::size_t> polePairs = 0;
         foc::SpeedCascade foc;
         hal::Eeprom& eeprom;
-        WatchdogSupervision watchdogSupervision;
+        infra::TimerSingleShot eventLoopStallTimer;
         std::array<uint8_t, 64> eepromBuffer{};
     };
 }

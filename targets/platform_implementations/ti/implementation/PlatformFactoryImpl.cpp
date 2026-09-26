@@ -1,6 +1,7 @@
 #include "targets/platform_implementations/ti/implementation/PlatformFactoryImpl.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "services/tracer/GlobalTracer.hpp"
+#include "targets/platform_implementations/error_handling_cortex_m/CutPowerStage.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
 
@@ -44,9 +45,6 @@ namespace application
             FormatFaultData(persistentFaultData, faultStatusString);
             persistentFaultData.Invalidate();
         }
-
-        if (persistentFaultData.TakeWatchdogExpiry())
-            resetCause = ResetCause::watchdog;
 
         application::Clocks::Initialize();
         peripherals.emplace();
@@ -128,6 +126,20 @@ namespace application
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
     {
         return pendSvLowPriorityInterrupt;
+    }
+
+    hal::tiva::WatchDog::Config PlatformFactoryImpl::Cortex::WatchdogConfig()
+    {
+        hal::tiva::WatchDog::Config config;
+        config.timeout = watchdogEarlyWarningPeriod;
+        config.resetOnMissedInterrupt = true;
+        config.interruptPriority = InterruptPriorities::watchdogEarlyWarning;
+        return config;
+    }
+
+    void PlatformFactoryImpl::Cortex::OnWatchdogExpired()
+    {
+        CutPowerStage();
     }
 
     PlatformFactoryImpl::Peripherals::PerformanceTrackerImpl::PerformanceTrackerImpl(hal::cortex::DataWatchpointAndTrace& dwt, hal::OutputPin& pin)
@@ -330,11 +342,6 @@ namespace application
         return peripherals->eepromPeripheral;
     }
 
-    drivers::Watchdog& PlatformFactoryImpl::Watchdog()
-    {
-        return watchdog;
-    }
-
     void PlatformFactoryImpl::RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>& onProtection)
     {
         onFaultCallback = onProtection;
@@ -347,12 +354,6 @@ namespace application
 
     void PlatformFactoryImpl::Reset()
     {
-        NVIC_SystemReset();
-    }
-
-    void PlatformFactoryImpl::ResetFromWatchdogExpiry()
-    {
-        persistentFaultData.RecordWatchdogExpiry();
         NVIC_SystemReset();
     }
 
