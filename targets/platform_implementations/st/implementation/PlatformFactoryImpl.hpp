@@ -222,6 +222,13 @@ namespace application
 
         static void OnWatchdogExpired();
 
+        struct HalInitialization
+        {
+            HalInitialization();
+        };
+
+        // Initialised first, so the watchdog the dispatcher starts runs on an initialised HAL
+        HalInitialization halInitialization;
         hal::WatchDogStm watchdog;
         services::EventDispatcherWithWeakPtrAndWatchdog::WithSize<50> eventDispatcher{ watchdog, watchdogExpirationTimeout, []()
             {

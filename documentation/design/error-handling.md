@@ -150,11 +150,11 @@ about two dozen inlined instructions, under one percent of the 20 kHz period.
 
 ### Provided
 
-| Interface                                    | Purpose                                               | Contract                                                                  |
-|----------------------------------------------|-------------------------------------------------------|---------------------------------------------------------------------------|
-| `PlatformFactory::Reset()`                   | Trigger an immediate software reset                   | Called synchronously; does not return                                     |
-| `PlatformFactory::GetResetCause() const`     | Return the reset cause captured at boot               | Valid for the lifetime of the application; thread-safe by value semantics |
-| `PlatformFactory::FaultStatus() const`       | Return the formatted fault string (empty if no fault) | Valid for the lifetime of the application once the constructor returns    |
+| Interface                                | Purpose                                               | Contract                                                                  |
+|------------------------------------------|-------------------------------------------------------|---------------------------------------------------------------------------|
+| `PlatformFactory::Reset()`               | Trigger an immediate software reset                   | Called synchronously; does not return                                     |
+| `PlatformFactory::GetResetCause() const` | Return the reset cause captured at boot               | Valid for the lifetime of the application; thread-safe by value semantics |
+| `PlatformFactory::FaultStatus() const`   | Return the formatted fault string (empty if no fault) | Valid for the lifetime of the application once the constructor returns    |
 
 ### Required
 
@@ -179,7 +179,8 @@ about two dozen inlined instructions, under one percent of the 20 kHz period.
 
 `ResetCause::watchdog` comes from the reset source bits alone. The watchdog never resets by software: on
 expiry it cuts the power stage and stops refreshing, and the peripheral's own reset sets the watchdog bit.
-No marker has to survive the reset. See [Watchdog Design](watchdog.md).
+No marker has to survive the reset on an MCU; the emulated target, which has no reset source bits, keeps a
+semihosting marker file instead. See [Watchdog Design](watchdog.md).
 
 ---
 

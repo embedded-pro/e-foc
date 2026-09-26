@@ -94,7 +94,9 @@
   shall: >
     A reset caused by the watchdog shall be reported as reset cause Watchdog on
     the subsequent boot, read from the MCU's own reset-cause register, so that
-    no record has to be written before the reset.
+    no record has to be written before the reset. The emulated target, which
+    has no such register, shall record the watchdog reset in a host file
+    through semihosting and report it the same way.
 
 - id: REQ-HIL-012
   title: A deliberately stalled event loop resets the target

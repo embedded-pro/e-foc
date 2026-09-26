@@ -144,10 +144,14 @@ namespace application
             static constexpr infra::Duration watchdogEarlyWarningPeriod{ std::chrono::milliseconds(25) };
             static constexpr infra::Duration watchdogExpirationTimeout{ std::chrono::milliseconds(100) };
 
+            static void OnWatchdogExpired();
+
             hal::cortex::InterruptTable::WithStorage<64> interruptTable;
             hal::WatchdogQemu watchdog{ hal::WatchdogQemu::Config{ .timeout = watchdogEarlyWarningPeriod } };
-            // The simulated bridge has no gate to cut; the machine reset that follows restarts the plant as well
-            EventDispatcherCortexWithWeakPtrAndWatchdog::WithSize<50> eventDispatcher{ watchdog, watchdogExpirationTimeout, infra::emptyFunction };
+            EventDispatcherCortexWithWeakPtrAndWatchdog::WithSize<50> eventDispatcher{ watchdog, watchdogExpirationTimeout, []()
+                {
+                    OnWatchdogExpired();
+                } };
             hal::cortex::SystemTickTimerService systemTick{ kQemuSystemClockHz, std::chrono::milliseconds(1) };
         };
 
@@ -182,6 +186,7 @@ namespace application
         void ApplyPlantConfig();
 
         const std::optional<sil::SilPlantConfig> plantConfig;
+        const ResetCause resetCause;
         infra::Function<void()> onInitialized;
         CycleCounter cycleCounter;
         ControlLoopMetrics controlLoopMetrics;

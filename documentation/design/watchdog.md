@@ -94,21 +94,21 @@ must not be able to preempt any interrupt that could hang:
 - A hung action in the event loop leaves the early warning free to run, so the handler cuts the power stage
   first and the hardware resets the target afterwards.
 
-| Failure                                             | Early warning runs? | Outcome                                  |
-|-----------------------------------------------------|---------------------|------------------------------------------|
-| An event-loop action never returns                  | yes                 | Power stage cut, then hardware reset     |
+| Failure                                             | Early warning runs? | Outcome                                    |
+|-----------------------------------------------------|---------------------|--------------------------------------------|
+| An event-loop action never returns                  | yes                 | Power stage cut, then hardware reset       |
 | An interrupt never returns (control, outer loop, …) | no, starved         | Hardware reset; pins return to reset state |
 | Interrupts disabled / CPU lockup                    | no                  | Hardware reset; pins return to reset state |
-| The control loop stops while the event loop runs    | yes, sees progress  | Not detected, by design                  |
+| The control loop stops while the event loop runs    | yes, sees progress  | Not detected, by design                    |
 
 ### Part D — platforms
 
-| Platform         | Hardware                              | Early-warning period          | Expiration timeout |
-|------------------|---------------------------------------|-------------------------------|--------------------|
-| TI (TM4C123/129) | Watchdog 0, reset on second timeout   | 25 ms                         | 100 ms             |
-| ST (STM32)       | Window watchdog, prescaler 8          | Fixed by PCLK1 (≈129 ms at 16 MHz) | 100 ms (one early warning) |
-| Emulated target  | CMSDK watchdog of the MPS2 machine    | 25 ms                         | 100 ms             |
-| Host             | none                                  | —                             | —                  |
+| Platform         | Hardware                            | Early-warning period               | Expiration timeout         |
+|------------------|-------------------------------------|------------------------------------|----------------------------|
+| TI (TM4C123/129) | Watchdog 0, reset on second timeout | 25 ms                              | 100 ms                     |
+| ST (STM32)       | Window watchdog, prescaler 8        | Fixed by PCLK1 (≈129 ms at 16 MHz) | 100 ms (one early warning) |
+| Emulated target  | CMSDK watchdog of the MPS2 machine  | 25 ms                              | 100 ms                     |
+| Host             | none                                | —                                  | —                          |
 
 - **ST:** the vendor driver pins the window watchdog to the highest priority when it starts. The platform
   lowers it to the lowest NVIC level straight after the dispatcher is constructed, for the reason given in
@@ -118,6 +118,10 @@ must not be able to preempt any interrupt that could hang:
 - **Emulated target:** the MPS2 machine wires its watchdog to NMI, which cannot be lowered. So on the
   emulated target a hung interrupt is caught only when the event loop is inside an action. That is
   acceptable for a target that drives a simulated plant.
+
+  The machine has no reset-cause register, and its reset reloads RAM. So the expiry handler writes a marker
+  file through semihosting before the reset, and the next boot reads the marker, clears it and reports
+  *watchdog*. The simulated bridge has no gate to cut.
 - **Host:** the host build keeps a plain dispatcher. It is not a target that can be reset.
 
 ### Part E — validation surface
@@ -135,28 +139,28 @@ There is no command to enable or query the watchdog, because it has no state the
 
 ### Provided
 
-| Interface                         | Purpose                                         | Contract                                                                 |
-|-----------------------------------|-------------------------------------------------|--------------------------------------------------------------------------|
-| Supervised event dispatcher       | Run the application and prove it makes progress | Every MCU platform; supervision starts in the constructor, never stops   |
+| Interface                   | Purpose                                         | Contract                                                               |
+|-----------------------------|-------------------------------------------------|------------------------------------------------------------------------|
+| Supervised event dispatcher | Run the application and prove it makes progress | Every MCU platform; supervision starts in the constructor, never stops |
 
 ### Required
 
-| Interface                     | Purpose                                                       | Contract                                                                   |
-|-------------------------------|---------------------------------------------------------------|----------------------------------------------------------------------------|
-| `hal::Watchdog`               | Early-warning interrupt, refresh, reset on a missed refresh  | Constructed before the dispatcher; early warning at the lowest priority where the hardware allows it |
-| Direct power-stage cutoff     | Safe state from the early-warning interrupt                   | Interrupt-safe, depends on no driver state; shared with the fault handler |
-| Reset-cause register          | Report the watchdog reset on the next boot                    | Read and cleared once at boot by the error-handling component             |
+| Interface                 | Purpose                                                     | Contract                                                                                             |
+|---------------------------|-------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
+| `hal::Watchdog`           | Early-warning interrupt, refresh, reset on a missed refresh | Constructed before the dispatcher; early warning at the lowest priority where the hardware allows it |
+| Direct power-stage cutoff | Safe state from the early-warning interrupt                 | Interrupt-safe, depends on no driver state; shared with the fault handler                            |
+| Reset-cause register      | Report the watchdog reset on the next boot                  | Read and cleared once at boot by the error-handling component                                        |
 
 ---
 
 ## Data Model
 
-| Entity      | Field               | Type / Unit | Range     | Notes                                                          |
-|-------------|---------------------|-------------|-----------|----------------------------------------------------------------|
-| Supervision | steps               | count       | wraps     | Incremented before and after each action; odd while executing |
-| Supervision | missed early warnings | count     | 0 … N     | Reset whenever progress is seen                                |
-| Supervision | N                   | count       | ≥ 1       | ⌈expiration timeout / early-warning period⌉                    |
-| Supervision | expired             | flag        | set once  | Refreshing stops; the hardware reset follows                   |
+| Entity      | Field                 | Type / Unit | Range    | Notes                                                         |
+|-------------|-----------------------|-------------|----------|---------------------------------------------------------------|
+| Supervision | steps                 | count       | wraps    | Incremented before and after each action; odd while executing |
+| Supervision | missed early warnings | count       | 0 … N    | Reset whenever progress is seen                               |
+| Supervision | N                     | count       | ≥ 1      | ⌈expiration timeout / early-warning period⌉                   |
+| Supervision | expired               | flag        | set once | Refreshing stops; the hardware reset follows                  |
 
 ---
 
@@ -247,24 +251,24 @@ New work that could block for longer than the expiration timeout has to be split
 
 ## Constraints & Limitations
 
-| Constraint                         | Value / Description                                                                                     |
-|------------------------------------|---------------------------------------------------------------------------------------------------------|
-| Scope                              | Proves the software is running; does not prove the control loops are running                          |
-| Always on                          | Starts with the dispatcher; there is no enable, disable or query                                         |
-| Boot before the dispatcher runs    | Construction outside an action looks like progress; a hang there is caught only if interrupts stop too |
-| Expiry handler                     | Interrupt context; power-stage cutoff only, then returns                                                 |
-| Early-warning priority             | Lowest on TI and ST, so a hung interrupt starves it; NMI on the emulated target                         |
-| ST target                          | Cutoff is empty while the platform drives no bridge                                                     |
-| Host build                         | No watchdog                                                                                             |
-| Reset cause                        | Read from the MCU's reset-cause register; no record is written before the reset                        |
+| Constraint                      | Value / Description                                                                                    |
+|---------------------------------|--------------------------------------------------------------------------------------------------------|
+| Scope                           | Proves the software is running; does not prove the control loops are running                           |
+| Always on                       | Starts with the dispatcher; there is no enable, disable or query                                       |
+| Boot before the dispatcher runs | Construction outside an action looks like progress; a hang there is caught only if interrupts stop too |
+| Expiry handler                  | Interrupt context; power-stage cutoff only, then returns                                               |
+| Early-warning priority          | Lowest on TI and ST, so a hung interrupt starves it; NMI on the emulated target                        |
+| ST target                       | Cutoff is empty while the platform drives no bridge                                                    |
+| Host build                      | No watchdog                                                                                            |
+| Reset cause                     | Read from the MCU's reset-cause register; the emulated target reads a semihosting marker file instead  |
 
 ---
 
 ## Open Questions
 
-| # | Question                                                                        | Answer or options                                                                                   | Status   |
-|---|---------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|----------|
-| 1 | Should the watchdog also prove the control loops are running?                   | No. It proves the software is running; bridge protection covers the power stage                    | answered |
-| 2 | Should a missed deadline be a fault code before the reset?                      | No — it is reported as the reset cause, because deferred reporting cannot outrun the reset          | answered |
+| # | Question                                                                        | Answer or options                                                                                                      | Status   |
+|---|---------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|----------|
+| 1 | Should the watchdog also prove the control loops are running?                   | No. It proves the software is running; bridge protection covers the power stage                                        | answered |
+| 2 | Should a missed deadline be a fault code before the reset?                      | No — it is reported as the reset cause, because deferred reporting cannot outrun the reset                             | answered |
 | 3 | Should the ST window-watchdog driver take the early-warning priority as config? | Yes, as the Tiva driver does; today the platform overrides the driver after start, which depends on construction order | open     |
-| 4 | Can the emulated target's reset be asserted by a SIL job?                       | The CMSDK watchdog resets the machine, but the emulated reset cause is fixed at power-up            | open     |
+| 4 | Can the emulated target's reset be asserted by a SIL job?                       | Yes: the CMSDK watchdog resets the machine and the semihosting marker reports the cause as *watchdog*                  | answered |

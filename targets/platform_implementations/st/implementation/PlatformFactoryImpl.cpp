@@ -48,11 +48,14 @@ namespace application
             persistentFaultData.Invalidate();
         }
 
-        HAL_Init();
-
         // The driver starts the window watchdog at the highest priority; an early warning that can preempt a hung
         // handler would keep refreshing it, so it is lowered to the lowest level the NVIC implements
         NVIC_SetPriority(WWDG_IRQn, (1u << __NVIC_PRIO_BITS) - 1u);
+    }
+
+    PlatformFactoryImpl::HalInitialization::HalInitialization()
+    {
+        HAL_Init();
     }
 
     void PlatformFactoryImpl::OnWatchdogExpired()
