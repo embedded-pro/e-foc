@@ -220,6 +220,7 @@ namespace application
     private:
         static constexpr infra::Duration watchdogExpirationTimeout{ std::chrono::milliseconds(100) };
 
+        static hal::WatchDogStm::Config WatchdogConfig();
         static void OnWatchdogExpired();
 
         struct HalInitialization
@@ -229,7 +230,7 @@ namespace application
 
         // Initialised first, so the watchdog the dispatcher starts runs on an initialised HAL
         HalInitialization halInitialization;
-        hal::WatchDogStm watchdog;
+        hal::WatchDogStm watchdog{ WatchdogConfig() };
         services::EventDispatcherWithWeakPtrAndWatchdog::WithSize<50> eventDispatcher{ watchdog, watchdogExpirationTimeout, []()
             {
                 OnWatchdogExpired();

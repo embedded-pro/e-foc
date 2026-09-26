@@ -103,18 +103,22 @@ must not be able to preempt any interrupt that could hang:
 
 ### Part D — platforms
 
-| Platform         | Hardware                            | Early-warning period               | Expiration timeout         |
-|------------------|-------------------------------------|------------------------------------|----------------------------|
-| TI (TM4C123/129) | Watchdog 0, reset on second timeout | 25 ms                              | 100 ms                     |
-| ST (STM32)       | Window watchdog, prescaler 8        | Fixed by PCLK1 (≈129 ms at 16 MHz) | 100 ms (one early warning) |
-| Emulated target  | CMSDK watchdog of the MPS2 machine  | 25 ms                              | 100 ms                     |
-| Host             | none                                | —                                  | —                          |
+| Platform         | Hardware                            | Early-warning period              | Expiration timeout            |
+|------------------|-------------------------------------|-----------------------------------|-------------------------------|
+| TI (TM4C123/129) | Watchdog 0, reset on second timeout | 25 ms                             | 100 ms                        |
+| ST (STM32)       | Window watchdog, prescaler 1        | Fixed by PCLK1 (≈16 ms at 16 MHz) | 100 ms (seven early warnings) |
+| Emulated target  | CMSDK watchdog of the MPS2 machine  | 25 ms                             | 100 ms                        |
+| Host             | none                                | —                                 | —                             |
 
 - **ST:** the vendor driver pins the window watchdog to the highest priority when it starts. The platform
   lowers it to the lowest NVIC level straight after the dispatcher is constructed, for the reason given in
   Part C. That level is set with the CMSIS encoding, because EMIL's priority enum assumes three priority
-  bits and the STM32 parts implement four. The
-  cutoff is empty while the ST platform drives no bridge.
+  bits and the STM32 parts implement four. The cutoff is empty while the ST platform drives no bridge.
+
+  The window watchdog resets one counter tick after its early warning (4096 · prescaler / PCLK1, 256 µs at
+  16 MHz with prescaler 1), so the early-warning handler must run within that tick. Prescaler 1 keeps the
+  early-warning period short, and with it the rounding of the timeout; a larger prescaler buys handler
+  latency at the cost of a later expiry.
 - **Emulated target:** the MPS2 machine wires its watchdog to NMI, which cannot be lowered. So on the
   emulated target a hung interrupt is caught only when the event loop is inside an action. That is
   acceptable for a target that drives a simulated plant.
@@ -130,6 +134,12 @@ The bring-up application keeps one command:
 
 - **watchdog_stall** — schedules an action that never returns. The expiry handler cuts the power stage,
   the hardware resets the target, and the target comes back reporting the reset cause as *watchdog*.
+
+The emulated target registers the same **watchdog_stall** command from its platform rather than from the
+application, so the production firmware carries no stall command. A SIL scenario uses it to stall the
+event loop and then waits for the reboot banner to report the reset cause as *watchdog*. That runs the
+whole expiry path in continuous integration: the stalled action, the NMI early warning, the semihosting
+marker, the machine reset and the reset-cause report.
 
 There is no command to enable or query the watchdog, because it has no state the application can change.
 
@@ -239,6 +249,8 @@ With early-warning period *P* and *N* = ⌈timeout / *P*⌉:
   detected between *N·P* and *(N+1)·P* after it started, and the power stage is cut at that point.
 - The hardware reset follows one period later, at most *(N+2)·P* after the action started.
 - With TI at *P* = 25 ms and *N* = 4, that is 100–125 ms to the cutoff and at most 150 ms to the reset.
+- With ST at *P* ≈ 16 ms (PCLK1 at 16 MHz) and *N* = 7, that is about 113–129 ms to the cutoff and at most
+  about 145 ms to the reset.
 
 A legitimate action must finish well inside *N·P*. Long work is already split across actions:
 - the TI EEPROM mass erase is polled from a timer rather than waited for;
@@ -271,4 +283,4 @@ New work that could block for longer than the expiration timeout has to be split
 | 1 | Should the watchdog also prove the control loops are running?                   | No. It proves the software is running; bridge protection covers the power stage                                        | answered |
 | 2 | Should a missed deadline be a fault code before the reset?                      | No — it is reported as the reset cause, because deferred reporting cannot outrun the reset                             | answered |
 | 3 | Should the ST window-watchdog driver take the early-warning priority as config? | Yes, as the Tiva driver does; today the platform overrides the driver after start, which depends on construction order | open     |
-| 4 | Can the emulated target's reset be asserted by a SIL job?                       | Yes: the CMSDK watchdog resets the machine and the semihosting marker reports the cause as *watchdog*                  | answered |
+| 4 | Can the emulated target's reset be asserted by a SIL job?                       | Yes: the SIL watchdog scenario stalls the event loop and asserts the *watchdog* reset cause after the reboot           | answered |

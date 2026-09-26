@@ -58,6 +58,14 @@ namespace application
         HAL_Init();
     }
 
+    hal::WatchDogStm::Config PlatformFactoryImpl::WatchdogConfig()
+    {
+        // The shortest early-warning period keeps the expiry close to the timeout, which is rounded up to whole periods
+        hal::WatchDogStm::Config config;
+        config.prescaler = WWDG_PRESCALER_1;
+        return config;
+    }
+
     void PlatformFactoryImpl::OnWatchdogExpired()
     {
         CutPowerStage();

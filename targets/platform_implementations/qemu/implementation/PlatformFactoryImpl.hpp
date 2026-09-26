@@ -27,6 +27,7 @@
 #include "targets/platform_implementations/qemu/implementation/SemihostingEeprom.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingPlantConfig.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingSerial.hpp"
+#include "targets/platform_implementations/qemu/implementation/SilWatchdogStall.hpp"
 #include <atomic>
 #include <optional>
 
@@ -197,6 +198,7 @@ namespace application
         QemuTimer focTimer;
         SemihostingSerial serial;
         TerminalAndTracerBlock terminalAndTracer{ serial };
+        SilWatchdogStall watchdogStall{ terminalAndTracer.terminal, terminalAndTracer.tracer };
         SemihostingEeprom eeprom{ "eeprom.bin" };
         GpioPinStub operationalPin;
         GpioPinStub warningPin;

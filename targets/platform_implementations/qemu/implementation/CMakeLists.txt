@@ -22,6 +22,8 @@ target_sources(e_foc.platform_abstraction_qemu PRIVATE
     SemihostingCanBusAdapter.hpp
     SemihostingSerial.cpp
     SemihostingSerial.hpp
+    SilWatchdogStall.cpp
+    SilWatchdogStall.hpp
 )
 
 target_include_directories(e_foc.platform_abstraction_qemu PUBLIC
