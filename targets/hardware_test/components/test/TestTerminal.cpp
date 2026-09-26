@@ -30,12 +30,10 @@ namespace
         MOCK_METHOD(foc::Volts, PowerSupplyVoltage, (), (override));
         MOCK_METHOD(foc::LowPriorityInterrupt&, LowPriorityInterrupt, (), (override));
         MOCK_METHOD(hal::Eeprom&, Eeprom, (), (override));
-        MOCK_METHOD(drivers::Watchdog&, Watchdog, (), (override));
         MOCK_METHOD(void, RegisterBoardProtection, (const infra::Function<void(application::PlatformFactory::BoardProtectionReason)>&), (override));
         MOCK_METHOD(application::PlatformFactory::BoardProtectionState, BoardProtectionStatus, (), (override));
         MOCK_METHOD(application::PlatformDiagnostics&, Diagnostics, (), (override));
         MOCK_METHOD(void, Reset, (), (override));
-        MOCK_METHOD(void, ResetFromWatchdogExpiry, (), (override));
         MOCK_METHOD(application::ResetCause, GetResetCause, (), (const, override));
         MOCK_METHOD(infra::BoundedConstString, FaultStatus, (), (const, override));
 
@@ -105,7 +103,6 @@ namespace
             EXPECT_CALL(platformFactoryMock, SystemClock()).WillRepeatedly(testing::Return(hal::Hertz{ 10000 }));
             EXPECT_CALL(platformFactoryMock, LowPriorityInterrupt()).WillRepeatedly(testing::ReturnRef(simpleLowPriorityInterrupt));
             EXPECT_CALL(platformFactoryMock, Eeprom()).WillRepeatedly(testing::ReturnRef(eepromMock));
-            EXPECT_CALL(platformFactoryMock, Watchdog()).WillRepeatedly(testing::ReturnRef(watchdogMock));
             EXPECT_CALL(platformFactoryMock, GetResetCause()).WillRepeatedly(testing::Return(application::ResetCause::powerUp));
             EXPECT_CALL(platformFactoryMock, FaultStatus()).WillRepeatedly(testing::Return(infra::BoundedConstString{}));
 
@@ -135,7 +132,6 @@ namespace
 
         testing::StrictMock<PerformanceTrackerMock> performanceTrackerMock;
         testing::StrictMock<hal::CleanEepromMock> eepromMock;
-        testing::StrictMock<drivers::WatchdogMock> watchdogMock;
         testing::StrictMock<application::CanBusAdapterMock> canAdapterMock;
 
         std::optional<application::TerminalInteractor> terminalInteractor;
@@ -1685,171 +1681,21 @@ TEST_F(TestHardwareTerminal, eeprom_read_address_out_of_range_returns_error)
     ExecuteAllActions();
 }
 
-TEST_F(TestHardwareTerminal, watchdog_reports_disabled_before_it_is_enabled)
-{
-    InvokeCommand("watchdog", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string newline{ "\r\n" };
-            std::string payload{ "[WDT] disabled" };
-
-            EXPECT_CALL(watchdogMock, IsEnabled()).WillOnce(testing::Return(false));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TestHardwareTerminal, watchdog_enables_supervision_with_the_requested_deadline)
-{
-    InvokeCommand("watchdog 1000", [this]()
-        {
-            EXPECT_CALL(watchdogMock, IsEnabled()).WillOnce(testing::Return(false));
-            EXPECT_CALL(watchdogMock, Enable(std::chrono::microseconds{ 1000000 }, testing::_))
-                .WillOnce(testing::Invoke(&watchdogMock, &drivers::WatchdogMock::StoreDeadlineMissedHandler));
-            EXPECT_CALL(watchdogMock, IsEnabled()).WillOnce(testing::Return(true));
-            EXPECT_CALL(watchdogMock, Deadline()).WillOnce(testing::Return(std::chrono::microseconds{ 1000000 }));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TestHardwareTerminal, watchdog_alias_enables_supervision)
-{
-    InvokeCommand("wd 500", [this]()
-        {
-            EXPECT_CALL(watchdogMock, IsEnabled()).WillOnce(testing::Return(false));
-            EXPECT_CALL(watchdogMock, Enable(std::chrono::microseconds{ 500000 }, testing::_))
-                .WillOnce(testing::Invoke(&watchdogMock, &drivers::WatchdogMock::StoreDeadlineMissedHandler));
-            EXPECT_CALL(watchdogMock, IsEnabled()).WillOnce(testing::Return(true));
-            EXPECT_CALL(watchdogMock, Deadline()).WillOnce(testing::Return(std::chrono::microseconds{ 500000 }));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TestHardwareTerminal, watchdog_refuses_a_deadline_outside_the_supported_range)
-{
-    InvokeCommand("watchdog 10", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string newline{ "\r\n" };
-            std::string header{ "ERROR: " };
-            std::string payload{ "invalid value for deadline_ms. It should be an integer between 50 and 10000." };
-
-            EXPECT_CALL(watchdogMock, IsEnabled()).WillOnce(testing::Return(false));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TestHardwareTerminal, watchdog_refuses_to_enable_supervision_twice)
-{
-    InvokeCommand("watchdog 1000", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string newline{ "\r\n" };
-            std::string header{ "ERROR: " };
-            std::string payload{ "watchdog already enabled" };
-
-            EXPECT_CALL(watchdogMock, IsEnabled()).WillOnce(testing::Return(true));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-}
-
-TEST_F(TestHardwareTerminal, an_enabled_watchdog_is_fed_from_the_event_loop)
-{
-    InvokeCommand("watchdog 1000", [this]()
-        {
-            EXPECT_CALL(watchdogMock, IsEnabled()).WillOnce(testing::Return(false));
-            EXPECT_CALL(watchdogMock, Enable(std::chrono::microseconds{ 1000000 }, testing::_))
-                .WillOnce(testing::Invoke(&watchdogMock, &drivers::WatchdogMock::StoreDeadlineMissedHandler));
-            EXPECT_CALL(watchdogMock, IsEnabled()).WillOnce(testing::Return(true));
-            EXPECT_CALL(watchdogMock, Deadline()).WillOnce(testing::Return(std::chrono::microseconds{ 1000000 }));
-        });
-
-    ExecuteAllActions();
-
-    EXPECT_CALL(watchdogMock, Feed()).Times(4);
-    ForwardTime(std::chrono::seconds(1));
-}
-
-TEST_F(TestHardwareTerminal, watchdog_stall_stops_feeding_the_watchdog)
-{
-    InvokeCommand("watchdog 1000", [this]()
-        {
-            EXPECT_CALL(watchdogMock, IsEnabled()).WillOnce(testing::Return(false));
-            EXPECT_CALL(watchdogMock, Enable(std::chrono::microseconds{ 1000000 }, testing::_))
-                .WillOnce(testing::Invoke(&watchdogMock, &drivers::WatchdogMock::StoreDeadlineMissedHandler));
-            EXPECT_CALL(watchdogMock, IsEnabled()).WillOnce(testing::Return(true));
-            EXPECT_CALL(watchdogMock, Deadline()).WillOnce(testing::Return(std::chrono::microseconds{ 1000000 }));
-        });
-
-    ExecuteAllActions();
-
-    InvokeCommand("watchdog_stall", [this]()
-        {
-            ::testing::InSequence _;
-
-            std::string newline{ "\r\n" };
-            std::string payload{ "[WDT] feeding stopped" };
-
-            EXPECT_CALL(watchdogMock, IsEnabled()).WillOnce(testing::Return(true));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
-        });
-
-    ExecuteAllActions();
-
-    ForwardTime(std::chrono::seconds(1));
-}
-
-TEST_F(TestHardwareTerminal, watchdog_stall_is_refused_while_supervision_is_off)
+TEST_F(TestHardwareTerminal, watchdog_stall_reports_before_stalling_the_event_loop)
 {
     InvokeCommand("watchdog_stall", [this]()
         {
             ::testing::InSequence _;
 
             std::string newline{ "\r\n" };
-            std::string header{ "ERROR: " };
-            std::string payload{ "watchdog not enabled" };
+            std::string payload{ "[WDT] stalling event loop" };
 
-            EXPECT_CALL(watchdogMock, IsEnabled()).WillOnce(testing::Return(false));
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
-            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
             EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
         });
 
     ExecuteAllActions();
-}
 
-TEST_F(TestHardwareTerminal, a_missed_deadline_stops_the_power_stage_before_resetting)
-{
-    InvokeCommand("watchdog 1000", [this]()
-        {
-            EXPECT_CALL(watchdogMock, IsEnabled()).WillOnce(testing::Return(false));
-            EXPECT_CALL(watchdogMock, Enable(std::chrono::microseconds{ 1000000 }, testing::_))
-                .WillOnce(testing::Invoke(&watchdogMock, &drivers::WatchdogMock::StoreDeadlineMissedHandler));
-            EXPECT_CALL(watchdogMock, IsEnabled()).WillOnce(testing::Return(true));
-            EXPECT_CALL(watchdogMock, Deadline()).WillOnce(testing::Return(std::chrono::microseconds{ 1000000 }));
-        });
-
-    ExecuteAllActions();
-
-    ::testing::InSequence _;
-    EXPECT_CALL(platformFactoryMock, Stop());
-    EXPECT_CALL(platformFactoryMock, ResetFromWatchdogExpiry());
-
-    watchdogMock.RaiseDeadlineMissed();
+    // Stops short of the stall delay: the stall action never returns, so running it would hang the test
+    ForwardTime(std::chrono::milliseconds(99));
 }

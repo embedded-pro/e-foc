@@ -13,20 +13,6 @@ namespace application
         magic = 0u;
     }
 
-    void PersistentFaultData::RecordWatchdogExpiry()
-    {
-        watchdogExpiryMagic = kWatchdogExpiryValid;
-    }
-
-    bool PersistentFaultData::TakeWatchdogExpiry()
-    {
-        if (watchdogExpiryMagic != kWatchdogExpiryValid)
-            return false;
-
-        watchdogExpiryMagic = 0u;
-        return true;
-    }
-
     void FormatFaultData(const PersistentFaultData& data, infra::BoundedString& out)
     {
         out.clear();

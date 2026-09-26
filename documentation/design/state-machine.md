@@ -50,13 +50,13 @@ date: 2026-09-21
 
 The state machine has five named states:
 
-| State         | Motor condition                                                                                                       | Allowed transitions                                                                                                                                                                                                                                                  |
-|---------------|-----------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled | → `Calibrating` (CmdCalibrate, CmdReAlign with loaded parameters, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                                                                                      |
+| State         | Motor condition                                                                                                                       | Allowed transitions                                                                                                                                                                                                                                                  |
+|---------------|---------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled                 | → `Calibrating` (CmdCalibrate, CmdReAlign with loaded parameters, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                                                                                      |
 | `Calibrating` | Calibration sequence in progress; motor is driven by identification services, under a provisional plant model for the mechanical step | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop with previously valid calibration), → `Idle` (record saved but incomplete for this mode, or CmdEmergencyStop without valid calibration), → `Fault` (any step or the NVM save fails, or hardware fault) |
-| `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true), → `Calibrating` (CmdCalibrate re-runs, CmdReAlign, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault, or the NVM invalidation failing)                  |
-| `Enabled`     | FOC controller active; motor under closed-loop control                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                                                                                |
-| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times. A further fault re-enters `Fault` but keeps the code that first tripped the drive                                                           |
+| `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true), → `Calibrating` (CmdCalibrate re-runs, CmdReAlign, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault, or the NVM invalidation failing)                  |
+| `Enabled`     | FOC controller active; motor under closed-loop control                                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                                                                                |
+| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times. A further fault re-enters `Fault` but keeps the code that first tripped the drive                                                           |
 
 ### State Diagram
 
@@ -312,10 +312,10 @@ calibration run: a failed step, a refused configuration, a failed NVM save, a ha
 stop, and the release of the machine's external resources when it is torn down. A record that saves but is
 incomplete for this mode restores as well, since nothing was committed for the loops to keep.
 
-| Situation                         | Restored state                                                                                                      |
-|-----------------------------------|---------------------------------------------------------------------------------------------------------------------|
-| A valid calibration is still held | That record is re-applied: electrical model, current tunings, mechanics, estimator seeds                            |
-| No valid calibration is held      | Nothing is re-applied; the motor stays un-enableable until a calibration succeeds                                   |
+| Situation                         | Restored state                                                                           |
+|-----------------------------------|------------------------------------------------------------------------------------------|
+| A valid calibration is still held | That record is re-applied: electrical model, current tunings, mechanics, estimator seeds |
+| No valid calibration is held      | Nothing is re-applied; the motor stays un-enableable until a calibration succeeds        |
 
 A committed calibration supersedes the provisional model instead of restoring over it: the record just
 saved is applied in full, so there is nothing left to put back.
@@ -787,23 +787,23 @@ sequenceDiagram
 
 ## Data Model
 
-| Entity            | Field                  | Type / Unit                    | Range    | Notes                                                                                                                   |
-|-------------------|------------------------|--------------------------------|----------|-------------------------------------------------------------------------------------------------------------------------|
-| `CalibrationData` | `polePairs`            | count (uint8)                  | 1–255    | Number of electrical pole pairs                                                                                         |
-| `CalibrationData` | `rPhase`               | Ohm (float)                    | > 0      | Phase resistance identified by electrical ident                                                                         |
-| `CalibrationData` | `lD` / `lQ`            | mH (float)                     | > 0      | D/Q inductances (set equal; anisotropy not estimated)                                                                   |
+| Entity            | Field                  | Type / Unit                    | Range    | Notes                                                                                                                                                                         |
+|-------------------|------------------------|--------------------------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `CalibrationData` | `polePairs`            | count (uint8)                  | 1–255    | Number of electrical pole pairs                                                                                                                                               |
+| `CalibrationData` | `rPhase`               | Ohm (float)                    | > 0      | Phase resistance identified by electrical ident                                                                                                                               |
+| `CalibrationData` | `lD` / `lQ`            | mH (float)                     | > 0      | D/Q inductances (set equal; anisotropy not estimated)                                                                                                                         |
 | `CalibrationData` | `encoderZeroOffset`    | int32 (bit-cast float Radians) | any      | Mechanical angle at encoder zero when rotor settled during alignment; stored for reference only — not re-applied to the encoder at boot or after calibration (see REQ-SM-019) |
-| `CalibrationData` | `inertia`              | N·m·s² (float)                 | ≥ 0      | Rotor inertia; populated only for speed/position modes                                                                  |
-| `CalibrationData` | `frictionViscous`      | N·m·s/rad (float)              | ≥ 0      | Viscous friction coefficient; populated only for speed/position modes                                                   |
-| `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0      | Coulomb friction; currently 0 (not identified)                                                                          |
-| `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0      | Speed loop closed-loop bandwidth; populated only for speed/position modes                                               |
-| `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0      | Current loop closed-loop bandwidth; defaults to 2π·fs/nyquistFactor when zero                                           |
-| `FaultCode`       | —                      | enum (uint8)                   | 8 values | `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed` |
+| `CalibrationData` | `inertia`              | N·m·s² (float)                 | ≥ 0      | Rotor inertia; populated only for speed/position modes                                                                                                                        |
+| `CalibrationData` | `frictionViscous`      | N·m·s/rad (float)              | ≥ 0      | Viscous friction coefficient; populated only for speed/position modes                                                                                                         |
+| `CalibrationData` | `frictionCoulomb`      | N·m (float)                    | ≥ 0      | Coulomb friction; currently 0 (not identified)                                                                                                                                |
+| `CalibrationData` | `speedLoopBandwidth`   | rad/s (float)                  | ≥ 0      | Speed loop closed-loop bandwidth; populated only for speed/position modes                                                                                                     |
+| `CalibrationData` | `currentLoopBandwidth` | rad/s (float)                  | ≥ 0      | Current loop closed-loop bandwidth; defaults to 2π·fs/nyquistFactor when zero                                                                                                 |
+| `FaultCode`       | —                      | enum (uint8)                   | 8 values | `overcurrent`, `overvoltage`, `undervoltage`, `overtemperature`, `encoderLoss`, `watchdogTimeout`, `hardwareFault`, `calibrationFailed`                                       |
 
-`watchdogTimeout` is reserved and not raised by the state machine. A watchdog expiry resets the target
-immediately, so there is no dispatcher turn in which a latched fault code could be read or broadcast; the
-expiry is reported after reboot through `ResetCause::watchdog` instead. The watchdog's miss handler reaches
-the state machine only through `CmdEmergencyStop()`, which stops the drive without latching a fault. See
+`watchdogTimeout` is reserved and not raised by the state machine. A watchdog expiry cuts the power stage
+from the watchdog interrupt and the hardware resets the target, so there is no dispatcher turn in which a
+latched fault code could be read or broadcast; the expiry is reported after reboot through
+`ResetCause::watchdog` instead. The watchdog does not reach the state machine at all. See
 [Watchdog Design](watchdog.md).
 
 ---

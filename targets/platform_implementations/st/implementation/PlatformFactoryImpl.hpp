@@ -7,15 +7,15 @@
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
-#include "core/platform_abstraction/SoftwareWatchdog.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/interfaces/Pwm.hpp"
 #include "hal/interfaces/SerialCommunication.hpp"
 #include "hal/synchronous_interfaces/SynchronousQuadratureEncoder.hpp"
-#include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "hal_st/stm32fxxx/WatchDogStm.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
+#include "services/util/EventDispatcherWatchdog.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 
 namespace application
@@ -47,9 +47,7 @@ namespace application
         foc::Volts PowerSupplyVoltage() override;
         foc::LowPriorityInterrupt& LowPriorityInterrupt() override;
         hal::Eeprom& Eeprom() override;
-        drivers::Watchdog& Watchdog() override;
         void Reset() override;
-        void ResetFromWatchdogExpiry() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
@@ -220,7 +218,23 @@ namespace application
         };
 
     private:
-        infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
+        static constexpr infra::Duration watchdogExpirationTimeout{ std::chrono::milliseconds(100) };
+
+        static hal::WatchDogStm::Config WatchdogConfig();
+        static void OnWatchdogExpired();
+
+        struct HalInitialization
+        {
+            HalInitialization();
+        };
+
+        // Initialised first, so the watchdog the dispatcher starts runs on an initialised HAL
+        HalInitialization halInitialization;
+        hal::WatchDogStm watchdog{ WatchdogConfig() };
+        services::EventDispatcherWithWeakPtrAndWatchdog::WithSize<50> eventDispatcher{ watchdog, watchdogExpirationTimeout, []()
+            {
+                OnWatchdogExpired();
+            } };
         infra::Function<void()> onInitialized;
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         static constexpr uint32_t timerId = 1;
@@ -234,7 +248,6 @@ namespace application
         std::optional<QuadratureEncoderDecoratorImpl<SynchronousQuadratureEncoderStub>> encoder;
         std::optional<CanBusAdapterImpl<CanStub>> canBus;
         EepromStub eepromStub;
-        SoftwareWatchdog watchdog;
         ResetCause resetCause{ ResetCause::powerUp };
         ControlLoopMetrics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };

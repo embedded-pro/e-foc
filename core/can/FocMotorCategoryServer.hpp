@@ -62,26 +62,26 @@ namespace can
         void BroadcastMechanicalParams(foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia);
 
     private:
-        void HandleStart(const hal::Can::Message& data);
-        void HandleStop(const hal::Can::Message& data);
-        void HandleClearFault(const hal::Can::Message& data);
-        void HandleEmergencyStop(const hal::Can::Message& data);
-        void HandleSelectControlMode(const hal::Can::Message& data);
-        void HandleSetTorqueSetpoint(const hal::Can::Message& data);
-        void HandleSetSpeedSetpoint(const hal::Can::Message& data);
-        void HandleSetPositionSetpoint(const hal::Can::Message& data);
+        bool HandleStart(const hal::Can::Message& data);
+        bool HandleStop(const hal::Can::Message& data);
+        bool HandleClearFault(const hal::Can::Message& data);
+        bool HandleEmergencyStop(const hal::Can::Message& data);
+        bool HandleSelectControlMode(const hal::Can::Message& data);
+        bool HandleSetTorqueSetpoint(const hal::Can::Message& data);
+        bool HandleSetSpeedSetpoint(const hal::Can::Message& data);
+        bool HandleSetPositionSetpoint(const hal::Can::Message& data);
 
-        void HandleSetPidCurrent(const hal::Can::Message& data);
-        void HandleSetPidSpeed(const hal::Can::Message& data);
-        void HandleSetPidPosition(const hal::Can::Message& data);
-        void HandleAlign(const hal::Can::Message& data);
-        void HandleIdentifyElectrical(const hal::Can::Message& data);
-        void HandleIdentifyMechanical(const hal::Can::Message& data);
-        void HandleRequestTelemetry(const hal::Can::Message& data);
-        void HandleSetEncoderResolution(const hal::Can::Message& data);
-        void HandleQueryMotorType(const hal::Can::Message& data);
-        void HandleConfigureTelemetryRate(const hal::Can::Message& data);
-        void HandleQueryContractVersion(const hal::Can::Message& data);
+        bool HandleSetPidCurrent(const hal::Can::Message& data);
+        bool HandleSetPidSpeed(const hal::Can::Message& data);
+        bool HandleSetPidPosition(const hal::Can::Message& data);
+        bool HandleAlign(const hal::Can::Message& data);
+        bool HandleIdentifyElectrical(const hal::Can::Message& data);
+        bool HandleIdentifyMechanical(const hal::Can::Message& data);
+        bool HandleRequestTelemetry(const hal::Can::Message& data);
+        bool HandleSetEncoderResolution(const hal::Can::Message& data);
+        bool HandleQueryMotorType(const hal::Can::Message& data);
+        bool HandleConfigureTelemetryRate(const hal::Can::Message& data);
+        bool HandleQueryContractVersion(const hal::Can::Message& data);
 
         services::CanMessageHandler<FocMotorCategoryServer> start{ focStartId, *this, &FocMotorCategoryServer::HandleStart };
         services::CanMessageHandler<FocMotorCategoryServer> stop{ focStopId, *this, &FocMotorCategoryServer::HandleStop };

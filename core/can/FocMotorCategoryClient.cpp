@@ -134,10 +134,10 @@ namespace can
         return contractCompatibility == ContractCompatibility::incompatible;
     }
 
-    void FocMotorCategoryClient::HandleContractVersionResponse(const hal::Can::Message& data)
+    bool FocMotorCategoryClient::HandleContractVersionResponse(const hal::Can::Message& data)
     {
         if (!PayloadExact(data, focContractVersionResponseId))
-            return;
+            return false;
 
         services::CanPayloadReader reader{ data };
         const auto major = reader.ReadUInt8();
@@ -149,12 +149,14 @@ namespace can
             {
                 observer.OnContractVersionResponse(major, minor);
             });
+
+        return true;
     }
 
-    void FocMotorCategoryClient::HandleSelectControlModeResponse(const hal::Can::Message& data)
+    bool FocMotorCategoryClient::HandleSelectControlModeResponse(const hal::Can::Message& data)
     {
         if (!PayloadExact(data, focSelectControlModeResponseId))
-            return;
+            return false;
 
         services::CanPayloadReader reader{ data };
         const auto activeMode = static_cast<FocMotorMode>(reader.ReadUInt8());
@@ -162,12 +164,14 @@ namespace can
             {
                 observer.OnSelectControlModeResponse(activeMode);
             });
+
+        return true;
     }
 
-    void FocMotorCategoryClient::HandleCategoryError(const hal::Can::Message& data)
+    bool FocMotorCategoryClient::HandleCategoryError(const hal::Can::Message& data)
     {
         if (!PayloadExact(data, services::canCategoryErrorResponseMessageTypeId))
-            return;
+            return false;
 
         services::CanPayloadReader reader{ data };
         const auto originCommandId = reader.ReadUInt8();
@@ -176,27 +180,33 @@ namespace can
             {
                 observer.OnCategoryError(originCommandId, errorCode);
             });
+
+        return true;
     }
 
-    void FocMotorCategoryClient::HandleTelemetryStatus(const hal::Can::Message& data)
+    bool FocMotorCategoryClient::HandleTelemetryStatus(const hal::Can::Message& data)
     {
         if (!PayloadExact(data, focTelemetryStatusResponseId))
-            return;
+            return false;
 
         NotifyObservers([&data](auto& observer)
             {
                 observer.OnTelemetryStatus(data);
             });
+
+        return true;
     }
 
-    void FocMotorCategoryClient::HandleTelemetryElectrical(const hal::Can::Message& data)
+    bool FocMotorCategoryClient::HandleTelemetryElectrical(const hal::Can::Message& data)
     {
         if (!PayloadExact(data, focTelemetryElectricalResponseId))
-            return;
+            return false;
 
         NotifyObservers([&data](auto& observer)
             {
                 observer.OnTelemetryElectrical(data);
             });
+
+        return true;
     }
 }

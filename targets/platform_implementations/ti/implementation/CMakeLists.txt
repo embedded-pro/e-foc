@@ -10,6 +10,7 @@ target_link_libraries(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PUBLIC
     infra.event
     infra.timer
     services.tracer
+    services.util.watchdog
     e_foc.error_handling_cortex_m
     e_foc.platform_abstraction_cortex_m_common
     e_foc.platform_abstraction_${E_FOC_TARGET_BOARD}
@@ -25,6 +26,4 @@ target_sources(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PRIVATE
     CutPowerStage.cpp
     PlatformFactoryImpl.cpp
     PlatformFactoryImpl.hpp
-    TivaWatchdog.cpp
-    TivaWatchdog.hpp
 )

@@ -1,6 +1,7 @@
 #include "cucumber_cpp/Steps.hpp"
 #include "integration_tests/support/Fixture.hpp"
 #include "integration_tests/support/interactor/hardware/Timeouts.hpp"
+#include <chrono>
 #include <gtest/gtest.h>
 #include <string>
 
@@ -16,22 +17,40 @@ namespace
 
         return false;
     }
+
+    bool WaitForLine(Fixture& fixture, const std::string& text, std::chrono::milliseconds timeout)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (!ContainsLine(fixture, text))
+        {
+            if (std::chrono::steady_clock::now() >= deadline)
+                return false;
+            (void)fixture.DrainLines(std::chrono::milliseconds{ 500 });
+        }
+
+        return true;
+    }
 }
 
-WHEN(R"(the watchdog command is sent to the hardware target)")
+GIVEN(R"(the emulated target is running)")
 {
-    auto& fixture = context.Get<Fixture>();
-    ASSERT_TRUE(fixture.SendCommand("watchdog", hil::timeouts::command))
-        << "watchdog command did not respond";
+    ASSERT_TRUE(context.Get<Fixture>().WaitForCanHeartbeat()) << "emulated target did not send a heartbeat";
 }
 
-WHEN(R"(the watchdog is enabled with a deadline of {int} ms)", (int deadlineMs))
+WHEN(R"(the event loop of the emulated target is stalled)")
 {
     auto& fixture = context.Get<Fixture>();
-    ASSERT_TRUE(fixture.SendCommand("watchdog " + std::to_string(deadlineMs), hil::timeouts::command))
-        << "watchdog command did not respond";
-    ASSERT_TRUE(ContainsLine(fixture, "[WDT] enabled"))
-        << "watchdog did not report that supervision started";
+    ASSERT_TRUE(fixture.SendCommand("watchdog_stall")) << "watchdog_stall could not be sent";
+    ASSERT_TRUE(WaitForLine(fixture, "[WDT] stalling event loop", std::chrono::seconds{ 10 }))
+        << "watchdog_stall did not report that the event loop is about to stall";
+}
+
+THEN(R"(the emulated target reboots and reports the reset cause Watchdog)")
+{
+    auto& fixture = context.Get<Fixture>();
+    ASSERT_TRUE(WaitForLine(fixture, "Reset Cause: Watchdog", std::chrono::seconds{ 30 }))
+        << "emulated target did not reboot reporting a watchdog reset";
+    EXPECT_TRUE(fixture.WaitForCanHeartbeat()) << "emulated target did not come back after the watchdog reset";
 }
 
 WHEN(R"(the watchdog_stall command is sent to the hardware target)")
@@ -39,24 +58,6 @@ WHEN(R"(the watchdog_stall command is sent to the hardware target)")
     auto& fixture = context.Get<Fixture>();
     ASSERT_TRUE(fixture.SendCommand("watchdog_stall", hil::timeouts::command))
         << "watchdog_stall command did not respond";
-    ASSERT_TRUE(ContainsLine(fixture, "[WDT] feeding stopped"))
-        << "watchdog_stall did not report that feeding stopped";
-}
-
-THEN(R"(the watchdog command reports supervision is disabled)")
-{
-    auto& fixture = context.Get<Fixture>();
-    ASSERT_TRUE(fixture.SendCommand("watchdog", hil::timeouts::command))
-        << "watchdog command did not respond";
-    EXPECT_TRUE(ContainsLine(fixture, "[WDT] disabled"))
-        << "Expected '[WDT] disabled' in watchdog output";
-}
-
-THEN(R"(the watchdog command reports a deadline of {int} ms)", (int deadlineMs))
-{
-    auto& fixture = context.Get<Fixture>();
-    ASSERT_TRUE(fixture.SendCommand("watchdog", hil::timeouts::command))
-        << "watchdog command did not respond";
-    EXPECT_TRUE(ContainsLine(fixture, "[WDT] enabled deadline=" + std::to_string(deadlineMs) + "ms"))
-        << "Expected the watchdog to report a deadline of " << deadlineMs << " ms";
+    ASSERT_TRUE(ContainsLine(fixture, "[WDT] stalling event loop"))
+        << "watchdog_stall did not report that the event loop is about to stall";
 }

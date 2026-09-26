@@ -4,7 +4,6 @@
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
-#include "core/platform_abstraction/WatchdogPlaceholder.hpp"
 #include "hal/interfaces/Can.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/interfaces/Pwm.hpp"
@@ -48,9 +47,7 @@ namespace application
         foc::Volts PowerSupplyVoltage() override;
         foc::LowPriorityInterrupt& LowPriorityInterrupt() override;
         hal::Eeprom& Eeprom() override;
-        drivers::Watchdog& Watchdog() override;
         void Reset() override;
-        void ResetFromWatchdogExpiry() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
@@ -264,7 +261,6 @@ namespace application
         std::optional<QuadratureEncoderDecoratorImpl<SynchronousQuadratureEncoderStub>> encoder;
         std::optional<CanBusAdapterImpl<CanStub>> canBus;
         EepromStub eepromStub;
-        WatchdogPlaceholder watchdog;
         ResetCause resetCause{ ResetCause::powerUp };
         ControlLoopMetrics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };

@@ -290,11 +290,8 @@ TEST_F(FocMotorWireContractTest, a_can_lite_shaped_gains_frame_is_rejected_rathe
 {
     const auto gainsFrame = Bytes({ 0x00, 0x00, 0x64, 0x00, 0x0A, 0x00, 0x01 });
 
-    server.HandleMessage(can::focSetPidCurrentId, gainsFrame);
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(can::focSetPidCurrentId, ackSpy.last->commandType);
-    EXPECT_EQ(services::CanAckStatus::invalidPayload, ackSpy.last->status);
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetPidCurrentId, gainsFrame));
+    EXPECT_FALSE(ackSpy.last.has_value());
 }
 
 TEST_F(FocMotorWireContractTest, every_command_is_rejected_one_byte_short_and_one_byte_long)
@@ -307,18 +304,12 @@ TEST_F(FocMotorWireContractTest, every_command_is_rejected_one_byte_short_and_on
         {
             hal::Can::Message tooShort;
             tooShort.resize(static_cast<std::size_t>(size - 1), 0);
-            ackSpy.Reset();
-            server.HandleMessage(descriptor.id, tooShort);
-            ASSERT_TRUE(ackSpy.last.has_value()) << descriptor.name;
-            EXPECT_EQ(services::CanAckStatus::invalidPayload, ackSpy.last->status) << descriptor.name;
+            EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(descriptor.id, tooShort)) << descriptor.name;
         }
 
         hal::Can::Message tooLong;
         tooLong.resize(static_cast<std::size_t>(size + 1), 0);
-        ackSpy.Reset();
-        server.HandleMessage(descriptor.id, tooLong);
-        ASSERT_TRUE(ackSpy.last.has_value()) << descriptor.name;
-        EXPECT_EQ(services::CanAckStatus::invalidPayload, ackSpy.last->status) << descriptor.name;
+        EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(descriptor.id, tooLong)) << descriptor.name;
     }
 }
 

@@ -6,15 +6,16 @@
 #include "core/foc/model/TorqueStepScheduler.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
-#include "core/platform_abstraction/SoftwareWatchdog.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
 #include "hal/cortex_m/SystemTickTimerService.hpp"
 #include "hal/interfaces/Gpio.hpp"
+#include "hal/qemu/async/WatchdogQemu.hpp"
 #include "infra/stream/OutputStream.hpp"
 #include "infra/timer/Timer.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
+#include "services/util/EventDispatcherWatchdog.hpp"
 #include "services/util/Terminal.hpp"
 #include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/EventDispatcherCortexWithWeakPtr.hpp"
@@ -26,6 +27,7 @@
 #include "targets/platform_implementations/qemu/implementation/SemihostingEeprom.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingPlantConfig.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingSerial.hpp"
+#include "targets/platform_implementations/qemu/implementation/SilWatchdogStall.hpp"
 #include <atomic>
 #include <optional>
 
@@ -56,11 +58,9 @@ namespace application
         foc::Volts PowerSupplyVoltage() override;
         foc::LowPriorityInterrupt& LowPriorityInterrupt() override;
         hal::Eeprom& Eeprom() override;
-        drivers::Watchdog& Watchdog() override;
         void RegisterBoardProtection(const infra::Function<void(BoardProtectionReason)>& onProtection) override;
         BoardProtectionState BoardProtectionStatus() override;
         void Reset() override;
-        void ResetFromWatchdogExpiry() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
@@ -138,10 +138,21 @@ namespace application
             }
         };
 
+        using EventDispatcherCortexWithWeakPtrAndWatchdog = infra::EventDispatcherWithWeakPtrConnector<services::EventDispatcherWatchdogWorker<EventDispatcherCortexWithWeakPtrWorker>>;
+
         struct Cortex
         {
+            static constexpr infra::Duration watchdogEarlyWarningPeriod{ std::chrono::milliseconds(25) };
+            static constexpr infra::Duration watchdogExpirationTimeout{ std::chrono::milliseconds(100) };
+
+            static void OnWatchdogExpired();
+
             hal::cortex::InterruptTable::WithStorage<64> interruptTable;
-            EventDispatcherCortexWithWeakPtr::WithSize<50> eventDispatcher;
+            hal::WatchdogQemu watchdog{ hal::WatchdogQemu::Config{ .timeout = watchdogEarlyWarningPeriod } };
+            EventDispatcherCortexWithWeakPtrAndWatchdog::WithSize<50> eventDispatcher{ watchdog, watchdogExpirationTimeout, []()
+                {
+                    OnWatchdogExpired();
+                } };
             hal::cortex::SystemTickTimerService systemTick{ kQemuSystemClockHz, std::chrono::milliseconds(1) };
         };
 
@@ -176,6 +187,7 @@ namespace application
         void ApplyPlantConfig();
 
         const std::optional<sil::SilPlantConfig> plantConfig;
+        const ResetCause resetCause;
         infra::Function<void()> onInitialized;
         CycleCounter cycleCounter;
         ControlLoopMetrics controlLoopMetrics;
@@ -186,8 +198,8 @@ namespace application
         QemuTimer focTimer;
         SemihostingSerial serial;
         TerminalAndTracerBlock terminalAndTracer{ serial };
+        SilWatchdogStall watchdogStall{ terminalAndTracer.terminal, terminalAndTracer.tracer };
         SemihostingEeprom eeprom{ "eeprom.bin" };
-        SoftwareWatchdog watchdog;
         GpioPinStub operationalPin;
         GpioPinStub warningPin;
         GpioPinStub failurePin;

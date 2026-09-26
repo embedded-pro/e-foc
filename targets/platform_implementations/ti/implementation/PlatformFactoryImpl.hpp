@@ -22,13 +22,13 @@
 #include "hal_tiva/tiva/Gpio.hpp"
 #include "hal_tiva/tiva/Pwm.hpp"
 #include "hal_tiva/tiva/UartWithDma.hpp"
-#include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include "hal_tiva/tiva/WatchDog.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
+#include "services/util/EventDispatcherWatchdog.hpp"
 #include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
-#include "targets/platform_implementations/ti/implementation/TivaWatchdog.hpp"
 
 extern "C" uint32_t SystemCoreClock;
 
@@ -42,6 +42,8 @@ namespace application
         static constexpr auto pwmFault{ hal::cortex::InterruptPriority::highest };
         static constexpr auto can{ hal::cortex::InterruptPriority::normal };
         static constexpr auto uart{ hal::cortex::InterruptPriority::low };
+        // No higher than any interrupt that could hang, so a hung handler starves the refresh and the hardware resets
+        static constexpr auto watchdogEarlyWarning{ hal::cortex::InterruptPriority::lowest };
     };
 
     class PlatformFactoryImpl
@@ -70,11 +72,9 @@ namespace application
         foc::Volts PowerSupplyVoltage() override;
         foc::LowPriorityInterrupt& LowPriorityInterrupt() override;
         hal::Eeprom& Eeprom() override;
-        drivers::Watchdog& Watchdog() override;
         void RegisterBoardProtection(const infra::Function<void(PlatformFactory::BoardProtectionReason)>& onProtection) override;
         PlatformFactory::BoardProtectionState BoardProtectionStatus() override;
         void Reset() override;
-        void ResetFromWatchdogExpiry() override;
         ResetCause GetResetCause() const override;
         infra::BoundedConstString FaultStatus() const override;
         PlatformDiagnostics& Diagnostics() override;
@@ -105,7 +105,18 @@ namespace application
 
         struct Cortex
         {
-            infra::EventDispatcherWithWeakPtr::WithSize<Resources::eventDispatcherSize> eventDispatcher;
+            static constexpr uint8_t watchdogIndex{ 0 };
+            static constexpr infra::Duration watchdogEarlyWarningPeriod{ std::chrono::milliseconds(25) };
+            static constexpr infra::Duration watchdogExpirationTimeout{ std::chrono::milliseconds(100) };
+
+            static hal::tiva::WatchDog::Config WatchdogConfig();
+            static void OnWatchdogExpired();
+
+            hal::tiva::WatchDog watchdog{ watchdogIndex, WatchdogConfig() };
+            services::EventDispatcherWithWeakPtrAndWatchdog::WithSize<Resources::eventDispatcherSize> eventDispatcher{ watchdog, watchdogExpirationTimeout, []()
+                {
+                    OnWatchdogExpired();
+                } };
             hal::cortex::DataWatchpointAndTrace dataWatchPointAndTrace;
             hal::cortex::SystemTickTimerService systemTick{ SystemCoreClock, std::chrono::milliseconds(1) };
         };
@@ -286,7 +297,6 @@ namespace application
         infra::Function<void()> onInitialized;
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         ResetCause resetCause{ ResetCause::powerUp };
-        TivaWatchdog watchdog;
         [[no_unique_address]] CycleCounter cycleCounter;
         ControlLoopMetrics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };

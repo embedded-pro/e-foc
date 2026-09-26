@@ -1,4 +1,5 @@
 #include "targets/platform_implementations/st/implementation/PlatformFactoryImpl.hpp"
+#include "targets/platform_implementations/error_handling_cortex_m/CutPowerStage.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
 
@@ -47,10 +48,27 @@ namespace application
             persistentFaultData.Invalidate();
         }
 
-        if (persistentFaultData.TakeWatchdogExpiry())
-            resetCause = ResetCause::watchdog;
+        // The driver starts the window watchdog at the highest priority; an early warning that can preempt a hung
+        // handler would keep refreshing it, so it is lowered to the lowest level the NVIC implements
+        NVIC_SetPriority(WWDG_IRQn, (1u << __NVIC_PRIO_BITS) - 1u);
+    }
 
+    PlatformFactoryImpl::HalInitialization::HalInitialization()
+    {
         HAL_Init();
+    }
+
+    hal::WatchDogStm::Config PlatformFactoryImpl::WatchdogConfig()
+    {
+        // The shortest early-warning period keeps the expiry close to the timeout, which is rounded up to whole periods
+        hal::WatchDogStm::Config config;
+        config.prescaler = WWDG_PRESCALER_1;
+        return config;
+    }
+
+    void PlatformFactoryImpl::OnWatchdogExpired()
+    {
+        CutPowerStage();
     }
 
     void PlatformFactoryImpl::Run()
@@ -204,11 +222,6 @@ namespace application
         return eepromStub;
     }
 
-    drivers::Watchdog& PlatformFactoryImpl::Watchdog()
-    {
-        return watchdog;
-    }
-
     void PlatformFactoryImpl::SerialCommunicationStub::SendData(infra::ConstByteRange, infra::Function<void()>)
     {}
 
@@ -303,12 +316,6 @@ namespace application
 
     void PlatformFactoryImpl::Reset()
     {
-        NVIC_SystemReset();
-    }
-
-    void PlatformFactoryImpl::ResetFromWatchdogExpiry()
-    {
-        persistentFaultData.RecordWatchdogExpiry();
         NVIC_SystemReset();
     }
 

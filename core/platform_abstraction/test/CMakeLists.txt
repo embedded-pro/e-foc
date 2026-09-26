@@ -13,5 +13,4 @@ target_sources(e_foc.platform_abstraction_test PRIVATE
     TestAdcPhaseCurrentMeasurement.cpp
     TestCanErrorCounters.cpp
     TestControlLoopMetrics.cpp
-    TestSoftwareWatchdog.cpp
 )

@@ -227,15 +227,13 @@ TEST_F(FocMotorCategoryServerTest, HandleSelectControlMode_ValidMode_InvokesObse
     EXPECT_EQ(lastSentMsgType, can::focSelectControlModeResponseId);
 }
 
-TEST_F(FocMotorCategoryServerTest, HandleSelectControlMode_InvalidMode_RejectsWithInvalidPayload)
+TEST_F(FocMotorCategoryServerTest, HandleSelectControlMode_InvalidMode_IsRejected)
 {
     hal::Can::Message msg;
     msg.resize(2, 0);
     msg[1] = 0xFF;
-    server.HandleMessage(can::focSelectControlModeId, msg);
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSelectControlModeId, msg));
+    EXPECT_FALSE(ackSpy.last.has_value());
 }
 
 TEST_F(FocMotorCategoryServerTest, SendCategoryError_EmitsCategoryErrorFrame)
@@ -299,39 +297,22 @@ TEST_F(FocMotorCategoryServerTest, HandleEmergencyStop_InvokesOnEmergencyStopObs
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
 }
 
-TEST_F(FocMotorCategoryServerTest, HandleSelectControlMode_InvalidMode_AcksInvalidPayload)
+TEST_F(FocMotorCategoryServerTest, HandleSetTorqueSetpoint_ShortPayload_IsRejected)
 {
-    hal::Can::Message data;
-    data.push_back(0);
-    data.push_back(0xFF);
-    server.HandleMessage(can::focSelectControlModeId, data);
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetTorqueSetpointId, MakePayload(1)));
+    EXPECT_FALSE(ackSpy.last.has_value());
 }
 
-TEST_F(FocMotorCategoryServerTest, HandleSetTorqueSetpoint_ShortPayload_AcksInvalidPayload)
+TEST_F(FocMotorCategoryServerTest, HandleSetSpeedSetpoint_ShortPayload_IsRejected)
 {
-    server.HandleMessage(can::focSetTorqueSetpointId, MakePayload(1));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetSpeedSetpointId, MakePayload(1)));
+    EXPECT_FALSE(ackSpy.last.has_value());
 }
 
-TEST_F(FocMotorCategoryServerTest, HandleSetSpeedSetpoint_ShortPayload_AcksInvalidPayload)
+TEST_F(FocMotorCategoryServerTest, HandleSetPositionSetpoint_ShortPayload_IsRejected)
 {
-    server.HandleMessage(can::focSetSpeedSetpointId, MakePayload(1));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
-}
-
-TEST_F(FocMotorCategoryServerTest, HandleSetPositionSetpoint_ShortPayload_AcksInvalidPayload)
-{
-    server.HandleMessage(can::focSetPositionSetpointId, MakePayload(1));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetPositionSetpointId, MakePayload(1)));
+    EXPECT_FALSE(ackSpy.last.has_value());
 }
 
 TEST_F(FocMotorCategoryServerTest, HandleIdentifyElectrical_InvokesObserver)
@@ -404,44 +385,34 @@ TEST_F(FocMotorCategoryServerTest, HandleSetPidPosition_ParsesBandwidthAndInvoke
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
 }
 
-TEST_F(FocMotorCategoryServerTest, HandleSetPidCurrent_ShortPayload_AcksInvalidPayload)
+TEST_F(FocMotorCategoryServerTest, HandleSetPidCurrent_ShortPayload_IsRejected)
 {
-    server.HandleMessage(can::focSetPidCurrentId, MakePayload(1));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetPidCurrentId, MakePayload(1)));
+    EXPECT_FALSE(ackSpy.last.has_value());
 }
 
-TEST_F(FocMotorCategoryServerTest, HandleSetPidSpeed_ShortPayload_AcksInvalidPayload)
+TEST_F(FocMotorCategoryServerTest, HandleSetPidSpeed_ShortPayload_IsRejected)
 {
-    server.HandleMessage(can::focSetPidSpeedId, MakePayload(1));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetPidSpeedId, MakePayload(1)));
+    EXPECT_FALSE(ackSpy.last.has_value());
 }
 
-TEST_F(FocMotorCategoryServerTest, HandleSetPidPosition_ShortPayload_AcksInvalidPayload)
+TEST_F(FocMotorCategoryServerTest, HandleSetPidPosition_ShortPayload_IsRejected)
 {
-    server.HandleMessage(can::focSetPidPositionId, MakePayload(1));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetPidPositionId, MakePayload(1)));
+    EXPECT_FALSE(ackSpy.last.has_value());
 }
 
-TEST_F(FocMotorCategoryServerTest, HandleSetEncoderResolution_ShortPayload_AcksInvalidPayload)
+TEST_F(FocMotorCategoryServerTest, HandleSetEncoderResolution_ShortPayload_IsRejected)
 {
-    server.HandleMessage(can::focSetEncoderResolutionId, MakePayload(1));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetEncoderResolutionId, MakePayload(1)));
+    EXPECT_FALSE(ackSpy.last.has_value());
 }
 
-TEST_F(FocMotorCategoryServerTest, HandleConfigureTelemetryRate_ShortPayload_AcksInvalidPayload)
+TEST_F(FocMotorCategoryServerTest, HandleConfigureTelemetryRate_ShortPayload_IsRejected)
 {
-    server.HandleMessage(can::focConfigureTelemetryRateId, MakePayload(1));
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focConfigureTelemetryRateId, MakePayload(1)));
+    EXPECT_FALSE(ackSpy.last.has_value());
 }
 
 TEST_F(FocMotorCategoryServerTest, HandleSetEncoderResolution_ParsesResolutionAndInvokesObserver)

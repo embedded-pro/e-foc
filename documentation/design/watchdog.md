@@ -2,9 +2,9 @@
 title: "Watchdog Design"
 type: design
 status: draft
-version: 0.2.0
+version: 0.3.0
 component: "watchdog"
-date: 2026-09-19
+date: 2026-09-26
 ---
 
 | Field     | Value           |
@@ -12,206 +12,136 @@ date: 2026-09-19
 | Title     | Watchdog Design |
 | Type      | design          |
 | Status    | draft           |
-| Version   | 0.2.0           |
+| Version   | 0.3.0           |
 | Component | watchdog        |
-| Date      | 2026-09-19      |
+| Date      | 2026-09-26      |
 
 ---
 
 ## Responsibilities
 
 **Is responsible for:**
-- Defining one platform-level watchdog port that every platform implementation must provide, so a target
-  cannot be built without a watchdog.
-- Supervising application progress against a deadline the application states when it enables supervision.
-- Accepting a progress signal from any execution context, including the control interrupt.
-- Reporting a missed deadline to the application within a bounded time, so the application can bring the
-  power stage to a safe state.
-- Backing that software supervision with hardware on targets whose hardware abstraction provides a watchdog
-  driver, so that a stall which also kills the interrupt or the event loop resets the target from hardware.
-- Reporting whether supervision is active and which deadline is being held, so a target that cannot
-  supervise says so rather than pretending to.
-
-- Deciding which execution contexts must make progress in which lifecycle state and control mode, and
-  feeding the port only when every one of them has made progress since the previous evaluation.
-- Holding a bounded grace for the startup phase, during which no control loop is expected yet, without ever
-  suspending supervision.
+- Proving that the software is running. Every MCU platform supervises its event dispatcher with the MCU
+  watchdog peripheral from the moment the dispatcher is constructed until the next reset.
+- Bringing the power stage to a safe state from interrupt context when the dispatcher has stopped making
+  progress, before the hardware resets the target.
+- Resetting the target from hardware, so that the next boot reports the reset cause as *watchdog*.
 
 **Is NOT responsible for:**
-- Deciding what happens after a missed deadline. The port reports; the application chooses the safe state
-  and whether to reset.
+- Proving that the control loops are running. A current loop or outer loop that stops while the dispatcher
+  keeps running is not a watchdog failure. It is left to the protections that watch the bridge itself:
+  the hardware overcurrent and overvoltage comparators, board protection and the fault state machine.
+- Being switched on, off or reconfigured by the application. There is no watchdog port in the platform
+  factory. The platform owns the watchdog, and supervision is always on.
 - Detecting the reset cause after a watchdog reset. That is the error-handling component's work, reached
   through the reset-cause port.
-- Enabling supervision on its own. Supervision is off until the application asks for it.
 
 ---
 
 ## Component Details
 
-### Part A — the platform watchdog port
+### Part A — supervision lives in the event dispatcher
 
-The port is part of the driver vocabulary the platform abstraction publishes, alongside the inverter, the
-encoder and the hall sensor. It is a required member of the platform factory, not an optional one, so every
-platform — the two production MCU families, the emulated target and the host build — has to answer for it.
+The mechanism is EMIL's, not e-foc's. EMIL provides:
+- a hardware watchdog interface, `hal::Watchdog`, implemented by the ST, TI and emulated-target drivers;
+- an event dispatcher worker that supervises it, `services::EventDispatcherWatchdogWorker`.
 
-It offers four operations:
+Each MCU platform builds its dispatcher from that worker and hands it the platform's watchdog. The
+dispatcher then does three things:
 
-- **Enable** — start supervision with a deadline and a handler to call when the deadline is missed. It is
-  accepted once; asking twice is a programming error.
-- **Feed** — signal that the supervised work made progress. This is the only operation that may be called
-  from interrupt context, so it does no more than set a flag.
-- **IsEnabled** — whether supervision is running.
-- **Deadline** — the deadline currently held.
+- **Counts progress.** The worker counts one step when an action starts and one when it finishes, so an
+  odd count means an action is executing.
+- **Refreshes on every early warning.** The hardware raises an early-warning interrupt once per
+  early-warning period. The handler always refreshes the hardware.
+- **Counts missed early warnings.** An early warning counts as missed when an action is executing and the
+  count has not changed since the previous early warning. Early warnings that find the dispatcher idle or
+  moving do not count, and they reset the tally.
 
-There is deliberately no *disable*. A watchdog that can be switched off from application code is a watchdog
-that gets switched off. Startup and calibration are covered by enabling supervision late and by choosing a
-deadline wide enough for the phase, not by suspending protection.
+After enough consecutive misses to cover the expiration timeout, the worker calls the platform's expiry
+handler once and stops refreshing. The hardware then resets the target at its next timeout.
 
-### Part B — the software progress watchdog
+Supervision is always on. It starts in the dispatcher's constructor, and nothing can disable it. The
+application needs no feed, no health check and no startup grace.
 
-Targets that run on real hardware get software supervision, which is what makes the port behave alike
-across them.
+### Part B — what happens on expiry
 
-It keeps a single *fed* flag and a repeating check that runs on the event loop at the deadline period. Each
-check reads the flag and clears it: if the flag was set, the supervised work made progress since the previous
-check and supervision continues; if it was not, the deadline was missed. On a miss the check stops and the
-handler is called once — expiry is terminal, and feeding afterwards does not restart supervision, because a
-watchdog that recovers by itself hides the failure it exists to expose.
+The expiry handler runs inside the watchdog's early-warning interrupt. It runs there *because* the event
+loop is stuck, so nothing can be scheduled and no application code can run.
 
-Splitting the work this way is what makes the progress signal safe to call from the control interrupt: the
-interrupt only writes a flag, and all timer bookkeeping stays on the event loop.
+The handler does only what is safe in an interrupt and needs no driver state:
+1. It calls the direct power-stage cutoff, which the hard-fault handler also uses. On TI this clears the
+   PWM output enables, so every gate is driven inactive and the motor coasts.
+2. It returns.
 
-The cost is latency. A miss is noticed at the first check after the last feed that a check observed, so the
-worst case from last feed to handler is **two deadline periods**, and the best case is one. The deadline is
-therefore chosen as half the time the application is willing to leave the power stage driven.
+The handler does not reset by software. The watchdog is no longer refreshed, so the hardware resets the
+target one early-warning period later. That reset shows as *watchdog* in the MCU's own reset-cause
+register, with no record to write before the reset.
 
-### Part C — hardware backing
+This is the most graceful stop that is possible at this point. A torque ramp-down would need the event loop
+that has just been proven stuck, and the time left before the hardware reset is only one early-warning
+period.
 
-Software supervision running on the event loop cannot detect a stall of that same event loop, and nothing
-running on the CPU can detect the CPU locking up. That is what MCU watchdog hardware is for.
+### Part C — interrupt priority of the early warning
 
-On the TI target the port composes the software watchdog with the vendor watchdog driver. The two cover
-different failures:
+Progress is counted only inside actions. A dispatcher that is idle, or frozen between actions because an
+interrupt never returns, looks like it is making progress. Because of that, the early-warning interrupt
+must not be able to preempt any interrupt that could hang:
 
-| Failure                                        | Detected by                      | Outcome                                      |
-|------------------------------------------------|----------------------------------|----------------------------------------------|
-| A supervised context stops signalling progress | Software check on the event loop | Handler called, application decides          |
-| The event loop stalls but interrupts still run | Vendor driver's own feed timer   | Power stage cut in the interrupt, then reset |
-| Interrupts stop running — CPU lockup           | Second hardware timeout          | MCU reset, reset cause reports Watchdog      |
+- The early-warning interrupt runs at the **lowest** priority the NVIC implements, no higher than the outer
+  loop's PendSV.
+- A hung interrupt at any priority then starves the early warning, so the hardware resets the target
+  without the handler running.
+- A hung action in the event loop leaves the early warning free to run, so the handler cuts the power stage
+  first and the hardware resets the target afterwards.
 
-The two paths end differently, and they have to. The software check runs on the event loop, so it can hand
-the miss to the application and let it choose the safe state. The hardware path runs in the watchdog
-interrupt precisely *because* the event loop has stopped, so there is nobody to hand it to: scheduling work
-on a dead dispatcher would never run, and calling an application handler there would run event-loop code —
-timers, tracing — from interrupt context. It instead does the one thing that is safe in an interrupt and
-needs no driver state: the same direct power-stage cutoff the hard fault handler uses, then a reset.
+| Failure                                             | Early warning runs? | Outcome                                    |
+|-----------------------------------------------------|---------------------|--------------------------------------------|
+| An event-loop action never returns                  | yes                 | Power stage cut, then hardware reset       |
+| An interrupt never returns (control, outer loop, …) | no, starved         | Hardware reset; pins return to reset state |
+| Interrupts disabled / CPU lockup                    | no                  | Hardware reset; pins return to reset state |
+| The control loop stops while the event loop runs    | yes, sees progress  | Not detected, by design                    |
 
-ST and the emulated target get software supervision only. Both have a watchdog peripheral that could back
-it — ST's window watchdog, and the CMSDK watchdog that the emulated machine models at 0x40008000 off a
-25 MHz clock — but neither hardware abstraction carries a driver for one yet. Wiring either is tracked in
-Open Questions; the emulated one is the more valuable of the two, because it is the only one a
-continuous-integration job can exercise.
+### Part D — platforms
 
-### Part D — the host build
+| Platform         | Hardware                            | Early-warning period              | Expiration timeout            |
+|------------------|-------------------------------------|-----------------------------------|-------------------------------|
+| TI (TM4C123/129) | Watchdog 0, reset on second timeout | 25 ms                             | 100 ms                        |
+| ST (STM32)       | Window watchdog, prescaler 1        | Fixed by PCLK1 (≈16 ms at 16 MHz) | 100 ms (seven early warnings) |
+| Emulated target  | CMSDK watchdog of the MPS2 machine  | 25 ms                             | 100 ms                        |
+| Host             | none                                | —                                 | —                             |
 
-The host build implements the port with a placeholder: it accepts a progress signal, does nothing with it,
-and reports supervision as disabled whatever the application asks for. It is not a target that can be
-reset, so supervising there would mean running machinery that proves nothing while reporting a protection
-the build does not have.
+- **ST:** the vendor driver pins the window watchdog to the highest priority when it starts. The platform
+  lowers it to the lowest NVIC level straight after the dispatcher is constructed, for the reason given in
+  Part C. That level is set with the CMSIS encoding, because EMIL's priority enum assumes three priority
+  bits and the STM32 parts implement four. The cutoff is empty while the ST platform drives no bridge.
 
-Reporting *disabled* rather than accepting the enable request is the whole point of the placeholder: code
-that asks whether supervision is running gets a truthful answer on every platform.
+  The window watchdog resets one counter tick after its early warning (4096 · prescaler / PCLK1, 256 µs at
+  16 MHz with prescaler 1), so the early-warning handler must run within that tick. Prescaler 1 keeps the
+  early-warning period short, and with it the rounding of the timeout; a larger prescaler buys handler
+  latency at the cost of a later expiry.
+- **Emulated target:** the MPS2 machine wires its watchdog to NMI, which cannot be lowered. So on the
+  emulated target a hung interrupt is caught only when the event loop is inside an action. That is
+  acceptable for a target that drives a simulated plant.
+
+  The machine has no reset-cause register, and its reset reloads RAM. So the expiry handler writes a marker
+  file through semihosting before the reset, and the next boot reads the marker, clears it and reports
+  *watchdog*. The simulated bridge has no gate to cut.
+- **Host:** the host build keeps a plain dispatcher. It is not a target that can be reset.
 
 ### Part E — validation surface
 
-The bring-up application exposes supervision over its CLI, so the behaviour can be exercised on real
-hardware rather than only reasoned about:
+The bring-up application keeps one command:
 
-- **watchdog** — reports whether supervision is enabled, and the deadline when it is.
-- **watchdog** *deadline_ms* — enables supervision with that deadline and starts feeding it from a repeating
-  timer at a quarter of the deadline, then reports the new state.
-- **watchdog_stall** — stops that feed timer, which is a deliberate stall of a supervised context.
+- **watchdog_stall** — schedules an action that never returns. The expiry handler cuts the power stage,
+  the hardware resets the target, and the target comes back reporting the reset cause as *watchdog*.
 
-The expiry handler in the bring-up application stops the power stage, says so on the trace, and resets the
-target. The reset is observable, and the target comes back reporting supervision as disabled, because
-supervision does not survive a reset and has to be asked for again.
+The emulated target registers the same **watchdog_stall** command from its platform rather than from the
+application, so the production firmware carries no stall command. A SIL scenario uses it to stall the
+event loop and then waits for the reboot banner to report the reset cause as *watchdog*. That runs the
+whole expiry path in continuous integration: the stalled action, the NMI early warning, the semihosting
+marker, the machine reset and the reset-cause report.
 
-### Part F — supervised contexts and the progress policy
-
-Parts A to E give the drive a watchdog. They do not say *what* has to be alive for it to be fed. A watchdog
-fed by whichever context happens still to be running proves only that something is running; the point of
-this part is that the feed is earned by the whole control system, not by one healthy interrupt.
-
-The production application therefore owns a **health aggregator**. It holds one progress flag per supervised
-context, and a periodic evaluation on the event loop that reads and clears every flag, works out which
-contexts the *current* lifecycle state and control mode expect, and feeds the port only when every expected
-context has made progress since the previous evaluation. A context that is not expected is not consulted,
-and a context that is expected and silent withholds the feed.
-
-Three execution contexts exist, and they are supervised differently because they fail differently:
-
-| Context            | Runs in                                          | Signals progress by                  |
-|--------------------|--------------------------------------------------|--------------------------------------|
-| Inner control loop | The phase-current interrupt, at the control rate | Writing the phase duty cycles        |
-| Outer loop         | The low-priority interrupt, at a divided rate    | Completing one outer-loop pass       |
-| Event loop         | The main dispatcher                              | The evaluation itself running at all |
-
-The event loop needs no flag: the evaluation runs on it, so an evaluation that happens is proof it is alive.
-That is also its limit — a stalled event loop stops the evaluation rather than reporting it, which is why
-Part C's hardware backing exists and why a target without it detects an application stall but not an
-event-loop one.
-
-#### What each state and mode expects
-
-| Lifecycle state | Torque mode               | Speed and position modes      |
-|-----------------|---------------------------|-------------------------------|
-| Startup         | nothing (graced, bounded) | nothing (graced, bounded)     |
-| Idle            | nothing                   | nothing                       |
-| Ready           | nothing                   | nothing                       |
-| Calibrating     | nothing                   | nothing                       |
-| Enabled         | inner loop                | inner loop **and** outer loop |
-| Fault           | nothing                   | nothing                       |
-
-Two rows carry most of the safety argument.
-
-*Enabled in speed or position mode requires both loops.* Inner-loop progress on its own is not enough, so a
-control system whose outer loop has stopped while the current loop still runs — the drive holding a stale
-torque reference forever — withholds the feed and is brought down. This is the rule that stops an unrelated
-healthy interrupt from servicing the watchdog on the rest of the system's behalf.
-
-*A stopped drive expects nothing.* `Idle` and `Ready` are healthy states in which no PWM is being written on
-purpose, and torque mode has no outer loop at all. Demanding a heartbeat that the current state cannot
-produce would reset a perfectly healthy drive, so the policy asks only for what the state can give.
-
-`Calibrating` is in the same group, for a reason worth stating: the identification services drive the bridge
-through their own timers and phase-current callbacks rather than through the control loop, so control-loop
-progress is not the right evidence there. Calibration is bounded by those services' own no-sample timeouts,
-not by the watchdog.
-
-#### Startup
-
-Supervision is enabled as the application is constructed, before the asynchronous configuration load that
-brings the rest of the system up — not afterwards. Until a control mode has been attached, the evaluation
-expects no control loop and feeds the port, but it does so for a **bounded** number of evaluations. If
-startup has not completed within that grace, the feed stops and the deadline expires like any other stall.
-A boot that hangs is therefore caught by the same mechanism as a running system that hangs, and nothing
-anywhere disables supervision to get through startup.
-
-#### Timing
-
-The evaluation runs several times per deadline, so a healthy system feeds well inside it, and the deadline
-is the quantity that bounds how long a stall can leave the bridge driven. The worst case from a context
-falling silent to the power stage being stopped is one evaluation period plus two deadline periods — the
-evaluation period to notice, and Part B's two-period detection latency to act.
-
-#### After a missed deadline
-
-The handler stops the drive through the lifecycle machine's emergency stop, stops the power stage directly,
-traces the event, and resets. The reset is recorded where it survives, so the next boot reports the reset
-cause as *watchdog* rather than *software* and the operator can tell a supervision failure from an operator
-reset. Nothing is broadcast outward first: the deferred work that a fault notification would schedule cannot
-run once the reset is taken, and delaying the reset to let a message flush would leave a stalled system
-running for exactly as long as the delay.
+There is no command to enable or query the watchdog, because it has no state the application can change.
 
 ---
 
@@ -219,45 +149,28 @@ running for exactly as long as the delay.
 
 ### Provided
 
-| Interface                      | Purpose                                              | Contract                                                                   |
-|--------------------------------|------------------------------------------------------|----------------------------------------------------------------------------|
-| Watchdog enable                | Start supervision with a deadline and a miss handler | Called once, from the event loop; a second call is a programming error     |
-| Watchdog feed                  | Signal that supervised work made progress            | Callable from any context including interrupts; bounded, allocation-free   |
-| Watchdog enabled query         | Whether supervision is running                       | Event loop only                                                            |
-| Watchdog deadline query        | The deadline being held                              | Event loop only; zero before supervision is enabled                        |
-| Platform factory watchdog port | Reach the platform's watchdog                        | Required on every platform; the reference is valid for the platform's life |
-| Watchdog placeholder           | Satisfy the port on a target that has no watchdog    | Reports disabled always; feeding and enabling have no effect               |
-| Progress signal                | Record that one supervised context made progress     | Callable from any context; read and cleared by the evaluation              |
-| Health aggregation             | Decide whether the port may be fed this evaluation   | Event loop only; consumes every signal, consults only the expected ones    |
-| Supervision enable             | Start supervision with a deadline and startup grace  | Called once as the application is constructed                              |
-| Control mode attachment        | End the startup grace once the lifecycle machine exists | Event loop only; until then no control loop is expected                 |
+| Interface                   | Purpose                                         | Contract                                                               |
+|-----------------------------|-------------------------------------------------|------------------------------------------------------------------------|
+| Supervised event dispatcher | Run the application and prove it makes progress | Every MCU platform; supervision starts in the constructor, never stops |
 
 ### Required
 
-| Interface                    | Purpose                                            | Contract                                                                  |
-|------------------------------|----------------------------------------------------|---------------------------------------------------------------------------|
-| Event-loop timer service     | Run the periodic progress check                    | Must be running before supervision is enabled                             |
-| MCU watchdog peripheral (TI) | Reset the target when interrupts stop running      | Configured when supervision is enabled; reset enabled on missed refresh   |
-| Power stage stop             | Reach a safe state after a missed deadline         | Called from the miss handler before the reset                             |
-| Direct power-stage cutoff    | Reach a safe state from the watchdog interrupt     | Interrupt-safe, depends on no driver state; shared with the fault handler |
-| Platform reset               | Restart the target after the safe state is reached | Does not return                                                           |
-| Lifecycle state and mode     | Decide what the current state and mode expect      | Event loop only; read once per evaluation                                 |
-| Lifecycle emergency stop     | Stop the drive when the deadline is missed         | Accepted from every state; synchronous                                    |
-| Reset with a watchdog record | Reset so the next boot reports the watchdog cause  | Records the expiry where it survives the reset, then does not return      |
+| Interface                 | Purpose                                                     | Contract                                                                                             |
+|---------------------------|-------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
+| `hal::Watchdog`           | Early-warning interrupt, refresh, reset on a missed refresh | Constructed before the dispatcher; early warning at the lowest priority where the hardware allows it |
+| Direct power-stage cutoff | Safe state from the early-warning interrupt                 | Interrupt-safe, depends on no driver state; shared with the fault handler                            |
+| Reset-cause register      | Report the watchdog reset on the next boot                  | Read and cleared once at boot by the error-handling component                                        |
 
 ---
 
 ## Data Model
 
-| Entity   | Field    | Type / Unit  | Range                | Notes                                                   |
-|----------|----------|--------------|----------------------|---------------------------------------------------------|
-| Watchdog | deadline | microseconds | > 0; 0 when disabled | Stated by the application when supervision is enabled   |
-| Watchdog | fed      | flag         | set / clear          | Written from any context, read and cleared by the check |
-| Watchdog | enabled  | flag         | set / clear          | Set once, never cleared                                 |
-| Watchdog | expired  | flag         | set / clear          | Set on the miss; supervision does not restart           |
-| Health   | inner loop progress | flag | set / clear      | Set by the control interrupt, read and cleared by the evaluation |
-| Health   | outer loop progress | flag | set / clear      | Set by the outer loop, read and cleared by the evaluation        |
-| Health   | startup evaluations left | count | >= 0        | The bounded startup grace, in evaluations; not replenished       |
+| Entity      | Field                 | Type / Unit | Range    | Notes                                                         |
+|-------------|-----------------------|-------------|----------|---------------------------------------------------------------|
+| Supervision | steps                 | count       | wraps    | Incremented before and after each action; odd while executing |
+| Supervision | missed early warnings | count       | 0 … N    | Reset whenever progress is seen                               |
+| Supervision | N                     | count       | ≥ 1      | ⌈expiration timeout / early-warning period⌉                   |
+| Supervision | expired               | flag        | set once | Refreshing stops; the hardware reset follows                  |
 
 ---
 
@@ -265,56 +178,51 @@ running for exactly as long as the delay.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Disabled
-    Disabled --> Supervising : Enable(deadline, handler)
-    Supervising --> Supervising : Feed observed at check
-    Supervising --> Expired : No feed observed at check
-    Expired --> [*] : Handler runs — safe state, then reset
-    note right of Disabled
-        Feed before Enable is accepted
-        and has no effect
-    end note
+    [*] --> Supervising : dispatcher constructed
+    Supervising --> Supervising : early warning, progress seen — refresh
+    Supervising --> Missing : early warning, same action still running — refresh
+    Missing --> Supervising : progress seen
+    Missing --> Missing : missed less than N times
+    Missing --> Expired : missed N times — cut power stage
+    Expired --> [*] : next timeout — hardware reset
 ```
 
 ---
 
 ## Sequence Diagrams
 
-### A supervised context stops making progress
+### An event-loop action never returns
 
 ```mermaid
 sequenceDiagram
-    participant App as Application
-    participant WD as Watchdog
-    participant Timer as Event-loop check
+    participant EL as Event dispatcher
+    participant WD as Watchdog early warning
     participant Inv as Power stage
+    participant HW as Watchdog peripheral
 
-    App->>WD: Enable(deadline, handler)
-    WD->>Timer: start periodic check at deadline
-    App->>WD: Feed()
-    Timer->>WD: check — fed, clear and continue
-    Note over App: supervised context stalls
-    Timer->>WD: check — fed (last feed), clear
-    Timer->>WD: check — not fed
-    WD->>Timer: cancel
-    WD->>App: handler()
-    App->>Inv: Stop()
-    App->>App: Reset()
+    EL->>EL: action starts (steps odd)
+    Note over EL: action hangs
+    WD->>HW: refresh (first warning in the action counts as progress)
+    loop N times
+        WD->>HW: refresh, missed++
+    end
+    WD->>Inv: CutPowerStage()
+    Note over WD: expired — no more refreshes
+    HW->>HW: timeout — reset
+    Note over HW: next boot reports reset cause Watchdog
 ```
 
-### The CPU locks up on a hardware-backed target
+### An interrupt never returns
 
 ```mermaid
 sequenceDiagram
-    participant CPU as MCU
+    participant ISR as Hung interrupt
+    participant WD as Watchdog early warning (lowest priority)
     participant HW as Watchdog peripheral
-    participant Boot as Next boot
 
-    Note over CPU: interrupts stop being serviced
-    HW->>HW: first timeout — no refresh
-    HW->>CPU: second timeout — reset
-    CPU->>Boot: reboot
-    Boot->>Boot: reset cause reads Watchdog
+    Note over ISR: never returns
+    HW-->>WD: early warning pending, starved
+    HW->>HW: timeout without refresh — reset
 ```
 
 ---
@@ -323,50 +231,56 @@ sequenceDiagram
 
 ```mermaid
 graph LR
-    ISR[Control interrupt] -->|Feed| Flag[fed flag]
-    App[Application] -->|Feed| Flag
-    Flag --> Check[Periodic check on event loop]
-    Check -->|deadline missed| Handler[Miss handler]
-    Handler --> Safe[Power stage stopped]
-    Safe --> Reset[Target reset]
-    HW[MCU watchdog peripheral] -->|interrupts dead| Reset
-    HW -->|event loop dead| Cut[Direct cutoff in the interrupt]
-    Cut --> Reset
+    EL[Event dispatcher worker] -->|steps| Sup[Supervision]
+    HW[MCU watchdog peripheral] -->|early warning| Sup
+    Sup -->|refresh| HW
+    Sup -->|expired| Cut[Direct power-stage cutoff]
+    HW -->|missed refresh| Reset[Target reset]
+    Reset --> Cause[Reset cause: Watchdog]
 ```
+
+---
+
+## Timing
+
+With early-warning period *P* and *N* = ⌈timeout / *P*⌉:
+
+- The first early warning after an action starts always counts as progress. A hung action is therefore
+  detected between *N·P* and *(N+1)·P* after it started, and the power stage is cut at that point.
+- The hardware reset follows one period later, at most *(N+2)·P* after the action started.
+- With TI at *P* = 25 ms and *N* = 4, that is 100–125 ms to the cutoff and at most 150 ms to the reset.
+- With ST at *P* ≈ 16 ms (PCLK1 at 16 MHz) and *N* = 7, that is about 113–129 ms to the cutoff and at most
+  about 145 ms to the reset.
+
+A legitimate action must finish well inside *N·P*. Long work is already split across actions:
+- the TI EEPROM mass erase is polled from a timer rather than waited for;
+- EEPROM writes wait only word by word;
+- identification sequences run from timers and phase-current callbacks.
+
+New work that could block for longer than the expiration timeout has to be split across actions the same way.
 
 ---
 
 ## Constraints & Limitations
 
-| Constraint                         | Value / Description                                                                                        |
-|------------------------------------|------------------------------------------------------------------------------------------------------------|
-| Detection latency                  | Between one and two deadline periods from the last feed; size the deadline at half the tolerable stall     |
-| Feed cost                          | One flag write; safe from the control interrupt, no allocation, no timer work                              |
-| Supervision cannot be stopped      | No disable operation, and expiry is terminal — feeding after a miss does not restart supervision           |
-| Supervision does not survive reset | The application enables it again on each boot                                                              |
-| Hardware backing                   | TI targets only; ST and the emulated target detect an application stall but no CPU lockup                  |
-| ST target                          | No MCU watchdog is configured, consistent with a platform whose peripherals are stubs and drives no bridge |
-| Emulated target                    | The machine models a CMSDK watchdog, but no driver exists for it, so supervision is software only          |
-| Host build                         | No watchdog at all — the port is a placeholder that always reports supervision as disabled                 |
-| Progress sources                   | Inner loop and outer loop are accounted separately; the event loop is proven by the evaluation running     |
-| Stall-to-safe-state bound          | One evaluation period plus two deadline periods, from the last progress of an expected context             |
-| Startup grace                      | Bounded in evaluations and never replenished; a boot that does not complete expires the deadline           |
-| Calibration                        | Expects no control-loop progress; bounded by the identification services' own no-sample timeouts           |
-| Hardware-path notification         | A stall the hardware catches resets without calling the application handler; the software path reports it  |
-| Software-path reset cause          | Recorded across the reset on Cortex-M targets only; the host and emulated builds cannot report it          |
+| Constraint                      | Value / Description                                                                                    |
+|---------------------------------|--------------------------------------------------------------------------------------------------------|
+| Scope                           | Proves the software is running; does not prove the control loops are running                           |
+| Always on                       | Starts with the dispatcher; there is no enable, disable or query                                       |
+| Boot before the dispatcher runs | Construction outside an action looks like progress; a hang there is caught only if interrupts stop too |
+| Expiry handler                  | Interrupt context; power-stage cutoff only, then returns                                               |
+| Early-warning priority          | Lowest on TI and ST, so a hung interrupt starves it; NMI on the emulated target                        |
+| ST target                       | Cutoff is empty while the platform drives no bridge                                                    |
+| Host build                      | No watchdog                                                                                            |
+| Reset cause                     | Read from the MCU's reset-cause register; the emulated target reads a semihosting marker file instead  |
 
 ---
 
 ## Open Questions
 
-| # | Question                                                                        | Answer or options                                                                                   | Status   |
-|---|---------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|----------|
-| 1 | Which execution contexts must make progress in each lifecycle state and mode?   | A health aggregator owned by the application, with the per-state and per-mode table in Part F       | answered |
-| 2 | Who enables supervision in the production application, and with which deadline? | The application, as it is constructed, with a bounded startup grace rather than a wider deadline    | answered |
-| 3 | Should the ST target configure its MCU watchdog?                                | Wire the vendor driver; leave it software-only until the platform drives a bridge                   | open     |
-| 4 | Should a missed deadline be a fault code before the reset?                      | No — it is recorded as the reset cause, because deferred reporting cannot outrun the reset          | answered |
-| 5 | Should the emulated target drive the CMSDK watchdog the machine already models? | Write a driver and compose it as on TI, which would let a SIL job assert a watchdog reset; leave it | open     |
-
-Question 5 is the prerequisite for any continuous-integration coverage of a watchdog reset. The emulated
-target's reset is a no-op today and its reset cause is fixed at power-up, so the reset path cannot be
-asserted there; until that changes, the stall scenarios are bench work.
+| # | Question                                                                        | Answer or options                                                                                                      | Status   |
+|---|---------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|----------|
+| 1 | Should the watchdog also prove the control loops are running?                   | No. It proves the software is running; bridge protection covers the power stage                                        | answered |
+| 2 | Should a missed deadline be a fault code before the reset?                      | No — it is reported as the reset cause, because deferred reporting cannot outrun the reset                             | answered |
+| 3 | Should the ST window-watchdog driver take the early-warning priority as config? | Yes, as the Tiva driver does; today the platform overrides the driver after start, which depends on construction order | open     |
+| 4 | Can the emulated target's reset be asserted by a SIL job?                       | Yes: the SIL watchdog scenario stalls the event loop and asserts the *watchdog* reset cause after the reboot           | answered |

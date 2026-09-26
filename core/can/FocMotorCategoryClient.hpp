@@ -65,11 +65,11 @@ namespace can
     private:
         bool SendsRefused() const;
 
-        void HandleSelectControlModeResponse(const hal::Can::Message& data);
-        void HandleCategoryError(const hal::Can::Message& data);
-        void HandleTelemetryStatus(const hal::Can::Message& data);
-        void HandleTelemetryElectrical(const hal::Can::Message& data);
-        void HandleContractVersionResponse(const hal::Can::Message& data);
+        bool HandleSelectControlModeResponse(const hal::Can::Message& data);
+        bool HandleCategoryError(const hal::Can::Message& data);
+        bool HandleTelemetryStatus(const hal::Can::Message& data);
+        bool HandleTelemetryElectrical(const hal::Can::Message& data);
+        bool HandleContractVersionResponse(const hal::Can::Message& data);
 
         services::CanMessageHandler<FocMotorCategoryClient> selectControlModeResponse{ focSelectControlModeResponseId, *this, &FocMotorCategoryClient::HandleSelectControlModeResponse };
         services::CanMessageHandler<FocMotorCategoryClient> categoryError{ services::canCategoryErrorResponseMessageTypeId, *this, &FocMotorCategoryClient::HandleCategoryError };

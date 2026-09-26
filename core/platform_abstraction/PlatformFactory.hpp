@@ -86,7 +86,6 @@ namespace application
         virtual foc::Volts PowerSupplyVoltage() = 0;
         virtual foc::LowPriorityInterrupt& LowPriorityInterrupt() = 0;
         virtual hal::Eeprom& Eeprom() = 0;
-        virtual drivers::Watchdog& Watchdog() = 0;
 
         virtual void RegisterBoardProtection(const infra::Function<void(BoardProtectionReason)>& onProtection) = 0;
         virtual BoardProtectionState BoardProtectionStatus() = 0;
@@ -94,8 +93,6 @@ namespace application
         virtual PlatformDiagnostics& Diagnostics() = 0;
 
         virtual void Reset() = 0;
-        // Records the expiry where it survives the reset, so the next boot reports Watchdog rather than Software
-        virtual void ResetFromWatchdogExpiry() = 0;
         virtual ResetCause GetResetCause() const = 0;
         virtual infra::BoundedConstString FaultStatus() const = 0;
     };

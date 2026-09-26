@@ -159,11 +159,6 @@ namespace application
         return eepromStub;
     }
 
-    drivers::Watchdog& PlatformFactoryImpl::Watchdog()
-    {
-        return watchdog;
-    }
-
     void PlatformFactoryImpl::SerialCommunicationStub::SendData(infra::ConstByteRange, infra::Function<void()>)
     {}
 
@@ -259,11 +254,6 @@ namespace application
     void PlatformFactoryImpl::Reset()
     {
         std::exit(0);
-    }
-
-    void PlatformFactoryImpl::ResetFromWatchdogExpiry()
-    {
-        Reset();
     }
 
     ResetCause PlatformFactoryImpl::GetResetCause() const

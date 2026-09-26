@@ -1,6 +1,7 @@
 #include "targets/platform_implementations/qemu/implementation/PlatformFactoryImpl.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "services/tracer/GlobalTracer.hpp"
+#include "targets/platform_implementations/qemu/implementation/SemihostingFile.hpp"
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -8,6 +9,38 @@
 namespace
 {
     constexpr int kResponseLinesPerDrain = 16;
+
+    // The emulated machine has no reset-cause register and its reset reloads RAM, so the watchdog leaves its
+    // record in a host file instead
+    constexpr const char* watchdogResetMarkerPath = "watchdog_reset.bin";
+    constexpr uint8_t watchdogResetMarker = 0x01;
+
+    void WriteWatchdogResetMarker(uint8_t value)
+    {
+        const int handle = application::semihosting::FileOpen(watchdogResetMarkerPath, application::semihosting::OpenMode::writeBinary);
+        if (handle < 0)
+            return;
+
+        application::semihosting::FileWrite(handle, &value, 1);
+        application::semihosting::FileClose(handle);
+    }
+
+    application::ResetCause TakeWatchdogResetMarker()
+    {
+        const int handle = application::semihosting::FileOpen(watchdogResetMarkerPath, application::semihosting::OpenMode::readBinary);
+        if (handle < 0)
+            return application::ResetCause::powerUp;
+
+        uint8_t value{ 0 };
+        const bool read = application::semihosting::FileRead(handle, &value, 1) == 0;
+        application::semihosting::FileClose(handle);
+
+        if (!read || value != watchdogResetMarker)
+            return application::ResetCause::powerUp;
+
+        WriteWatchdogResetMarker(0);
+        return application::ResetCause::watchdog;
+    }
 
     long Milli(float value)
     {
@@ -116,6 +149,7 @@ namespace application
     PlatformFactoryImpl::PlatformFactoryImpl(const foc::ThreePhaseMotorModel::Parameters& motorParams,
         const infra::Function<void()>& onInit)
         : plantConfig(LoadSilPlantConfig(sil::plantConfigFileName))
+        , resetCause(TakeWatchdogResetMarker())
         , onInitialized(onInit)
         , focTimer(0x40000000u, 8, kQemuSystemClockHz, BaseFrequencyFrom(plantConfig).Value(), [this]()
               {
@@ -207,11 +241,6 @@ namespace application
         return eeprom;
     }
 
-    drivers::Watchdog& PlatformFactoryImpl::Watchdog()
-    {
-        return watchdog;
-    }
-
     void PlatformFactoryImpl::RegisterBoardProtection(const infra::Function<void(BoardProtectionReason)>& onProtection)
     {
         boardProtection.Register(onProtection);
@@ -225,14 +254,15 @@ namespace application
     void PlatformFactoryImpl::Reset()
     {}
 
-    void PlatformFactoryImpl::ResetFromWatchdogExpiry()
-    {
-        Reset();
-    }
-
     ResetCause PlatformFactoryImpl::GetResetCause() const
     {
-        return ResetCause::powerUp;
+        return resetCause;
+    }
+
+    void PlatformFactoryImpl::Cortex::OnWatchdogExpired()
+    {
+        // The simulated bridge has no gate to cut; the machine reset that follows restarts the plant as well
+        WriteWatchdogResetMarker(watchdogResetMarker);
     }
 
     infra::BoundedConstString PlatformFactoryImpl::FaultStatus() const
