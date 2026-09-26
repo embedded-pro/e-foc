@@ -61,8 +61,9 @@ The category occupies slot `0x02` (the first application-reserved category ID). 
 `0x00–0x7F`; responses occupy `0x80–0xFF`. The category error frame uses the `can-lite` reserved type `0xFE`.
 
 Every command carries the `can-lite` sequence byte ahead of its fields; responses and telemetry do not. A frame
-whose length is not exactly the length its descriptor states is answered with `invalidPayload` and never
-partially decoded — a payload of another length is a foreign layout, not a tolerable variant of this one. The
+whose length is not exactly the length its descriptor states is rejected by its handler and never partially
+decoded; the `can-lite` protocol server answers a rejected command with `invalidPayload` and does not advance
+the sequence or client-liveness bookkeeping for it — a payload of another length is a foreign layout, not a tolerable variant of this one. The
 category-error frame on the `can-lite` reserved type `0xFE` carries a descriptor of its own and is held to the
 same exactness, so no decode path in this category escapes it.
 
@@ -92,7 +93,7 @@ Physical-to-wire conversions use fixed-point scale factors:
 
 ### Deviations from the can-lite reference example
 
-`infra/can-lite` (pinned at `9741ec1`) ships `examples/foc_motor`, which also claims category `0x02` and
+`infra/can-lite` (pinned at `ea80b3e`) ships `examples/foc_motor`, which also claims category `0x02` and
 disagrees with this contract. e-foc's definitions are authoritative for this product; the example is
 documentation. Because every decode is length-exact, a frame built from the example is rejected with
 `invalidPayload` rather than misread — visibly, not silently.
@@ -164,10 +165,15 @@ It is composed in the instantiation layer alongside the CAN bridge, so the bridg
 
 ### Part G — Fault Broadcast Priority
 
-`BroadcastFaultStatus` sends its frame at `CanPriority::emergency` (0) rather than through `SendTelemetry`,
-which uses `CanPriority::telemetry` (12). CAN arbitration is by identifier, and the priority field is the high
-bits of the identifier, so a telemetry-priority fault notification loses arbitration to routine telemetry on a
-busy bus — exactly when the bus is busiest and the notification matters most. The payload is unchanged.
+`BroadcastFaultStatus` sends its frame through `SendEmergency`, at `CanPriority::emergency` (0), rather than
+through `SendTelemetry`, which uses `CanPriority::telemetry` (12). CAN arbitration is by identifier, and the
+priority field is the high bits of the identifier, so a telemetry-priority fault notification loses arbitration
+to routine telemetry on a busy bus — exactly when the bus is busiest and the notification matters most. The
+payload is unchanged.
+
+Arbitration only helps a frame that reaches the controller. The `can-lite` send queue therefore orders queued
+frames by priority, keeps two of its slots for emergency frames only, and lets an emergency frame displace the
+newest lowest-priority frame when it is full, so a fault notification is not refused behind queued telemetry.
 
 ### Part H — Tracing Decorators
 

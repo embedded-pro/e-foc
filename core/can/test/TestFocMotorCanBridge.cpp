@@ -260,10 +260,11 @@ namespace
             ackSpy.Reset();
         }
 
-        void Dispatch(uint8_t msgType, hal::Can::Message data)
+        services::CanDispatchResult Dispatch(uint8_t msgType, hal::Can::Message data)
         {
-            motorServer->HandleMessage(msgType, data);
+            const auto result = motorServer->HandleMessage(msgType, data);
             ExecuteAllActions();
+            return result;
         }
 
         static hal::Can::Message SequenceOnlyPayload()
@@ -555,7 +556,7 @@ TEST_F(FocMotorCanBridgeTest, OnSetTorqueSetpoint_ExceedsInverterCurrent_Rejects
     EXPECT_FALSE(categoryErrorSent);
 }
 
-TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_UnrecognisedMode_RejectsWithInvalidPayload)
+TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_UnrecognisedMode_IsRejected)
 {
     ConstructFixture();
     ResetCaptures();
@@ -563,10 +564,8 @@ TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_UnrecognisedMode_RejectsWithIn
     hal::Can::Message data;
     data.resize(2, 0);
     data[1] = 0xFF;
-    Dispatch(can::focSelectControlModeId, data);
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_EQ(services::CanDispatchResult::rejected, Dispatch(can::focSelectControlModeId, data));
+    EXPECT_FALSE(ackSpy.last.has_value());
     EXPECT_FALSE(selectResponseSent);
 }
 
@@ -589,7 +588,7 @@ TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_WhilePending_RejectsBusy)
     EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
 }
 
-TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_InvalidMode_RejectsInvalidPayload)
+TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_InvalidMode_IsRejected)
 {
     ConstructFixture();
     ResetCaptures();
@@ -597,10 +596,8 @@ TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_InvalidMode_RejectsInvalidPayl
     hal::Can::Message data;
     data.resize(2, 0);
     data[1] = 0xFF;
-    Dispatch(can::focSelectControlModeId, data);
-
-    ASSERT_TRUE(ackSpy.last.has_value());
-    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidPayload);
+    EXPECT_EQ(services::CanDispatchResult::rejected, Dispatch(can::focSelectControlModeId, data));
+    EXPECT_FALSE(ackSpy.last.has_value());
     EXPECT_FALSE(selectResponseSent);
 }
 
