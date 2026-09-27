@@ -294,6 +294,84 @@ TEST_F(ControlModeStateMachineTest, Select_Remains_Usable_After_Nvm_Reports_Busy
     EXPECT_EQ(subject->Active(), state_machine::ControlMode::speed);
 }
 
+TEST_F(ControlModeStateMachineTest, OnSaveConfigDone_DoesNotActivate_When_Fault_Latched_During_Nvm_Write)
+{
+    GivenNvmAlwaysInvalid();
+
+    infra::Function<void(services::NvmStatus)> deferredSave;
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([&deferredSave](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                deferredSave = onDone;
+            }))
+        .WillOnce(Invoke([](const services::ConfigData& config, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_EQ(config.defaultControlMode, static_cast<uint8_t>(state_machine::ControlMode::torque));
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    ConstructSubject();
+
+    state_machine::SelectResult result{ state_machine::SelectResult::ok };
+    subject->Select(state_machine::ControlMode::speed, [&result](state_machine::SelectResult r)
+        {
+            result = r;
+        });
+
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::hardwareFault);
+
+    deferredSave(services::NvmStatus::Ok);
+
+    EXPECT_EQ(result, state_machine::SelectResult::busy);
+    EXPECT_EQ(subject->Active(), state_machine::ControlMode::torque);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(
+        subject->ActiveStateMachine().CurrentState()));
+    EXPECT_EQ(subject->ActiveStateMachine().LastFaultCode(), state_machine::FaultCode::hardwareFault);
+
+    state_machine::SelectResult retryResult{ state_machine::SelectResult::ok };
+    subject->Select(state_machine::ControlMode::speed, [&retryResult](state_machine::SelectResult r)
+        {
+            retryResult = r;
+        });
+
+    EXPECT_EQ(retryResult, state_machine::SelectResult::busy);
+}
+
+TEST_F(ControlModeStateMachineTest, OnSaveConfigDone_DoesNotActivate_When_Calibration_Starts_During_Nvm_Write)
+{
+    GivenNvmAlwaysInvalid();
+
+    infra::Function<void(services::NvmStatus)> deferredSave;
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([&deferredSave](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                deferredSave = onDone;
+            }))
+        .WillOnce(Invoke([](const services::ConfigData& config, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_EQ(config.defaultControlMode, static_cast<uint8_t>(state_machine::ControlMode::torque));
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    ConstructSubject();
+
+    state_machine::SelectResult result{ state_machine::SelectResult::ok };
+    subject->Select(state_machine::ControlMode::speed, [&result](state_machine::SelectResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _));
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+
+    deferredSave(services::NvmStatus::Ok);
+
+    EXPECT_EQ(result, state_machine::SelectResult::busy);
+    EXPECT_EQ(subject->Active(), state_machine::ControlMode::torque);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(
+        subject->ActiveStateMachine().CurrentState()));
+}
+
 TEST_F(ControlModeStateMachineTest, Select_While_Previous_Select_Pending_Reports_Busy)
 {
     GivenNvmAlwaysInvalid();

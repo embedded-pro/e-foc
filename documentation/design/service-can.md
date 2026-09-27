@@ -77,19 +77,26 @@ from the server's shall report the mismatch and send no further category-`0x02` 
 compatible. Adding a message is a minor bump; changing any field layout, or the meaning of any enumerator, is
 a major bump.
 
-Physical-to-wire conversions use fixed-point scale factors:
+Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
+saturate (`CanFrameCodec::FloatToFixed16`). Friction and inertia of the reference motors are around
+1e-5 and 1e-6 in SI units, which any useful `int16` scale rounds to zero, so they travel as unsigned
+32-bit nano-unit counts:
 
-| Quantity   | Wire type | Scale factor | Example                        |
-|------------|-----------|--------------|--------------------------------|
-| Current    | int16     | 10           | 1.5 A → 15 wire                |
-| Speed      | int16     | 1            | 300 rad/s → 300 wire           |
-| Position   | int16     | 100          | 3.14 rad → 314 wire            |
-| Voltage    | int16     | 10           | 24.0 V → 240 wire              |
-| Bandwidth  | int16     | 1            | closed-loop bandwidth in rad/s |
-| Resistance | int16     | 1000         | 0.5 Ω → 500 wire               |
-| Inductance | int16     | 1000         | 1.0 mH → 1000 wire             |
-| Friction   | int16     | 10000        | 0.001 Nm·s/rad → 10 wire       |
-| Inertia    | int16     | 10000        | 0.001 kg·m² → 10 wire          |
+| Quantity   | Wire type | Scale factor  | Example                                          |
+|------------|-----------|---------------|--------------------------------------------------|
+| Current    | int16     | 10            | 1.5 A → 15 wire                                  |
+| Speed      | int16     | 1             | 300 rad/s → 300 wire                             |
+| Position   | int16     | 100           | 3.14 rad → 314 wire                              |
+| Voltage    | int16     | 10            | 24.0 V → 240 wire                                |
+| Bandwidth  | int16     | 1             | closed-loop bandwidth in rad/s                   |
+| Resistance | int16     | 1000          | 0.36 Ω (Teknic M-2310P-LN-04K) → 360 wire        |
+| Inductance | int16     | 1000          | 0.20 mH (Teknic M-2310P-LN-04K) → 200 wire       |
+| Friction   | uint32    | 1000000000    | 1.5e-5 N·m·s/rad (Teknic M-2310P-LN-04K) → 15000 |
+| Inertia    | uint32    | 1000000000    | 7.06e-6 kg·m² (Teknic M-2310P-LN-04K) → 7060     |
+
+The `uint32` fields round to nearest, saturate at `UINT32_MAX` and encode a negative or NaN value as
+`0`: friction and inertia are never negative in a physical plant. The reference-motor values come from
+`documentation/theory/foc-plant-models.md` "Reference motors".
 
 ### Deviations from the can-lite reference example
 

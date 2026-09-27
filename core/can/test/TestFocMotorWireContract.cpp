@@ -75,6 +75,8 @@ namespace
         MOCK_METHOD(void, OnTelemetryStatus, (const hal::Can::Message&), (override));
         MOCK_METHOD(void, OnTelemetryElectrical, (const hal::Can::Message&), (override));
         MOCK_METHOD(void, OnContractVersionResponse, (uint8_t, uint8_t), (override));
+        MOCK_METHOD(void, OnElectricalParamsResponse, (foc::Ohm, foc::MilliHenry, uint8_t), (override));
+        MOCK_METHOD(void, OnMechanicalParamsResponse, (foc::NewtonMeterSecondPerRadian, foc::NewtonMeterSecondSquared), (override));
     };
 
     struct SequenceSourceStub
@@ -392,7 +394,7 @@ namespace
 
             { can::focMotorTypeResponseId, { 0x01 } },
             { can::focElectricalParamsResponseId, { 0x01, 0xF4, 0x03, 0xE8, 0x07 } },
-            { can::focMechanicalParamsResponseId, { 0x00, 0x0A, 0x00, 0x14 } },
+            { can::focMechanicalParamsResponseId, { 0x00, 0x00, 0x3A, 0x98, 0x00, 0x00, 0x1B, 0x94 } },
             { can::focTelemetryElectricalResponseId, { 0x00, 0xF0, 0x00, 0x96, 0x00, 0x0F, 0x00, 0x00 } },
             { can::focTelemetryStatusResponseId, { 0x04, 0x02, 0x00, 0x00, 0x00, 0x00 } },
             { can::focSelectControlModeResponseId, { 0x02 } },

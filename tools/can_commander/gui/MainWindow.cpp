@@ -194,10 +194,10 @@ namespace tool
     void MainWindow::OnCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status)
     {
         logView->appendPlainText(QString("ACK: cat=0x%1 cmd=0x%2 status=%3 (%4)")
-                .arg(categoryId, 2, 16, QChar('0'))
-                .arg(commandType, 2, 16, QChar('0'))
-                .arg(static_cast<int>(status))
-                .arg(QString::fromUtf8(services::CanAckStatusToString(status))));
+                                     .arg(categoryId, 2, 16, QChar('0'))
+                                     .arg(commandType, 2, 16, QChar('0'))
+                                     .arg(static_cast<int>(status))
+                                     .arg(QString::fromUtf8(services::CanAckStatusToString(status))));
     }
 
     void MainWindow::OnContractVersion(uint8_t major, uint8_t minor, bool compatible)
@@ -209,10 +209,25 @@ namespace tool
             logView->appendPlainText(QString("Contract version %1.%2").arg(major).arg(minor));
         else
             logView->appendPlainText(QString("ERROR: contract version %1.%2 is incompatible with %3.%4; commands stay disabled")
-                    .arg(major)
-                    .arg(minor)
-                    .arg(can::focContractVersionMajor)
-                    .arg(can::focContractVersionMinor));
+                                         .arg(major)
+                                         .arg(minor)
+                                         .arg(can::focContractVersionMajor)
+                                         .arg(can::focContractVersionMinor));
+    }
+
+    void MainWindow::OnElectricalParametersReceived(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs)
+    {
+        logView->appendPlainText(QString("Electrical params: R=%1 ohm, L=%2 mH, poles=%3")
+                                     .arg(resistanceOhm)
+                                     .arg(inductanceMilliHenry)
+                                     .arg(polePairs));
+    }
+
+    void MainWindow::OnMechanicalParametersReceived(float frictionNmSPerRad, float inertiaKgM2)
+    {
+        logView->appendPlainText(QString("Mechanical params: B=%1 Nm.s/rad, J=%2 kg.m2")
+                                     .arg(frictionNmSPerRad)
+                                     .arg(inertiaKgM2));
     }
 
     void MainWindow::OnMotorStatusReceived(tool::FocMotorState state, tool::FocFaultCode fault)
