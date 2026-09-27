@@ -32,7 +32,8 @@ namespace application
             const MotorHardware& hardware,
             services::NonVolatileMemory& nvm,
             const CalibrationServices& calibServices,
-            foc::Ampere driveCurrentLimit);
+            foc::Ampere driveCurrentLimit,
+            NvmActivity& nvmActivity);
 
         bool HasModeSpecificWorkPending() const override;
         void ApplyModeSpecificCalibration(const services::CalibrationData& data) override;

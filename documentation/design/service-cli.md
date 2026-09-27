@@ -101,9 +101,11 @@ message in the others, and rejected when the lifecycle state does not accept set
 | `set_speed`    | `ss`  | omega (rad/s) | ±1000          | Speed    |
 | `set_position` | `sp`  | theta (rad)   | ±2π            | Position |
 
-Ranges come from `foc::CommandLimits`, the same constants the CAN command path validates against, so
-an operator cannot reach through the terminal a setpoint the bus would have refused. A value outside
-the range is rejected with an out-of-range message and never reaches the control law.
+Ranges come from `foc::CommandLimits`. The CAN path checks speed and position against the same
+limits, but checks torque against the inverter's `MaxCurrentSupported()`. Either way the torque
+cascade scales every setpoint onto the `MaxCurrentSupported()` envelope, so neither path can command
+more current than the inverter supports. A value outside the range checked at entry is rejected and
+never reaches the control law.
 
 The torque command takes the q-axis current only. The d-axis reference is held at zero by the
 control law, so exposing it would let an operator command a flux reference the cascade immediately

@@ -180,7 +180,7 @@ collaborators that carry out the work, each with one responsibility.
 | `OperationFlow`      | Enable and disable, faults and emergency stop, and the post-commit work of every state                                             |
 | `PendingCommand`     | The one outstanding operator command, and the result held back until the target state has been committed                           |
 | `CommandRejections`  | The observer that completes a queued command's callback with `rejected` when the table refuses it, so no callback is left dangling |
-| `NvmActivity`        | The count of NVM operations whose callbacks still capture the machine; part of `HasPendingAsyncWork()`                             |
+| `NvmActivity`        | The count of NVM operations whose callbacks still capture the machine; part of `HasPendingAsyncWork()`. Owned by `ControlModeStateMachine`, not by `FocStateMachineCommon` — see C2a |
 | `CalibrationContext` | The calibration record in RAM and its application to the controller                                                                |
 | `ModeHooks`          | The interface through which the flows reach the control mode: the controller, its tunables and the mode-specific calibration steps |
 
@@ -522,9 +522,10 @@ decided by the transition table:
   have rows in `Calibrating`. The mechanical result additionally carries a guard on the active
   sub-step. The calibration orchestrator also drops results of a run that was aborted.
 - The `SaveCalibration` completion becomes `CalibrationSaved`, which only has rows in
-  `Calibrating`. The callback also carries the epoch of the transition that issued the save,
-  so a save completing after an emergency stop and a fresh `CmdCalibrate` is discarded
-  instead of being consumed by the new run.
+  `Calibrating`, and only ever carries a non-`Busy` status: `CalibrationFlow` retries a `Busy`
+  response internally (see C2c) rather than dispatching it. The callback also carries the epoch
+  of the transition that issued the save, so a save completing after an emergency stop and a
+  fresh `CmdCalibrate` is discarded instead of being consumed by the new run.
 - The boot-time NVM completions become `BootValidityChecked` and `BootCalibrationLoaded`, which
   only have rows in `Idle`.
 - The `InvalidateCalibration` completion becomes `CalibrationInvalidated`, with rows in `Idle`
@@ -713,6 +714,36 @@ sequenceDiagram
     NVM-->>CSM: WriteDone(Ok)
     CSM-->>Caller: cb1(ok)
 ```
+
+#### C2a — One `NvmActivity` for Every Writer of the Shared NVM
+
+`NonVolatileMemoryImpl` serves one operation at a time and answers a concurrent call with `Busy`,
+without queueing. `NvmActivity` is therefore owned by `ControlModeStateMachine`, which outlives every
+mode switch, and every writer of the shared instance brackets its operation with it:
+
+| Writer                                                                                   | Accounting                                                                      |
+|------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------|
+| Calibration, maintenance and boot (`CalibrationFlow`, `MaintenanceFlow`, `BootSequence`) | `LifecycleEnvironment::nvmActivity`, a reference to the shared counter          |
+| `Select`'s `SaveConfig` and its rollback write                                           | `Begin`/`End` around each write                                                 |
+| `AlgorithmPersistence::PersistConfig`                                                    | `Begin` before the first attempt, `End` once a status other than `Busy` arrives |
+| `FocMotorCanBridge` encoder-resolution and telemetry-rate writes                         | `ControlModeStateMachine::BeginNvmActivity`/`EndNvmActivity`                    |
+
+`HasPendingAsyncWork()` is therefore true while any of them is outstanding, and every guard built on
+it — `CmdCalibrate`, `CmdEnable`, `CmdClearCalibration`, `Select` — refuses instead of colliding.
+
+#### C2b — Algorithm Selection Is Refused While Busy
+
+`SelectCurrentAlgorithm`, `SelectSpeedAlgorithm` and `SelectPositionAlgorithm` apply the same guard as
+`Select` — the active machine is `Idle` or `Ready` and has no pending asynchronous work — and return
+`busy` otherwise. Selection is therefore refused while `Calibrating`, `Enabled` or `Fault`, and while
+any NVM operation is outstanding. The cascades' own refusal while enabled remains as a second guard.
+
+#### C2c — A Busy Calibration Save Is Retried
+
+`CalibrationFlow` retries a `SaveCalibration` answered with `Busy` every 10 ms from a copy of the
+record, keeping `NvmActivity` raised and reusing the completion captured at the epoch of the run, so
+`CalibrationSaved` is only dispatched with the status of a write that actually ran. An abort while a
+retry is waiting cancels it and releases `NvmActivity`: an aborted run is not persisted.
 
 #### C3 — Deferred Apply and Re-check Before Activate
 

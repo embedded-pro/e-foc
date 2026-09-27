@@ -8,8 +8,9 @@ namespace application
         services::NonVolatileMemory& nvm,
         const CalibrationServices& calibServices,
         state_machine::FaultNotifier& faultNotifier,
-        state_machine::TransitionPolicy transitionPolicy)
-        : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices)
+        state_machine::TransitionPolicy transitionPolicy,
+        NvmActivity& nvmActivity)
+        : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices, nvmActivity)
         , focController(hardware.inverter, hardware.encoder, hardware.inverter.MaxCurrentSupported())
     {
         RegisterFaultHandler(faultNotifier);

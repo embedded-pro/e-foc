@@ -4,6 +4,7 @@
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
+#include "core/state_machine/NvmActivity.hpp"
 #include "infra/timer/Timer.hpp"
 #include "services/tracer/Tracer.hpp"
 #include <optional>
@@ -13,7 +14,8 @@ namespace state_machine
     class AlgorithmPersistence
     {
     public:
-        AlgorithmPersistence(services::NonVolatileMemory& nvm, services::ConfigData& configData, services::Tracer& tracer);
+        AlgorithmPersistence(services::NonVolatileMemory& nvm, services::ConfigData& configData, services::Tracer& tracer,
+            application::NvmActivity& nvmActivity);
 
         void ApplyPersistedAlgorithms(
             foc::CurrentLoopSelectable* current,
@@ -48,6 +50,7 @@ namespace state_machine
         services::NonVolatileMemory& nvm;
         services::ConfigData& configData;
         services::Tracer& tracer;
+        application::NvmActivity& nvmActivity;
         infra::TimerSingleShot persistRetryTimer;
     };
 }

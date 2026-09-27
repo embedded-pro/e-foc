@@ -42,6 +42,7 @@ namespace
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
+        application::NvmActivity nvmActivity;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
@@ -214,7 +215,8 @@ namespace
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock },
                 faultNotifierMock,
-                state_machine::TransitionPolicy::Cli
+                state_machine::TransitionPolicy::Cli,
+                nvmActivity
             };
         }
 
@@ -868,6 +870,95 @@ TEST_F(FocStateMachineTorqueCliTest, nvm_save_failure_after_full_calibration_ent
     sm.CmdCalibrate([](state_machine::CommandResult) {});
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, nvm_save_busy_after_full_calibration_is_retried_and_reaches_ready)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
+            {
+                cb(std::size_t{ 7 });
+            }));
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const auto&,
+                             const infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)>& cb)
+            {
+                cb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
+            }));
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&,
+                             const infra::Function<void(std::optional<foc::Radians>)>& cb)
+            {
+                cb(foc::Radians{ 0.0f });
+            }));
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Busy);
+            }))
+        .WillOnce(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            }));
+    EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+
+    auto sm = CreateStateMachine();
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+    EXPECT_TRUE(sm.HasPendingAsyncWork());
+
+    ForwardTime(std::chrono::milliseconds{ 10 });
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+}
+
+TEST_F(FocStateMachineTorqueCliTest, emergency_stop_while_a_busy_calibration_save_waits_cancels_the_retry)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
+            {
+                cb(std::size_t{ 7 });
+            }));
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const auto&,
+                             const infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)>& cb)
+            {
+                cb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
+            }));
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&,
+                             const infra::Function<void(std::optional<foc::Radians>)>& cb)
+            {
+                cb(foc::Radians{ 0.0f });
+            }));
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Busy);
+            }));
+    EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+
+    auto sm = CreateStateMachine();
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+    EXPECT_TRUE(sm.HasPendingAsyncWork());
+
+    sm.CmdEmergencyStop();
+    ForwardTime(std::chrono::milliseconds{ 50 });
+
+    EXPECT_FALSE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
 }
 
 TEST_F(FocStateMachineTorqueCliTest, enable_from_ready_starts_foc_and_enters_enabled)
@@ -1532,6 +1623,7 @@ namespace
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
+        application::NvmActivity nvmActivity;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
@@ -1680,7 +1772,8 @@ namespace
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock },
                 faultNotifierMock,
-                state_machine::TransitionPolicy::Auto
+                state_machine::TransitionPolicy::Auto,
+                nvmActivity
             };
         }
 

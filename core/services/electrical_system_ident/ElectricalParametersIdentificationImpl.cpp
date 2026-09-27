@@ -27,7 +27,7 @@ namespace services
 
     void ElectricalParametersIdentificationImpl::EstimateResistanceAndInductance(const ResistanceAndInductanceConfig& config, const infra::Function<void(ResistanceInductanceResult)>& onDone)
     {
-        if (rlRunning)
+        if (IsRunning())
         {
             onDone(ResistanceInductanceResult{});
             return;
@@ -75,7 +75,7 @@ namespace services
 
     void ElectricalParametersIdentificationImpl::EstimateNumberOfPolePairs(const PolePairsConfig& config, const infra::Function<void(std::optional<std::size_t>)>& onDone)
     {
-        if (polePairsRunning)
+        if (IsRunning())
         {
             onDone(std::nullopt);
             return;

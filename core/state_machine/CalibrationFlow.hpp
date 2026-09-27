@@ -3,6 +3,7 @@
 #include "core/state_machine/CalibrationOrchestrator.hpp"
 #include "core/state_machine/FocStateMachineDependencies.hpp"
 #include "core/state_machine/LifecycleContext.hpp"
+#include "infra/timer/Timer.hpp"
 
 namespace application
 {
@@ -36,10 +37,15 @@ namespace application
     private:
         void TraceRecord(const services::CalibrationData& data) const;
         void OnSaved(services::NvmStatus status);
+        void RetrySave();
 
     private:
+        static constexpr std::chrono::milliseconds saveRetryDelay{ 10 };
+
         const LifecycleEnvironment& env;
         CalibrationOrchestrator orchestrator;
         infra::Function<void(services::NvmStatus)> saveCompletion;
+        services::CalibrationData pendingSaveData;
+        infra::TimerSingleShot saveRetryTimer;
     };
 }

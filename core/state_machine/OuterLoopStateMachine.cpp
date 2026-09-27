@@ -23,8 +23,9 @@ namespace application
         const MotorHardware& hardware,
         services::NonVolatileMemory& nvm,
         const CalibrationServices& calibServices,
-        foc::Ampere driveCurrentLimit)
-        : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices)
+        foc::Ampere driveCurrentLimit,
+        NvmActivity& nvmActivity)
+        : FocStateMachineCommon(terminalAndTracer, hardware, nvm, calibServices, nvmActivity)
         , driveCurrentLimit(driveCurrentLimit)
     {}
 

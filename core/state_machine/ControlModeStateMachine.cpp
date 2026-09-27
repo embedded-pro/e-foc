@@ -21,7 +21,7 @@ namespace state_machine
         , faultNotifier(faultNotifier)
         , outerLoopArgs(outerLoopArgs)
         , configData(configData)
-        , algorithmPersistence(nvm, this->configData, terminalAndTracer.tracer)
+        , algorithmPersistence(nvm, this->configData, terminalAndTracer.tracer, nvmActivity)
     {
         RegisterCliCommands();
         Activate(ControlModeFromRaw(configData.defaultControlMode));
@@ -45,6 +45,7 @@ namespace state_machine
         configData.defaultControlMode = static_cast<uint8_t>(mode);
         pendingSelectMode = mode;
         pendingSelectCallback = onDone;
+        nvmActivity.Begin();
         nvm.SaveConfig(configData, [this](services::NvmStatus status)
             {
                 OnSaveConfigDone(status);
@@ -58,6 +59,8 @@ namespace state_machine
 
     void ControlModeStateMachine::OnSaveConfigDone(services::NvmStatus status)
     {
+        nvmActivity.End();
+
         if (status != services::NvmStatus::Ok)
         {
             configData.defaultControlMode = previousDefaultControlMode;
@@ -73,6 +76,7 @@ namespace state_machine
         }
 
         configData.defaultControlMode = previousDefaultControlMode;
+        nvmActivity.Begin();
         nvm.SaveConfig(configData, [this](services::NvmStatus rollbackStatus)
             {
                 OnRollbackSaveConfigDone(rollbackStatus);
@@ -81,6 +85,7 @@ namespace state_machine
 
     void ControlModeStateMachine::OnRollbackSaveConfigDone(services::NvmStatus)
     {
+        nvmActivity.End();
         pendingSelectCallback(SelectResult::busy);
     }
 
@@ -227,7 +232,8 @@ namespace state_machine
                 calibServices,
                 faultNotifier,
                 TransitionPolicy::Auto,
-                outerLoopArgs));
+                outerLoopArgs,
+                nvmActivity));
         else if (mode == ControlMode::position)
             AttachAlgorithmRestore(activeSm.emplace<application::PositionStateMachine>(
                 terminalAndTracer,
@@ -236,7 +242,8 @@ namespace state_machine
                 calibServices,
                 faultNotifier,
                 TransitionPolicy::Auto,
-                outerLoopArgs));
+                outerLoopArgs,
+                nvmActivity));
         else
             AttachAlgorithmRestore(activeSm.emplace<application::TorqueStateMachine>(
                 terminalAndTracer,
@@ -244,7 +251,8 @@ namespace state_machine
                 nvm,
                 calibServices,
                 faultNotifier,
-                TransitionPolicy::Auto));
+                TransitionPolicy::Auto,
+                nvmActivity));
     }
 
     void ControlModeStateMachine::AttachAlgorithmRestore(application::FocStateMachineCommon& stateMachine)
@@ -314,17 +322,33 @@ namespace state_machine
 
     foc::SelectResult ControlModeStateMachine::SelectCurrentAlgorithm(foc::CurrentAlgorithm algorithm)
     {
+        if (!CanActivatePendingSelect())
+            return foc::SelectResult::busy;
         return algorithmPersistence.SelectCurrentAlgorithm(algorithm, CurrentSelectable());
     }
 
     foc::SelectResult ControlModeStateMachine::SelectSpeedAlgorithm(foc::SpeedAlgorithm algorithm)
     {
+        if (!CanActivatePendingSelect())
+            return foc::SelectResult::busy;
         return algorithmPersistence.SelectSpeedAlgorithm(algorithm, SpeedSelectable());
     }
 
     foc::SelectResult ControlModeStateMachine::SelectPositionAlgorithm(foc::PositionAlgorithm algorithm)
     {
+        if (!CanActivatePendingSelect())
+            return foc::SelectResult::busy;
         return algorithmPersistence.SelectPositionAlgorithm(algorithm, PositionSelectable());
+    }
+
+    void ControlModeStateMachine::BeginNvmActivity()
+    {
+        nvmActivity.Begin();
+    }
+
+    void ControlModeStateMachine::EndNvmActivity()
+    {
+        nvmActivity.End();
     }
 
     foc::CurrentAlgorithm ControlModeStateMachine::ActiveCurrentAlgorithm() const

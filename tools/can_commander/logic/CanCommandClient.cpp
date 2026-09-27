@@ -3,11 +3,28 @@
 #include "can-lite/core/CanPayload.hpp"
 #include "core/can/FocMotorWireContract.hpp"
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 namespace tool
 {
     using namespace services;
+
+    namespace
+    {
+        // Clamp before converting: an out-of-range float cast to int32_t is undefined behaviour
+        int32_t ScaleAndClampToInt16(float value, float scale)
+        {
+            const float scaled = value * scale;
+            if (std::isnan(scaled))
+                return 0;
+
+            constexpr float minInt16 = static_cast<float>(std::numeric_limits<int16_t>::min());
+            constexpr float maxInt16 = static_cast<float>(std::numeric_limits<int16_t>::max());
+
+            return static_cast<int32_t>(std::clamp(scaled, minInt16, maxInt16));
+        }
+    }
 
     CanCommandClient::CanCommandClient(CanBusAdapter& adapter)
         : focClient{ adapter, nodeId }
@@ -82,9 +99,7 @@ namespace tool
     void CanCommandClient::SendSetTorqueSetpoint(float iqCurrent)
     {
         SetBusy(true);
-        const auto scaled = std::clamp(static_cast<int32_t>(iqCurrent * can::focCurrentScale),
-            static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
-            static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
+        const auto scaled = ScaleAndClampToInt16(iqCurrent, can::focCurrentScale);
         if (focClient.SetTorque(foc::Ampere{ static_cast<float>(scaled) / can::focCurrentScale }))
             SetBusy(false);
     }
@@ -92,9 +107,7 @@ namespace tool
     void CanCommandClient::SendSetSpeedSetpoint(float speedRadPerSec)
     {
         SetBusy(true);
-        const auto scaled = std::clamp(static_cast<int32_t>(speedRadPerSec * can::focSpeedScale),
-            static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
-            static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
+        const auto scaled = ScaleAndClampToInt16(speedRadPerSec, can::focSpeedScale);
         if (focClient.SetSpeed(foc::RadiansPerSecond{ static_cast<float>(scaled) / can::focSpeedScale }))
             SetBusy(false);
     }
@@ -102,9 +115,7 @@ namespace tool
     void CanCommandClient::SendSetPositionSetpoint(float positionRad)
     {
         SetBusy(true);
-        const auto scaled = std::clamp(static_cast<int32_t>(positionRad * can::focPositionScale),
-            static_cast<int32_t>(std::numeric_limits<int16_t>::min()),
-            static_cast<int32_t>(std::numeric_limits<int16_t>::max()));
+        const auto scaled = ScaleAndClampToInt16(positionRad, can::focPositionScale);
         if (focClient.SetPosition(foc::Radians{ static_cast<float>(scaled) / can::focPositionScale }))
             SetBusy(false);
     }

@@ -63,7 +63,8 @@ namespace application
         FocStateMachineCommon(const TerminalAndTracer& terminalAndTracer,
             const MotorHardware& hardware,
             services::NonVolatileMemory& nvm,
-            const CalibrationServices& calibServices);
+            const CalibrationServices& calibServices,
+            NvmActivity& nvmActivity);
 
         void RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier);
         void ReleaseExternalResources();
@@ -98,7 +99,7 @@ namespace application
         services::TerminalWithStorage& terminal;
         services::Tracer& tracer;
         CalibrationContext calibrationContext;
-        NvmActivity nvmActivity;
+        NvmActivity& nvmActivity;
         PendingCommand pendingCommand;
         LifecycleEnvironment environment;
         CalibrationFlow calibration;

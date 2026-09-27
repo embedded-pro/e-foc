@@ -6,6 +6,7 @@
 #include "tools/can_commander/logic/test/CanCommandClientObserverMock.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <limits>
 
 namespace
 {
@@ -512,6 +513,40 @@ namespace
         ASSERT_EQ(capturedData.size(), 3u);
         EXPECT_EQ(capturedData[1], 0x80u); // high byte of INT16_MIN
         EXPECT_EQ(capturedData[2], 0x00u); // low  byte of INT16_MIN
+    }
+
+    TEST_F(TestCanCommandClient, send_speed_setpoint_extreme_value_clamps_without_ub)
+    {
+        hal::Can::Message capturedData;
+        EXPECT_CALL(adapter, SendData(_, _, _))
+            .WillOnce(Invoke([&capturedData](hal::Can::Id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
+                {
+                    capturedData = msg;
+                    cb(true);
+                }));
+
+        client.SendSetSpeedSetpoint(1e10f); // far beyond int32_t range once scaled → must clamp in float, not overflow the cast
+
+        ASSERT_EQ(capturedData.size(), 3u);
+        EXPECT_EQ(capturedData[1], 0x7Fu); // high byte of INT16_MAX
+        EXPECT_EQ(capturedData[2], 0xFFu); // low  byte of INT16_MAX
+    }
+
+    TEST_F(TestCanCommandClient, send_speed_setpoint_nan_encodes_as_zero)
+    {
+        hal::Can::Message capturedData;
+        EXPECT_CALL(adapter, SendData(_, _, _))
+            .WillOnce(Invoke([&capturedData](hal::Can::Id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
+                {
+                    capturedData = msg;
+                    cb(true);
+                }));
+
+        client.SendSetSpeedSetpoint(std::numeric_limits<float>::quiet_NaN());
+
+        ASSERT_EQ(capturedData.size(), 3u);
+        EXPECT_EQ(capturedData[1], 0x00u);
+        EXPECT_EQ(capturedData[2], 0x00u);
     }
 
     TEST_F(TestCanCommandClient, send_position_setpoint_encodes_with_correct_scale)

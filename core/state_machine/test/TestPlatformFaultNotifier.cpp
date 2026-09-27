@@ -48,6 +48,7 @@ namespace
         StrictMock<application::CanBusAdapterMock> canBusMock;
         infra::Function<void(application::CanBusAdapter::CanError)> storedCanErrorHandler;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
+        application::NvmActivity nvmActivity;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         infra::Execute setupTeardownExpectations{ [this]()
@@ -110,7 +111,8 @@ namespace
                 nvmMock,
                 application::CalibrationServices{ electricalIdentMock, alignmentMock },
                 *faultNotifier,
-                state_machine::TransitionPolicy::Cli
+                state_machine::TransitionPolicy::Cli,
+                nvmActivity
             };
         }
 

@@ -351,8 +351,10 @@ namespace can
         configData.encoderResolution = resolution;
         pendingNvmDoneCallback = onDone;
 
+        controlMode.BeginNvmActivity();
         nvm.SaveConfig(configData, [this](services::NvmStatus status)
             {
+                controlMode.EndNvmActivity();
                 auto callback = pendingNvmDoneCallback;
                 pendingNvmDoneCallback = nullptr;
                 if (status == services::NvmStatus::Ok)
@@ -379,8 +381,10 @@ namespace can
         configData.telemetryRateHz = rateHz;
         pendingNvmDoneCallback = onDone;
 
+        controlMode.BeginNvmActivity();
         nvm.SaveConfig(configData, [this](services::NvmStatus status)
             {
+                controlMode.EndNvmActivity();
                 auto callback = pendingNvmDoneCallback;
                 pendingNvmDoneCallback = nullptr;
                 if (status == services::NvmStatus::Ok)

@@ -111,6 +111,7 @@ namespace
         StrictMock<drivers::ThreePhaseInverterMock> inverterMock;
         StrictMock<drivers::EncoderMock> encoderMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
+        application::NvmActivity nvmActivity;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<state_machine::FaultNotifierMock> faultNotifierMock;
@@ -135,7 +136,8 @@ namespace
             nvmMock,
             application::CalibrationServices{ electricalIdentMock, alignmentMock },
             faultNotifierMock,
-            state_machine::TransitionPolicy::Auto
+            state_machine::TransitionPolicy::Auto,
+            nvmActivity
         };
     };
 }
