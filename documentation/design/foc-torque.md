@@ -183,7 +183,7 @@ The pole-pair count is an integer property that translates the mechanical rotor 
 
 The dual-PID current controller described above is one of several selectable strategies for the
 current loop. Alternative controllers — Decoupled PID, Deadbeat, and Sliding-mode — are described in
-`documentation/theory/current-loop-controllers.md`. Plant model foundations are in
+`documentation/theory/advanced-controllers.md` (`current-loop-decoupled-pid.md`, `current-loop-deadbeat.md`, `current-loop-sliding-mode.md`). Plant model foundations are in
 `documentation/theory/foc-plant-models.md`.
 
 The mechanism by which a controller strategy is selected at runtime, stored without heap allocation,

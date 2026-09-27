@@ -76,7 +76,7 @@ classDiagram
 | `enable`            | `en`  | —         | Enables the motor; rejected outside `Ready`    |
 | `disable`           | `dis` | —         | Disables the motor                             |
 | `clear_fault`       | `cf`  | —         | Clears a latched fault                         |
-| `clear_calibration` | `cc`  | —         | Invalidates stored calibration                 |
+| `clear_cal`         | `cc`  | —         | Invalidates stored calibration                 |
 | `active_mode`       | `am`  | —         | Prints the active control mode                 |
 | `apply_estimates`   | `ae`  | —         | Applies the online estimates to the loop gains |
 | `estimate_status`   | `es`  | —         | Prints the current online estimates            |

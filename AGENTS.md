@@ -14,10 +14,12 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `core/platform_abstraction/` — `PlatformFactory` + hardware ports (`drivers::ThreePhaseInverter`, `drivers::Encoder`, `drivers::HallSensor`) in `interfaces/Drivers.hpp`
 - `core/state_machine/` — Motor lifecycle FSM (`Idle` → `Calibrating` → `Ready` ⇄ `Enabled`, `Fault`) on EmIL `services::TableStateMachine`: `std::variant` states, `std::variant` events (`FocStateMachineEvents.hpp`), transition table in `FocLifecycleTable`. `TransitionPolicy::{Cli,Auto}` only selects terminal commands.
 - `core/services/` — Alignment, CLI, system ID, NVM
-- `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`) + platform implementations (`host`, `ti`, `st`)
+- `core/can/` — FOC motor CAN category: server, client, `FocMotorCanBridge`, wire contract (`FocMotorWireContract.hpp`)
+- `core/supervision/` — Runtime plausibility monitors (`EncoderPlausibilityMonitor`)
+- `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`) + platform implementations (`host`, `qemu`, `ti`, `st`, shared `cortex_m_common`, `error_handling_cortex_m`, `motor_boards`)
 - `infra/numerical-toolbox/` — PID, filters, fixed-point math (see its own `AGENTS.md`)
 - `infra/embedded-infra-lib/` — Bounded containers, build helpers, toolchain cmake
-- `tools/simulator/` — Host simulation; `tools/can_commander/` — CAN interface
+- `tools/simulator/` — Host simulation; `tools/can_commander/` — CAN interface; `tools/hardware_bridge/` — terminal/CAN/serial bridge client used by the HIL runner
 
 ## Memory — no heap (embedded/runtime code)
 
@@ -110,7 +112,7 @@ Documentation-first: update `documentation/` **before or alongside** behavioral 
 
 - `documentation/theory/` — FOC algorithm or motor model changes
 - `documentation/performance-optimization/README.md` — timing-critical changes
-- All visuals: Mermaid (flowcharts/state/sequence), TikZ `{=latex}` raw blocks (technical charts, signal flows, coordinate frames — source in `documentation/tikz/`), or ASCII art — no external image references
+- All visuals: Mermaid (flowcharts/state/sequence), TikZ `{=latex}` raw blocks (technical charts, signal flows, coordinate frames — source in `documentation/tikz/`), or ASCII art. Markdown image syntax is allowed only for the pre-rendered preview of a TikZ figure (`documentation/tikz/images/*.svg`) placed next to its `{=latex}` block; no other image references
 - Templates: `documentation/templates/`
 
 ## Build
@@ -133,7 +135,7 @@ Presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1
 # 1. Full host build must succeed
 cmake --preset host && cmake --build build/host --config Debug -j$(nproc)
 
-# 2. Unit tests must pass (one pre-existing failure in electrical_system_ident is known)
+# 2. Unit tests must pass
 ctest --test-dir build/host -C Debug -E "e_foc.integration_tests" --output-on-failure
 
 # 3. SIL binary must link (QEMU firmware required for runtime correctness)
