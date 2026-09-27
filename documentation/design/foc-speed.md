@@ -222,7 +222,7 @@ sequenceDiagram
 
 The speed PID described above is one of several selectable strategies for the outer speed loop.
 Alternative controllers — LQI, ADRC, and Two-DOF — are described in
-`documentation/theory/speed-loop-controllers.md`. Plant model foundations are in
+`documentation/theory/advanced-controllers.md` (`speed-loop-lqi.md`, `speed-loop-adrc.md`, `speed-loop-two-dof.md`). Plant model foundations are in
 `documentation/theory/foc-plant-models.md`.
 
 The runtime selection mechanism is described in `documentation/design/controller-selection.md`.

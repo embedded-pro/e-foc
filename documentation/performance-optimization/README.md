@@ -337,7 +337,7 @@ vmovgt.f32 s0, s1
 
 ## Measurement tiers
 
-Three complementary approaches verify cycle budgets. See [qemu-sil.md](qemu-sil.md) for full detail on Tier 2.
+Three complementary approaches verify cycle budgets. Tier 2 runs the software-in-the-loop firmware ([software-in-the-loop.md](../design/software-in-the-loop.md)) and reads the counter described in [Cycle Counter (DWT)](#cycle-counter-dwt).
 
 | Tier                | Tool                                            | Purpose           | Authoritative for                            |
 |---------------------|-------------------------------------------------|-------------------|----------------------------------------------|
