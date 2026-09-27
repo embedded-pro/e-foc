@@ -1,4 +1,5 @@
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
+#include "core/foc/math/AngleWrap.hpp"
 #include "core/services/InjectionCurrentLimit.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include <cmath>
@@ -66,7 +67,7 @@ namespace services
     void MotorAlignmentImpl::ProcessPosition()
     {
         auto currentPosition = encoder.Read();
-        auto positionChange = std::abs((currentPosition - previousPosition).Value());
+        auto positionChange = std::abs(foc::detail::PositionWithWrapAround((currentPosition - previousPosition).Value()));
 
         if (positionChange < alignmentConfig.settledThreshold.Value())
         {

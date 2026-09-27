@@ -121,6 +121,10 @@ commanded ratio between $I_d$ and $I_q$ rather than clipping one axis and rotati
 The envelope comes from the inverter's `MaxCurrentSupported()`, the same source the speed and
 position cascades take theirs from, so the three modes cannot disagree about the hardware limit.
 
+The (Id, Iq) pair is written outside the interrupt and read by it. It is handed over through a
+lock-free triple buffer — the same mechanism that carries estimator windows the other way — so the
+interrupt always reads a pair published together, never a new Id with the previous Iq.
+
 ### Pole-Pair Configuration
 
 The pole-pair count is an integer property that translates the mechanical rotor angle supplied by the encoder into the electrical angle required by the Park transform. It must be configured before the first `Calculate()` call. Changing it while enabled produces undefined control behaviour and must be avoided.

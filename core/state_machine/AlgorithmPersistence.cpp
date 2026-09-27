@@ -170,9 +170,28 @@ namespace state_machine
     {
         nvm.SaveConfig(configData, [this](services::NvmStatus status)
             {
+                if (status == services::NvmStatus::Busy)
+                {
+                    RetryPersist();
+                    return;
+                }
+
                 if (status != services::NvmStatus::Ok)
                     tracer.Trace() << "config persist failed";
             });
+    }
+
+    void AlgorithmPersistence::RetryPersist()
+    {
+        persistRetryTimer.Start(persistRetryDelay, [this]()
+            {
+                PersistConfig();
+            });
+    }
+
+    bool AlgorithmPersistence::HasPendingPersist() const
+    {
+        return persistRetryTimer.Armed();
     }
 
     std::optional<foc::CurrentAlgorithm> AlgorithmPersistence::CurrentAlgorithmFromRaw(uint8_t raw)

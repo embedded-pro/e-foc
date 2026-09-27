@@ -29,7 +29,7 @@ namespace state_machine
 
     void ControlModeStateMachine::Select(ControlMode mode, const infra::Function<void(SelectResult)>& onDone)
     {
-        if (pendingSelectCallback != nullptr)
+        if (pendingSelectCallback != nullptr || algorithmPersistence.HasPendingPersist())
         {
             onDone(SelectResult::busy);
             return;

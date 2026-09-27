@@ -12,6 +12,7 @@
         "Adc0Sequence.*Handler",
         "InterruptTable::Invoke",
         "ImmediateInterruptHandler::Invoke",
+        "AdcPhaseCurrentMeasurementImpl.*lambda",
         "Runner.*::OnPhaseCurrents",
         "ControlLoopMetrics::Record",
         "ControlLoopMetrics::RecordReentry"

@@ -6,10 +6,13 @@ namespace application
 {
     PlatformFactoryImpl::PlatformFactoryImpl(const infra::Function<void()>& onInitialized)
         : onInitialized(onInitialized)
-    {}
+    {
+        this->onInitialized();
+    }
 
     void PlatformFactoryImpl::Run()
     {
+        eventDispatcher.Run();
     }
 
     services::Tracer& PlatformFactoryImpl::Tracer()
@@ -203,7 +206,7 @@ namespace application
 
     void PlatformFactoryImpl::AdcMultiChannelStub::Measure(const infra::Function<void(Samples)>& onDone)
     {
-        onDone(Samples());
+        onDone(Samples(neutralSamples));
     }
 
     void PlatformFactoryImpl::AdcMultiChannelStub::Stop()

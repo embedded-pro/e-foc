@@ -103,7 +103,7 @@ namespace foc
         if (mechanical == nullptr)
             return;
 
-        const auto& snapshot = Acquire();
+        const auto& snapshot = buffer.Acquire();
         mechanical->Update(MechanicalWindow{ Ampere{ snapshot.meanIq }, RadiansPerSecond{ mechanicalSpeed } });
     }
 
@@ -112,7 +112,7 @@ namespace foc
         if (electrical == nullptr)
             return;
 
-        const auto& snapshot = Acquire();
+        const auto& snapshot = buffer.Acquire();
         electrical->Update(ElectricalWindow{ Volts{ snapshot.meanNormalizedVd * vdcInvScale }, Ampere{ snapshot.meanId }, Ampere{ snapshot.idAtEnd }, snapshot.meanElectricalSpeedTimesIq });
     }
 

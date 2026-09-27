@@ -1,6 +1,7 @@
 #include "TestFocStateMachineHelper.hpp"
 #include "core/foc/interfaces/test_doubles/FocMock.hpp"
 #include "core/state_machine/AlgorithmPersistence.hpp"
+#include "infra/timer/test_helper/ClockFixture.hpp"
 
 namespace
 {
@@ -8,6 +9,7 @@ namespace
 
     class AlgorithmPersistenceTest
         : public ::testing::Test
+        , public infra::ClockFixture
     {
     public:
         StrictMock<services::NonVolatileMemoryMock> nvm;
@@ -101,6 +103,62 @@ TEST_F(AlgorithmPersistenceTest, select_current_algorithm_null_selectable_return
 {
     const auto result = persistence.SelectCurrentAlgorithm(foc::CurrentAlgorithm::pid, nullptr);
     EXPECT_EQ(result, foc::SelectResult::invalidAlgorithm);
+}
+
+TEST_F(AlgorithmPersistenceTest, a_busy_nvm_is_retried_rather_than_silently_dropped)
+{
+    EXPECT_CALL(currentMock, SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat)).WillOnce(Return(foc::SelectResult::ok));
+
+    infra::Function<void(services::NvmStatus)> firstAttempt;
+    EXPECT_CALL(nvm, SaveConfig(_, _))
+        .WillOnce([&firstAttempt](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                firstAttempt = onDone;
+            });
+
+    persistence.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat, &currentMock);
+    firstAttempt(services::NvmStatus::Busy);
+
+    EXPECT_TRUE(persistence.HasPendingPersist());
+
+    EXPECT_CALL(nvm, SaveConfig(_, _))
+        .WillOnce([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            });
+
+    ForwardTime(std::chrono::milliseconds{ 10 });
+
+    EXPECT_FALSE(persistence.HasPendingPersist());
+}
+
+TEST_F(AlgorithmPersistenceTest, a_persist_keeps_retrying_while_the_nvm_stays_busy)
+{
+    EXPECT_CALL(currentMock, SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat)).WillOnce(Return(foc::SelectResult::ok));
+
+    EXPECT_CALL(nvm, SaveConfig(_, _))
+        .Times(6)
+        .WillRepeatedly([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Busy);
+            });
+
+    persistence.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat, &currentMock);
+
+    for (int retry = 0; retry != 5; ++retry)
+        ForwardTime(std::chrono::milliseconds{ 10 });
+
+    EXPECT_TRUE(persistence.HasPendingPersist());
+
+    EXPECT_CALL(nvm, SaveConfig(_, _))
+        .WillOnce([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            });
+
+    ForwardTime(std::chrono::milliseconds{ 10 });
+
+    EXPECT_FALSE(persistence.HasPendingPersist());
 }
 
 TEST_F(AlgorithmPersistenceTest, select_speed_algorithm_succeeds)

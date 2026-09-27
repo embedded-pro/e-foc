@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <gmock/gmock.h>
+#include <numbers>
 #include <optional>
 
 namespace
@@ -566,6 +567,50 @@ TEST_F(MotorAlignmentTest, AbortStopsTheDriverAndDropsTheCompletion)
 
     driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
     EXPECT_FALSE(fired);
+}
+
+TEST_F(MotorAlignmentTest, ForceAlignment_ConvergesForARotorRestingOnTheWrapBoundary)
+{
+    services::MotorAlignmentImpl::AlignmentConfig config;
+    config.testVoltage = hal::DutyCycle::FromPercent(20);
+    config.maxSamples = 100;
+    config.settledThreshold = foc::Radians{ 0.05f };
+    config.settledCount = 5;
+    std::size_t polePairs = 7;
+
+    constexpr float pi = std::numbers::pi_v<float>;
+    const foc::Radians justBelowPi{ pi - 0.005f };
+    const foc::Radians justAboveNegativePi{ -pi + 0.005f };
+
+    EXPECT_CALL(encoderMock, Read())
+        .WillOnce(Return(justBelowPi));
+    EXPECT_CALL(driverMock, Stop()).Times(2);
+    EXPECT_CALL(encoderMock, SetZero()).Times(1);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& onDone)
+            {
+                driverMock.StorePhaseCurrentsCallback(onDone);
+            });
+
+    std::optional<foc::Radians> result;
+    alignment.ForceAlignment(polePairs, config, [&result](std::optional<foc::Radians> offset)
+        {
+            result = offset;
+        });
+
+    EXPECT_CALL(encoderMock, Read())
+        .WillOnce(Return(justAboveNegativePi))
+        .WillOnce(Return(justBelowPi))
+        .WillOnce(Return(justAboveNegativePi))
+        .WillOnce(Return(justBelowPi))
+        .WillRepeatedly(Return(justAboveNegativePi));
+
+    for (std::size_t i = 0; i < config.settledCount; ++i)
+        driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_NEAR(result->Value(), justAboveNegativePi.Value(), 0.001f);
 }
 
 TEST_F(MotorAlignmentTest, AbortWithoutARunInFlightIsANoOp)

@@ -7,6 +7,7 @@ target_include_directories(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} P
 
 target_link_libraries(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PUBLIC
     e_foc.platform_abstraction
+    hal.generic
     infra.event
     infra.timer
     services.tracer

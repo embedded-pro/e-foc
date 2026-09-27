@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/cascade/TripleBuffer.hpp"
 #include "core/foc/current_loop/CurrentControllerSelector.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Signals.hpp"
@@ -38,7 +39,8 @@ namespace foc
         Ampere maxCurrent;
         float polePairs{ 0.0f };
         volatile bool enabled{ false };
-        IdAndIqPoint lastSetPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
+        IdAndIqPoint requestedSetPoint{ Ampere{ 0.0f }, Ampere{ 0.0f } };
+        TripleBuffer<IdAndIqPoint> setPointBuffer;
 
         float electricalSpeedScale{ 0.0f };
         filters::passive::ExponentialMovingAverage<float> speedFilter{ 1.0f };

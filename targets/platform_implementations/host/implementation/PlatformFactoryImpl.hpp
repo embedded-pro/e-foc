@@ -4,12 +4,14 @@
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
+#include "hal/generic/TimerServiceGeneric.hpp"
 #include "hal/interfaces/Can.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/interfaces/Pwm.hpp"
 #include "hal/interfaces/SerialCommunication.hpp"
 #include "hal/synchronous_interfaces/SynchronousAdc.hpp"
 #include "hal/synchronous_interfaces/SynchronousQuadratureEncoder.hpp"
+#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
@@ -121,6 +123,11 @@ namespace application
             // Implementation of hal::AdcMultiChannel
             void Measure(const infra::Function<void(Samples)>& onDone) override;
             void Stop() override;
+
+        private:
+            // 12-bit ADC mid-scale: the zero-current reading a bipolar current-sense amplifier reports.
+            static constexpr uint16_t neutralCode = 2048;
+            static constexpr std::array<uint16_t, 3> neutralSamples{ neutralCode, neutralCode, neutralCode };
         };
 
         class ThreeChannelsPwmStub
@@ -251,6 +258,10 @@ namespace application
         };
 
     private:
+        // Constructed before onInitialized() runs, so anything it schedules or times during
+        // Logic's construction finds a live TimerService / EventDispatcherWithWeakPtr::Instance().
+        hal::TimerServiceGeneric timerService;
+        infra::EventDispatcherWithWeakPtr::WithSize<50> eventDispatcher;
         infra::Function<void()> onInitialized;
         SimpleLowPriorityInterrupt simpleLowPriorityInterrupt;
         LedPins ledPins;
