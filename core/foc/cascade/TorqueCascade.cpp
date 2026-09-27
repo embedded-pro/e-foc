@@ -27,7 +27,7 @@ namespace foc
         previousAngleValid = false;
         lastElectricalSpeed = 0.0f;
         lastIq = 0.0f;
-        SetPoint(lastSetPoint);
+        SetPoint(requestedSetPoint);
     }
 
     void TorqueCascade::Disable()
@@ -63,7 +63,8 @@ namespace foc
 
     void TorqueCascade::SetPoint(IdAndIqPoint setPoint)
     {
-        lastSetPoint = LimitToCurrentEnvelope(setPoint);
+        requestedSetPoint = LimitToCurrentEnvelope(setPoint);
+        setPointBuffer.Publish(requestedSetPoint);
     }
 
     IdAndIqPoint TorqueCascade::LimitToCurrentEnvelope(IdAndIqPoint setPoint) const
@@ -119,7 +120,8 @@ namespace foc
         const auto electricalSpeed = MeasureElectricalSpeed(mechanicalAngle);
         lastElectricalSpeed = electricalSpeed;
         lastIq = idAndIq.q;
-        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ lastSetPoint.first.Value(), lastSetPoint.second.Value() }, electricalSpeed });
+        const auto& setPoint = setPointBuffer.Acquire();
+        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ setPoint.first.Value(), setPoint.second.Value() }, electricalSpeed });
         auto output = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
 
         return ToDutyCycles(output);

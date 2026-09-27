@@ -452,6 +452,11 @@ Two failure kinds are distinguished when a persisted identifier cannot be activa
 | Byte out of enum range, or names no algorithm for that loop | Corrected to the active algorithm — the record is meaningless |
 | Valid algorithm, not selectable yet (`InvalidParameters`)   | Preserved, and retried on the next entry to `Ready`           |
 
+The non-volatile memory serves one write at a time and answers a concurrent one with *busy*; the
+control-mode selection writes the same record. A selection's write that comes back busy is therefore
+retried after a short delay until it lands, and a control-mode selection is refused with *busy*
+while such a retry is pending, so neither write can be lost to the other.
+
 The persistence ensures that an operator who selects ADRC for the speed loop does not need to
 repeat the selection after every power cycle. The motor state machine will transition directly to
 `Ready` with the previously selected algorithms active, ready to enable.

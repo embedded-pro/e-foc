@@ -23,6 +23,7 @@ target_sources(e_foc.foc.cascade PRIVATE
     TorqueCascade.hpp
     CascadeWithSpeedLoop.cpp
     CascadeWithSpeedLoop.hpp
+    TripleBuffer.hpp
 )
 
 add_subdirectory(test)

@@ -4,6 +4,7 @@
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/services/non_volatile_memory/ConfigData.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
+#include "infra/timer/Timer.hpp"
 #include "services/tracer/Tracer.hpp"
 #include <optional>
 
@@ -31,15 +32,22 @@ namespace state_machine
         static const char* SpeedAlgorithmName(foc::SpeedAlgorithm algorithm);
         static const char* PositionAlgorithmName(foc::PositionAlgorithm algorithm);
 
+        // Busy is transient, so a busy write is retried until it lands; a mode switch waits for it
+        bool HasPendingPersist() const;
+
     private:
         void PersistConfig();
+        void RetryPersist();
 
         static std::optional<foc::CurrentAlgorithm> CurrentAlgorithmFromRaw(uint8_t raw);
         static std::optional<foc::SpeedAlgorithm> SpeedAlgorithmFromRaw(uint8_t raw);
         static std::optional<foc::PositionAlgorithm> PositionAlgorithmFromRaw(uint8_t raw);
 
+        static constexpr std::chrono::milliseconds persistRetryDelay{ 10 };
+
         services::NonVolatileMemory& nvm;
         services::ConfigData& configData;
         services::Tracer& tracer;
+        infra::TimerSingleShot persistRetryTimer;
     };
 }
