@@ -27,9 +27,7 @@ date: 2026-09-21
 
 This document derives the discrete-time state-space plant models used by all advanced FOC controllers.
 It is a shared prerequisite for:
-- `documentation/theory/current-loop-controllers.md`
-- `documentation/theory/speed-loop-controllers.md`
-- `documentation/theory/position-loop-controllers.md`
+- the current, speed and position loop controllers indexed in `documentation/theory/advanced-controllers.md`
 
 The reader is assumed familiar with Clarke/Park transforms, SVM, and PI current control as described
 in `documentation/theory/foc.md`.

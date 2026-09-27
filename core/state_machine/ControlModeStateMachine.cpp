@@ -35,7 +35,7 @@ namespace state_machine
             return;
         }
 
-        if (!IsStopped(ActiveStateMachine().CurrentState()) || ActiveStateMachine().HasPendingAsyncWork())
+        if (!CanActivatePendingSelect())
         {
             onDone(SelectResult::busy);
             return;
@@ -51,18 +51,37 @@ namespace state_machine
             });
     }
 
+    bool ControlModeStateMachine::CanActivatePendingSelect() const
+    {
+        return IsStopped(ActiveStateMachine().CurrentState()) && !ActiveStateMachine().HasPendingAsyncWork();
+    }
+
     void ControlModeStateMachine::OnSaveConfigDone(services::NvmStatus status)
     {
         if (status != services::NvmStatus::Ok)
         {
             configData.defaultControlMode = previousDefaultControlMode;
             pendingSelectCallback(status == services::NvmStatus::Busy ? SelectResult::busy : SelectResult::nvmFailed);
+            return;
         }
-        else
+
+        if (CanActivatePendingSelect())
         {
             Activate(pendingSelectMode);
             pendingSelectCallback(SelectResult::ok);
+            return;
         }
+
+        configData.defaultControlMode = previousDefaultControlMode;
+        nvm.SaveConfig(configData, [this](services::NvmStatus rollbackStatus)
+            {
+                OnRollbackSaveConfigDone(rollbackStatus);
+            });
+    }
+
+    void ControlModeStateMachine::OnRollbackSaveConfigDone(services::NvmStatus)
+    {
+        pendingSelectCallback(SelectResult::busy);
     }
 
     ControlMode ControlModeStateMachine::Active() const

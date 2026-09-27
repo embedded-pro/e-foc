@@ -653,7 +653,10 @@ The electrical estimator is seeded using `lD` (d-axis inductance), as the underl
 
 When `ApplyOnlineEstimates()` is called while in `Enabled` state:
 1. Current inertia and friction estimates are read from the mechanical estimator
-2. Speed PID gains are recomputed using the bandwidth-based derivation from `speed-loop-controllers.md`: $k_p = 2 J \omega_{bw} / K_t$, $k_i = B_f \omega_{bw} / K_t$, where $J$ is the estimated inertia, $B_f$ the viscous friction, and $K_t = \tfrac{3}{2} p \psi_f$ the torque constant derived from the calibration record
+2. Speed PID gains are recomputed using the bandwidth-based rule from `documentation/theory/speed-loop-pi.md`
+   ("What the implementation uses"): $k_p = 2 J \omega_{bw} / K_t$, $k_i = k_p \max(B_f/J,\ \omega_{bw}/4)\, T_s$
+   with $T_s$ the outer-loop sample period, where $J$ is the estimated inertia, $B_f$ the viscous friction, and
+   $K_t = \tfrac{3}{2} p \psi_f$ the torque constant derived from the calibration record
 3. Current resistance and inductance estimates are read from the electrical estimator
 4. Current PID gains are recomputed from the bandwidth-based tuning rule
 
@@ -676,19 +679,10 @@ predictable.
 
 #### C1 — CAN Wire-Scale Convention
 
-All setpoint and telemetry values exchanged over CAN use signed 16-bit integers. The physical value is recovered by dividing the wire integer by a mode-specific scale factor. The authoritative scale constants are defined once in `FocMotorDefinitions` (in the `services` namespace) and shared by every consumer:
-
-| Physical Quantity | Scale Factor | Resolution | Wire Range (int16) | Physical Range   |
-|-------------------|--------------|------------|--------------------|------------------|
-| Phase current     | 100          | 10 mA      | −32 768 … +32 767  | ≈ ±327.67 A      |
-| Angular velocity  | 10           | 0.1 rad/s  | −32 768 … +32 767  | ≈ ±3 276.7 rad/s |
-| Angular position  | 1 000        | 1 mrad     | −32 768 … +32 767  | ≈ ±32.767 rad    |
-| Bus voltage       | 10           | 0.1 V      | 0 … +32 767        | 0 … 3 276.7 V    |
-
-Encoding: `wire_int16 = clamp(trunc(physical × scale), INT16_MIN, INT16_MAX)`, where `trunc` means truncation toward zero (matching `static_cast<int32_t>(physical * scale)` in C++).  
-Decoding: `physical = wire_int16 / scale` (using floating-point division).
-
-Clamping the truncated intermediate value before the cast to `int16_t` is mandatory to prevent signed integer overflow (undefined behaviour in C++).
+`ControlModeStateMachine` receives setpoints from the CAN bridge in physical unit types (`foc::Ampere`,
+`foc::RadiansPerSecond`, `foc::Radians`). The fixed-point wire encoding (scale constants in
+`core/can/FocMotorMessages.hpp`, round-to-nearest with saturation) is specified once, in
+`documentation/design/service-can.md` Part A.
 
 #### C2 — Re-entrancy Guard for In-Flight Selection
 
@@ -720,16 +714,24 @@ sequenceDiagram
     CSM-->>Caller: cb1(ok)
 ```
 
-#### C3 — NVM Failure Rollback
+#### C3 — Deferred Apply and Re-check Before Activate
 
-If `SaveConfig` returns a write failure after a `Select()` call, the active mode is **rolled back** to the mode that was active before the `Select()`. This ensures that:
+`Select()` does not switch the active state machine up front. It records the previous
+`defaultControlMode`, writes the new one into `configData` and starts the asynchronous `SaveConfig`;
+`activeSm` is untouched until `OnSaveConfigDone` runs.
 
-1. The in-memory active mode always agrees with what is persisted in NVM.
-2. A transient NVM error does not silently leave the active mode in an inconsistent state across a power cycle.
+`Select()` starts the write only when the active machine is stopped and has no pending asynchronous
+work, but that is a snapshot: a fault, an emergency stop or a calibration can land while the write is
+outstanding. Activating the new mode then would destroy the machine that holds the fault and start the
+new one unlatched. `OnSaveConfigDone` therefore decides:
 
-Rollback does not trigger a new NVM write; the NVM already holds the previous (still-valid) default.
-
-Behavioral rule: `Select(newMode, cb)` → if `SaveConfig` fails → restore previous mode → invoke `cb(nvmFailed)`.
+1. **Write failed**: restore `configData.defaultControlMode` (NVM still holds the previous default) and
+   report `busy` for a transient failure or `nvmFailed` otherwise. The active mode was never touched.
+2. **Write succeeded and the guard still holds**: `Activate(pendingSelectMode)` and report `ok`.
+3. **Write succeeded but the guard no longer holds**: keep the active mode, restore
+   `configData.defaultControlMode` and write it back so NVM agrees with the running mode, then report
+   `busy` when that write completes, whatever its status. The pending callback stays set during the
+   rollback write, so a `Select()` in that window is refused with `busy` (C2).
 
 ```mermaid
 sequenceDiagram
@@ -738,11 +740,15 @@ sequenceDiagram
     participant NVM
 
     Caller->>CSM: Select(Speed, cb)
-    note over CSM: previousMode = Torque\nactiveMode  = Speed (optimistic)
+    note over CSM: previousMode = Torque (saved)\nconfigData.defaultControlMode = Speed\nactiveSm still Torque
     CSM->>NVM: SaveConfig(defaultMode=Speed)
-    NVM-->>CSM: WriteFailed
-    note over CSM: rollback: activeMode = Torque
-    CSM-->>Caller: cb(nvmFailed)
+    note over CSM: a fault latches on the active (Torque) machine\nwhile the write is outstanding
+    NVM-->>CSM: OnSaveConfigDone(Ok)
+    note over CSM: re-check fails: CurrentState() == Fault
+    CSM->>NVM: SaveConfig(defaultMode=Torque)  [rollback]
+    NVM-->>CSM: Ok
+    CSM-->>Caller: cb(busy)
+    note over CSM: activeSm is still the Torque machine,\nstill in Fault, fault code unchanged
 ```
 
 ---

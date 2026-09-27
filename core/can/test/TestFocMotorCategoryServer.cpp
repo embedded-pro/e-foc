@@ -5,6 +5,7 @@
 #include "core/can/FocMotorCategoryServer.hpp"
 #include "core/can/FocMotorMessages.hpp"
 #include "infra/util/Function.hpp"
+#include <cmath>
 #include <gtest/gtest.h>
 #include <optional>
 
@@ -113,6 +114,14 @@ namespace
             hal::Can::Message msg;
             msg.resize(5, 0);
             services::CanFrameCodec::WriteUInt32(msg, 1, value);
+            return msg;
+        }
+
+        hal::Can::Message MakeMessage(std::initializer_list<uint8_t> bytes) const
+        {
+            hal::Can::Message msg;
+            for (const auto byte : bytes)
+                msg.push_back(byte);
             return msg;
         }
 
@@ -441,4 +450,31 @@ TEST_F(FocMotorCategoryServerTest, HandleConfigureTelemetryRate_ParsesRateAndInv
 
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCategoryServerTest, BroadcastMechanicalParams_EncodesFrictionAndInertiaAsNanoUnits)
+{
+    server.BroadcastMechanicalParams(foc::NewtonMeterSecondPerRadian{ 1.5e-5f }, foc::NewtonMeterSecondSquared{ 7.06e-6f });
+
+    EXPECT_EQ(lastSentMsgType, can::focMechanicalParamsResponseId);
+    const auto expected = MakeMessage({ 0x00, 0x00, 0x3A, 0x98, 0x00, 0x00, 0x1B, 0x94 });
+    EXPECT_EQ(lastSentMsg, expected);
+}
+
+TEST_F(FocMotorCategoryServerTest, BroadcastMechanicalParams_ClampsNegativeAndNanToZero)
+{
+    server.BroadcastMechanicalParams(foc::NewtonMeterSecondPerRadian{ -1.0f }, foc::NewtonMeterSecondSquared{ std::nanf("") });
+
+    EXPECT_EQ(lastSentMsgType, can::focMechanicalParamsResponseId);
+    const auto expected = MakeMessage({ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
+    EXPECT_EQ(lastSentMsg, expected);
+}
+
+TEST_F(FocMotorCategoryServerTest, BroadcastMechanicalParams_SaturatesAtUint32Max)
+{
+    server.BroadcastMechanicalParams(foc::NewtonMeterSecondPerRadian{ 5.0f }, foc::NewtonMeterSecondSquared{ 1.0f });
+
+    EXPECT_EQ(lastSentMsgType, can::focMechanicalParamsResponseId);
+    const auto expected = MakeMessage({ 0xFF, 0xFF, 0xFF, 0xFF, 0x3B, 0x9A, 0xCA, 0x00 });
+    EXPECT_EQ(lastSentMsg, expected);
 }

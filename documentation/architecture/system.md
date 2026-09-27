@@ -244,10 +244,11 @@ In CLI mode, `ControlModeStateMachine` registers the lifecycle commands `calibra
 
 Host-only tools that do not run on the embedded target:
 
-| Tool          | Responsibility                                                                                                                                                                                   |
-|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Simulator     | Closed-loop software simulation: real FOC control code drives a physics-based PMSM model (Euler integration of the dq electrical equations). Used for validating control loops without hardware. |
-| CAN Commander | Desktop application for sending CAN commands and logging motor telemetry.                                                                                                                        |
+| Tool            | Responsibility                                                                                                                                                                                   |
+|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Simulator       | Closed-loop software simulation: real FOC control code drives a physics-based PMSM model (Euler integration of the dq electrical equations). Used for validating control loops without hardware. |
+| CAN Commander   | Desktop application for sending CAN commands and logging motor telemetry.                                                                                                                        |
+| Hardware Bridge | Desktop client that bridges the target's terminal (serial) and CAN bus to the host; the hardware-in-the-loop runner reaches the board through it.                                                |
 
 ### 6. Infrastructure (was §5)
 

@@ -85,6 +85,8 @@ namespace state_machine
         void RegisterCliCommands();
         TuningResult CheckRedesignPreconditions() const;
         void OnSaveConfigDone(services::NvmStatus status);
+        void OnRollbackSaveConfigDone(services::NvmStatus status);
+        bool CanActivatePendingSelect() const;
 
         const application::TerminalAndTracer terminalAndTracer;
         const application::MotorHardware hardware;

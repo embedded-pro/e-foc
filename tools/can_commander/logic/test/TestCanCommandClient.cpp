@@ -393,12 +393,19 @@ namespace
         // StrictMock: no observer method should be called — OnMotorTypeResponse is a no-op
     }
 
-    TEST_F(TestCanCommandClient, electrical_params_response_received_does_not_call_any_observer)
+    TEST_F(TestCanCommandClient, electrical_params_response_notifies_observer)
     {
         EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnElectricalParametersReceived(testing::FloatNear(0.5f, 0.001f),
+                                  testing::FloatNear(1.0f, 0.001f), 7));
 
         hal::Can::Message data;
-        data.resize(4, 0);
+        data.resize(5, 0);
+        data[0] = 0x01;
+        data[1] = 0xF4; // resistance wire = 500 -> physical = 500 / focResistanceScale(1000) = 0.5 ohm
+        data[2] = 0x03;
+        data[3] = 0xE8; // inductance wire = 1000 -> physical = 1000 / focInductanceScale(1000) = 1.0 mH
+        data[4] = 7;    // polePairs
 
         auto canId = hal::Can::Id::Create29BitId(
             services::MakeCanId(services::CanPriority::response,
@@ -406,15 +413,24 @@ namespace
                 can::focElectricalParamsResponseId,
                 1));
         receiveCallback(canId, data);
-        // StrictMock: no observer method should be called — OnElectricalParamsResponse is a no-op
     }
 
-    TEST_F(TestCanCommandClient, mechanical_params_response_received_does_not_call_any_observer)
+    TEST_F(TestCanCommandClient, mechanical_params_response_notifies_observer)
     {
         EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnMechanicalParametersReceived(testing::FloatNear(1.5e-5f, 1e-7f),
+                                  testing::FloatNear(7.06e-6f, 1e-8f)));
 
         hal::Can::Message data;
-        data.resize(4, 0);
+        data.resize(8, 0);
+        data[0] = 0x00;
+        data[1] = 0x00;
+        data[2] = 0x3A;
+        data[3] = 0x98; // friction nano-units = 15000 -> physical = 15000 / 1e9 = 1.5e-5 Nm.s/rad
+        data[4] = 0x00;
+        data[5] = 0x00;
+        data[6] = 0x1B;
+        data[7] = 0x94; // inertia nano-units = 7060 -> physical = 7060 / 1e9 = 7.06e-6 kg.m2
 
         auto canId = hal::Can::Id::Create29BitId(
             services::MakeCanId(services::CanPriority::response,
@@ -422,7 +438,6 @@ namespace
                 can::focMechanicalParamsResponseId,
                 1));
         receiveCallback(canId, data);
-        // StrictMock: no observer method should be called — OnMechanicalParamsResponse is a no-op
     }
 
     // ---------- SelectControlModeResponse forwarding ----------

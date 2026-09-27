@@ -23,5 +23,7 @@ namespace tool
         MOCK_METHOD(void, OnControlModeAcknowledged, (can::FocMotorMode activeMode), (override));
         MOCK_METHOD(void, OnCommandAck, (uint8_t categoryId, uint8_t commandType, services::CanAckStatus status), (override));
         MOCK_METHOD(void, OnContractVersion, (uint8_t major, uint8_t minor, bool compatible), (override));
+        MOCK_METHOD(void, OnElectricalParametersReceived, (float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs), (override));
+        MOCK_METHOD(void, OnMechanicalParametersReceived, (float frictionNmSPerRad, float inertiaKgM2), (override));
     };
 }

@@ -36,6 +36,7 @@ This project provides a production-ready motor control implementation designed f
 
 ### Prerequisites
 - CMake 3.24 or later
+- Ninja, ccache, and Qt 6 (Core, Network, Widgets) for the host preset — the host build always configures `tools/`
 - Compatible toolchain for embedded targets (ARM GCC)
 - Development board: EK-TM4C1294XL (TI) or STM32F407G-DISC1 (ST)
 - Basic understanding of motor control and embedded systems
@@ -89,6 +90,8 @@ e-foc/
 │   │   ├── electrical_system_ident/ # Resistance/inductance estimation
 │   │   ├── mechanical_system_ident/ # Friction and inertia estimation
 │   │   └── non_volatile_memory/     # NVM persistence service
+│   ├── can/                         # FOC motor CAN category (server, client, bridge, wire contract)
+│   ├── supervision/                 # Runtime plausibility monitors
 │   └── state_machine/               # FOC motor lifecycle state machine (Idle/Calibrating/Ready/Enabled/Fault)
 ├── integration_tests/               # BDD integration tests (Cucumber/Gherkin)
 │   ├── features/                    # Gherkin .feature files
@@ -101,12 +104,13 @@ e-foc/
 │   ├── hardware_test/               # Hardware validation application
 │   └── platform_implementations/   # Platform-specific PlatformFactory implementations
 │       ├── host/                    # Host simulation (GoogleTest stubs/mocks)
+│       ├── qemu/                    # Emulated Cortex-M4 platform for software-in-the-loop tests
 │       ├── st/                      # STM32 platform implementation
 │       └── ti/                      # TI Tiva C platform implementation
 ├── tools/                           # Host-side developer tools
 │   ├── simulator/                   # C++ motor simulators (torque, speed, position control)
 │   ├── can_commander/               # CAN bus command interface tool
-│   └── hardware_bridge/             # Terminal/CAN/serial bridge client and Python server
+│   └── hardware_bridge/             # Terminal/CAN/serial bridge client (Qt) for HIL tests
 ├── infra/                           # Infrastructure submodules
 │   ├── embedded-infra-lib/          # Bounded containers, build helpers, toolchain CMake
 │   ├── numerical-toolbox/           # PID, filters, fixed-point algorithms

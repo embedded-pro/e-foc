@@ -215,6 +215,21 @@ namespace tool
                     .arg(can::focContractVersionMinor));
     }
 
+    void MainWindow::OnElectricalParametersReceived(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs)
+    {
+        logView->appendPlainText(QString("Electrical params: R=%1 ohm, L=%2 mH, poles=%3")
+                .arg(resistanceOhm)
+                .arg(inductanceMilliHenry)
+                .arg(polePairs));
+    }
+
+    void MainWindow::OnMechanicalParametersReceived(float frictionNmSPerRad, float inertiaKgM2)
+    {
+        logView->appendPlainText(QString("Mechanical params: B=%1 Nm.s/rad, J=%2 kg.m2")
+                .arg(frictionNmSPerRad)
+                .arg(inertiaKgM2));
+    }
+
     void MainWindow::OnMotorStatusReceived(tool::FocMotorState state, tool::FocFaultCode fault)
     {
         telemetryPanel->OnMotorStatus(state, fault);

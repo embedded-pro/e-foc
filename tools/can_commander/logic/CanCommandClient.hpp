@@ -39,6 +39,8 @@ namespace tool
         virtual void OnControlModeAcknowledged(can::FocMotorMode activeMode) = 0;
         virtual void OnCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status) = 0;
         virtual void OnContractVersion(uint8_t major, uint8_t minor, bool compatible) = 0;
+        virtual void OnElectricalParametersReceived(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs) = 0;
+        virtual void OnMechanicalParametersReceived(float frictionNmSPerRad, float inertiaKgM2) = 0;
     };
 
     class CanCommandClient
@@ -84,6 +86,8 @@ namespace tool
         void OnTelemetryStatus(const hal::Can::Message& msg) override;
         void OnTelemetryElectrical(const hal::Can::Message& msg) override;
         void OnContractVersionResponse(uint8_t major, uint8_t minor) override;
+        void OnElectricalParamsResponse(foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs) override;
+        void OnMechanicalParamsResponse(foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia) override;
 
         // CanBusAdapterObserver
         void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) override;

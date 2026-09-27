@@ -1,9 +1,26 @@
 #include "core/can/FocMotorCategoryServer.hpp"
 #include "can-lite/core/CanPayload.hpp"
 #include "core/can/FocMotorWireContract.hpp"
+#include <cmath>
+#include <limits>
 
 namespace can
 {
+    namespace
+    {
+        uint32_t ToNanoUnits(float value, int32_t scale)
+        {
+            if (std::isnan(value) || value <= 0.0f)
+                return 0;
+
+            const float scaled = std::roundf(value * static_cast<float>(scale));
+            if (scaled >= static_cast<float>(std::numeric_limits<uint32_t>::max()))
+                return std::numeric_limits<uint32_t>::max();
+
+            return static_cast<uint32_t>(scaled);
+        }
+    }
+
     FocMotorCategoryServer::FocMotorCategoryServer(services::CanFrameTransport& transport)
         : CanCategoryServer(transport)
     {
@@ -429,8 +446,8 @@ namespace can
     void FocMotorCategoryServer::BroadcastMechanicalParams(foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia)
     {
         services::CanPayloadWriter payload;
-        payload.WriteFixed16(friction.Value(), focFrictionScale);
-        payload.WriteFixed16(inertia.Value(), focInertiaScale);
+        payload.WriteUInt32(ToNanoUnits(friction.Value(), focFrictionScale));
+        payload.WriteUInt32(ToNanoUnits(inertia.Value(), focInertiaScale));
         SendResponse(focMechanicalParamsResponseId, payload);
     }
 }
