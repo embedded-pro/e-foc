@@ -42,6 +42,8 @@ namespace
         MOCK_METHOD(void, OnTelemetryStatus, (const hal::Can::Message& msg), (override));
         MOCK_METHOD(void, OnTelemetryElectrical, (const hal::Can::Message& msg), (override));
         MOCK_METHOD(void, OnContractVersionResponse, (uint8_t major, uint8_t minor), (override));
+        MOCK_METHOD(void, OnElectricalParamsResponse, (foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs), (override));
+        MOCK_METHOD(void, OnMechanicalParamsResponse, (foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia), (override));
     };
 
     class FocMotorCategoryClientTest
@@ -58,6 +60,14 @@ namespace
                         lastSentMsg = msg;
                         cb(true);
                     }));
+        }
+
+        hal::Can::Message MakeMessage(std::initializer_list<uint8_t> bytes) const
+        {
+            hal::Can::Message msg;
+            for (const auto byte : bytes)
+                msg.push_back(byte);
+            return msg;
         }
 
         StrictMock<hal::CanMock> canMock;
@@ -192,4 +202,55 @@ TEST_F(FocMotorCategoryClientTest, SendStart_PrependSequenceByte)
     client.SendStart(1);
     EXPECT_EQ(lastSentMsgType, can::focStartId);
     ASSERT_GE(lastSentMsg.size(), 1u);
+}
+
+TEST_F(FocMotorCategoryClientTest, OnElectricalParamsResponse_DecodesResistanceInductanceAndPolePairs)
+{
+    foc::Ohm resistance{ 0.0f };
+    foc::MilliHenry inductance{ 0.0f };
+    uint8_t polePairs{};
+    EXPECT_CALL(observer, OnElectricalParamsResponse(_, _, _))
+        .WillOnce(Invoke([&](foc::Ohm r, foc::MilliHenry l, uint8_t p)
+            {
+                resistance = r;
+                inductance = l;
+                polePairs = p;
+            }));
+
+    const auto msg = MakeMessage({ 0x01, 0xF4, 0x03, 0xE8, 0x07 });
+    client.HandleMessage(can::focElectricalParamsResponseId, msg);
+
+    EXPECT_NEAR(resistance.Value(), 500.0f / can::focResistanceScale, 0.001f);
+    EXPECT_NEAR(inductance.Value(), 1000.0f / can::focInductanceScale, 0.001f);
+    EXPECT_EQ(polePairs, 7);
+}
+
+TEST_F(FocMotorCategoryClientTest, OnElectricalParamsResponse_ShortPayload_IsRejected)
+{
+    const auto msg = MakeMessage({ 0x01, 0xF4, 0x03, 0xE8 });
+    EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focElectricalParamsResponseId, msg));
+}
+
+TEST_F(FocMotorCategoryClientTest, OnMechanicalParamsResponse_DecodesFrictionAndInertiaFromNanoUnits)
+{
+    foc::NewtonMeterSecondPerRadian friction{ 0.0f };
+    foc::NewtonMeterSecondSquared inertia{ 0.0f };
+    EXPECT_CALL(observer, OnMechanicalParamsResponse(_, _))
+        .WillOnce(Invoke([&](foc::NewtonMeterSecondPerRadian f, foc::NewtonMeterSecondSquared j)
+            {
+                friction = f;
+                inertia = j;
+            }));
+
+    const auto msg = MakeMessage({ 0x00, 0x00, 0x3A, 0x98, 0x00, 0x00, 0x1B, 0x94 });
+    client.HandleMessage(can::focMechanicalParamsResponseId, msg);
+
+    EXPECT_NEAR(friction.Value(), 15000.0f / can::focFrictionScale, 1e-8f);
+    EXPECT_NEAR(inertia.Value(), 7060.0f / can::focInertiaScale, 1e-9f);
+}
+
+TEST_F(FocMotorCategoryClientTest, OnMechanicalParamsResponse_ShortPayload_IsRejected)
+{
+    const auto msg = MakeMessage({ 0x00, 0x00, 0x3A, 0x98 });
+    EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focMechanicalParamsResponseId, msg));
 }

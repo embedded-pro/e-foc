@@ -8,7 +8,8 @@ namespace can
         services::CanSequenceSource& sequenceSource)
         : CanCategoryClient(transport, sequenceSource)
     {
-        AddMessageTypes(selectControlModeResponse, categoryError, telemetryStatus, telemetryElectrical, contractVersionResponse);
+        AddMessageTypes(selectControlModeResponse, categoryError, telemetryStatus, telemetryElectrical, contractVersionResponse,
+            electricalParamsResponse, mechanicalParamsResponse);
     }
 
     uint8_t FocMotorCategoryClient::Id() const
@@ -205,6 +206,41 @@ namespace can
         NotifyObservers([&data](auto& observer)
             {
                 observer.OnTelemetryElectrical(data);
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryClient::HandleElectricalParamsResponse(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focElectricalParamsResponseId))
+            return false;
+
+        services::CanPayloadReader reader{ data };
+        const auto resistance = foc::Ohm{ reader.ReadFixed16(focResistanceScale) };
+        const auto inductance = foc::MilliHenry{ reader.ReadFixed16(focInductanceScale) };
+        const auto polePairs = reader.ReadUInt8();
+
+        NotifyObservers([resistance, inductance, polePairs](auto& observer)
+            {
+                observer.OnElectricalParamsResponse(resistance, inductance, polePairs);
+            });
+
+        return true;
+    }
+
+    bool FocMotorCategoryClient::HandleMechanicalParamsResponse(const hal::Can::Message& data)
+    {
+        if (!PayloadExact(data, focMechanicalParamsResponseId))
+            return false;
+
+        services::CanPayloadReader reader{ data };
+        const auto friction = foc::NewtonMeterSecondPerRadian{ static_cast<float>(reader.ReadUInt32()) / static_cast<float>(focFrictionScale) };
+        const auto inertia = foc::NewtonMeterSecondSquared{ static_cast<float>(reader.ReadUInt32()) / static_cast<float>(focInertiaScale) };
+
+        NotifyObservers([friction, inertia](auto& observer)
+            {
+                observer.OnMechanicalParamsResponse(friction, inertia);
             });
 
         return true;

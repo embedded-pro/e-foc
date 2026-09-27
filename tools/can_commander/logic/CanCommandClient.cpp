@@ -284,6 +284,22 @@ namespace tool
         DecodeTelemetryElectrical(msg);
     }
 
+    void CanCommandClient::OnElectricalParamsResponse(foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs)
+    {
+        NotifyObservers([resistance, inductance, polePairs](auto& observer)
+            {
+                observer.OnElectricalParametersReceived(resistance.Value(), inductance.Value(), polePairs);
+            });
+    }
+
+    void CanCommandClient::OnMechanicalParamsResponse(foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia)
+    {
+        NotifyObservers([friction, inertia](auto& observer)
+            {
+                observer.OnMechanicalParametersReceived(friction.Value(), inertia.Value());
+            });
+    }
+
     void CanCommandClient::OnContractVersionResponse(uint8_t major, uint8_t minor)
     {
         const bool compatible = major == can::focContractVersionMajor;

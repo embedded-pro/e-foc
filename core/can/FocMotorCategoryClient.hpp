@@ -27,6 +27,8 @@ namespace can
         virtual void OnTelemetryStatus(const hal::Can::Message& msg) = 0;
         virtual void OnTelemetryElectrical(const hal::Can::Message& msg) = 0;
         virtual void OnContractVersionResponse(uint8_t major, uint8_t minor) = 0;
+        virtual void OnElectricalParamsResponse(foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs) = 0;
+        virtual void OnMechanicalParamsResponse(foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia) = 0;
     };
 
     enum class ContractCompatibility : uint8_t
@@ -70,12 +72,16 @@ namespace can
         bool HandleTelemetryStatus(const hal::Can::Message& data);
         bool HandleTelemetryElectrical(const hal::Can::Message& data);
         bool HandleContractVersionResponse(const hal::Can::Message& data);
+        bool HandleElectricalParamsResponse(const hal::Can::Message& data);
+        bool HandleMechanicalParamsResponse(const hal::Can::Message& data);
 
         services::CanMessageHandler<FocMotorCategoryClient> selectControlModeResponse{ focSelectControlModeResponseId, *this, &FocMotorCategoryClient::HandleSelectControlModeResponse };
         services::CanMessageHandler<FocMotorCategoryClient> categoryError{ services::canCategoryErrorResponseMessageTypeId, *this, &FocMotorCategoryClient::HandleCategoryError };
         services::CanMessageHandler<FocMotorCategoryClient> telemetryStatus{ focTelemetryStatusResponseId, *this, &FocMotorCategoryClient::HandleTelemetryStatus };
         services::CanMessageHandler<FocMotorCategoryClient> telemetryElectrical{ focTelemetryElectricalResponseId, *this, &FocMotorCategoryClient::HandleTelemetryElectrical };
         services::CanMessageHandler<FocMotorCategoryClient> contractVersionResponse{ focContractVersionResponseId, *this, &FocMotorCategoryClient::HandleContractVersionResponse };
+        services::CanMessageHandler<FocMotorCategoryClient> electricalParamsResponse{ focElectricalParamsResponseId, *this, &FocMotorCategoryClient::HandleElectricalParamsResponse };
+        services::CanMessageHandler<FocMotorCategoryClient> mechanicalParamsResponse{ focMechanicalParamsResponseId, *this, &FocMotorCategoryClient::HandleMechanicalParamsResponse };
 
         ContractCompatibility contractCompatibility{ ContractCompatibility::unknown };
     };

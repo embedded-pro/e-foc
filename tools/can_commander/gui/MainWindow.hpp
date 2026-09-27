@@ -40,6 +40,8 @@ namespace tool
         void OnControlModeAcknowledged(can::FocMotorMode activeMode) override;
         void OnCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status) override;
         void OnContractVersion(uint8_t major, uint8_t minor, bool compatible) override;
+        void OnElectricalParametersReceived(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs) override;
+        void OnMechanicalParametersReceived(float frictionNmSPerRad, float inertiaKgM2) override;
 
         void UpdateCommandsEnabled();
 

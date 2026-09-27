@@ -10,7 +10,7 @@
 
 namespace can
 {
-    static constexpr uint8_t focContractVersionMajor = 1;
+    static constexpr uint8_t focContractVersionMajor = 2;
     static constexpr uint8_t focContractVersionMinor = 0;
 
     enum class FieldType : uint8_t
@@ -92,8 +92,8 @@ namespace can
     } };
 
     inline constexpr std::array<FieldDescriptor, 2> mechanicalParamsFields{ {
-        { "friction", FieldType::fixed16, focFrictionScale, "Nm.s/rad" },
-        { "inertia", FieldType::fixed16, focInertiaScale, "kg.m2" },
+        { "friction", FieldType::uint32, focFrictionScale, "Nm.s/rad" },
+        { "inertia", FieldType::uint32, focInertiaScale, "kg.m2" },
     } };
 
     inline constexpr std::array<FieldDescriptor, 4> telemetryElectricalFields{ {
