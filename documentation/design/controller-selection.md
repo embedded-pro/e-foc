@@ -470,18 +470,18 @@ repeat the selection after every power cycle. The motor state machine will trans
 
 ### Provided
 
-| Interface                        | Purpose                                                                                 | Contract                                                                           |
-|----------------------------------|-----------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
-| SelectCurrentAlgorithm           | Selects the active current-loop controller by enum value                                | `busy` unless stopped with no pending work (Part D). Effect is immediate if `ok`.  |
-| SelectSpeedAlgorithm             | Selects the active speed-loop controller by enum value                                  | As above.                                                                          |
-| SelectPositionAlgorithm          | Selects the active position-loop controller by enum value                               | As above.                                                                          |
-| ActiveCurrentAlgorithm           | Returns the currently active current-loop algorithm identifier                          | Always returns a valid enum value. Never blocks.                                   |
-| ActiveSpeedAlgorithm             | Returns the currently active speed-loop algorithm identifier                            | As above.                                                                          |
-| ActivePositionAlgorithm          | Returns the currently active position-loop algorithm identifier                         | As above.                                                                          |
-| ComputeCurrentControl            | Dispatches to the active current controller for one sample                              | Called at 20 kHz from ISR. Zero heap. No virtual dispatch.                         |
-| ComputeSpeedControl              | Dispatches to the active speed controller for one sample                                | Called at 1 kHz from low-priority handler.                                         |
-| ComputePositionControl           | Dispatches to the active position controller for one sample                             | Called at 1 kHz from low-priority handler.                                         |
-| ReconfigureFromCurrentParameters | Re-applies the latest RLS snapshot to the active controllers without changing algorithm | Motor must be disabled.                                                            |
+| Interface                        | Purpose                                                                                 | Contract                                                                          |
+|----------------------------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| SelectCurrentAlgorithm           | Selects the active current-loop controller by enum value                                | `busy` unless stopped with no pending work (Part D). Effect is immediate if `ok`. |
+| SelectSpeedAlgorithm             | Selects the active speed-loop controller by enum value                                  | As above.                                                                         |
+| SelectPositionAlgorithm          | Selects the active position-loop controller by enum value                               | As above.                                                                         |
+| ActiveCurrentAlgorithm           | Returns the currently active current-loop algorithm identifier                          | Always returns a valid enum value. Never blocks.                                  |
+| ActiveSpeedAlgorithm             | Returns the currently active speed-loop algorithm identifier                            | As above.                                                                         |
+| ActivePositionAlgorithm          | Returns the currently active position-loop algorithm identifier                         | As above.                                                                         |
+| ComputeCurrentControl            | Dispatches to the active current controller for one sample                              | Called at 20 kHz from ISR. Zero heap. No virtual dispatch.                        |
+| ComputeSpeedControl              | Dispatches to the active speed controller for one sample                                | Called at 1 kHz from low-priority handler.                                        |
+| ComputePositionControl           | Dispatches to the active position controller for one sample                             | Called at 1 kHz from low-priority handler.                                        |
+| ReconfigureFromCurrentParameters | Re-applies the latest RLS snapshot to the active controllers without changing algorithm | Motor must be disabled.                                                           |
 
 ### Required
 

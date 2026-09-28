@@ -171,18 +171,18 @@ rejected or discarded event with its state.
 It owns the table-driven machine and hands the rows a `LifecycleContext`: references to the
 collaborators that carry out the work, each with one responsibility.
 
-| Collaborator         | Responsibility                                                                                                                     |
-|----------------------|------------------------------------------------------------------------------------------------------------------------------------|
-| `FocLifecycleTable`  | The 45 `constexpr` rows and the entered hooks; the only place that knows which event is legal in which state                       |
-| `CalibrationFlow`    | Full calibration, re-alignment and external calibration: running the orchestrator, saving the record and completing the command    |
-| `MaintenanceFlow`    | Clearing the stored calibration and changing the flux linkage                                                                      |
-| `BootSequence`       | The boot-time validity check and load of the stored record                                                                         |
-| `OperationFlow`      | Enable and disable, faults and emergency stop, and the post-commit work of every state                                             |
-| `PendingCommand`     | The one outstanding operator command, and the result held back until the target state has been committed                           |
-| `CommandRejections`  | The observer that completes a queued command's callback with `rejected` when the table refuses it, so no callback is left dangling |
+| Collaborator         | Responsibility                                                                                                                                                                       |
+|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `FocLifecycleTable`  | The 45 `constexpr` rows and the entered hooks; the only place that knows which event is legal in which state                                                                         |
+| `CalibrationFlow`    | Full calibration, re-alignment and external calibration: running the orchestrator, saving the record and completing the command                                                      |
+| `MaintenanceFlow`    | Clearing the stored calibration and changing the flux linkage                                                                                                                        |
+| `BootSequence`       | The boot-time validity check and load of the stored record                                                                                                                           |
+| `OperationFlow`      | Enable and disable, faults and emergency stop, and the post-commit work of every state                                                                                               |
+| `PendingCommand`     | The one outstanding operator command, and the result held back until the target state has been committed                                                                             |
+| `CommandRejections`  | The observer that completes a queued command's callback with `rejected` when the table refuses it, so no callback is left dangling                                                   |
 | `NvmActivity`        | The count of NVM operations whose callbacks still capture the machine; part of `HasPendingAsyncWork()`. Owned by `ControlModeStateMachine`, not by `FocStateMachineCommon` — see C2a |
-| `CalibrationContext` | The calibration record in RAM and its application to the controller                                                                |
-| `ModeHooks`          | The interface through which the flows reach the control mode: the controller, its tunables and the mode-specific calibration steps |
+| `CalibrationContext` | The calibration record in RAM and its application to the controller                                                                                                                  |
+| `ModeHooks`          | The interface through which the flows reach the control mode: the controller, its tunables and the mode-specific calibration steps                                                   |
 
 `TorqueStateMachine`, `SpeedStateMachine` and `PositionStateMachine` derive from
 `FocStateMachineCommon` and implement `ModeHooks`; nothing else in the lifecycle depends on the
