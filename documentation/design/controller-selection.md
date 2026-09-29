@@ -34,7 +34,8 @@ date: 2026-08-17
 - Activating one controller per loop at runtime by constructing it in place from the available set
 - Routing each loop's per-sample computation to the active controller with zero virtual-dispatch
   overhead through type-aware dispatch (variant visit)
-- Enforcing that algorithm selection is only permitted while the motor is in a non-enabled state
+- Enforcing that algorithm selection is only permitted while the active mode is stopped (`Idle` or
+  `Ready`) and has no NVM work outstanding — not only while the motor is disabled
 - Propagating motor model parameters from the online RLS estimators to the newly selected controller
   immediately after selection
 - Persisting the active algorithm identifier for each loop to non-volatile memory upon each selection
@@ -155,20 +156,22 @@ flowchart TD
 ### Part D — State Gating
 
 Algorithm selection is a configuration-time operation, not a run-time one. It is only permitted while
-the motor state machine is in the **Ready** or **Idle** state (motor disabled). A selection request
-arriving while the motor is **Enabled** is rejected immediately with a `Busy` result code without
-altering the active algorithm or any controller state.
+the active mode's lifecycle state machine is **stopped** (`Idle` or `Ready`) and has no asynchronous
+work outstanding, including any write to the shared non-volatile memory. A request arriving while
+the motor is `Enabled`, `Calibrating` or in `Fault`, or while such a write is outstanding, is
+rejected immediately with `Busy` without altering the active algorithm or any controller state.
 
-The guard is symmetric with the existing `ControlModeStateMachine::Select` guard, which also rejects
-mode changes while the motor is enabled.
+The guard is the same one `ControlModeStateMachine::Select` applies to mode changes
+(`documentation/design/state-machine.md` C2b). The cascades' own refusal while enabled remains
+underneath it.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
-    Idle --> Selecting : SelectAlgorithm\n(motor not enabled)
+    Idle --> Selecting : SelectAlgorithm\n(stopped, no pending NVM work)
     Selecting --> Configured : ConstructInPlace\n→ Configure\n→ Reset\n→ PersistToNvm
     Configured --> Idle : Done
-    Idle --> Rejected : SelectAlgorithm\n(motor enabled)
+    Idle --> Rejected : SelectAlgorithm\n(enabled, calibrating,\nfaulted, or NVM busy)
     Rejected --> Idle : Return Busy
 ```
 
@@ -402,15 +405,15 @@ return to their defaults on boot.
 
 #### Readiness Gate per Algorithm
 
-The selection guard (Part D) enforces not only the motor-enabled check but also a parameter-readiness
-check. Attempting to select an algorithm whose required parameters are not yet available returns
-`InvalidParameters` rather than `ok`.
+The selection guard (Part D) enforces not only the stopped-and-not-busy check but also a
+parameter-readiness check. Attempting to select an algorithm whose required parameters are not yet
+available returns `InvalidParameters` rather than `ok`.
 
 ```mermaid
 flowchart TD
-    REQ["SelectAlgorithm(algo)"] --> GATENABLED{"Motor\nenabled?"}
-    GATENABLED -- yes --> BUSY["Return Busy"]
-    GATENABLED -- no --> GATEPARAMS{"Required\nparams\navailable?"}
+    REQ["SelectAlgorithm(algo)"] --> GATENABLED{"Stopped &\nno pending\nNVM work?"}
+    GATENABLED -- no --> BUSY["Return Busy"]
+    GATENABLED -- yes --> GATEPARAMS{"Required\nparams\navailable?"}
     GATEPARAMS -- no --> INVALID["Return InvalidParameters"]
     GATEPARAMS -- yes --> CONSTRUCT["Construct + Configure + Reset + Persist"]
     CONSTRUCT --> OK["Return ok"]
@@ -452,10 +455,10 @@ Two failure kinds are distinguished when a persisted identifier cannot be activa
 | Byte out of enum range, or names no algorithm for that loop | Corrected to the active algorithm — the record is meaningless |
 | Valid algorithm, not selectable yet (`InvalidParameters`)   | Preserved, and retried on the next entry to `Ready`           |
 
-The non-volatile memory serves one write at a time and answers a concurrent one with *busy*; the
-control-mode selection writes the same record. A selection's write that comes back busy is therefore
-retried after a short delay until it lands, and a control-mode selection is refused with *busy*
-while such a retry is pending, so neither write can be lost to the other.
+The non-volatile memory serves one write at a time and answers a concurrent one with *busy*. A
+selection's write that comes back busy is retried after a short delay until it lands; while it or
+any other write to that memory is outstanding, selections, mode changes and calibration are refused
+with *busy* (`documentation/design/state-machine.md` C2a).
 
 The persistence ensures that an operator who selects ADRC for the speed loop does not need to
 repeat the selection after every power cycle. The motor state machine will transition directly to
@@ -467,18 +470,18 @@ repeat the selection after every power cycle. The motor state machine will trans
 
 ### Provided
 
-| Interface                        | Purpose                                                                                 | Contract                                                                           |
-|----------------------------------|-----------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
-| SelectCurrentAlgorithm           | Selects the active current-loop controller by enum value                                | Returns `ok` if motor is disabled, `busy` if enabled. Effect is immediate if `ok`. |
-| SelectSpeedAlgorithm             | Selects the active speed-loop controller by enum value                                  | As above.                                                                          |
-| SelectPositionAlgorithm          | Selects the active position-loop controller by enum value                               | As above.                                                                          |
-| ActiveCurrentAlgorithm           | Returns the currently active current-loop algorithm identifier                          | Always returns a valid enum value. Never blocks.                                   |
-| ActiveSpeedAlgorithm             | Returns the currently active speed-loop algorithm identifier                            | As above.                                                                          |
-| ActivePositionAlgorithm          | Returns the currently active position-loop algorithm identifier                         | As above.                                                                          |
-| ComputeCurrentControl            | Dispatches to the active current controller for one sample                              | Called at 20 kHz from ISR. Zero heap. No virtual dispatch.                         |
-| ComputeSpeedControl              | Dispatches to the active speed controller for one sample                                | Called at 1 kHz from low-priority handler.                                         |
-| ComputePositionControl           | Dispatches to the active position controller for one sample                             | Called at 1 kHz from low-priority handler.                                         |
-| ReconfigureFromCurrentParameters | Re-applies the latest RLS snapshot to the active controllers without changing algorithm | Motor must be disabled.                                                            |
+| Interface                        | Purpose                                                                                 | Contract                                                                          |
+|----------------------------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| SelectCurrentAlgorithm           | Selects the active current-loop controller by enum value                                | `busy` unless stopped with no pending work (Part D). Effect is immediate if `ok`. |
+| SelectSpeedAlgorithm             | Selects the active speed-loop controller by enum value                                  | As above.                                                                         |
+| SelectPositionAlgorithm          | Selects the active position-loop controller by enum value                               | As above.                                                                         |
+| ActiveCurrentAlgorithm           | Returns the currently active current-loop algorithm identifier                          | Always returns a valid enum value. Never blocks.                                  |
+| ActiveSpeedAlgorithm             | Returns the currently active speed-loop algorithm identifier                            | As above.                                                                         |
+| ActivePositionAlgorithm          | Returns the currently active position-loop algorithm identifier                         | As above.                                                                         |
+| ComputeCurrentControl            | Dispatches to the active current controller for one sample                              | Called at 20 kHz from ISR. Zero heap. No virtual dispatch.                        |
+| ComputeSpeedControl              | Dispatches to the active speed controller for one sample                                | Called at 1 kHz from low-priority handler.                                        |
+| ComputePositionControl           | Dispatches to the active position controller for one sample                             | Called at 1 kHz from low-priority handler.                                        |
+| ReconfigureFromCurrentParameters | Re-applies the latest RLS snapshot to the active controllers without changing algorithm | Motor must be disabled.                                                           |
 
 ### Required
 
@@ -522,7 +525,8 @@ repeat the selection after every power cycle. The motor state machine will trans
 
 The controller selection component has no states of its own — it is stateless except for the
 union's active alternative and the active enum values. Its behaviour is governed entirely by the
-motor state machine's current state (enabled vs. not enabled).
+motor state machine's current state (stopped with no pending NVM work, vs. enabled, calibrating,
+faulted, or NVM-busy — Part D).
 
 The sequence on a successful algorithm selection:
 
@@ -608,7 +612,7 @@ graph TD
 |--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Heap allocation                | Zero. All controller instances reside in fixed-size, statically-allocated storage.                                                                                                                                                |
 | Hot-path virtual dispatch      | None. The visit dispatch inlines directly to concrete implementations.                                                                                                                                                            |
-| Selection while enabled        | Rejected. `SelectResult::busy` returned; no state change.                                                                                                                                                                         |
+| Selection while not stopped    | Rejected (Part D). `SelectResult::busy` returned; no state change.                                                                                                                                                                |
 | Current loop cycle overhead    | Visit dispatch adds ≤ 10 cycles versus direct call on the measured cycle budget.                                                                                                                                                  |
 | Maximum number of algorithms   | Fixed at build time by the union type list. Adding a new algorithm requires a rebuild.                                                                                                                                            |
 | NVM write latency              | NVM write occurs synchronously after selection; motor must remain disabled during the write.                                                                                                                                      |

@@ -14,7 +14,8 @@ namespace application
             services::NonVolatileMemory& nvm,
             const CalibrationServices& calibServices,
             state_machine::FaultNotifier& faultNotifier,
-            state_machine::TransitionPolicy transitionPolicy);
+            state_machine::TransitionPolicy transitionPolicy,
+            NvmActivity& nvmActivity);
         ~TorqueStateMachine() override;
 
         foc::FocTorque& GetController();

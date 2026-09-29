@@ -337,7 +337,7 @@ TEST_F(ControlModeStateMachineTest, OnSaveConfigDone_DoesNotActivate_When_Fault_
     EXPECT_EQ(retryResult, state_machine::SelectResult::busy);
 }
 
-TEST_F(ControlModeStateMachineTest, OnSaveConfigDone_DoesNotActivate_When_Calibration_Starts_During_Nvm_Write)
+TEST_F(ControlModeStateMachineTest, Calibrate_Is_Refused_While_Select_Nvm_Write_Is_In_Flight)
 {
     GivenNvmAlwaysInvalid();
 
@@ -346,11 +346,6 @@ TEST_F(ControlModeStateMachineTest, OnSaveConfigDone_DoesNotActivate_When_Calibr
         .WillOnce(Invoke([&deferredSave](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
             {
                 deferredSave = onDone;
-            }))
-        .WillOnce(Invoke([](const services::ConfigData& config, infra::Function<void(services::NvmStatus)> onDone)
-            {
-                EXPECT_EQ(config.defaultControlMode, static_cast<uint8_t>(state_machine::ControlMode::torque));
-                onDone(services::NvmStatus::Ok);
             }));
 
     ConstructSubject();
@@ -361,15 +356,20 @@ TEST_F(ControlModeStateMachineTest, OnSaveConfigDone_DoesNotActivate_When_Calibr
             result = r;
         });
 
-    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _));
-    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    state_machine::CommandResult calibrateResult{ state_machine::CommandResult::ok };
+    subject->ActiveStateMachine().CmdCalibrate([&calibrateResult](state_machine::CommandResult r)
+        {
+            calibrateResult = r;
+        });
+
+    EXPECT_EQ(calibrateResult, state_machine::CommandResult::rejected);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(
+        subject->ActiveStateMachine().CurrentState()));
 
     deferredSave(services::NvmStatus::Ok);
 
-    EXPECT_EQ(result, state_machine::SelectResult::busy);
-    EXPECT_EQ(subject->Active(), state_machine::ControlMode::torque);
-    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(
-        subject->ActiveStateMachine().CurrentState()));
+    EXPECT_EQ(result, state_machine::SelectResult::ok);
+    EXPECT_EQ(subject->Active(), state_machine::ControlMode::speed);
 }
 
 TEST_F(ControlModeStateMachineTest, Select_While_Previous_Select_Pending_Reports_Busy)
@@ -935,6 +935,24 @@ TEST_F(ControlModeStateMachineLifecycleTest, Full_Calibration_Completes_To_Ready
     ConstructSubject();
 
     subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    CompleteCalibration_Torque();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(
+        subject->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(ControlModeStateMachineLifecycleTest, Algorithm_Select_Mid_Calibration_Is_Refused_And_Calibration_Still_Completes)
+{
+    GivenNvmAlwaysInvalid();
+    SetUpTorqueCalibrationCaptures();
+    ConstructSubject();
+
+    subject->ActiveStateMachine().CmdCalibrate([](state_machine::CommandResult) {});
+    ASSERT_TRUE(std::holds_alternative<state_machine::Calibrating>(
+        subject->ActiveStateMachine().CurrentState()));
+
+    EXPECT_EQ(subject->SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat), foc::SelectResult::busy);
+
     CompleteCalibration_Torque();
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(

@@ -195,15 +195,14 @@ stateDiagram-v2
 
 ## Numerical Properties
 
-| Property             | Value / Condition                                                          |
-|----------------------|----------------------------------------------------------------------------|
-| Steps per revolution | 12 (30° electrical per step)                                               |
-| Angular step size    | $2\pi/12 \approx 0.524\ \text{rad}$ electrical                             |
-| Detection threshold  | Position change $< \epsilon_{threshold}$ per check                         |
-| Consecutive checks   | $M$ samples below threshold before declaring settled                       |
-| Offset precision     | Limited by encoder resolution (e.g. ±0.5 count)                            |
-| Torque cost          | Alignment uses $i_d$ only → zero torque, no motion intended                |
-| Worst-case duration  | $N_{steps} \times T_{settle}$ where $T_{settle} \approx 5/(\zeta\omega_n)$ |
+| Property            | Value / Condition                                                                       |
+|---------------------|-----------------------------------------------------------------------------------------|
+| Field application   | Single fixed stator field at $\theta_e^{field} = 0$ (§3); no stepping                   |
+| Detection threshold | Position change $< \epsilon_{threshold}$ per check                                      |
+| Consecutive checks  | $M$ samples below threshold before declaring settled                                    |
+| Offset precision    | Limited by encoder resolution (e.g. ±0.5 count)                                         |
+| Torque cost         | The d-axis field produces the synchronising torque of §2; no $i_q$ is commanded         |
+| Worst-case duration | `AlignmentConfig::timeout` (default 2 s), or `maxSamples` samples if that elapses first |
 
 ---
 

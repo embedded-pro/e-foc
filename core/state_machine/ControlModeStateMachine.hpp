@@ -7,6 +7,7 @@
 #include "core/state_machine/AlgorithmPersistence.hpp"
 #include "core/state_machine/ControlMode.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
+#include "core/state_machine/NvmActivity.hpp"
 #include "core/state_machine/OuterLoopStateMachine.hpp"
 #include "core/state_machine/PositionStateMachine.hpp"
 #include "core/state_machine/SpeedStateMachine.hpp"
@@ -69,6 +70,12 @@ namespace state_machine
         foc::SpeedAlgorithm ActiveSpeedAlgorithm() const;
         foc::PositionAlgorithm ActivePositionAlgorithm() const;
 
+        // Lets writers outside the lifecycle (e.g. CAN configuration persistence) share the same
+        // single-flight NVM accounting the FSM guards read from, so they collide with a Busy rather
+        // than an unguarded fault.
+        void BeginNvmActivity();
+        void EndNvmActivity();
+
         application::FocStateMachineCommon& ActiveCommon();
         const application::FocStateMachineCommon& ActiveCommon() const;
         application::OuterLoopStateMachine* ActiveOuterLoop();
@@ -96,6 +103,7 @@ namespace state_machine
         OuterLoopArgs outerLoopArgs;
 
         services::ConfigData configData;
+        application::NvmActivity nvmActivity;
         AlgorithmPersistence algorithmPersistence;
         ControlMode pendingSelectMode{ ControlMode::torque };
         infra::AutoResetFunction<void(SelectResult)> pendingSelectCallback;

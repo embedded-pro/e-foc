@@ -8,10 +8,12 @@ namespace application
         const TerminalAndTracer& terminalAndTracer,
         const MotorHardware& hardware,
         services::NonVolatileMemory& nvm,
-        const CalibrationServices& calibServices)
+        const CalibrationServices& calibServices,
+        NvmActivity& nvmActivity)
         : terminal(terminalAndTracer.terminal)
         , tracer(terminalAndTracer.tracer)
         , calibrationContext(hardware.inverter, hardware.vdc, calibServices.fluxLinkage)
+        , nvmActivity(nvmActivity)
         , environment{ stateMachine, calibrationContext, nvm, nvmActivity, pendingCommand, *this, tracer }
         , calibration(environment, calibServices)
         , maintenance(environment, calibration)

@@ -317,6 +317,69 @@ TEST_F(ElectricalParametersIdentificationTest, concurrent_pole_pairs_estimate_is
     EXPECT_FALSE(second.hasValue);
 }
 
+TEST_F(ElectricalParametersIdentificationTest, pole_pairs_estimate_is_rejected_while_rl_estimation_is_running)
+{
+    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig rlConfig{
+        hal::DutyCycle::FromPercent(15), std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
+    };
+    services::ElectricalParametersIdentification::PolePairsConfig ppConfig{
+        hal::DutyCycle::FromPercent(20), 5, std::chrono::milliseconds{ 50 }
+    };
+
+    struct PpResult
+    {
+        bool called = false;
+        bool hasValue = true;
+    } second;
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_));
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_));
+    EXPECT_CALL(driverMock, Stop());
+
+    identification.EstimateResistanceAndInductance(rlConfig, [](services::ElectricalParametersIdentification::ResistanceInductanceResult) {});
+
+    identification.EstimateNumberOfPolePairs(ppConfig, [&second](auto result)
+        {
+            second.called = true;
+            second.hasValue = result.has_value();
+        });
+
+    EXPECT_TRUE(second.called);
+    EXPECT_FALSE(second.hasValue);
+}
+
+TEST_F(ElectricalParametersIdentificationTest, rl_estimate_is_rejected_while_pole_pairs_estimation_is_running)
+{
+    services::ElectricalParametersIdentification::PolePairsConfig ppConfig{
+        hal::DutyCycle::FromPercent(20), 5, std::chrono::milliseconds{ 50 }
+    };
+    services::ElectricalParametersIdentification::ResistanceAndInductanceConfig rlConfig{
+        hal::DutyCycle::FromPercent(15), std::chrono::milliseconds{ 100 }, services::WindingConfiguration::Wye
+    };
+
+    struct RlResult
+    {
+        bool called = false;
+        services::ElectricalParametersIdentification::ResistanceInductanceResult result{};
+    } second;
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(::testing::Return(foc::Radians{ 0.0f }));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(::testing::_, ::testing::_));
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_));
+
+    identification.EstimateNumberOfPolePairs(ppConfig, [](auto) {});
+
+    identification.EstimateResistanceAndInductance(rlConfig, [&second](services::ElectricalParametersIdentification::ResistanceInductanceResult r)
+        {
+            second.called = true;
+            second.result = r;
+        });
+
+    EXPECT_TRUE(second.called);
+    EXPECT_FALSE(second.result.resistance.has_value());
+    EXPECT_FALSE(second.result.inductance.has_value());
+}
+
 TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_with_8_pole_motor)
 {
     services::ElectricalParametersIdentification::PolePairsConfig config{

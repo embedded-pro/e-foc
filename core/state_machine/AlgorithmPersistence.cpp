@@ -2,10 +2,12 @@
 
 namespace state_machine
 {
-    AlgorithmPersistence::AlgorithmPersistence(services::NonVolatileMemory& nvm, services::ConfigData& configData, services::Tracer& tracer)
+    AlgorithmPersistence::AlgorithmPersistence(services::NonVolatileMemory& nvm, services::ConfigData& configData, services::Tracer& tracer,
+        application::NvmActivity& nvmActivity)
         : nvm(nvm)
         , configData(configData)
         , tracer(tracer)
+        , nvmActivity(nvmActivity)
     {}
 
     void AlgorithmPersistence::ApplyPersistedAlgorithms(foc::CurrentLoopSelectable* current, foc::SpeedLoopSelectable* speed, foc::PositionLoopSelectable* position)
@@ -57,6 +59,7 @@ namespace state_machine
             return result;
 
         configData.currentAlgorithm = static_cast<uint8_t>(algorithm);
+        nvmActivity.Begin();
         PersistConfig();
         return result;
     }
@@ -71,6 +74,7 @@ namespace state_machine
             return result;
 
         configData.speedAlgorithm = static_cast<uint8_t>(algorithm);
+        nvmActivity.Begin();
         PersistConfig();
         return result;
     }
@@ -85,6 +89,7 @@ namespace state_machine
             return result;
 
         configData.positionAlgorithm = static_cast<uint8_t>(algorithm);
+        nvmActivity.Begin();
         PersistConfig();
         return result;
     }
@@ -176,6 +181,7 @@ namespace state_machine
                     return;
                 }
 
+                nvmActivity.End();
                 if (status != services::NvmStatus::Ok)
                     tracer.Trace() << "config persist failed";
             });

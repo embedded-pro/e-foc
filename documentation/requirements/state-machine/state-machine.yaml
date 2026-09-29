@@ -258,3 +258,14 @@
     and report busy once that write completes, so that a fault, calibration or emergency stop
     raised while the write was outstanding is never discarded. A selection issued before that
     write completes shall be refused with busy.
+
+- id: REQ-SM-030
+  title: Non-volatile-memory writers never collide with the lifecycle
+  shall: >
+    Every writer of the drive's single non-volatile memory — calibration, maintenance and boot,
+    control-mode selection and its rollback, algorithm selection including its busy retries, and
+    CAN encoder-resolution and telemetry-rate saves — shall count as outstanding asynchronous work
+    until its write completes. Calibrate, enable, clear calibration, control-mode selection and
+    algorithm selection shall be refused as busy while any such write is outstanding. A calibration
+    save answered busy shall be retried, not reported as a failure, and shall not be retried once
+    the run has been aborted.

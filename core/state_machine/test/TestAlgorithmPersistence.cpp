@@ -17,7 +17,8 @@ namespace
         infra::TextOutputStream::WithErrorPolicy stream{ streamWriter };
         services::TracerToStream tracer{ stream };
         services::ConfigData configData{};
-        state_machine::AlgorithmPersistence persistence{ nvm, configData, tracer };
+        application::NvmActivity nvmActivity;
+        state_machine::AlgorithmPersistence persistence{ nvm, configData, tracer, nvmActivity };
 
         StrictMock<foc::FocTorqueMock> currentMock;
         StrictMock<foc::FocSpeedMock> speedMock;
@@ -159,6 +160,34 @@ TEST_F(AlgorithmPersistenceTest, a_persist_keeps_retrying_while_the_nvm_stays_bu
     ForwardTime(std::chrono::milliseconds{ 10 });
 
     EXPECT_FALSE(persistence.HasPendingPersist());
+}
+
+TEST_F(AlgorithmPersistenceTest, nvm_activity_stays_in_flight_while_a_persist_retry_is_armed)
+{
+    EXPECT_CALL(currentMock, SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat)).WillOnce(Return(foc::SelectResult::ok));
+
+    infra::Function<void(services::NvmStatus)> firstAttempt;
+    EXPECT_CALL(nvm, SaveConfig(_, _))
+        .WillOnce([&firstAttempt](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                firstAttempt = onDone;
+            });
+
+    persistence.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat, &currentMock);
+    EXPECT_TRUE(nvmActivity.InFlight());
+
+    firstAttempt(services::NvmStatus::Busy);
+    EXPECT_TRUE(nvmActivity.InFlight());
+
+    EXPECT_CALL(nvm, SaveConfig(_, _))
+        .WillOnce([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            });
+
+    ForwardTime(std::chrono::milliseconds{ 10 });
+
+    EXPECT_FALSE(nvmActivity.InFlight());
 }
 
 TEST_F(AlgorithmPersistenceTest, select_speed_algorithm_succeeds)

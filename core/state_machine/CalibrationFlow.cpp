@@ -136,8 +136,9 @@ namespace application
             {
                 return state_machine::CalibrationSaved{ status };
             });
+        pendingSaveData = calibrating.pendingData;
         env.nvmActivity.Begin();
-        env.nvm.SaveCalibration(calibrating.pendingData, [this](services::NvmStatus status)
+        env.nvm.SaveCalibration(pendingSaveData, [this](services::NvmStatus status)
             {
                 OnSaved(status);
             });
@@ -154,12 +155,30 @@ namespace application
                            << " B_uNms=" << data.frictionViscous * microPerUnit;
     }
 
+    // Busy is contention with another writer of the shared NVM, not a failure of this record
     void CalibrationFlow::OnSaved(services::NvmStatus status)
     {
+        if (status == services::NvmStatus::Busy)
+        {
+            RetrySave();
+            return;
+        }
+
         env.nvmActivity.End();
         auto completion = saveCompletion;
         saveCompletion = nullptr;
         completion(status);
+    }
+
+    void CalibrationFlow::RetrySave()
+    {
+        saveRetryTimer.Start(saveRetryDelay, [this]()
+            {
+                env.nvm.SaveCalibration(pendingSaveData, [this](services::NvmStatus status)
+                    {
+                        OnSaved(status);
+                    });
+            });
     }
 
     state_machine::Ready CalibrationFlow::Complete(const state_machine::Calibrating& calibrating)
@@ -205,6 +224,13 @@ namespace application
 
     void CalibrationFlow::Abort()
     {
+        if (saveRetryTimer.Armed())
+        {
+            saveRetryTimer.Cancel();
+            saveCompletion = nullptr;
+            env.nvmActivity.End();
+        }
+
         orchestrator.Abort();
         env.mode.AbortModeSpecificServices();
         env.mode.RestoreControlAfterProvisionalIdentification();

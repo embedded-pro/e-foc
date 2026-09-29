@@ -35,6 +35,7 @@ namespace
         StrictMock<drivers::EncoderMock> encoderMock;
         StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
+        application::NvmActivity nvmActivity;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<services::MechanicalParametersIdentificationMock> mechIdentMock;
@@ -224,7 +225,8 @@ namespace
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
                 faultNotifierMock,
                 state_machine::TransitionPolicy::Cli,
-                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
+                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock },
+                nvmActivity
             };
         }
 
@@ -1116,6 +1118,7 @@ namespace
         StrictMock<drivers::EncoderMock> encoderMock;
         StrictMock<foc::LowPriorityInterruptMock> lowPriorityInterruptMock;
         StrictMock<services::NonVolatileMemoryMock> nvmMock;
+        application::NvmActivity nvmActivity;
         StrictMock<services::ElectricalParametersIdentificationMock> electricalIdentMock;
         StrictMock<services::MotorAlignmentMock> alignmentMock;
         StrictMock<services::MechanicalParametersIdentificationMock> mechIdentMock;
@@ -1305,7 +1308,8 @@ namespace
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } },
                 faultNotifierMock,
                 state_machine::TransitionPolicy::Auto,
-                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
+                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock },
+                nvmActivity
             };
         }
 
@@ -2421,7 +2425,8 @@ namespace
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), fluxLinkage },
                 faultNotifierMock,
                 state_machine::TransitionPolicy::Cli,
-                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
+                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock },
+                nvmActivity
             };
         }
 
@@ -2434,7 +2439,8 @@ namespace
                 application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), fluxLinkage },
                 faultNotifierMock,
                 state_machine::TransitionPolicy::Cli,
-                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock }
+                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock },
+                nvmActivity
             };
         }
 
