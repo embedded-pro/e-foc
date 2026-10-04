@@ -129,6 +129,7 @@ namespace foc
         void RunOneCycle(const foc::PhasePwmDutyCycles& dutyPhases);
         void ScheduleNextCycle();
         float SampleNoise();
+        float SampleEncoderNoise();
         void ApplyOpenPhases();
 
     private:
@@ -164,6 +165,7 @@ namespace foc
             EncoderNoiseConfig config{};
             std::mt19937 engine{ std::random_device{}() };
             std::normal_distribution<float> distribution{ 0.0f, 1.0f };
+            float lastSample{ 0.0f };
         };
 
         struct FaultInjectionState
