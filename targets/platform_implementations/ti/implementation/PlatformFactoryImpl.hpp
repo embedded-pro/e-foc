@@ -23,7 +23,6 @@
 #include "hal_tiva/tiva/Pwm.hpp"
 #include "hal_tiva/tiva/UartWithDma.hpp"
 #include "hal_tiva/tiva/WatchDog.hpp"
-#include "numerical/math/CompilerOptimizations.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "services/util/EventDispatcherWatchdog.hpp"
@@ -80,15 +79,15 @@ namespace application
         PlatformDiagnostics& Diagnostics() override;
 
         // Implementation of drivers::ThreePhaseInverter
-        OPTIMIZE_FOR_SPEED void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
-        OPTIMIZE_FOR_SPEED void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
+        void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
+        void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;
         void Start() override;
         void Stop() override;
         hal::Hertz BaseFrequency() const override;
         foc::Ampere MaxCurrentSupported() const override;
 
         // Implementation of drivers::Encoder
-        OPTIMIZE_FOR_SPEED foc::Radians Read() override;
+        foc::Radians Read() override;
         void Set(foc::Radians value) override;
         void SetZero() override;
 
@@ -124,7 +123,7 @@ namespace application
         struct TerminalAndTracer
         {
             hal::tiva::Dma dma{ infra::emptyFunction };
-            hal::tiva::UartWithDma::Config uartConfig{ true, true, hal::tiva::UartWithDma::Baudrate::_921000_bps, hal::tiva::UartWithDma::FlowControl::none, hal::tiva::UartWithDma::Parity::none, hal::tiva::UartWithDma::StopBits::one, hal::tiva::UartWithDma::NumberOfBytes::_8_bytes, std::make_optional(InterruptPriorities::uart) };
+            hal::tiva::UartWithDma::Config uartConfig{ true, true, hal::tiva::UartWithDma::Baudrate::_921600_bps, hal::tiva::UartWithDma::FlowControl::none, hal::tiva::UartWithDma::Parity::none, hal::tiva::UartWithDma::StopBits::one, hal::tiva::UartWithDma::NumberOfBytes::_8_bytes, std::make_optional(InterruptPriorities::uart) };
             hal::tiva::UartWithDma::WithRxBuffer<Resources::uartReceiveBufferSize> uart{ Peripheral::UartIndex, Pins::uartTx, Pins::uartRx, dma, uartConfig };
             services::StreamWriterOnSerialCommunication::WithStorage<Resources::tracerBufferSize> streamWriterOnSerialCommunication{ uart };
             infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterOnSerialCommunication };

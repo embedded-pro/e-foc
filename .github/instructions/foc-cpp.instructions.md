@@ -39,8 +39,7 @@ Every implementation file with hot-path code MUST scope `#pragma GCC optimize` t
 #pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
 #endif
-OPTIMIZE_FOR_SPEED
-ReturnType Calculate(...)
+ReturnType Cascade::Calculate(...)
 {
     ...
 }
@@ -49,7 +48,7 @@ ReturnType Calculate(...)
 #endif
 ```
 
-Apply `OPTIMIZE_FOR_SPEED` (from `numerical/math/CompilerOptimizations.hpp`) on `Calculate()`, `Compute()`, and other hot-path methods.
+Apply `OPTIMIZE_FOR_SPEED` (from `numerical/math/CompilerOptimizations.hpp`) to `Calculate()`, `Compute()` and other hot-path methods defined in a header — in the class body or as a template. On embedded and QEMU builds it expands to `always_inline` + `inline`, so never put it on a function defined in a `.cpp`: callers in other translation units have no body to inline and the build fails.
 
 ## FOC Theory — Correctness
 

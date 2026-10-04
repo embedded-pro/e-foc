@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/foc/speed_loop/SpeedController.hpp"
-#include "numerical/math/CompilerOptimizations.hpp"
 #include "numerical/robust_control/ActiveDisturbanceRejection.hpp"
 
 namespace foc
@@ -15,7 +14,7 @@ namespace foc
         bool SetTunings(const SpeedLoopTunings& tunings);
         void Reset();
 
-        OPTIMIZE_FOR_SPEED foc::Ampere Compute(const SpeedControlContext& context);
+        foc::Ampere Compute(const SpeedControlContext& context);
 
     private:
         using SpeedAdrc = robust_control::ActiveDisturbanceRejectionControl<float, 1>;

@@ -28,7 +28,6 @@ namespace foc
 #pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
 #endif
-    OPTIMIZE_FOR_SPEED
     PositionOutput PidPositionController::Compute(const PositionControlContext& context)
     {
         const auto error = WrappedPositionError(context.reference, context.measured);

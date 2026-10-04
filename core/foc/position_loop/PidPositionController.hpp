@@ -3,7 +3,6 @@
 #include "core/foc/interfaces/Algorithms.hpp"
 #include "core/foc/interfaces/LoopTunings.hpp"
 #include "core/foc/position_loop/PositionController.hpp"
-#include "numerical/math/CompilerOptimizations.hpp"
 #include <numbers>
 
 namespace foc
@@ -19,7 +18,7 @@ namespace foc
         bool SetTunings(const PositionLoopTunings& tunings);
         void Reset();
 
-        OPTIMIZE_FOR_SPEED PositionOutput Compute(const PositionControlContext& context);
+        PositionOutput Compute(const PositionControlContext& context);
 
     private:
         float SpeedEnvelope() const;

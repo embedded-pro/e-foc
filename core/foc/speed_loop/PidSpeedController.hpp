@@ -2,7 +2,6 @@
 
 #include "core/foc/speed_loop/SpeedController.hpp"
 #include "numerical/controllers/implementations/PidIncremental.hpp"
-#include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc
 {
@@ -15,7 +14,7 @@ namespace foc
         bool SetTunings(const SpeedLoopTunings& tunings);
         void Reset();
 
-        OPTIMIZE_FOR_SPEED foc::Ampere Compute(const SpeedControlContext& context);
+        foc::Ampere Compute(const SpeedControlContext& context);
 
     private:
         bool ApplyGains();

@@ -33,7 +33,6 @@ namespace foc
 #pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
 #endif
-    OPTIMIZE_FOR_SPEED
     foc::Ampere AdrcSpeedController::Compute(const SpeedControlContext& context)
     {
         const auto current = adrc.Compute(context.reference.Value(), context.measured.Value(), lastApplied);

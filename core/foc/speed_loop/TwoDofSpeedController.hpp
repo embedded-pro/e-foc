@@ -14,7 +14,7 @@ namespace foc
         bool SetTunings(const SpeedLoopTunings& tunings);
         void Reset();
 
-        OPTIMIZE_FOR_SPEED foc::Ampere Compute(const SpeedControlContext& context);
+        foc::Ampere Compute(const SpeedControlContext& context);
 
     private:
         void ApplyReferenceFilter();

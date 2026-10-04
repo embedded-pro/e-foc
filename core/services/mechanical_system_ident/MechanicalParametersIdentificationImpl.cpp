@@ -4,7 +4,6 @@
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
-#include "numerical/math/CompilerOptimizations.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -142,7 +141,6 @@ namespace services
 #pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
 #endif
-    OPTIMIZE_FOR_SPEED
     void MechanicalParametersIdentificationImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant)
     {
         if (!rls.has_value())

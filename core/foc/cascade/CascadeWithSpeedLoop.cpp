@@ -23,7 +23,6 @@ namespace foc
 #pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
 #endif
-    OPTIMIZE_FOR_SPEED
     float SpeedDifferentiator::Measure()
     {
         const float angle = windowAngle;
@@ -215,7 +214,6 @@ namespace foc
 #pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
 #endif
-    OPTIMIZE_FOR_SPEED
     PhasePwmDutyCycles CascadeWithSpeedLoop::CalculateInnerLoop(const PhaseCurrents& currentPhases, const Radians& position)
     {
         const float ia = currentPhases.a.Value();
@@ -262,7 +260,6 @@ namespace foc
 #pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
 #endif
-    OPTIMIZE_FOR_SPEED
     float CascadeWithSpeedLoop::MeasureMechanicalSpeed()
     {
         const auto mechanicalSpeed = speedDifferentiator.Measure();
@@ -271,13 +268,11 @@ namespace foc
         return mechanicalSpeed;
     }
 
-    OPTIMIZE_FOR_SPEED
     void CascadeWithSpeedLoop::RunSpeedLoop(float mechanicalSpeed)
     {
         lastSpeedLoopOutput = speedLoop.Compute(SpeedControlContext{ RadiansPerSecond{ mechanicalSpeed }, RadiansPerSecond{ speedReference } }).Value();
     }
 
-    OPTIMIZE_FOR_SPEED
     void CascadeWithSpeedLoop::SetDirectCurrentReference(float current)
     {
         lastSpeedLoopOutput = current;

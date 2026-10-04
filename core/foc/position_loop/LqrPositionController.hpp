@@ -16,7 +16,7 @@ namespace foc
 
         void Reset() const;
 
-        OPTIMIZE_FOR_SPEED PositionOutput Compute(const PositionControlContext& context);
+        PositionOutput Compute(const PositionControlContext& context);
     };
 
     static_assert(PositionController<LqrPositionController>);

@@ -229,6 +229,11 @@ ReturnType HotFunction(...)
 
 Place the bracket immediately around the hot function's definition, not at the top of the file.
 
+Hot functions defined in a header — in the class body or as templates — carry the numerical toolbox's
+`OPTIMIZE_FOR_SPEED` instead. With `NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS` on (embedded and QEMU presets) it
+expands to `always_inline`, `hot` and O3/fast-math plus `inline`, so the call folds into its caller. It never goes
+on a function defined in a `.cpp`: the other translation units have no body to inline, and the build fails.
+
 ### 9. Per-Function Attributes
 
 ```cpp

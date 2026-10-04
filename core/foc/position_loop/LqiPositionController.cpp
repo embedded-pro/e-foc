@@ -39,7 +39,6 @@ namespace foc
 #pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
 #endif
-    OPTIMIZE_FOR_SPEED
     PositionOutput LqiPositionController::Compute(const PositionControlContext& context)
     {
         if (currentPerNormalizedInput == 0.0f)

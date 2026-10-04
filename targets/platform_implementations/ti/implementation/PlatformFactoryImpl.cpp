@@ -258,7 +258,7 @@ namespace application
 #pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
 #endif
-    OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+    void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
         onPhaseCurrentsReady = onDone;
         WithPwm([baseFrequency](auto& pwm)
@@ -283,7 +283,7 @@ namespace application
             });
     }
 
-    OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
+    void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
         WithPwm([&dutyPhases](auto& pwm)
             {
@@ -319,7 +319,7 @@ namespace application
 #pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
 #endif
-    OPTIMIZE_FOR_SPEED foc::Radians PlatformFactoryImpl::Read()
+    foc::Radians PlatformFactoryImpl::Read()
     {
         return peripherals->encoder->Read() - encoderOffset;
     }

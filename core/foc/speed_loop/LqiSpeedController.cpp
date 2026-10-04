@@ -33,7 +33,6 @@ namespace foc
 #pragma GCC push_options
 #pragma GCC optimize("O3", "fast-math")
 #endif
-    OPTIMIZE_FOR_SPEED
     foc::Ampere LqiSpeedController::Compute(const SpeedControlContext& context)
     {
         const SpeedLqi::StateVector state{ context.measured.Value() };
