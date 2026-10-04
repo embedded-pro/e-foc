@@ -154,8 +154,8 @@ The callback fires exactly once per `ForceAlignment` invocation, from the event 
 
 ### Provided
 
-| Interface                                            | Purpose                                                                                                                                        | Contract                                                                                                         |
-|------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| Interface                                            | Purpose                                                                                                                                        | Contract                                                                                                                              |
+|------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
 | `ForceAlignment(polePairs, AlignmentConfig, onDone)` | Starts the alignment procedure using the supplied configuration; reports the calibrated encoder offset (or failure) via `onDone` when complete | Silently ignored if already aligning; `onDone` fires exactly once, from the event loop; inverter is stopped before `onDone` is called |
 
 ### Required
