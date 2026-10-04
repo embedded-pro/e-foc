@@ -571,3 +571,30 @@ TEST_F(SinusoidalInductanceEstimatorTest, a_watchdog_timeout_while_the_outcome_i
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->inductance.has_value());
 }
+
+TEST_F(SinusoidalInductanceEstimatorTest, an_overcurrent_before_the_injection_starts_leaves_the_bridge_stopped)
+{
+    std::optional<services::SinusoidalInductanceEstimator::Result> result;
+
+    {
+        InSequence sequence;
+        EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+            .WillOnce([this](auto, const auto& cb)
+                {
+                    driverMock.StorePhaseCurrentsCallback(cb);
+                    TriggerOvercurrent();
+                });
+        EXPECT_CALL(driverMock, Stop());
+        EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+        EXPECT_CALL(driverMock, Stop());
+    }
+
+    estimator->Start(shortConfig, [&result](auto r)
+        {
+            result = r;
+        });
+    ExecuteAllActions();
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->inductance.has_value());
+}

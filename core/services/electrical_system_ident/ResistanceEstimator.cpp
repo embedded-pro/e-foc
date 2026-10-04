@@ -68,6 +68,13 @@ namespace services
             neutralDuty,
             neutralDuty });
 
+        // The interrupt can trip between registering the callback and the write above, which would re-arm the bridge it stopped.
+        if (finishing)
+        {
+            driver.Stop();
+            return;
+        }
+
         StartSampleWatchdog();
         settleTimer.Start(activeConfig.settleTime, [this]()
             {

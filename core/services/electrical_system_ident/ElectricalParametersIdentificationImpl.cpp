@@ -171,6 +171,13 @@ namespace services
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, std::cos(electricalAngle), std::sin(electricalAngle))));
 
+        // The interrupt can trip between this step's check and the write above, which would re-arm the bridge it stopped.
+        if (polePairsFinishing)
+        {
+            driver.Stop();
+            return;
+        }
+
         settleTimer.Start(polePairsConfig.settleTimeBetweenSteps, [this]()
             {
                 if (!polePairsRunning || polePairsFinishing)
@@ -191,7 +198,7 @@ namespace services
     {
         driver.Stop();
 
-        if (!onPolePairsDone)
+        if (!onPolePairsDone || polePairsFinishing)
             return;
 
         const float mechanicalRotation = std::abs(accumulatedRotation);

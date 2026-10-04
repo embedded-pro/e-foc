@@ -513,3 +513,31 @@ TEST_F(ResistanceEstimatorTest, a_watchdog_timeout_while_the_measurement_is_queu
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result->resistance.has_value());
 }
+
+TEST_F(ResistanceEstimatorTest, an_overcurrent_before_the_test_voltage_is_applied_leaves_the_bridge_stopped)
+{
+    std::optional<services::ResistanceEstimator::Result> result;
+
+    {
+        InSequence sequence;
+        EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+            .WillOnce([this](auto, const auto& cb)
+                {
+                    driverMock.StorePhaseCurrentsCallback(cb);
+                    driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+                        foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+                });
+        EXPECT_CALL(driverMock, Stop());
+        EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+        EXPECT_CALL(driverMock, Stop());
+    }
+
+    estimator->Start(measurementConfig, [&result](auto r)
+        {
+            result = r;
+        });
+    ExecuteAllActions();
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->resistance.has_value());
+}

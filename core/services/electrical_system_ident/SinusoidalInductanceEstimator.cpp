@@ -82,6 +82,13 @@ namespace services
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ 0.0f, 0.0f }, 1.0f, 0.0f)));
 
+        // The interrupt can trip between registering the callback and the write above, which would re-arm the bridge it stopped.
+        if (finishing)
+        {
+            driver.Stop();
+            return;
+        }
+
         StartSampleWatchdog();
     }
 

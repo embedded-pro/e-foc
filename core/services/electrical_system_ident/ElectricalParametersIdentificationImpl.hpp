@@ -60,7 +60,7 @@ namespace services
 
         bool rlRunning{ false };
         bool polePairsRunning{ false };
-        bool polePairsFinishing{ false };
+        volatile bool polePairsFinishing{ false };
         uint32_t polePairsRun{ 0 };
         infra::TimerSingleShot settleTimer;
     };

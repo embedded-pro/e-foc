@@ -760,3 +760,81 @@ TEST_F(ElectricalParametersIdentificationTest, a_step_timeout_while_the_pole_pai
     EXPECT_TRUE(fired);
     EXPECT_FALSE(result.has_value());
 }
+
+TEST_F(ElectricalParametersIdentificationTest, an_overcurrent_that_preempts_a_step_leaves_the_bridge_stopped)
+{
+    std::optional<std::size_t> result{ 7 };
+    bool fired = false;
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+
+    {
+        InSequence sequence;
+        EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+        EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+        EXPECT_CALL(encoderMock, Read()).WillOnce([this]()
+            {
+                TriggerOvercurrent();
+                return foc::Radians{ 0.1f };
+            });
+        EXPECT_CALL(driverMock, Stop());
+        EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+        EXPECT_CALL(driverMock, Stop());
+    }
+
+    identification->EstimateNumberOfPolePairs({}, [&](auto polePairs)
+        {
+            fired = true;
+            result = polePairs;
+        });
+    ForwardTime(std::chrono::milliseconds{ 50 });
+
+    EXPECT_TRUE(fired);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST_F(ElectricalParametersIdentificationTest, an_overcurrent_during_the_last_step_fails_the_sweep)
+{
+    const services::ElectricalParametersIdentification::PolePairsConfig config{
+        hal::DutyCycle::FromPercent(20),
+        1,
+        std::chrono::milliseconds{ 50 }
+    };
+    constexpr std::size_t totalSteps = 12;
+    constexpr std::size_t polePairs = 2;
+    std::optional<std::size_t> result{ 7 };
+    bool fired = false;
+
+    encoderStepIndex = 0;
+    EXPECT_CALL(encoderMock, Read())
+        .WillOnce(Return(foc::Radians{ 0.0f }))
+        .WillRepeatedly([this, totalSteps, polePairs]()
+            {
+                if (++encoderStepIndex == totalSteps)
+                    TriggerOvercurrent();
+                return foc::Radians{ MechanicalAngle(encoderStepIndex, totalSteps, polePairs) };
+            });
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(totalSteps);
+    EXPECT_CALL(driverMock, Stop()).Times(2);
+
+    identification->EstimateNumberOfPolePairs(config, [&](auto identified)
+        {
+            fired = true;
+            result = identified;
+        });
+
+    for (std::size_t i = 0; i < totalSteps; ++i)
+        ForwardTime(std::chrono::milliseconds{ 50 });
+
+    EXPECT_TRUE(fired);
+    EXPECT_FALSE(result.has_value());
+}

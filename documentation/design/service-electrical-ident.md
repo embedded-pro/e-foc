@@ -108,7 +108,11 @@ and in a full calibration took one execution of 6709 cycles, more than five cont
 run is still in progress: samples are discarded, the settle and step timers and the no-sample watchdog do
 nothing, and `Abort()` drops the queued outcome. The outcome carries the run it belongs to, so one that an
 abort overtook cannot complete a run started after it. Outcomes decided on the event loop already — the
-pole-pair count, which the sweep computes on its step timer, and a no-sample failure — complete directly.
+pole-pair count, which the sweep computes on its step timer, and a no-sample failure — complete directly,
+unless an over-current outcome is already queued, which they then leave to be delivered. The interrupt can
+also trip while the event loop is between its check and a write to the bridge — the sweep's next step, or the
+first duty a procedure applies — and that write would re-arm the bridge the interrupt had just stopped, so each
+such write is followed by a second check that stops the bridge again.
 
 Every estimator is also RAII-safe: if destroyed while active, the destructor cancels all timers and stops
 the driver without invoking the completion callback.
