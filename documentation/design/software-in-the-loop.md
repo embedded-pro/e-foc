@@ -162,6 +162,35 @@ flakiness rather than merely reducing it.
 > to halve the rate of the firmware's own clock. Capacity comes from the instruction-counted
 > clock above; the declared value must stay matched to the machine.
 
+### Part B3 — Timing the control interrupt
+
+The platform measures every execution of the control callback and counts the ones that overrun
+the budget, miss the period or re-enter (REQ-PERF-004 to REQ-PERF-006); `loop_stats` reports
+them. On hardware the duration comes from the DWT cycle counter. The emulator does not implement
+the DWT and its registers read zero, so every execution measured zero and the counters could not
+report an overrun however long the callback ran. The emulated platform reads a free-running timer
+of the emulated machine instead, clocked from the same 25 MHz system clock as the control timer,
+so the budget (three quarters of the period, 937 cycles at 20 kHz) and the period (1250) keep the
+units the platform already declared. Because that clock is instruction-counted (Part B2), one of
+its cycles is five instructions retired, and a run reproduces its own durations to within a
+cycle.
+
+What it measures is the instruction count of the callback, not the cycles a real core would take,
+so it is a regression signal and the static cycle-budget gate remains the authority on hardware
+cycles. The plant step the same interrupt carries before the callback is outside the window, as
+REQ-PERF-004 requires.
+
+The timing scenarios clear the counters before the rotor is aligned, so the window covers
+alignment as well as closed-loop running, and run every current law in torque mode and the
+decoupled law in speed and position mode. They boot calibrated and align on command, so
+identification is not timed. Each requires at least one execution, a non-zero
+shortest one (a dead counter reads zero), no overrun, deadline miss or re-entry, and a slowest
+execution under a pinned limit. The slowest execution measured 103 to 104 cycles for every law in
+torque mode and 119 in speed and position mode, about 520 and 600 instructions, the same to within
+a cycle across runs. The limits are one and a half times that, rounded up to ten, so a regression
+trips them long before it reaches the budget; a change that makes the callback slower on purpose
+re-pins them by the same rule.
+
 ### Part C — Starting from a chosen calibration
 
 Reaching a mode that regulates speed or position requires a complete calibration, including the
@@ -617,6 +646,21 @@ What the first characterisation found, in the order it was found:
 Every identification scenario, offline and online, runs in the default set on both motors
 (REQ-CAL-012 to REQ-CAL-014).
 
+Timing the control interrupt (Part B3) found two more, both inside the measured window, and the
+timing scenarios fail on each when it is put back:
+
+- **Alignment completed inside the control interrupt — fixed.** Alignment decides in the sampling
+  interrupt that the rotor has settled, and it invoked the caller's completion there too, which
+  stores calibration data and changes state: one execution of 27 000 to 34 000 cycles, over a
+  millisecond against a 50 µs period, an overrun and a missed deadline on every alignment. The
+  service now stops the inverter and zeroes the encoder in the interrupt and delivers the outcome
+  from the event loop (`service-alignment.md`, REQ-PERF-008).
+- **The plant drew encoder noise inside the measured window — fixed.** Every encoder read drew a
+  normal deviate, even with the noise switched off, so about one read in five hundred refilled the
+  generator's state inside the callback: 1650 to 1700 cycles, an overrun and a missed deadline
+  each time. The plant now draws one deviate per step, outside the window, and every read within a
+  step returns that step's sample, as a latched encoder count would.
+
 ---
 
 ---
@@ -635,6 +679,7 @@ Every identification scenario, offline and online, runs in the default set on bo
 | Control robustness       | The same response measured on a noisy, hot, loaded or differently wound plant, and the law reported still running |
 | Disturbance rejection    | A shaft torque step while regulating is bounded in excursion and recovered from                                   |
 | Parameter identification | What the firmware identifies offline, and tracks online, matches the plant it was given, on both reference motors |
+| Control loop timing      | The control interrupt holds its budget and a pinned worst case from alignment through closed-loop running         |
 
 Controller coverage sweeps each loop's algorithms with the other loops held at the baseline, and
 adds a handful of combinations chosen to exercise both kinds of position law: those that produce a
@@ -655,8 +700,9 @@ rotor movement, step-response metrics, disturbance recovery and identified or tr
 
 **Required from the target:** that it read its plant description at boot, expose its state, fault
 code, measured speed and position over telemetry, trace the algorithm each loop is running, trace
-every calibration record it stores and its online estimates on request, and, when asked to, report
-the plant's trajectory and the tick each command frame was delivered on.
+every calibration record it stores and its online estimates on request, report its control-loop
+execution statistics on request, and, when asked to, report the plant's trajectory and the tick
+each command frame was delivered on.
 
 **How a terminal command reaches the emulated target:** on the same socket as the CAN frames. The
 firmware reads that socket line by line; a line with the `CAN_RX` prefix is a frame, any other line

@@ -726,7 +726,7 @@ namespace application
         identState.alignRunning = true;
         tracer.Trace() << "align: running...";
 
-        identState.alignment.ForceAlignment(polePairs.value(), {},
+        identState.alignment->ForceAlignment(polePairs.value(), {},
             [this](std::optional<foc::Radians> offset)
             {
                 identState.alignRunning = false;

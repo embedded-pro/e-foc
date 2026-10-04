@@ -5,11 +5,14 @@
 #include "core/services/alignment/MotorAlignment.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/AutoResetFunction.hpp"
+#include "infra/util/SharedPtr.hpp"
+#include <cstdint>
 
 namespace services
 {
     class MotorAlignmentImpl
         : public MotorAlignment
+        , public infra::EnableSharedFromThis<MotorAlignmentImpl>
     {
     public:
         MotorAlignmentImpl(drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder);
@@ -22,6 +25,8 @@ namespace services
         void CalculateAlignmentOffset();
         void ProcessPosition();
         void FailToConverge();
+        void Finish(std::optional<foc::Radians> result);
+        void Complete(std::optional<foc::Radians> result);
 
         constexpr static uint8_t neutralDuty = 50;
         constexpr static float alignmentAngle = 0.0f;
@@ -35,7 +40,10 @@ namespace services
         std::size_t consecutiveSettledSamples = 0;
         foc::Radians previousPosition{ 0.0f };
         foc::Radians alignedPosition{ 0.0f };
+        std::optional<foc::Radians> outcome;
         infra::AutoResetFunction<void(std::optional<foc::Radians>)> onAlignmentDone;
         infra::TimerSingleShot timeoutTimer;
+        uint32_t run{ 0 };
+        bool finishing{ false };
     };
 }

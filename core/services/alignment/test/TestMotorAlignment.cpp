@@ -1,6 +1,7 @@
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
+#include "infra/util/WithSharedAccess.hpp"
 #include <array>
 #include <cmath>
 #include <gmock/gmock.h>
@@ -28,9 +29,20 @@ namespace
         , public infra::ClockFixture
     {
     public:
+        void TearDown() override
+        {
+            ExecuteAllActions();
+        }
+
+        void TriggerSettledSamples(std::size_t count)
+        {
+            for (std::size_t i = 0; i < count; ++i)
+                driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+        }
+
         StrictMock<drivers::ThreePhaseInverterMock> driverMock;
         StrictMock<drivers::EncoderMock> encoderMock;
-        services::MotorAlignmentImpl alignment{ driverMock, encoderMock };
+        infra::WithSharedAccess<services::MotorAlignmentImpl> alignment{ driverMock, encoderMock };
     };
 }
 
@@ -56,7 +68,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ConfiguresCorrectPwmDutyCycles)
             });
 
     bool callbackCalled = false;
-    alignment.ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians>)
+    alignment->ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians>)
         {
             callbackCalled = true;
         });
@@ -84,7 +96,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ReturnsNulloptWhenTimeoutOccurs)
             });
 
     std::optional<foc::Radians> result;
-    alignment.ForceAlignment(polePairs, config, [&result](std::optional<foc::Radians> offset)
+    alignment->ForceAlignment(polePairs, config, [&result](std::optional<foc::Radians> offset)
         {
             result = offset;
         });
@@ -97,6 +109,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ReturnsNulloptWhenTimeoutOccurs)
     }
 
     driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    ExecuteAllActions();
 
     EXPECT_FALSE(result.has_value());
 }
@@ -125,7 +138,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ConvergesWhenPositionStable)
             });
 
     std::optional<foc::Radians> result;
-    alignment.ForceAlignment(polePairs, config, [&result](std::optional<foc::Radians> offset)
+    alignment->ForceAlignment(polePairs, config, [&result](std::optional<foc::Radians> offset)
         {
             result = offset;
         });
@@ -138,6 +151,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ConvergesWhenPositionStable)
 
     for (std::size_t i = 0; i < 4 + config.settledCount; ++i)
         driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    ExecuteAllActions();
 
     ASSERT_TRUE(result.has_value());
     EXPECT_NEAR(result->Value(), stablePosition.Value(), 0.01f);
@@ -166,13 +180,14 @@ TEST_F(MotorAlignmentTest, ForceAlignment_CalculatesCorrectOffsetForDifferentPol
             });
 
     std::optional<foc::Radians> result;
-    alignment.ForceAlignment(polePairs, config, [&result](std::optional<foc::Radians> offset)
+    alignment->ForceAlignment(polePairs, config, [&result](std::optional<foc::Radians> offset)
         {
             result = offset;
         });
 
     for (std::size_t i = 0; i < config.settledCount; ++i)
         driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    ExecuteAllActions();
 
     ASSERT_TRUE(result.has_value());
     EXPECT_NEAR(result->Value(), mechanicalPosition.Value(), 0.001f);
@@ -199,7 +214,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ResetsCounterWhenPositionChanges)
             });
 
     std::optional<foc::Radians> result;
-    alignment.ForceAlignment(polePairs, config, [&result](std::optional<foc::Radians> offset)
+    alignment->ForceAlignment(polePairs, config, [&result](std::optional<foc::Radians> offset)
         {
             result = offset;
         });
@@ -215,6 +230,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ResetsCounterWhenPositionChanges)
 
     for (std::size_t i = 0; i < 4 + config.settledCount; ++i)
         driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    ExecuteAllActions();
 
     ASSERT_TRUE(result.has_value());
 }
@@ -241,7 +257,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_WithCustomVoltagePercent)
             });
 
     bool callbackCalled = false;
-    alignment.ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians>)
+    alignment->ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians>)
         {
             callbackCalled = true;
         });
@@ -266,7 +282,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_WithCustomSamplingFrequency)
             });
 
     bool callbackCalled = false;
-    alignment.ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians>)
+    alignment->ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians>)
         {
             callbackCalled = true;
         });
@@ -292,7 +308,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ZeroesTheEncoderWhileHeldThenStopsBefo
             });
 
     bool callbackCalled = false;
-    alignment.ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians>)
+    alignment->ForceAlignment(polePairs, config, [&callbackCalled](std::optional<foc::Radians>)
         {
             callbackCalled = true;
         });
@@ -314,6 +330,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ZeroesTheEncoderWhileHeldThenStopsBefo
     EXPECT_CALL(encoderMock, SetZero()).Times(1);
     EXPECT_CALL(driverMock, Stop()).Times(1);
     driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    ExecuteAllActions();
 
     EXPECT_TRUE(callbackCalled);
 }
@@ -337,13 +354,14 @@ TEST_F(MotorAlignmentTest, ForceAlignment_WithZeroPosition)
             });
 
     std::optional<foc::Radians> result;
-    alignment.ForceAlignment(polePairs, config, [&result](std::optional<foc::Radians> offset)
+    alignment->ForceAlignment(polePairs, config, [&result](std::optional<foc::Radians> offset)
         {
             result = offset;
         });
 
     for (std::size_t i = 0; i < config.settledCount; ++i)
         driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    ExecuteAllActions();
 
     ASSERT_TRUE(result.has_value());
     EXPECT_NEAR(result->Value(), 0.0f, 0.001f);
@@ -369,7 +387,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_AbortsWhenTheInjectedCurrentExceedsThe
 
     std::optional<foc::Radians> result;
     bool called = false;
-    alignment.ForceAlignment(polePairs, config, [&result, &called](std::optional<foc::Radians> offset)
+    alignment->ForceAlignment(polePairs, config, [&result, &called](std::optional<foc::Radians> offset)
         {
             called = true;
             result = offset;
@@ -377,6 +395,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_AbortsWhenTheInjectedCurrentExceedsThe
 
     const auto overLimit = drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f;
     driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ overLimit }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    ExecuteAllActions();
 
     EXPECT_TRUE(called);
     EXPECT_FALSE(result.has_value());
@@ -402,7 +421,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_AbortsOnOvercurrentInAnyPhaseAndInEith
     {
         StrictMock<drivers::ThreePhaseInverterMock> driver;
         StrictMock<drivers::EncoderMock> encoder;
-        services::MotorAlignmentImpl subject{ driver, encoder };
+        infra::WithSharedAccess<services::MotorAlignmentImpl> subject{ driver, encoder };
 
         EXPECT_CALL(encoder, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
         EXPECT_CALL(driver, Stop()).Times(2);
@@ -415,13 +434,14 @@ TEST_F(MotorAlignmentTest, ForceAlignment_AbortsOnOvercurrentInAnyPhaseAndInEith
 
         std::optional<foc::Radians> result;
         bool called = false;
-        subject.ForceAlignment(polePairs, config, [&result, &called](std::optional<foc::Radians> offset)
+        subject->ForceAlignment(polePairs, config, [&result, &called](std::optional<foc::Radians> offset)
             {
                 called = true;
                 result = offset;
             });
 
         driver.TriggerPhaseCurrentsCallback(currents);
+        ExecuteAllActions();
 
         EXPECT_TRUE(called);
         EXPECT_FALSE(result.has_value());
@@ -447,13 +467,14 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ContinuesWhileTheInjectedCurrentStaysW
             });
 
     bool called = false;
-    alignment.ForceAlignment(polePairs, config, [&called](std::optional<foc::Radians>)
+    alignment->ForceAlignment(polePairs, config, [&called](std::optional<foc::Radians>)
         {
             called = true;
         });
 
     const auto withinLimit = drivers::ThreePhaseInverterMock::defaultMaxCurrent - 1.0f;
     driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ withinLimit }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    ExecuteAllActions();
 
     EXPECT_FALSE(called);
 }
@@ -468,14 +489,14 @@ TEST_F(MotorAlignmentTest, AReentrantForceAlignmentRejectsTheNewCallerRatherThan
     EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _));
 
     bool firstFired = false;
-    alignment.ForceAlignment(7, config, [&firstFired](auto)
+    alignment->ForceAlignment(7, config, [&firstFired](auto)
         {
             firstFired = true;
         });
 
     bool secondFired = false;
     std::optional<foc::Radians> secondResult{ foc::Radians{ 1.0f } };
-    alignment.ForceAlignment(7, config, [&](auto offset)
+    alignment->ForceAlignment(7, config, [&](auto offset)
         {
             secondFired = true;
             secondResult = offset;
@@ -498,7 +519,7 @@ TEST_F(MotorAlignmentTest, ARunThatNeverReceivesASampleFailsOnTheStepTimeout)
 
     bool fired = false;
     std::optional<foc::Radians> result{ foc::Radians{ 1.0f } };
-    alignment.ForceAlignment(7, config, [&](auto offset)
+    alignment->ForceAlignment(7, config, [&](auto offset)
         {
             fired = true;
             result = offset;
@@ -528,12 +549,13 @@ TEST_F(MotorAlignmentTest, TheStepTimeoutDoesNotFireAfterASuccessfulAlignment)
             });
 
     std::size_t fired = 0;
-    alignment.ForceAlignment(7, config, [&fired](auto)
+    alignment->ForceAlignment(7, config, [&fired](auto)
         {
             ++fired;
         });
 
     driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    ExecuteAllActions();
     ASSERT_EQ(1u, fired);
 
     ForwardTime(std::chrono::milliseconds{ 501 });
@@ -555,13 +577,13 @@ TEST_F(MotorAlignmentTest, AbortStopsTheDriverAndDropsTheCompletion)
                 driverMock.StorePhaseCurrentsCallback(cb);
             });
 
-    alignment.ForceAlignment(7, config, [&fired](auto)
+    alignment->ForceAlignment(7, config, [&fired](auto)
         {
             fired = true;
         });
 
     EXPECT_CALL(driverMock, Stop());
-    alignment.Abort();
+    alignment->Abort();
 
     EXPECT_FALSE(fired);
 
@@ -594,7 +616,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ConvergesForARotorRestingOnTheWrapBoun
             });
 
     std::optional<foc::Radians> result;
-    alignment.ForceAlignment(polePairs, config, [&result](std::optional<foc::Radians> offset)
+    alignment->ForceAlignment(polePairs, config, [&result](std::optional<foc::Radians> offset)
         {
             result = offset;
         });
@@ -608,6 +630,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ConvergesForARotorRestingOnTheWrapBoun
 
     for (std::size_t i = 0; i < config.settledCount; ++i)
         driverMock.TriggerPhaseCurrentsCallback({ foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    ExecuteAllActions();
 
     ASSERT_TRUE(result.has_value());
     EXPECT_NEAR(result->Value(), justAboveNegativePi.Value(), 0.001f);
@@ -615,7 +638,7 @@ TEST_F(MotorAlignmentTest, ForceAlignment_ConvergesForARotorRestingOnTheWrapBoun
 
 TEST_F(MotorAlignmentTest, AbortWithoutARunInFlightIsANoOp)
 {
-    alignment.Abort();
+    alignment->Abort();
 }
 
 TEST_F(MotorAlignmentTest, AbortCancelsTimeoutSoCallbackDoesNotFireAfterTimeout)
@@ -633,15 +656,133 @@ TEST_F(MotorAlignmentTest, AbortCancelsTimeoutSoCallbackDoesNotFireAfterTimeout)
             });
 
     bool fired = false;
-    alignment.ForceAlignment(7, config, [&fired](auto)
+    alignment->ForceAlignment(7, config, [&fired](auto)
         {
             fired = true;
         });
 
-    alignment.Abort();
+    alignment->Abort();
     EXPECT_FALSE(fired);
 
     ForwardTime(std::chrono::milliseconds{ 501 });
+
+    EXPECT_FALSE(fired);
+}
+
+TEST_F(MotorAlignmentTest, TheOutcomeIsDeliveredFromTheEventLoopNotFromTheSampleCallback)
+{
+    services::MotorAlignmentImpl::AlignmentConfig config;
+    config.settledCount = 1;
+    config.settledThreshold = foc::Radians{ 1.0f };
+
+    EXPECT_CALL(encoderMock, Read()).WillRepeatedly(Return(foc::Radians{ 0.25f }));
+    EXPECT_CALL(encoderMock, SetZero());
+    EXPECT_CALL(driverMock, Stop()).Times(2);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+
+    std::optional<foc::Radians> result;
+    alignment->ForceAlignment(7, config, [&result](std::optional<foc::Radians> offset)
+        {
+            result = offset;
+        });
+
+    TriggerSettledSamples(1);
+    EXPECT_FALSE(result.has_value());
+
+    ExecuteAllActions();
+    ASSERT_TRUE(result.has_value());
+    EXPECT_NEAR(result->Value(), 0.25f, 0.001f);
+}
+
+TEST_F(MotorAlignmentTest, SamplesArrivingBeforeTheOutcomeIsDeliveredAreIgnored)
+{
+    services::MotorAlignmentImpl::AlignmentConfig config;
+    config.settledCount = 1;
+    config.settledThreshold = foc::Radians{ 1.0f };
+
+    EXPECT_CALL(encoderMock, Read()).Times(3).WillRepeatedly(Return(foc::Radians{ 0.25f }));
+    EXPECT_CALL(encoderMock, SetZero());
+    EXPECT_CALL(driverMock, Stop()).Times(2);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+
+    std::size_t fired = 0;
+    alignment->ForceAlignment(7, config, [&fired](auto)
+        {
+            ++fired;
+        });
+
+    TriggerSettledSamples(3);
+    ExecuteAllActions();
+
+    EXPECT_EQ(1u, fired);
+}
+
+TEST_F(MotorAlignmentTest, AnAbortBeforeTheOutcomeIsDeliveredDropsIt)
+{
+    services::MotorAlignmentImpl::AlignmentConfig config;
+    config.settledCount = 1;
+    config.settledThreshold = foc::Radians{ 1.0f };
+
+    EXPECT_CALL(encoderMock, Read()).WillRepeatedly(Return(foc::Radians{ 0.25f }));
+    EXPECT_CALL(encoderMock, SetZero());
+    EXPECT_CALL(driverMock, Stop()).Times(3);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+
+    bool fired = false;
+    alignment->ForceAlignment(7, config, [&fired](auto)
+        {
+            fired = true;
+        });
+
+    TriggerSettledSamples(1);
+    alignment->Abort();
+    ExecuteAllActions();
+
+    EXPECT_FALSE(fired);
+}
+
+TEST_F(MotorAlignmentTest, AnOutcomeQueuedByAnAbortedRunDoesNotCompleteTheNextRun)
+{
+    services::MotorAlignmentImpl::AlignmentConfig config;
+    config.settledCount = 1;
+    config.settledThreshold = foc::Radians{ 1.0f };
+
+    EXPECT_CALL(encoderMock, Read()).WillRepeatedly(Return(foc::Radians{ 0.25f }));
+    EXPECT_CALL(encoderMock, SetZero());
+    EXPECT_CALL(driverMock, Stop()).Times(4);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(2);
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .Times(2)
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+
+    alignment->ForceAlignment(7, config, [](auto) {});
+    TriggerSettledSamples(1);
+    alignment->Abort();
+
+    bool fired = false;
+    alignment->ForceAlignment(7, config, [&fired](auto)
+        {
+            fired = true;
+        });
+    ExecuteAllActions();
 
     EXPECT_FALSE(fired);
 }

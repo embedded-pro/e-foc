@@ -29,13 +29,15 @@
   title: The control interrupt measures its own execution time
   shall: >
     The platform shall measure the duration of every control-interrupt execution with the Cortex-M
-    cycle counter and shall maintain, without dynamic allocation, the last, minimum, maximum and a
-    filtered average of that duration, together with the count of executions. The measurement shall
-    span the application callback — encoder read, control law and PWM write — that executes inside
-    the interrupt context. Hardware ISR entry/exit overhead and any platform-specific pre-processing
-    that is not part of the real-time control law (such as simulation model steps in QEMU) are
-    excluded from the measured window. REQ-PERF-001 accounts for this: the 4500-cycle budget covers
-    Calculate() with 25% headroom reserved for ISR entry/exit overhead outside the measured window.
+    cycle counter, or on the emulated target, which has none, with a free-running timer of its
+    instruction-counted clock, and shall maintain, without dynamic allocation, the last, minimum,
+    maximum and a filtered average of that duration, together with the count of executions. The
+    measurement shall span the application callback — encoder read, control law and PWM write — that
+    executes inside the interrupt context. Hardware ISR entry/exit overhead and any platform-
+    specific pre-processing that is not part of the real-time control law (such as simulation model
+    steps in QEMU) are excluded from the measured window. REQ-PERF-001 accounts for this: the
+    4500-cycle budget covers Calculate() with 25% headroom reserved for ISR entry/exit overhead
+    outside the measured window.
 
 - id: REQ-PERF-005
   title: Overruns and deadline misses are counted separately
@@ -58,3 +60,11 @@
     The CAN adapter shall count every error class it reports, not only the bus-off condition that
     raises a fault. Counting shall happen on the common adapter base so that no reporting path can
     omit it, and the counters shall be readable from the command line.
+
+- id: REQ-PERF-008
+  title: Commanded alignment and closed-loop running hold the control-interrupt budget
+  shall: >
+    In every control mode, while the rotor is aligned on command and while the motor then runs
+    closed loop, no control-interrupt execution shall exceed the budget or the control period, and
+    none shall re-enter. Rotor alignment shall deliver its outcome from the event loop, not from
+    the interrupt that decides it.
