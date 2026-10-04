@@ -2,6 +2,7 @@
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/services/InjectionCurrentLimit.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
+#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include <cmath>
 
 namespace services
@@ -22,10 +23,12 @@ namespace services
 
         this->polePairs = polePairs;
         alignmentConfig = config;
-        onAlignmentDone = onDone;
+        ++run;
+        finishing = false;
         currentSampleIndex = 0;
         consecutiveSettledSamples = 0;
         previousPosition = encoder.Read();
+        onAlignmentDone = onDone;
 
         timeoutTimer.Start(config.timeout, [this]()
             {
@@ -46,19 +49,19 @@ namespace services
 
         driver.PhaseCurrentsReady(alignmentConfig.samplingFrequency, [this](auto currents)
             {
-                if (!onAlignmentDone)
+                if (!onAlignmentDone || finishing)
                     return;
 
                 if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
                 {
-                    FailToConverge();
+                    Finish(std::nullopt);
                     return;
                 }
 
                 currentSampleIndex++;
 
                 if (currentSampleIndex >= alignmentConfig.maxSamples)
-                    FailToConverge();
+                    Finish(std::nullopt);
                 else
                     ProcessPosition();
             });
@@ -85,21 +88,42 @@ namespace services
     {
         alignedPosition = encoder.Read();
         encoder.SetZero();
-
-        timeoutTimer.Cancel();
-        driver.Stop();
-
-        if (onAlignmentDone)
-            onAlignmentDone(std::make_optional<foc::Radians>(alignedPosition));
+        Finish(std::make_optional<foc::Radians>(alignedPosition));
     }
 
     void MotorAlignmentImpl::FailToConverge()
     {
-        timeoutTimer.Cancel();
+        if (finishing)
+            return;
+
         driver.Stop();
+        Complete(std::nullopt);
+    }
+
+    // Interrupt context: the caller's completion is event-loop work, and the run tag drops an aborted run's outcome.
+    void MotorAlignmentImpl::Finish(std::optional<foc::Radians> result)
+    {
+        driver.Stop();
+        outcome = result;
+        finishing = true;
+
+        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
+            [finishingRun = run](const infra::SharedPtr<MotorAlignmentImpl>& self)
+            {
+                if (self->run != finishingRun)
+                    return;
+
+                self->Complete(self->outcome);
+            },
+            WeakFromThis());
+    }
+
+    void MotorAlignmentImpl::Complete(std::optional<foc::Radians> result)
+    {
+        timeoutTimer.Cancel();
 
         if (onAlignmentDone)
-            onAlignmentDone(std::nullopt);
+            onAlignmentDone(result);
     }
 
     void MotorAlignmentImpl::Abort()

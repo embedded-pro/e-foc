@@ -50,7 +50,7 @@ namespace application
         services::NvmEepromRegion configRegion;
         services::NonVolatileMemoryImpl nvm;
         services::ElectricalParametersIdentificationImpl electricalIdent;
-        services::MotorAlignmentImpl motorAlignment;
+        infra::WithSharedAccess<services::MotorAlignmentImpl> motorAlignment;
         infra::WithSharedAccess<state_machine::PlatformFaultNotifier> platformFaultNotifier;
         supervision::EncoderPlausibilityMonitor encoderPlausibility;
         services::ConfigData configData;
