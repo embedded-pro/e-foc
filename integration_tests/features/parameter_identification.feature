@@ -10,7 +10,10 @@ Feature: Parameter Identification Against a Known Plant
   motors. The online estimators regress window averages the control interrupt
   accumulates over each outer-loop period, and the resistance is observable
   because the speed and position cascades carry a small d-axis square wave while
-  the electrical estimator runs. See Part J of
+  the electrical estimator runs. With a constant shaft torque the excitation
+  waits on the plant's clock until the torque is on: the step that enables the
+  motor waits in host time, so a slow host would otherwise start the rotor
+  before the load arrives. See Part J of
   documentation/design/software-in-the-loop.md.
 
   @sil @REQ-CAL-012
@@ -128,6 +131,7 @@ Feature: Parameter Identification Against a Known Plant
     When the target boots
     And the rotor is aligned
     And the motor is enabled
+    And the response is captured for 700 ms after enable
     And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
     And the online estimates are read
     Then the online inertia estimate shall be within 20 % of the plant
