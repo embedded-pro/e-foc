@@ -20,19 +20,12 @@ namespace foc
         speedPid.Reset();
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
     foc::Ampere PidSpeedController::Compute(const SpeedControlContext& context)
     {
         speedPid.SetPoint(context.reference.Value());
 
         return LimitToCurrentEnvelope(speedPid.Process(context.measured.Value()) * parameters.maxCurrent.Value(), parameters.maxCurrent);
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 
     bool PidSpeedController::ApplyGains()
     {

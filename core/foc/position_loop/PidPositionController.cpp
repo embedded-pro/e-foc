@@ -24,10 +24,6 @@ namespace foc
         primed = false;
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
     PositionOutput PidPositionController::Compute(const PositionControlContext& context)
     {
         const auto error = WrappedPositionError(context.reference, context.measured);
@@ -42,9 +38,6 @@ namespace foc
 
         return { PositionOutputKind::speedReference, output * SpeedEnvelope() };
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 
     float PidPositionController::SpeedEnvelope() const
     {

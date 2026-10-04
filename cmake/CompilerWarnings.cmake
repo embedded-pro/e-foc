@@ -8,7 +8,7 @@ function(e_foc_enable_project_warnings)
         add_compile_options(-Wall -Wextra)
     endif()
 
-    # At -O3 GCC inlines infra::Function::operator() into our translation units and reports
+    # GCC inlines infra::Function::operator() into our translation units and reports
     # -Wmaybe-uninitialized against the caller, naming an index into a single object. Definite
     # -Wuninitialized stays on; see AGENTS.md.
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

@@ -141,10 +141,6 @@ namespace foc
         return observation;
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
     void PositionCascade::LowPriorityHandler()
     {
         auto mechanicalSpeed = MeasureMechanicalSpeed();
@@ -176,7 +172,4 @@ namespace foc
     {
         return CalculateInnerLoop(currentPhases, position);
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 }

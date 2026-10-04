@@ -26,17 +26,10 @@ namespace foc
         referenceFilter.Reset();
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
     foc::Ampere TwoDofSpeedController::Compute(const SpeedControlContext& context)
     {
         return feedback.Compute({ context.measured, foc::RadiansPerSecond{ referenceFilter.Filter(context.reference.Value()) } });
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 
     void TwoDofSpeedController::ApplyReferenceFilter()
     {

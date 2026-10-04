@@ -129,10 +129,6 @@ namespace foc
         inverter.PhaseCurrentsReady(inverter.BaseFrequency(), [](auto) {});
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
     template<typename FocImpl>
     OPTIMIZE_FOR_SPEED void Runner<FocImpl>::OnPhaseCurrents(const PhaseCurrents& currentPhases)
     {
@@ -145,7 +141,4 @@ namespace foc
         if (observerRegistered)
             phaseCurrentsObserver(currentPhases);
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 }

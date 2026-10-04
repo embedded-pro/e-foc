@@ -254,10 +254,6 @@ namespace application
         return *peripherals->canBus;
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
     void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
         onPhaseCurrentsReady = onDone;
@@ -290,9 +286,6 @@ namespace application
                 pwm.Start(dutyPhases.a, dutyPhases.b, dutyPhases.c);
             });
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 
     void PlatformFactoryImpl::Start()
     {
@@ -315,17 +308,10 @@ namespace application
         return pwmBaseFrequency;
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
     foc::Radians PlatformFactoryImpl::Read()
     {
         return peripherals->encoder->Read() - encoderOffset;
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 
     void PlatformFactoryImpl::Set(foc::Radians value)
     {

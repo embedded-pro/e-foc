@@ -137,10 +137,6 @@ namespace services
             Complete(std::nullopt, std::nullopt);
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
     void MechanicalParametersIdentificationImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant)
     {
         if (!rls.has_value())
@@ -192,7 +188,4 @@ namespace services
         outcome = Outcome::converged;
         ScheduleFinish();
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 }

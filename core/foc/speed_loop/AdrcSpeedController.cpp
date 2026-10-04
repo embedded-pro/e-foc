@@ -29,10 +29,6 @@ namespace foc
         lastApplied = 0.0f;
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
     foc::Ampere AdrcSpeedController::Compute(const SpeedControlContext& context)
     {
         const auto current = adrc.Compute(context.reference.Value(), context.measured.Value(), lastApplied);
@@ -41,9 +37,6 @@ namespace foc
 
         return applied;
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 
     AdrcSpeedController::SpeedAdrc AdrcSpeedController::Inert()
     {

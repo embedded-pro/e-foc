@@ -329,10 +329,6 @@ namespace application
         onPhaseCurrentsReadyValid = true;
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
     void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
         lastDutyPhases = dutyPhases;
@@ -384,9 +380,6 @@ namespace application
 
         boardProtection.Evaluate(lastCurrents, model.EffectiveSupplyVoltage().Value(), model.WindingTemperatureCelsius());
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 
     void PlatformFactoryImpl::Start()
     {
@@ -484,17 +477,10 @@ namespace application
         return model.MaxCurrentSupported();
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
     foc::Radians PlatformFactoryImpl::Read()
     {
         return model.Read();
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 
     void PlatformFactoryImpl::Set(foc::Radians value)
     {
