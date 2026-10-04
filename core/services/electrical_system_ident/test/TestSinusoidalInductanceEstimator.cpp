@@ -3,6 +3,7 @@
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/electrical_system_ident/SinusoidalInductanceEstimator.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
+#include "infra/util/WithSharedAccess.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
@@ -26,6 +27,7 @@ namespace
     };
 
     PlantSimResult RunPlantSimulation(
+        infra::ClockFixture& clock,
         StrictMock<drivers::ThreePhaseInverterMock>& driverMock,
         services::SinusoidalInductanceEstimator& estimator,
         const services::SinusoidalInductanceEstimator::Config& config,
@@ -88,6 +90,7 @@ namespace
             iAlpha = plant.ad * iAlpha + plant.bd * vTerm;
         }
 
+        clock.ExecuteAllActions();
         return { result, expectedL };
     }
 
@@ -96,9 +99,34 @@ namespace
         , public infra::ClockFixture
     {
     public:
+        void TearDown() override
+        {
+            ExecuteAllActions();
+        }
+
+        void ExpectAnInjection()
+        {
+            EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+                .WillOnce([this](auto, const auto& cb)
+                    {
+                        driverMock.StorePhaseCurrentsCallback(cb);
+                    });
+            EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+        }
+
+        void TriggerOvercurrent()
+        {
+            driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+                foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+        }
+
+        const services::SinusoidalInductanceEstimator::Config shortConfig{
+            hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 2, 5, 1, services::WindingConfiguration::Wye
+        };
+
         StrictMock<drivers::ThreePhaseInverterMock> driverMock;
         foc::Volts busVoltage{ vdc };
-        services::SinusoidalInductanceEstimator estimator{ driverMock, busVoltage };
+        infra::WithSharedAccess<services::SinusoidalInductanceEstimator> estimator{ driverMock, busVoltage };
     };
 }
 
@@ -110,7 +138,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, start_registers_phase_current_callback
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [](auto) {});
+    estimator->Start(config, [](auto) {});
 }
 
 TEST_F(SinusoidalInductanceEstimatorTest, zero_current_response_returns_no_inductance)
@@ -133,7 +161,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, zero_current_response_returns_no_induc
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(totalSamples + 1);
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r)
+    estimator->Start(config, [&result](auto r)
         {
             result = r;
         });
@@ -141,6 +169,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, zero_current_response_returns_no_induc
     for (std::size_t k = 0; k < totalSamples; ++k)
         driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
             foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    ExecuteAllActions();
 
     EXPECT_FALSE(result.inductance.has_value());
     EXPECT_FLOAT_EQ(result.fitQuality, 0.0f);
@@ -156,7 +185,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_o
         hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 5, 20, 1, services::WindingConfiguration::Wye
     };
 
-    auto [result, expectedL] = RunPlantSimulation(driverMock, estimator, config, rTerminal, lTerminalMH);
+    auto [result, expectedL] = RunPlantSimulation(*this, driverMock, *estimator, config, rTerminal, lTerminalMH);
 
     ASSERT_TRUE(result.inductance.has_value());
     EXPECT_NEAR(result.inductance->Value(), expectedL, expectedL * 0.01f);
@@ -173,7 +202,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_o
         hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 5, 20, 1, services::WindingConfiguration::Wye
     };
 
-    auto [result, expectedL] = RunPlantSimulation(driverMock, estimator, config, rTerminal, lTerminalMH);
+    auto [result, expectedL] = RunPlantSimulation(*this, driverMock, *estimator, config, rTerminal, lTerminalMH);
 
     ASSERT_TRUE(result.inductance.has_value());
     EXPECT_NEAR(result.inductance->Value(), expectedL, expectedL * 0.01f);
@@ -190,7 +219,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_o
         hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 5, 20, 1, services::WindingConfiguration::Wye
     };
 
-    auto [result, expectedL] = RunPlantSimulation(driverMock, estimator, config, rTerminal, lTerminalMH);
+    auto [result, expectedL] = RunPlantSimulation(*this, driverMock, *estimator, config, rTerminal, lTerminalMH);
 
     ASSERT_TRUE(result.inductance.has_value());
     EXPECT_NEAR(result.inductance->Value(), expectedL, expectedL * 0.01f);
@@ -206,7 +235,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_o
         hal::Hertz{ 500 }, hal::DutyCycle::FromPercent(15), 5, 20, 1, services::WindingConfiguration::Wye
     };
 
-    auto [result, expectedL] = RunPlantSimulation(driverMock, estimator, config, rTerminal, lTerminalMH);
+    auto [result, expectedL] = RunPlantSimulation(*this, driverMock, *estimator, config, rTerminal, lTerminalMH);
 
     ASSERT_TRUE(result.inductance.has_value());
     EXPECT_NEAR(result.inductance->Value(), expectedL, expectedL * 0.01f);
@@ -233,7 +262,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, fitQuality_drops_for_unexpected_signal
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(totalSamples + 1);
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r)
+    estimator->Start(config, [&result](auto r)
         {
             result = r;
         });
@@ -242,6 +271,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, fitQuality_drops_for_unexpected_signal
     for (std::size_t k = 0; k < totalSamples; ++k)
         driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
             foc::Ampere{ 1.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    ExecuteAllActions();
 
     EXPECT_LT(result.fitQuality, 0.5f);
 }
@@ -254,7 +284,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, zero_injection_frequency_returns_empty
 
     services::SinusoidalInductanceEstimator::Result result{ foc::MilliHenry{ 99.0f }, 1.0f };
 
-    estimator.Start(config, [&result](auto r)
+    estimator->Start(config, [&result](auto r)
         {
             result = r;
         });
@@ -285,7 +315,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, negative_zimag_returns_nullopt_inducta
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(totalSamples + 1);
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r)
+    estimator->Start(config, [&result](auto r)
         {
             result = r;
         });
@@ -301,6 +331,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, negative_zimag_returns_nullopt_inducta
             foc::Ampere{ std::cos(phase) }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
         phase += phaseInc;
     }
+    ExecuteAllActions();
 
     // zImag <= 0 → nullopt inductance but fitQuality is computed
     EXPECT_FALSE(result.inductance.has_value());
@@ -323,7 +354,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, overcurrent_on_first_sample_stops_driv
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r)
+    estimator->Start(config, [&result](auto r)
         {
             result = r;
         });
@@ -332,6 +363,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, overcurrent_on_first_sample_stops_driv
         foc::Ampere{ drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f },
         foc::Ampere{ 0.0f },
         foc::Ampere{ 0.0f } });
+    ExecuteAllActions();
 
     EXPECT_FALSE(result.inductance.has_value());
     EXPECT_FLOAT_EQ(result.fitQuality, 0.0f);
@@ -353,7 +385,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, overcurrent_on_phase_b_also_aborts)
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r)
+    estimator->Start(config, [&result](auto r)
         {
             result = r;
         });
@@ -363,11 +395,12 @@ TEST_F(SinusoidalInductanceEstimatorTest, overcurrent_on_phase_b_also_aborts)
         foc::Ampere{ -(drivers::ThreePhaseInverterMock::defaultMaxCurrent + 1.0f) },
         foc::Ampere{ 0.0f } });
 
-    EXPECT_FALSE(result.inductance.has_value());
-
     // No further PWM injection after abort
     driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
         foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+    ExecuteAllActions();
+
+    EXPECT_FALSE(result.inductance.has_value());
 }
 
 TEST_F(SinusoidalInductanceEstimatorTest, delta_winding_recovers_inductance_correctly)
@@ -380,7 +413,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, delta_winding_recovers_inductance_corr
         hal::Hertz{ 700 }, hal::DutyCycle::FromPercent(15), 5, 20, 1, services::WindingConfiguration::Delta
     };
 
-    auto [result, expectedL] = RunPlantSimulation(driverMock, estimator, config, rTerminal, lTerminalMH);
+    auto [result, expectedL] = RunPlantSimulation(*this, driverMock, *estimator, config, rTerminal, lTerminalMH);
 
     ASSERT_TRUE(result.inductance.has_value());
     EXPECT_NEAR(result.inductance->Value(), expectedL, expectedL * 0.02f);
@@ -399,7 +432,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, no_sample_timeout_fires_if_no_adc_call
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r)
+    estimator->Start(config, [&result](auto r)
         {
             result = r;
         });
@@ -427,7 +460,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, sample_watchdog_fires_once_samples_sto
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(samplesSent + 1);
     EXPECT_CALL(driverMock, Stop());
 
-    estimator.Start(config, [&result](auto r)
+    estimator->Start(config, [&result](auto r)
         {
             result = r;
         });
@@ -452,7 +485,89 @@ TEST_F(SinusoidalInductanceEstimatorTest, destructor_stops_driver_when_destroyed
     EXPECT_CALL(localMock, Stop());
 
     {
-        services::SinusoidalInductanceEstimator local{ localMock, foc::Volts{ 24.0f } };
-        local.Start(config, [](auto) {});
+        infra::WithSharedAccess<services::SinusoidalInductanceEstimator> local{ localMock, foc::Volts{ 24.0f } };
+        local->Start(config, [](auto) {});
     }
+}
+
+TEST_F(SinusoidalInductanceEstimatorTest, the_result_is_delivered_from_the_event_loop_not_from_the_sample_callback)
+{
+    ExpectAnInjection();
+    EXPECT_CALL(driverMock, Stop());
+
+    std::optional<services::SinusoidalInductanceEstimator::Result> result;
+    estimator->Start(shortConfig, [&result](auto r)
+        {
+            result = r;
+        });
+
+    TriggerOvercurrent();
+    EXPECT_FALSE(result.has_value());
+
+    ExecuteAllActions();
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->inductance.has_value());
+}
+
+TEST_F(SinusoidalInductanceEstimatorTest, an_abort_before_the_result_is_delivered_drops_it)
+{
+    ExpectAnInjection();
+    EXPECT_CALL(driverMock, Stop()).Times(2);
+
+    bool fired = false;
+    estimator->Start(shortConfig, [&fired](auto)
+        {
+            fired = true;
+        });
+
+    TriggerOvercurrent();
+    estimator->Abort();
+    ExecuteAllActions();
+
+    EXPECT_FALSE(fired);
+}
+
+TEST_F(SinusoidalInductanceEstimatorTest, a_result_queued_by_an_aborted_run_does_not_complete_the_next_run)
+{
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .Times(2)
+        .WillRepeatedly([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(2);
+    EXPECT_CALL(driverMock, Stop()).Times(3);
+
+    estimator->Start(shortConfig, [](auto) {});
+    TriggerOvercurrent();
+    estimator->Abort();
+
+    bool fired = false;
+    estimator->Start(shortConfig, [&fired](auto)
+        {
+            fired = true;
+        });
+    ExecuteAllActions();
+
+    EXPECT_FALSE(fired);
+}
+
+TEST_F(SinusoidalInductanceEstimatorTest, a_watchdog_timeout_while_the_outcome_is_queued_leaves_it_to_be_delivered)
+{
+    ExpectAnInjection();
+    EXPECT_CALL(driverMock, Stop());
+
+    std::optional<services::SinusoidalInductanceEstimator::Result> result;
+    estimator->Start(shortConfig, [&result](auto r)
+        {
+            result = r;
+        });
+
+    TriggerOvercurrent();
+    systemTimerService.TimeProgressed(shortConfig.noSampleTimeout);
+    EXPECT_FALSE(result.has_value());
+
+    ExecuteAllActions();
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->inductance.has_value());
 }

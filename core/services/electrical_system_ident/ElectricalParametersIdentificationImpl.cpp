@@ -3,6 +3,7 @@
 #include "core/foc/math/DutyConversion.hpp"
 #include "core/services/InjectionCurrentLimit.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
+#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include <cmath>
 #include <numbers>
 
@@ -37,7 +38,7 @@ namespace services
         onResistanceAndInductanceDone = onDone;
         pendingResult = ResistanceInductanceResult{};
 
-        resistanceEstimator.Start(
+        resistanceEstimator->Start(
             ResistanceEstimator::Config{ config.testVoltage, config.settleTime, config.windingConfig },
             [this](auto result)
             {
@@ -56,7 +57,7 @@ namespace services
             return;
         }
 
-        inductanceEstimator.Start(
+        inductanceEstimator->Start(
             SinusoidalInductanceEstimator::Config{
                 rlConfig.injectionFrequency,
                 rlConfig.injectionVoltage,
@@ -80,6 +81,8 @@ namespace services
             onDone(std::nullopt);
             return;
         }
+        ++polePairsRun;
+        polePairsFinishing = false;
         polePairsRunning = true;
         polePairsConfig = config;
         onPolePairsDone = onDone;
@@ -91,11 +94,11 @@ namespace services
 
         driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
             {
-                if (!polePairsRunning)
+                if (!polePairsRunning || polePairsFinishing)
                     return;
 
                 if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
-                    FailPolePairs();
+                    FinishPolePairs();
             });
         ApplyNextElectricalAngle();
     }
@@ -107,8 +110,8 @@ namespace services
 
     void ElectricalParametersIdentificationImpl::Abort()
     {
-        resistanceEstimator.Abort();
-        inductanceEstimator.Abort();
+        resistanceEstimator->Abort();
+        inductanceEstimator->Abort();
         rlRunning = false;
         onResistanceAndInductanceDone = nullptr;
 
@@ -121,13 +124,29 @@ namespace services
         }
     }
 
+    // Interrupt context: only the bridge stops here; the step timer and the caller belong to the event loop, and the run tag drops an aborted run's outcome.
+    void ElectricalParametersIdentificationImpl::FinishPolePairs()
+    {
+        driver.Stop();
+        polePairsFinishing = true;
+
+        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
+            [finishingRun = polePairsRun](const infra::SharedPtr<ElectricalParametersIdentificationImpl>& self)
+            {
+                if (self->polePairsRun != finishingRun)
+                    return;
+
+                self->FailPolePairs();
+            },
+            WeakFromThis());
+    }
+
     void ElectricalParametersIdentificationImpl::FailPolePairs()
     {
         if (!polePairsRunning)
             return;
 
         settleTimer.Cancel();
-        driver.Stop();
         polePairsRunning = false;
 
         if (onPolePairsDone)
@@ -154,7 +173,7 @@ namespace services
 
         settleTimer.Start(polePairsConfig.settleTimeBetweenSteps, [this]()
             {
-                if (!polePairsRunning)
+                if (!polePairsRunning || polePairsFinishing)
                     return;
 
                 const auto currentPosition = encoder.Read();

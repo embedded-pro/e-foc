@@ -35,6 +35,7 @@ date: 2026-08-30
 - Delivering a combined `ResistanceInductanceResult` — resistance, inductance, and fit quality — via a single completion callback once both sub-estimators finish
 - Enforcing that R/L identification and pole-pairs estimation cannot run concurrently
 - Stopping the inverter cleanly before invoking any completion callback
+- Delivering every completion from the event loop, never from the sampling interrupt that decides it
 - Rejecting calibration when `fitQuality < 0.5` (incoherent injection response)
 
 **Is NOT responsible for:**
@@ -95,6 +96,19 @@ the no-sample watchdog), and drops the pending completion **without invoking it*
 owns the outcome, so a fault raised by the state machine cannot be overwritten by the result of the
 procedure it interrupted. It covers whichever stage is live: resistance, inductance injection, or the
 pole-pairs sweep.
+
+The decisions that end a procedure on a sample — the resistance buffer filling, the inductance block
+completing, a phase current over the limit — are taken in the sampling interrupt, and so is the one thing that
+must happen at that instant: the injection is stopped there. The completion is not. Computing the result,
+starting the inductance stage once the resistance is known, and whatever the caller does next — answering over
+CAN, tracing, starting the next calibration step — is event-loop work. Run from the interrupt, it started the
+inductance stage from inside the resistance stage's own sample callback, started and cancelled timers there,
+and in a full calibration took one execution of 6709 cycles, more than five control periods
+(`software-in-the-loop.md`, Part I). So the outcome is queued and delivered from the event loop. Until then the
+run is still in progress: samples are discarded, the settle and step timers and the no-sample watchdog do
+nothing, and `Abort()` drops the queued outcome. The outcome carries the run it belongs to, so one that an
+abort overtook cannot complete a run started after it. Outcomes decided on the event loop already — the
+pole-pair count, which the sweep computes on its step timer, and a no-sample failure — complete directly.
 
 Every estimator is also RAII-safe: if destroyed while active, the destructor cancels all timers and stops
 the driver without invoking the completion callback.
@@ -263,10 +277,10 @@ flowchart TD
 
 ### Provided
 
-| Interface                                         | Purpose                                                                                                                                | Contract                                                                                                                                   |
-|---------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
-| `EstimateResistanceAndInductance(config, onDone)` | Sequences DC-step R estimation then sinusoidal L estimation; delivers `ResistanceInductanceResult{resistance, inductance, fitQuality}` | Rejected (immediate empty callback) if pole-pairs procedure is already running; inverter stopped before callback fires; fires exactly once |
-| `EstimateNumberOfPolePairs(config, onDone)`       | Sweeps an open-loop rotating vector and delivers `optional<size_t>` pole pairs                                                         | Rejected if R/L procedure is already running; inverter stopped before callback fires; fires exactly once                                   |
+| Interface                                         | Purpose                                                                                                                                | Contract                                                                                                                                                        |
+|---------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `EstimateResistanceAndInductance(config, onDone)` | Sequences DC-step R estimation then sinusoidal L estimation; delivers `ResistanceInductanceResult{resistance, inductance, fitQuality}` | Rejected (immediate empty callback) if pole-pairs procedure is already running; inverter stopped before callback fires; fires exactly once, from the event loop |
+| `EstimateNumberOfPolePairs(config, onDone)`       | Sweeps an open-loop rotating vector and delivers `optional<size_t>` pole pairs                                                         | Rejected if R/L procedure is already running; inverter stopped before callback fires; fires exactly once, from the event loop                                   |
 
 ### Result Type
 

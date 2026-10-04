@@ -1,6 +1,7 @@
 #include "core/services/electrical_system_ident/ResistanceEstimator.hpp"
 #include "core/foc/math/DutyConversion.hpp"
 #include "core/services/InjectionCurrentLimit.hpp"
+#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include <numeric>
 
 namespace
@@ -42,9 +43,11 @@ namespace services
     void ResistanceEstimator::Start(const Config& config, const infra::Function<void(Result)>& onDone)
     {
         activeConfig = config;
-        this->onDone = onDone;
+        ++run;
+        finishing = false;
         currentSamples.clear();
         filteredSamples.clear();
+        this->onDone = onDone;
         StartSettlePhase();
     }
 
@@ -52,13 +55,13 @@ namespace services
     {
         driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
             {
-                if (!this->onDone)
+                if (!this->onDone || finishing)
                     return;
 
                 sampleSeen = true;
 
                 if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
-                    FailMeasurement();
+                    Finish(false);
             });
         driver.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{
             activeConfig.testVoltage,
@@ -68,6 +71,9 @@ namespace services
         StartSampleWatchdog();
         settleTimer.Start(activeConfig.settleTime, [this]()
             {
+                if (finishing)
+                    return;
+
                 StartMeasurementPhase();
             });
     }
@@ -83,14 +89,14 @@ namespace services
 
     void ResistanceEstimator::OnMeasurementSample(foc::PhaseCurrents currents)
     {
-        if (!onDone)
+        if (!onDone || finishing)
             return;
 
         sampleSeen = true;
 
         if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
         {
-            FailMeasurement();
+            Finish(false);
             return;
         }
 
@@ -100,7 +106,7 @@ namespace services
             filteredSamples.push_back(AverageAndRemoveFront(currentSamples));
 
         if (filteredSamples.full())
-            OnMeasurementComplete();
+            Finish(true);
     }
 
     void ResistanceEstimator::Abort()
@@ -128,6 +134,9 @@ namespace services
 
     void ResistanceEstimator::FailMeasurement()
     {
+        if (finishing)
+            return;
+
         settleTimer.Cancel();
         noSampleTimer.Cancel();
         driver.Stop();
@@ -136,18 +145,39 @@ namespace services
             onDone(Result{});
     }
 
-    void ResistanceEstimator::OnMeasurementComplete()
+    // Interrupt context: only the injection stops here; the timers and the caller belong to the event loop, and the run tag drops an aborted run's outcome.
+    void ResistanceEstimator::Finish(bool measured)
     {
-        noSampleTimer.Cancel();
         driver.Stop();
+        measurementComplete = measured;
+        finishing = true;
 
+        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
+            [finishingRun = run](const infra::SharedPtr<ResistanceEstimator>& self)
+            {
+                if (self->run != finishingRun)
+                    return;
+
+                self->Complete();
+            },
+            WeakFromThis());
+    }
+
+    void ResistanceEstimator::Complete()
+    {
+        settleTimer.Cancel();
+        noSampleTimer.Cancel();
+
+        if (onDone)
+            onDone(measurementComplete ? Measure() : Result{});
+    }
+
+    ResistanceEstimator::Result ResistanceEstimator::Measure() const
+    {
         const float steadyStateCurrent = GetSteadyStateCurrent(filteredSamples);
 
         if (steadyStateCurrent <= 0.0f)
-        {
-            onDone(Result{});
-            return;
-        }
+            return Result{};
 
         const auto appliedDuty = foc::DutyFraction(activeConfig.testVoltage) - foc::DutyFraction(neutralDuty);
         const float terminalVoltage = appliedDuty * vdc.Value();
@@ -156,7 +186,6 @@ namespace services
                                          : wyeTerminalFactor;
         const float phaseResistance = terminalVoltage / steadyStateCurrent / terminalFactor;
 
-        filteredSamples.clear();
-        onDone(Result{ foc::Ohm{ phaseResistance } });
+        return Result{ foc::Ohm{ phaseResistance } };
     }
 }

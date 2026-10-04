@@ -49,7 +49,7 @@ namespace application
         services::NvmEepromRegion calibrationRegion;
         services::NvmEepromRegion configRegion;
         services::NonVolatileMemoryImpl nvm;
-        services::ElectricalParametersIdentificationImpl electricalIdent;
+        infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent;
         infra::WithSharedAccess<services::MotorAlignmentImpl> motorAlignment;
         infra::WithSharedAccess<state_machine::PlatformFaultNotifier> platformFaultNotifier;
         supervision::EncoderPlausibilityMonitor encoderPlausibility;

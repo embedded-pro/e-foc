@@ -78,7 +78,7 @@ namespace simulator
             motorParams, pidParameters, setpointConfig, vdc };
 
         infra::WithSharedAccess<services::MotorAlignmentImpl> alignment{ *model, *model };
-        services::ElectricalParametersIdentificationImpl electricalIdent{ *model, *model, vdc };
+        infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent{ *model, *model, vdc };
         infra::WithSharedAccess<services::MechanicalParametersIdentificationImpl> mechanicalIdent{ controller, controller, controller, *model, *model };
         const foc::NewtonMeter torqueConstant{ 1.5f * static_cast<float>(motorParams.p) * motorParams.psi_f.Value() };
 
@@ -92,7 +92,7 @@ namespace simulator
         QObject::connect(&mechanicalRls, &OnlineMechanicalRls::mechanicalEstimatesChanged,
             &gui, &Gui::OnMechanicalRlsUpdate);
 
-        WireCommonCalibrations(gui, controller, *alignment, electricalIdent, motorParams);
+        WireCommonCalibrations(gui, controller, *alignment, *electricalIdent, motorParams);
 
         QObject::connect(&gui, &Gui::identifyMechanicalRequested, [&]()
             {

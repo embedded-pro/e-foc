@@ -2,6 +2,7 @@
 #include "core/foc/math/DutyConversion.hpp"
 #include "core/services/InjectionCurrentLimit.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
+#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "numerical/math/Math.hpp"
 #include <algorithm>
 #include <cmath>
@@ -30,14 +31,16 @@ namespace services
     void SinusoidalInductanceEstimator::Start(const Config& config, const infra::Function<void(Result)>& onDone)
     {
         activeConfig = config;
-        this->onDone = onDone;
+        ++run;
+        finishing = false;
 
         if (!InitializeParameters())
         {
-            this->onDone(Result{});
+            onDone(Result{});
             return;
         }
 
+        this->onDone = onDone;
         BeginInjection();
     }
 
@@ -92,6 +95,32 @@ namespace services
         onDone = nullptr;
     }
 
+    // Interrupt context: only the injection stops here; the timer and the caller belong to the event loop, and the run tag drops an aborted run's outcome.
+    void SinusoidalInductanceEstimator::Finish(bool measured)
+    {
+        driver.Stop();
+        measurementComplete = measured;
+        finishing = true;
+
+        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
+            [finishingRun = run](const infra::SharedPtr<SinusoidalInductanceEstimator>& self)
+            {
+                if (self->run != finishingRun)
+                    return;
+
+                self->Complete();
+            },
+            WeakFromThis());
+    }
+
+    void SinusoidalInductanceEstimator::Complete()
+    {
+        noSampleTimer.Cancel();
+
+        if (onDone)
+            onDone(measurementComplete ? ComputeResult() : Result{});
+    }
+
     void SinusoidalInductanceEstimator::StartSampleWatchdog()
     {
         sampleSeen = false;
@@ -106,6 +135,9 @@ namespace services
 
     void SinusoidalInductanceEstimator::FailMeasurement()
     {
+        if (finishing)
+            return;
+
         noSampleTimer.Cancel();
         driver.Stop();
         if (onDone)
@@ -133,14 +165,12 @@ namespace services
 
     void SinusoidalInductanceEstimator::OnCurrentSample(foc::PhaseCurrents currents)
     {
-        if (!onDone)
+        if (!onDone || finishing)
             return;
 
         if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
         {
-            noSampleTimer.Cancel();
-            driver.Stop();
-            onDone(Result{});
+            Finish(false);
             return;
         }
 
@@ -154,11 +184,7 @@ namespace services
         sumSquared += iAlpha * iAlpha;
 
         if (goertzel->Ready())
-        {
-            noSampleTimer.Cancel();
-            driver.Stop();
-            onDone(ComputeResult());
-        }
+            Finish(true);
     }
 
     SinusoidalInductanceEstimator::Result SinusoidalInductanceEstimator::ComputeResult() const

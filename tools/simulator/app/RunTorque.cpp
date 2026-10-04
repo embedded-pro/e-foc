@@ -59,7 +59,7 @@ namespace simulator
             foc::M_2310P_LN_04K::parameters, pidParameters, setpointConfig, vdc };
 
         infra::WithSharedAccess<services::MotorAlignmentImpl> alignment{ model, model };
-        services::ElectricalParametersIdentificationImpl electricalIdent{ model, model, vdc };
+        infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent{ model, model, vdc };
 
         auto& gui = simulation.GetGui();
         gui.DisableMechanicalIdent();
@@ -68,7 +68,7 @@ namespace simulator
         QObject::connect(&electricalRls, &OnlineElectricalRls::electricalEstimatesChanged,
             &gui, &Gui::OnElectricalRlsUpdate);
 
-        WireCommonCalibrations(gui, controller, *alignment, electricalIdent, foc::M_2310P_LN_04K::parameters);
+        WireCommonCalibrations(gui, controller, *alignment, *electricalIdent, foc::M_2310P_LN_04K::parameters);
 
         QObject::connect(&gui, &Gui::setpointChanged, [&controller](int amps)
             {

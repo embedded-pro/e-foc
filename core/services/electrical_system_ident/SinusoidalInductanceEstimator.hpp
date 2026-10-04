@@ -6,12 +6,15 @@
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/AutoResetFunction.hpp"
+#include "infra/util/SharedPtr.hpp"
 #include "numerical/analysis/GoertzelAlgorithm.hpp"
+#include <cstdint>
 #include <optional>
 
 namespace services
 {
     class SinusoidalInductanceEstimator
+        : public infra::EnableSharedFromThis<SinusoidalInductanceEstimator>
     {
     public:
         struct Config
@@ -45,6 +48,8 @@ namespace services
         void OnCurrentSample(foc::PhaseCurrents currents);
         void StartSampleWatchdog();
         void FailMeasurement();
+        void Finish(bool measured);
+        void Complete();
         Result ComputeResult() const;
 
         static constexpr float wyeTerminalFactor = 1.5f;
@@ -58,6 +63,9 @@ namespace services
         infra::AutoResetFunction<void(Result)> onDone;
         infra::TimerRepeating noSampleTimer;
         volatile bool sampleSeen{ false };
+        volatile bool finishing{ false };
+        bool measurementComplete{ false };
+        uint32_t run{ 0 };
 
         float injectionPhase{ 0.0f };
         float phaseIncrement{ 0.0f };
