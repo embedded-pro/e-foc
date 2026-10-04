@@ -62,9 +62,10 @@
     omit it, and the counters shall be readable from the command line.
 
 - id: REQ-PERF-008
-  title: Commanded alignment and closed-loop running hold the control-interrupt budget
+  title: Calibration, commanded alignment and closed-loop running hold the control-interrupt budget
   shall: >
-    In every control mode, while the rotor is aligned on command and while the motor then runs
-    closed loop, no control-interrupt execution shall exceed the budget or the control period, and
-    none shall re-enter. Rotor alignment shall deliver its outcome from the event loop, not from
-    the interrupt that decides it.
+    Through a full calibration, while the rotor is aligned on command and while the motor then
+    runs closed loop in any control mode, no control-interrupt execution shall exceed the budget
+    or the control period, and none shall re-enter. Rotor alignment and every identification
+    procedure shall deliver its outcome from the event loop, not from the interrupt that
+    decides it.
