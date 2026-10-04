@@ -61,6 +61,8 @@ caller sees — defined in the class body or as a template in a header; there it
 `NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS` on (embedded and QEMU presets) it expands to `always_inline` + `inline` +
 O3/fast-math, so a function defined in a `.cpp` must never carry it: every other translation unit would call an
 `always_inline` function it has no body for, which fails the build. Out-of-line hot functions get the scoped pragma alone.
+A free function defined in a header takes `ALWAYS_INLINE_HOT` instead: it must stay `inline` in the builds where
+`OPTIMIZE_FOR_SPEED` is empty, and with it enabled the macro's own `inline` would be a duplicate.
 
 ## FOC theory — correctness
 

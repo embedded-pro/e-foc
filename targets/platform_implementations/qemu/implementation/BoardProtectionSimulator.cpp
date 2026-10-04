@@ -33,6 +33,10 @@ namespace application
                         : PlatformFactory::BoardProtectionState::clear;
     }
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("O3", "fast-math")
+#endif
     bool BoardProtectionSimulator::Exceeded(const foc::PhaseCurrents& currents,
         float busVoltageVolts, float windingTemperatureCelsius,
         PlatformFactory::BoardProtectionReason& reason) const
@@ -90,6 +94,9 @@ namespace application
             pending = true;
         }
     }
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC pop_options
+#endif
 
     void BoardProtectionSimulator::DeliverPendingProtection()
     {

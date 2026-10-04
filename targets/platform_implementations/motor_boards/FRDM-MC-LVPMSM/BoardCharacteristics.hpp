@@ -12,8 +12,8 @@ namespace application
         static constexpr float overvoltageThresholdVolts{ 58.0f };
 
         static constexpr float voltageToCurrent{ 5.0f };
-        static constexpr float maxCurrentAmps{ 15.0f };
-        static constexpr float overcurrentThresholdAmps{ 12.0f };
+        // 80 % of the +8.25 A that the mid-rail biased sense spans on a 3.3 V ADC
+        static constexpr float overcurrentThresholdAmps{ 6.6f };
 
         static constexpr float AdcToVoltsFactor(float adcReferenceVoltage, float adcResolution)
         {
@@ -35,12 +35,13 @@ namespace application
             return static_cast<uint16_t>((overvoltageThresholdVolts / (adcReferenceVoltage * voltageToVolts)) * (adcResolution - 1.0f));
         }
 
-        static constexpr uint16_t OvercurrentThresholdCounts(float adcResolution)
+        // Zero current reads half scale, so the trip level is an offset above it
+        static constexpr uint16_t OvercurrentThresholdCounts(float adcReferenceVoltage, float adcResolution)
         {
-            return static_cast<uint16_t>((overcurrentThresholdAmps / maxCurrentAmps) * (adcResolution - 1.0f));
+            return static_cast<uint16_t>((0.5f + overcurrentThresholdAmps / (adcReferenceVoltage * voltageToCurrent)) * (adcResolution - 1.0f));
         }
     };
 
     static_assert(BoardCharacteristics::OvervoltageThresholdCounts(3.3f, 4096.0f) == 3904u, "FRDM-MC-LVPMSM overvoltage threshold mismatch");
-    static_assert(BoardCharacteristics::OvercurrentThresholdCounts(4096.0f) == 3276u, "FRDM-MC-LVPMSM overcurrent threshold mismatch");
+    static_assert(BoardCharacteristics::OvercurrentThresholdCounts(3.3f, 4096.0f) == 3685u, "FRDM-MC-LVPMSM overcurrent threshold mismatch");
 }

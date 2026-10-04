@@ -77,7 +77,7 @@ namespace application
         constexpr static uint16_t overvoltageThresholdCounts =
             application::BoardCharacteristics::OvervoltageThresholdCounts(adcReferenceVoltage, adcResolution);
         constexpr static uint16_t overcurrentThresholdCounts =
-            application::BoardCharacteristics::OvercurrentThresholdCounts(adcResolution);
+            application::BoardCharacteristics::OvercurrentThresholdCounts(adcReferenceVoltage, adcResolution);
 
         constexpr static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator1;
 
