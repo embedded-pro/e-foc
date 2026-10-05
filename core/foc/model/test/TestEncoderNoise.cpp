@@ -13,6 +13,11 @@ namespace
         : public ::testing::Test
     {
     protected:
+        void Step()
+        {
+            model.StepForTest({ hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50), hal::DutyCycle::FromPercent(50) });
+        }
+
         foc::ThreePhaseMotorModel model{
             foc::M_2310P_LN_04K::parameters,
             foc::Volts{ 24.0f },
@@ -49,10 +54,37 @@ TEST_F(TestEncoderNoise, sigma_yields_zero_mean_perturbation)
 
     double sum = 0.0;
     for (int i = 0; i < samples; ++i)
-        sum += static_cast<double>(model.Read().Value()) - baseAngle;
+    {
+        Step();
+        sum += static_cast<double>(model.Read().Value()) - model.MechanicalAngle().Value();
+    }
 
     const double mean = sum / samples;
     EXPECT_NEAR(mean, 0.0, 5.0 * sigma / std::sqrt(static_cast<double>(samples)));
+}
+
+TEST_F(TestEncoderNoise, noise_is_drawn_once_per_plant_step)
+{
+    model.SetEncoderNoise(foc::ThreePhaseMotorModel::EncoderNoiseConfig{ 0.05f, 0.0f });
+    model.Set(foc::Radians{ 2.0f });
+
+    Step();
+    const auto first = model.Read().Value();
+    EXPECT_FLOAT_EQ(model.Read().Value(), first);
+
+    Step();
+    EXPECT_NE(model.Read().Value(), first);
+}
+
+TEST_F(TestEncoderNoise, disabling_noise_takes_effect_before_the_next_step)
+{
+    model.SetEncoderNoise(foc::ThreePhaseMotorModel::EncoderNoiseConfig{ 0.05f, 0.0f });
+    model.Set(foc::Radians{ 2.0f });
+    Step();
+
+    model.SetEncoderNoise(foc::ThreePhaseMotorModel::EncoderNoiseConfig{ 0.0f, 0.0f });
+
+    EXPECT_FLOAT_EQ(model.Read().Value(), model.MechanicalAngle().Value());
 }
 
 TEST_F(TestEncoderNoise, output_is_wrapped_into_zero_to_two_pi)

@@ -368,11 +368,11 @@ namespace application
         else if (onPhaseCurrentsReadyValid && onPhaseCurrentsReady && !controlLoopEntered)
         {
             controlLoopEntered = true;
-            const auto entryCycles = CycleCounter::Now();
+            const auto entryCycles = QemuCycleCounter::Now();
 
             onPhaseCurrentsReady(lastCurrents);
 
-            controlLoopMetrics.Record(CycleCounter::Now() - entryCycles);
+            controlLoopMetrics.Record(QemuCycleCounter::Now() - entryCycles);
             controlLoopEntered = false;
         }
         else if (onPhaseCurrentsReadyValid && onPhaseCurrentsReady && controlLoopEntered)

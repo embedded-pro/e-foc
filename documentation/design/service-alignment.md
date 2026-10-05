@@ -102,6 +102,15 @@ reaches anything.
 completion **without invoking it**, so a fault raised by the state machine cannot be overwritten by an
 alignment result that arrives after it.
 
+Every decision above is taken in the sampling interrupt, and so is everything that must happen at that
+instant: the inverter is stopped there and, on success, the encoder zeroed there. The completion is not. The
+caller stores calibration data and changes state from it, which is event-loop work and far longer than a
+control period, so the outcome is queued and delivered from the event loop. Until then the run is still in
+progress: samples are discarded, a second `ForceAlignment` is rejected, and `Abort()` drops the queued outcome.
+The outcome carries the run it belongs to, so one that an abort overtook cannot complete a run started after
+it. The step timeout already runs on the event loop and completes the run directly, unless an outcome is
+already queued, which it then leaves to be delivered.
+
 The encoder position at the moment of settlement declaration becomes the calibration offset. This offset represents the mechanical angle the rotor adopts when the electrical d-axis is at 0°; subtracting it from any subsequent encoder reading yields the corrected angle for the closed-loop FOC controller.
 
 The offset is in **mechanical** radians, which is the unit `Encoder::Set` and `Encoder::SetZero` consume. It is not scaled by pole pairs; scaling it would make it an electrical angle and misorient the field.
@@ -121,10 +130,11 @@ The service follows a four-state machine:
 stateDiagram-v2
     [*] --> Idle
     Idle --> Aligning : ForceAlignment called
-    Aligning --> Settled : settledCount consecutive\nsamples below threshold
-    Aligning --> TimedOut : maxSamples exceeded
-    Settled --> Idle : onDone(offset) fired,\ninverter stopped
-    TimedOut --> Idle : onDone(nullopt) fired,\ninverter stopped
+    Aligning --> Delivering : settled, maxSamples exceeded or over-current\n(sampling interrupt stops the inverter)
+    Aligning --> Idle : step timeout\n(inverter stopped, onDone(nullopt) fired)
+    Delivering --> Idle : event loop fires\nonDone(offset) or onDone(nullopt)
+    Aligning --> Idle : Abort\n(inverter stopped, onDone dropped)
+    Delivering --> Idle : Abort\n(onDone dropped)
 ```
 
 While in the **Aligning** state, any further call to `ForceAlignment` is silently ignored — the service will not restart or nest. Only one alignment may be in progress at any time. Transitions out of the **Aligning** state always stop the inverter before invoking the callback, so the caller's callback receives control only after the hardware is in a safe, stopped state.
@@ -136,7 +146,7 @@ The `onDone` callback accepts a single `std::optional<Radians>` argument:
 - `std::optional` with a value: alignment succeeded; the contained value is the encoder offset in mechanical radians, already applied to the encoder by the service.
 - Empty `std::optional`: alignment failed (timeout); the caller should not use any offset and may retry.
 
-The callback fires exactly once per `ForceAlignment` invocation. The callback is reset (using `infra::AutoResetFunction` semantics) after firing so that stale references cannot cause a second invocation.
+The callback fires exactly once per `ForceAlignment` invocation, from the event loop and never from the sampling interrupt. The callback is reset (using `infra::AutoResetFunction` semantics) after firing so that stale references cannot cause a second invocation.
 
 ---
 
@@ -144,9 +154,9 @@ The callback fires exactly once per `ForceAlignment` invocation. The callback is
 
 ### Provided
 
-| Interface                                            | Purpose                                                                                                                                        | Contract                                                                                                         |
-|------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
-| `ForceAlignment(polePairs, AlignmentConfig, onDone)` | Starts the alignment procedure using the supplied configuration; reports the calibrated encoder offset (or failure) via `onDone` when complete | Silently ignored if already aligning; `onDone` fires exactly once; inverter is stopped before `onDone` is called |
+| Interface                                            | Purpose                                                                                                                                        | Contract                                                                                                                              |
+|------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| `ForceAlignment(polePairs, AlignmentConfig, onDone)` | Starts the alignment procedure using the supplied configuration; reports the calibrated encoder offset (or failure) via `onDone` when complete | Silently ignored if already aligning; `onDone` fires exactly once, from the event loop; inverter is stopped before `onDone` is called |
 
 ### Required
 

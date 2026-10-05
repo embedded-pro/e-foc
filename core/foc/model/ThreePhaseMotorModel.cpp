@@ -64,6 +64,7 @@ namespace foc
     void ThreePhaseMotorModel::SetEncoderNoise(const EncoderNoiseConfig& config)
     {
         encoderNoise.config = config;
+        encoderNoise.lastSample = 0.0f;
     }
 
     void ThreePhaseMotorModel::SetThermalConfig(const ThermalConfig& config)
@@ -144,6 +145,11 @@ namespace foc
         return currentNoise.config.sigmaAmpere * currentNoise.distribution(currentNoise.engine);
     }
 
+    float ThreePhaseMotorModel::SampleEncoderNoise()
+    {
+        return encoderNoise.config.sigmaRadians * encoderNoise.distribution(encoderNoise.engine);
+    }
+
     void ThreePhaseMotorModel::PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone)
     {
         this->baseFrequency = baseFrequency;
@@ -180,6 +186,7 @@ namespace foc
         currentNoise.iaLast = iaNoise;
         currentNoise.ibLast = ibNoise;
         currentNoise.icLast = icNoise;
+        encoderNoise.lastSample = SampleEncoderNoise();
 
         const auto supply = EffectiveSupplyVoltage().Value();
         const auto va = (foc::DutyFraction(dutyPhases.a) - half) * supply;
@@ -285,8 +292,7 @@ namespace foc
     foc::Radians ThreePhaseMotorModel::Read()
     {
         const auto angle = faultInjection.config.encoderStuck ? faultInjection.stuckAngle : motorState.theta_mech;
-        const float noise = encoderNoise.config.sigmaRadians * encoderNoise.distribution(encoderNoise.engine);
-        return foc::Radians{ detail::PositionWithWrapAround(angle.Value() + encoderNoise.config.biasRadians + noise) };
+        return foc::Radians{ detail::PositionWithWrapAround(angle.Value() + encoderNoise.config.biasRadians + encoderNoise.lastSample) };
     }
 
     void ThreePhaseMotorModel::Set(foc::Radians value)

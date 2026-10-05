@@ -315,12 +315,12 @@ vmovgt.f32 s0, s1
 
 ## Measurement tiers
 
-Three complementary approaches verify cycle budgets. Tier 2 runs the software-in-the-loop firmware ([software-in-the-loop.md](../design/software-in-the-loop.md)) and reads the counter described in [Cycle Counter (DWT)](#cycle-counter-dwt).
+Three complementary approaches verify cycle budgets. Tier 2 runs the software-in-the-loop firmware ([software-in-the-loop.md](../design/software-in-the-loop.md), Part B3). The emulator has no DWT, so the emulated platform times the control callback with a free-running timer of its instruction-counted clock: one cycle of that 25 MHz clock is five instructions retired, and a run reproduces its own figures to within a cycle. The control loop timing scenarios fail when an execution overruns the budget or the worst one passes a limit pinned at one and a half times what it measures.
 
 | Tier                | Tool                                            | Purpose           | Authoritative for                            |
 |---------------------|-------------------------------------------------|-------------------|----------------------------------------------|
 | 1 — Static estimate | `cortex-cycle-budget` CI action                 | Merge gate        | Absolute budget (≤ 4500 / ≤ 6000 / ≤ 20000)  |
-| 2 — QEMU SIL        | `qemu-system-arm` + DWT CYCCNT                  | Regression signal | ARM ISA correctness, instruction-count delta |
+| 2 — QEMU SIL        | `qemu-system-arm -icount` + free-running timer  | Regression signal | ARM ISA correctness, instruction-count delta |
 | 3 — On-silicon DWT  | `PlatformFactory::ElapsedCycles()` via TIVA HIL | Ground truth      | Absolute silicon timing                      |
 
 Tier 1 gates three paths, each with its own configuration under `targets/sync_foc_sensored/main/`:

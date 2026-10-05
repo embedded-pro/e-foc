@@ -16,11 +16,11 @@
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "services/util/EventDispatcherWatchdog.hpp"
 #include "services/util/Terminal.hpp"
-#include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/EventDispatcherCortexWithWeakPtr.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
 #include "targets/platform_implementations/qemu/implementation/BoardProtectionSimulator.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuConstants.hpp"
+#include "targets/platform_implementations/qemu/implementation/QemuCycleCounter.hpp"
 #include "targets/platform_implementations/qemu/implementation/QemuTimer.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingCanBusAdapter.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingEeprom.hpp"
@@ -188,7 +188,7 @@ namespace application
         const std::optional<sil::SilPlantConfig> plantConfig;
         const ResetCause resetCause;
         infra::Function<void()> onInitialized;
-        CycleCounter cycleCounter;
+        QemuCycleCounter cycleCounter;
         ControlLoopMetrics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
         volatile bool controlLoopEntered{ false };

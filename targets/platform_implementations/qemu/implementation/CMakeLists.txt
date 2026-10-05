@@ -16,6 +16,7 @@ target_sources(e_foc.platform_abstraction_qemu PRIVATE
     PlatformFactoryImpl.cpp
     PlatformFactoryImpl.hpp
     QemuConstants.hpp
+    QemuCycleCounter.hpp
     SemihostingCan.cpp
     SemihostingCan.hpp
     SemihostingCanBusAdapter.cpp

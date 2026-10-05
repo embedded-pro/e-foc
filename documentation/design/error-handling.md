@@ -131,7 +131,9 @@ is one measured execution. Unsigned subtraction makes the measurement correct ac
 own wrap, which at 120 MHz comes around every 36 seconds. The measured window covers encoder read,
 control law and PWM write — the work the cycle budget applies to. Hardware ISR entry/exit overhead
 is excluded; REQ-PERF-001 reserves 25% of the control period for that overhead. The measurement is
-taken in the platform layer so it is consistent across targets.
+taken in the platform layer so it is consistent across targets. The emulated target has no cycle
+counter and reads a free-running timer of its instruction-counted clock instead
+([software-in-the-loop.md](software-in-the-loop.md), Part B3).
 
 From it the platform maintains the last, minimum, maximum and a filtered average duration, the
 execution count, and three failure counts: **overruns** (over the budget, margin gone, deadline

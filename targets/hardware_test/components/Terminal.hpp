@@ -9,6 +9,7 @@
 #include "hal/interfaces/Pwm.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/BoundedDeque.hpp"
+#include "infra/util/WithSharedAccess.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
 
@@ -64,7 +65,7 @@ namespace application
             {}
 
             services::ElectricalParametersIdentificationImpl electricalIdent;
-            services::MotorAlignmentImpl alignment;
+            infra::WithSharedAccess<services::MotorAlignmentImpl> alignment;
             bool identRunning{ false };
             bool alignRunning{ false };
         };
