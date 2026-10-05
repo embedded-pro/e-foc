@@ -32,7 +32,9 @@ The `Calculate()` method runs at 20 kHz in interrupt context. Every cycle matter
 - Target: <=4500 cycles at 120 MHz for the 20 kHz inner loop (75% of the 6000-cycle period); the 1 kHz outer loop budget is 20000 cycles
 - Use `FastTrigonometry` (from `core/foc/math/FastTrigonometry.hpp`) or lookup tables — not raw `sin`/`cos` in hot paths
 
-Never give a function optimisation options of its own — no `#pragma GCC optimize`, no `optimize` attribute. GCC does not inline a callee whose options differ from its caller's, so every small helper a hot function calls would stay an out-of-line call. Embedded and QEMU builds compile all of e-foc with one set of options from `cmake/CompilerOptimizations.cmake`: the configuration's level plus `-ffast-math -fno-finite-math-only`.
+Never give a function optimisation options of its own — no `#pragma GCC optimize`, no `optimize` attribute.
+GCC does not inline a callee whose options differ from its caller's, so every small helper a hot function calls would stay an out-of-line call.
+Embedded and QEMU builds compile all of e-foc with one set of options from `cmake/CompilerOptimizations.cmake`: the configuration's level plus `-ffast-math -fno-finite-math-only`.
 
 Apply `OPTIMIZE_FOR_SPEED` (from `numerical/math/CompilerOptimizations.hpp`) to `Calculate()`, `Compute()` and other hot-path methods defined in a header — in the class body or as a template. On embedded and QEMU builds it makes the function `always_inline` + `inline`, so never put it on a function defined in a `.cpp`: callers in other translation units have no body to inline and the build fails.
 
