@@ -546,7 +546,10 @@ wrong by given factors, the online estimators from a wrong seed under a speed re
 alternates between two levels (the same shape the identification service uses, because a constant
 speed excites neither inertia nor friction), the same with a constant shaft torque applied while
 the estimators run, and a winding that heats while running. The excitation is paced on the plant's
-own clock, read from its trajectory samples, so it lasts the same guest time on every host.
+own clock, read from its trajectory samples, so it lasts the same guest time on every host. Where a
+scenario also schedules a shaft torque, the excitation waits on that clock until the torque is on:
+the step that enables the motor waits half a second of host time, so the first setpoint otherwise
+lands wherever the host's speed puts it.
 
 What the first characterisation found, in the order it was found:
 
@@ -643,6 +646,16 @@ What the first characterisation found, in the order it was found:
   plateaus are what separate friction from the intercept; only the whole-percent ripple had let
   them through. Both procedures now take every sample above standstill and require a span of
   speeds before publishing (`service-mechanical-ident.md` § *Persistence of Excitation*).
+
+- **The constant-torque scenario depended on the host's speed — fixed.** Its 0.01 N·m steps in
+  500 ms after enable on the plant's clock, but the excitation started after the enable step's
+  half second of host time. A host that runs the emulator slower than real time (230 to 350 ms of
+  guest time to that half second here) turned the rotor first, and the online estimator kept a
+  stretch of unloaded motion at 52 rad/s in its two-second memory. The load is 20 to 40 times the
+  friction torque, so the few per cent of weight that stretch still carried six seconds later
+  pulled the Anaheim friction 15 to 48 % low, further the earlier the rotor started; CI read
+  +4 %. The scenario now holds the excitation until 700 ms after enable, so every host applies
+  the load at standstill, where the estimator takes no samples, and the friction reads +7 %.
 
 Every identification scenario, offline and online, runs in the default set on both motors
 (REQ-CAL-012 to REQ-CAL-014).
