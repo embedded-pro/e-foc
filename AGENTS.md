@@ -40,26 +40,19 @@ currents or duty cycles — see REQ-PERF-003. Sensor and power-stage failures ar
 to catch. `foc::IsFiniteValue` exists for configuration-time and outer-loop checks only
 (`CurrentPlantModel::IsUsable`, the mechanical estimator's plausibility band); it is not for `Calculate()`.
 
-Required in every hot-path file: scope `#pragma GCC optimize` to the hot function(s) with `push_options`/`pop_options` — an unscoped file-wide pragma silently applies fast-math to every function in the translation unit, including config/validation code that must not get it.
+Never give a function optimisation options of its own: no `#pragma GCC optimize`, no `optimize` attribute. GCC does not
+inline a callee whose options differ from its caller's, so a hot function with its own options calls every small helper
+it uses (unit accessors, matrix element access, toolbox wrappers) out of line. Embedded and QEMU builds compile all of
+e-foc with the same options instead: the configuration's level plus `-ffast-math -fno-finite-math-only`, from
+`cmake/CompilerOptimizations.cmake`. `-fno-finite-math-only` keeps NaN and infinity checks meaningful.
 
-```cpp
-#include "numerical/math/CompilerOptimizations.hpp"
-
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
-OPTIMIZE_FOR_SPEED
-ReturnType Calculate(...)
-{
-    ...
-}
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
-```
-
-`OPTIMIZE_FOR_SPEED` alone is enough when the hot method is the only thing in the file that plausibly needs it — skip the pragma bracket in that case.
+`OPTIMIZE_FOR_SPEED` (`numerical/math/CompilerOptimizations.hpp`) forces inlining: with
+`NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS` on (embedded and QEMU presets) it makes the function `always_inline` +
+`inline`, otherwise it expands to nothing. It goes only on hot functions whose definition every caller sees — defined in
+the class body or as a template in a header. A function defined in a `.cpp` must never carry it: every other translation
+unit would call an `always_inline` function it has no body for, which fails the build. A free function defined in a
+header takes `ALWAYS_INLINE_HOT` instead: it must stay `inline` in the builds where `OPTIMIZE_FOR_SPEED` is empty, and
+with it enabled the macro's own `inline` would be a duplicate.
 
 ## FOC theory — correctness
 
@@ -159,10 +152,15 @@ mark this project's own targets SYSTEM, silencing the warnings the flags exist t
 FetchContent dependencies such as `cucumber_cpp` would be missed. Never silence a warning with a pragma —
 fix it, or drop the parameter name if it is genuinely unused.
 
+**Optimisation**: `cmake/CompilerOptimizations.cmake` provides `e_foc_enable_embedded_optimizations()`, which adds
+`-ffast-math -fno-finite-math-only` to the embedded and QEMU builds. Its call sits next to the warnings call, after the
+submodules and before `add_subdirectory(core)`, so `core/` and `targets/` — and the toolbox code they include — get the
+options while the infrastructure libraries and HALs keep their own.
+
 Neither belongs in `CMakePresets.json`. A preset condition is evaluated before configure, so it cannot
 branch on `CMAKE_CXX_COMPILER_ID`, and both guards are load-bearing — see below.
 
-`-Wmaybe-uninitialized` is off, for GNU only. SYSTEM marking does not help here: at `-O3` GCC inlines
+`-Wmaybe-uninitialized` is off, for GNU only. SYSTEM marking does not help here: GCC inlines
 `infra::Function::operator()` into our translation units and reports the diagnostic against the caller,
 naming addresses like `((const infra::Function<...>*)this)[1319]` — an index into a single object, so the
 path it claims does not exist. Definite `-Wuninitialized` stays enabled and is the one that matters; it is
@@ -208,7 +206,7 @@ Before finalizing any plan or implementation, verify:
 - [ ] No virtual dispatch in `Calculate()` hot path
 - [ ] No blocking calls or heap reachable from `Calculate()`
 - [ ] `FastTrigonometry` used — not raw `sin`/`cos`
-- [ ] `#pragma GCC optimize("O3","fast-math")` present (guarded) and scoped to the hot function(s) with `push_options`/`pop_options` — never file-wide; `OPTIMIZE_FOR_SPEED` on hot-path methods
+- [ ] No `#pragma GCC optimize` or `optimize` attribute (per-function options block inlining); `OPTIMIZE_FOR_SPEED` on header-defined hot-path methods only, never on a `.cpp` definition
 
 **FOC theory**
 - [ ] Clarke: `Iα=(2/3)·(Ia−(Ib+Ic)/2)`, `Iβ=(Ib−Ic)/√3`; Park: `Id=Iα·cos(θ)+Iβ·sin(θ)`, `Iq=−Iα·sin(θ)+Iβ·cos(θ)`

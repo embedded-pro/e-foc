@@ -151,10 +151,6 @@ namespace services
             onDone(Result{});
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
     void SinusoidalInductanceEstimator::AdvanceInjection()
     {
         sampleSeen = true;
@@ -221,7 +217,4 @@ namespace services
         const float lPhase = zImag / (omega * terminalFactor);
         return Result{ foc::MilliHenry{ lPhase * 1000.0f }, fitQuality };
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 }

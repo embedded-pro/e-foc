@@ -79,7 +79,7 @@ The GCC/Clang compiler applies transformations that can drastically change cycle
    propagation and dead-code elimination.
 
 2. **Loop unrolling**: The compiler repeats loop body $k$ times to reduce branch overhead and expose
-   more instruction-level parallelism.  Controlled by `-funroll-loops` or `#pragma GCC optimize("O3")`.
+   more instruction-level parallelism.  Controlled by `-funroll-loops` or `-O3`.
 
 3. **Constant propagation / folding**: Compile-time evaluation of constant expressions eliminates
    runtime computation.  Use `constexpr` aggressively for lookup tables and configuration constants.
@@ -87,10 +87,12 @@ The GCC/Clang compiler applies transformations that can drastically change cycle
 4. **Auto-vectorisation**: Cortex-M4 SIMD (DSP extensions) can process two 16-bit or four 8-bit
    operands per cycle.  Q15/Q31 fixed-point code benefits; floating-point does not (no NEON on M4).
 
-5. **Fast-math transformations** (`-ffast-math`, `#pragma GCC optimize("fast-math")`):
+5. **Fast-math transformations** (`-ffast-math`):
    - Allows re-association of floating-point expressions.
    - Enables FMA generation (avoids separate multiply + add).
-   - Assumes no NaN/Inf inputs.
+   - Drops `errno` handling, so `sqrtf` is a single `vsqrt.f32`, and multiplies by reciprocals.
+   - With `-ffinite-math-only`, which `-ffast-math` includes, assumes no NaN/Inf inputs and folds
+     `std::isnan` to a constant — e-foc turns that part off with `-fno-finite-math-only`.
    - **May change numerical results slightly** — verify with tests.
 
 ### Virtual Dispatch Cost Model
@@ -205,40 +207,31 @@ result = a * b + c;
 // Becomes: vfma.f32 s0, s1, s2  (1 cycle, full precision)
 ```
 
-### 8. Per-Function Optimisation Pragmas
+### 8. One Set of Optimisation Options per Build
 
-For performance-critical hot-path functions (FOC implementations, SVM, transforms), bracket only the
-hot function(s) with `push_options`/`pop_options` — never apply the pragma unscoped for the whole file.
-An unscoped `#pragma GCC optimize("O3", "fast-math")` silently applies finite-math assumptions to every
-function in the translation unit, including config-time validation or finiteness checks that must keep
-their real NaN/Inf semantics:
+GCC does not inline a callee whose optimisation options differ from its caller's. A `#pragma GCC optimize` bracket or
+an `optimize` attribute gives the functions it covers options of their own, so every small helper they call — unit
+accessors, matrix element access, toolbox wrappers — stays an out-of-line call, and they are no longer inlined into
+their own callers. That costs more than the O3/fast-math such a bracket buys: with them, the three gated paths made 256
+calls to helpers of 12 bytes or less; with one set of options for the whole build, 11.
 
-```cpp
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
-ReturnType HotFunction(...)
-{
-    // ...
-}
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
-```
+Embedded and QEMU builds therefore compile all of e-foc with one set of options, from
+`cmake/CompilerOptimizations.cmake`: the configuration's level (`-O2` for `RelWithDebInfo`) plus
+`-ffast-math -fno-finite-math-only`. `-fno-finite-math-only` keeps NaN and infinity checks meaningful everywhere,
+including configuration-time validation in the same translation unit as a hot function. Never add
+`#pragma GCC optimize` or an `optimize` attribute.
 
-Place the bracket immediately around the hot function's definition, not at the top of the file.
+Hot functions defined in a header — in the class body or as templates — carry the numerical toolbox's
+`OPTIMIZE_FOR_SPEED`. With `NUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS` on (embedded and QEMU presets) it makes the
+function `always_inline` and `inline`, so the call folds into its caller. It never goes on a function defined in a `.cpp`:
+the other translation units have no body to inline, and the build fails.
 
-### 9. Per-Function Attributes
-
-```cpp
-__attribute__((optimize("-O3")))
-void CriticalFunction() {
-    // Always compiled at -O3 regardless of TU-level flags
-}
-```
-
-Note: function attributes do not propagate to callees.  Use file-level pragmas for transitive effect.
+At `-O2`, loops over small fixed-size matrices stay rolled, so a store that a later loop overwrites is not removed. The
+toolbox's `math::Matrix` operators therefore build their results without zero-filling them first. Zeroing a 3×3 result
+is a call to newlib-nano's `memset`, which the Arm GNU toolchain builds to store one byte at a time. With CI's
+toolchain, four such calls in the RLS covariance update took the slowest control-interrupt execution of a full
+calibration in SIL from 237 to 377 cycles; without them it is 250. Hot code uses the `Matrix` operators rather than
+hand-written element loops, which under `-ffast-math` can also round a symmetric matrix's (i, j) and (j, i) differently.
 
 ---
 
@@ -247,30 +240,22 @@ Note: function attributes do not propagate to callees.  Use file-level pragmas f
 By default, Debug builds (`-O0`) disable all optimisations, making code 3–10× slower than Release.
 This breaks real-time deadlines for FOC ISRs during debugging sessions.
 
-**Solution 1 — Use `-Og` for debug builds** (recommended):
+e-foc's Debug builds use `-Og`:
 
 ```cmake
 set(CMAKE_CXX_FLAGS_DEBUG "-Og -g" CACHE STRING "Debug flags" FORCE)
 ```
 
 `-Og` provides: basic inlining, dead-code elimination, register allocation — while keeping full
-debuggability (variable inspection, correct stack trace).
+debuggability (variable inspection, correct stack trace). `OPTIMIZE_FOR_SPEED` still force-inlines the
+header-defined hot functions, and embedded Debug builds keep `-ffast-math -fno-finite-math-only`.
 
-**Solution 2 — Scoped pragma** (when a specific function must remain fast even at -O0, bracketed with
-`push_options`/`pop_options` so the rest of the file still builds at the configured optimisation level):
+Do not raise single functions to `O3` with a pragma or an `optimize` attribute to speed a Debug build up: such a
+function cannot inline any helper built at `-Og`, so the hot path costs no less with it than without it. When a
+Debug build must be faster, raise the level of whole translation units instead:
 
-```cpp
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-void CriticalFunction() { /* ... */ }
-#pragma GCC pop_options
-```
-
-**Solution 3 — Function attribute** (for a single bottleneck function):
-
-```cpp
-__attribute__((optimize("-O3")))
-void CriticalFunction() { /* ... */ }
+```cmake
+set_source_files_properties(TorqueCascade.cpp PROPERTIES COMPILE_OPTIONS "$<$<CONFIG:Debug>:-O2>")
 ```
 
 ---
@@ -428,14 +413,12 @@ build (`-O0`, `sinf`/`cosf` calls) costs several times that and does not fit.
 
 ## Quick Reference
 
-### GCC Optimisation Pragmas
+### Optimisation Flags (whole translation units only)
 
-```cpp
-#pragma GCC optimize("O3")        // Maximum speed
-#pragma GCC optimize("Os")        // Minimum size
-#pragma GCC optimize("fast-math") // Aggressive FP
-#pragma GCC push_options          // Save current options
-#pragma GCC pop_options           // Restore options
+```cmake
+add_compile_options(-O3)                                # Maximum speed
+add_compile_options(-Os)                                # Minimum size
+add_compile_options(-ffast-math -fno-finite-math-only)  # Aggressive FP, NaN/Inf checks kept
 ```
 
 ### Function Attributes

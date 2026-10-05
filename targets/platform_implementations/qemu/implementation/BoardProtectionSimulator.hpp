@@ -3,7 +3,6 @@
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "infra/util/Function.hpp"
-#include "numerical/math/CompilerOptimizations.hpp"
 
 namespace application
 {
@@ -23,14 +22,14 @@ namespace application
 
         void SetArmed(bool armed);
 
-        OPTIMIZE_FOR_SPEED void Evaluate(const foc::PhaseCurrents& currents, float busVoltageVolts, float windingTemperatureCelsius);
+        void Evaluate(const foc::PhaseCurrents& currents, float busVoltageVolts, float windingTemperatureCelsius);
 
         void DeliverPendingProtection();
 
         PlatformFactory::BoardProtectionState Status() const;
 
     private:
-        OPTIMIZE_FOR_SPEED bool Exceeded(const foc::PhaseCurrents& currents, float busVoltageVolts,
+        bool Exceeded(const foc::PhaseCurrents& currents, float busVoltageVolts,
             float windingTemperatureCelsius, PlatformFactory::BoardProtectionReason& reason) const;
 
         Trips trips;

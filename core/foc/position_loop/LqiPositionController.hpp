@@ -17,7 +17,7 @@ namespace foc
         void Reset();
         void OnDesignChanged();
 
-        OPTIMIZE_FOR_SPEED PositionOutput Compute(const PositionControlContext& context);
+        PositionOutput Compute(const PositionControlContext& context);
 
     private:
         float accumulatedDeviation{ 0.0f };

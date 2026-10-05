@@ -47,6 +47,7 @@ set_directory_properties(PROPERTY USE_FOLDERS ON)
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/QemuHelpers.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/MarkIncludesSystem.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerWarnings.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompilerOptimizations.cmake")
 
 set(E_FOC_EXCLUDE_FROM_ALL "")
 
@@ -115,6 +116,7 @@ endif()
 
 e_foc_mark_includes_system("${CMAKE_CURRENT_SOURCE_DIR}")
 e_foc_enable_project_warnings()
+e_foc_enable_embedded_optimizations()
 
 add_subdirectory(core)
 

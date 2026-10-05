@@ -33,7 +33,7 @@ namespace application
                         : PlatformFactory::BoardProtectionState::clear;
     }
 
-    OPTIMIZE_FOR_SPEED bool BoardProtectionSimulator::Exceeded(const foc::PhaseCurrents& currents,
+    bool BoardProtectionSimulator::Exceeded(const foc::PhaseCurrents& currents,
         float busVoltageVolts, float windingTemperatureCelsius,
         PlatformFactory::BoardProtectionReason& reason) const
     {
@@ -68,7 +68,7 @@ namespace application
         return false;
     }
 
-    OPTIMIZE_FOR_SPEED void BoardProtectionSimulator::Evaluate(const foc::PhaseCurrents& currents,
+    void BoardProtectionSimulator::Evaluate(const foc::PhaseCurrents& currents,
         float busVoltageVolts, float windingTemperatureCelsius)
     {
         if (!armed)

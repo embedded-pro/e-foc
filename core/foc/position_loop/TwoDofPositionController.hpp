@@ -3,6 +3,7 @@
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/position_loop/PidPositionController.hpp"
 #include "core/foc/position_loop/PositionPlantModel.hpp"
+#include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc
 {

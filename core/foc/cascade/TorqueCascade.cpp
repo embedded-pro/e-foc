@@ -3,7 +3,6 @@
 #include "core/foc/math/DutyConversion.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "infra/util/ReallyAssert.hpp"
-#include "numerical/math/CompilerOptimizations.hpp"
 #include "numerical/math/Math.hpp"
 
 namespace foc
@@ -99,11 +98,6 @@ namespace foc
         return currentLoop;
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
-    OPTIMIZE_FOR_SPEED
     PhasePwmDutyCycles TorqueCascade::Calculate(const PhaseCurrents& currentPhases, Radians& position)
     {
         const float ia = currentPhases.a.Value();
@@ -127,7 +121,6 @@ namespace foc
         return ToDutyCycles(output);
     }
 
-    OPTIMIZE_FOR_SPEED
     float TorqueCascade::MeasureElectricalSpeed(float mechanicalAngle)
     {
         if (!previousAngleValid)
@@ -141,7 +134,4 @@ namespace foc
         previousMechanicalAngle = mechanicalAngle;
         return speedFilter.Filter(sampled);
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 }

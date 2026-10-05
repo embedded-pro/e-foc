@@ -317,7 +317,7 @@ namespace application
     // samples are delivered, as an ADC trigger divider would. The identification procedures ask for
     // 10 kHz and demodulate on that assumption, so handing them every 20 kHz sample doubles the
     // inductance they measure.
-    OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz frequency, const infra::Function<void(foc::PhaseCurrents)>& onDone)
+    void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz frequency, const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
         const uint32_t requested = frequency.Value();
         really_assert(requested != 0 && baseFrequency.Value() % requested == 0);
@@ -329,15 +329,11 @@ namespace application
         onPhaseCurrentsReadyValid = true;
     }
 
-    OPTIMIZE_FOR_SPEED void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
+    void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
         lastDutyPhases = dutyPhases;
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
     void PlatformFactoryImpl::FocTimerIsr()
     {
         const uint32_t tick = controlTick.load(std::memory_order_relaxed) + 1;
@@ -384,9 +380,6 @@ namespace application
 
         boardProtection.Evaluate(lastCurrents, model.EffectiveSupplyVoltage().Value(), model.WindingTemperatureCelsius());
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 
     void PlatformFactoryImpl::Start()
     {
@@ -484,7 +477,7 @@ namespace application
         return model.MaxCurrentSupported();
     }
 
-    OPTIMIZE_FOR_SPEED foc::Radians PlatformFactoryImpl::Read()
+    foc::Radians PlatformFactoryImpl::Read()
     {
         return model.Read();
     }

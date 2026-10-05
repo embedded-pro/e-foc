@@ -35,11 +35,6 @@ namespace foc
         accumulatedDeviation = 0.0f;
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
-    OPTIMIZE_FOR_SPEED
     PositionOutput LqiPositionController::Compute(const PositionControlContext& context)
     {
         if (currentPerNormalizedInput == 0.0f)
@@ -59,9 +54,6 @@ namespace foc
 
         return { PositionOutputKind::currentReference, limited.Value() };
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 
     void LqiPositionController::OnDesignChanged()
     {

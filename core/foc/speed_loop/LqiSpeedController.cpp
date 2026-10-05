@@ -29,11 +29,6 @@ namespace foc
         lqi.Reset();
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
-    OPTIMIZE_FOR_SPEED
     foc::Ampere LqiSpeedController::Compute(const SpeedControlContext& context)
     {
         const SpeedLqi::StateVector state{ context.measured.Value() };
@@ -52,9 +47,6 @@ namespace foc
 
         return LimitToCurrentEnvelope(control * parameters.maxCurrent.Value(), parameters.maxCurrent);
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 
     LqiSpeedController::SpeedLqi LqiSpeedController::Inert()
     {

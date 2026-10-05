@@ -164,9 +164,9 @@ clamps each modulator output into [0, 1] and converts to percent, and does nothi
 
 `foc::IsFiniteValue` survives for the places where validation is affordable and worth having —
 `CurrentPlantModel::IsUsable` when the plant is configured, and the plausibility band the mechanical estimator
-applies before publishing. Both run outside the hot path. It exists because the hot path is built with
-`-ffast-math`, which licenses the compiler to fold `std::isnan` to a constant, so the test is made on the
-float's exponent bits instead.
+applies before publishing. Both run outside the hot path. It tests the float's exponent bits rather than
+calling `std::isnan`, which `-ffinite-math-only` licenses the compiler to fold to a constant; the embedded builds
+keep `-fno-finite-math-only`, but the check does not depend on it.
 
 ### 2. Services
 
@@ -392,7 +392,7 @@ These patterns eliminate polling, decouple producers from consumers, and allow t
 | Memory                | Absolutely no heap on the embedded target. All objects are statically or stack-allocated. Bounded containers from `embedded-infra-lib` replace STL heap-based containers. Host-side tools and tests may use the standard heap freely. |
 | Real-time determinism | The FOC `Calculate()` path contains no virtual dispatch, no blocking calls, and no unpredictable branches. The outer loops run at lower-priority interrupts on a deterministic prescale ratio.                                        |
 | Unit safety           | All physical quantities use typed unit aliases (`Ampere`, `Radians`, `Volts`, `RadiansPerSecond`, …) from `embedded-infra-lib`. Raw floating-point with no unit context is not used for motor quantities.                             |
-| Compiler optimisation | Critical paths use per-file optimisation pragmas (GCC/Clang `O3` + `fast-math`). Debug builds use `-Og` for debuggability.                                                                                                            |
+| Compiler optimisation | Embedded builds compile all of e-foc with one option set: the configuration's level plus `-ffast-math -fno-finite-math-only`. No per-function pragmas; they block inlining. Debug builds use `-Og` for debuggability.                 |
 | Error handling        | No C++ exceptions. Synchronous errors use `std::optional` (absent = error). Asynchronous errors are delivered as typed status codes in callbacks.                                                                                     |
 | Portability           | The control core has no knowledge of the underlying MCU. Portability to a new board is achieved by implementing a platform factory for that board and providing the PAL concrete implementations.                                     |
 | Testability           | All modules depend on abstract interfaces, enabling host-build unit tests with mock or stub implementations. The simulator provides closed-loop integration testing without hardware.                                                 |

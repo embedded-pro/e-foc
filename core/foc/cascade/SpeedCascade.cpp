@@ -80,11 +80,6 @@ namespace foc
         DisableSpeedLoop();
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
-    OPTIMIZE_FOR_SPEED
     void SpeedCascade::LowPriorityHandler()
     {
         auto mechanicalSpeed = MeasureMechanicalSpeed();
@@ -93,9 +88,6 @@ namespace foc
         UpdateOnlineMechanicalEstimator(mechanicalSpeed);
         UpdateOnlineElectricalEstimator();
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 
     MotionObservation SpeedCascade::ObserveMotion() const
     {
@@ -127,16 +119,8 @@ namespace foc
         return outerLoopFrequency;
     }
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
-    OPTIMIZE_FOR_SPEED
     PhasePwmDutyCycles SpeedCascade::Calculate(const PhaseCurrents& currentPhases, Radians& position)
     {
         return CalculateInnerLoop(currentPhases, position);
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 }

@@ -18,10 +18,6 @@ namespace services
         , samplingFrequency{ static_cast<float>(samplingFrequency.Value()) }
     {}
 
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC push_options
-#pragma GCC optimize("O3", "fast-math")
-#endif
     void RealTimeResistanceAndInductanceEstimator::ComputeEstimate(const foc::ElectricalWindow& window)
     {
         const auto idAtEnd = window.idAtEnd.Value();
@@ -50,9 +46,6 @@ namespace services
 
         Publish();
     }
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC pop_options
-#endif
 
     void RealTimeResistanceAndInductanceEstimator::Publish()
     {
