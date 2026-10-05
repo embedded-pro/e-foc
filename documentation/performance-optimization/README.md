@@ -232,6 +232,10 @@ zeroing was a call to newlib-nano's `memset`, which the Arm GNU toolchain builds
 updates matrices in place instead, as the toolbox's RLS covariance update now does: with CI's toolchain, that took the
 slowest control-interrupt execution of a full calibration in SIL from 377 to 231 cycles.
 
+`-ffast-math` also lets the compiler reassociate, so elements (i, j) and (j, i) computed separately can round
+differently. An in-place update of a symmetric matrix therefore computes one triangle and mirrors it. A covariance that
+loses its symmetry under a forgetting factor drifts: its antisymmetric part grows by 1/λ per update.
+
 ---
 
 ## Debug Builds
