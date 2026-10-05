@@ -226,15 +226,12 @@ Hot functions defined in a header — in the class body or as templates — carr
 function `always_inline` and `inline`, so the call folds into its caller. It never goes on a function defined in a `.cpp`:
 the other translation units have no body to inline, and the build fails.
 
-At `-O2`, loops over small fixed-size matrices stay rolled. A matrix-valued temporary is zero-initialised and then
-overwritten element by element, so its zeroing survives. For the 3×3 temporaries of the RLS covariance update that
-zeroing was a call to newlib-nano's `memset`, which the Arm GNU toolchain builds to store one byte at a time. Hot code
-updates matrices in place instead, as the toolbox's RLS covariance update now does: with CI's toolchain, that took the
-slowest control-interrupt execution of a full calibration in SIL from 377 to 231 cycles.
-
-`-ffast-math` also lets the compiler reassociate, so elements (i, j) and (j, i) computed separately can round
-differently. An in-place update of a symmetric matrix therefore computes one triangle and mirrors it. A covariance that
-loses its symmetry under a forgetting factor drifts: its antisymmetric part grows by 1/λ per update.
+At `-O2`, loops over small fixed-size matrices stay rolled, so a store that a later loop overwrites is not removed. The
+toolbox's `math::Matrix` operators therefore build their results without zero-filling them first. Zeroing a 3×3 result
+is a call to newlib-nano's `memset`, which the Arm GNU toolchain builds to store one byte at a time. With CI's
+toolchain, four such calls in the RLS covariance update took the slowest control-interrupt execution of a full
+calibration in SIL from 237 to 377 cycles; without them it is 250. Hot code uses the `Matrix` operators rather than
+hand-written element loops, which under `-ffast-math` can also round a symmetric matrix's (i, j) and (j, i) differently.
 
 ---
 
