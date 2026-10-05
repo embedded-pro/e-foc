@@ -64,7 +64,7 @@ namespace application
                 , alignment{ driver, encoder }
             {}
 
-            services::ElectricalParametersIdentificationImpl electricalIdent;
+            infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent;
             infra::WithSharedAccess<services::MotorAlignmentImpl> alignment;
             bool identRunning{ false };
             bool alignRunning{ false };

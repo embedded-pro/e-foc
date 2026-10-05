@@ -7,11 +7,14 @@
 #include "infra/util/AutoResetFunction.hpp"
 #include "infra/util/BoundedDeque.hpp"
 #include "infra/util/BoundedVector.hpp"
+#include "infra/util/SharedPtr.hpp"
+#include <cstdint>
 #include <optional>
 
 namespace services
 {
     class ResistanceEstimator
+        : public infra::EnableSharedFromThis<ResistanceEstimator>
     {
     public:
         struct Config
@@ -38,9 +41,11 @@ namespace services
         void StartSettlePhase();
         void StartMeasurementPhase();
         void OnMeasurementSample(foc::PhaseCurrents currents);
-        void OnMeasurementComplete();
         void StartSampleWatchdog();
         void FailMeasurement();
+        void Finish(bool measured);
+        void Complete();
+        Result Measure() const;
 
         static constexpr hal::DutyCycle neutralDuty{ hal::DutyCycle::FromPercent(1) };
         static constexpr float wyeTerminalFactor = 1.5f;
@@ -58,5 +63,8 @@ namespace services
         infra::TimerSingleShot settleTimer;
         infra::TimerRepeating noSampleTimer;
         volatile bool sampleSeen{ false };
+        volatile bool finishing{ false };
+        bool measurementComplete{ false };
+        uint32_t run{ 0 };
     };
 }
