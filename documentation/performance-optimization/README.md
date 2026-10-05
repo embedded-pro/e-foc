@@ -226,6 +226,12 @@ Hot functions defined in a header — in the class body or as templates — carr
 function `always_inline` and `inline`, so the call folds into its caller. It never goes on a function defined in a `.cpp`:
 the other translation units have no body to inline, and the build fails.
 
+At `-O2`, loops over small fixed-size matrices stay rolled. A matrix-valued temporary is zero-initialised and then
+overwritten element by element, so its zeroing survives. For the 3×3 temporaries of the RLS covariance update that
+zeroing was a call to newlib-nano's `memset`, which the Arm GNU toolchain builds to store one byte at a time. Hot code
+updates matrices in place instead, as the toolbox's RLS covariance update now does: with CI's toolchain, that took the
+slowest control-interrupt execution of a full calibration in SIL from 377 to 231 cycles.
+
 ---
 
 ## Debug Builds
