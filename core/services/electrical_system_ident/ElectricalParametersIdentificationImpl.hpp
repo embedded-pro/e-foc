@@ -7,12 +7,16 @@
 #include "core/services/electrical_system_ident/SinusoidalInductanceEstimator.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/AutoResetFunction.hpp"
+#include "infra/util/SharedPtr.hpp"
+#include "infra/util/WithSharedAccess.hpp"
+#include <cstdint>
 #include <numbers>
 
 namespace services
 {
     class ElectricalParametersIdentificationImpl
         : public ElectricalParametersIdentification
+        , public infra::EnableSharedFromThis<ElectricalParametersIdentificationImpl>
     {
     public:
         ElectricalParametersIdentificationImpl(drivers::ThreePhaseInverter& driver, drivers::Encoder& encoder, foc::Volts vdc);
@@ -27,6 +31,7 @@ namespace services
         void RunPolePairLogic();
         void ApplyNextElectricalAngle();
         void CalculatePolePairs();
+        void FinishPolePairs();
         void FailPolePairs();
 
         static constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
@@ -38,8 +43,8 @@ namespace services
         foc::Volts vdc;
         [[no_unique_address]] foc::ClarkePark transforms;
 
-        ResistanceEstimator resistanceEstimator;
-        SinusoidalInductanceEstimator inductanceEstimator;
+        infra::WithSharedAccess<ResistanceEstimator> resistanceEstimator;
+        infra::WithSharedAccess<SinusoidalInductanceEstimator> inductanceEstimator;
 
         ResistanceAndInductanceConfig rlConfig;
         PolePairsConfig polePairsConfig;
@@ -55,6 +60,8 @@ namespace services
 
         bool rlRunning{ false };
         bool polePairsRunning{ false };
+        volatile bool polePairsFinishing{ false };
+        uint32_t polePairsRun{ 0 };
         infra::TimerSingleShot settleTimer;
     };
 }

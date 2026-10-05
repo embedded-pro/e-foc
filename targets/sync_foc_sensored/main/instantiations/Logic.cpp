@@ -40,14 +40,14 @@ namespace application
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
                     MotorHardware{ this->hardware, this->hardware, vdc },
                     nvm,
-                    CalibrationServices{ .electricalIdent = electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb } },
+                    CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb } },
                     *platformFaultNotifier,
                     configData,
                     ControlMode::OuterLoopArgs{
                         this->hardware.MaxCurrentSupported(),
                         this->hardware.BaseFrequency(),
                         this->hardware.LowPriorityInterrupt() });
-                canBridge.emplace(*motorCanServer, *controlMode, this->hardware, this->hardware, electricalIdent, nullptr, nvm, configData, this->hardware.Tracer());
+                canBridge.emplace(*motorCanServer, *controlMode, this->hardware, this->hardware, *electricalIdent, nullptr, nvm, configData, this->hardware.Tracer());
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
                 encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&
                     {

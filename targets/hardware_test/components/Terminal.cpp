@@ -685,7 +685,7 @@ namespace application
         identState.identRunning = true;
         tracer.Trace() << "ident: running R then L estimation...";
 
-        identState.electricalIdent.EstimateResistanceAndInductance({},
+        identState.electricalIdent->EstimateResistanceAndInductance({},
             [this](services::ElectricalParametersIdentification::ResistanceInductanceResult result)
             {
                 identState.identRunning = false;

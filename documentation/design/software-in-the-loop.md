@@ -180,16 +180,17 @@ so it is a regression signal and the static cycle-budget gate remains the author
 cycles. The plant step the same interrupt carries before the callback is outside the window, as
 REQ-PERF-004 requires.
 
-The timing scenarios clear the counters before the rotor is aligned, so the window covers
-alignment as well as closed-loop running, and run every current law in torque mode and the
-decoupled law in speed and position mode. They boot calibrated and align on command, so
-identification is not timed. Each requires at least one execution, a non-zero
-shortest one (a dead counter reads zero), no overrun, deadline miss or re-entry, and a slowest
-execution under a pinned limit. The slowest execution measured 103 to 104 cycles for every law in
-torque mode and 119 in speed and position mode, about 520 and 600 instructions, the same to within
-a cycle across runs. The limits are one and a half times that, rounded up to ten, so a regression
-trips them long before it reaches the budget; a change that makes the callback slower on purpose
-re-pins them by the same rule.
+The mode scenarios boot calibrated and clear the counters before the rotor is aligned on command,
+so the window covers alignment as well as closed-loop running, and run every current law in torque
+mode and the decoupled law in speed and position mode. The calibration scenario clears them before
+a full calibration is run from the terminal, so the window covers every identification procedure
+and the alignment between them. Each requires at least one execution, a non-zero shortest one (a
+dead counter reads zero), no overrun, deadline miss or re-entry, and a slowest execution under a
+pinned limit. The slowest execution measured 103 to 104 cycles for every law in torque mode, 119 in
+speed and position mode and 236 through a full calibration, about 520, 600 and 1180 instructions,
+the same to within a cycle across runs. The limits are one and a half times that, rounded up to
+ten, so a regression trips them long before it reaches the budget; a change that makes the callback
+slower on purpose re-pins them by the same rule.
 
 ### Part C — Starting from a chosen calibration
 
@@ -545,7 +546,10 @@ wrong by given factors, the online estimators from a wrong seed under a speed re
 alternates between two levels (the same shape the identification service uses, because a constant
 speed excites neither inertia nor friction), the same with a constant shaft torque applied while
 the estimators run, and a winding that heats while running. The excitation is paced on the plant's
-own clock, read from its trajectory samples, so it lasts the same guest time on every host.
+own clock, read from its trajectory samples, so it lasts the same guest time on every host. Where a
+scenario also schedules a shaft torque, the excitation waits on that clock until the torque is on:
+the step that enables the motor waits half a second of host time, so the first setpoint otherwise
+lands wherever the host's speed puts it.
 
 What the first characterisation found, in the order it was found:
 
@@ -643,10 +647,20 @@ What the first characterisation found, in the order it was found:
   them through. Both procedures now take every sample above standstill and require a span of
   speeds before publishing (`service-mechanical-ident.md` § *Persistence of Excitation*).
 
+- **The constant-torque scenario depended on the host's speed — fixed.** Its 0.01 N·m steps in
+  500 ms after enable on the plant's clock, but the excitation started after the enable step's
+  half second of host time. A host that runs the emulator slower than real time (230 to 350 ms of
+  guest time to that half second here) turned the rotor first, and the online estimator kept a
+  stretch of unloaded motion at 52 rad/s in its two-second memory. The load is 20 to 40 times the
+  friction torque, so the few per cent of weight that stretch still carried six seconds later
+  pulled the Anaheim friction 15 to 48 % low, further the earlier the rotor started; CI read
+  +4 %. The scenario now holds the excitation until 700 ms after enable, so every host applies
+  the load at standstill, where the estimator takes no samples, and the friction reads +7 %.
+
 Every identification scenario, offline and online, runs in the default set on both motors
 (REQ-CAL-012 to REQ-CAL-014).
 
-Timing the control interrupt (Part B3) found two more, both inside the measured window, and the
+Timing the control interrupt (Part B3) found three more, all inside the measured window, and the
 timing scenarios fail on each when it is put back:
 
 - **Alignment completed inside the control interrupt — fixed.** Alignment decides in the sampling
@@ -660,6 +674,16 @@ timing scenarios fail on each when it is put back:
   generator's state inside the callback: 1650 to 1700 cycles, an overrun and a missed deadline
   each time. The plant now draws one deviate per step, outside the window, and every read within a
   step returns that step's sample, as a latched encoder count would.
+- **Identification completed inside the control interrupt — fixed.** The resistance and inductance
+  estimators decide in the sampling interrupt that a measurement is complete, and every procedure
+  decides there that a phase current is over the limit; each invoked its caller's completion there
+  too. The resistance result started the inductance stage from inside the resistance stage's own
+  sample callback, and in a full calibration the inductance result ran the next calibration step —
+  its trace and the start of the alignment — in the interrupt as well: one execution of 6709
+  cycles, more than five control periods, an overrun and a missed deadline on every calibration.
+  Identification over CAN peaked at 506. Each procedure now stops the injection in the interrupt
+  and delivers its outcome from the event loop (`service-electrical-ident.md`, REQ-PERF-008); a
+  full calibration then peaks at 236 cycles and identification over CAN at 114.
 
 ---
 
@@ -679,7 +703,7 @@ timing scenarios fail on each when it is put back:
 | Control robustness       | The same response measured on a noisy, hot, loaded or differently wound plant, and the law reported still running |
 | Disturbance rejection    | A shaft torque step while regulating is bounded in excursion and recovered from                                   |
 | Parameter identification | What the firmware identifies offline, and tracks online, matches the plant it was given, on both reference motors |
-| Control loop timing      | The control interrupt holds its budget and a pinned worst case from alignment through closed-loop running         |
+| Control loop timing      | The control interrupt holds its budget and a pinned worst case in calibration, alignment and closed-loop running  |
 
 Controller coverage sweeps each loop's algorithms with the other loops held at the baseline, and
 adds a handful of combinations chosen to exercise both kinds of position law: those that produce a
