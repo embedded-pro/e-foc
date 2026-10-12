@@ -46,19 +46,19 @@ jobs:
           configurePreset: "host"
           buildPreset: "host-Debug-WithPackage"
           testPreset: "host"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e_foc
           path: build/host/e_foc-*-Linux.tar.gz
           if-no-files-found: error
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e_foc.integration_tests
           path: build/host/integration_tests/main/Debug/e_foc.integration_tests
           if-no-files-found: error
       - name: Upload test logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-logs
           path: build/host/Testing/Temporary/
@@ -86,7 +86,7 @@ jobs:
         run: cmake --preset windows && cmake --build --preset windows-RelWithDebInfo
         env:
           CCACHE_DIR: ${{ github.workspace }}/.ccache
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e_foc-windows
           path: build/windows/**/*.exe
@@ -122,7 +122,7 @@ jobs:
           key: ${{ matrix.configuration }}-${{ matrix.target }}
           max-size: 2G
           save: ${{ github.ref == 'refs/heads/main' }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: e_foc
       - run: tar -zxvf e_foc-*.tar.gz
@@ -235,7 +235,7 @@ jobs:
           configurePreset: qemu-foc-sensored
           buildPreset: qemu-foc-sensored-RelWithDebInfo
       - name: Upload QEMU FOC Sensored ELF
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e_foc.sync_foc_sensored.qemu.elf
           path: build/qemu-foc-sensored/targets/sync_foc_sensored/main/RelWithDebInfo/e_foc.sync_foc_sensored.main.elf
@@ -256,11 +256,11 @@ jobs:
         with:
           persist-credentials: false
           submodules: false
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: e_foc.integration_tests
           path: sil_runner/
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: e_foc.sync_foc_sensored.qemu.elf
           path: qemu_elf/
@@ -331,7 +331,7 @@ jobs:
           report_suite_logs: info
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sil-test-report
           path: sil-test-report.xml
