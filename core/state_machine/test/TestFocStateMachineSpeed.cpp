@@ -152,7 +152,8 @@ namespace
 
             if (alignmentOk)
                 EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
-                    .WillOnce(Invoke([](std::size_t, const auto&,
+                    .Times(mechOk ? 1 : 3)
+                    .WillRepeatedly(Invoke([](std::size_t, const auto&,
                                          const infra::Function<void(std::optional<foc::Radians>)>& cb)
                         {
                             cb(foc::Radians{ 0.0f });
@@ -185,7 +186,8 @@ namespace
             else
             {
                 EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
-                    .WillOnce(Invoke([](const foc::NewtonMeter&,
+                    .Times(3)
+                    .WillRepeatedly(Invoke([](const foc::NewtonMeter&,
                                          std::size_t,
                                          const services::MechanicalParametersIdentification::Config&,
                                          const infra::Function<void(
@@ -1235,7 +1237,8 @@ namespace
 
             if (alignmentOk)
                 EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
-                    .WillOnce(Invoke([](std::size_t, const auto&,
+                    .Times(mechOk ? 1 : 3)
+                    .WillRepeatedly(Invoke([](std::size_t, const auto&,
                                          const infra::Function<void(std::optional<foc::Radians>)>& cb)
                         {
                             cb(foc::Radians{ 0.0f });
@@ -1268,7 +1271,8 @@ namespace
             else
             {
                 EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
-                    .WillOnce(Invoke([](const foc::NewtonMeter&,
+                    .Times(3)
+                    .WillRepeatedly(Invoke([](const foc::NewtonMeter&,
                                          std::size_t,
                                          const services::MechanicalParametersIdentification::Config&,
                                          const infra::Function<void(
@@ -2444,7 +2448,7 @@ namespace
             };
         }
 
-        void GivenElectricalStepsSucceed()
+        void GivenElectricalStepsSucceed(std::size_t alignments = 1)
         {
             EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
                 .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
@@ -2457,7 +2461,8 @@ namespace
                         cb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
                     }));
             EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
-                .WillOnce(Invoke([](std::size_t, const auto&, const infra::Function<void(std::optional<foc::Radians>)>& cb)
+                .Times(alignments)
+                .WillRepeatedly(Invoke([](std::size_t, const auto&, const infra::Function<void(std::optional<foc::Radians>)>& cb)
                     {
                         cb(foc::Radians{ 0.0f });
                     }));
@@ -2477,18 +2482,23 @@ TEST_F(FocStateMachineSpeedIdentificationTest, identification_only_starts_once_t
 
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
-    GivenElectricalStepsSucceed();
+    GivenElectricalStepsSucceed(3);
 
     auto sm = CreateRecordingStateMachine();
     auto& cascade = sm.GetController();
 
     EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+        .Times(3)
         .WillOnce(Invoke([&observed, &cascade](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto& cb)
             {
                 observed.electricalConfigurations = cascade.electricalConfigurations;
                 observed.mechanicalConfigurations = cascade.mechanicalConfigurations;
                 observed.resistance = cascade.lastElectrical.resistance.Value();
                 observed.provisionalInertia = cascade.lastMechanical.inertia.Value();
+                cb(std::nullopt, std::nullopt);
+            }))
+        .WillRepeatedly(Invoke([](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto& cb)
+            {
                 cb(std::nullopt, std::nullopt);
             }));
 
@@ -2506,12 +2516,13 @@ TEST_F(FocStateMachineSpeedIdentificationTest, identification_is_bounded_by_the_
 
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
-    GivenElectricalStepsSucceed();
+    GivenElectricalStepsSucceed(3);
 
     auto sm = CreateRecordingStateMachine();
 
     EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
-        .WillOnce(Invoke([&observed](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config& config, const auto& cb)
+        .Times(3)
+        .WillRepeatedly(Invoke([&observed](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config& config, const auto& cb)
             {
                 observed = config;
                 cb(std::nullopt, std::nullopt);
@@ -2520,7 +2531,7 @@ TEST_F(FocStateMachineSpeedIdentificationTest, identification_is_bounded_by_the_
     sm.CmdCalibrate([](state_machine::CommandResult) {});
 
     EXPECT_GT(observed.maxCurrent.Value(), 10.0f);
-    EXPECT_LE(observed.maxCurrent.Value(), 12.0f);
+    EXPECT_NEAR(observed.maxCurrent.Value(), 10.0f * services::identificationCurrentMargin, 1e-4f);
     EXPECT_GT(observed.maxSpeed.Value(), observed.targetSpeed.Value());
     EXPECT_LT(observed.dwellSpeed.Value(), observed.targetSpeed.Value());
     EXPECT_TRUE(services::IsUsableIdentificationConfig(observed));
@@ -2549,14 +2560,66 @@ TEST_F(FocStateMachineSpeedIdentificationTest, an_implausible_identified_inertia
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
-    GivenElectricalStepsSucceed();
+    GivenElectricalStepsSucceed(3);
+
+    auto sm = CreateRecordingStateMachine();
+
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+        .Times(3)
+        .WillRepeatedly(Invoke([](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto& cb)
+            {
+                cb(foc::NewtonMeterSecondPerRadian{ 0.01f }, foc::NewtonMeterSecondSquared{ 1.0e30f });
+            }));
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _)).Times(0);
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(std::get<state_machine::Fault>(sm.CurrentState()).code, state_machine::FaultCode::calibrationFailed);
+}
+
+TEST_F(FocStateMachineSpeedIdentificationTest, an_identification_that_fails_once_is_run_again_from_a_new_alignment_and_the_calibration_completes)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    GivenElectricalStepsSucceed(2);
 
     auto sm = CreateRecordingStateMachine();
 
     EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
         .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto& cb)
             {
-                cb(foc::NewtonMeterSecondPerRadian{ 0.01f }, foc::NewtonMeterSecondSquared{ 1.0e30f });
+                cb(std::nullopt, std::nullopt);
+            }))
+        .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto& cb)
+            {
+                cb(foc::NewtonMeterSecondPerRadian{ 0.01f }, foc::NewtonMeterSecondSquared{ 0.005f });
+            }));
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            }));
+    EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineSpeedIdentificationTest, an_identification_that_keeps_failing_is_given_up_after_three_attempts)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    GivenElectricalStepsSucceed(3);
+
+    auto sm = CreateRecordingStateMachine();
+
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+        .Times(3)
+        .WillRepeatedly(Invoke([](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto& cb)
+            {
+                cb(std::nullopt, std::nullopt);
             }));
     EXPECT_CALL(nvmMock, SaveCalibration(_, _)).Times(0);
 
@@ -2570,13 +2633,14 @@ TEST_F(FocStateMachineSpeedIdentificationTest, a_failed_identification_restores_
 {
     GivenFaultNotifierRegistered();
     GivenNvmValidWithSpeedGainsAndInertia();
-    GivenElectricalStepsSucceed();
+    GivenElectricalStepsSucceed(3);
 
     auto sm = CreateRecordingStateMachine();
     auto& cascade = sm.GetController();
 
     EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
-        .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto& cb)
+        .Times(3)
+        .WillRepeatedly(Invoke([](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto& cb)
             {
                 cb(std::nullopt, std::nullopt);
             }));

@@ -168,7 +168,7 @@ namespace application
     services::MechanicalParametersIdentification::Config OuterLoopStateMachine::ExcitationConfig() const
     {
         auto config = services::MechanicalParametersIdentification::Config{};
-        config.maxCurrent = foc::Ampere{ driveCurrentLimit.Value() * identificationCurrentMarginFactor };
+        config.maxCurrent = foc::Ampere{ driveCurrentLimit.Value() * services::identificationCurrentMargin };
         config.maxSpeed = foc::RadiansPerSecond{ config.targetSpeed.Value() * identificationSpeedMarginFactor };
         return config;
     }

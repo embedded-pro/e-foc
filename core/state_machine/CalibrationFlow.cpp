@@ -113,6 +113,17 @@ namespace application
         if (!event.friction || !event.inertia || !services::IsPlausibleMechanics(event.inertia->Value(), event.friction->Value()))
         {
             env.tracer.Trace() << "[SM] Mechanical identification produced no usable estimate";
+
+            // A run that stalls says nothing about the plant, and it stalls for the same reason on every repeat from the same
+            // rotor reference: the zero offset the alignment set. A new attempt therefore starts from a new alignment.
+            if (calibrating.mechanicalAttempts + 1 < maxMechanicalAttempts)
+            {
+                ++calibrating.mechanicalAttempts;
+                env.tracer.Trace() << "[SM] Aligning again for mechanical identification, attempt " << static_cast<uint32_t>(calibrating.mechanicalAttempts + 1) << " of " << static_cast<uint32_t>(maxMechanicalAttempts);
+                RunAlignmentOnly(calibrating);
+                return;
+            }
+
             env.machine.Dispatch(state_machine::CalibrationStepFailed{});
             return;
         }

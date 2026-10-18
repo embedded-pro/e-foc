@@ -330,6 +330,15 @@ is never handed to the NVM service. The completeness check that stamps `Calibrat
 zero and non-finite values but not a merely absurd one such as an inertia of 10^30, which is why the band is
 applied at the point the estimate arrives.
 
+### Retrying the mechanical step from a new alignment
+
+The excitation starts from a rotor at rest, under provisional gains, and its outcome depends on the rotor reference the
+alignment just set: a run that stalls or leaves its envelope does so again when it is repeated from the same
+reference, and not when it is repeated from a new one. A run that yields no usable estimate therefore sends the
+sequence back through alignment and then the mechanical step, up to three attempts in all, before the calibration is
+given up through the failure path above. Each retry traces
+`[SM] Aligning again for mechanical identification, attempt n of 3`. Electrical identification is not repeated.
+
 ### External Calibration (CAN-driven)
 
 An external client (e.g. the CAN bridge) can supply pre-measured calibration data without running the internal identification chain. This uses a two-command protocol to ensure the FSM state is correct before any inverter interaction begins:

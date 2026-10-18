@@ -75,10 +75,6 @@ namespace application
         static constexpr float provisionalFriction = 0.0f;
         static constexpr float identificationBandwidthRadPerSec = 20.0f;
         static constexpr float identificationSpeedMarginFactor = 2.0f;
-        // The speed loop already clamps its reference to the drive envelope; the run aborts a little above
-        // that, so measurement noise at the clamp does not read as a runaway. The service clamps the result
-        // down to what the inverter supports.
-        static constexpr float identificationCurrentMarginFactor = 1.2f;
 
         foc::Ampere driveCurrentLimit;
     };

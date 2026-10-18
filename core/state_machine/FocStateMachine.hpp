@@ -30,6 +30,7 @@ namespace state_machine
         CalibrationStep step{ CalibrationStep::polePairs };
         services::CalibrationData pendingData{};
         bool alignmentOnly{ false };
+        uint8_t mechanicalAttempts{ 0 };
     };
 
     struct Ready

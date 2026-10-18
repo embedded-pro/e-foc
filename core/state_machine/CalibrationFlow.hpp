@@ -41,6 +41,7 @@ namespace application
 
     private:
         static constexpr std::chrono::milliseconds saveRetryDelay{ 10 };
+        static constexpr uint8_t maxMechanicalAttempts{ 3 };
 
         const LifecycleEnvironment& env;
         CalibrationOrchestrator orchestrator;
