@@ -40,7 +40,7 @@ namespace application
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
                     MotorHardware{ this->hardware, this->hardware, vdc },
                     nvm,
-                    CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb } },
+                    CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2 },
                     *platformFaultNotifier,
                     configData,
                     ControlMode::OuterLoopArgs{

@@ -124,7 +124,9 @@ time as for a single-sample window.
 Convergence additionally requires the inertia to have **settled**: it is compared with itself one estimator memory earlier
 (the memory being $1/(1-\lambda)$ observations) and must have moved by less than 10 %. A single innovation under its bound
 can be luck, and the covariance trace is dominated by the Coulomb term, so neither shows that the inertia is known; without
-this check a hardware run occasionally converged on a value ten times too low.
+this check a hardware run occasionally converged on a value ten times too low. The settling check is not enough on its own
+on a rotor with no load, so the calibration also asks for two runs that agree
+(see [state-machine.md](state-machine.md#confirming-the-estimate-by-agreement)).
 
 The current envelope is checked on every sample, because an over-current must stop the power stage at once; the speed
 envelope is checked once per window, on the windowed speed. Wrap-around compensation shifts the raw position

@@ -31,5 +31,6 @@ namespace application
         services::MotorAlignment& motorAlignment;
         std::optional<std::reference_wrapper<services::MechanicalParametersIdentification>> mechIdentOverride{ std::nullopt };
         foc::Weber fluxLinkage{ foc::Weber{ 0.0f } };
+        uint8_t agreeingMechanicalRuns{ 1 };
     };
 }

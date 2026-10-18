@@ -339,6 +339,17 @@ sequence back through alignment and then the mechanical step, up to three attemp
 given up through the failure path above. Each retry traces
 `[SM] Aligning again for mechanical identification, attempt n of 3`. Electrical identification is not repeated.
 
+### Confirming the estimate by agreement
+
+A single run can converge on noise: on a rotor with no load, friction and cogging swamp the inertia signal, and an
+isolated run occasionally reports an inertia an order of magnitude too low. The calibration therefore asks the
+mechanical step for `CalibrationServices::agreeingMechanicalRuns` runs that agree (default 1, which accepts the first
+usable run; the motor application asks for 2). Each usable run is kept; as soon as two inertia estimates differ by less
+than 20 % of the larger (`services::EstimatesAgree`), their mean is the answer and the record is saved. Runs that do not
+agree are repeated from a new alignment under the three-attempt limit above, so a lone outlier is outvoted by two
+runs that agree, and three mutually disagreeing runs fail the calibration. An unconfirmed estimate traces
+`[SM] Mechanical estimate J_uNms2=… not confirmed by a second run`.
+
 ### External Calibration (CAN-driven)
 
 An external client (e.g. the CAN bridge) can supply pre-measured calibration data without running the internal identification chain. This uses a two-command protocol to ensure the FSM state is correct before any inverter interaction begins:

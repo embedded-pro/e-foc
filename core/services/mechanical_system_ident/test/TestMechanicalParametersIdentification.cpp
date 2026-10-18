@@ -832,6 +832,18 @@ TEST(MechanicalEstimatePolicyTest, a_clearly_negative_friction_stays_implausible
     EXPECT_FALSE(services::IsPlausibleMechanics(3.0e-6f, services::SettledFriction(-5.0e-4f)));
 }
 
+TEST(MechanicalEstimatePolicyTest, inertia_estimates_within_the_tolerance_agree)
+{
+    EXPECT_TRUE(services::EstimatesAgree(12.0e-6f, 13.0e-6f));
+    EXPECT_TRUE(services::EstimatesAgree(13.0e-6f, 12.0e-6f));
+}
+
+TEST(MechanicalEstimatePolicyTest, a_tenfold_outlier_does_not_agree_with_the_rotor)
+{
+    EXPECT_FALSE(services::EstimatesAgree(1.2e-6f, 12.0e-6f));
+    EXPECT_FALSE(services::EstimatesAgree(12.0e-6f, 1.2e-6f));
+}
+
 TEST(MechanicalEstimatePolicyTest, a_positive_friction_is_untouched)
 {
     EXPECT_EQ(services::SettledFriction(2.0e-5f), 2.0e-5f);

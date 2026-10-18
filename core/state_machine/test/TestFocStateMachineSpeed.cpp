@@ -1,6 +1,8 @@
 #include "TestFocStateMachineHelper.hpp"
 #include "core/foc/cascade/SpeedCascade.hpp"
 #include <limits>
+#include <memory>
+#include <vector>
 
 namespace
 {
@@ -2448,6 +2450,33 @@ namespace
             };
         }
 
+        RecordingStateMachine CreateStateMachineRequiringAgreement()
+        {
+            return RecordingStateMachine{
+                application::TerminalAndTracer{ terminal, tracer },
+                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                nvmMock,
+                application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), fluxLinkage, 2 },
+                faultNotifierMock,
+                state_machine::TransitionPolicy::Cli,
+                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock },
+                nvmActivity
+            };
+        }
+
+        void GivenIdentificationRuns(std::initializer_list<float> inertias)
+        {
+            const std::vector<float> values{ inertias };
+            auto next = std::make_shared<std::size_t>(0);
+
+            EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+                .Times(static_cast<int>(values.size()))
+                .WillRepeatedly(Invoke([values, next](const foc::NewtonMeter&, std::size_t, const services::MechanicalParametersIdentification::Config&, const auto& cb)
+                    {
+                        cb(foc::NewtonMeterSecondPerRadian{ 0.01f }, foc::NewtonMeterSecondSquared{ values[(*next)++] });
+                    }));
+        }
+
         void GivenElectricalStepsSucceed(std::size_t alignments = 1)
         {
             EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
@@ -2621,6 +2650,71 @@ TEST_F(FocStateMachineSpeedIdentificationTest, an_identification_that_keeps_fail
             {
                 cb(std::nullopt, std::nullopt);
             }));
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _)).Times(0);
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Fault>(sm.CurrentState()));
+    EXPECT_EQ(std::get<state_machine::Fault>(sm.CurrentState()).code, state_machine::FaultCode::calibrationFailed);
+}
+
+TEST_F(FocStateMachineSpeedIdentificationTest, two_identification_runs_that_agree_are_saved_as_their_mean)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    GivenElectricalStepsSucceed(2);
+    GivenIdentificationRuns({ 0.0050f, 0.0055f });
+
+    auto sm = CreateStateMachineRequiringAgreement();
+    float savedInertia = 0.0f;
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([&savedInertia](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                savedInertia = data.inertia;
+                onDone(services::NvmStatus::Ok);
+            }));
+    EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_NEAR(savedInertia, 0.00525f, 1e-6f);
+}
+
+TEST_F(FocStateMachineSpeedIdentificationTest, an_outlying_run_is_outvoted_by_two_runs_that_agree)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    GivenElectricalStepsSucceed(3);
+    GivenIdentificationRuns({ 0.0005f, 0.0050f, 0.0052f });
+
+    auto sm = CreateStateMachineRequiringAgreement();
+    float savedInertia = 0.0f;
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([&savedInertia](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                savedInertia = data.inertia;
+                onDone(services::NvmStatus::Ok);
+            }));
+    EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_NEAR(savedInertia, 0.0051f, 1e-6f);
+}
+
+TEST_F(FocStateMachineSpeedIdentificationTest, three_identification_runs_that_never_agree_fail_the_calibration)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    GivenElectricalStepsSucceed(3);
+    GivenIdentificationRuns({ 0.0010f, 0.0050f, 0.0200f });
+
+    auto sm = CreateStateMachineRequiringAgreement();
+
     EXPECT_CALL(nvmMock, SaveCalibration(_, _)).Times(0);
 
     sm.CmdCalibrate([](state_machine::CommandResult) {});
