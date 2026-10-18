@@ -20,6 +20,7 @@ namespace hil
         void Teardown() override;
         void BeforeScenario() override;
         void AfterScenario() override;
+        void RestartTarget() override;
 
         bool SendCommand(const std::string& command, std::chrono::milliseconds timeout) override;
         bool DrainSerial(std::chrono::milliseconds timeout) override;

@@ -79,6 +79,19 @@ namespace hil
             return script;
         }
 
+        std::string BuildResetScript(const BridgeConfig& cfg)
+        {
+            std::string script;
+            script += "set pagination off\n";
+            script += "set confirm off\n";
+            script += "target extended-remote " + cfg.gdbTarget + "\n";
+            script += "monitor reset\n";
+            script += "monitor go\n";
+            script += "disconnect\n";
+            script += "quit\n";
+            return script;
+        }
+
         int RunAndCapture(const std::string& command, std::string& outOutput)
         {
             outOutput.clear();
@@ -140,6 +153,23 @@ namespace hil
         if (exitCode != 0)
             throw std::runtime_error{ "GDB flash failed (exit " +
                                       std::to_string(exitCode) + ")" };
+
+        std::this_thread::sleep_for(config.postFlashDelay);
+    }
+
+    void GdbFlasher::Reset() const
+    {
+        if (config.gdbExe.empty() || config.gdbTarget.empty())
+            throw std::runtime_error{ "GdbFlasher: gdbExe and gdbTarget must be set to reset the target" };
+
+        ScopedTempFile script;
+        WriteFile(script.path, BuildResetScript(config));
+
+        std::string output;
+        const int exitCode = RunAndCapture(config.gdbExe + " --batch --nx -x " + script.path + " 2>&1", output);
+
+        if (exitCode != 0)
+            throw std::runtime_error{ "GDB reset failed (exit " + std::to_string(exitCode) + "): " + output };
 
         std::this_thread::sleep_for(config.postFlashDelay);
     }

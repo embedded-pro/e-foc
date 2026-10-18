@@ -29,15 +29,35 @@ namespace hil
     {
         SerialLogger::Instance().BeginScenario();
         auto& session = BridgeSession::Instance();
+
+        if (GetBridgeConfig().restartPerScenario)
+        {
+            RestartTarget();
+            return;
+        }
+
         (void)session.WaitForPrompt(timeouts::promptShort);
         (void)session.SendSerial("stop", timeouts::cleanup);
         (void)session.SendSerial("can_stop", timeouts::cleanup);
         (void)session.WaitForPrompt(timeouts::cleanup);
     }
 
+    void HardwareInteractor::RestartTarget()
+    {
+        auto& session = BridgeSession::Instance();
+        GdbFlasher{ GetBridgeConfig() }.Reset();
+        (void)session.DrainSerial(timeouts::bootBanner);
+        (void)session.WaitForPrompt(timeouts::prompt);
+    }
+
     void HardwareInteractor::AfterScenario()
     {
         auto& session = BridgeSession::Instance();
+
+        // A reset puts the power stage outputs back to their idle state, whatever a failed step left running
+        if (GetBridgeConfig().restartPerScenario)
+            GdbFlasher{ GetBridgeConfig() }.Reset();
+
         (void)session.DrainSerial(timeouts::cleanup);
         (void)session.WaitForPrompt(timeouts::promptShort);
         SerialLogger::Instance().EndScenario(true);

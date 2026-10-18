@@ -88,8 +88,10 @@ namespace integration
 
     bool Fixture::FlushPartialLines(std::chrono::milliseconds timeout)
     {
+        const auto linesBeforeFlush = allLines;
         const bool ok = interactor.DrainSerial(timeout);
         SyncLines();
+        allLines.insert(allLines.begin(), linesBeforeFlush.begin(), linesBeforeFlush.end());
         return ok;
     }
 

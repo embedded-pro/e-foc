@@ -345,6 +345,15 @@ namespace hil
                 promptSeen == promptBefore)
                 break;
         }
+
+        // The terminal prints its last output line without a terminator until the next prompt, so a quiet line holds a finished one.
+        if (!serialBuffer.empty())
+        {
+            if (serialBuffer.back() == '\r')
+                serialBuffer.pop_back();
+            EmitSerialLine(std::move(serialBuffer));
+            serialBuffer.clear();
+        }
     }
 
     void BridgeSession::TransmitSerial(const std::string& payload)
