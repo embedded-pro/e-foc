@@ -14,6 +14,8 @@ namespace application
         static constexpr float voltageToCurrent{ 5.0f };
         // 80 % of the +8.25 A that the mid-rail biased sense spans on a 3.3 V ADC
         static constexpr float overcurrentThresholdAmps{ 6.6f };
+        // Kept at the limit this board has always been run with; it is not derived from the trip level above.
+        static constexpr float maxCurrentSupportedAmps{ 15.0f };
 
         static constexpr float AdcToVoltsFactor(float adcReferenceVoltage, float adcResolution)
         {

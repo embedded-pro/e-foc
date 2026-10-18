@@ -5,6 +5,7 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/foc/model/TorqueStepScheduler.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
+#include "core/foc/interfaces/IsrCallback.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
 #include "hal/cortex_m/SystemTickTimerService.hpp"
@@ -215,10 +216,9 @@ namespace application
         infra::TimerRepeating protectionPollTimer;
         infra::TimerRepeating responseDrainTimer;
         hal::Hertz baseFrequency;
-        volatile bool onPhaseCurrentsReadyValid{ false };
         volatile uint32_t sampleDecimation{ 1 };
         uint32_t samplePhase{ 0 };
-        infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
+        foc::IsrCallback<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         foc::PhasePwmDutyCycles lastDutyPhases{};
         foc::PhaseCurrents lastCurrents{};
     };

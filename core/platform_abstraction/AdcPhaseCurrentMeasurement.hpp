@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/interfaces/IsrCallback.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "hal/interfaces/AdcMultiChannel.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
@@ -35,7 +36,8 @@ namespace application
         Impl adc;
         float slope = 0.0f;
         float offset = 0.0f;
-        infra::Function<void(foc::Ampere phaseA, foc::Ampere phaseB, foc::Ampere phaseC)> onMeasurementDone;
+        foc::IsrCallback<void(foc::Ampere phaseA, foc::Ampere phaseB, foc::Ampere phaseC)> onMeasurementDone;
+        bool converterArmed{ false };
     };
 
     template<typename Impl>
@@ -52,7 +54,14 @@ namespace application
     requires std::derived_from<Impl, hal::AdcMultiChannel>
     OPTIMIZE_FOR_SPEED void AdcPhaseCurrentMeasurementImpl<Impl>::Measure(const infra::Function<void(foc::Ampere phaseA, foc::Ampere phaseB, foc::Ampere phaseC)>& onDone)
     {
-        onMeasurementDone = onDone;
+        onMeasurementDone.Set(onDone);
+
+        // The converter's own callback is handed over once: it runs in the sampling interrupt, and replacing it while that
+        // interrupt is live is the race the callback above exists to avoid. Later calls only swap what it forwards to.
+        if (converterArmed)
+            return;
+
+        converterArmed = true;
         adc.Measure([this](auto samples)
             {
                 if (samples.size() < phaseCount) [[unlikely]]
@@ -72,5 +81,6 @@ namespace application
     void AdcPhaseCurrentMeasurementImpl<Impl>::Stop()
     {
         adc.Stop();
+        converterArmed = false;
     }
 }

@@ -322,11 +322,9 @@ namespace application
         const uint32_t requested = frequency.Value();
         really_assert(requested != 0 && baseFrequency.Value() % requested == 0);
 
-        onPhaseCurrentsReadyValid = false;
-        onPhaseCurrentsReady = onDone;
+        onPhaseCurrentsReady.Set(onDone);
         sampleDecimation = baseFrequency.Value() / requested;
         samplePhase = 0;
-        onPhaseCurrentsReadyValid = true;
     }
 
     void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
@@ -365,7 +363,7 @@ namespace application
         if (!sampleDue)
         {
         }
-        else if (onPhaseCurrentsReadyValid && onPhaseCurrentsReady && !controlLoopEntered)
+        else if (onPhaseCurrentsReady.IsSet() && !controlLoopEntered)
         {
             controlLoopEntered = true;
             const auto entryCycles = QemuCycleCounter::Now();
@@ -375,7 +373,7 @@ namespace application
             controlLoopMetrics.Record(QemuCycleCounter::Now() - entryCycles);
             controlLoopEntered = false;
         }
-        else if (onPhaseCurrentsReadyValid && onPhaseCurrentsReady && controlLoopEntered)
+        else if (onPhaseCurrentsReady.IsSet() && controlLoopEntered)
             controlLoopMetrics.RecordReentry();
 
         boardProtection.Evaluate(lastCurrents, model.EffectiveSupplyVoltage().Value(), model.WindingTemperatureCelsius());

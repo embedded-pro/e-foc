@@ -11,6 +11,7 @@ namespace
     {
         infra::Function<void(hal::AdcMultiChannel::Samples)> onSamples;
         bool stopped{ false };
+        int measureCalls{ 0 };
     };
 
     class CapturingAdc
@@ -24,6 +25,7 @@ namespace
         void Measure(const infra::Function<void(Samples)>& onDone) override
         {
             capture.onSamples = onDone;
+            ++capture.measureCalls;
         }
 
         void Stop() override
@@ -103,4 +105,42 @@ TEST_F(TestAdcPhaseCurrentMeasurement, stopping_reaches_the_converter)
     subject.Stop();
 
     EXPECT_TRUE(capture.stopped);
+}
+
+TEST_F(TestAdcPhaseCurrentMeasurement, the_converter_callback_is_handed_over_once_however_often_the_target_changes)
+{
+    subject.Measure([](foc::Ampere, foc::Ampere, foc::Ampere) {});
+    subject.Measure([](foc::Ampere, foc::Ampere, foc::Ampere) {});
+    subject.Measure([](foc::Ampere, foc::Ampere, foc::Ampere) {});
+
+    EXPECT_EQ(capture.measureCalls, 1);
+}
+
+TEST_F(TestAdcPhaseCurrentMeasurement, a_later_target_receives_the_conversions_in_place_of_the_earlier_one)
+{
+    int first = 0;
+    int second = 0;
+    const std::array<uint16_t, 3> samples{ 1, 2, 3 };
+
+    subject.Measure([&first](foc::Ampere, foc::Ampere, foc::Ampere)
+        {
+            ++first;
+        });
+    subject.Measure([&second](foc::Ampere, foc::Ampere, foc::Ampere)
+        {
+            ++second;
+        });
+    capture.onSamples(infra::MakeRange(samples));
+
+    EXPECT_EQ(first, 0);
+    EXPECT_EQ(second, 1);
+}
+
+TEST_F(TestAdcPhaseCurrentMeasurement, measuring_again_after_a_stop_hands_the_converter_a_new_callback)
+{
+    subject.Measure([](foc::Ampere, foc::Ampere, foc::Ampere) {});
+    subject.Stop();
+    subject.Measure([](foc::Ampere, foc::Ampere, foc::Ampere) {});
+
+    EXPECT_EQ(capture.measureCalls, 2);
 }

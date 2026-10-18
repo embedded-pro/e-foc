@@ -5,7 +5,6 @@
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
 #include <atomic>
-#include <utility>
 
 namespace
 {
@@ -184,7 +183,6 @@ namespace application
             adcCfg.digitalComparators = infra::MakeRange(impl.digitalComparators);
 
         peripherals->phaseCurrentAdc.reset();
-        phaseCurrentAdcArmed = false;
         peripherals->phaseCurrentAdc.emplace(
             AdcForPhaseCurrentMeasurementImpl::adcToAmpereSlope,
             AdcForPhaseCurrentMeasurementImpl::adcToAmpereOffset,
@@ -259,26 +257,13 @@ namespace application
 
     void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
-        // The sampling interrupt keeps firing while the callback is replaced, and it must never run a half-assigned function.
-        phaseCurrentsCallbackValid = false;
-        std::atomic_signal_fence(std::memory_order_seq_cst);
-        onPhaseCurrentsReady = onDone;
-        std::atomic_signal_fence(std::memory_order_seq_cst);
-        phaseCurrentsCallbackValid = true;
+        onPhaseCurrentsReady.Set(onDone);
         WithPwm([baseFrequency](auto& pwm)
             {
                 pwm.SetBaseFrequency(baseFrequency);
             });
-        // The converter's own callback and the wrapper's slot are assigned from here and invoked by the sampling interrupt, so they
-        // are installed once; later calls only swap the guarded control-loop callback above.
-        if (std::exchange(phaseCurrentAdcArmed, true))
-            return;
-
         peripherals->phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
             {
-                if (!phaseCurrentsCallbackValid)
-                    return;
-
                 if (controlLoopEntered)
                 {
                     controlLoopMetrics.RecordReentry();
