@@ -7,6 +7,7 @@ target_include_directories(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} P
 
 target_link_libraries(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PUBLIC
     e_foc.platform_abstraction
+    e_foc.services.cli
     infra.event
     infra.timer
     services.tracer
@@ -27,3 +28,9 @@ target_sources(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PRIVATE
     PlatformFactoryImpl.cpp
     PlatformFactoryImpl.hpp
 )
+
+# The console is mirrored on RTT whenever the RTT support is built, so a debug probe can read and drive it even when the
+# USB-serial link is down.
+if(EMIL_INCLUDE_SEGGER_RTT)
+    target_compile_definitions(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PUBLIC E_FOC_CONSOLE_ON_RTT)
+endif()
