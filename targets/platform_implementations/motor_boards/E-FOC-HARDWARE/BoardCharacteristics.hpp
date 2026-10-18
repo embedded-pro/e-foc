@@ -13,6 +13,10 @@ namespace application
         static constexpr float ratedCurrentAmps{ 3.0f };
         // 80 % of the +8.25 A that a mid-rail biased 5 A/V sense spans on a 3.3 V ADC
         static constexpr float overcurrentThresholdAmps{ 6.6f };
+        // The largest phase current the control loops may command: the rated current. Above it the supply collapses
+        // and the bus-total trip cuts the bridge, so the winding never sees what the loop asked for.
+        static constexpr float maxCurrentSupportedAmps{ ratedCurrentAmps };
+        static_assert(maxCurrentSupportedAmps < overcurrentThresholdAmps);
 
         static constexpr float AdcToVoltsFactor(float adcReferenceVoltage, float adcResolution)
         {

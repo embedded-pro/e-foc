@@ -135,10 +135,14 @@ namespace application
         {
             static constexpr float adcToVoltsFactor = application::BoardCharacteristics::AdcToVoltsFactor(adcReferenceVoltage, adcResolution);
             infra::Function<void(std::tuple<infra::Ampere, infra::Ampere, infra::Ampere> voltagePhases)> phaseCurrentsReady;
-            std::array<hal::tiva::AnalogPin, 1> powerSupplyAnalogPins{ { hal::tiva::AnalogPin{ Pins::powerSupplyVoltage } } };
+            // The pin is owned by the phase-current ADC (overvoltage comparator input); claiming it twice trips Gpio::ReservePin at boot.
+            explicit AdcForPowerSupplyMeasurementImpl(hal::tiva::AnalogPin& powerSupplyPin)
+                : powerSupplyAdc{ 1, 0, infra::MakeRangeFromSingleObject(powerSupplyPin), powerSupplyAdcConfig }
+            {}
+
             constexpr static auto powerSupplyOversampling = hal::tiva::SynchronousAdc::Oversampling::oversampling8;
             hal::tiva::SynchronousAdc::Config powerSupplyAdcConfig{ hal::tiva::SynchronousAdc::SampleAndHold::sampleAndHold256, hal::tiva::SynchronousAdc::Priority::priority3, std::make_optional(powerSupplyOversampling) };
-            hal::tiva::SynchronousAdc powerSupplyAdc{ 1, 0, powerSupplyAnalogPins, powerSupplyAdcConfig };
+            hal::tiva::SynchronousAdc powerSupplyAdc;
         };
 
         struct AdcForPhaseCurrentMeasurementImpl
@@ -170,6 +174,7 @@ namespace application
             } };
 
             hal::tiva::Adc::Config adcConfig{ false, 0, Peripheral::adcTrigger, hal::tiva::Adc::SampleAndHold::sampleAndHold8, std::make_optional(currentSensingOversampling), phaseDelay, {}, hal::cortex::InterruptPriority::highest };
+            static constexpr std::size_t powerSupplyPinIndex{ 4 };
             std::array<hal::tiva::AnalogPin, 5> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC }, hal::tiva::AnalogPin{ Pins::currentTotal }, hal::tiva::AnalogPin{ Pins::powerSupplyVoltage } } };
         };
 
@@ -264,8 +269,8 @@ namespace application
             hal::OutputPin performance{ Pins::performance };
             Cortex cortex;
             TerminalAndTracer terminalAndTracer;
-            AdcForPowerSupplyMeasurementImpl adcForPowerSupplyMeasurementImpl;
             AdcForPhaseCurrentMeasurementImpl adcForPhaseCurrentMeasurementImpl;
+            AdcForPowerSupplyMeasurementImpl adcForPowerSupplyMeasurementImpl{ adcForPhaseCurrentMeasurementImpl.currentPhaseAnalogPins[AdcForPhaseCurrentMeasurementImpl::powerSupplyPinIndex] };
             PwmConfiguration pwmConfig;
             hal::tiva::Eeprom eepromPeripheral;
 
@@ -303,6 +308,7 @@ namespace application
         infra::BoundedString::WithStorage<Resources::faultStatusSize> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };
+        volatile bool phaseCurrentsCallbackValid{ false };
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         infra::Function<void(BoardProtectionReason)> onFaultCallback;
         std::optional<Peripherals> peripherals;

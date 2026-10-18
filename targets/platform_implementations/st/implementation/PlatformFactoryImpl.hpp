@@ -254,6 +254,7 @@ namespace application
         infra::BoundedString::WithStorage<1024> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };
+        volatile bool phaseCurrentsCallbackValid{ false };
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         infra::Function<void(PlatformFactory::BoardProtectionReason)> onBoardProtection;
     };

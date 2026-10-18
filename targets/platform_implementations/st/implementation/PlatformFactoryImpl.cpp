@@ -2,6 +2,7 @@
 #include "targets/platform_implementations/error_handling_cortex_m/CutPowerStage.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
+#include <atomic>
 
 unsigned int hse_value = 8'000'000;
 
@@ -174,9 +175,17 @@ namespace application
 
     void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz /*baseFrequency*/, const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
+        // The sampling interrupt keeps firing while the callback is replaced, and it must never run a half-assigned function.
+        phaseCurrentsCallbackValid = false;
+        std::atomic_signal_fence(std::memory_order_seq_cst);
         onPhaseCurrentsReady = onDone;
+        std::atomic_signal_fence(std::memory_order_seq_cst);
+        phaseCurrentsCallbackValid = true;
         phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
             {
+                if (!phaseCurrentsCallbackValid)
+                    return;
+
                 onPhaseCurrentsReady(foc::PhaseCurrents{ a, b, c });
             });
     }

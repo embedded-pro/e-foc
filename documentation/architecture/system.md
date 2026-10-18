@@ -216,6 +216,13 @@ Concrete implementations exist for:
 - **ST STM32 (STM32F407G-DISC1, NUCLEO-H563ZI)**: platform-specific peripheral adapters under `targets/platform_implementations/st/`.
 - **Host / Simulator**: a software-backed platform implementation that emulates the motor-control I/O needed to run the closed-loop algorithm on a development machine, located under `targets/platform_implementations/host/`.
 
+Each platform also states the electrical facts of its board, which the control loops cannot discover:
+
+| Board setting                | Meaning                                                                                                                                                                                                                       |
+|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Maximum current supported    | The largest phase current the loops may command (`MaxCurrentSupported`). It is the board's rated current: above it the supply collapses or the bus-total trip cuts the bridge, and the winding never sees what the loop asked for. |
+| Encoder phase inversion      | True when the encoder counts against the phase order A-B-C. Inverting channel A restores the electrical direction; a wrong direction makes torque commands hold the rotor instead of turning it. It is a build-time board setting today and is the natural candidate for a persisted configuration parameter. |
+
 ```mermaid
 graph LR
     FOC_CORE["FOC Core\n+ Services"] -->|depends on| PAL_IF["PAL Interfaces\n(ThreePhaseInverter · Encoder\nLowPriorityInterrupt · …)"]

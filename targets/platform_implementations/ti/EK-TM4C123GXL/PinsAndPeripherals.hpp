@@ -55,6 +55,7 @@ namespace application
         using hal_pwm = hal::tiva::SynchronousPwm;
 
         constexpr static uint8_t QeiIndex = 0;
+        constexpr static bool encoderInvertPhaseA{ false };
         constexpr static uint8_t AdcIndex = 0;
         constexpr static uint8_t AdcSequencerIndex = 0;
         constexpr static uint8_t UartIndex = 0;
