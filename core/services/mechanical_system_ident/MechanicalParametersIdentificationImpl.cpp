@@ -24,8 +24,12 @@ namespace
     // An inertia that moves by more than this fraction over one memory of the estimator has not settled
     constexpr float inertiaSettlingTolerance{ 0.1f };
     constexpr std::size_t maximumSettlingInterval{ 2000 };
-    constexpr float minimumWindowedForgetting{ 1e-3f };
+    constexpr std::size_t minimumSettlingUpdates{ 8 };
+    constexpr float coveredWindowSamples{ 16.0f };
 
+    // The viscous friction shows only in the speed difference between the two levels, and a run that converges before it has
+    // crossed both of them has estimated it from one transition, so the run must last long enough to cross both.
+    constexpr float minimumRunDwells{ 2.0f };
     std::size_t WindowSamplesFor(float countAngle, float samplingPeriod)
     {
         if (!std::isfinite(countAngle))
@@ -79,6 +83,8 @@ namespace services
         ++run;
 
         RestartEstimator(config.forgettingFactor);
+        this->samplesSinceStart = 0;
+        this->minimumRunSamples = static_cast<std::size_t>(minimumRunDwells * std::chrono::duration<float>(config.dwellTime).count() / samplingPeriod);
 
         observable.RegisterPhaseCurrentsObserver([this, torqueConstant](const auto& currents)
             {
@@ -122,7 +128,9 @@ namespace services
     // moving it may converge.
     void MechanicalParametersIdentificationImpl::TrackInertiaSettling()
     {
-        const auto memoryInUpdates = updateForgetting < 1.0f ? static_cast<std::size_t>(std::ceil(1.0f / (1.0f - updateForgetting))) : maximumSettlingInterval;
+        // The memory is a number of samples, 1 / (1 - lambda), and an observation spans a window of them
+        const auto memoryInSamples = updateForgetting < 1.0f ? std::ceil(1.0f / (1.0f - updateForgetting)) : static_cast<float>(maximumSettlingInterval);
+        const auto memoryInUpdates = std::max<std::size_t>(minimumSettlingUpdates, static_cast<std::size_t>(std::ceil(memoryInSamples / static_cast<float>(windowSamples))));
 
         if (++updatesSinceReference < memoryInUpdates)
             return;
@@ -246,6 +254,8 @@ namespace services
 
         // The torque is accumulated over the window like the speed is: the acceleration between two window speeds is a triangular
         // average of the true acceleration over both windows, and only a torque averaged the same way can be regressed on it.
+        ++samplesSinceStart;
+
         const auto mechanicalPos = encoder.Read().Value();
         const auto electricalAngle = mechanicalPos * polePairs;
         const auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
@@ -297,10 +307,6 @@ namespace services
         {
             windowSamples = wanted;
             windowPeriod = samplingPeriod * static_cast<float>(wanted);
-
-            // The forgetting factor is a memory per observation, and a window makes an observation span several samples, so
-            // the factor is rescaled to keep the memory the same in time rather than in observations
-            RestartEstimator(std::max(std::pow(currentConfig.forgettingFactor, static_cast<float>(wanted)), minimumWindowedForgetting));
             hasPreviousSpeed = false;
             hasPreviousTorque = false;
             return;
@@ -328,7 +334,7 @@ namespace services
         excitation.Count(acceleration, centredSpeed);
         TrackInertiaSettling();
 
-        if (!inertiaSettled || !HasConvergedMechanics(metrics, excitation, updateForgetting))
+        if (samplesSinceStart < minimumRunSamples || !inertiaSettled || !HasConvergedMechanics(metrics, excitation, updateForgetting, std::max(1.0f, static_cast<float>(windowSamples) / coveredWindowSamples)))
             return;
 
         outcome = Outcome::converged;

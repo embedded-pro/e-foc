@@ -619,6 +619,37 @@ TEST_F(MechanicalParametersIdentificationTest, a_coarse_encoder_run_converges_in
     EXPECT_NEAR(outcome.inertia->Value(), trueInertia, trueInertia * 0.3f);
 }
 
+TEST_F(MechanicalParametersIdentificationTest, a_run_lasts_at_least_two_dwell_periods_before_it_converges)
+{
+    auto config = DefaultConfig();
+    config.timeout = std::chrono::seconds{ 60 };
+
+    std::size_t samplesAtCompletion = 0;
+    bool fired = false;
+
+    GivenEncoderFollowsTheProfile();
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
+    ExpectDriveReleased();
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config,
+        [&](auto, auto)
+        {
+            fired = true;
+        });
+
+    for (std::size_t i = 0; i != 400000 && !fired; ++i)
+    {
+        PublishConsistentSample();
+        ExecuteAllActions();
+        samplesAtCompletion = i + 1;
+    }
+
+    ASSERT_TRUE(fired);
+    const auto dwellSamples = static_cast<std::size_t>(std::chrono::duration<float>(config.dwellTime).count() / samplingPeriod);
+    EXPECT_GE(samplesAtCompletion, 2 * dwellSamples);
+}
+
 TEST_F(MechanicalParametersIdentificationTest, a_sample_above_the_current_envelope_ends_the_run_without_an_estimate)
 {
     auto config = DefaultConfig();

@@ -65,6 +65,8 @@ namespace services
         std::size_t updatesSinceReference{ 0 };
         bool hasInertiaReference{ false };
         bool inertiaSettled{ false };
+        std::size_t samplesSinceStart{ 0 };
+        std::size_t minimumRunSamples{ 0 };
         float previousPosition{ 0.0f };
         float previousSpeed{ 0.0f };
         bool hasPreviousSpeed{ false };

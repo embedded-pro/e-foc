@@ -116,13 +116,17 @@ regressed on must be averaged the same way. For windows longer than a sample the
 one instant: the acceleration between two window speeds, the mean of the two speeds, and the mean of the two window
 torques all belong to the boundary between their windows. A change of window length starts the pairing again.
 
-The forgetting factor is a memory per observation, so a window of $W$ samples would stretch the memory $W$-fold in time and
-leave the covariance too large to meet its bound within the run. When the window is chosen the factor is therefore rescaled
-to $\lambda^{W}$ and the estimator restarted, which keeps the memory, and the covariance bound derived from it, the same in
-time as for a single-sample window.
+An estimator fed long window means makes far fewer updates per second than one fed samples, so its covariance trace falls
+too slowly in time to reach its bound within a run: on a 4000-count encoder (an 80-sample window) it was still just above
+the bound when the five-second timeout ended. For windows longer than 16 samples the bound is therefore scaled by the window
+over 16; shorter windows keep the bound unchanged. The forgetting factor itself is not rescaled with the window: doing so
+shortened the memory so far that the viscous friction, which is resolved only from the difference between the two speed
+levels, was estimated from one level and came out 20 to 30 % high in simulation.
+
+A run may not converge before it has crossed both speed levels, so it lasts at least two dwell periods.
 
 Convergence additionally requires the inertia to have **settled**: it is compared with itself one estimator memory earlier
-(the memory being $1/(1-\lambda)$ observations) and must have moved by less than 10 %. A single innovation under its bound
+(the memory being $1/(1-\lambda)$ samples, that is that many divided by the window in updates) and must have moved by less than 10 %. A single innovation under its bound
 can be luck, and the covariance trace is dominated by the Coulomb term, so neither shows that the inertia is known; without
 this check a hardware run occasionally converged on a value ten times too low. The settling check is not enough on its own
 on a rotor with no load, so the calibration also asks for two runs that agree

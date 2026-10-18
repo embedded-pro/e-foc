@@ -140,7 +140,10 @@ namespace application
         const bool usable = event.friction && event.inertia && services::IsPlausibleMechanics(event.inertia->Value(), event.friction->Value());
 
         if (usable)
+        {
             calibrating.mechanicalRuns[calibrating.mechanicalRunCount++] = state_machine::MechanicalRun{ event.inertia->Value(), event.friction->Value() };
+            env.tracer.Trace() << "[SM] Mechanical run " << static_cast<uint32_t>(calibrating.mechanicalRunCount) << ": J_uNms2=" << event.inertia->Value() * microPerUnit << " B_uNms=" << event.friction->Value() * microPerUnit;
+        }
         else
             env.tracer.Trace() << "[SM] Mechanical identification produced no usable estimate";
 
