@@ -5,6 +5,7 @@
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
 #include <atomic>
+#include <utility>
 
 namespace
 {
@@ -183,6 +184,7 @@ namespace application
             adcCfg.digitalComparators = infra::MakeRange(impl.digitalComparators);
 
         peripherals->phaseCurrentAdc.reset();
+        phaseCurrentAdcArmed = false;
         peripherals->phaseCurrentAdc.emplace(
             AdcForPhaseCurrentMeasurementImpl::adcToAmpereSlope,
             AdcForPhaseCurrentMeasurementImpl::adcToAmpereOffset,
@@ -267,6 +269,11 @@ namespace application
             {
                 pwm.SetBaseFrequency(baseFrequency);
             });
+        // The converter's own callback and the wrapper's slot are assigned from here and invoked by the sampling interrupt, so they
+        // are installed once; later calls only swap the guarded control-loop callback above.
+        if (std::exchange(phaseCurrentAdcArmed, true))
+            return;
+
         peripherals->phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
             {
                 if (!phaseCurrentsCallbackValid)

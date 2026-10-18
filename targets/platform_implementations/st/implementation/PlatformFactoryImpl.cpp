@@ -3,6 +3,7 @@
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
 #include <atomic>
+#include <utility>
 
 unsigned int hse_value = 8'000'000;
 
@@ -149,6 +150,7 @@ namespace application
     void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds /*deadTime*/, SampleAndHold /*sampleAndHold*/)
     {
         phaseCurrentAdc.reset();
+        phaseCurrentAdcArmed = false;
         phaseCurrentAdc.emplace(0.0f, 0.0f);
         pwm.reset();
         pwm.emplace();
@@ -181,6 +183,9 @@ namespace application
         onPhaseCurrentsReady = onDone;
         std::atomic_signal_fence(std::memory_order_seq_cst);
         phaseCurrentsCallbackValid = true;
+        if (std::exchange(phaseCurrentAdcArmed, true))
+            return;
+
         phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
             {
                 if (!phaseCurrentsCallbackValid)

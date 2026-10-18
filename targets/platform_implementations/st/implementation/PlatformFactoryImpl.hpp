@@ -255,6 +255,7 @@ namespace application
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };
         volatile bool phaseCurrentsCallbackValid{ false };
+        bool phaseCurrentAdcArmed{ false };
         infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         infra::Function<void(PlatformFactory::BoardProtectionReason)> onBoardProtection;
     };
