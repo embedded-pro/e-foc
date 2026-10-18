@@ -16,6 +16,7 @@ namespace services
         inline constexpr float minimumInertia{ 1e-9f };
         inline constexpr float maximumInertia{ 1.0f };
         inline constexpr float maximumFriction{ 1.0f };
+        inline constexpr float frictionResolution{ 1e-4f };
 
         inline constexpr float innovationThreshold{ 1e-4f };
         inline constexpr float uncertaintyBudgetFactor{ 20.0f };
@@ -29,6 +30,13 @@ namespace services
     }
 
     using MechanicalRls = estimators::RecursiveLeastSquares<float, 3>;
+
+    // A rotor with almost no viscous friction presents as slightly negative: the estimator cannot resolve
+    // the coefficient below the torque noise over the speed span. Within that resolution the value is zero.
+    inline float SettledFriction(float friction)
+    {
+        return friction < 0.0f && friction > -mechanical_estimate::frictionResolution ? 0.0f : friction;
+    }
 
     inline bool IsPlausibleMechanics(float inertia, float friction)
     {

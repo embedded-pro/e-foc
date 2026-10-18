@@ -11,6 +11,7 @@
 #include <gmock/gmock.h>
 #include <limits>
 #include <numbers>
+#include <vector>
 
 namespace
 {
@@ -110,22 +111,20 @@ namespace
                     }));
         }
 
-        // Mirrors the service's own double finite difference so the observation handed to the estimator is
-        // consistent with the motion the encoder reports.
+        // The plant's speed and acceleration are evaluated analytically at every sample, and the torque it needs follows from them,
+        // so the observation the service derives from window means is consistent with the motion.
         void AdvanceProfile()
         {
-            constexpr float samplesPerCycle = 1000.0f;
+            constexpr float samplesPerCycle = 4000.0f;
             constexpr float speedAmplitude = 9.0f;
-            const auto speedCommand = speedAmplitude * (1.0f - std::cos(2.0f * std::numbers::pi_v<float> * static_cast<float>(sampleIndex) / samplesPerCycle));
+            constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
+            const auto phase = twoPi * static_cast<float>(sampleIndex) / samplesPerCycle;
+            const auto speedCommand = speedAmplitude * (1.0f - std::cos(phase));
+            lastSpeed = speedCommand;
+            lastAcceleration = speedAmplitude * std::sin(phase) * twoPi / samplesPerCycle / samplingPeriod;
             ++sampleIndex;
 
-            previousPosition = position;
             position += speedCommand * samplingPeriod;
-
-            const auto speed = (position - previousPosition) / samplingPeriod;
-            lastAcceleration = (speed - previousSpeed) / samplingPeriod;
-            previousSpeed = speed;
-            lastSpeed = speed;
         }
 
         void PublishConsistentSample()
@@ -226,13 +225,13 @@ namespace
     };
 }
 
-TEST_F(MechanicalParametersIdentificationTest, estimate_friction_starts_the_drive_and_sets_target_speed)
+TEST_F(MechanicalParametersIdentificationTest, estimate_friction_starts_the_drive_from_standstill)
 {
     auto config = DefaultConfig();
 
     EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
     ExpectRunStarted();
-    EXPECT_CALL(controllerMock, CommandSpeed(config.targetSpeed));
+    EXPECT_CALL(controllerMock, CommandSpeed(foc::RadiansPerSecond{ 0.0f }));
 
     identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config, [](auto, auto) {});
 
@@ -260,21 +259,78 @@ TEST_F(MechanicalParametersIdentificationTest, the_excitation_trajectory_alterna
     auto config = DefaultConfig();
     config.dwellTime = std::chrono::milliseconds{ 100 };
 
+    std::vector<float> commands;
+
     EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
     ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_))
+        .WillRepeatedly(Invoke([&commands](foc::RadiansPerSecond speed)
+            {
+                commands.push_back(speed.Value());
+            }));
 
-    InSequence sequence;
-    EXPECT_CALL(controllerMock, CommandSpeed(config.targetSpeed));
-    EXPECT_CALL(controllerMock, CommandSpeed(config.dwellSpeed));
-    EXPECT_CALL(controllerMock, CommandSpeed(config.targetSpeed));
-    EXPECT_CALL(controllerMock, CommandSpeed(config.dwellSpeed));
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config, [](auto, auto) {});
+
+    ForwardTime(std::chrono::milliseconds{ 360 });
+
+    std::vector<float> plateaus;
+    for (const auto command : commands)
+        if ((command == config.dwellSpeed.Value() || command == config.targetSpeed.Value()) && (plateaus.empty() || plateaus.back() != command))
+            plateaus.push_back(command);
+
+    const std::vector<float> expected{ config.dwellSpeed.Value(), config.targetSpeed.Value(), config.dwellSpeed.Value(), config.targetSpeed.Value() };
+    EXPECT_EQ(plateaus, expected);
+
+    ExpectDriveReleased();
+    identification->Abort();
+}
+
+TEST_F(MechanicalParametersIdentificationTest, the_commanded_speed_never_changes_faster_than_the_slew_rate)
+{
+    auto config = DefaultConfig();
+    config.dwellTime = std::chrono::milliseconds{ 100 };
+    config.speedSlewRate = 500.0f;
+
+    std::vector<float> commands;
+
+    EXPECT_CALL(encoderMock, Read()).WillOnce(Return(foc::Radians{ 0.0f }));
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_))
+        .WillRepeatedly(Invoke([&commands](foc::RadiansPerSecond speed)
+            {
+                commands.push_back(speed.Value());
+            }));
 
     identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config, [](auto, auto) {});
 
     ForwardTime(std::chrono::milliseconds{ 310 });
 
+    ASSERT_GT(commands.size(), 100u);
+    EXPECT_EQ(commands.front(), 0.0f);
+    for (std::size_t i = 1; i != commands.size(); ++i)
+        EXPECT_LE(std::abs(commands[i] - commands[i - 1]), config.speedSlewRate * 0.001f + 1e-3f);
+
     ExpectDriveReleased();
     identification->Abort();
+}
+
+TEST_F(MechanicalParametersIdentificationTest, a_config_without_a_positive_slew_rate_is_rejected_immediately)
+{
+    auto config = DefaultConfig();
+    config.speedSlewRate = 0.0f;
+
+    bool fired = false;
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config,
+        [&fired](auto friction, auto inertia)
+        {
+            fired = true;
+            EXPECT_FALSE(friction.has_value());
+            EXPECT_FALSE(inertia.has_value());
+        });
+
+    EXPECT_TRUE(fired);
+    EXPECT_FALSE(identification->IsRunning());
 }
 
 TEST_F(MechanicalParametersIdentificationTest, a_config_without_a_usable_trajectory_is_rejected_immediately)
@@ -506,7 +562,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_consistent_excited_run_reports_
             outcome.inertia = j;
         });
 
-    for (std::size_t i = 0; i != 4000 && !outcome.fired; ++i)
+    for (std::size_t i = 0; i != 400000 && !outcome.fired; ++i)
     {
         PublishConsistentSample();
         ExecuteAllActions();
@@ -518,6 +574,49 @@ TEST_F(MechanicalParametersIdentificationTest, a_consistent_excited_run_reports_
     EXPECT_NEAR(outcome.inertia->Value(), trueInertia, trueInertia * 0.2f);
     EXPECT_NEAR(outcome.friction->Value(), trueFriction, trueFriction * 0.2f);
     EXPECT_FALSE(observableMock.HasObserver());
+}
+
+TEST_F(MechanicalParametersIdentificationTest, a_coarse_encoder_run_converges_inside_the_default_timeout)
+{
+    constexpr float countsPerRevolution = 4000.0f;
+    constexpr float countAngle = 2.0f * std::numbers::pi_v<float> / countsPerRevolution;
+
+    auto config = DefaultConfig();
+    config.timeout = std::chrono::seconds{ 5 };
+
+    struct Outcome
+    {
+        bool fired = false;
+        std::optional<foc::NewtonMeterSecondPerRadian> friction;
+        std::optional<foc::NewtonMeterSecondSquared> inertia;
+    } outcome;
+
+    EXPECT_CALL(encoderMock, Read())
+        .WillRepeatedly(Invoke([this]()
+            {
+                return foc::Radians{ std::floor(position / countAngle) * countAngle };
+            }));
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
+    ExpectDriveReleased();
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config,
+        [&outcome](auto b, auto j)
+        {
+            outcome.fired = true;
+            outcome.friction = b;
+            outcome.inertia = j;
+        });
+
+    for (std::size_t i = 0; i != 100000 && !outcome.fired; ++i)
+    {
+        PublishConsistentSample();
+        ExecuteAllActions();
+    }
+
+    ASSERT_TRUE(outcome.fired);
+    ASSERT_TRUE(outcome.inertia.has_value());
+    EXPECT_NEAR(outcome.inertia->Value(), trueInertia, trueInertia * 0.3f);
 }
 
 TEST_F(MechanicalParametersIdentificationTest, a_sample_above_the_current_envelope_ends_the_run_without_an_estimate)
@@ -551,6 +650,62 @@ TEST_F(MechanicalParametersIdentificationTest, a_sample_above_the_current_envelo
     EXPECT_FALSE(observableMock.HasObserver());
 }
 
+TEST_F(MechanicalParametersIdentificationTest, a_current_between_the_supported_limit_and_its_margin_does_not_end_the_run)
+{
+    auto config = DefaultConfig();
+    config.timeout = std::chrono::seconds{ 60 };
+    config.maxCurrent = foc::Ampere{ 100.0f };
+
+    const auto supported = driverMock.MaxCurrentSupported().Value();
+    bool fired = false;
+
+    GivenEncoderFollowsTheProfile();
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config, [&fired](auto, auto)
+        {
+            fired = true;
+        });
+
+    AdvanceProfile();
+    PublishCurrents(supported * 1.8f, -supported * 0.9f, -supported * 0.9f);
+    ExecuteAllActions();
+
+    EXPECT_FALSE(fired);
+    EXPECT_TRUE(identification->IsRunning());
+
+    ExpectDriveReleased();
+    identification->Abort();
+}
+
+TEST_F(MechanicalParametersIdentificationTest, a_current_beyond_the_margin_ends_the_run_even_when_the_config_allows_more)
+{
+    auto config = DefaultConfig();
+    config.timeout = std::chrono::seconds{ 60 };
+    config.maxCurrent = foc::Ampere{ 100.0f };
+
+    const auto supported = driverMock.MaxCurrentSupported().Value();
+    bool fired = false;
+
+    GivenEncoderFollowsTheProfile();
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
+    ExpectPowerStageStoppedImmediately();
+    ExpectDriveReleased();
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config, [&fired](auto, auto)
+        {
+            fired = true;
+        });
+
+    AdvanceProfile();
+    PublishCurrents(supported * 2.2f, -supported * 1.1f, -supported * 1.1f);
+    ExecuteAllActions();
+
+    EXPECT_TRUE(fired);
+}
+
 TEST_F(MechanicalParametersIdentificationTest, a_rotor_faster_than_the_speed_limit_ends_the_run_without_an_estimate)
 {
     auto config = DefaultConfig();
@@ -577,8 +732,11 @@ TEST_F(MechanicalParametersIdentificationTest, a_rotor_faster_than_the_speed_lim
             inertia = j;
         });
 
-    position += 100.0f * samplingPeriod;
-    PublishCurrents(0.1f, -0.05f, -0.05f);
+    for (std::size_t i = 0; i != 400; ++i)
+    {
+        position += 100.0f * samplingPeriod;
+        PublishCurrents(0.1f, -0.05f, -0.05f);
+    }
     ExecuteAllActions();
 
     EXPECT_TRUE(fired);
@@ -619,6 +777,64 @@ TEST_F(MechanicalParametersIdentificationTest, a_rotor_held_at_a_constant_speed_
 
     ExpectDriveReleased();
     identification->Abort();
+}
+
+TEST_F(MechanicalParametersIdentificationTest, a_coarse_encoder_at_a_steady_speed_stays_inside_the_speed_limit)
+{
+    constexpr float countsPerRevolution = 4000.0f;
+    constexpr float countAngle = 2.0f * std::numbers::pi_v<float> / countsPerRevolution;
+    constexpr float steadySpeed = 55.0f;
+
+    auto config = DefaultConfig();
+    config.timeout = std::chrono::seconds{ 60 };
+    config.maxSpeed = foc::RadiansPerSecond{ 60.0f };
+
+    bool fired = false;
+
+    EXPECT_CALL(encoderMock, Read())
+        .WillRepeatedly(Invoke([this]()
+            {
+                return foc::Radians{ std::floor(position / countAngle) * countAngle };
+            }));
+    ExpectRunStarted();
+    EXPECT_CALL(driverMock, Stop()).Times(AnyNumber());
+    EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config,
+        [&](auto, auto)
+        {
+            fired = true;
+        });
+
+    for (std::size_t i = 0; i != 4000; ++i)
+    {
+        position += steadySpeed * samplingPeriod;
+        PublishCurrents(0.5f, -0.25f, -0.25f);
+        ExecuteAllActions();
+    }
+
+    EXPECT_FALSE(fired);
+    EXPECT_TRUE(observableMock.HasObserver());
+
+    ExpectDriveReleased();
+    identification->Abort();
+}
+
+TEST(MechanicalEstimatePolicyTest, a_friction_within_the_estimator_resolution_below_zero_settles_to_zero)
+{
+    EXPECT_EQ(services::SettledFriction(-2.5e-5f), 0.0f);
+    EXPECT_TRUE(services::IsPlausibleMechanics(3.0e-6f, services::SettledFriction(-2.5e-5f)));
+}
+
+TEST(MechanicalEstimatePolicyTest, a_clearly_negative_friction_stays_implausible)
+{
+    EXPECT_EQ(services::SettledFriction(-5.0e-4f), -5.0e-4f);
+    EXPECT_FALSE(services::IsPlausibleMechanics(3.0e-6f, services::SettledFriction(-5.0e-4f)));
+}
+
+TEST(MechanicalEstimatePolicyTest, a_positive_friction_is_untouched)
+{
+    EXPECT_EQ(services::SettledFriction(2.0e-5f), 2.0e-5f);
 }
 
 TEST_F(MechanicalParametersIdentificationTest, a_config_without_a_finite_speed_limit_is_rejected_immediately)
@@ -698,7 +914,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_sample_outside_the_envelope_inv
             outcome.inertia = j;
         });
 
-    for (std::size_t i = 0; i != 4000 && !AFinishIsQueued(); ++i)
+    for (std::size_t i = 0; i != 400000 && !AFinishIsQueued(); ++i)
         PublishConsistentSample();
 
     ASSERT_TRUE(AFinishIsQueued());
@@ -730,7 +946,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_convergence_scheduled_before_an
             firstFired = true;
         });
 
-    for (std::size_t i = 0; i != 4000 && !AFinishIsQueued(); ++i)
+    for (std::size_t i = 0; i != 400000 && !AFinishIsQueued(); ++i)
         PublishConsistentSample();
 
     ASSERT_TRUE(AFinishIsQueued());

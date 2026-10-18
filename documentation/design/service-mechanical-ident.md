@@ -83,52 +83,53 @@ The d-axis contribution to torque is zero for surface PMSM under the Id = 0 oper
 
 ### Speed and Acceleration Estimation
 
-Angular velocity (ω) at each observation instant is obtained from two successive encoder angle samples using a finite difference with wrap-around compensation:
+Speed and acceleration come from differences of encoder positions, and an encoder gives positions in counts. For a
+count of $q$ radians, a window of $T_w$ seconds quantises the speed at $q/T_w$ and the acceleration at $q/T_w^2$. A
+1000-line encoder (4000 counts per revolution, $q$ = 1.6 mrad) read at 20 kHz moves in steps of about 31 rad/s, and its
+second difference is quantised at over 600 000 rad/s². The acceleration is the harder quantity, because its
+quantisation falls with the *square* of the window.
+
+The procedure therefore sizes its **observation window** from the encoder it is given. It tracks the smallest non-zero
+position step it sees, which is one count, and once it has seen enough steps it chooses the window that holds the
+acceleration quantum at a fixed target (100 rad/s²):
 
 ```text
-ω_k = (θ_k − θ_{k−1}) / Δt
+T_w = sqrt( q / 100 )          q = smallest non-zero position step, in radians
 ```
 
-where Δt is the sampling period and wrap-around compensation shifts the raw difference into the range (−π/Δt, +π/Δt) rad/s in exactly the same manner used by the speed control outer loop.
+A clean encoder (a simulated plant, or a very fine one) has a tiny step and so a single-sample window, which is the
+sample itself. A 4000-count encoder gets about 4 ms. Until enough steps have been seen the window is one sample and no
+speed limit is applied to it, because a quantised single-sample speed is not a speed; the current limit is checked
+on every sample throughout.
 
-Δt must be the period of the callback that produced the two samples. Observations arrive with the control
-loop's current samples, at the inverter's **base** frequency rather than the speed-command frequency, so Δt is
-derived from `BaseFrequency()`. Deriving it from the outer-loop rate instead scales ω by the ratio of the two
-frequencies and α by its square — at 20 kHz against 1 kHz that is 20× on speed and 400× on inertia, and the
-inertia estimate becomes speed-loop PID gains.
-
-### Obtaining the observations
-
-The inverter carries a **single** phase-current callback slot, and that slot is the control loop's only path to
-the PWM output. A procedure that claims it for itself evicts the control loop: no duty cycles are written, the
-inverter is never started, the rotor stays where it is, and the regressor carries no excitation for the
-estimator to converge on. The procedure then runs to its timeout and reports failure — on hardware only, since
-a test double that publishes samples on demand hides the whole effect.
-
-So this procedure does not claim the slot. It registers as an **observer** on the running control loop, which
-publishes the phase currents it has just used, after the duty cycles are written. Starting and stopping the
-drive is likewise done through the controller rather than by writing the inverter directly.
-
-Two consequences follow from the observer running in the ADC interrupt:
-
-- The procedure's completion is handed to the event dispatcher rather than invoked from the interrupt.
-  Releasing the observer from inside its own invocation would destroy the closure being executed, and the
-  completion reaches non-volatile memory through the state machine.
-- An abort takes effect immediately — the drive is stopped and the observer released — but the pending
-  completion is dropped rather than invoked. The caller that aborted owns the outcome.
-- Because the completion is deferred, an abort and a new run can both happen before the dispatcher gets to
-  it. Each run therefore carries a generation, and a queued completion finishes only the run that queued
-  it; a terminal outcome belonging to an aborted run can never complete the run that followed it.
-
-Each observation reads the encoder once. Reading it twice within a callback samples two different rotor positions and mixes them into a single difference.
-
-Angular acceleration (dω/dt) is obtained from two successive velocity estimates by a further finite difference:
+Each window yields one observation:
 
 ```text
-α_k = (ω_k − ω_{k−1}) / Δt
+ω_w = (θ_end − θ_start) / T_w          wrap-around compensated
+α_w = (ω_w − ω_{w−1}) / T_w
 ```
 
-The double finite difference amplifies noise; the quality of the acceleration estimate therefore depends on the encoder resolution and sampling rate. Low-resolution encoders or very low speeds produce noisy acceleration estimates and degrade identification accuracy. The caller is advised to command a non-zero target speed of sufficient magnitude to obtain a good signal-to-noise ratio.
+The encoder is read at every sample, because the electrical angle that turns the phase currents into the q-axis
+current needs it, and the q-axis current is accumulated over the window the way the speed is. The acceleration
+between two window means is a triangular average of the true acceleration over both windows, so the torque it is
+regressed on must be averaged the same way. For windows longer than a sample the regressors are therefore centred on
+one instant: the acceleration between two window speeds, the mean of the two speeds, and the mean of the two window
+torques all belong to the boundary between their windows. A change of window length starts the pairing again.
+
+The forgetting factor is a memory per observation, so a window of $W$ samples would stretch the memory $W$-fold in time and
+leave the covariance too large to meet its bound within the run. When the window is chosen the factor is therefore rescaled
+to $\lambda^{W}$ and the estimator restarted, which keeps the memory, and the covariance bound derived from it, the same in
+time as for a single-sample window.
+
+Convergence additionally requires the inertia to have **settled**: it is compared with itself one estimator memory earlier
+(the memory being $1/(1-\lambda)$ observations) and must have moved by less than 10 %. A single innovation under its bound
+can be luck, and the covariance trace is dominated by the Coulomb term, so neither shows that the inertia is known; without
+this check a hardware run occasionally converged on a value ten times too low.
+
+The current envelope is checked on every sample, because an over-current must stop the power stage at once; the speed
+envelope is checked once per window, on the windowed speed. Wrap-around compensation shifts the raw position
+difference into (−π, +π], so a window must move the rotor by less than half a turn, which is a speed far above any
+envelope this procedure accepts.
 
 ### Excitation Trajectory
 
@@ -137,17 +138,21 @@ A single constant speed setpoint is not an excitation. Once the loop has settled
 intercept and speed columns are collinear, so B cannot be separated from the Coulomb term. Every sample
 then adds information in no direction while the forgetting factor keeps inflating the covariance.
 
-The procedure therefore drives a two-level trajectory. It commands the target speed, then alternates
-between the target speed and a lower dwell speed every dwell period until the run ends. Each transition is
+The procedure therefore drives a two-level trajectory. It starts at the lower dwell speed, so the first
+step out of standstill is the smaller one (the speed loop still runs on provisional gains, and a light rotor
+overshoots a large step past the speed limit), then alternates between the target speed and the dwell speed
+every dwell period until the run ends. Level changes are not stepped: the commanded speed moves toward the next level
+at a bounded slew rate (5000 rad/s² by default), because the speed loop still runs on provisional gains and a
+step out of standstill makes it request a current spike that a small supply cannot deliver. Each transition is
 a commanded acceleration, and the rotor spends the whole run above the minimum speed the update gate
 requires, so both the inertia and the friction directions are excited repeatedly.
 
 ```text
 speed
-  ω_target ─┐     ┌─────┐     ┌─────┐
-            │     │     │     │     │
-  ω_dwell   └─────┘     └─────┘     └───  …
-            |<-T->|<-T->|<-T->|
+  ω_target        ┌─────┐     ┌─────┐
+                  │     │     │     │
+  ω_dwell   ──────┘     └─────┘     └───  …
+            |<-T->|<-T->|<-T->|<-T->|
 ```
 
 ### Bounded Envelope
@@ -156,7 +161,7 @@ The trajectory is given explicit limits and the run stays inside them:
 
 | Limit    | Meaning                                                                                        |
 |----------|------------------------------------------------------------------------------------------------|
-| current  | The largest phase-current magnitude the run may produce, clamped to what the inverter supports |
+| current  | The largest phase-current magnitude the run may produce, clamped to twice what the inverter supports: the measured phase current carries overshoot and ripple above the command the loops are limited to |
 | speed    | The largest rotor speed the run may reach, measured rather than commanded                      |
 | duration | The timeout after which the run ends whether or not it has converged                           |
 
