@@ -111,10 +111,14 @@ Each window yields one observation:
 
 The encoder is read at every sample, because the electrical angle that turns the phase currents into the q-axis
 current needs it, and the q-axis current is accumulated over the window the way the speed is. The acceleration
-between two window means is a triangular average of the true acceleration over both windows, so the torque it is
-regressed on must be averaged the same way. For windows longer than a sample the regressors are therefore centred on
-one instant: the acceleration between two window speeds, the mean of the two speeds, and the mean of the two window
-torques all belong to the boundary between their windows. A change of window length starts the pairing again.
+between two window means is the true acceleration weighted by a triangle that rises over the first window and falls
+over the second, so the torque it is regressed on must be weighted by the same triangle, sample by sample. A plain
+mean of the two window torques agrees with it on a ramp and differs wherever the torque bends, which at a window of
+eighty samples made the inertia read about a tenth low even on a continuous encoder (a simulation of the estimator
+alone gave 0.87 of the true value, and 0.99 with the triangle). For windows longer than a sample the regressors are
+therefore centred on one instant: the acceleration between two window speeds, the mean of the two speeds, and the
+triangle-weighted torque all belong to the boundary between their windows. A change of window length starts the
+pairing again.
 
 An estimator fed long window means makes far fewer updates per second than one fed samples, so its covariance trace falls
 too slowly in time to reach its bound within a run: on a 4000-count encoder (an 80-sample window) it was still just above
