@@ -132,6 +132,22 @@ its convergence metrics are then in the reciprocal inertia, which touches the es
 
 ---
 
+## Interfaces
+
+### Provided
+
+- The `bench` plant preset (`integration_tests/support/plant/PlantPresets.hpp`), whose values Part A traces to the rig
+- The noise figures of Parts B and C, as the sigma and bias inputs of the plant's ADC and encoder noise settings
+- The scenarios of `identification_robustness.feature`, which hold each target of Part D once its fix lands
+
+### Required
+
+- A capture path from the board: a RAM ring read over RTT, with the AD3 as the independent reference
+- The plant keys the SIL step definitions accept: noise, Coulomb friction, supply source resistance and current limit, encoder counts per revolution
+- The `[METRIC]` lines the identification step prints, which Part E compares between the emulated and the real target
+
+---
+
 ## Constraints & Limitations
 
 - Nothing here runs until the board is powered from the stronger supply.
