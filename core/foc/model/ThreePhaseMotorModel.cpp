@@ -32,17 +32,17 @@ namespace foc
 
     void ThreePhaseMotorModel::SetLoad(foc::NewtonMeter load)
     {
-        this->load.emplace(load);
+        loads.load.emplace(load);
     }
 
     void ThreePhaseMotorModel::SetExternalTorque(foc::NewtonMeter torque)
     {
-        externalTorque = torque;
+        loads.externalTorque = torque;
     }
 
     foc::NewtonMeter ThreePhaseMotorModel::ExternalTorque() const
     {
-        return externalTorque;
+        return loads.externalTorque;
     }
 
     foc::RadiansPerSecond ThreePhaseMotorModel::MechanicalSpeed() const
@@ -130,12 +130,12 @@ namespace foc
 
     void ThreePhaseMotorModel::SetCoulombFriction(foc::NewtonMeter friction)
     {
-        coulombFrictionNm = friction.Value();
+        nonIdealities.coulombFrictionNm = friction.Value();
     }
 
     void ThreePhaseMotorModel::SetEncoderResolution(uint32_t countsPerRevolution)
     {
-        encoderCountsPerRevolution = countsPerRevolution;
+        nonIdealities.encoderCountsPerRevolution = countsPerRevolution;
     }
 
     void ThreePhaseMotorModel::ApplyOpenPhases()
@@ -326,9 +326,9 @@ namespace foc
         const auto angle = faultInjection.config.encoderStuck ? faultInjection.stuckAngle : motorState.theta_mech;
         float measured = angle.Value() + encoderNoise.config.biasRadians + encoderNoise.lastSample;
 
-        if (encoderCountsPerRevolution != 0)
+        if (nonIdealities.encoderCountsPerRevolution != 0)
         {
-            const float step = 2.0f * std::numbers::pi_v<float> / static_cast<float>(encoderCountsPerRevolution);
+            const float step = 2.0f * std::numbers::pi_v<float> / static_cast<float>(nonIdealities.encoderCountsPerRevolution);
             measured = std::floor(measured / step) * step;
         }
 
@@ -410,18 +410,18 @@ namespace foc
 
         auto torqueElec = torqueConstant * parameters.p * (parameters.psi_f.Value() * iq + (ldEff - lqEff) * id * iq);
 
-        auto loadTorque = load.value_or(foc::NewtonMeter{ 0.0f }).Value();
+        auto loadTorque = loads.load.value_or(foc::NewtonMeter{ 0.0f }).Value();
         auto loadOpposing = (motorState.omega_mech.Value() >= 0.0f) ? loadTorque : -loadTorque;
 
         lastDqCurrents = foc::RotatingFrame{ id, iq };
 
-        auto d_omega_mech_dt = (torqueElec - parameters.B.Value() * motorState.omega_mech.Value() - loadOpposing - externalTorque.Value()) / parameters.J.Value();
+        auto d_omega_mech_dt = (torqueElec - parameters.B.Value() * motorState.omega_mech.Value() - loadOpposing - loads.externalTorque.Value()) / parameters.J.Value();
 
         float omegaMech = motorState.omega_mech.Value() + d_omega_mech_dt * dt;
 
-        if (coulombFrictionNm > 0.0f)
+        if (nonIdealities.coulombFrictionNm > 0.0f)
         {
-            const float frictionStep = coulombFrictionNm * dt / parameters.J.Value();
+            const float frictionStep = nonIdealities.coulombFrictionNm * dt / parameters.J.Value();
             omegaMech = std::fabs(omegaMech) <= frictionStep ? 0.0f : omegaMech - std::copysign(frictionStep, omegaMech);
         }
 

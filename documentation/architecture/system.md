@@ -216,14 +216,16 @@ Concrete implementations exist for:
 - **ST STM32 (STM32F407G-DISC1, NUCLEO-H563ZI)**: platform-specific peripheral adapters under `targets/platform_implementations/st/`.
 - **Host / Simulator**: a software-backed platform implementation that emulates the motor-control I/O needed to run the closed-loop algorithm on a development machine, located under `targets/platform_implementations/host/`.
 
-On the Texas Instruments targets the command console and the trace output are also mirrored on SEGGER RTT (channel 0) whenever RTT support is built (`EMIL_INCLUDE_SEGGER_RTT`, on in the embedded presets). `services::SerialCommunicationMirror` sends everything to both the UART and RTT and accepts input from either, with completion following the UART only. A debug probe can then read and drive the console with the USB-serial link down, which is the situation in which a hardware failure most needs diagnosing. RTT writes are non-blocking and drop when no probe is reading.
+On the Texas Instruments targets the command console and the trace output are also mirrored on SEGGER RTT (channel 0) whenever RTT support is built (`EMIL_INCLUDE_SEGGER_RTT`, on in the embedded presets). `services::SerialCommunicationMirror` sends everything to both the UART and RTT and accepts input from either, with completion following the UART only.
+A debug probe can then read and drive the console with the USB-serial link down, which is the situation in which a hardware failure most needs diagnosing.
+RTT writes are non-blocking and drop when no probe is reading.
 
 Each platform also states the electrical facts of its board, which the control loops cannot discover:
 
-| Board setting                | Meaning                                                                                                                                                                                                                       |
-|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Maximum current supported    | The largest phase current the loops may command (`MaxCurrentSupported`). It is the board's rated current: above it the supply collapses or the bus-total trip cuts the bridge, and the winding never sees what the loop asked for. |
-| Encoder phase inversion      | True when the encoder counts against the phase order A-B-C. Inverting channel A restores the electrical direction; a wrong direction makes torque commands hold the rotor instead of turning it. It is a build-time board setting today and is the natural candidate for a persisted configuration parameter. |
+| Board setting             | Meaning                                                                                                                                                                                                                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Maximum current supported | The largest phase current the loops may command (`MaxCurrentSupported`). It is the board's rated current: above it the supply collapses or the bus-total trip cuts the bridge, and the winding never sees what the loop asked for.                                                                            |
+| Encoder phase inversion   | True when the encoder counts against the phase order A-B-C. Inverting channel A restores the electrical direction; a wrong direction makes torque commands hold the rotor instead of turning it. It is a build-time board setting today and is the natural candidate for a persisted configuration parameter. |
 
 ```mermaid
 graph LR

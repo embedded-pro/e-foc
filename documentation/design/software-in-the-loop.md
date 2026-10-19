@@ -80,18 +80,18 @@ a truncated or stale description is rejected rather than half-read.
 
 The description covers everything the plant needs:
 
-| Group             | Contents                                                                      |
-|-------------------|-------------------------------------------------------------------------------|
-| Winding and rotor | Resistance, both axis inductances, flux linkage, pole pairs, inertia, damping |
-| Drive             | Supply voltage, control frequency, peak current, load torque                  |
-| Measurement       | Current noise deviation and per-phase bias, encoder noise deviation and bias  |
-| Thermal           | Ambient, thermal resistance and capacitance, copper and iron coefficients     |
-| Protection        | Over-current, over-voltage, under-voltage and over-temperature trips          |
-| Fault injection   | Open phase per phase, stuck encoder, when it freezes, supply voltage scaling  |
+| Group             | Contents                                                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------- |
+| Winding and rotor | Resistance, both axis inductances, flux linkage, pole pairs, inertia, damping               |
+| Drive             | Supply voltage, control frequency, peak current, load torque                                |
+| Measurement       | Current noise deviation and per-phase bias, encoder noise deviation and bias                |
+| Thermal           | Ambient, thermal resistance and capacitance, copper and iron coefficients                   |
+| Protection        | Over-current, over-voltage, under-voltage and over-temperature trips                        |
+| Fault injection   | Open phase per phase, stuck encoder, when it freezes, supply voltage scaling                |
 | Non-idealities    | Coulomb friction, encoder counts per revolution, supply source resistance and current limit |
-| Reproducibility   | The seed both noise generators start from                                     |
-| Disturbance       | A signed shaft torque and the delay after enabling at which it steps in       |
-| Recording         | The rate at which the plant reports its trajectory, and how many samples      |
+| Reproducibility   | The seed both noise generators start from                                                   |
+| Disturbance       | A signed shaft torque and the delay after enabling at which it steps in                     |
+| Recording         | The rate at which the plant reports its trajectory, and how many samples                    |
 
 The thermal group's resistance and inductance coefficients act from the temperature the
 nameplate values were measured at (25 °C), not from the ambient, so a plant described with a hot
@@ -720,12 +720,12 @@ encoder, viscous friction only, and a supply that holds its voltage whatever the
 firmware can pass every scenario against them and still misidentify a real rotor. The plant
 description therefore carries the non-idealities as optional fields, each off when zero:
 
-| Field                       | Effect in the plant                                                         |
-|-----------------------------|-----------------------------------------------------------------------------|
-| Coulomb friction            | A constant opposing torque that holds the rotor still below break-away      |
-| Encoder counts per rev      | The reported angle is floored to whole counts                               |
-| Supply source resistance    | The bus falls by resistance times the current the motor draws               |
-| Supply current limit        | Past the limit the bus folds back in proportion, as a bench supply does     |
+| Field                    | Effect in the plant                                                     |
+| ------------------------ | ----------------------------------------------------------------------- |
+| Coulomb friction         | A constant opposing torque that holds the rotor still below break-away  |
+| Encoder counts per rev   | The reported angle is floored to whole counts                           |
+| Supply source resistance | The bus falls by resistance times the current the motor draws           |
+| Supply current limit     | Past the limit the bus folds back in proportion, as a bench supply does |
 
 The bus current is the electrical power the inverter delivers, divided by the bus voltage and
 smoothed by a one millisecond bulk capacitor. Regeneration is ignored: a supply cannot absorb it.

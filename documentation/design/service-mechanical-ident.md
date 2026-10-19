@@ -165,11 +165,11 @@ speed
 
 The trajectory is given explicit limits and the run stays inside them:
 
-| Limit    | Meaning                                                                                        |
-|----------|------------------------------------------------------------------------------------------------|
+| Limit    | Meaning                                                                                                                                                                                                  |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | current  | The largest phase-current magnitude the run may produce, clamped to twice what the inverter supports: the measured phase current carries overshoot and ripple above the command the loops are limited to |
-| speed    | The largest rotor speed the run may reach, measured rather than commanded                      |
-| duration | The timeout after which the run ends whether or not it has converged                           |
+| speed    | The largest rotor speed the run may reach, measured rather than commanded                                                                                                                                |
+| duration | The timeout after which the run ends whether or not it has converged                                                                                                                                     |
 
 On the first sample whose phase current exceeds the current envelope in any phase and in either
 direction, or whose measured speed exceeds the speed limit, the run ends and reports absent values.

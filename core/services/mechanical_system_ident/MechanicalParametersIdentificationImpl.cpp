@@ -30,6 +30,7 @@ namespace
     // The viscous friction shows only in the speed difference between the two levels, and a run that converges before it has
     // crossed both of them has estimated it from one transition, so the run must last long enough to cross both.
     constexpr float minimumRunDwells{ 2.0f };
+
     std::size_t WindowSamplesFor(float countAngle, float samplingPeriod)
     {
         if (!std::isfinite(countAngle))

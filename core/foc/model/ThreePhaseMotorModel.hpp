@@ -190,6 +190,18 @@ namespace foc
             float busCurrentAmpere{ 0.0f };
         };
 
+        struct PlantNonIdealities
+        {
+            float coulombFrictionNm{ 0.0f };
+            uint32_t encoderCountsPerRevolution{ 0 };
+        };
+
+        struct LoadState
+        {
+            std::optional<foc::NewtonMeter> load;
+            foc::NewtonMeter externalTorque{ 0.0f };
+        };
+
         struct SelfDriveState
         {
             bool driving{ false };
@@ -208,8 +220,7 @@ namespace foc
         infra::Function<void(foc::PhaseCurrents)> onCurrentPhasesReady;
         bool running{ false };
         const bool selfDriveEnabled;
-        std::optional<foc::NewtonMeter> load;
-        foc::NewtonMeter externalTorque{ 0.0f };
+        LoadState loads;
         foc::RotatingFrame lastDqCurrents{};
         const std::optional<std::size_t> maxIterations;
         std::optional<std::size_t> counter;
@@ -219,8 +230,7 @@ namespace foc
         EncoderNoiseState encoderNoise;
         FaultInjectionState faultInjection;
         SupplyState supplyState;
-        float coulombFrictionNm{ 0.0f };
-        uint32_t encoderCountsPerRevolution{ 0 };
+        PlantNonIdealities nonIdealities;
         SelfDriveState selfDrive;
     };
 }

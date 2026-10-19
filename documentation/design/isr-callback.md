@@ -8,7 +8,7 @@ date: 2026-10-19
 ---
 
 | Field     | Value                                              |
-|-----------|----------------------------------------------------|
+| --------- | -------------------------------------------------- |
 | Title     | IsrCallback and HotSwapFunction: EMIL and the HALs |
 | Type      | design                                             |
 | Status    | draft                                              |
@@ -63,11 +63,11 @@ a reader, but it promises safety against any interrupt, which the contract does 
 `DoubleBufferedFunction` (names the mechanism), `PublishedFunction` (names the atomic publish),
 `IsrFunction` (short, but ties it to interrupts when any preempting invoker qualifies).
 
-| Step | Work | State |
-|------|------|-------|
-| 1 | Review and merge the EMIL change | Done (#179) |
-| 2 | Bump the EMIL pin in e-foc and replace `foc::IsrCallback`, header and tests included | Done: the runner, the ADC wrapper and the three platform factories use `infra::HotSwapFunction` |
-| 3 | Update `async-callback-lifetime.md` to point at the EMIL header | Done |
+| Step | Work                                                                                 | State                                                                                           |
+| ---- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| 1    | Review and merge the EMIL change                                                     | Done (#179)                                                                                     |
+| 2    | Bump the EMIL pin in e-foc and replace `foc::IsrCallback`, header and tests included | Done: the runner, the ADC wrapper and the three platform factories use `infra::HotSwapFunction` |
+| 3    | Update `async-callback-lifetime.md` to point at the EMIL header                      | Done                                                                                            |
 
 Whether to change `Function::operator=` instead was considered and rejected: the stored callable
 is several words and no single store replaces it.
@@ -80,20 +80,20 @@ Outcome: every finding below was filed and fixed in the HAL repositories (hal-ti
 fixed by #130; hal-st #128 to #130, fixed by #131), and e-foc's pins are bumped to them. The
 fixes made `Gpio` handlers, the ADC, UART and comparator callbacks and the ST timer `onIrq`
 `infra::HotSwapFunction`, reordered the ST `EnableInterrupt`, and gave the TI `Can` a completion
-ring that copies the callback when the completion is queued. Two verdicts in the table were
+ring that copies the callback when the completion is queued. Two verdicts in the list below were
 wrong or incomplete: the TI `Can` send-complete and the `Gpio` handlers did have defects, found
-on the way and listed after the table.
+on the way and listed after the list.
 
 e-foc's own arm-once workaround in `AdcPhaseCurrentMeasurement` and the platform factories
 (`converterArmed`, `phaseCurrentAdcArmed`) is kept: `Measure` does more than set the callback. TI
 flushes the FIFO and re-enables the sequencer, ST asserts that no conversion is ongoing and
 restarts the DMA, so calling it again on a running converter is not harmless.
 
-The table is the survey as it stood before those fixes. It was done in `infra/hal/ti/hal_tiva/tiva`
+The list is the survey as it stood before those fixes. It was done in `infra/hal/ti/hal_tiva/tiva`
 and `infra/hal/st/hal_st/stm32fxxx` by reading each
 `infra::Function` and `AutoResetFunction` member against its interrupt handler, its assignment
 sites and the order in which the interrupt is enabled. A first pass listed the CAN and GPIO
-drivers as the likeliest to need the type; the reading showed that wrong, and this table
+drivers as the likeliest to need the type; the reading showed that wrong, and this list
 replaces it.
 
 The local convention is not to hot-swap at all: assign before enabling the interrupt, often with
@@ -103,13 +103,18 @@ to the dispatcher with an atomic flag or counter (`scheduled`, `pendingEdges`,
 dispatcher's own `Schedule` reserves a slot by compare-and-swap and publishes it afterwards, so
 an interrupt scheduling work is safe.
 
-| Verdict | Members |
-|---------|---------|
-| **Needs it** | ST `TimerWithInterruptStm::onIrq` and `LowPowerTimerWithInterruptStm::onIrq`: immediate by default, invoked unguarded, replaced by every `Start` with no assert and no mask, so a second `Start` on a running timer can abort |
-| **Needs it, low likelihood** | The four UART `dataReceived` members (TI `Uart` and `UartWithDma`, ST `UartStm` and `UartStmDuplexDma`): replacing one while live drops the bytes the interrupt already drained. Masking the receive interrupt around the assignment is the cheaper alternative |
-| **Hardening only** | TI `Adc::callback` and ST `AdcDmaMultiChannelStmBase::onDone` (a second `Measure` without `Stop` races; the failure is one dropped batch; with the type in the HAL, e-foc's arm-once workaround in `AdcPhaseCurrentMeasurement` could go), TI `AnalogComparator::onOutputChanged` (not used by e-foc) |
-| **Not appropriate** | TI `Can` `onSendComplete` and `onReceive`, ST `CanStm`, ST `AdcTriggeredByTimerWithDma`, ST `AdcStm`: never invoked from an interrupt, only from the dispatcher, so the contest is thread against thread. TI and ST `Gpio` `handlers[]`: the check and the call are both inside the interrupt, which the thread cannot preempt, and TI asserts the slot empty and masks before assigning. One-shot `AutoResetFunction` members (`SpiMaster`, `I2c`, the DMA and flash drivers): armed before the operation, taken and cleared by the interrupt or the dispatcher, with overlap asserted away |
-| **Already safe** | Members assigned in the constructor or before the interrupt is enabled and never replaced (TI and ST `WatchDog`, TI `Pwm`, `Dma`, ST DMA stream handlers), TI `Can::onError`, ST `ComparatorStm`, which orders disable, unregister and clear correctly |
+- **Needs it**: ST `TimerWithInterruptStm::onIrq` and `LowPowerTimerWithInterruptStm::onIrq`: immediate by default, invoked unguarded, replaced by every `Start` with no assert and no mask, so a second
+  `Start` on a running timer can abort
+- **Needs it, low likelihood**: The four UART `dataReceived` members (TI `Uart` and `UartWithDma`, ST `UartStm` and `UartStmDuplexDma`): replacing one while live drops the bytes the interrupt already
+  drained. Masking the receive interrupt around the assignment is the cheaper alternative
+- **Hardening only**: TI `Adc::callback` and ST `AdcDmaMultiChannelStmBase::onDone` (a second `Measure` without `Stop` races; the failure is one dropped batch; with the type in the HAL the callback itself
+  is safe; e-foc's arm-once workaround stays, see above), TI `AnalogComparator::onOutputChanged` (not used by e-foc)
+- **Not appropriate**: TI `Can` `onSendComplete` and `onReceive`, ST `CanStm`, ST `AdcTriggeredByTimerWithDma`, ST `AdcStm`: never invoked from an interrupt, only from the dispatcher, so the contest
+  is thread against thread. TI and ST `Gpio` `handlers[]`: the check and the call are both inside the interrupt, which the thread cannot preempt, and TI asserts the slot empty and masks before
+  assigning. One-shot `AutoResetFunction` members (`SpiMaster`, `I2c`, the DMA and flash drivers): armed before the operation, taken and cleared by the interrupt or the dispatcher, with overlap
+  asserted away
+- **Already safe**: Members assigned in the constructor or before the interrupt is enabled and never replaced (TI and ST `WatchDog`, TI `Pwm`, `Dma`, ST DMA stream handlers), TI `Can::onError`, ST
+  `ComparatorStm`, which orders disable, unregister and clear correctly
 
 Findings outside the type, found on the way:
 

@@ -274,17 +274,17 @@ and reset the target on `pwm` followed by `duty`. The rule that follows:
 
 ## Constraints & Limitations
 
-| Constraint                      | Value / Description                                                                                    |
-|---------------------------------|--------------------------------------------------------------------------------------------------------|
-| Scope                           | Proves the software is running; does not prove the control loops are running                           |
-| Always on                       | Starts with the dispatcher; there is no enable, disable or query                                       |
-| Boot before the dispatcher runs | Construction outside an action looks like progress; a hang there is caught only if interrupts stop too |
-| Expiry handler                  | Interrupt context; power-stage cutoff only, then returns                                               |
-| Early-warning priority          | Lowest on TI and ST, so a hung interrupt starves it; NMI on the emulated target                        |
-| ST target                       | Cutoff is empty while the platform drives no bridge                                                    |
+| Constraint                      | Value / Description                                                                                             |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Scope                           | Proves the software is running; does not prove the control loops are running                                    |
+| Always on                       | Starts with the dispatcher; there is no enable, disable or query                                                |
+| Boot before the dispatcher runs | Construction outside an action looks like progress; a hang there is caught only if interrupts stop too          |
+| Expiry handler                  | Interrupt context; power-stage cutoff only, then returns                                                        |
+| Early-warning priority          | Lowest on TI and ST, so a hung interrupt starves it; NMI on the emulated target                                 |
+| ST target                       | Cutoff is empty while the platform drives no bridge                                                             |
 | Interrupt work                  | An interrupt that runs longer than the early-warning timeout resets the target, so interrupts only collect data |
-| Host build                      | No watchdog                                                                                            |
-| Reset cause                     | Read from the MCU's reset-cause register; the emulated target reads a semihosting marker file instead  |
+| Host build                      | No watchdog                                                                                                     |
+| Reset cause                     | Read from the MCU's reset-cause register; the emulated target reads a semihosting marker file instead           |
 
 ---
 
