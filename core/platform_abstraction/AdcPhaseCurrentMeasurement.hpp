@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/foc/interfaces/IsrCallback.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "hal/interfaces/AdcMultiChannel.hpp"
+#include "infra/util/HotSwapFunction.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <concepts>
 #include <utility>
@@ -36,7 +36,7 @@ namespace application
         Impl adc;
         float slope = 0.0f;
         float offset = 0.0f;
-        foc::IsrCallback<void(foc::Ampere phaseA, foc::Ampere phaseB, foc::Ampere phaseC)> onMeasurementDone;
+        infra::HotSwapFunction<void(foc::Ampere phaseA, foc::Ampere phaseB, foc::Ampere phaseC)> onMeasurementDone;
         bool converterArmed{ false };
     };
 

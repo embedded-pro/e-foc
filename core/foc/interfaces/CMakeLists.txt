@@ -16,7 +16,6 @@ target_sources(e_foc.foc.interfaces PRIVATE
     CommandLimits.hpp
     Execution.hpp
     Foc.hpp
-    IsrCallback.hpp
     LoopTunings.hpp
     MotorModel.hpp
     OnlineEstimators.hpp

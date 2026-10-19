@@ -21,9 +21,8 @@ date: 2026-10-19
 ## Responsibilities
 
 **Is responsible for:**
-- Stating the contract `foc::IsrCallback` relies on, and the cases where it does not hold
-- Planning its move to EMIL as a generic type
-- Listing the HAL callbacks that have the same defect, with the order to convert them
+- Stating the contract `infra::HotSwapFunction` relies on, and the cases where it does not hold
+- Recording its move from e-foc to EMIL and the HAL callbacks that were converted
 - Analysing priority inversion and the neighbouring hazards
 
 **Is NOT responsible for:**
@@ -50,9 +49,9 @@ detail, with no barrier behind it.
 
 ### Part B — Moving it to EMIL
 
-The type needs nothing from e-foc: it is `infra::Function` plus `std::atomic<uint8_t>`. It is
-implemented as `infra::HotSwapFunction` on branch `feat/hot-swap-function` of the EMIL
-repository (commit a9d9b01d, not pushed): `infra/util/HotSwapFunction.hpp`, void-returning only,
+The type needs nothing from e-foc: it is `infra::Function` plus `std::atomic<uint8_t>`. It
+started as `foc::IsrCallback` and is now `infra::HotSwapFunction` in embedded-infra-lib
+(embedded-pro/embedded-infra-lib#179): `infra/util/HotSwapFunction.hpp`, void-returning only,
 with the `ExtraSize` parameter of `infra::Function`, copy deleted, and twelve tests, among them
 the key one, which calls the object from a copy-constructor hook in the middle of a `Set` and
 must see a whole old function, and a negative control showing the same hook aborts a plain
@@ -64,11 +63,11 @@ a reader, but it promises safety against any interrupt, which the contract does 
 `DoubleBufferedFunction` (names the mechanism), `PublishedFunction` (names the atomic publish),
 `IsrFunction` (short, but ties it to interrupts when any preempting invoker qualifies).
 
-| Step | Work |
-|------|------|
-| 1 | Review and push the EMIL branch, open the pull request |
-| 2 | Bump the EMIL pin in e-foc; make `foc::IsrCallback` an alias of `infra::HotSwapFunction`, then delete it once no caller names it |
-| 3 | Update `async-callback-lifetime.md` to point at the EMIL header |
+| Step | Work | State |
+|------|------|-------|
+| 1 | Review and merge the EMIL change | Done (#179) |
+| 2 | Bump the EMIL pin in e-foc and replace `foc::IsrCallback`, header and tests included | Done: the runner, the ADC wrapper and the three platform factories use `infra::HotSwapFunction` |
+| 3 | Update `async-callback-lifetime.md` to point at the EMIL header | Done |
 
 Whether to change `Function::operator=` instead was considered and rejected: the stored callable
 is several words and no single store replaces it.
@@ -77,7 +76,21 @@ Open: a one-shot take-and-clear operation. The HAL survey in Part C found no mem
 
 ### Part C — The HAL drivers
 
-Surveyed in `infra/hal/ti/hal_tiva/tiva` and `infra/hal/st/hal_st/stm32fxxx` by reading each
+Outcome: every finding below was filed and fixed in the HAL repositories (hal-ti #127 to #130,
+fixed by #130; hal-st #128 to #130, fixed by #131), and e-foc's pins are bumped to them. The
+fixes made `Gpio` handlers, the ADC, UART and comparator callbacks and the ST timer `onIrq`
+`infra::HotSwapFunction`, reordered the ST `EnableInterrupt`, and gave the TI `Can` a completion
+ring that copies the callback when the completion is queued. Two verdicts in the table were
+wrong or incomplete: the TI `Can` send-complete and the `Gpio` handlers did have defects, found
+on the way and listed after the table.
+
+e-foc's own arm-once workaround in `AdcPhaseCurrentMeasurement` and the platform factories
+(`converterArmed`, `phaseCurrentAdcArmed`) is kept: `Measure` does more than set the callback. TI
+flushes the FIFO and re-enables the sequencer, ST asserts that no conversion is ongoing and
+restarts the DMA, so calling it again on a running converter is not harmless.
+
+The table is the survey as it stood before those fixes. It was done in `infra/hal/ti/hal_tiva/tiva`
+and `infra/hal/st/hal_st/stm32fxxx` by reading each
 `infra::Function` and `AutoResetFunction` member against its interrupt handler, its assignment
 sites and the order in which the interrupt is enabled. A first pass listed the CAN and GPIO
 drivers as the likeliest to need the type; the reading showed that wrong, and this table

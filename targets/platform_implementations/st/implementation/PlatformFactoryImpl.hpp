@@ -5,7 +5,6 @@
 #include HARDWARE_PINS_AND_PERIPHERALS_HEADER
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
-#include "core/foc/interfaces/IsrCallback.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
 #include "hal/interfaces/Gpio.hpp"
@@ -13,6 +12,7 @@
 #include "hal/interfaces/SerialCommunication.hpp"
 #include "hal/synchronous_interfaces/SynchronousQuadratureEncoder.hpp"
 #include "hal_st/stm32fxxx/WatchDogStm.hpp"
+#include "infra/util/HotSwapFunction.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
@@ -255,7 +255,7 @@ namespace application
         infra::BoundedString::WithStorage<1024> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };
-        foc::IsrCallback<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
+        infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         infra::Function<void(PlatformFactory::BoardProtectionReason)> onBoardProtection;
     };
 }

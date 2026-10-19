@@ -6,7 +6,6 @@
 #include MOTOR_BOARD_CHARACTERISTICS_HEADER
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
-#include "core/foc/interfaces/IsrCallback.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
 #include "core/services/cli/SerialCommunicationMirror.hpp"
@@ -25,6 +24,7 @@
 #include "hal_tiva/tiva/Pwm.hpp"
 #include "hal_tiva/tiva/UartWithDma.hpp"
 #include "hal_tiva/tiva/WatchDog.hpp"
+#include "infra/util/HotSwapFunction.hpp"
 #include "services/tracer/SerialCommunicationOnSeggerRtt.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
@@ -318,7 +318,7 @@ namespace application
         infra::BoundedString::WithStorage<Resources::faultStatusSize> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };
-        foc::IsrCallback<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
+        infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         infra::Function<void(BoardProtectionReason)> onFaultCallback;
         std::optional<Peripherals> peripherals;
     };

@@ -2,8 +2,8 @@
 
 #include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
-#include "core/foc/interfaces/IsrCallback.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
+#include "infra/util/HotSwapFunction.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc
@@ -35,7 +35,7 @@ namespace foc
         drivers::ThreePhaseInverter& inverter;
         drivers::Encoder& encoder;
         FocImpl& foc;
-        IsrCallback<void(const PhaseCurrents& currentPhases)> phaseCurrentsObserver;
+        infra::HotSwapFunction<void(const PhaseCurrents& currentPhases)> phaseCurrentsObserver;
         volatile bool enabled{ false };
         volatile bool stopRequested{ false };
     };

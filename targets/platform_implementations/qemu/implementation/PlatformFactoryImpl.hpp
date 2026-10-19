@@ -5,7 +5,6 @@
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/foc/model/TorqueStepScheduler.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
-#include "core/foc/interfaces/IsrCallback.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
 #include "hal/cortex_m/SystemTickTimerService.hpp"
@@ -13,6 +12,7 @@
 #include "hal/qemu/async/WatchdogQemu.hpp"
 #include "infra/stream/OutputStream.hpp"
 #include "infra/timer/Timer.hpp"
+#include "infra/util/HotSwapFunction.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "services/util/EventDispatcherWatchdog.hpp"
@@ -218,7 +218,7 @@ namespace application
         hal::Hertz baseFrequency;
         volatile uint32_t sampleDecimation{ 1 };
         uint32_t samplePhase{ 0 };
-        foc::IsrCallback<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
+        infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         foc::PhasePwmDutyCycles lastDutyPhases{};
         foc::PhaseCurrents lastCurrents{};
     };
