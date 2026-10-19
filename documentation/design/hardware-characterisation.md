@@ -114,8 +114,10 @@ of the true inertia, and quantisation moved it by one point. The cause is the we
 acceleration between two window speeds is weighted by a triangle over both windows; the torque
 beside it was a plain mean of the two window torques, which differs wherever the torque bends.
 Weighting the torque by the same triangle gave 0.99 in the simulation and 0.03 % to 1.6 % on the
-reference motors in SIL, and is what the firmware does now. At 1000 counts the window is
-clamped at 128 samples and 7 % remains, because the speed regressor is still a plain mean.
+reference motors in SIL, and is what the firmware does now. At 1000 counts 7 % remained. The
+speed regressor being a plain mean was a guess; the simulation of the estimator showed the
+window was the cause, clamped at 128 samples where the encoder asked for 158. With the limit at
+256 samples the bench motor reads 1.9 % off at 1000 counts and the reference rotors within 3.2 %.
 The scenarios are in `identification_robustness.feature`.
 
 **Fixed: a calibration of the light reference rotor under 0.2 mrad of encoder noise ended in

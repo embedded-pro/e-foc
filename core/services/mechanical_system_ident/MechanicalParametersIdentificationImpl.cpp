@@ -14,7 +14,7 @@ namespace
     constexpr float slewPeriodSeconds{ 0.001f };
 
     constexpr float accelerationQuantumTarget{ 100.0f };
-    constexpr std::size_t maximumObservationWindow{ 128 };
+    constexpr std::size_t maximumObservationWindow{ 256 };
     constexpr std::size_t minimumCountSteps{ 8 };
     constexpr std::size_t stepChangeMemory{ 4096 };
     constexpr float stepChangeToResolution{ 1.41421356f };
