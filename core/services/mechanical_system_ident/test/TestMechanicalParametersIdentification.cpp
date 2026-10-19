@@ -7,6 +7,7 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/WithSharedAccess.hpp"
+#include <algorithm>
 #include <cmath>
 #include <gmock/gmock.h>
 #include <limits>
@@ -615,6 +616,57 @@ TEST_F(MechanicalParametersIdentificationTest, a_coarse_encoder_run_converges_in
     ASSERT_TRUE(outcome.fired);
     ASSERT_TRUE(outcome.inertia.has_value());
     EXPECT_NEAR(outcome.inertia->Value(), trueInertia, trueInertia * 0.3f);
+}
+
+TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_coarse_encoder_reports_the_inertia_without_bias)
+{
+    constexpr float countsPerRevolution = 4000.0f;
+    constexpr float countAngle = 2.0f * std::numbers::pi_v<float> / countsPerRevolution;
+
+    auto config = DefaultConfig();
+    config.timeout = std::chrono::seconds{ 60 };
+    config.maxCurrent = foc::Ampere{ 1000.0f };
+
+    const auto dwellSamples = static_cast<std::size_t>(std::chrono::duration<float>(config.dwellTime).count() / samplingPeriod);
+    const auto slewStep = config.speedSlewRate * samplingPeriod;
+
+    bool fired = false;
+    std::optional<foc::NewtonMeterSecondSquared> inertia;
+
+    EXPECT_CALL(encoderMock, Read())
+        .WillRepeatedly(Invoke([this]()
+            {
+                return foc::Radians{ std::floor(position / countAngle) * countAngle };
+            }));
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
+    ExpectDriveReleased();
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config,
+        [&](auto, auto j)
+        {
+            fired = true;
+            inertia = j;
+        });
+
+    float speed = 0.0f;
+
+    for (std::size_t i = 0; i != 400000 && !fired; ++i)
+    {
+        const auto level = (i / dwellSamples) % 2 == 0 ? config.dwellSpeed.Value() : config.targetSpeed.Value();
+        const auto change = std::clamp(level - speed, -slewStep, slewStep);
+        const auto acceleration = change / samplingPeriod;
+
+        speed += change;
+        position += speed * samplingPeriod;
+
+        observableMock.Publish(CurrentsProducing(trueCoulomb + trueInertia * acceleration + trueFriction * speed, position));
+        ExecuteAllActions();
+    }
+
+    ASSERT_TRUE(fired);
+    ASSERT_TRUE(inertia.has_value());
+    EXPECT_NEAR(inertia->Value(), trueInertia, trueInertia * 0.03f);
 }
 
 TEST_F(MechanicalParametersIdentificationTest, a_run_lasts_at_least_two_dwell_periods_before_it_converges)

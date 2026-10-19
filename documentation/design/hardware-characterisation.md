@@ -38,17 +38,17 @@ date: 2026-10-19
 
 ### Part A — What is known about the bench motor
 
-| Quantity            | Value            | Provenance                                                                                                       |
-|---------------------|------------------|------------------------------------------------------------------------------------------------------------------|
-| Resistance          | 1.10 Ω           | Identified by the firmware, stable to 0.3 % over 38 runs                                                         |
-| d-axis inductance   | 1.07 mH          | Identified; the same procedure reads 11 % low on the SIL bench plant, so the rig's true value may be near 1.2 mH |
-| Pole pairs          | 4                | Identified                                                                                                       |
-| Encoder             | 4000 counts      | Observed from the position steps                                                                                 |
-| Inertia (with disk) | 12.4 µkg·m²      | Identified; reads about 10 % low on this encoder in SIL (Part D)                                                 |
-| Flux linkage        | 0.007 Wb         | **Not measured**: derived from a claimed 0.042 Nm/A                                                              |
-| Viscous friction    | 5 µNm·s/rad      | **Not measured**: a guess                                                                                        |
-| Coulomb friction    | 0.5 mNm          | **Not measured**: a guess                                                                                        |
-| Supply              | 24 V, 4 A → 10 A | The 4 A supply collapsed during runs; the 10 A one is pending                                                    |
+| Quantity            | Value            | Provenance                                                                                                                         |
+|---------------------|------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| Resistance          | 1.10 Ω           | Identified by the firmware, stable to 0.3 % over 38 runs                                                                           |
+| d-axis inductance   | 1.07 mH          | Identified; the same procedure reads 11 % low on the SIL bench plant, so the rig's true value may be near 1.2 mH                   |
+| Pole pairs          | 4                | Identified                                                                                                                         |
+| Encoder             | 4000 counts      | Observed from the position steps                                                                                                   |
+| Inertia (with disk) | 12.4 µkg·m²      | Identified with the weighting bias of Part D, about 10 % low; the true value is nearer 13.8 µ until the rig is re-run with the fix |
+| Flux linkage        | 0.007 Wb         | **Not measured**: derived from a claimed 0.042 Nm/A                                                                                |
+| Viscous friction    | 5 µNm·s/rad      | **Not measured**: a guess                                                                                                          |
+| Coulomb friction    | 0.5 mNm          | **Not measured**: a guess                                                                                                          |
+| Supply              | 24 V, 4 A → 10 A | The 4 A supply collapsed during runs; the 10 A one is pending                                                                      |
 
 The three guesses are measured in Part C before the plant is trusted for anything but regression.
 
@@ -77,8 +77,8 @@ once after ten minutes of PWM, to separate noise from drift.
 | Constant speed at 10, 50 and 100 rad/s              | Residual of the angle against a fitted line: the count-step regularity and the once-per-revolution error |
 | The same, differenced over 1, 10, 20 and 80 samples | The acceleration noise the estimator sees at each window                                                 |
 
-The last row is the number the SIL needs most: it fixes the regressor noise that biases the
-inertia (Part D). It is compared against the acceleration noise the plant predicts from its own
+The last row is the number the SIL needs most: it fixes how much noise the acceleration carries
+at each window. It is compared against the acceleration noise the plant predicts from its own
 count size.
 
 **How to capture.** The control interrupt writes into a RAM ring only while a capture is armed,
@@ -103,20 +103,28 @@ the data asks for them: a periodic encoder error (amplitude and order) and a slo
 | Viscous friction | Torque against speed at steady state over five speeds, minus the Coulomb term                                                                                                                |
 | True inertia     | Add a steel disk of known mass and radius, J = ½·m·r², and compare the change the firmware reports. A bias in the estimator shows as a ratio other than one, with no model of the rig needed |
 
-### Part D — Targets not met yet
+### Part D — Targets
 
-These are defects found by the bench plant. Each joins `identification_robustness.feature` with
-its fix, as the rule against held-out scenarios requires.
+The bench plant found two defects.
 
-| Target                                                                               | Today                                                                                                       | Scenario to add                                               |
-|--------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------|
-| Inertia within 5 % on a quantised encoder                                            | 22 % low at 1000 counts, 10 % at 4000, 4 % at 20 000; both runs agree, so the agreement check cannot see it | A bench-plant calibration at 1000, 4000 and 20 000 counts     |
-| A calibration of the light reference rotor completes under 0.2 mrad of encoder noise | Ends in Fault, inertia about 100× too small                                                                 | The teknic plant with `encoder_noise_sigma_radians` of 0.0002 |
+**Fixed: the inertia read about 10 % low** on a 4000-count encoder, 22 % at 1000 counts. The
+first diagnosis was noise in the acceleration regressor. A simulation of the estimator alone
+showed otherwise: with a continuous encoder and no noise, an 80-sample window already gave 0.87
+of the true inertia, and quantisation moved it by one point. The cause is the weighting. The
+acceleration between two window speeds is weighted by a triangle over both windows; the torque
+beside it was a plain mean of the two window torques, which differs wherever the torque bends.
+Weighting the torque by the same triangle gave 0.99 in the simulation and 0.03 % to 1.6 % on the
+reference motors in SIL, and is what the firmware does now. At 1000 counts the window is
+clamped at 128 samples and 7 % remains, because the speed regressor is still a plain mean.
+The scenarios are in `identification_robustness.feature`.
 
-The first is an errors-in-variables bias: the torque is regressed on the acceleration, whose
-quantisation noise lies in the regressor. Regressing the acceleration on the torque and the speed
-moves that noise into the output, where it does not bias the estimate. The estimator state and
-its convergence metrics are then in the reciprocal inertia, which touches the estimator tests.
+**Open: a calibration of the light reference rotor under 0.2 mrad of encoder noise ends in
+Fault**, with inertia about 100× too small. The likely cause, not yet confirmed by a trace: the
+window is chosen from the smallest position step the encoder shows, which is one count for a
+quantised encoder and nearly zero for a noisy continuous one, so the window would collapse to
+one sample and the acceleration would be pure noise. The
+fix is a window chosen from the noise the encoder actually shows. The scenario to add is the
+teknic plant with `encoder_noise_sigma_radians` of 0.0002.
 
 ### Part E — The bench motor as a first-class SIL motor
 

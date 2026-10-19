@@ -70,8 +70,10 @@ namespace services
         float previousPosition{ 0.0f };
         float previousSpeed{ 0.0f };
         bool hasPreviousSpeed{ false };
-        float previousTorque{ 0.0f };
+        float previousTorqueRise{ 0.0f };
         float torqueSum{ 0.0f };
+        float torqueRise{ 0.0f };
+        float torqueFall{ 0.0f };
         float lastSamplePosition{ 0.0f };
         float countAngle{ 0.0f };
         std::size_t countSteps{ 0 };

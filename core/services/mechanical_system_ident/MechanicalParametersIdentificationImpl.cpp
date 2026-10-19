@@ -64,6 +64,8 @@ namespace services
         this->hasPreviousSpeed = false;
         this->hasPreviousTorque = false;
         this->torqueSum = 0.0f;
+        this->torqueRise = 0.0f;
+        this->torqueFall = 0.0f;
         this->lastSamplePosition = this->previousPosition;
         this->countAngle = std::numeric_limits<float>::infinity();
         this->countSteps = 0;
@@ -244,7 +246,12 @@ namespace services
         const auto mechanicalPos = encoder.Read().Value();
         const auto electricalAngle = mechanicalPos * polePairs;
         const auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
-        torqueSum += rotatingFrame.q * torqueConstant.Value();
+
+        const auto sampleTorque = rotatingFrame.q * torqueConstant.Value();
+        const auto weight = (static_cast<float>(samplesInWindow) + 0.5f) / static_cast<float>(windowSamples);
+        torqueSum += sampleTorque;
+        torqueRise += sampleTorque * weight;
+        torqueFall += sampleTorque * (1.0f - weight);
 
         const auto step = std::abs(foc::detail::PositionWithWrapAround(mechanicalPos - lastSamplePosition));
         lastSamplePosition = mechanicalPos;
@@ -261,7 +268,11 @@ namespace services
         samplesInWindow = 0;
 
         const auto windowTorque = torqueSum / static_cast<float>(windowSamples);
+        const auto windowRise = torqueRise;
+        const auto windowFall = torqueFall;
         torqueSum = 0.0f;
+        torqueRise = 0.0f;
+        torqueFall = 0.0f;
 
         const auto speed = foc::detail::PositionWithWrapAround(mechanicalPos - previousPosition) / windowPeriod;
         const auto acceleration = (speed - previousSpeed) / windowPeriod;
@@ -270,12 +281,12 @@ namespace services
 
         const auto centred = windowSamples > 1;
         const auto centredSpeed = centred ? 0.5f * (speed + previousSpeed) : speed;
-        const auto centredTorque = centred ? 0.5f * (windowTorque + previousTorque) : windowTorque;
+        const auto centredTorque = centred ? (previousTorqueRise + windowFall) / static_cast<float>(windowSamples) : windowTorque;
 
         previousPosition = mechanicalPos;
         previousSpeed = speed;
         hasPreviousSpeed = true;
-        previousTorque = windowTorque;
+        previousTorqueRise = windowRise;
         hasPreviousTorque = true;
 
         const auto countKnown = countSteps >= minimumCountSteps;
