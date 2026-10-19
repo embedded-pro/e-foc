@@ -13,6 +13,8 @@ namespace application
         static constexpr float ratedCurrentAmps{ 3.0f };
         // 80 % of the +8.25 A that a mid-rail biased 5 A/V sense spans on a 3.3 V ADC
         static constexpr float overcurrentThresholdAmps{ 6.6f };
+        static constexpr float maxCurrentSupportedAmps{ ratedCurrentAmps };
+        static_assert(maxCurrentSupportedAmps < overcurrentThresholdAmps);
 
         static constexpr float AdcToVoltsFactor(float adcReferenceVoltage, float adcResolution)
         {

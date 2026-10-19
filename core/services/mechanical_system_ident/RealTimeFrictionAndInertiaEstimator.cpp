@@ -162,7 +162,7 @@ namespace services
             return;
 
         const auto inertia = onlineRls->Coefficients().at(1, 0) / parameterScale;
-        const auto friction = onlineRls->Coefficients().at(2, 0) / parameterScale;
+        const auto friction = SettledFriction(onlineRls->Coefficients().at(2, 0) / parameterScale);
 
         if (!IsPlausibleMechanics(inertia, friction))
             return;

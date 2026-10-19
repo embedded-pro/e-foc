@@ -35,8 +35,12 @@ namespace services
         void StopExcitation();
         void ReleaseDrive();
         void ScheduleFinish();
+        void FailEnvelope();
         void FinishRun();
         void CommandNextExcitationLevel();
+        void StepSpeedCommand();
+        void RestartEstimator(float forgettingFactor);
+        void TrackInertiaSettling();
         void Complete(std::optional<foc::NewtonMeterSecondPerRadian> friction, std::optional<foc::NewtonMeterSecondSquared> inertia);
 
         foc::SpeedCommandable& controller;
@@ -53,11 +57,31 @@ namespace services
 
         std::optional<MechanicalRls> rls;
 
+        std::size_t windowSamples{ 1 };
+        std::size_t samplesInWindow{ 0 };
+        float windowPeriod{ 0.0f };
+        float updateForgetting{ 1.0f };
+        float inertiaReference{ 0.0f };
+        std::size_t updatesSinceReference{ 0 };
+        bool hasInertiaReference{ false };
+        bool inertiaSettled{ false };
+        std::size_t samplesSinceStart{ 0 };
+        std::size_t minimumRunSamples{ 0 };
         float previousPosition{ 0.0f };
         float previousSpeed{ 0.0f };
+        bool hasPreviousSpeed{ false };
+        float previousTorque{ 0.0f };
+        float torqueSum{ 0.0f };
+        float lastSamplePosition{ 0.0f };
+        float countAngle{ 0.0f };
+        std::size_t countSteps{ 0 };
+        bool hasPreviousTorque{ false };
         float polePairs{ 1.0f };
         MechanicalExcitation excitation;
         bool atDwellLevel{ false };
+        float commandedSpeed{ 0.0f };
+        float levelSpeed{ 0.0f };
+        infra::TimerRepeating slewTimer;
         [[no_unique_address]] foc::ClarkePark transform;
         infra::TimerSingleShot timeoutTimer;
         infra::TimerRepeating excitationTimer;

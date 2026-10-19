@@ -5,6 +5,8 @@
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
+#include <algorithm>
+#include <cmath>
 #include <numbers>
 
 namespace foc
@@ -14,6 +16,8 @@ namespace foc
         constexpr float two_pi = 2.0f * std::numbers::pi_v<float>;
         constexpr float half = 0.5f;
         constexpr float torqueConstant = 1.5f;
+        constexpr float supplyBulkTimeConstantSeconds = 0.001f;
+        constexpr float minimumBusVoltage = 1.0f;
 
     }
 
@@ -28,17 +32,17 @@ namespace foc
 
     void ThreePhaseMotorModel::SetLoad(foc::NewtonMeter load)
     {
-        this->load.emplace(load);
+        loads.load.emplace(load);
     }
 
     void ThreePhaseMotorModel::SetExternalTorque(foc::NewtonMeter torque)
     {
-        externalTorque = torque;
+        loads.externalTorque = torque;
     }
 
     foc::NewtonMeter ThreePhaseMotorModel::ExternalTorque() const
     {
-        return externalTorque;
+        return loads.externalTorque;
     }
 
     foc::RadiansPerSecond ThreePhaseMotorModel::MechanicalSpeed() const
@@ -104,7 +108,34 @@ namespace foc
 
     foc::Volts ThreePhaseMotorModel::EffectiveSupplyVoltage() const
     {
-        return foc::Volts{ powerSupplyVoltage.Value() * faultInjection.config.supplyVoltageScale };
+        const float open = powerSupplyVoltage.Value() * faultInjection.config.supplyVoltageScale;
+        float loaded = open - supplyState.config.sourceResistanceOhm * supplyState.busCurrentAmpere;
+
+        if (supplyState.config.currentLimitAmpere > 0.0f && supplyState.busCurrentAmpere > supplyState.config.currentLimitAmpere)
+            loaded *= supplyState.config.currentLimitAmpere / supplyState.busCurrentAmpere;
+
+        return foc::Volts{ std::max(loaded, 0.0f) };
+    }
+
+    foc::Ampere ThreePhaseMotorModel::SupplyCurrent() const
+    {
+        return foc::Ampere{ supplyState.busCurrentAmpere };
+    }
+
+    void ThreePhaseMotorModel::SetSupply(const SupplyConfig& config)
+    {
+        supplyState.config = config;
+        supplyState.busCurrentAmpere = 0.0f;
+    }
+
+    void ThreePhaseMotorModel::SetCoulombFriction(foc::NewtonMeter friction)
+    {
+        nonIdealities.coulombFrictionNm = friction.Value();
+    }
+
+    void ThreePhaseMotorModel::SetEncoderResolution(uint32_t countsPerRevolution)
+    {
+        nonIdealities.encoderCountsPerRevolution = countsPerRevolution;
     }
 
     void ThreePhaseMotorModel::ApplyOpenPhases()
@@ -272,6 +303,7 @@ namespace foc
         running = false;
         selfDrive.driving = false;
         counter = std::nullopt;
+        supplyState.busCurrentAmpere = 0.0f;
         motorState.ia = foc::Ampere{ 0.0f };
         motorState.ib = foc::Ampere{ 0.0f };
         motorState.ic = foc::Ampere{ 0.0f };
@@ -292,7 +324,15 @@ namespace foc
     foc::Radians ThreePhaseMotorModel::Read()
     {
         const auto angle = faultInjection.config.encoderStuck ? faultInjection.stuckAngle : motorState.theta_mech;
-        return foc::Radians{ detail::PositionWithWrapAround(angle.Value() + encoderNoise.config.biasRadians + encoderNoise.lastSample) };
+        float measured = angle.Value() + encoderNoise.config.biasRadians + encoderNoise.lastSample;
+
+        if (nonIdealities.encoderCountsPerRevolution != 0)
+        {
+            const float step = 2.0f * std::numbers::pi_v<float> / static_cast<float>(nonIdealities.encoderCountsPerRevolution);
+            measured = std::floor(measured / step) * step;
+        }
+
+        return foc::Radians{ detail::PositionWithWrapAround(measured) };
     }
 
     void ThreePhaseMotorModel::Set(foc::Radians value)
@@ -351,6 +391,13 @@ namespace foc
 
         ApplyOpenPhases();
 
+        if (supplyState.config.sourceResistanceOhm > 0.0f || supplyState.config.currentLimitAmpere > 0.0f)
+        {
+            const float inputPower = va.Value() * motorState.ia.Value() + vb.Value() * motorState.ib.Value() + vc.Value() * motorState.ic.Value();
+            const float instantaneous = std::max(inputPower, 0.0f) / std::max(supply.Value(), minimumBusVoltage);
+            supplyState.busCurrentAmpere += (instantaneous - supplyState.busCurrentAmpere) * std::min(dt / supplyBulkTimeConstantSeconds, 1.0f);
+        }
+
         if (faultInjection.config.AnyPhaseOpen())
         {
             const auto masked = park.Forward(clarke.Forward(foc::ThreePhase{ motorState.ia.Value(), motorState.ib.Value(), motorState.ic.Value() }), cos_end, sin_end);
@@ -363,14 +410,22 @@ namespace foc
 
         auto torqueElec = torqueConstant * parameters.p * (parameters.psi_f.Value() * iq + (ldEff - lqEff) * id * iq);
 
-        auto loadTorque = load.value_or(foc::NewtonMeter{ 0.0f }).Value();
+        auto loadTorque = loads.load.value_or(foc::NewtonMeter{ 0.0f }).Value();
         auto loadOpposing = (motorState.omega_mech.Value() >= 0.0f) ? loadTorque : -loadTorque;
 
         lastDqCurrents = foc::RotatingFrame{ id, iq };
 
-        auto d_omega_mech_dt = (torqueElec - parameters.B.Value() * motorState.omega_mech.Value() - loadOpposing - externalTorque.Value()) / parameters.J.Value();
+        auto d_omega_mech_dt = (torqueElec - parameters.B.Value() * motorState.omega_mech.Value() - loadOpposing - loads.externalTorque.Value()) / parameters.J.Value();
 
-        motorState.omega_mech += foc::RadiansPerSecond{ d_omega_mech_dt * dt };
+        float omegaMech = motorState.omega_mech.Value() + d_omega_mech_dt * dt;
+
+        if (nonIdealities.coulombFrictionNm > 0.0f)
+        {
+            const float frictionStep = nonIdealities.coulombFrictionNm * dt / parameters.J.Value();
+            omegaMech = std::fabs(omegaMech) <= frictionStep ? 0.0f : omegaMech - std::copysign(frictionStep, omegaMech);
+        }
+
+        motorState.omega_mech = foc::RadiansPerSecond{ omegaMech };
         motorState.omega = foc::RadiansPerSecond{ parameters.p * motorState.omega_mech.Value() };
 
         motorState.theta_mech += foc::Radians{ motorState.omega_mech.Value() * dt };

@@ -14,6 +14,8 @@ target_link_libraries(e_foc.services.cli PUBLIC
 )
 
 target_sources(e_foc.services.cli PRIVATE
+    SerialCommunicationMirror.cpp
+    SerialCommunicationMirror.hpp
     TerminalBase.cpp
     TerminalBase.hpp
     TerminalDiagnostics.cpp

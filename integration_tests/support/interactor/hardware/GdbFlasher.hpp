@@ -10,6 +10,7 @@ namespace hil
         explicit GdbFlasher(const BridgeConfig& config);
 
         void Flash() const;
+        void Reset() const;
 
     private:
         const BridgeConfig& config;

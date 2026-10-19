@@ -30,6 +30,7 @@ namespace application
         StatusWithMessage ReadEncoder();
         StatusWithMessage Stop();
         void ProcessAdcSamples();
+        void ReportAdcSamples();
         StatusWithMessage SetPwmDuty(const infra::BoundedConstString& param);
         StatusWithMessage SetMotorParameters(const infra::BoundedConstString& param);
         StatusWithMessage CanStart(const infra::BoundedConstString& param);
@@ -51,6 +52,7 @@ namespace application
         // Leaves the command's response and trace time to reach the host before the event loop stops
         static constexpr infra::Duration eventLoopStallDelay{ std::chrono::milliseconds(100) };
         static constexpr std::size_t averageSampleSize = 100;
+        static constexpr std::size_t adcReportLinesPerAction = 10;
         using QueueOfPhaseCurrents = infra::BoundedDeque<foc::PhaseCurrents>::WithMaxSize<averageSampleSize>;
 
         void StartAdc(PlatformFactory::SampleAndHold sampleAndHold);
@@ -86,6 +88,7 @@ namespace application
         IdentificationState identState;
         PeripheralConfiguration peripheralConfiguration;
         bool adcActive_{ false };
+        bool adcReporting_{ false };
         bool canStarted = false;
         QueueOfPhaseCurrents queueOfPhaseCurrents;
         hal::PerformanceTracker& performanceTimer;

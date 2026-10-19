@@ -14,6 +14,7 @@ target_sources(e_foc.foc.model_test PRIVATE
     TestEncoderNoise.cpp
     TestFaultInjection.cpp
     TestMotorModel.cpp
+    TestPlantNonidealities.cpp
     TestPlantResponseRecorder.cpp
     TestThermalModel.cpp
     TestTorqueStepScheduler.cpp

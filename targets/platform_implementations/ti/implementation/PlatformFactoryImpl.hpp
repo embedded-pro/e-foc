@@ -8,6 +8,7 @@
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
+#include "core/services/cli/SerialCommunicationMirror.hpp"
 #include "hal/cortex_m/DataWatchpointAndTrace.hpp"
 #include "hal/cortex_m/InterruptCortex.hpp"
 #include "hal/cortex_m/SystemTickTimerService.hpp"
@@ -23,6 +24,8 @@
 #include "hal_tiva/tiva/Pwm.hpp"
 #include "hal_tiva/tiva/UartWithDma.hpp"
 #include "hal_tiva/tiva/WatchDog.hpp"
+#include "infra/util/HotSwapFunction.hpp"
+#include "services/tracer/SerialCommunicationOnSeggerRtt.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "services/util/EventDispatcherWatchdog.hpp"
@@ -125,20 +128,31 @@ namespace application
             hal::tiva::Dma dma{ infra::emptyFunction };
             hal::tiva::UartWithDma::Config uartConfig{ true, true, hal::tiva::UartWithDma::Baudrate::_921600_bps, hal::tiva::UartWithDma::FlowControl::none, hal::tiva::UartWithDma::Parity::none, hal::tiva::UartWithDma::StopBits::one, hal::tiva::UartWithDma::NumberOfBytes::_8_bytes, std::make_optional(InterruptPriorities::uart) };
             hal::tiva::UartWithDma::WithRxBuffer<Resources::uartReceiveBufferSize> uart{ Peripheral::UartIndex, Pins::uartTx, Pins::uartRx, dma, uartConfig };
-            services::StreamWriterOnSerialCommunication::WithStorage<Resources::tracerBufferSize> streamWriterOnSerialCommunication{ uart };
+#ifdef E_FOC_CONSOLE_ON_RTT
+            services::SerialCommunicationOnSeggerRtt rtt;
+            services::SerialCommunicationMirror mirror{ uart, rtt };
+            hal::SerialCommunication& console{ mirror };
+#else
+            hal::SerialCommunication& console{ uart };
+#endif
+            services::StreamWriterOnSerialCommunication::WithStorage<Resources::tracerBufferSize> streamWriterOnSerialCommunication{ console };
             infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterOnSerialCommunication };
             services::TracerWithDateTime tracer{ tracerStream };
-            services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<Resources::terminalQueueSize, Resources::terminalHistorySize> terminal{ uart, tracer };
+            services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<Resources::terminalQueueSize, Resources::terminalHistorySize> terminal{ console, tracer };
         };
 
         struct AdcForPowerSupplyMeasurementImpl
         {
             static constexpr float adcToVoltsFactor = application::BoardCharacteristics::AdcToVoltsFactor(adcReferenceVoltage, adcResolution);
             infra::Function<void(std::tuple<infra::Ampere, infra::Ampere, infra::Ampere> voltagePhases)> phaseCurrentsReady;
-            std::array<hal::tiva::AnalogPin, 1> powerSupplyAnalogPins{ { hal::tiva::AnalogPin{ Pins::powerSupplyVoltage } } };
+
+            explicit AdcForPowerSupplyMeasurementImpl(hal::tiva::AnalogPin& powerSupplyPin)
+                : powerSupplyAdc{ 1, 0, infra::MakeRangeFromSingleObject(powerSupplyPin), powerSupplyAdcConfig }
+            {}
+
             constexpr static auto powerSupplyOversampling = hal::tiva::SynchronousAdc::Oversampling::oversampling8;
             hal::tiva::SynchronousAdc::Config powerSupplyAdcConfig{ hal::tiva::SynchronousAdc::SampleAndHold::sampleAndHold256, hal::tiva::SynchronousAdc::Priority::priority3, std::make_optional(powerSupplyOversampling) };
-            hal::tiva::SynchronousAdc powerSupplyAdc{ 1, 0, powerSupplyAnalogPins, powerSupplyAdcConfig };
+            hal::tiva::SynchronousAdc powerSupplyAdc;
         };
 
         struct AdcForPhaseCurrentMeasurementImpl
@@ -170,6 +184,7 @@ namespace application
             } };
 
             hal::tiva::Adc::Config adcConfig{ false, 0, Peripheral::adcTrigger, hal::tiva::Adc::SampleAndHold::sampleAndHold8, std::make_optional(currentSensingOversampling), phaseDelay, {}, hal::cortex::InterruptPriority::highest };
+            static constexpr std::size_t powerSupplyPinIndex{ 4 };
             std::array<hal::tiva::AnalogPin, 5> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC }, hal::tiva::AnalogPin{ Pins::currentTotal }, hal::tiva::AnalogPin{ Pins::powerSupplyVoltage } } };
         };
 
@@ -264,8 +279,8 @@ namespace application
             hal::OutputPin performance{ Pins::performance };
             Cortex cortex;
             TerminalAndTracer terminalAndTracer;
-            AdcForPowerSupplyMeasurementImpl adcForPowerSupplyMeasurementImpl;
             AdcForPhaseCurrentMeasurementImpl adcForPhaseCurrentMeasurementImpl;
+            AdcForPowerSupplyMeasurementImpl adcForPowerSupplyMeasurementImpl{ adcForPhaseCurrentMeasurementImpl.currentPhaseAnalogPins[AdcForPhaseCurrentMeasurementImpl::powerSupplyPinIndex] };
             PwmConfiguration pwmConfig;
             hal::tiva::Eeprom eepromPeripheral;
 
@@ -303,7 +318,7 @@ namespace application
         infra::BoundedString::WithStorage<Resources::faultStatusSize> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };
-        infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
+        infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         infra::Function<void(BoardProtectionReason)> onFaultCallback;
         std::optional<Peripherals> peripherals;
     };

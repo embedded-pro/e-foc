@@ -3,6 +3,7 @@
 #include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
+#include "infra/util/HotSwapFunction.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 
 namespace foc
@@ -34,8 +35,7 @@ namespace foc
         drivers::ThreePhaseInverter& inverter;
         drivers::Encoder& encoder;
         FocImpl& foc;
-        infra::Function<void(const PhaseCurrents& currentPhases)> phaseCurrentsObserver;
-        volatile bool observerRegistered{ false };
+        infra::HotSwapFunction<void(const PhaseCurrents& currentPhases)> phaseCurrentsObserver;
         volatile bool enabled{ false };
         volatile bool stopRequested{ false };
     };
@@ -103,15 +103,13 @@ namespace foc
     template<typename FocImpl>
     void Runner<FocImpl>::RegisterPhaseCurrentsObserver(const infra::Function<void(const PhaseCurrents& currentPhases)>& observer)
     {
-        phaseCurrentsObserver = observer;
-        observerRegistered = true;
+        phaseCurrentsObserver.Set(observer);
     }
 
     template<typename FocImpl>
     void Runner<FocImpl>::UnregisterPhaseCurrentsObserver()
     {
-        observerRegistered = false;
-        phaseCurrentsObserver = nullptr;
+        phaseCurrentsObserver.Clear();
     }
 
     template<typename FocImpl>
@@ -138,7 +136,6 @@ namespace foc
         auto position = encoder.Read();
         inverter.ThreePhasePwmOutput(foc.Calculate(currentPhases, position));
 
-        if (observerRegistered)
-            phaseCurrentsObserver(currentPhases);
+        phaseCurrentsObserver(currentPhases);
     }
 }

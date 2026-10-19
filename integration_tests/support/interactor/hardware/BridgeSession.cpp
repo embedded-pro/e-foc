@@ -345,6 +345,14 @@ namespace hil
                 promptSeen == promptBefore)
                 break;
         }
+
+        if (!serialBuffer.empty())
+        {
+            if (serialBuffer.back() == '\r')
+                serialBuffer.pop_back();
+            EmitSerialLine(std::move(serialBuffer));
+            serialBuffer.clear();
+        }
     }
 
     void BridgeSession::TransmitSerial(const std::string& payload)

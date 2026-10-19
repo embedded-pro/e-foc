@@ -40,10 +40,12 @@ int main(int argc, char** argv)
     cli.add_option("--bridge-host", g_bridgeConfig.host, "hardware_bridge TCP host (mode=hil)");
     cli.add_option("--serial-port", g_bridgeConfig.serialPort, "hardware_bridge serial TCP port (mode=hil)");
     cli.add_option("--can-port", g_bridgeConfig.canPort, "hardware_bridge CAN TCP port (mode=hil)");
+    cli.add_option("--can-bitrate", g_bridgeConfig.canBitrate, "CAN bitrate in bit/s the target is started with; must match the bridge adapter (mode=hil)");
     cli.add_option("--gdb-exe", g_bridgeConfig.gdbExe, "GDB client executable (mode=hil)");
     cli.add_option("--gdb-target", g_bridgeConfig.gdbTarget, "GDB remote target host:port (mode=hil)");
     cli.add_option("--firmware-elf", g_bridgeConfig.firmwareElf, "Firmware ELF to flash (mode=hil)");
     cli.add_flag("--skip-flash", g_bridgeConfig.skipFlash, "Skip GDB flash step (mode=hil)");
+    cli.add_flag("--restart-per-scenario", g_bridgeConfig.restartPerScenario, "Reset the target before every scenario so CAN sequence numbers and state machine start clean (mode=hil)");
 
     cli.parse_complete_callback([]
         {

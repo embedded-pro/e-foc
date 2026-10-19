@@ -73,6 +73,12 @@ namespace foc
             float biasRadians{ 0.0f };
         };
 
+        struct SupplyConfig
+        {
+            float sourceResistanceOhm{ 0.0f };
+            float currentLimitAmpere{ 0.0f };
+        };
+
         struct FaultInjectionConfig
         {
             bool openPhaseA{ false };
@@ -99,11 +105,15 @@ namespace foc
         void SetEncoderNoise(const EncoderNoiseConfig& config);
         void SetThermalConfig(const ThermalConfig& config);
         void SetFaultInjection(const FaultInjectionConfig& config);
+        void SetSupply(const SupplyConfig& config);
+        void SetCoulombFriction(foc::NewtonMeter friction);
+        void SetEncoderResolution(uint32_t countsPerRevolution);
         void SetRandomSeed(uint32_t seed);
         void ResetTemperature();
         float WindingTemperatureCelsius() const;
         foc::PhaseCurrents LastMeasuredCurrents() const;
         foc::Volts EffectiveSupplyVoltage() const;
+        foc::Ampere SupplyCurrent() const;
         foc::Ohm EffectiveResistance() const;
         foc::Henry EffectiveInductanceD() const;
         foc::Henry EffectiveInductanceQ() const;
@@ -174,6 +184,24 @@ namespace foc
             foc::Radians stuckAngle{ 0.0f };
         };
 
+        struct SupplyState
+        {
+            SupplyConfig config{};
+            float busCurrentAmpere{ 0.0f };
+        };
+
+        struct PlantNonIdealities
+        {
+            float coulombFrictionNm{ 0.0f };
+            uint32_t encoderCountsPerRevolution{ 0 };
+        };
+
+        struct LoadState
+        {
+            std::optional<foc::NewtonMeter> load;
+            foc::NewtonMeter externalTorque{ 0.0f };
+        };
+
         struct SelfDriveState
         {
             bool driving{ false };
@@ -192,8 +220,7 @@ namespace foc
         infra::Function<void(foc::PhaseCurrents)> onCurrentPhasesReady;
         bool running{ false };
         const bool selfDriveEnabled;
-        std::optional<foc::NewtonMeter> load;
-        foc::NewtonMeter externalTorque{ 0.0f };
+        LoadState loads;
         foc::RotatingFrame lastDqCurrents{};
         const std::optional<std::size_t> maxIterations;
         std::optional<std::size_t> counter;
@@ -202,6 +229,8 @@ namespace foc
         ThermalState thermal;
         EncoderNoiseState encoderNoise;
         FaultInjectionState faultInjection;
+        SupplyState supplyState;
+        PlantNonIdealities nonIdealities;
         SelfDriveState selfDrive;
     };
 }

@@ -6,6 +6,34 @@
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include <algorithm>
 #include <cmath>
+#include <limits>
+
+namespace
+{
+    constexpr infra::Duration slewPeriod{ std::chrono::milliseconds{ 1 } };
+    constexpr float slewPeriodSeconds{ 0.001f };
+
+    constexpr float accelerationQuantumTarget{ 100.0f };
+    constexpr std::size_t maximumObservationWindow{ 128 };
+    constexpr std::size_t minimumCountSteps{ 8 };
+
+    constexpr float inertiaSettlingTolerance{ 0.1f };
+    constexpr std::size_t maximumSettlingInterval{ 2000 };
+    constexpr std::size_t minimumSettlingUpdates{ 8 };
+    constexpr float coveredWindowSamples{ 16.0f };
+
+    constexpr float minimumRunDwells{ 2.0f };
+
+    std::size_t WindowSamplesFor(float countAngle, float samplingPeriod)
+    {
+        if (!std::isfinite(countAngle))
+            return 1;
+
+        const auto seconds = std::sqrt(countAngle / accelerationQuantumTarget);
+        const auto samples = static_cast<std::size_t>(std::ceil(seconds / samplingPeriod));
+        return std::clamp<std::size_t>(samples, 1, maximumObservationWindow);
+    }
+}
 
 namespace services
 {
@@ -29,26 +57,45 @@ namespace services
         }
 
         this->currentConfig = config;
-        this->currentEnvelope = foc::Ampere{ std::min(config.maxCurrent.Value(), supportedCurrent.Value()) };
+        this->currentEnvelope = foc::Ampere{ std::min(config.maxCurrent.Value(), supportedCurrent.Value() * identificationCurrentMargin) };
         this->onDone = onDone;
         this->previousPosition = encoder.Read().Value();
         this->previousSpeed = 0.0f;
+        this->hasPreviousSpeed = false;
+        this->hasPreviousTorque = false;
+        this->torqueSum = 0.0f;
+        this->lastSamplePosition = this->previousPosition;
+        this->countAngle = std::numeric_limits<float>::infinity();
+        this->countSteps = 0;
+        this->windowSamples = 1;
+        this->samplesInWindow = 0;
+        this->windowPeriod = samplingPeriod;
         this->polePairs = static_cast<float>(numberOfPolePairs);
         this->excitation.Restart();
-        this->atDwellLevel = false;
+        this->atDwellLevel = true;
         this->outcome = Outcome::pending;
         ++run;
 
-        rls.emplace(1000.0f, config.forgettingFactor);
+        RestartEstimator(config.forgettingFactor);
+        this->samplesSinceStart = 0;
+        this->minimumRunSamples = static_cast<std::size_t>(minimumRunDwells * std::chrono::duration<float>(config.dwellTime).count() / samplingPeriod);
 
         observable.RegisterPhaseCurrentsObserver([this, torqueConstant](const auto& currents)
             {
                 OnSamplingUpdate(currents, torqueConstant);
             });
 
+        this->commandedSpeed = 0.0f;
+        this->levelSpeed = config.dwellSpeed.Value();
+
         drive.Start();
         controller.EnableSpeedCommand();
-        controller.CommandSpeed(config.targetSpeed);
+        controller.CommandSpeed(foc::RadiansPerSecond{ commandedSpeed });
+
+        slewTimer.Start(slewPeriod, [this]()
+            {
+                StepSpeedCommand();
+            });
 
         excitationTimer.Start(config.dwellTime, [this]()
             {
@@ -61,10 +108,43 @@ namespace services
             });
     }
 
+    void MechanicalParametersIdentificationImpl::RestartEstimator(float forgettingFactor)
+    {
+        updateForgetting = forgettingFactor;
+        rls.emplace(1000.0f, updateForgetting);
+        hasInertiaReference = false;
+        inertiaSettled = false;
+        updatesSinceReference = 0;
+    }
+
+    void MechanicalParametersIdentificationImpl::TrackInertiaSettling()
+    {
+        const auto memoryInSamples = updateForgetting < 1.0f ? std::ceil(1.0f / (1.0f - updateForgetting)) : static_cast<float>(maximumSettlingInterval);
+        const auto memoryInUpdates = std::max<std::size_t>(minimumSettlingUpdates, static_cast<std::size_t>(std::ceil(memoryInSamples / static_cast<float>(windowSamples))));
+
+        if (++updatesSinceReference < memoryInUpdates)
+            return;
+
+        const auto inertia = rls->Coefficients().at(1, 0);
+        inertiaSettled = hasInertiaReference && std::abs(inertia - inertiaReference) <= inertiaSettlingTolerance * std::abs(inertia);
+        inertiaReference = inertia;
+        hasInertiaReference = true;
+        updatesSinceReference = 0;
+    }
+
     void MechanicalParametersIdentificationImpl::CommandNextExcitationLevel()
     {
         atDwellLevel = !atDwellLevel;
-        controller.CommandSpeed(atDwellLevel ? currentConfig.dwellSpeed : currentConfig.targetSpeed);
+        levelSpeed = atDwellLevel ? currentConfig.dwellSpeed.Value() : currentConfig.targetSpeed.Value();
+    }
+
+    void MechanicalParametersIdentificationImpl::StepSpeedCommand()
+    {
+        const auto step = currentConfig.speedSlewRate * slewPeriodSeconds;
+        const auto remaining = levelSpeed - commandedSpeed;
+
+        commandedSpeed = std::abs(remaining) <= step ? levelSpeed : commandedSpeed + std::copysign(step, remaining);
+        controller.CommandSpeed(foc::RadiansPerSecond{ commandedSpeed });
     }
 
     void MechanicalParametersIdentificationImpl::Abort()
@@ -87,6 +167,7 @@ namespace services
     {
         timeoutTimer.Cancel();
         excitationTimer.Cancel();
+        slewTimer.Cancel();
     }
 
     void MechanicalParametersIdentificationImpl::ReleaseDrive()
@@ -127,7 +208,7 @@ namespace services
 
         const auto& theta = rls->Coefficients();
         const auto inertia = theta.at(1, 0);
-        const auto friction = theta.at(2, 0);
+        const auto friction = SettledFriction(theta.at(2, 0));
         const bool usable = outcome == Outcome::converged && IsPlausibleMechanics(inertia, friction);
         rls.reset();
 
@@ -137,52 +218,99 @@ namespace services
             Complete(std::nullopt, std::nullopt);
     }
 
+    void MechanicalParametersIdentificationImpl::FailEnvelope()
+    {
+        if (outcome == Outcome::outsideEnvelope)
+            return;
+
+        outcome = Outcome::outsideEnvelope;
+        inverter.Stop();
+        ScheduleFinish();
+    }
+
     void MechanicalParametersIdentificationImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant)
     {
         if (!rls.has_value())
             return;
 
-        auto mechanicalPos = encoder.Read().Value();
-        auto speed = foc::detail::PositionWithWrapAround(mechanicalPos - previousPosition) / samplingPeriod;
-        auto acceleration = (speed - previousSpeed) / samplingPeriod;
+        if (ExceedsInjectionLimit(currentPhases, currentEnvelope))
+        {
+            FailEnvelope();
+            return;
+        }
+
+        ++samplesSinceStart;
+
+        const auto mechanicalPos = encoder.Read().Value();
+        const auto electricalAngle = mechanicalPos * polePairs;
+        const auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
+        torqueSum += rotatingFrame.q * torqueConstant.Value();
+
+        const auto step = std::abs(foc::detail::PositionWithWrapAround(mechanicalPos - lastSamplePosition));
+        lastSamplePosition = mechanicalPos;
+
+        if (step > 0.0f)
+        {
+            countAngle = std::min(countAngle, step);
+            ++countSteps;
+        }
+
+        if (++samplesInWindow < windowSamples)
+            return;
+
+        samplesInWindow = 0;
+
+        const auto windowTorque = torqueSum / static_cast<float>(windowSamples);
+        torqueSum = 0.0f;
+
+        const auto speed = foc::detail::PositionWithWrapAround(mechanicalPos - previousPosition) / windowPeriod;
+        const auto acceleration = (speed - previousSpeed) / windowPeriod;
+        const auto hadSpeed = hasPreviousSpeed;
+        const auto hadTorque = hasPreviousTorque;
+
+        const auto centred = windowSamples > 1;
+        const auto centredSpeed = centred ? 0.5f * (speed + previousSpeed) : speed;
+        const auto centredTorque = centred ? 0.5f * (windowTorque + previousTorque) : windowTorque;
 
         previousPosition = mechanicalPos;
         previousSpeed = speed;
+        hasPreviousSpeed = true;
+        previousTorque = windowTorque;
+        hasPreviousTorque = true;
 
-        // Checked on every sample the drive is still live, a converged one included: the run is only over
-        // once the dispatcher has released the drive, so a sample that leaves the envelope in between must
-        // still invalidate the estimate. The power stage is stopped here rather than with the rest of the
-        // teardown, because leaving it driving an out-of-envelope current until the dispatcher runs is what
-        // the envelope exists to prevent. Releasing the observer here would destroy the closure being
-        // executed, so that, and the completion, stay deferred.
-        if (ExceedsInjectionLimit(currentPhases, currentEnvelope) || std::abs(speed) > currentConfig.maxSpeed.Value())
+        const auto countKnown = countSteps >= minimumCountSteps;
+
+        const auto wanted = countKnown ? WindowSamplesFor(countAngle, samplingPeriod) : windowSamples;
+
+        if (wanted != windowSamples)
         {
-            if (outcome != Outcome::outsideEnvelope)
-            {
-                outcome = Outcome::outsideEnvelope;
-                inverter.Stop();
-                ScheduleFinish();
-            }
+            windowSamples = wanted;
+            windowPeriod = samplingPeriod * static_cast<float>(wanted);
+            hasPreviousSpeed = false;
+            hasPreviousTorque = false;
+            return;
+        }
 
+        if (countKnown && std::abs(speed) > currentConfig.maxSpeed.Value())
+        {
+            FailEnvelope();
             return;
         }
 
         if (outcome != Outcome::pending)
             return;
 
-        if (!IsMechanicallyObservable(speed))
+        if (!countKnown || !hadSpeed || !hadTorque || !IsMechanicallyObservable(centredSpeed))
             return;
 
-        auto electricalAngle = mechanicalPos * polePairs;
-        auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
-
-        MechanicalRls::MakeRegressor(regressor, acceleration, speed);
-        torque.at(0, 0) = rotatingFrame.q * torqueConstant.Value();
+        MechanicalRls::MakeRegressor(regressor, acceleration, centredSpeed);
+        torque.at(0, 0) = centredTorque;
 
         auto metrics = rls->Update(regressor, torque);
-        excitation.Count(acceleration, speed);
+        excitation.Count(acceleration, centredSpeed);
+        TrackInertiaSettling();
 
-        if (!HasConvergedMechanics(metrics, excitation, currentConfig.forgettingFactor))
+        if (samplesSinceStart < minimumRunSamples || !inertiaSettled || !HasConvergedMechanics(metrics, excitation, updateForgetting, std::max(1.0f, static_cast<float>(windowSamples) / coveredWindowSamples)))
             return;
 
         outcome = Outcome::converged;

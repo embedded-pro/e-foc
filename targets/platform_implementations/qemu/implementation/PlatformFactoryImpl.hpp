@@ -12,6 +12,7 @@
 #include "hal/qemu/async/WatchdogQemu.hpp"
 #include "infra/stream/OutputStream.hpp"
 #include "infra/timer/Timer.hpp"
+#include "infra/util/HotSwapFunction.hpp"
 #include "services/tracer/StreamWriterOnSerialCommunication.hpp"
 #include "services/tracer/TracerWithDateTime.hpp"
 #include "services/util/EventDispatcherWatchdog.hpp"
@@ -215,10 +216,9 @@ namespace application
         infra::TimerRepeating protectionPollTimer;
         infra::TimerRepeating responseDrainTimer;
         hal::Hertz baseFrequency;
-        volatile bool onPhaseCurrentsReadyValid{ false };
         volatile uint32_t sampleDecimation{ 1 };
         uint32_t samplePhase{ 0 };
-        infra::Function<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
+        infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         foc::PhasePwmDutyCycles lastDutyPhases{};
         foc::PhaseCurrents lastCurrents{};
     };

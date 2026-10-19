@@ -4,6 +4,7 @@
 #include "core/state_machine/FocStateMachineDependencies.hpp"
 #include "core/state_machine/LifecycleContext.hpp"
 #include "infra/timer/Timer.hpp"
+#include <optional>
 
 namespace application
 {
@@ -38,11 +39,14 @@ namespace application
         void TraceRecord(const services::CalibrationData& data) const;
         void OnSaved(services::NvmStatus status);
         void RetrySave();
+        std::optional<state_machine::MechanicalRun> AgreedMechanicalRun(const state_machine::Calibrating& calibrating) const;
 
     private:
         static constexpr std::chrono::milliseconds saveRetryDelay{ 10 };
+        static constexpr uint8_t maxMechanicalAttempts{ state_machine::Calibrating::maxMechanicalRuns };
 
         const LifecycleEnvironment& env;
+        uint8_t agreeingRuns;
         CalibrationOrchestrator orchestrator;
         infra::Function<void(services::NvmStatus)> saveCompletion;
         services::CalibrationData pendingSaveData;

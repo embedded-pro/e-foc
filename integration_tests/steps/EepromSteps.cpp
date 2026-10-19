@@ -47,6 +47,7 @@ THEN(R"(the data read back from EEPROM shall be identical to the written data)")
     auto& fixture = context.Get<Fixture>();
     ASSERT_TRUE(fixture.SendCommand("eeprom_read 0 2", hil::timeouts::slowCommand))
         << "eeprom_read command did not receive a response";
+    fixture.FlushPartialLines(hil::timeouts::command);
 
     int readA{ -1 }, readB{ -1 };
     for (const auto& line : fixture.allLines)

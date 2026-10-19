@@ -5,6 +5,8 @@
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
 #include "infra/util/Function.hpp"
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <variant>
 
@@ -23,13 +25,24 @@ namespace state_machine
         static constexpr const char* name{ "Idle" };
     };
 
+    struct MechanicalRun
+    {
+        float inertia{ 0.0f };
+        float friction{ 0.0f };
+    };
+
     struct Calibrating
     {
+        static constexpr std::size_t maxMechanicalRuns{ 3 };
+
         static constexpr const char* name{ "Calibrating" };
 
         CalibrationStep step{ CalibrationStep::polePairs };
         services::CalibrationData pendingData{};
         bool alignmentOnly{ false };
+        uint8_t mechanicalAttempts{ 0 };
+        std::array<MechanicalRun, maxMechanicalRuns> mechanicalRuns{};
+        uint8_t mechanicalRunCount{ 0 };
     };
 
     struct Ready

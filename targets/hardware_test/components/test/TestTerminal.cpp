@@ -970,6 +970,53 @@ TEST_F(TestHardwareTerminal, adc_buffer_full_triggers_processing)
     ExecuteAllActions();
 }
 
+TEST_F(TestHardwareTerminal, adc_buffer_full_traces_nothing_in_the_callback)
+{
+    foc::PhaseCurrents phases{ foc::Ampere{ 1.0f }, foc::Ampere{ 2.0f }, foc::Ampere{ 3.0f } };
+
+    for (std::size_t i = 0; i < 100; ++i)
+        onPhaseCurrentsReady(phases);
+
+    EXPECT_CALL(platformFactoryMock, Stop());
+    EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(0);
+
+    onPhaseCurrentsReady(phases);
+
+    testing::Mock::VerifyAndClearExpectations(&streamWriterMock);
+    EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).Times(testing::AnyNumber());
+    ExecuteAllActions();
+}
+
+TEST_F(TestHardwareTerminal, adc_samples_are_reported_in_bounded_dispatcher_actions)
+{
+    foc::PhaseCurrents phases{ foc::Ampere{ 1.0f }, foc::Ampere{ 2.0f }, foc::Ampere{ 3.0f } };
+    std::size_t separators{ 0 };
+
+    for (std::size_t i = 0; i < 100; ++i)
+        onPhaseCurrentsReady(phases);
+
+    EXPECT_CALL(platformFactoryMock, Stop());
+    EXPECT_CALL(streamWriterMock, Insert(testing::_, testing::_)).WillRepeatedly([&separators](infra::ConstByteRange range, infra::StreamErrorPolicy&)
+        {
+            if (range.size() == 1 && range.front() == ';')
+                ++separators;
+        });
+
+    onPhaseCurrentsReady(phases);
+
+    std::size_t actions{ 0 };
+    while (!IsIdle())
+    {
+        const auto before = separators;
+        ExecuteFirstAction();
+        ++actions;
+        EXPECT_LE(separators - before, 2u * 10u);
+    }
+
+    EXPECT_EQ(10u, actions);
+    EXPECT_EQ(200u, separators);
+}
+
 TEST_F(TestHardwareTerminal, adc_reconfigure_after_buffer_full)
 {
     foc::PhaseCurrents phases{ foc::Ampere{ 1.0f }, foc::Ampere{ 2.0f }, foc::Ampere{ 3.0f } };

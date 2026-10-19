@@ -13,6 +13,7 @@ namespace application
 {
     CalibrationFlow::CalibrationFlow(const LifecycleEnvironment& environment, const CalibrationServices& services)
         : env(environment)
+        , agreeingRuns(services.agreeingMechanicalRuns)
         , orchestrator(services.electricalIdent, services.motorAlignment, environment.tracer)
     {}
 
@@ -108,19 +109,63 @@ namespace application
             env.mode.RunPostAlignmentStep(calibrating);
     }
 
+    std::optional<state_machine::MechanicalRun> CalibrationFlow::AgreedMechanicalRun(const state_machine::Calibrating& calibrating) const
+    {
+        const auto count = calibrating.mechanicalRunCount;
+
+        if (agreeingRuns <= 1)
+            return count > 0 ? std::optional{ calibrating.mechanicalRuns[count - 1] } : std::nullopt;
+
+        for (std::size_t first = 0; first != count; ++first)
+        {
+            for (std::size_t second = first + 1; second != count; ++second)
+            {
+                const auto& a = calibrating.mechanicalRuns[first];
+                const auto& b = calibrating.mechanicalRuns[second];
+
+                if (!services::EstimatesAgree(a.inertia, b.inertia))
+                    continue;
+
+                return state_machine::MechanicalRun{ 0.5f * (a.inertia + b.inertia), 0.5f * (a.friction + b.friction) };
+            }
+        }
+
+        return std::nullopt;
+    }
+
     void CalibrationFlow::OnMechanicalParametersIdentified(state_machine::Calibrating& calibrating, const state_machine::MechanicalParametersIdentified& event)
     {
-        if (!event.friction || !event.inertia || !services::IsPlausibleMechanics(event.inertia->Value(), event.friction->Value()))
+        const bool usable = event.friction && event.inertia && services::IsPlausibleMechanics(event.inertia->Value(), event.friction->Value());
+
+        if (usable)
         {
+            calibrating.mechanicalRuns[calibrating.mechanicalRunCount++] = state_machine::MechanicalRun{ event.inertia->Value(), event.friction->Value() };
+            env.tracer.Trace() << "[SM] Mechanical run " << static_cast<uint32_t>(calibrating.mechanicalRunCount) << ": J_uNms2=" << event.inertia->Value() * microPerUnit << " B_uNms=" << event.friction->Value() * microPerUnit;
+        }
+        else
             env.tracer.Trace() << "[SM] Mechanical identification produced no usable estimate";
-            env.machine.Dispatch(state_machine::CalibrationStepFailed{});
+
+        if (const auto agreed = AgreedMechanicalRun(calibrating))
+        {
+            calibrating.pendingData.inertia = agreed->inertia;
+            calibrating.pendingData.frictionViscous = agreed->friction;
+            calibrating.pendingData.speedLoopBandwidth = event.speedLoopBandwidth;
+            Save(calibrating);
             return;
         }
 
-        calibrating.pendingData.inertia = event.inertia->Value();
-        calibrating.pendingData.frictionViscous = event.friction->Value();
-        calibrating.pendingData.speedLoopBandwidth = event.speedLoopBandwidth;
-        Save(calibrating);
+        if (usable)
+            env.tracer.Trace() << "[SM] Mechanical estimate J_uNms2=" << event.inertia->Value() * microPerUnit << " not confirmed by a second run";
+
+        if (calibrating.mechanicalAttempts + 1 < maxMechanicalAttempts)
+        {
+            ++calibrating.mechanicalAttempts;
+            env.tracer.Trace() << "[SM] Aligning again for mechanical identification, attempt " << static_cast<uint32_t>(calibrating.mechanicalAttempts + 1) << " of " << static_cast<uint32_t>(maxMechanicalAttempts);
+            RunAlignmentOnly(calibrating);
+            return;
+        }
+
+        env.machine.Dispatch(state_machine::CalibrationStepFailed{});
     }
 
     void CalibrationFlow::Save(state_machine::Calibrating& calibrating)

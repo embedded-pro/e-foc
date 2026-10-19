@@ -2,6 +2,7 @@
 #include "targets/platform_implementations/error_handling_cortex_m/CutPowerStage.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
+#include <atomic>
 
 unsigned int hse_value = 8'000'000;
 
@@ -174,7 +175,7 @@ namespace application
 
     void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz /*baseFrequency*/, const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
-        onPhaseCurrentsReady = onDone;
+        onPhaseCurrentsReady.Set(onDone);
         phaseCurrentAdc->Measure([this](foc::Ampere a, foc::Ampere b, foc::Ampere c)
             {
                 onPhaseCurrentsReady(foc::PhaseCurrents{ a, b, c });

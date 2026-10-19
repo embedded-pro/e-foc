@@ -4,6 +4,7 @@
 #include "targets/platform_implementations/error_handling_cortex_m/CutPowerStage.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
+#include <atomic>
 
 namespace
 {
@@ -120,7 +121,7 @@ namespace application
 
     foc::Ampere PlatformFactoryImpl::MaxCurrentSupported() const
     {
-        return foc::Ampere(15.0f);
+        return foc::Ampere(BoardCharacteristics::maxCurrentSupportedAmps);
     }
 
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
@@ -222,7 +223,7 @@ namespace application
     void PlatformFactoryImpl::SetEncoderResolution(uint32_t resolution)
     {
         using Conf = hal::tiva::QuadratureEncoder::Config;
-        hal::tiva::QuadratureEncoder::Config qeiConfig{ resolution, 0, false, false, false,
+        hal::tiva::QuadratureEncoder::Config qeiConfig{ resolution, 0, Peripheral::encoderInvertPhaseA, false, false,
             Conf::ResetMode::onMaxPosition, Conf::CaptureMode::phaseAandPhaseB, Conf::SignalMode::quadrature };
         peripherals->encoder.reset();
         peripherals->encoder.emplace(resolution, Peripheral::QeiIndex, Pins::encoderA, Pins::encoderB, Pins::encoderZ, qeiConfig);
@@ -256,7 +257,7 @@ namespace application
 
     void PlatformFactoryImpl::PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents)>& onDone)
     {
-        onPhaseCurrentsReady = onDone;
+        onPhaseCurrentsReady.Set(onDone);
         WithPwm([baseFrequency](auto& pwm)
             {
                 pwm.SetBaseFrequency(baseFrequency);

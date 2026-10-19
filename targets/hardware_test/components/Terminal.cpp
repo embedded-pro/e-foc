@@ -3,6 +3,7 @@
 #include "core/services/alignment/MotorAlignment.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "hal/interfaces/Pwm.hpp"
+#include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "infra/stream/StringInputStream.hpp"
 #include "infra/stream/StringOutputStream.hpp"
 #include "infra/util/BoundedString.hpp"
@@ -367,12 +368,34 @@ namespace application
         adcActive_ = false;
         hardware.Stop();
 
-        tracer.Trace() << "  Current Phases [A;B;C] ampere";
+        adcReporting_ = true;
+        infra::EventDispatcherWithWeakPtr::Instance().Schedule([this]()
+            {
+                if (adcReporting_)
+                    tracer.Trace() << "  Current Phases [A;B;C] ampere";
+                ReportAdcSamples();
+            });
+    }
 
-        for (const auto& phase : queueOfPhaseCurrents)
+    void TerminalInteractor::ReportAdcSamples()
+    {
+        if (!adcReporting_)
+            return;
+
+        for (std::size_t line = 0; line != adcReportLinesPerAction && !queueOfPhaseCurrents.empty(); ++line)
+        {
+            const auto& phase = queueOfPhaseCurrents.front();
             tracer.Trace() << phase.a.Value() << ";" << phase.b.Value() << ";" << phase.c.Value();
+            queueOfPhaseCurrents.pop_front();
+        }
 
-        queueOfPhaseCurrents.clear();
+        if (queueOfPhaseCurrents.empty())
+            adcReporting_ = false;
+        else
+            infra::EventDispatcherWithWeakPtr::Instance().Schedule([this]()
+                {
+                    ReportAdcSamples();
+                });
     }
 
     TerminalInteractor::StatusWithMessage TerminalInteractor::SetPwmDuty(const infra::BoundedConstString& param)
@@ -423,6 +446,8 @@ namespace application
     void TerminalInteractor::StartAdc(PlatformFactory::SampleAndHold sampleAndHold)
     {
         peripheralConfiguration.sampleAndHold = sampleAndHold;
+        adcReporting_ = false;
+        queueOfPhaseCurrents.clear();
         adcActive_ = true;
         hardware.PhaseCurrentsReady(peripheralConfiguration.pwmFrequency, [this](foc::PhaseCurrents phases)
             {

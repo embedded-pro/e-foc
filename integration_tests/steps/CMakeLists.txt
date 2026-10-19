@@ -6,6 +6,7 @@ add_library(e_foc.integration_tests.steps OBJECT
     EepromSteps.cpp
     FaultSteps.cpp
     HardfaultRecoverySteps.cpp
+    HilMotorSteps.cpp
     IdentificationSteps.cpp
     LoopTimingSteps.cpp
     MotorControlSteps.cpp

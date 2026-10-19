@@ -1,0 +1,32 @@
+- id: REQ-HIL-020
+  title: Electrical identification measures the connected motor
+  shall: >
+    On the motor controller target with a motor connected, the electrical identification
+    command shall report the number of pole pairs, the phase resistance and the phase
+    inductance of the connected motor, and the controller shall reach the ready state.
+
+- id: REQ-HIL-021
+  title: Full calibration identifies the rotor inertia
+  shall: >
+    On the motor controller target with a motor connected, the calibration command in speed
+    mode shall identify the rotor inertia and friction without leaving the current envelope
+    or the speed envelope, store the record, and reach the ready state.
+
+- id: REQ-HIL-022
+  title: The speed loop tracks its setpoint on the connected motor
+  shall: >
+    With the motor enabled in speed mode, the measured speed shall settle within the stated
+    tolerance of the commanded speed within the stated time, in both directions, for each
+    available current-loop and speed-loop algorithm, without a fault.
+
+- id: REQ-HIL-023
+  title: The position loop holds its setpoint on the connected motor
+  shall: >
+    With the motor enabled in position mode, the measured position shall settle within the
+    stated tolerance of the commanded position within the stated time, without a fault.
+
+- id: REQ-HIL-024
+  title: Torque mode produces torque on the connected motor
+  shall: >
+    With the motor enabled in torque mode, a small torque setpoint shall accelerate the
+    rotor in the commanded direction, and disabling the motor shall remove the torque.

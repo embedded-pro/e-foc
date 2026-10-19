@@ -16,6 +16,7 @@ namespace services
         inline constexpr float minimumInertia{ 1e-9f };
         inline constexpr float maximumInertia{ 1.0f };
         inline constexpr float maximumFriction{ 1.0f };
+        inline constexpr float frictionResolution{ 1e-4f };
 
         inline constexpr float innovationThreshold{ 1e-4f };
         inline constexpr float uncertaintyBudgetFactor{ 20.0f };
@@ -26,15 +27,27 @@ namespace services
         inline constexpr float minimumSpeedSpan{ 0.25f };
 
         inline constexpr uint16_t minimumExcitedUpdates{ 64 };
+
+        inline constexpr float agreementTolerance{ 0.2f };
     }
 
     using MechanicalRls = estimators::RecursiveLeastSquares<float, 3>;
+
+    inline float SettledFriction(float friction)
+    {
+        return friction < 0.0f && friction > -mechanical_estimate::frictionResolution ? 0.0f : friction;
+    }
 
     inline bool IsPlausibleMechanics(float inertia, float friction)
     {
         return foc::IsFiniteValue(inertia) && foc::IsFiniteValue(friction) &&
                inertia > mechanical_estimate::minimumInertia && inertia < mechanical_estimate::maximumInertia &&
                friction >= 0.0f && friction < mechanical_estimate::maximumFriction;
+    }
+
+    inline bool EstimatesAgree(float first, float second)
+    {
+        return std::abs(first - second) <= mechanical_estimate::agreementTolerance * std::max(std::abs(first), std::abs(second));
     }
 
     inline bool IsMechanicallyObservable(float speed)
@@ -85,9 +98,9 @@ namespace services
         return std::max(mechanical_estimate::uncertaintyBudgetFactor * (1.0f - forgettingFactor), mechanical_estimate::minimumUncertaintyThreshold);
     }
 
-    inline bool HasConvergedMechanics(const MechanicalRls::EstimationMetrics& metrics, const MechanicalExcitation& excitation, float forgettingFactor)
+    inline bool HasConvergedMechanics(const MechanicalRls::EstimationMetrics& metrics, const MechanicalExcitation& excitation, float forgettingFactor, float uncertaintyScale = 1.0f)
     {
         return excitation.AcceleratingObservations() >= mechanical_estimate::minimumExcitedUpdates && excitation.HasSpannedDistinctSpeeds() &&
-               MechanicalRls::EvaluateConvergence(metrics, mechanical_estimate::innovationThreshold, UncertaintyThresholdFor(forgettingFactor)) == estimators::State::converged;
+               MechanicalRls::EvaluateConvergence(metrics, mechanical_estimate::innovationThreshold, UncertaintyThresholdFor(forgettingFactor) * uncertaintyScale) == estimators::State::converged;
     }
 }

@@ -14,7 +14,15 @@ namespace services
     {
         float value = 0.0f;
         infra::StringInputStream stream(data, infra::softFail);
-        stream >> value;
+
+        if (data.find('.') == infra::BoundedConstString::npos)
+        {
+            int32_t whole = 0;
+            stream >> whole;
+            value = static_cast<float>(whole);
+        }
+        else
+            stream >> value;
 
         if (!stream.ErrorPolicy().Failed() && value >= minValue && value <= maxValue)
             return std::make_optional(value);

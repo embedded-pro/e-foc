@@ -1,6 +1,7 @@
 #include "cucumber_cpp/Steps.hpp"
 #include "hal/interfaces/Can.hpp"
 #include "integration_tests/support/Fixture.hpp"
+#include "integration_tests/support/interactor/hardware/BridgeConfig.hpp"
 #include "integration_tests/support/interactor/hardware/Timeouts.hpp"
 #include <algorithm>
 #include <array>
@@ -24,7 +25,7 @@ WHEN(R"(a CAN command is transmitted to the hardware target)")
 
     fixture.StartCanCapture();
 
-    ASSERT_TRUE(fixture.SendCommand("can_start 500000", hil::timeouts::command))
+    ASSERT_TRUE(fixture.SendCommand("can_start " + std::to_string(hil::GetBridgeConfig().canBitrate), hil::timeouts::command))
         << "can_start command did not receive a response";
 
     ASSERT_TRUE(fixture.SendCommand("can_send 256 1 2 3", hil::timeouts::command))

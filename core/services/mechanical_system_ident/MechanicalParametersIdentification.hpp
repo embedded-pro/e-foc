@@ -9,6 +9,8 @@
 
 namespace services
 {
+    inline constexpr float identificationCurrentMargin{ 2.0f };
+
     class MechanicalParametersIdentification
     {
     public:
@@ -35,6 +37,7 @@ namespace services
             infra::Duration dwellTime{ std::chrono::milliseconds{ 250 } };
             foc::Ampere maxCurrent{ 10.0f };
             foc::RadiansPerSecond maxSpeed{ 104.72f };
+            float speedSlewRate{ 5000.0f };
         };
 
         virtual void EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone) = 0;
@@ -50,6 +53,7 @@ namespace services
                config.dwellSpeed.Value() < config.targetSpeed.Value() &&
                foc::IsFinitePositive(config.maxCurrent.Value()) &&
                foc::IsFinitePositive(config.maxSpeed.Value()) &&
+               foc::IsFinitePositive(config.speedSlewRate) &&
                config.maxSpeed.Value() >= config.targetSpeed.Value() &&
                foc::IsWithinInclusive(config.forgettingFactor, 0.0f, 1.0f) && config.forgettingFactor > 0.0f &&
                config.dwellTime > infra::Duration::zero() &&

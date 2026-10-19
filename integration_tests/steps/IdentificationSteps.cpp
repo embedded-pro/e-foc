@@ -170,8 +170,14 @@ WHEN(R"(electrical identification is run)")
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focIdentifyElectricalId, {}, kIdentificationTimeout))
         << "Electrical identification did not complete successfully";
 
-    const auto payload = fixture.FindCapturedCanFrame(ResponseId(can::focElectricalParamsResponseId), mark);
-    ASSERT_TRUE(payload.has_value()) << "The target sent no electrical parameters response";
+    std::optional<hal::Can::Message> payload;
+    ASSERT_TRUE(DrainUntil(fixture, [&]
+        {
+            payload = fixture.FindCapturedCanFrame(ResponseId(can::focElectricalParamsResponseId), mark);
+            return payload.has_value();
+        },
+        kTraceTimeout))
+        << "The target sent no electrical parameters response";
     ASSERT_GE(payload->size(), kElectricalResponseBytes) << "Electrical parameters response is too short";
 
     setup.identified.resistanceOhm = Fixed16(*payload, 0, can::focResistanceScale);

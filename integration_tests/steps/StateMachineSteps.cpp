@@ -10,6 +10,7 @@ GIVEN(R"(the {word} motor system is initialised with no valid calibration data)"
 {
     auto& fixture = context.Get<Fixture>();
     ASSERT_TRUE(fixture.WaitForCanHeartbeat()) << "CAN stack not ready";
+    ASSERT_TRUE(fixture.SendCommand("clear_cal")) << "Could not clear the stored calibration";
 }
 
 WHEN(R"(the {word} control mode is selected)", (std::string mode))
