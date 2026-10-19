@@ -98,6 +98,14 @@ namespace
             plant.overTemperatureTripCelsius = value;
         else if (key == "supply_voltage_scale")
             plant.supplyVoltageScale = value;
+        else if (key == "coulomb_friction_nm")
+            plant.coulombFrictionNm = value;
+        else if (key == "supply_source_resistance_ohm")
+            plant.supplySourceResistanceOhm = value;
+        else if (key == "supply_current_limit_ampere")
+            plant.supplyCurrentLimitAmpere = value;
+        else if (key == "encoder_counts_per_revolution")
+            plant.encoderCountsPerRevolution = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else if (key == "random_seed")
             plant.randomSeed = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else

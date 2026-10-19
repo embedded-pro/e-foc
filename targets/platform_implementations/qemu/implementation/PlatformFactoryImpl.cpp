@@ -118,6 +118,12 @@ namespace application
             .supplyVoltageScale = plantConfig->supplyVoltageScale,
         };
         model.SetFaultInjection(bootFaultInjection);
+        model.SetSupply({
+            .sourceResistanceOhm = plantConfig->supplySourceResistanceOhm,
+            .currentLimitAmpere = plantConfig->supplyCurrentLimitAmpere,
+        });
+        model.SetCoulombFriction(foc::NewtonMeter{ plantConfig->coulombFrictionNm });
+        model.SetEncoderResolution(plantConfig->encoderCountsPerRevolution);
         model.ResetTemperature();
 
         boardProtection.Configure({

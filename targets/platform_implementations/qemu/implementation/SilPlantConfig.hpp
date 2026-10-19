@@ -54,6 +54,11 @@ namespace sil
         uint32_t responseSampleRateHz;
         uint32_t responseMaxSamples;
 
+        float coulombFrictionNm;
+        float supplySourceResistanceOhm;
+        float supplyCurrentLimitAmpere;
+        uint32_t encoderCountsPerRevolution;
+
         uint8_t polePairs;
         uint8_t faultFlags;
         // Carried in centiseconds so it fits the byte this record already reserved; zero means the
@@ -64,10 +69,10 @@ namespace sil
         uint8_t reserved1;
     };
 
-    static_assert(sizeof(SilPlantConfig) == 128, "SilPlantConfig layout must be free of implicit padding");
+    static_assert(sizeof(SilPlantConfig) == 144, "SilPlantConfig layout must be free of implicit padding");
 
     static constexpr uint32_t plantConfigMagic = 0x504C4E54;
-    static constexpr uint8_t plantConfigLayoutVersion = 2;
+    static constexpr uint8_t plantConfigLayoutVersion = 3;
 
     static constexpr std::size_t plantConfigRecordSize =
         sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t) + sizeof(SilPlantConfig);

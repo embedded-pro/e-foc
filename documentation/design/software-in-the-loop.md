@@ -88,6 +88,7 @@ The description covers everything the plant needs:
 | Thermal           | Ambient, thermal resistance and capacitance, copper and iron coefficients     |
 | Protection        | Over-current, over-voltage, under-voltage and over-temperature trips          |
 | Fault injection   | Open phase per phase, stuck encoder, when it freezes, supply voltage scaling  |
+| Non-idealities    | Coulomb friction, encoder counts per revolution, supply source resistance and current limit |
 | Reproducibility   | The seed both noise generators start from                                     |
 | Disturbance       | A signed shaft torque and the delay after enabling at which it steps in       |
 | Recording         | The rate at which the plant reports its trajectory, and how many samples      |
@@ -710,6 +711,48 @@ adds a handful of combinations chosen to exercise both kinds of position law: th
 speed reference and run through the speed loop, and those that produce a current reference and
 bypass it. The full cross product is an order of magnitude more scenarios for coverage the sweep
 already provides.
+
+
+### Part K — A plant that behaves like the bench
+
+The reference motors are ideal in the three ways that mattered on the bench: a continuous
+encoder, viscous friction only, and a supply that holds its voltage whatever the motor draws. A
+firmware can pass every scenario against them and still misidentify a real rotor. The plant
+description therefore carries the non-idealities as optional fields, each off when zero:
+
+| Field                       | Effect in the plant                                                         |
+|-----------------------------|-----------------------------------------------------------------------------|
+| Coulomb friction            | A constant opposing torque that holds the rotor still below break-away      |
+| Encoder counts per rev      | The reported angle is floored to whole counts                               |
+| Supply source resistance    | The bus falls by resistance times the current the motor draws               |
+| Supply current limit        | Past the limit the bus folds back in proportion, as a bench supply does     |
+
+The bus current is the electrical power the inverter delivers, divided by the bus voltage and
+smoothed by a one millisecond bulk capacitor. Regeneration is ignored: a supply cannot absorb it.
+The existing under-voltage trip reads the sagging bus, so a scenario sees a collapse as a fault.
+
+The `bench` plant takes its winding, rotor, supply and encoder from the values the firmware
+identified on the real test rig (1.10 Ω, 1.07 mH, four pole pairs, about 12.4 µkg·m², 24 V, 3 A,
+4000 counts), not from a datasheet. Its dry friction is a guess until the rig is measured.
+
+What the plant has shown so far:
+
+- **The inertia reads about 10 % low on a 4000-count encoder, and the two runs agree on it**, so
+  the agreement check cannot see it. The estimator regresses torque on the acceleration, whose
+  quantisation noise lies in the regressor and biases the estimate toward zero; the bias falls as
+  the count grows (22 % at 1000 counts, 10 % at 4000, 4 % at 20000). The scenarios tagged
+  `@sil_known_gap` hold the 5 % target and are run with that tag alone.
+- **Encoder noise of 0.2 mrad on the light reference rotor ends the calibration in Fault**, with
+  inertia estimates a hundred times too small. The heavier bench rotor completes.
+- **Dry friction does not disturb the identification**; the estimator models it.
+- **A one amp supply is enough for the calibration of the bench motor.** The electrical power of
+  the identification is under half an amp, so a collapsing supply on the rig is not explained by
+  the motor's power alone.
+
+What the plant cannot show: interrupt preemption at an arbitrary instruction, the vendor HAL
+drivers, the event queue under a hardware error storm, and power-rail behaviour. The emulated
+platform replaces the HAL, so a defect that lives in it, such as the per-error scheduling of the
+CAN driver, is outside what a scenario can reach and belongs to a test of that driver.
 
 ---
 

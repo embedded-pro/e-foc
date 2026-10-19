@@ -62,6 +62,11 @@ namespace sil
             .responseSampleRateHz = 0u,
             .responseMaxSamples = 0u,
 
+            .coulombFrictionNm = 0.0f,
+            .supplySourceResistanceOhm = 0.0f,
+            .supplyCurrentLimitAmpere = 0.0f,
+            .encoderCountsPerRevolution = 0u,
+
             .polePairs = 0u,
             .faultFlags = 0u,
             .encoderFreezeDelayCentiseconds = 0u,
@@ -82,6 +87,23 @@ namespace sil
         if (name == "anaheim")
         {
             DescribeMotor(config, foc::BLY172S_24V_4000::parameters, foc::BLY172S_24V_4000::ratedSupply);
+            return true;
+        }
+
+        if (name == "bench")
+        {
+            config.statorResistanceOhm = 1.10f;
+            config.dAxisInductanceHenry = 0.00107f;
+            config.qAxisInductanceHenry = 0.00107f;
+            config.fluxLinkageWeber = 0.007f;
+            config.rotorInertiaKgM2 = 0.0000124f;
+            config.viscousDampingNmSPerRad = 0.000005f;
+            config.coulombFrictionNm = 0.0005f;
+            config.maxSupportedCurrentAmpere = 3.0f;
+            config.powerSupplyVoltageVolts = 24.0f;
+            config.polePairs = 4u;
+            config.encoderCountsPerRevolution = 4000u;
+            config.noiseSigmaAmpere = 0.01f;
             return true;
         }
 
