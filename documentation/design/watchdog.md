@@ -275,7 +275,7 @@ and reset the target on `pwm` followed by `duty`. The rule that follows:
 ## Constraints & Limitations
 
 | Constraint                      | Value / Description                                                                                             |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+|---------------------------------|-----------------------------------------------------------------------------------------------------------------|
 | Scope                           | Proves the software is running; does not prove the control loops are running                                    |
 | Always on                       | Starts with the dispatcher; there is no enable, disable or query                                                |
 | Boot before the dispatcher runs | Construction outside an action looks like progress; a hang there is caught only if interrupts stop too          |

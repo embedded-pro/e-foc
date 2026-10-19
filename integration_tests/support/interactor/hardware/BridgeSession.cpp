@@ -346,7 +346,6 @@ namespace hil
                 break;
         }
 
-        // The terminal prints its last output line without a terminator until the next prompt, so a quiet line holds a finished one.
         if (!serialBuffer.empty())
         {
             if (serialBuffer.back() == '\r')

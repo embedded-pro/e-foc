@@ -170,7 +170,6 @@ WHEN(R"(electrical identification is run)")
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focIdentifyElectricalId, {}, kIdentificationTimeout))
         << "Electrical identification did not complete successfully";
 
-    // On hardware the serial stream is only read when someone drains it, so the traced response frame is still in transit
     std::optional<hal::Can::Message> payload;
     ASSERT_TRUE(DrainUntil(fixture, [&]
         {

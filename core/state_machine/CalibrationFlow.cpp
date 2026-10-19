@@ -109,8 +109,6 @@ namespace application
             env.mode.RunPostAlignmentStep(calibrating);
     }
 
-    // A run that is usable on its own is not yet trustworthy: it can have converged on noise. With more than one run required,
-    // two estimates of the rotor that agree make an answer, and the answer is their mean.
     std::optional<state_machine::MechanicalRun> CalibrationFlow::AgreedMechanicalRun(const state_machine::Calibrating& calibrating) const
     {
         const auto count = calibrating.mechanicalRunCount;
@@ -159,8 +157,6 @@ namespace application
         if (usable)
             env.tracer.Trace() << "[SM] Mechanical estimate J_uNms2=" << event.inertia->Value() * microPerUnit << " not confirmed by a second run";
 
-        // A run that stalls says nothing about the plant, and it stalls for the same reason on every repeat from the same
-        // rotor reference: the zero offset the alignment set. A new attempt therefore starts from a new alignment.
         if (calibrating.mechanicalAttempts + 1 < maxMechanicalAttempts)
         {
             ++calibrating.mechanicalAttempts;

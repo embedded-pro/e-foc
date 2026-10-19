@@ -146,7 +146,6 @@ namespace application
             static constexpr float adcToVoltsFactor = application::BoardCharacteristics::AdcToVoltsFactor(adcReferenceVoltage, adcResolution);
             infra::Function<void(std::tuple<infra::Ampere, infra::Ampere, infra::Ampere> voltagePhases)> phaseCurrentsReady;
 
-            // The pin is owned by the phase-current ADC (overvoltage comparator input); claiming it twice trips Gpio::ReservePin at boot.
             explicit AdcForPowerSupplyMeasurementImpl(hal::tiva::AnalogPin& powerSupplyPin)
                 : powerSupplyAdc{ 1, 0, infra::MakeRangeFromSingleObject(powerSupplyPin), powerSupplyAdcConfig }
             {}

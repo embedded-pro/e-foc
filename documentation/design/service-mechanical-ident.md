@@ -87,7 +87,7 @@ Speed and acceleration come from differences of encoder positions, and an encode
 count of $q$ radians, a window of $T_w$ seconds quantises the speed at $q/T_w$ and the acceleration at $q/T_w^2$. A
 1000-line encoder (4000 counts per revolution, $q$ = 1.6 mrad) read at 20 kHz moves in steps of about 31 rad/s, and its
 second difference is quantised at over 600 000 rad/s². The acceleration is the harder quantity, because its
-quantisation falls with the *square* of the window.
+quantisation falls with the _square_ of the window.
 
 The procedure therefore sizes its **observation window** from the encoder it is given. It tracks the smallest non-zero
 position step it sees, which is one count, and once it has seen enough steps it chooses the window that holds the
@@ -166,7 +166,7 @@ speed
 The trajectory is given explicit limits and the run stays inside them:
 
 | Limit    | Meaning                                                                                                                                                                                                  |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | current  | The largest phase-current magnitude the run may produce, clamped to twice what the inverter supports: the measured phase current carries overshoot and ripple above the command the loops are limited to |
 | speed    | The largest rotor speed the run may reach, measured rather than commanded                                                                                                                                |
 | duration | The timeout after which the run ends whether or not it has converged                                                                                                                                     |

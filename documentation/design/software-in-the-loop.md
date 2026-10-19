@@ -81,7 +81,7 @@ a truncated or stale description is rejected rather than half-read.
 The description covers everything the plant needs:
 
 | Group             | Contents                                                                                    |
-| ----------------- | ------------------------------------------------------------------------------------------- |
+|-------------------|---------------------------------------------------------------------------------------------|
 | Winding and rotor | Resistance, both axis inductances, flux linkage, pole pairs, inertia, damping               |
 | Drive             | Supply voltage, control frequency, peak current, load torque                                |
 | Measurement       | Current noise deviation and per-phase bias, encoder noise deviation and bias                |
@@ -712,7 +712,6 @@ speed reference and run through the speed loop, and those that produce a current
 bypass it. The full cross product is an order of magnitude more scenarios for coverage the sweep
 already provides.
 
-
 ### Part K — A plant that behaves like the bench
 
 The reference motors are ideal in the three ways that mattered on the bench: a continuous
@@ -721,7 +720,7 @@ firmware can pass every scenario against them and still misidentify a real rotor
 description therefore carries the non-idealities as optional fields, each off when zero:
 
 | Field                    | Effect in the plant                                                     |
-| ------------------------ | ----------------------------------------------------------------------- |
+|--------------------------|-------------------------------------------------------------------------|
 | Coulomb friction         | A constant opposing torque that holds the rotor still below break-away  |
 | Encoder counts per rev   | The reported angle is floored to whole counts                           |
 | Supply source resistance | The bus falls by resistance times the current the motor draws           |

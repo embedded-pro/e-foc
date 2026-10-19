@@ -29,8 +29,6 @@ target_sources(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PRIVATE
     PlatformFactoryImpl.hpp
 )
 
-# The console is mirrored on RTT whenever the RTT support is built, so a debug probe can read and drive it even when the
-# USB-serial link is down.
 if(EMIL_INCLUDE_SEGGER_RTT)
     target_compile_definitions(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PUBLIC E_FOC_CONSOLE_ON_RTT)
 endif()

@@ -54,7 +54,6 @@ namespace hil
     {
         auto& session = BridgeSession::Instance();
 
-        // A reset puts the power stage outputs back to their idle state, whatever a failed step left running
         if (GetBridgeConfig().restartPerScenario)
             GdbFlasher{ GetBridgeConfig() }.Reset();
 

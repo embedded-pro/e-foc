@@ -52,7 +52,6 @@ namespace application
         // Leaves the command's response and trace time to reach the host before the event loop stops
         static constexpr infra::Duration eventLoopStallDelay{ std::chrono::milliseconds(100) };
         static constexpr std::size_t averageSampleSize = 100;
-        // Bounds one dispatcher action well under the watchdog supervision window
         static constexpr std::size_t adcReportLinesPerAction = 10;
         using QueueOfPhaseCurrents = infra::BoundedDeque<foc::PhaseCurrents>::WithMaxSize<averageSampleSize>;
 

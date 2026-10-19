@@ -13,22 +13,15 @@ namespace
     constexpr infra::Duration slewPeriod{ std::chrono::milliseconds{ 1 } };
     constexpr float slewPeriodSeconds{ 0.001f };
 
-    // The speed and acceleration come from differences of encoder positions, which an encoder only gives in counts. A window
-    // of T seconds quantises the speed at q/T and the acceleration at q/T^2 for a count of q radians, so the window that keeps
-    // the acceleration quantum at a fixed target grows with the square root of the count size: a clean encoder is read every
-    // sample, a 4000-count one over several milliseconds.
     constexpr float accelerationQuantumTarget{ 100.0f };
     constexpr std::size_t maximumObservationWindow{ 128 };
     constexpr std::size_t minimumCountSteps{ 8 };
 
-    // An inertia that moves by more than this fraction over one memory of the estimator has not settled
     constexpr float inertiaSettlingTolerance{ 0.1f };
     constexpr std::size_t maximumSettlingInterval{ 2000 };
     constexpr std::size_t minimumSettlingUpdates{ 8 };
     constexpr float coveredWindowSamples{ 16.0f };
 
-    // The viscous friction shows only in the speed difference between the two levels, and a run that converges before it has
-    // crossed both of them has estimated it from one transition, so the run must last long enough to cross both.
     constexpr float minimumRunDwells{ 2.0f };
 
     std::size_t WindowSamplesFor(float countAngle, float samplingPeriod)
@@ -124,12 +117,8 @@ namespace services
         updatesSinceReference = 0;
     }
 
-    // A single innovation below its bound can be luck, and the covariance trace is dominated by the Coulomb term, so neither says
-    // the inertia is known. The inertia is compared with itself one estimator memory earlier, and only a run that has stopped
-    // moving it may converge.
     void MechanicalParametersIdentificationImpl::TrackInertiaSettling()
     {
-        // The memory is a number of samples, 1 / (1 - lambda), and an observation spans a window of them
         const auto memoryInSamples = updateForgetting < 1.0f ? std::ceil(1.0f / (1.0f - updateForgetting)) : static_cast<float>(maximumSettlingInterval);
         const auto memoryInUpdates = std::max<std::size_t>(minimumSettlingUpdates, static_cast<std::size_t>(std::ceil(memoryInSamples / static_cast<float>(windowSamples))));
 
@@ -229,9 +218,6 @@ namespace services
             Complete(std::nullopt, std::nullopt);
     }
 
-    // The power stage is stopped here rather than with the rest of the teardown, because leaving it driving an
-    // out-of-envelope current until the dispatcher runs is what the envelope exists to prevent. Releasing the
-    // observer here would destroy the closure being executed, so that, and the completion, stay deferred.
     void MechanicalParametersIdentificationImpl::FailEnvelope()
     {
         if (outcome == Outcome::outsideEnvelope)
@@ -253,8 +239,6 @@ namespace services
             return;
         }
 
-        // The torque is accumulated over the window like the speed is: the acceleration between two window speeds is a triangular
-        // average of the true acceleration over both windows, and only a torque averaged the same way can be regressed on it.
         ++samplesSinceStart;
 
         const auto mechanicalPos = encoder.Read().Value();
@@ -262,7 +246,6 @@ namespace services
         const auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
         torqueSum += rotatingFrame.q * torqueConstant.Value();
 
-        // The smallest position step the encoder ever shows is one of its counts
         const auto step = std::abs(foc::detail::PositionWithWrapAround(mechanicalPos - lastSamplePosition));
         lastSamplePosition = mechanicalPos;
 
@@ -285,9 +268,6 @@ namespace services
         const auto hadSpeed = hasPreviousSpeed;
         const auto hadTorque = hasPreviousTorque;
 
-        // A single-sample window is the sample itself: speed, acceleration and torque all belong to the same instant. Over a longer
-        // window the acceleration between two window speeds, the mean of the two, and the mean of the two window torques belong to
-        // the boundary between their windows.
         const auto centred = windowSamples > 1;
         const auto centredSpeed = centred ? 0.5f * (speed + previousSpeed) : speed;
         const auto centredTorque = centred ? 0.5f * (windowTorque + previousTorque) : windowTorque;
@@ -298,10 +278,8 @@ namespace services
         previousTorque = windowTorque;
         hasPreviousTorque = true;
 
-        // Until enough counts have been seen the window is a guess
         const auto countKnown = countSteps >= minimumCountSteps;
 
-        // A changed window length starts the pairing again
         const auto wanted = countKnown ? WindowSamplesFor(countAngle, samplingPeriod) : windowSamples;
 
         if (wanted != windowSamples)
@@ -313,9 +291,6 @@ namespace services
             return;
         }
 
-        // Checked on every observation the drive is still live, a converged one included: the run is only over
-        // once the dispatcher has released the drive, so an observation that leaves the envelope in between must
-        // still invalidate the estimate.
         if (countKnown && std::abs(speed) > currentConfig.maxSpeed.Value())
         {
             FailEnvelope();

@@ -111,8 +111,6 @@ namespace
                     }));
         }
 
-        // The plant's speed and acceleration are evaluated analytically at every sample, and the torque it needs follows from them,
-        // so the observation the service derives from window means is consistent with the motion.
         void AdvanceProfile()
         {
             constexpr float samplesPerCycle = 4000.0f;

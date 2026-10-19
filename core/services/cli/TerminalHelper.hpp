@@ -15,8 +15,6 @@ namespace services
         float value = 0.0f;
         infra::StringInputStream stream(data, infra::softFail);
 
-        // The stream's float reader peeks for a fraction after the integer part and fails at the end of the token, so a
-        // whole number such as "3" is read as an integer instead.
         if (data.find('.') == infra::BoundedConstString::npos)
         {
             int32_t whole = 0;

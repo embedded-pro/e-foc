@@ -33,8 +33,6 @@ namespace services
 
     using MechanicalRls = estimators::RecursiveLeastSquares<float, 3>;
 
-    // A rotor with almost no viscous friction presents as slightly negative: the estimator cannot resolve
-    // the coefficient below the torque noise over the speed span. Within that resolution the value is zero.
     inline float SettledFriction(float friction)
     {
         return friction < 0.0f && friction > -mechanical_estimate::frictionResolution ? 0.0f : friction;
@@ -47,8 +45,6 @@ namespace services
                friction >= 0.0f && friction < mechanical_estimate::maximumFriction;
     }
 
-    // Two inertia estimates of the same rotor agree when they differ by less than the tolerance of the larger one. A fluke
-    // that converged on noise does not repeat, so agreement between independent runs is what makes an estimate trustworthy.
     inline bool EstimatesAgree(float first, float second)
     {
         return std::abs(first - second) <= mechanical_estimate::agreementTolerance * std::max(std::abs(first), std::abs(second));
@@ -102,8 +98,6 @@ namespace services
         return std::max(mechanical_estimate::uncertaintyBudgetFactor * (1.0f - forgettingFactor), mechanical_estimate::minimumUncertaintyThreshold);
     }
 
-    // An estimator fed long window means makes far fewer updates per second than one fed samples, so its covariance falls too
-    // slowly in time to reach the bound within a run; the caller scales the bound up for such windows (1 otherwise).
     inline bool HasConvergedMechanics(const MechanicalRls::EstimationMetrics& metrics, const MechanicalExcitation& excitation, float forgettingFactor, float uncertaintyScale = 1.0f)
     {
         return excitation.AcceleratingObservations() >= mechanical_estimate::minimumExcitedUpdates && excitation.HasSpannedDistinctSpeeds() &&

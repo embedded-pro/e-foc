@@ -9,9 +9,6 @@
 
 namespace services
 {
-    // Measured phase currents run above the current the loops are commanded to: the current loop overshoots, the switching ripple
-    // rides on top, and breaking a rotor away from a detent drives the speed loop to its limit. A run is therefore judged against
-    // the drive limit with this margin, not against the limit itself.
     inline constexpr float identificationCurrentMargin{ 2.0f };
 
     class MechanicalParametersIdentification
@@ -40,8 +37,6 @@ namespace services
             infra::Duration dwellTime{ std::chrono::milliseconds{ 250 } };
             foc::Ampere maxCurrent{ 10.0f };
             foc::RadiansPerSecond maxSpeed{ 104.72f };
-            // Largest change of the commanded speed per second. The speed loop still runs on provisional gains while it is identified,
-            // and a step out of standstill makes it ask for a current spike that a small supply cannot deliver.
             float speedSlewRate{ 5000.0f };
         };
 

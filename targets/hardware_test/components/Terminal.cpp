@@ -363,7 +363,6 @@ namespace application
         return { success };
     }
 
-    // Runs in the phase-current ADC interrupt: formatting the whole table here starved the watchdog's early-warning interrupt and reset the target
     void TerminalInteractor::ProcessAdcSamples()
     {
         adcActive_ = false;

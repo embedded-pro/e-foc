@@ -56,8 +56,6 @@ namespace application
     {
         onMeasurementDone.Set(onDone);
 
-        // The converter's own callback is handed over once: it runs in the sampling interrupt, and replacing it while that
-        // interrupt is live is the race the callback above exists to avoid. Later calls only swap what it forwards to.
         if (converterArmed)
             return;
 

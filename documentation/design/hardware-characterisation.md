@@ -8,7 +8,7 @@ date: 2026-10-19
 ---
 
 | Field     | Value                                         |
-| --------- | --------------------------------------------- |
+|-----------|-----------------------------------------------|
 | Title     | Hardware Characterisation and the Bench Motor |
 | Type      | design                                        |
 | Status    | draft                                         |
@@ -21,12 +21,14 @@ date: 2026-10-19
 ## Responsibilities
 
 **Is responsible for:**
+
 - Defining what is measured on the real rig to learn its encoder and current-sensing noise
 - Defining how those measurements become the parameters of the SIL `bench` plant
 - Defining how the same scenario is compared between the emulated and the real target
 - Recording the targets the firmware does not meet yet, with the scenario that will hold each
 
 **Is NOT responsible for:**
+
 - Changing the estimators; each target below is fixed in its own change
 - Datasheet values: the rig's motor is generic and its published parameters are not trusted
 
@@ -37,7 +39,7 @@ date: 2026-10-19
 ### Part A — What is known about the bench motor
 
 | Quantity            | Value            | Provenance                                                                                                       |
-| ------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------- |
+|---------------------|------------------|------------------------------------------------------------------------------------------------------------------|
 | Resistance          | 1.10 Ω           | Identified by the firmware, stable to 0.3 % over 38 runs                                                         |
 | d-axis inductance   | 1.07 mH          | Identified; the same procedure reads 11 % low on the SIL bench plant, so the rig's true value may be near 1.2 mH |
 | Pole pairs          | 4                | Identified                                                                                                       |
@@ -59,7 +61,7 @@ once after ten minutes of PWM, to separate noise from drift.
 **Current sensing** (PWM running, motor connected, no commanded current):
 
 | Condition                                                   | Learns                                                |
-| ----------------------------------------------------------- | ----------------------------------------------------- |
+|-------------------------------------------------------------|-------------------------------------------------------|
 | PWM off                                                     | Offset and noise of the amplifier and converter alone |
 | PWM on at 50 % duty, rotor locked                           | Switching noise added to the same                     |
 | PWM on, sampled at the centre versus the edge of the period | How much the sampling instant matters                 |
@@ -69,7 +71,7 @@ once after ten minutes of PWM, to separate noise from drift.
 **Encoder** (rotor free, disk fitted):
 
 | Condition                                           | Learns                                                                                                   |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+|-----------------------------------------------------|----------------------------------------------------------------------------------------------------------|
 | At rest, unpowered                                  | Count dither: how often the reading flips between neighbours                                             |
 | At rest, holding current                            | Noise coupled in from the power stage                                                                    |
 | Constant speed at 10, 50 and 100 rad/s              | Residual of the angle against a fitted line: the count-step regularity and the once-per-revolution error |
@@ -95,7 +97,7 @@ the data asks for them: a periodic encoder error (amplitude and order) and a slo
 ### Part C — Measuring what is guessed
 
 | Parameter        | How                                                                                                                                                                                          |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Flux linkage     | Spin the rotor open-loop at three speeds with the phases floating, read the back-EMF on the AD3                                                                                              |
 | Coulomb friction | The smallest q-axis current that breaks the rotor away, in both directions                                                                                                                   |
 | Viscous friction | Torque against speed at steady state over five speeds, minus the Coulomb term                                                                                                                |
@@ -107,7 +109,7 @@ These are defects found by the bench plant. Each joins `identification_robustnes
 its fix, as the rule against held-out scenarios requires.
 
 | Target                                                                               | Today                                                                                                       | Scenario to add                                               |
-| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+|--------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------|
 | Inertia within 5 % on a quantised encoder                                            | 22 % low at 1000 counts, 10 % at 4000, 4 % at 20 000; both runs agree, so the agreement check cannot see it | A bench-plant calibration at 1000, 4000 and 20 000 counts     |
 | A calibration of the light reference rotor completes under 0.2 mrad of encoder noise | Ends in Fault, inertia about 100× too small                                                                 | The teknic plant with `encoder_noise_sigma_radians` of 0.0002 |
 
