@@ -1,5 +1,5 @@
 ---
-title: "IsrCallback: Moving It to EMIL and Using It in the HALs"
+title: "IsrCallback and HotSwapFunction: EMIL and the HALs"
 type: design
 status: draft
 version: 0.1.0
@@ -9,7 +9,7 @@ date: 2026-10-19
 
 | Field     | Value                                              |
 |-----------|----------------------------------------------------|
-| Title     | IsrCallback: Moving It to EMIL and Using It in the HALs |
+| Title     | IsrCallback and HotSwapFunction: EMIL and the HALs |
 | Type      | design                                             |
 | Status    | draft                                              |
 | Version   | 0.1.0                                              |
@@ -40,24 +40,84 @@ sentinel table, and then copy-constructs the new one (`Function.hpp`, `operator=
 that invokes the function between the two runs the sentinel and aborts. Any callback that is
 replaced from the thread while its interrupt keeps firing has that window.
 
+What the failure looks like depends on the call site. An unguarded call runs the abort sentinel.
+A guarded call (`if (f) f();`, which is nearly every ISR-side call in the HALs) sees the
+sentinel as empty and is skipped, so the event or the batch of bytes is silently dropped.
+For a callable with a non-trivial destructor there is a third window: `Clear` and `= nullptr`
+destroy the callable first and install the sentinel afterwards, so an interrupt landing between
+the two calls a destroyed object. The vtable pointer being written last is an implementation
+detail, with no barrier behind it.
+
 ### Part B — Moving it to EMIL
 
-The type needs nothing from e-foc: it is `infra::Function` plus `std::atomic<uint8_t>`.
+The type needs nothing from e-foc: it is `infra::Function` plus `std::atomic<uint8_t>`. It is
+implemented as `infra::HotSwapFunction` on branch `feat/hot-swap-function` of the EMIL
+repository (commit a9d9b01d, not pushed): `infra/util/HotSwapFunction.hpp`, void-returning only,
+with the `ExtraSize` parameter of `infra::Function`, copy deleted, and twelve tests, among them
+the key one, which calls the object from a copy-constructor hook in the middle of a `Set` and
+must see a whole old function, and a negative control showing the same hook aborts a plain
+`infra::Function` assignment.
+
+Names considered: `HotSwapFunction` (chosen: says what it does, a function replaced while live,
+and does not promise more than the contract gives), `InterruptSafeFunction` (the clearest to
+a reader, but it promises safety against any interrupt, which the contract does not),
+`DoubleBufferedFunction` (names the mechanism), `PublishedFunction` (names the atomic publish),
+`IsrFunction` (short, but ties it to interrupts when any preempting invoker qualifies).
 
 | Step | Work |
 |------|------|
-| 1 | Open a proposal on `embedded-pro/embedded-infra-lib` with the failure above, the contract of Part D and the two alternatives (below) |
-| 2 | Add `infra/util/IsrFunction.hpp` (working name; `AtomicFunction` is wrong, the assignment is not atomic) with the same interface, and a test file beside `TestFunction.cpp` |
-| 3 | Tests: set, replace, clear, call with arguments, an invoker that fires from inside a `Set` (a hook that calls the function from the copy constructor stands in for the interrupt), a callback that replaces itself once, and a compile test on the smallest core EMIL builds for |
-| 4 | Bump the EMIL pin in e-foc; make `foc::IsrCallback` an alias of the EMIL type, then delete it once no caller names it |
-| 5 | Update `async-callback-lifetime.md` to point at the EMIL header |
+| 1 | Review and push the EMIL branch, open the pull request |
+| 2 | Bump the EMIL pin in e-foc; make `foc::IsrCallback` an alias of `infra::HotSwapFunction`, then delete it once no caller names it |
+| 3 | Update `async-callback-lifetime.md` to point at the EMIL header |
 
-Alternatives for the proposal: change `Function::operator=` itself, which cannot close the window
-either, because the stored callable is several words and no single store replaces it; or leave
-`Function` alone and give the type to the HALs only. The second is what this document plans.
+Whether to change `Function::operator=` instead was considered and rejected: the stored callable
+is several words and no single store replaces it.
 
-Open: the name, the `one-shot` operation of Part D, and whether the extra slot's storage is
-acceptable for the large `ExtraSize` callbacks.
+Open: a one-shot take-and-clear operation. The HAL survey below found no member that needs it.
+
+### Part C — The HAL drivers
+
+Surveyed in `infra/hal/ti/hal_tiva/tiva` and `infra/hal/st/hal_st/stm32fxxx` by reading each
+`infra::Function` and `AutoResetFunction` member against its interrupt handler, its assignment
+sites and the order in which the interrupt is enabled. A first pass listed the CAN and GPIO
+drivers as the likeliest to need the type; the reading showed that wrong, and this table
+replaces it.
+
+The local convention is not to hot-swap at all: assign before enabling the interrupt, often with
+`really_assert(!f)` against overlap; mask the interrupt source around the assignment; hand off
+to the dispatcher with an atomic flag or counter (`scheduled`, `pendingEdges`,
+`pendingErrors`, `sending`); use `ATOMIC_SET_BIT` for register read-modify-write. The
+dispatcher's own `Schedule` reserves a slot by compare-and-swap and publishes it afterwards, so
+an interrupt scheduling work is safe.
+
+| Verdict | Members |
+|---------|---------|
+| **Needs it** | ST `TimerWithInterruptStm::onIrq` and `LowPowerTimerWithInterruptStm::onIrq`: immediate by default, invoked unguarded, replaced by every `Start` with no assert and no mask, so a second `Start` on a running timer can abort |
+| **Needs it, low likelihood** | The four UART `dataReceived` members (TI `Uart` and `UartWithDma`, ST `UartStm` and `UartStmDuplexDma`): replacing one while live drops the bytes the interrupt already drained. Masking the receive interrupt around the assignment is the cheaper alternative |
+| **Hardening only** | TI `Adc::callback` and ST `AdcDmaMultiChannelStmBase::onDone` (a second `Measure` without `Stop` races; the failure is one dropped batch; with the type in the HAL, e-foc's arm-once workaround in `AdcPhaseCurrentMeasurement` could go), TI `AnalogComparator::onOutputChanged` (not used by e-foc) |
+| **Not appropriate** | TI `Can` `onSendComplete` and `onReceive`, ST `CanStm`, ST `AdcTriggeredByTimerWithDma`, ST `AdcStm`: never invoked from an interrupt, only from the dispatcher, so the contest is thread against thread. TI and ST `Gpio` `handlers[]`: the check and the call are both inside the interrupt, which the thread cannot preempt, and TI asserts the slot empty and masks before assigning. One-shot `AutoResetFunction` members (`SpiMaster`, `I2c`, the DMA and flash drivers): armed before the operation, taken and cleared by the interrupt or the dispatcher, with overlap asserted away |
+| **Already safe** | Members assigned in the constructor or before the interrupt is enabled and never replaced (TI and ST `WatchDog`, TI `Pwm`, `Dma`, ST DMA stream handlers), TI `Can::onError`, ST `ComparatorStm`, which orders disable, unregister and clear correctly |
+
+Findings outside the type, found on the way:
+
+- **TI `Can::onSendComplete` can be rebound before the queued completion runs.** The transmit
+  interrupt clears `sending` and schedules a lambda that reads the member in the dispatcher. A
+  `SendData` for the next frame in between passes the `!sending` assert and rebinds the member,
+  so the first completion calls the second callback early and the first never runs. It stays
+  hidden while the only sender is the completion callback itself. The fix is to capture the
+  callback when the completion is queued, or to clear `sending` in the dispatcher lambda;
+  `NotifySendFailedFromInterrupt` has the same shape.
+- **ST `Gpio::EnableInterrupt` unmasks before it assigns** the handler and its interrupt type, so
+  an edge in between is dropped or dispatched as the wrong type. TI orders it correctly: mask,
+  assert empty, assign, clear the flag, unmask. The fix is the reorder.
+- **TI and ST `Gpio` destroy the executing function** when `DisableInterrupt` is called from
+  inside the handler: harmless for trivial captures and a use after destroy for the rest.
+- **TI `Gpio` port interrupts scan all eight lines**, so an edge on one pin can run the handler
+  while another is being enabled or disabled. It then skips an empty or half-assigned slot.
+
+Recommended order: the two ST timers, the UARTs if the mask is judged too costly, then the two
+ADC drivers if the workaround in e-foc is to go. The CAN and GPIO items are separate small
+changes in the HAL repositories and do not need the type.
 
 ### Part C — HAL callbacks with the same defect
 
