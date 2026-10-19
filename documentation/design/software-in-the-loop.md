@@ -740,8 +740,8 @@ What the plant has shown so far:
 - **The inertia reads about 10 % low on a 4000-count encoder, and the two runs agree on it**, so
   the agreement check cannot see it. The estimator regresses torque on the acceleration, whose
   quantisation noise lies in the regressor and biases the estimate toward zero; the bias falls as
-  the count grows (22 % at 1000 counts, 10 % at 4000, 4 % at 20000). The scenarios tagged
-  `@sil_known_gap` hold the 5 % target and are run with that tag alone.
+  the count grows (22 % at 1000 counts, 10 % at 4000, 4 % at 20000). The 5 % target is listed in
+  `documentation/design/hardware-characterisation.md` and joins the scenarios with the fix.
 - **Encoder noise of 0.2 mrad on the light reference rotor ends the calibration in Fault**, with
   inertia estimates a hundred times too small. The heavier bench rotor completes.
 - **Dry friction does not disturb the identification**; the estimator models it.
