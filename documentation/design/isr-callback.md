@@ -73,7 +73,7 @@ a reader, but it promises safety against any interrupt, which the contract does 
 Whether to change `Function::operator=` instead was considered and rejected: the stored callable
 is several words and no single store replaces it.
 
-Open: a one-shot take-and-clear operation. The HAL survey below found no member that needs it.
+Open: a one-shot take-and-clear operation. The HAL survey in Part C found no member that needs it.
 
 ### Part C — The HAL drivers
 
@@ -118,28 +118,6 @@ Findings outside the type, found on the way:
 Recommended order: the two ST timers, the UARTs if the mask is judged too costly, then the two
 ADC drivers if the workaround in e-foc is to go. The CAN and GPIO items are separate small
 changes in the HAL repositories and do not need the type.
-
-### Part C — HAL callbacks with the same defect
-
-A callback qualifies when an interrupt invokes it and the thread assigns it while the interrupt
-can fire. Surveyed in `infra/hal/ti/hal_tiva/tiva` and `infra/hal/st/hal_st/stm32fxxx`:
-
-| Driver | Member | Assigned | Defect |
-|--------|--------|----------|--------|
-| TI `Can` | `onSendComplete`, `onReceive` | every `SendData` / `ReceiveData` | The send-complete interrupt of the previous frame can land in the assignment for the next. This is the likeliest to bite: it is called per frame |
-| TI `Adc` | `callback` | every `Measure` | The case already worked around in e-foc by handing the converter one callback once |
-| TI `AnalogComparator` | `onOutputChanged` | `Enable`, and `nullptr` in `Disable` | Disabling while the comparator fires |
-| TI and ST `Gpio` | `handlers[]` | `EnableInterrupt`, `nullptr` on disable | The interrupt tests `if (handlers[h])` and then calls: a check-then-act on a function that can change in between |
-| ST `AdcDmaStm`, `AnalogToDigitalPinStm` | `onDone` (`AutoResetFunction`) | every `Measure` | Same as the TI ADC, and the interrupt resets it |
-| TI and ST `WatchDog` | `onEarlyWarning` | `Start` | Assigned once before the interrupt is enabled: safe |
-| TI `Pwm`, ST DMA stream handlers | constructor arguments | Construction | Safe: never reassigned |
-
-Order: `Can`, `Adc`, `Gpio`, `AnalogComparator`, then the ST equivalents. Each is its own change
-in the HAL repository with a test that fires the handler from inside the assignment, which the
-host build can do by calling the handler from a copy hook. The `AutoResetFunction` members need
-the one-shot operation: take the callback and clear it in one step. On a core with exclusive
-loads that is an atomic exchange of the index; on one without, it is the case Part D forbids and
-needs a short critical section instead.
 
 ### Part D — Contract, priority inversion and the other hazards
 
