@@ -740,9 +740,11 @@ What the plant has shown so far:
   the agreement check could not see it. A simulation of the estimator alone traced it to the
   weighting of the torque against the acceleration, not to quantisation; it is fixed, and the
   scenarios pin it at 3 % (`documentation/design/hardware-characterisation.md`, Part D).
-- **Encoder noise of 0.2 mrad on the light reference rotor ends the calibration in Fault**, with
-  inertia estimates a hundred times too small. The heavier bench rotor completes. This is the one
-  target still open.
+- **Encoder noise of 0.2 mrad on the light reference rotor ended the calibration in Fault**, with
+  inertia estimates a hundred times too small, while the heavier bench rotor completed. The
+  window was sized from the smallest position step, which a noisy continuous encoder drives to
+  zero; it is now sized from the noise the encoder shows as well, and the scenarios pin both
+  reference rotors at 10 % (`documentation/design/hardware-characterisation.md`, Part D).
 - **Dry friction does not disturb the identification**; the estimator models it.
 - **A one amp supply is enough for the calibration of the bench motor.** The electrical power of
   the identification is under half an amp, so a collapsing supply on the rig is not explained by

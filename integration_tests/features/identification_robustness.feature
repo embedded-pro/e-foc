@@ -5,10 +5,7 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
   quantisation and the supply impedance real hardware has. Nothing here is a datasheet value;
   see Part K of documentation/design/software-in-the-loop.md.
 
-  The limits are pinned from measured runs with a margin. One target the firmware does not
-  meet yet, a calibration of the light rotor under encoder noise, is listed in
-  documentation/design/hardware-characterisation.md and joins this file with the fix, not
-  before.
+  The limits are pinned from measured runs with a margin.
 
   @sil @REQ-CAL-013
   Scenario Outline: The full calibration identifies the bench motor with dry friction (<coulomb> Nm)
@@ -88,3 +85,22 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
       | sigma   |
       | 0.00005 |
       | 0.0002  |
+
+  @sil @REQ-CAL-013
+  Scenario Outline: The calibration of the <motor> motor completes with encoder noise (<sigma> rad)
+    Given a <motor> motor plant
+    And a motor plant with:
+      | encoder_noise_sigma_radians | <sigma> |
+    And the motor is already calibrated
+    And the stored calibration is off by:
+      | inertia  | 2.0 |
+      | friction | 0.5 |
+    And the motor boots in speed mode
+    When the target boots
+    And the full calibration is run from the terminal
+    Then the identified inertia shall be within 10 % of the plant
+
+    Examples:
+      | motor   | sigma  |
+      | teknic  | 0.0002 |
+      | anaheim | 0.0002 |

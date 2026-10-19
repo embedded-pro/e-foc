@@ -77,6 +77,9 @@ namespace services
         float lastSamplePosition{ 0.0f };
         float countAngle{ 0.0f };
         std::size_t countSteps{ 0 };
+        float lastStep{ 0.0f };
+        float stepChangeEnergy{ 0.0f };
+        std::size_t stepChanges{ 0 };
         bool hasPreviousTorque{ false };
         float polePairs{ 1.0f };
         MechanicalExcitation excitation;

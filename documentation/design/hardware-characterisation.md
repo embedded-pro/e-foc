@@ -118,13 +118,14 @@ reference motors in SIL, and is what the firmware does now. At 1000 counts the w
 clamped at 128 samples and 7 % remains, because the speed regressor is still a plain mean.
 The scenarios are in `identification_robustness.feature`.
 
-**Open: a calibration of the light reference rotor under 0.2 mrad of encoder noise ends in
-Fault**, with inertia about 100× too small. The likely cause, not yet confirmed by a trace: the
-window is chosen from the smallest position step the encoder shows, which is one count for a
-quantised encoder and nearly zero for a noisy continuous one, so the window would collapse to
-one sample and the acceleration would be pure noise. The
-fix is a window chosen from the noise the encoder actually shows. The scenario to add is the
-teknic plant with `encoder_noise_sigma_radians` of 0.0002.
+**Fixed: a calibration of the light reference rotor under 0.2 mrad of encoder noise ended in
+Fault**, with inertia about 100× too small. A trace confirmed the cause: the window is chosen
+from the smallest position step the encoder shows, which is one count for a quantised encoder and
+shrinks without bound for a noisy continuous one, so it fell to 3 to 7 samples and the
+acceleration was mostly noise. The window now comes from the larger of that step and the step
+the encoder's noise is equivalent to, measured from the second difference of the position. The
+light rotor then identifies within 2.2 %. The scenario is the teknic plant with
+`encoder_noise_sigma_radians` of 0.0002 in `identification_robustness.feature`.
 
 ### Part E — The bench motor as a first-class SIL motor
 

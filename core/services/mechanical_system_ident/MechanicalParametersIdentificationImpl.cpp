@@ -16,6 +16,8 @@ namespace
     constexpr float accelerationQuantumTarget{ 100.0f };
     constexpr std::size_t maximumObservationWindow{ 128 };
     constexpr std::size_t minimumCountSteps{ 8 };
+    constexpr std::size_t stepChangeMemory{ 4096 };
+    constexpr float stepChangeToResolution{ 1.41421356f };
 
     constexpr float inertiaSettlingTolerance{ 0.1f };
     constexpr std::size_t maximumSettlingInterval{ 2000 };
@@ -69,6 +71,9 @@ namespace services
         this->lastSamplePosition = this->previousPosition;
         this->countAngle = std::numeric_limits<float>::infinity();
         this->countSteps = 0;
+        this->lastStep = 0.0f;
+        this->stepChangeEnergy = 0.0f;
+        this->stepChanges = 0;
         this->windowSamples = 1;
         this->samplesInWindow = 0;
         this->windowPeriod = samplingPeriod;
@@ -253,8 +258,18 @@ namespace services
         torqueRise += sampleTorque * weight;
         torqueFall += sampleTorque * (1.0f - weight);
 
-        const auto step = std::abs(foc::detail::PositionWithWrapAround(mechanicalPos - lastSamplePosition));
+        const auto signedStep = foc::detail::PositionWithWrapAround(mechanicalPos - lastSamplePosition);
+        const auto step = std::abs(signedStep);
         lastSamplePosition = mechanicalPos;
+
+        if (samplesSinceStart > 1)
+        {
+            const auto change = signedStep - lastStep;
+            ++stepChanges;
+            stepChangeEnergy += (change * change - stepChangeEnergy) / static_cast<float>(std::min(stepChanges, stepChangeMemory));
+        }
+
+        lastStep = signedStep;
 
         if (step > 0.0f)
         {
@@ -291,7 +306,8 @@ namespace services
 
         const auto countKnown = countSteps >= minimumCountSteps;
 
-        const auto wanted = countKnown ? WindowSamplesFor(countAngle, samplingPeriod) : windowSamples;
+        const auto stepChangeResolution = stepChanges >= minimumCountSteps ? stepChangeToResolution * std::sqrt(stepChangeEnergy) : 0.0f;
+        const auto wanted = countKnown ? WindowSamplesFor(std::max(countAngle, stepChangeResolution), samplingPeriod) : windowSamples;
 
         if (wanted != windowSamples)
         {

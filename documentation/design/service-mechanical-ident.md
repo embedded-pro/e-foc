@@ -97,6 +97,14 @@ acceleration quantum at a fixed target (100 rad/s²):
 T_w = sqrt( q / 100 )          q = smallest non-zero position step, in radians
 ```
 
+A continuous encoder with noise has no count: every position step is nonzero, and the smallest of them keeps shrinking
+as more are seen, which would collapse the window to one sample. The procedure therefore also tracks the second
+difference of the position, which motion barely changes at 20 kHz and noise dominates. For white noise of standard
+deviation $\sigma$ the second difference has an RMS of $\sqrt{6}\,\sigma$, and a quantiser of step $q$ has the same noise
+power at $\sigma = q/\sqrt{12}$, so $\sqrt{2}$ times that RMS is the step the encoder is equivalent to. The window is sized
+from the larger of the smallest step and this equivalent step, so a noisy encoder gets a window as long as a coarse one
+of the same noise, and a clean quantised encoder is unaffected because its equivalent step does not exceed one count.
+
 A clean encoder (a simulated plant, or a very fine one) has a tiny step and so a single-sample window, which is the
 sample itself. A 4000-count encoder gets about 4 ms. Until enough steps have been seen the window is one sample and no
 speed limit is applied to it, because a quantised single-sample speed is not a speed; the current limit is checked

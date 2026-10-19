@@ -12,6 +12,7 @@
 #include <gmock/gmock.h>
 #include <limits>
 #include <numbers>
+#include <random>
 #include <vector>
 
 namespace
@@ -667,6 +668,59 @@ TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_coars
     ASSERT_TRUE(fired);
     ASSERT_TRUE(inertia.has_value());
     EXPECT_NEAR(inertia->Value(), trueInertia, trueInertia * 0.03f);
+}
+
+TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_noisy_continuous_encoder_reports_the_inertia)
+{
+    constexpr float positionNoise = 2.0e-4f;
+
+    auto config = DefaultConfig();
+    config.timeout = std::chrono::seconds{ 60 };
+    config.maxCurrent = foc::Ampere{ 1000.0f };
+
+    const auto dwellSamples = static_cast<std::size_t>(std::chrono::duration<float>(config.dwellTime).count() / samplingPeriod);
+    const auto slewStep = config.speedSlewRate * samplingPeriod;
+
+    std::mt19937 engine{ 11 };
+    std::normal_distribution<float> noise{ 0.0f, positionNoise };
+
+    bool fired = false;
+    std::optional<foc::NewtonMeterSecondSquared> inertia;
+
+    EXPECT_CALL(encoderMock, Read())
+        .WillRepeatedly(Invoke([&]()
+            {
+                return foc::Radians{ position + noise(engine) };
+            }));
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
+    ExpectDriveReleased();
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config,
+        [&](auto, auto j)
+        {
+            fired = true;
+            inertia = j;
+        });
+
+    float speed = 0.0f;
+
+    for (std::size_t i = 0; i != 400000 && !fired; ++i)
+    {
+        const auto level = (i / dwellSamples) % 2 == 0 ? config.dwellSpeed.Value() : config.targetSpeed.Value();
+        const auto change = std::clamp(level - speed, -slewStep, slewStep);
+        const auto acceleration = change / samplingPeriod;
+
+        speed += change;
+        position += speed * samplingPeriod;
+
+        observableMock.Publish(CurrentsProducing(trueCoulomb + trueInertia * acceleration + trueFriction * speed, position));
+        ExecuteAllActions();
+    }
+
+    ASSERT_TRUE(fired);
+    ASSERT_TRUE(inertia.has_value());
+    EXPECT_NEAR(inertia->Value(), trueInertia, trueInertia * 0.1f);
 }
 
 TEST_F(MechanicalParametersIdentificationTest, a_run_lasts_at_least_two_dwell_periods_before_it_converges)
