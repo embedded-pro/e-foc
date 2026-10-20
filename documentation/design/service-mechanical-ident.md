@@ -103,7 +103,10 @@ difference of the position, which motion barely changes at 20 kHz and noise domi
 deviation $\sigma$ the second difference has an RMS of $\sqrt{6}\,\sigma$, and a quantiser of step $q$ has the same noise
 power at $\sigma = q/\sqrt{12}$, so $\sqrt{2}$ times that RMS is the step the encoder is equivalent to. The window is sized
 from the larger of the smallest step and this equivalent step, so a noisy encoder gets a window as long as a coarse one
-of the same noise, and a clean quantised encoder is unaffected because its equivalent step does not exceed one count.
+of the same noise. A clean quantised encoder measures an equivalent step of about 1.1 counts, and at most $\sqrt{2}$ counts
+for a perfectly alternating pattern, which moves the window by under 20 %. A new window is adopted only when it differs
+from the current one by more than about 6 % (any change below 16 samples), because an estimate that drifts by one sample
+would otherwise restart the pairing of windows, and so discard the data, on nearly every window.
 
 A clean encoder (a simulated plant, or a very fine one) has a tiny step and so a single-sample window, which is the
 sample itself. A 4000-count encoder gets about 4 ms and a 1000-count one about 8 ms. The window is limited to 256 samples, which an encoder of fewer than about 400 counts reaches. Until enough steps have been seen the window is one sample and no

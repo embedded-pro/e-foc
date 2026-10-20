@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <numbers>
 
 namespace
 {
@@ -17,7 +18,9 @@ namespace
     constexpr std::size_t maximumObservationWindow{ 256 };
     constexpr std::size_t minimumCountSteps{ 8 };
     constexpr std::size_t stepChangeMemory{ 4096 };
-    constexpr float stepChangeToResolution{ 1.41421356f };
+    constexpr float stepChangeToResolution{ std::numbers::sqrt2_v<float> };
+    constexpr std::size_t windowHysteresisFloor{ 16 };
+    constexpr std::size_t windowHysteresisDivisor{ 16 };
 
     constexpr float inertiaSettlingTolerance{ 0.1f };
     constexpr std::size_t maximumSettlingInterval{ 2000 };
@@ -309,7 +312,9 @@ namespace services
         const auto stepChangeResolution = stepChanges >= minimumCountSteps ? stepChangeToResolution * std::sqrt(stepChangeEnergy) : 0.0f;
         const auto wanted = countKnown ? WindowSamplesFor(std::max(countAngle, stepChangeResolution), samplingPeriod) : windowSamples;
 
-        if (wanted != windowSamples)
+        const auto windowDifference = wanted > windowSamples ? wanted - windowSamples : windowSamples - wanted;
+
+        if (windowDifference != 0 && (windowSamples < windowHysteresisFloor || windowDifference * windowHysteresisDivisor > windowSamples))
         {
             windowSamples = wanted;
             windowPeriod = samplingPeriod * static_cast<float>(wanted);

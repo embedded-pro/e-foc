@@ -653,9 +653,11 @@ void MechanicalParametersIdentificationTest::ExpectUnbiasedInertiaOnCoarseEncode
 
     float speed = 0.0f;
 
-    for (std::size_t i = 0; i != 400000 && !fired; ++i)
+    std::size_t samples = 0;
+
+    for (; samples != 400000 && !fired; ++samples)
     {
-        const auto level = (i / dwellSamples) % 2 == 0 ? config.dwellSpeed.Value() : config.targetSpeed.Value();
+        const auto level = (samples / dwellSamples) % 2 == 0 ? config.dwellSpeed.Value() : config.targetSpeed.Value();
         const auto change = std::clamp(level - speed, -slewStep, slewStep);
         const auto acceleration = change / samplingPeriod;
 
@@ -669,6 +671,7 @@ void MechanicalParametersIdentificationTest::ExpectUnbiasedInertiaOnCoarseEncode
     ASSERT_TRUE(fired);
     ASSERT_TRUE(inertia.has_value());
     EXPECT_NEAR(inertia->Value(), trueInertia, trueInertia * tolerance);
+    EXPECT_LT(samples, 60000u);
 }
 
 TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_coarse_encoder_reports_the_inertia_without_bias)
@@ -716,9 +719,11 @@ TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_noisy
 
     float speed = 0.0f;
 
-    for (std::size_t i = 0; i != 400000 && !fired; ++i)
+    std::size_t samples = 0;
+
+    for (; samples != 400000 && !fired; ++samples)
     {
-        const auto level = (i / dwellSamples) % 2 == 0 ? config.dwellSpeed.Value() : config.targetSpeed.Value();
+        const auto level = (samples / dwellSamples) % 2 == 0 ? config.dwellSpeed.Value() : config.targetSpeed.Value();
         const auto change = std::clamp(level - speed, -slewStep, slewStep);
         const auto acceleration = change / samplingPeriod;
 
@@ -732,6 +737,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_noisy
     ASSERT_TRUE(fired);
     ASSERT_TRUE(inertia.has_value());
     EXPECT_NEAR(inertia->Value(), trueInertia, trueInertia * 0.1f);
+    EXPECT_LT(samples, 40000u);
 }
 
 TEST_F(MechanicalParametersIdentificationTest, a_run_lasts_at_least_two_dwell_periods_before_it_converges)
