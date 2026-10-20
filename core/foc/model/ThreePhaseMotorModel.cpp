@@ -408,7 +408,8 @@ namespace foc
         const auto pCu = rEff * (motorState.ia.Value() * motorState.ia.Value() + motorState.ib.Value() * motorState.ib.Value() + motorState.ic.Value() * motorState.ic.Value());
         thermal.windingTempCelsius += dt * (pCu - (thermal.windingTempCelsius - thermal.config.ambientCelsius) / thermal.config.thermalResistance) / thermal.config.thermalCapacitance;
 
-        auto torqueElec = torqueConstant * parameters.p * (parameters.psi_f.Value() * iq + (ldEff - lqEff) * id * iq);
+        // The start-of-step torque keeps the position's second difference on the current reported with it.
+        auto torqueElec = torqueConstant * parameters.p * (parameters.psi_f.Value() * i_dq.q + (ldEff - lqEff) * i_dq.d * i_dq.q);
 
         auto loadTorque = loads.load.value_or(foc::NewtonMeter{ 0.0f }).Value();
         auto loadOpposing = (motorState.omega_mech.Value() >= 0.0f) ? loadTorque : -loadTorque;

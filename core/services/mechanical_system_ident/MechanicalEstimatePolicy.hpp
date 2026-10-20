@@ -98,9 +98,10 @@ namespace services
         return std::max(mechanical_estimate::uncertaintyBudgetFactor * (1.0f - forgettingFactor), mechanical_estimate::minimumUncertaintyThreshold);
     }
 
-    inline bool HasConvergedMechanics(const MechanicalRls::EstimationMetrics& metrics, const MechanicalExcitation& excitation, float forgettingFactor, float uncertaintyScale = 1.0f)
+    // windowScale is how many 16-sample windows one observation spans; it carries their excitation in one update.
+    inline bool HasConvergedMechanics(const MechanicalRls::EstimationMetrics& metrics, const MechanicalExcitation& excitation, float forgettingFactor, float windowScale = 1.0f)
     {
-        return excitation.AcceleratingObservations() >= mechanical_estimate::minimumExcitedUpdates && excitation.HasSpannedDistinctSpeeds() &&
-               MechanicalRls::EvaluateConvergence(metrics, mechanical_estimate::innovationThreshold, UncertaintyThresholdFor(forgettingFactor) * uncertaintyScale) == estimators::State::converged;
+        return static_cast<float>(excitation.AcceleratingObservations()) * windowScale >= mechanical_estimate::minimumExcitedUpdates && excitation.HasSpannedDistinctSpeeds() &&
+               MechanicalRls::EvaluateConvergence(metrics, mechanical_estimate::innovationThreshold, UncertaintyThresholdFor(forgettingFactor) * windowScale) == estimators::State::converged;
     }
 }

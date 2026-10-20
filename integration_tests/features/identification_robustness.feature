@@ -61,11 +61,11 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
 
     Examples:
       | motor   | counts | limit |
-      | bench   | 4000   | 3     |
-      | bench   | 20000  | 3     |
-      | bench   | 1000   | 4     |
-      | teknic  | 4000   | 3     |
-      | anaheim | 4000   | 3     |
+      | bench   | 4000   | 1     |
+      | bench   | 20000  | 1     |
+      | bench   | 1000   | 1     |
+      | teknic  | 4000   | 1     |
+      | anaheim | 4000   | 1     |
 
   @sil @REQ-CAL-013
   Scenario Outline: The calibration of the bench motor completes with encoder noise (<sigma> rad)

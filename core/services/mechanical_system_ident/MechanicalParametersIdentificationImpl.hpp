@@ -69,10 +69,16 @@ namespace services
         std::size_t minimumRunSamples{ 0 };
         float previousPosition{ 0.0f };
         float previousSpeed{ 0.0f };
+        bool hasPreviousMean{ false };
         bool hasPreviousSpeed{ false };
+        float positionSum{ 0.0f };
+        float previousMeanToEnd{ 0.0f };
+        float earlierTorqueRise{ 0.0f };
         float previousTorqueRise{ 0.0f };
+        float previousTorquePeak{ 0.0f };
         float torqueSum{ 0.0f };
         float torqueRise{ 0.0f };
+        float torquePeak{ 0.0f };
         float torqueFall{ 0.0f };
         float lastSamplePosition{ 0.0f };
         float countAngle{ 0.0f };
@@ -80,7 +86,6 @@ namespace services
         float lastStep{ 0.0f };
         float stepChangeEnergy{ 0.0f };
         std::size_t stepChanges{ 0 };
-        bool hasPreviousTorque{ false };
         float polePairs{ 1.0f };
         MechanicalExcitation excitation;
         bool atDwellLevel{ false };

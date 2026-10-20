@@ -671,17 +671,17 @@ void MechanicalParametersIdentificationTest::ExpectUnbiasedInertiaOnCoarseEncode
     ASSERT_TRUE(fired);
     ASSERT_TRUE(inertia.has_value());
     EXPECT_NEAR(inertia->Value(), trueInertia, trueInertia * tolerance);
-    EXPECT_LT(samples, 60000u);
+    EXPECT_LT(samples, 30000u);
 }
 
 TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_coarse_encoder_reports_the_inertia_without_bias)
 {
-    ExpectUnbiasedInertiaOnCoarseEncoder(4000.0f, 0.03f);
+    ExpectUnbiasedInertiaOnCoarseEncoder(4000.0f, 0.01f);
 }
 
-TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_very_coarse_encoder_reports_the_inertia_within_a_few_percent)
+TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_very_coarse_encoder_reports_the_inertia_without_bias)
 {
-    ExpectUnbiasedInertiaOnCoarseEncoder(1000.0f, 0.04f);
+    ExpectUnbiasedInertiaOnCoarseEncoder(1000.0f, 0.01f);
 }
 
 TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_noisy_continuous_encoder_reports_the_inertia)
@@ -736,8 +736,8 @@ TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_noisy
 
     ASSERT_TRUE(fired);
     ASSERT_TRUE(inertia.has_value());
-    EXPECT_NEAR(inertia->Value(), trueInertia, trueInertia * 0.1f);
-    EXPECT_LT(samples, 40000u);
+    EXPECT_NEAR(inertia->Value(), trueInertia, trueInertia * 0.02f);
+    EXPECT_LT(samples, 30000u);
 }
 
 TEST_F(MechanicalParametersIdentificationTest, a_run_lasts_at_least_two_dwell_periods_before_it_converges)
