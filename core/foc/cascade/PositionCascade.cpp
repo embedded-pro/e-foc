@@ -149,7 +149,7 @@ namespace foc
         {
             SetSpeedReference(speedCommand);
             RunSpeedLoop(mechanicalSpeed);
-            UpdateOnlineMechanicalEstimator(mechanicalSpeed);
+            UpdateOnlineMechanicalEstimator();
             UpdateOnlineElectricalEstimator();
             return;
         }
@@ -164,7 +164,7 @@ namespace foc
         else
             SetDirectCurrentReference(command.value);
 
-        UpdateOnlineMechanicalEstimator(mechanicalSpeed);
+        UpdateOnlineMechanicalEstimator();
         UpdateOnlineElectricalEstimator();
     }
 

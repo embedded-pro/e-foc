@@ -7,6 +7,7 @@
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/math/AngleWrap.hpp"
+#include "core/foc/math/MechanicalWindowAccumulator.hpp"
 #include "core/foc/speed_loop/SpeedControllerSelector.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
@@ -22,20 +23,24 @@ namespace foc
         float idAtEnd{ 0.0f };
         float meanNormalizedVd{ 0.0f };
         float meanElectricalSpeedTimesIq{ 0.0f };
+        MechanicalWindow mechanical{};
     };
 
     class EstimatorWindowAccumulator
     {
     public:
-        explicit EstimatorWindowAccumulator(hal::Hertz tickFrequency);
+        EstimatorWindowAccumulator(hal::Hertz tickFrequency, uint32_t ticksPerWindow);
 
         void Restart();
 
         ALWAYS_INLINE_HOT void Accumulate(RotatingFrame measured, RotatingFrame normalizedVoltage, float mechanicalAngle, float polePairs)
         {
-            const auto electricalRotation = rotationPrimed ? detail::PositionWithWrapAround(mechanicalAngle - previousMechanicalAngle) * polePairs : 0.0f;
+            const auto mechanicalRotation = rotationPrimed ? detail::PositionWithWrapAround(mechanicalAngle - previousMechanicalAngle) : 0.0f;
+            const auto electricalRotation = mechanicalRotation * polePairs;
             previousMechanicalAngle = mechanicalAngle;
             rotationPrimed = true;
+
+            mechanical.Accumulate(measured.q, mechanicalRotation);
 
             const auto meanIq = 0.5f * (measured.q + previousIq);
 
@@ -53,7 +58,7 @@ namespace foc
         ALWAYS_INLINE_HOT EstimatorSnapshot Close()
         {
             const auto inverseTicks = ticks != 0 ? 1.0f / static_cast<float>(ticks) : 0.0f;
-            const EstimatorSnapshot snapshot{ iqSum * inverseTicks, idSum * inverseTicks, previousId, vdSum * inverseTicks, rotationTimesIqSum * inverseTicks * tickFrequency };
+            const EstimatorSnapshot snapshot{ iqSum * inverseTicks, idSum * inverseTicks, previousId, vdSum * inverseTicks, rotationTimesIqSum * inverseTicks * tickFrequency, mechanical.Close() };
 
             iqSum = 0.0f;
             idSum = 0.0f;
@@ -75,6 +80,8 @@ namespace foc
         float previousMechanicalAngle{ 0.0f };
         bool rotationPrimed{ false };
         float tickFrequency{ 0.0f };
+        uint32_t ticksPerWindow;
+        MechanicalWindowAccumulator mechanical;
         uint32_t ticks{ 0 };
     };
 
@@ -104,7 +111,7 @@ namespace foc
         void SetMechanical(OnlineMechanicalEstimator& estimator);
         void SetElectrical(OnlineElectricalEstimator& estimator);
         bool HasElectrical() const;
-        void UpdateMechanical(float mechanicalSpeed);
+        void UpdateMechanical();
         void UpdateElectrical(float vdcInvScale);
 
     private:
@@ -176,7 +183,7 @@ namespace foc
 
         void SetOnlineMechanicalEstimatorImpl(OnlineMechanicalEstimator& estimator);
         void SetOnlineElectricalEstimatorImpl(OnlineElectricalEstimator& estimator);
-        void UpdateOnlineMechanicalEstimator(float mechanicalSpeed);
+        void UpdateOnlineMechanicalEstimator();
         void UpdateOnlineElectricalEstimator();
         void SetDirectAxisExcitation(Ampere amplitude, hal::Hertz frequency);
 

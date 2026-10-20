@@ -85,7 +85,7 @@ namespace foc
         auto mechanicalSpeed = MeasureMechanicalSpeed();
         RunSpeedLoop(mechanicalSpeed);
 
-        UpdateOnlineMechanicalEstimator(mechanicalSpeed);
+        UpdateOnlineMechanicalEstimator();
         UpdateOnlineElectricalEstimator();
     }
 

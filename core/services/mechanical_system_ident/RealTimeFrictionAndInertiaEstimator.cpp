@@ -2,6 +2,7 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/math/FiniteGuard.hpp"
+#include <algorithm>
 #include <cmath>
 #include <optional>
 
@@ -15,7 +16,7 @@ namespace services
 
         constexpr float onlineInitialCovariance{ 1e4f };
         constexpr float onlineCovarianceCeiling{ 1e5f };
-        constexpr uint16_t onlineMinimumUpdates{ 1000 };
+        constexpr uint16_t onlineMinimumPeriods{ 1000 };
         constexpr float residualAveragingWeight{ 1e-3f };
         constexpr float settledResidualRatio{ 0.1f };
     }
@@ -25,6 +26,7 @@ namespace services
         , forgettingFactor(forgettingFactor)
         , rls(std::in_place, 1000.0f, forgettingFactor)
         , onlineRls(std::in_place, onlineInitialCovariance, forgettingFactor)
+        , kinematics(1.0f / this->samplingFrequency)
     {
     }
 
@@ -96,8 +98,8 @@ namespace services
         onlineRls->SetCoefficients(initial);
 
         onlineMetrics = MotorRLS::EstimationMetrics{};
-        onlinePrimed = false;
-        onlineUpdates = 0;
+        kinematics.Restart();
+        onlinePeriods = 0;
         onlineExcitation.Restart();
         residualPower = 0.0f;
         outputPower = 0.0f;
@@ -105,37 +107,20 @@ namespace services
 
     void RealTimeFrictionAndInertiaEstimator::Update(const foc::MechanicalWindow& window)
     {
-        const auto speed = window.meanSpeed.Value();
-        const auto iq = window.meanIq.Value();
-
-        if (!onlinePrimed)
-        {
-            previousWindowSpeed = speed;
-            previousWindowIq = iq;
-            onlinePrimed = true;
-            return;
-        }
-
-        const auto acceleration = (speed - previousWindowSpeed) * samplingFrequency;
-        const auto midSpeed = 0.5f * (speed + previousWindowSpeed);
-        const auto midIq = 0.5f * (iq + previousWindowIq);
-        previousWindowSpeed = speed;
-        previousWindowIq = iq;
-
-        if (!IsOnlineObservationInformative(acceleration, midSpeed))
+        const auto observation = kinematics.Add(window);
+        if (!observation.has_value() || !IsOnlineObservationInformative(observation->acceleration, observation->speed))
             return;
 
-        MotorRLS::MakeRegressor(onlineRegressor, acceleration * columnScale, midSpeed * columnScale);
+        MotorRLS::MakeRegressor(onlineRegressor, observation->acceleration * columnScale, observation->speed * columnScale);
         math::Matrix<float, 1, 1> output;
-        output.at(0, 0) = torqueConstant.Value() * midIq * outputScale;
+        output.at(0, 0) = torqueConstant.Value() * observation->iq * outputScale;
 
         onlineMetrics = onlineRls->Update(onlineRegressor, output);
         residualPower += residualAveragingWeight * (onlineMetrics.residual * onlineMetrics.residual - residualPower);
         outputPower += residualAveragingWeight * (output.at(0, 0) * output.at(0, 0) - outputPower);
 
-        onlineExcitation.Count(acceleration, midSpeed);
-        if (onlineUpdates != onlineMinimumUpdates)
-            ++onlineUpdates;
+        onlineExcitation.Count(observation->acceleration, observation->speed);
+        onlinePeriods = static_cast<uint16_t>(std::min<uint32_t>(onlinePeriods + kinematics.WindowsPerObservation(), onlineMinimumPeriods));
 
         PublishOnlineEstimate();
     }
@@ -150,8 +135,8 @@ namespace services
 
     bool RealTimeFrictionAndInertiaEstimator::HasOnlineEstimateSettled() const
     {
-        return onlineUpdates >= onlineMinimumUpdates &&
-               onlineExcitation.AcceleratingObservations() >= mechanical_estimate::minimumExcitedUpdates &&
+        return onlinePeriods >= onlineMinimumPeriods &&
+               onlineExcitation.AcceleratingObservations() * kinematics.WindowsPerObservation() >= mechanical_estimate::minimumExcitedUpdates &&
                onlineExcitation.HasSpannedDistinctSpeeds() &&
                residualPower <= settledResidualRatio * settledResidualRatio * outputPower;
     }
