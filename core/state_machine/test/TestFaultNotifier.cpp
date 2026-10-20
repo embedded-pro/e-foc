@@ -90,6 +90,24 @@ TEST_F(TestFaultNotifier, no_op_fault_notifier_register_accepts_empty_function)
     notifier.Register(infra::Function<void(state_machine::FaultCode)>{}, infra::Function<void(state_machine::FaultCode)>{});
 }
 
+TEST_F(TestFaultNotifier, every_fault_code_traces_by_name)
+{
+    EXPECT_STREQ("none", state_machine::FaultCodeName(state_machine::FaultCode::none));
+    EXPECT_STREQ("overcurrent", state_machine::FaultCodeName(state_machine::FaultCode::overcurrent));
+    EXPECT_STREQ("overvoltage", state_machine::FaultCodeName(state_machine::FaultCode::overvoltage));
+    EXPECT_STREQ("undervoltage", state_machine::FaultCodeName(state_machine::FaultCode::undervoltage));
+    EXPECT_STREQ("overtemperature", state_machine::FaultCodeName(state_machine::FaultCode::overtemperature));
+    EXPECT_STREQ("encoderLoss", state_machine::FaultCodeName(state_machine::FaultCode::encoderLoss));
+    EXPECT_STREQ("watchdogTimeout", state_machine::FaultCodeName(state_machine::FaultCode::watchdogTimeout));
+    EXPECT_STREQ("hardwareFault", state_machine::FaultCodeName(state_machine::FaultCode::hardwareFault));
+    EXPECT_STREQ("calibrationFailed", state_machine::FaultCodeName(state_machine::FaultCode::calibrationFailed));
+}
+
+TEST_F(TestFaultNotifier, a_fault_code_outside_the_enumeration_traces_as_unknown)
+{
+    EXPECT_STREQ("unknown", state_machine::FaultCodeName(static_cast<state_machine::FaultCode>(0xff)));
+}
+
 TEST_F(TestFocStateMachineBase, apply_online_estimates_default_implementation_does_not_crash)
 {
     MinimalStateMachine sm;
