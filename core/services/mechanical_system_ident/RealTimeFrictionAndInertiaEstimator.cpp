@@ -18,7 +18,7 @@ namespace services
         constexpr float onlineCovarianceCeiling{ 1e5f };
         constexpr uint16_t onlineMinimumPeriods{ 1000 };
         constexpr float residualAveragingWeight{ 1e-3f };
-        constexpr float settledResidualRatio{ 0.1f };
+        constexpr float settledResidualRatio{ 0.25f };
     }
 
     RealTimeFrictionAndInertiaEstimator::RealTimeFrictionAndInertiaEstimator(float forgettingFactor, hal::Hertz samplingFrequency)

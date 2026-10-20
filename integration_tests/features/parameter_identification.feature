@@ -89,14 +89,31 @@ Feature: Parameter Identification Against a Known Plant
     And the motor is enabled
     And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
     And the online estimates are read
-    Then the online inertia estimate shall be within 20 % of the plant
-    And the online friction estimate shall be within 30 % of the plant
+    Then the online inertia estimate shall be within 2 % of the plant
+    And the online friction estimate shall be within 5 % of the plant
     And the online inductance estimate shall be within 15 % of the plant
 
     Examples:
       | motor   |
       | teknic  |
       | anaheim |
+
+  @sil @REQ-CAL-014
+  Scenario: The online mechanical estimators converge through the bench motor's 4000-count encoder
+    Given a bench motor plant
+    And the plant response is recorded at 100 Hz for up to 2000 samples
+    And the motor is already calibrated
+    And the stored calibration is off by:
+      | inertia  | 2.0 |
+      | friction | 0.5 |
+    And the motor boots in speed mode
+    When the target boots
+    And the rotor is aligned
+    And the motor is enabled
+    And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
+    And the online estimates are read
+    Then the online inertia estimate shall be within 2 % of the plant
+    And the online friction estimate shall be within 5 % of the plant
 
   @sil @REQ-CAL-014
   Scenario Outline: The online resistance estimate follows the plant (<motor>)
@@ -134,8 +151,8 @@ Feature: Parameter Identification Against a Known Plant
     And the response is captured for 700 ms after enable
     And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
     And the online estimates are read
-    Then the online inertia estimate shall be within 20 % of the plant
-    And the online friction estimate shall be within 30 % of the plant
+    Then the online inertia estimate shall be within 2 % of the plant
+    And the online friction estimate shall be within 15 % of the plant
 
     Examples:
       | motor   |

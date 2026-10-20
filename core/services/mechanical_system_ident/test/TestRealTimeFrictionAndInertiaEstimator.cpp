@@ -5,6 +5,7 @@
 #include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
+#include <random>
 
 namespace
 {
@@ -44,6 +45,8 @@ namespace
         float friction{ 1.5e-5f };
         float torqueConstant{ 0.0384f };
         float shaftTorque{ 0.0f };
+        float currentNoise{ 0.0f };
+        float torqueDisturbance{ 0.0f };
     };
 
     constexpr uint32_t substeps{ 20 };
@@ -52,7 +55,8 @@ namespace
     // A rotor under a speed loop, sampled substeps times per outer-loop window through an encoder of the given
     // counts (zero for a continuous one), the way the control interrupt accumulates its windows. The current follows
     // its reference through a current loop, as a winding's does, and the position and the current are sampled at the
-    // same instant, the start of each step.
+    // same instant, the start of each step. The sampled current can carry white noise, and the shaft a torque
+    // disturbance the model does not know of, drawn anew for each window.
     class WindowedRotorRun
     {
     public:
@@ -74,13 +78,14 @@ namespace
                 const auto currentReference = gain * (reference - measuredSpeed) + rotor.friction * reference / rotor.torqueConstant;
 
                 const auto startAngle = measuredAngle;
+                const auto disturbance = noise(engine) * rotor.torqueDisturbance;
                 for (uint32_t substep = 0; substep != substeps; ++substep)
                 {
                     const auto measured = Measure(angle);
-                    window.Accumulate(current, measured - measuredAngle);
+                    window.Accumulate(current + noise(engine) * rotor.currentNoise, measured - measuredAngle);
                     measuredAngle = measured;
 
-                    const auto acceleration = (rotor.torqueConstant * current - rotor.friction * speed - rotor.shaftTorque) / rotor.inertia;
+                    const auto acceleration = (rotor.torqueConstant * current - rotor.friction * speed - rotor.shaftTorque - disturbance) / rotor.inertia;
                     angle += speed * dt + 0.5f * acceleration * dt * dt;
                     speed += acceleration * dt;
                     current += (currentReference - current) * currentResponse;
@@ -101,6 +106,8 @@ namespace
         services::RealTimeFrictionAndInertiaEstimator& estimator;
         float count;
         foc::MechanicalWindowAccumulator window{ substeps };
+        std::mt19937 engine{ 7 };
+        std::normal_distribution<float> noise{ 0.0f, 1.0f };
         float current{ 0.0f };
         float speed{ 0.0f };
         float angle{ 0.0f };
@@ -283,4 +290,23 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_four_thousand_count_encoder_id
 
     EXPECT_NEAR(production.CurrentInertia().Value(), rotor.inertia, 0.02f * rotor.inertia);
     EXPECT_NEAR(production.CurrentFriction().Value(), rotor.friction, 0.05f * rotor.friction);
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, the_bench_rotor_is_identified_through_an_unmodelled_torque_disturbance)
+{
+    services::RealTimeFrictionAndInertiaEstimator production{ services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, hal::Hertz{ 1000 } };
+    ReferenceRotor rotor;
+    rotor.inertia = 13.9e-6f;
+    rotor.friction = 7e-6f;
+    rotor.torqueConstant = 0.042f;
+    rotor.shaftTorque = 3.7e-3f;
+    rotor.currentNoise = 0.012f;
+    rotor.torqueDisturbance = 5e-3f;
+    production.SetTorqueConstant(foc::NewtonMeter{ rotor.torqueConstant });
+    production.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 2.0f * rotor.inertia }, foc::NewtonMeterSecondPerRadian{ 0.5f * rotor.friction });
+
+    WindowedRotorRun{ rotor, production, 4000 }.Run(26.0f, 52.0f, 100, 3200);
+
+    EXPECT_NEAR(production.CurrentInertia().Value(), rotor.inertia, 0.02f * rotor.inertia);
+    EXPECT_NEAR(production.CurrentFriction().Value(), rotor.friction, 0.3f * rotor.friction);
 }

@@ -240,8 +240,9 @@ $B$ from $\tau_0$ respectively.
 
 The online estimator does not use the instantaneous innovation: 0.1 mN·m sits under the torque ripple
 any real drive has, so it was met by chance. It publishes once it has observed a thousand outer-loop
-periods (one second) since its seed and its exponentially averaged residual power is under 1 % of the
-averaged output power — the fit explains the torque it sees.
+periods (one second) since its seed and its exponentially averaged residual is under a quarter of the
+averaged output in RMS terms — the fit explains the torque it sees, apart from the ripple a real drive has and
+no term of the model carries.
 
 ### 6. Observability Requirement
 

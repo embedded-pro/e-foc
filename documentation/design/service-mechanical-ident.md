@@ -435,9 +435,13 @@ A finiteness test alone admits values such as $10^{30}$. Before an estimate is p
 acceptance policy above: enough accelerating observations and a span of speeds since the last seed, a
 settled fit, and a value inside the physical band. The offline procedure judges the fit by its innovation
 and covariance; the online estimator, which runs on outer-loop window averages (see
-`documentation/theory/friction-inertia-estimation.md` §4.1), by an averaged residual power under 1 % of the
-averaged output power, because an instantaneous innovation of 0.1 mN·m sits under any real drive's torque
-ripple. A publication is therefore rate-limited by construction —
+`documentation/theory/friction-inertia-estimation.md` §4.1), by an averaged residual under a quarter of the
+averaged output in RMS terms (a residual power under 1/16 of the output power), because an instantaneous
+innovation of 0.1 mN·m sits under any real drive's torque ripple. The bound was a tenth until the bench motor
+ran: there the residual, torque the model has no term for, settles at 14 % of the torque the 26/52 rad/s steps
+excite while the inertia sits within 1 % of the calibration's, so nothing ever published. With at least
+$1000/M$ observations behind a publication, a residual a quarter of the output leaves the inertia a statistical
+error of about $0.25/\sqrt{1000/M}$: 1.6 % at $M = 4$, 3.2 % at $M = 16$. A publication is therefore rate-limited by construction —
 no estimate reaches the accessors during the warm-up that follows a seed, and none reaches them while the
 fit is still moving. An estimate that fails any gate is discarded and the last accepted pair is retained.
 

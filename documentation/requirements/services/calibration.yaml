@@ -123,9 +123,10 @@
   title: Online estimates converge on the plant from a wrong seed
   shall: >
     Seeded from a stored calibration whose values are wrong by the factors of REQ-CAL-013 and
-    excited for three seconds by a speed reference alternating between 26 and 52 rad/s every
-    250 ms, the online estimators shall report an inertia within 20 %, a viscous friction within
-    30 % and an inductance within 15 % of the plant's, for each reference motor, and shall hold
-    the same envelope for inertia and friction with a constant shaft torque of 0.01 N·m applied
-    during the excitation. The estimates shall be readable through the product's own terminal
-    command.
+    excited for six seconds by a speed reference alternating between 26 and 52 rad/s every
+    250 ms, the online estimators shall report an inertia within 2 %, a viscous friction within
+    5 % and an inductance within 15 % of the plant's, for each reference motor, and an inertia
+    within 2 % and a viscous friction within 5 % for the bench motor seen through its
+    4000-count encoder. With a constant shaft torque of 0.01 N·m applied during the excitation
+    they shall hold the inertia within 2 % and the viscous friction within 15 %. The estimates
+    shall be readable through the product's own terminal command.
