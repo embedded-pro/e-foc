@@ -27,6 +27,7 @@ namespace hil
         bool WaitForPrompt(std::chrono::milliseconds timeout) override;
         void ClearSerialLines() override;
         const std::vector<std::string>& SerialLines() const override;
+        std::size_t DiscardedSerialLineCount() const override;
         const std::string& LastSerialLine() const override;
         std::chrono::milliseconds LastSerialDuration() const override;
 
@@ -37,5 +38,7 @@ namespace hil
             std::chrono::milliseconds timeout,
             std::chrono::steady_clock::time_point referenceTime,
             std::chrono::milliseconds& elapsed) override;
+        std::size_t ReceivedCanFrameCount() const override;
+        std::optional<hal::Can::Message> FindReceivedCanFrame(hal::Can::Id id, std::size_t fromFrame) const override;
     };
 }

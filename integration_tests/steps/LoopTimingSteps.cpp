@@ -33,16 +33,6 @@ namespace
         return std::strtoul(line.c_str() + at + key.size(), nullptr, 10);
     }
 
-    std::optional<std::string> LastLineWith(std::size_t fromLine, const std::string& needle)
-    {
-        const auto& lines = TargetInteractor::Instance().SerialLines();
-        std::optional<std::string> found;
-        for (std::size_t i = fromLine; i < lines.size(); ++i)
-            if (lines[i].find(needle) != std::string::npos)
-                found = lines[i];
-        return found;
-    }
-
     template<typename Predicate>
     bool DrainUntil(Fixture& fixture, Predicate done, std::chrono::milliseconds timeout)
     {
@@ -67,9 +57,9 @@ namespace
         std::optional<std::string> counters;
         const bool printed = DrainUntil(fixture, [&]
             {
-                totals = LastLineWith(mark, "[LOOP] samples=");
-                durations = LastLineWith(mark, "[LOOP] cycles last=");
-                counters = LastLineWith(mark, "[LOOP] overruns=");
+                totals = fixture.LastCapturedLineWith(mark, "[LOOP] samples=");
+                durations = fixture.LastCapturedLineWith(mark, "[LOOP] cycles last=");
+                counters = fixture.LastCapturedLineWith(mark, "[LOOP] overruns=");
                 return totals.has_value() && durations.has_value() && counters.has_value();
             },
             kTraceTimeout);

@@ -54,16 +54,6 @@ namespace
         return std::strtof(line.c_str() + at + key.size(), nullptr);
     }
 
-    std::optional<std::string> LastLineWith(std::size_t fromLine, const std::string& needle)
-    {
-        const auto& lines = TargetInteractor::Instance().SerialLines();
-        std::optional<std::string> found;
-        for (std::size_t i = fromLine; i < lines.size(); ++i)
-            if (lines[i].find(needle) != std::string::npos)
-                found = lines[i];
-        return found;
-    }
-
     template<typename Predicate>
     bool DrainUntil(Fixture& fixture, Predicate done, std::chrono::milliseconds timeout)
     {
@@ -166,7 +156,7 @@ WHEN(R"(electrical identification is run)")
     auto& fixture = context.Get<Fixture>();
     auto& setup = context.Get<ScenarioSetup>();
 
-    const auto mark = fixture.CapturedLineCount();
+    const auto mark = fixture.MarkCapture();
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focIdentifyElectricalId, {}, kIdentificationTimeout))
         << "Electrical identification did not complete successfully";
 
@@ -211,7 +201,7 @@ WHEN(R"(the full calibration is run from the terminal)")
     std::optional<std::string> record;
     ASSERT_TRUE(DrainUntil(fixture, [&]
         {
-            record = LastLineWith(mark, "[SM] Calibration record:");
+            record = fixture.LastCapturedLineWith(mark, "[SM] Calibration record:");
             return record.has_value();
         },
         kTraceTimeout))
@@ -264,8 +254,8 @@ WHEN(R"(the online estimates are read)")
     std::optional<std::string> electrical;
     ASSERT_TRUE(DrainUntil(fixture, [&]
         {
-            mechanical = LastLineWith(mark, "[EST] Mech:");
-            electrical = LastLineWith(mark, "[EST] Elec:");
+            mechanical = fixture.LastCapturedLineWith(mark, "[EST] Mech:");
+            electrical = fixture.LastCapturedLineWith(mark, "[EST] Elec:");
             return mechanical.has_value() && electrical.has_value();
         },
         kTraceTimeout))

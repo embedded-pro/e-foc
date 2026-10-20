@@ -48,6 +48,11 @@ namespace hil
             return serialLines;
         }
 
+        std::size_t DiscardedSerialLines() const
+        {
+            return discardedSerialLines;
+        }
+
         const std::string& LastSerialLine() const
         {
             return lastSerialLine;
@@ -59,6 +64,11 @@ namespace hil
         }
 
         void ClearCanFrames();
+
+        const std::vector<CanFrame>& ReceivedFrames() const
+        {
+            return receivedFrames;
+        }
 
         bool SendCanFrame(hal::Can::Id id, const hal::Can::Message& message,
             std::chrono::milliseconds timeout);
@@ -125,10 +135,12 @@ namespace hil
 
         std::string serialBuffer;
         std::vector<std::string> serialLines;
+        std::size_t discardedSerialLines{ 0 };
         std::string lastSerialLine;
         bool promptSeen{ false };
         std::chrono::milliseconds lastSerialDuration{ 0 };
 
         std::deque<CanFrame> canQueue;
+        std::vector<CanFrame> receivedFrames;
     };
 }

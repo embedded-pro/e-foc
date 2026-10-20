@@ -2,7 +2,9 @@
 
 #include "hal/interfaces/Can.hpp"
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -28,6 +30,8 @@ namespace integration
         virtual bool WaitForPrompt(std::chrono::milliseconds timeout) = 0;
         virtual void ClearSerialLines() = 0;
         virtual const std::vector<std::string>& SerialLines() const = 0;
+        // Lines dropped from SerialLines() since setup, so a line count taken before a drop still names the same line.
+        virtual std::size_t DiscardedSerialLineCount() const;
         virtual const std::string& LastSerialLine() const = 0;
         virtual std::chrono::milliseconds LastSerialDuration() const = 0;
 
@@ -38,6 +42,10 @@ namespace integration
             std::chrono::milliseconds timeout,
             std::chrono::steady_clock::time_point referenceTime,
             std::chrono::milliseconds& elapsed) = 0;
+
+        // A wait for one frame drops the others it reads; these keep every frame received from the target.
+        virtual std::size_t ReceivedCanFrameCount() const;
+        virtual std::optional<hal::Can::Message> FindReceivedCanFrame(hal::Can::Id id, std::size_t fromFrame) const;
 
         static TargetInteractor& Instance();
         static void SetInstance(TargetInteractor& instance);

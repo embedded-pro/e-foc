@@ -108,6 +108,7 @@ namespace hil
                 frame.id = id;
                 frame.message = data;
                 frame.arrival = std::chrono::steady_clock::now();
+                receivedFrames.push_back(frame);
                 canQueue.push_back(std::move(frame));
             });
 
@@ -155,6 +156,7 @@ namespace hil
 
     void BridgeSession::ClearSerialLines()
     {
+        discardedSerialLines += serialLines.size();
         serialLines.clear();
         lastSerialLine.clear();
         serialBuffer.clear();
@@ -193,7 +195,10 @@ namespace hil
         DrainUntilQuiet(timeout);
 
         if (!serialLines.empty() && serialLines.front() == command)
+        {
             serialLines.erase(serialLines.begin());
+            ++discardedSerialLines;
+        }
 
         lastSerialLine.clear();
         for (auto it = serialLines.rbegin(); it != serialLines.rend(); ++it)
@@ -392,6 +397,7 @@ namespace hil
     void BridgeSession::ClearCanFrames()
     {
         canQueue.clear();
+        receivedFrames.clear();
     }
 
     bool BridgeSession::SendCanFrame(hal::Can::Id id, const hal::Can::Message& message,

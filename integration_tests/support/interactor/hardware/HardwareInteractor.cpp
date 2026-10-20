@@ -97,6 +97,11 @@ namespace hil
         return BridgeSession::Instance().LastSerialDuration();
     }
 
+    std::size_t HardwareInteractor::DiscardedSerialLineCount() const
+    {
+        return BridgeSession::Instance().DiscardedSerialLines();
+    }
+
     void HardwareInteractor::ClearCanFrames()
     {
         BridgeSession::Instance().ClearCanFrames();
@@ -119,5 +124,22 @@ namespace hil
         if (ok)
             out = frame.message;
         return ok;
+    }
+
+    std::size_t HardwareInteractor::ReceivedCanFrameCount() const
+    {
+        return BridgeSession::Instance().ReceivedFrames().size();
+    }
+
+    std::optional<hal::Can::Message> HardwareInteractor::FindReceivedCanFrame(hal::Can::Id id, std::size_t fromFrame) const
+    {
+        const auto& frames = BridgeSession::Instance().ReceivedFrames();
+        std::optional<hal::Can::Message> found;
+
+        for (std::size_t i = fromFrame; i < frames.size(); ++i)
+            if (frames[i].id == id)
+                found = frames[i].message;
+
+        return found;
     }
 }
