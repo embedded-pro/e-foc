@@ -340,8 +340,27 @@ Integrated over one outer-loop period $T$ it needs no derivative of a sampled cu
 $$\overline{V_d} = R\,\overline{I_d} + L\left(\frac{I_{d,end} - I_{d,start}}{T} - \overline{\omega_e I_q}\right)$$
 
 The regressor vector is $\phi = [\overline{I_d},\ (\Delta I_d / T - \overline{\omega_e I_q})]^T$ in amperes and
-amperes per millisecond, and the parameter vector is $\theta = [R,\ L]^T$ in ohms and millihenries. An RLS
-algorithm with forgetting factor 0.999 updates $\theta$ once per outer-loop period (1 kHz).
+amperes per millisecond, and the parameter vector is $\theta = [R,\ L]^T$ in ohms and millihenries. A recursive
+instrumental-variable estimator with forgetting factor 0.999 updates $\theta$ once per outer-loop period (1 kHz).
+
+### Instrumental Variables
+
+The inductance column takes its current change from two single samples: the last of this window and the last
+of the one before. Each carries the current sensor's noise in full, and least squares reads noise in a regressor
+as a weaker dependence on it. On the bench motor the recursive least-squares estimate read the inductance 55 %
+low with the ±75 mA excitation below, and still 33 % low with ±0.3 A; in simulation, with 10 mA of noise, 9 to
+11 % low, where the estimate below reads it within 5 %.
+
+The recursion therefore takes its gain along an instrument $z$ rather than along the regressor:
+
+$$K = \frac{P z}{\lambda + \phi^T P z}, \qquad \theta \leftarrow \theta + K\,(\overline{V_d} - \phi^T \theta), \qquad P \leftarrow \frac{P - K \phi^T P}{\lambda}$$
+
+with $z = [I_d^*,\ \Delta I_d^* / T]^T$: the d-axis reference the window ran with, and its change from the
+previous window's. The reference is the excitation itself. It moves with the true current and not with the
+sensor's noise, so the estimate converges on the winding however noisy the samples are. The constant part of
+$\overline{V_d}$ that no column explains, such as a small error in the rotor angle, which leaks back-EMF into
+the d axis, also averages out against a reference that alternates in sign. With $z = \phi$ the recursion is
+the ordinary RLS one.
 
 The averages are accumulated by the control interrupt, tick by tick, and published with each window:
 
@@ -359,9 +378,8 @@ The product regulates $I_d$ to zero, so the resistance column is never excited o
 drifted, read $-0.68\ \Omega$ for a $0.36\ \Omega$ winding, and could not by construction track a warming
 one. The speed and position cascades therefore add a d-axis square wave to the current reference while the
 estimator is attached: $\pm 2.5\,\%$ of the drive's current limit at 10 Hz. It produces no torque on a
-non-salient machine and a copper loss proportional to its square. An update is taken only while
-$|\overline{I_d}|$ exceeds 50 mA, so an amplitude of zero switches both the injection and resistance
-tracking off.
+non-salient machine and a copper loss proportional to its square. An update is taken only while the
+reference exceeds 50 mA, so an amplitude of zero switches both the injection and resistance tracking off.
 
 ### Publication
 

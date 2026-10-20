@@ -2,7 +2,7 @@
 
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Units.hpp"
-#include "numerical/estimators/online/RecursiveLeastSquares.hpp"
+#include "numerical/estimators/online/RecursiveInstrumentalVariables.hpp"
 #include <optional>
 
 namespace services
@@ -30,15 +30,16 @@ namespace services
         foc::MilliHenry CurrentInductance() const override;
 
     private:
-        using ElecRLS = estimators::RecursiveLeastSquares<float, 2>;
+        using Estimator = estimators::RecursiveInstrumentalVariables<float, 2>;
 
         void ComputeEstimate(const foc::ElectricalWindow& window);
         void Publish();
 
         float forgettingFactor;
-        std::optional<ElecRLS> rls;
+        std::optional<Estimator> estimator;
         float samplingFrequency;
         float previousIdAtEnd{ 0.0f };
+        float previousReference{ 0.0f };
         bool primed{ false };
         uint16_t updates{ 0 };
 

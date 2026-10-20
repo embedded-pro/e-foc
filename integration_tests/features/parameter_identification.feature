@@ -91,7 +91,7 @@ Feature: Parameter Identification Against a Known Plant
     And the online estimates are read
     Then the online inertia estimate shall be within 2 % of the plant
     And the online friction estimate shall be within 5 % of the plant
-    And the online inductance estimate shall be within 15 % of the plant
+    And the online inductance estimate shall be within 10 % of the plant
 
     Examples:
       | motor   |
@@ -99,13 +99,14 @@ Feature: Parameter Identification Against a Known Plant
       | anaheim |
 
   @sil @REQ-CAL-014
-  Scenario: The online mechanical estimators converge through the bench motor's 4000-count encoder
+  Scenario: The online estimators converge through the bench motor's 4000-count encoder and current noise
     Given a bench motor plant
     And the plant response is recorded at 100 Hz for up to 2000 samples
     And the motor is already calibrated
     And the stored calibration is off by:
-      | inertia  | 2.0 |
-      | friction | 0.5 |
+      | inductance | 0.7 |
+      | inertia    | 2.0 |
+      | friction   | 0.5 |
     And the motor boots in speed mode
     When the target boots
     And the rotor is aligned
@@ -114,6 +115,7 @@ Feature: Parameter Identification Against a Known Plant
     And the online estimates are read
     Then the online inertia estimate shall be within 2 % of the plant
     And the online friction estimate shall be within 5 % of the plant
+    And the online inductance estimate shall be within 10 % of the plant
 
   @sil @REQ-CAL-014
   Scenario Outline: The online resistance estimate follows the plant (<motor>)

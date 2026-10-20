@@ -112,7 +112,7 @@ namespace foc
         void SetElectrical(OnlineElectricalEstimator& estimator);
         bool HasElectrical() const;
         void UpdateMechanical();
-        void UpdateElectrical(float vdcInvScale);
+        void UpdateElectrical(float vdcInvScale, Ampere directCurrentReference);
 
     private:
         OnlineMechanicalEstimator* mechanical{ nullptr };
