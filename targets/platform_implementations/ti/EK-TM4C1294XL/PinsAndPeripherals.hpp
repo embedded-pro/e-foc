@@ -1,5 +1,6 @@
 #pragma once
 
+#include "hal/interfaces/DutyCycle.hpp"
 #include "hal_tiva/synchronous_tiva/SynchronousPwm.hpp"
 #include "hal_tiva/tiva/Adc.hpp"
 #include "hal_tiva/tiva/ClockTm4c129.hpp"
@@ -86,6 +87,7 @@ namespace application
             application::BoardCharacteristics::UndervoltageThresholdCounts(adcReferenceVoltage, adcResolution);
 
         constexpr static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator1;
+        constexpr static hal::DutyCycle maxReadableDuty{ hal::DutyCycle::FromPercent(application::BoardCharacteristics::maxReadableDutyPercent) };
 
         inline std::array<hal_pwm::PinChannel, 3> pwmPhases{ {
             { hal_pwm::GeneratorIndex::generator1, Pins::pwmPhase1a, Pins::pwmPhase1b, true, true, std::make_optional(hal_pwm::PinChannel::Trigger::countZero) },

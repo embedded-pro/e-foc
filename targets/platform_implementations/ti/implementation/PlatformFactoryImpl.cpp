@@ -1,4 +1,5 @@
 #include "targets/platform_implementations/ti/implementation/PlatformFactoryImpl.hpp"
+#include "core/foc/math/LowSideShuntWindow.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/CutPowerStage.hpp"
@@ -284,9 +285,11 @@ namespace application
 
     void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        WithPwm([&dutyPhases](auto& pwm)
+        const auto readable = foc::KeepLowSideShuntsReadable(dutyPhases, Peripheral::maxReadableDuty);
+
+        WithPwm([&readable](auto& pwm)
             {
-                pwm.Start(dutyPhases.a, dutyPhases.b, dutyPhases.c);
+                pwm.Start(readable.a, readable.b, readable.c);
             });
     }
 
