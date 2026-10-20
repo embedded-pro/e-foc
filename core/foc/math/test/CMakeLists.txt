@@ -12,6 +12,7 @@ target_sources(e_foc.foc.math_test PRIVATE
     TestDutyConversion.cpp
     TestFastTrigonometry.cpp
     TestLowSideShuntWindow.cpp
+    TestMechanicalWindowAccumulator.cpp
     TestParameterValidation.cpp
     TestTorqueConstant.cpp
 )

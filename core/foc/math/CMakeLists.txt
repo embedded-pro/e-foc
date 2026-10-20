@@ -16,6 +16,7 @@ target_sources(e_foc.foc.math INTERFACE
     FastTrigonometry.hpp
     FiniteGuard.hpp
     LowSideShuntWindow.hpp
+    MechanicalWindowAccumulator.hpp
     ParameterValidation.hpp
     TorqueConstant.hpp
 )

@@ -186,21 +186,35 @@ scales the identified inertia by about $e^{-\sigma T} \approx 0.67$ — the 26�
 first measured.
 
 The online estimator therefore regresses quantities the control interrupt integrates over each outer
-period $T$. With $\bar\omega_k = (\theta_k - \theta_{k-1})/T$ the window-mean speed and $\bar i_{q,k}$
-the window-mean current (trapezoidal over the interrupt's samples), the momentum balance integrated
-across two windows gives, to second order,
+period $T$, and it takes them the way the one-shot procedure does (see
+`documentation/design/service-mechanical-ident.md`, Speed and Acceleration Estimation). An earlier
+form regressed $K_T(\bar i_{q,k} + \bar i_{q,k-1})/2$ on $(\bar\omega_k - \bar\omega_{k-1})/T$, with
+$\bar\omega_k = (\theta_k - \theta_{k-1})/T$ the speed between the angles latched at the window
+boundaries. Those are two single readings, so on a 4000-count encoder the acceleration carried
+about 1600 rad/s² of quantisation per count at $T$ = 1 ms. Noise in a regressor biases its
+coefficient toward zero: $J$ read about 4 % low in simulation, and on the bench motor's plant the
+fit never explained the torque well enough to publish.
+
+The interrupt now accumulates, over each outer period, the mean of the positions it sampled relative to
+the window's start, the window's rotation, the smallest non-zero encoder step, and the moments
+$\overline{i_q}$, $\overline{i_q u}$ and $\overline{i_q u^2}$ of the current, with $u$ a sample's place
+in the window. The estimator merges $M$ outer windows into an observation window of $T_w = M T$, $M$ sized
+from the encoder count and at least 4, and from three consecutive observation windows with mean positions
+$\bar\theta_{k-2}, \bar\theta_{k-1}, \bar\theta_k$ it regresses
 
 $$
-\boxed{K_T\,\frac{\bar i_{q,k} + \bar i_{q,k-1}}{2} = J\,\frac{\bar\omega_k - \bar\omega_{k-1}}{T}
-+ B\,\frac{\bar\omega_k + \bar\omega_{k-1}}{2} + \tau_0}
+\boxed{K_T\,\tilde i_q = J\,\frac{\bar\theta_k - 2\bar\theta_{k-1} + \bar\theta_{k-2}}{T_w^2}
++ B\,\frac{\bar\theta_k - \bar\theta_{k-2}}{2T_w} + \tau_0}
 $$
 
-Both sides now describe the same span, and the switching ripple is averaged out rather than sampled.
-Two details keep the window honest. The angle is latched *by the interrupt* at the window boundary:
-the outer loop can start a tick late, and differencing the angle it finds then measured 19- or
-21-tick spans as if they were 20, an acceleration noise of some 2000 rad/s² that biased $J$ toward
-zero exactly as the misalignment did. And the regression runs in milli-newton-metres against
-micro-unit $J$ and $B$, so its three columns are of order one on these rotors.
+where $\tilde i_q$ is the current weighted by the quadratic B-spline that the second difference of three
+window means puts on the acceleration: $u^2/2$ over the first window, $1/2 + u(1-u)$ over the second and
+$(1-u)^2/2$ over the third. The moments are what make that weighting exact when windows are merged:
+$u$ in the merged window is $(j + u_j)/M$ for outer window $j$, and its square expands into the three
+moments of each outer window. Both sides then describe the same instant, the middle of the middle
+window, and a window mean carries little of the quantisation of any one reading. The regression runs
+in milli-newton-metres against micro-unit $J$ and $B$, so its three columns are of order one on these
+rotors.
 
 ### 5. Convergence Criteria
 
@@ -225,9 +239,10 @@ span more than one speed (a quarter of the fastest seen), which is what identifi
 $B$ from $\tau_0$ respectively.
 
 The online estimator does not use the instantaneous innovation: 0.1 mN·m sits under the torque ripple
-any real drive has, so it was met by chance. It publishes once it has taken a thousand observations
-and its exponentially averaged residual power is under 1 % of the averaged output power — the fit
-explains the torque it sees.
+any real drive has, so it was met by chance. It publishes once it has observed a thousand outer-loop
+periods (one second) since its seed and its exponentially averaged residual is under a quarter of the
+averaged output in RMS terms — the fit explains the torque it sees, apart from the ripple a real drive has and
+no term of the model carries.
 
 ### 6. Observability Requirement
 
@@ -291,7 +306,7 @@ graph TD
 | Parameter vector size          | 3: $[J,\ B,\ \tau_0]^T$                                                               |
 | Covariance matrix              | $3\times 3$ symmetric positive definite                                               |
 | Forgetting factor (online)     | $\lambda = 0.9995$                                                                    |
-| Effective window (online)      | $N_{eff} = 1/(1-\lambda) = 2000$ outer-loop samples                                   |
+| Effective window (online)      | $N_{eff} = 1/(1-\lambda) = 2000$ observations (8 s at 4 ms observation windows)       |
 | Convergence check $\epsilon_e$ | $10^{-4}$ (innovation threshold)                                                      |
 | Convergence check $\epsilon_K$ | $10^{-2}$ (gain trace threshold)                                                      |
 | RLS per-step cost              | $O(n^2) = O(9)$ — 9 multiply-add ops for $n=3$                                        |

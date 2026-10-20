@@ -5,10 +5,18 @@
 
 namespace foc
 {
+    // One outer-loop window of the control interrupt. Positions are relative to the window's start, the previous
+    // window's last sample; u = (sample + 1/2) / samples is a sample's place in the window, and first marks the
+    // window after a restart, which continues no earlier one.
     struct MechanicalWindow
     {
-        Ampere meanIq;
-        RadiansPerSecond meanSpeed;
+        Ampere meanIq{ 0.0f };
+        float meanIqTimesU{ 0.0f };
+        float meanIqTimesUSquared{ 0.0f };
+        Radians meanPosition{ 0.0f };
+        Radians rotation{ 0.0f };
+        Radians smallestStep{ 0.0f };
+        bool first{ true };
     };
 
     struct ElectricalWindow

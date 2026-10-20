@@ -604,7 +604,8 @@ What the first characterisation found, in the order it was found:
   and its convergence gate — an innovation under 0.1 mN·m — sat under that same ripple and was
   met by chance. It now regresses the momentum balance over window averages the control interrupt
   accumulates (theory: `friction-inertia-estimation.md` §4.1) with a two-second memory, and
-  publishes once its averaged residual is under 1 % of the torque it explains.
+  publishes once its averaged residual is small against the torque it explains (the bound is in
+  `service-mechanical-ident.md`, Plausibility Band and Update Rate).
 
   Fixing that exposed a platform-independent timing fault: the outer loop measured speed by
   differencing whatever angle it found when it ran, and it runs up to a tick after the window

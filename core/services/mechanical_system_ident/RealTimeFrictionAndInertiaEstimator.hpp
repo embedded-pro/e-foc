@@ -6,6 +6,7 @@
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/services/mechanical_system_ident/FrictionAndInertiaEstimator.hpp"
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
+#include "core/services/mechanical_system_ident/MechanicalWindowKinematics.hpp"
 #include "numerical/estimators/online/RecursiveLeastSquares.hpp"
 
 namespace services
@@ -54,10 +55,8 @@ namespace services
         std::optional<MotorRLS> onlineRls;
         MotorRLS::InputMatrix onlineRegressor;
         MotorRLS::EstimationMetrics onlineMetrics{};
-        float previousWindowSpeed{ 0.0f };
-        float previousWindowIq{ 0.0f };
-        bool onlinePrimed{ false };
-        uint16_t onlineUpdates{ 0 };
+        MechanicalWindowKinematics kinematics;
+        uint16_t onlinePeriods{ 0 };
         MechanicalExcitation onlineExcitation;
         float residualPower{ 0.0f };
         float outputPower{ 0.0f };

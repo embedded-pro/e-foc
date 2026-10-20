@@ -41,13 +41,15 @@ namespace foc
         const hal::Hertz excitationFrequency{ 10 };
     }
 
-    EstimatorWindowAccumulator::EstimatorWindowAccumulator(hal::Hertz tickFrequency)
+    EstimatorWindowAccumulator::EstimatorWindowAccumulator(hal::Hertz tickFrequency, uint32_t ticksPerWindow)
         : tickFrequency{ static_cast<float>(tickFrequency.Value()) }
+        , ticksPerWindow{ ticksPerWindow }
+        , mechanical{ ticksPerWindow }
     {}
 
     void EstimatorWindowAccumulator::Restart()
     {
-        *this = EstimatorWindowAccumulator{ hal::Hertz{ static_cast<uint32_t>(tickFrequency) } };
+        *this = EstimatorWindowAccumulator{ hal::Hertz{ static_cast<uint32_t>(tickFrequency) }, ticksPerWindow };
     }
 
     DirectAxisExcitation::DirectAxisExcitation(Ampere amplitude, hal::Hertz frequency, hal::Hertz outerLoopFrequency)
@@ -90,13 +92,12 @@ namespace foc
         return electrical != nullptr;
     }
 
-    void EstimatorChannel::UpdateMechanical(float mechanicalSpeed)
+    void EstimatorChannel::UpdateMechanical()
     {
         if (mechanical == nullptr)
             return;
 
-        const auto& snapshot = buffer.Acquire();
-        mechanical->Update(MechanicalWindow{ Ampere{ snapshot.meanIq }, RadiansPerSecond{ mechanicalSpeed } });
+        mechanical->Update(buffer.Acquire().mechanical);
     }
 
     void EstimatorChannel::UpdateElectrical(float vdcInvScale)
@@ -114,7 +115,7 @@ namespace foc
         , outerLoopFrequency{ lowPriorityFrequency }
         , speedDifferentiator{ lowPriorityFrequency }
         , prescaler{ baseFrequency.Value() / lowPriorityFrequency.Value() }
-        , estimatorWindow{ baseFrequency }
+        , estimatorWindow{ baseFrequency, prescaler }
         , directAxisExcitation{ Ampere{ maxCurrent.Value() * excitationCurrentFraction }, excitationFrequency, lowPriorityFrequency }
     {
         really_assert(maxCurrent.Value() > 0);
@@ -290,9 +291,9 @@ namespace foc
         estimators.SetElectrical(estimator);
     }
 
-    void CascadeWithSpeedLoop::UpdateOnlineMechanicalEstimator(float mechanicalSpeed)
+    void CascadeWithSpeedLoop::UpdateOnlineMechanicalEstimator()
     {
-        estimators.UpdateMechanical(mechanicalSpeed);
+        estimators.UpdateMechanical();
     }
 
     void CascadeWithSpeedLoop::UpdateOnlineElectricalEstimator()

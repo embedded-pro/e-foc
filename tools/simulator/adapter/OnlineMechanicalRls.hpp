@@ -2,6 +2,7 @@
 
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/foc/math/MechanicalWindowAccumulator.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
@@ -40,7 +41,8 @@ namespace simulator
         services::RealTimeFrictionAndInertiaEstimator estimator;
         uint32_t samplesPerWindow;
         uint32_t samplesInWindow{ 0 };
-        float sumIq{ 0.0f };
-        float sumSpeed{ 0.0f };
+        foc::MechanicalWindowAccumulator window;
+        float previousAngle{ 0.0f };
+        bool primed{ false };
     };
 }

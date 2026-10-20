@@ -362,9 +362,36 @@ The mechanical equation of motion for the motor shaft is:
 
 $$T_e = J \cdot \dot{\omega} + B \cdot \omega + \tau_c$$
 
-The electromagnetic torque is approximated as $T_e = I_q \cdot k_t$, where $k_t = \tfrac{3}{2} p \psi_f$ is derived from the calibration record's pole pairs and flux linkage. Angular acceleration $\dot{\omega}$ is derived from a finite difference of successive speed measurements scaled by the sampling frequency.
+The electromagnetic torque is approximated as $T_e = I_q \cdot k_t$, where $k_t = \tfrac{3}{2} p \psi_f$ is derived from the calibration record's pole pairs and flux linkage. Angular acceleration $\dot{\omega}$ and speed $\omega$ come from the window-mean positions of three consecutive observation windows (see Window Kinematics below).
 
-The regressor vector is $\phi = [1,\ \dot{\omega},\ \omega]^T$, and the parameter vector is $\theta = [\tau_c,\ J,\ B]^T$. The scalar output is $T_e$. An RLS algorithm with a forgetting factor of 0.9995 updates $\theta$ each outer-loop period from window averages the control interrupt accumulates.
+The regressor vector is $\phi = [1,\ \dot{\omega},\ \omega]^T$, and the parameter vector is $\theta = [\tau_c,\ J,\ B]^T$. The scalar output is $T_e$. An RLS algorithm with a forgetting factor of 0.9995 updates $\theta$ once per observation window from what the control interrupt accumulates over each outer-loop period.
+
+### Window Kinematics
+
+The online estimator uses the kinematics of the one-shot procedure (see Speed and Acceleration Estimation): window-mean
+positions, the acceleration as their second difference, and the torque weighted by the kernel that second difference
+puts on the acceleration. An earlier version took each outer-loop window's speed from the encoder reading at its two
+ends. On a 4000-count encoder over 1 ms that quantises the speed at 1.6 rad/s and the acceleration at about
+1600 rad/s² per count. In simulation the inertia read about 4 % low on both reference motors, and on the bench motor's
+plant the residual never fell under its publication bound, so the estimate stayed on its seed.
+
+Over every outer-loop window the control interrupt now accumulates the mean rotor position relative to the window's
+start, the rotation across it, the smallest non-zero step the encoder took, and three moments of the q-axis current:
+its mean and the means of $i_q u$ and $i_q u^2$, with $u$ the sample's position within the window. Those moments let
+the estimator merge $M$ consecutive outer-loop windows into one observation window and still weight the current by
+the kernel exactly, sample by sample. $M$ follows the one-shot rule: the window that holds the acceleration quantum
+at 100 rad/s², $T_w = \sqrt{q/100}$ with $q$ the smallest step seen, rounded up to whole outer-loop periods, but never
+fewer than 4 and at most 16: 4 ms on a fine or continuous encoder and on a 4000-count one, 8 ms on a 1000-count one. The
+floor is there because the kernel is the continuous B-spline evaluated at each sample's centre, which differs from the
+weight the window means really put on each sample by a fraction of order $1/N^2$ for $N$ samples per window. At 20
+samples that is a quarter percent of the transient torque, close to the whole torque the friction adds between the two
+speed levels, and in simulation the friction read 5 to 15 % low; at 80 samples it is sixteen times smaller and the
+friction reads within about 2 %. A change of $M$ restarts the run of three windows, not the fit.
+
+The update count the estimator waits for after a seed, and the count of accelerating observations it must see, are
+counted in outer-loop periods, so each observation counts $M$ times. The forgetting factor and the residual averaging
+stay per observation, as in the one-shot procedure: the memory then lengthens with the window rather than shortening,
+which keeps the friction resolved across both speed levels.
 
 ### Torque Constant Dependency
 
@@ -408,9 +435,13 @@ A finiteness test alone admits values such as $10^{30}$. Before an estimate is p
 acceptance policy above: enough accelerating observations and a span of speeds since the last seed, a
 settled fit, and a value inside the physical band. The offline procedure judges the fit by its innovation
 and covariance; the online estimator, which runs on outer-loop window averages (see
-`documentation/theory/friction-inertia-estimation.md` §4.1), by an averaged residual power under 1 % of the
-averaged output power, because an instantaneous innovation of 0.1 mN·m sits under any real drive's torque
-ripple. A publication is therefore rate-limited by construction —
+`documentation/theory/friction-inertia-estimation.md` §4.1), by an averaged residual under a quarter of the
+averaged output in RMS terms (a residual power under 1/16 of the output power), because an instantaneous
+innovation of 0.1 mN·m sits under any real drive's torque ripple. The bound was a tenth until the bench motor
+ran: there the residual, torque the model has no term for, settles at 14 % of the torque the 26/52 rad/s steps
+excite while the inertia sits within 1 % of the calibration's, so nothing ever published. With at least
+$1000/M$ observations behind a publication, a residual a quarter of the output leaves the inertia a statistical
+error of about $0.25/\sqrt{1000/M}$: 1.6 % at $M = 4$, 3.2 % at $M = 16$. A publication is therefore rate-limited by construction —
 no estimate reaches the accessors during the warm-up that follows a seed, and none reaches them while the
 fit is still moving. An estimate that fails any gate is discarded and the last accepted pair is retained.
 

@@ -1,9 +1,11 @@
 #include "core/foc/math/FastTrigonometry.hpp"
+#include "core/foc/math/MechanicalWindowAccumulator.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
 #include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
+#include <random>
 
 namespace
 {
@@ -43,48 +45,87 @@ namespace
         float friction{ 1.5e-5f };
         float torqueConstant{ 0.0384f };
         float shaftTorque{ 0.0f };
+        float currentNoise{ 0.0f };
+        float torqueDisturbance{ 0.0f };
     };
 
+    constexpr uint32_t substeps{ 20 };
+    constexpr float currentLoopTimeConstant{ 1e-4f };
+
+    // A rotor under a speed loop, sampled substeps times per outer-loop window through an encoder of the given
+    // counts (zero for a continuous one), the way the control interrupt accumulates its windows. The current follows
+    // its reference through a current loop, as a winding's does, and the position and the current are sampled at the
+    // same instant, the start of each step. The sampled current can carry white noise, and the shaft a torque
+    // disturbance the model does not know of, drawn anew for each window.
     class WindowedRotorRun
     {
     public:
-        WindowedRotorRun(const ReferenceRotor& rotor, services::RealTimeFrictionAndInertiaEstimator& estimator)
+        WindowedRotorRun(const ReferenceRotor& rotor, services::RealTimeFrictionAndInertiaEstimator& estimator, uint32_t countsPerRevolution = 0)
             : rotor{ rotor }
             , estimator{ estimator }
+            , count{ countsPerRevolution != 0 ? 2.0f * std::numbers::pi_v<float> / static_cast<float>(countsPerRevolution) : 0.0f }
         {}
 
         void Run(float lowSpeed, float highSpeed, int samplesPerLevel, int samples)
         {
-            constexpr int substeps{ 20 };
             constexpr float dt{ 1.0f / outerLoopFrequency / substeps };
             const float gain{ 2.0f * rotor.inertia * 200.0f / rotor.torqueConstant };
+            const float currentResponse{ 1.0f - std::exp(-dt / currentLoopTimeConstant) };
 
             for (int sample = 0; sample != samples; ++sample)
             {
                 const auto reference = (sample / samplesPerLevel) % 2 == 0 ? lowSpeed : highSpeed;
-                const auto current = pendingCurrent;
-                pendingCurrent = gain * (reference - measuredSpeed) + rotor.friction * reference / rotor.torqueConstant;
+                const auto currentReference = gain * (reference - measuredSpeed) + rotor.friction * reference / rotor.torqueConstant;
 
-                const auto startAngle = angle;
-                for (int substep = 0; substep != substeps; ++substep)
+                const auto startAngle = measuredAngle;
+                const auto disturbance = noise(engine) * rotor.torqueDisturbance;
+                for (uint32_t substep = 0; substep != substeps; ++substep)
                 {
-                    speed += (rotor.torqueConstant * current - rotor.friction * speed - rotor.shaftTorque) / rotor.inertia * dt;
-                    angle += speed * dt;
+                    const auto measured = Measure(angle);
+                    window.Accumulate(current + noise(engine) * rotor.currentNoise, measured - measuredAngle);
+                    measuredAngle = measured;
+
+                    const auto acceleration = (rotor.torqueConstant * current - rotor.friction * speed - rotor.shaftTorque - disturbance) / rotor.inertia;
+                    angle += speed * dt + 0.5f * acceleration * dt * dt;
+                    speed += acceleration * dt;
+                    current += (currentReference - current) * currentResponse;
                 }
 
-                measuredSpeed = (angle - startAngle) * outerLoopFrequency;
-                estimator.Update(foc::MechanicalWindow{ foc::Ampere{ current }, foc::RadiansPerSecond{ measuredSpeed } });
+                measuredSpeed = (measuredAngle - startAngle) * outerLoopFrequency;
+                estimator.Update(window.Close());
             }
         }
 
     private:
+        float Measure(float trueAngle) const
+        {
+            return count > 0.0f ? std::floor(trueAngle / count) * count : trueAngle;
+        }
+
         ReferenceRotor rotor;
         services::RealTimeFrictionAndInertiaEstimator& estimator;
-        float pendingCurrent{ 0.0f };
+        float count;
+        foc::MechanicalWindowAccumulator window{ substeps };
+        std::mt19937 engine{ 7 };
+        std::normal_distribution<float> noise{ 0.0f, 1.0f };
+        float current{ 0.0f };
         float speed{ 0.0f };
         float angle{ 0.0f };
+        float measuredAngle{ 0.0f };
         float measuredSpeed{ 0.0f };
     };
+
+    foc::MechanicalWindow SteadyWindow(float iq, float speed, bool first)
+    {
+        foc::MechanicalWindowAccumulator window{ substeps };
+        const auto step = speed / outerLoopFrequency / static_cast<float>(substeps);
+        for (uint32_t substep = 0; substep != substeps; ++substep)
+            window.Accumulate(iq, step);
+
+        auto closed = window.Close();
+        closed.first = first;
+        return closed;
+    }
 }
 
 TEST_F(TestRealTimeFrictionAndInertiaEstimator, update_produces_finite_results)
@@ -170,7 +211,7 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_standstill_run_does_not_publis
     estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
 
     for (int sample = 0; sample != 2000; ++sample)
-        estimator.Update(foc::MechanicalWindow{ foc::Ampere{ 0.0f }, foc::RadiansPerSecond{ 0.0f } });
+        estimator.Update(SteadyWindow(0.0f, 0.0f, sample == 0));
 
     EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 1.0e-4f);
     EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
@@ -182,7 +223,7 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_steady_speed_is_not_excitation
     estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
 
     for (int sample = 0; sample != 5000; ++sample)
-        estimator.Update(foc::MechanicalWindow{ foc::Ampere{ 0.5f }, speed });
+        estimator.Update(SteadyWindow(0.5f, speed.Value(), sample == 0));
 
     EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 1.0e-4f);
     EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
@@ -194,7 +235,7 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_short_burst_of_excitation_is_n
     estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
 
     for (int sample = 0; sample != 8; ++sample)
-        estimator.Update(foc::MechanicalWindow{ foc::Ampere{ 1.0f }, foc::RadiansPerSecond{ static_cast<float>(sample) * 13.0f } });
+        estimator.Update(SteadyWindow(1.0f, static_cast<float>(sample) * 13.0f, sample == 0));
 
     EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 1.0e-4f);
     EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
@@ -236,4 +277,36 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, reseeding_restarts_the_online_fi
 
     EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 1.0e-4f);
     EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_four_thousand_count_encoder_identifies_the_reference_rotor_from_a_wrong_seed)
+{
+    services::RealTimeFrictionAndInertiaEstimator production{ services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, hal::Hertz{ 1000 } };
+    const ReferenceRotor rotor;
+    production.SetTorqueConstant(foc::NewtonMeter{ rotor.torqueConstant });
+    production.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 2.0f * rotor.inertia }, foc::NewtonMeterSecondPerRadian{ 0.5f * rotor.friction });
+
+    WindowedRotorRun{ rotor, production, 4000 }.Run(26.0f, 52.0f, 250, 6000);
+
+    EXPECT_NEAR(production.CurrentInertia().Value(), rotor.inertia, 0.02f * rotor.inertia);
+    EXPECT_NEAR(production.CurrentFriction().Value(), rotor.friction, 0.05f * rotor.friction);
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, the_bench_rotor_is_identified_through_an_unmodelled_torque_disturbance)
+{
+    services::RealTimeFrictionAndInertiaEstimator production{ services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, hal::Hertz{ 1000 } };
+    ReferenceRotor rotor;
+    rotor.inertia = 13.9e-6f;
+    rotor.friction = 7e-6f;
+    rotor.torqueConstant = 0.042f;
+    rotor.shaftTorque = 3.7e-3f;
+    rotor.currentNoise = 0.012f;
+    rotor.torqueDisturbance = 5e-3f;
+    production.SetTorqueConstant(foc::NewtonMeter{ rotor.torqueConstant });
+    production.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 2.0f * rotor.inertia }, foc::NewtonMeterSecondPerRadian{ 0.5f * rotor.friction });
+
+    WindowedRotorRun{ rotor, production, 4000 }.Run(26.0f, 52.0f, 100, 3200);
+
+    EXPECT_NEAR(production.CurrentInertia().Value(), rotor.inertia, 0.02f * rotor.inertia);
+    EXPECT_NEAR(production.CurrentFriction().Value(), rotor.friction, 0.3f * rotor.friction);
 }
