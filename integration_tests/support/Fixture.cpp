@@ -340,19 +340,27 @@ namespace integration
         canReference = std::chrono::steady_clock::now();
     }
 
-    std::optional<hal::Can::Message> Fixture::FindCapturedCanFrame(hal::Can::Id id, std::size_t fromLine) const
+    std::optional<hal::Can::Message> Fixture::FindCapturedCanFrame(hal::Can::Id id, CaptureMark from) const
     {
         const auto& lines = interactor.SerialLines();
         std::optional<hal::Can::Message> found;
 
-        for (std::size_t i = fromLine; i < lines.size(); ++i)
+        for (std::size_t i = from.line; i < lines.size(); ++i)
         {
             hal::Can::Message payload;
             if (ParseTransmittedFrame(lines[i], id, payload))
                 found = payload;
         }
 
-        return found;
+        if (found)
+            return found;
+
+        return interactor.FindReceivedCanFrame(id, from.frame);
+    }
+
+    Fixture::CaptureMark Fixture::MarkCapture() const
+    {
+        return { interactor.SerialLines().size(), interactor.ReceivedCanFrameCount() };
     }
 
     std::size_t Fixture::CapturedLineCount() const

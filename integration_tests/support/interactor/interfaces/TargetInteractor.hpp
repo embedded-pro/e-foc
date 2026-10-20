@@ -2,7 +2,9 @@
 
 #include "hal/interfaces/Can.hpp"
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -38,6 +40,10 @@ namespace integration
             std::chrono::milliseconds timeout,
             std::chrono::steady_clock::time_point referenceTime,
             std::chrono::milliseconds& elapsed) = 0;
+
+        // A wait for one frame drops the others it reads; these keep every frame received from the target.
+        virtual std::size_t ReceivedCanFrameCount() const;
+        virtual std::optional<hal::Can::Message> FindReceivedCanFrame(hal::Can::Id id, std::size_t fromFrame) const;
 
         static TargetInteractor& Instance();
         static void SetInstance(TargetInteractor& instance);

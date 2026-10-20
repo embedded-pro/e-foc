@@ -37,5 +37,7 @@ namespace hil
             std::chrono::milliseconds timeout,
             std::chrono::steady_clock::time_point referenceTime,
             std::chrono::milliseconds& elapsed) override;
+        std::size_t ReceivedCanFrameCount() const override;
+        std::optional<hal::Can::Message> FindReceivedCanFrame(hal::Can::Id id, std::size_t fromFrame) const override;
     };
 }

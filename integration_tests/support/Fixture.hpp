@@ -55,9 +55,17 @@ namespace integration
         void StartCanCapture();
         void MarkCanReference();
 
-        // Frames the target sent while another wait was consuming the serial stream stay in the captured
-        // lines; this finds the last one with the given id, from the line index the caller marked.
-        std::optional<hal::Can::Message> FindCapturedCanFrame(hal::Can::Id id, std::size_t fromLine) const;
+        struct CaptureMark
+        {
+            std::size_t line;
+            std::size_t frame;
+        };
+
+        // A frame the target sent while another wait was reading stays captured: the simulated target prints it
+        // as a serial line, the bridge to real hardware keeps it. This finds the last one with the given id
+        // after the mark.
+        std::optional<hal::Can::Message> FindCapturedCanFrame(hal::Can::Id id, CaptureMark from) const;
+        CaptureMark MarkCapture() const;
         std::size_t CapturedLineCount() const;
 
         std::string lastResponse;

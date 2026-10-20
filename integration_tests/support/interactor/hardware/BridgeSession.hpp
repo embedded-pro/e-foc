@@ -60,6 +60,11 @@ namespace hil
 
         void ClearCanFrames();
 
+        const std::vector<CanFrame>& ReceivedFrames() const
+        {
+            return receivedFrames;
+        }
+
         bool SendCanFrame(hal::Can::Id id, const hal::Can::Message& message,
             std::chrono::milliseconds timeout);
 
@@ -130,5 +135,6 @@ namespace hil
         std::chrono::milliseconds lastSerialDuration{ 0 };
 
         std::deque<CanFrame> canQueue;
+        std::vector<CanFrame> receivedFrames;
     };
 }

@@ -166,7 +166,7 @@ WHEN(R"(electrical identification is run)")
     auto& fixture = context.Get<Fixture>();
     auto& setup = context.Get<ScenarioSetup>();
 
-    const auto mark = fixture.CapturedLineCount();
+    const auto mark = fixture.MarkCapture();
     ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focIdentifyElectricalId, {}, kIdentificationTimeout))
         << "Electrical identification did not complete successfully";
 

@@ -31,6 +31,16 @@ namespace integration
     void TargetInteractor::ConfigureNonVolatileMemory(const std::vector<uint8_t>&)
     {}
 
+    std::size_t TargetInteractor::ReceivedCanFrameCount() const
+    {
+        return 0;
+    }
+
+    std::optional<hal::Can::Message> TargetInteractor::FindReceivedCanFrame(hal::Can::Id, std::size_t) const
+    {
+        return std::nullopt;
+    }
+
     void TargetInteractor::RestartTarget()
     {}
 }

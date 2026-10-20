@@ -108,6 +108,7 @@ namespace hil
                 frame.id = id;
                 frame.message = data;
                 frame.arrival = std::chrono::steady_clock::now();
+                receivedFrames.push_back(frame);
                 canQueue.push_back(std::move(frame));
             });
 
@@ -392,6 +393,7 @@ namespace hil
     void BridgeSession::ClearCanFrames()
     {
         canQueue.clear();
+        receivedFrames.clear();
     }
 
     bool BridgeSession::SendCanFrame(hal::Can::Id id, const hal::Can::Message& message,
