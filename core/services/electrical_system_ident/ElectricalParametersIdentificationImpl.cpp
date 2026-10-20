@@ -13,6 +13,7 @@ namespace
     constexpr std::size_t stepsPerRevolution = 12;
     constexpr float anglePerStep = twoPi / static_cast<float>(stepsPerRevolution);
     constexpr float minRotationThreshold = std::numbers::pi_v<float> / 2.0f;
+    constexpr float maxPolePairsDeviation = 0.25f;
     const hal::Hertz samplingFrequency{ 10000 };
 }
 
@@ -89,9 +90,6 @@ namespace services
         currentSampleIndex = 0;
         accumulatedRotation = 0.0f;
 
-        initialPosition = encoder.Read();
-        previousPosition = initialPosition;
-
         driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
             {
                 if (!polePairsRunning || polePairsFinishing)
@@ -157,7 +155,7 @@ namespace services
     {
         const auto totalSteps = polePairsConfig.electricalRevolutions * stepsPerRevolution;
 
-        if (currentSampleIndex < totalSteps)
+        if (currentSampleIndex <= totalSteps)
             RunPolePairLogic();
         else
             CalculatePolePairs();
@@ -183,11 +181,14 @@ namespace services
                 if (!polePairsRunning || polePairsFinishing)
                     return;
 
+                // The first step pulls the rotor onto the field from wherever it rested, by up to half an electrical turn.
                 const auto currentPosition = encoder.Read();
-                auto delta = currentPosition.Value() - previousPosition.Value();
-                delta = delta - twoPi * std::floor((delta + std::numbers::pi_v<float>) / twoPi);
+                if (currentSampleIndex != 0)
+                {
+                    auto delta = currentPosition.Value() - previousPosition.Value();
+                    accumulatedRotation += delta - twoPi * std::floor((delta + std::numbers::pi_v<float>) / twoPi);
+                }
 
-                accumulatedRotation += delta;
                 previousPosition = currentPosition;
                 ++currentSampleIndex;
                 ApplyNextElectricalAngle();
@@ -204,13 +205,17 @@ namespace services
         const float mechanicalRotation = std::abs(accumulatedRotation);
         polePairsRunning = false;
 
-        if (mechanicalRotation > minRotationThreshold)
+        if (mechanicalRotation <= minRotationThreshold)
         {
-            const auto electricalRevolutions = static_cast<float>(polePairsConfig.electricalRevolutions);
-            const float mechanicalRevolutions = mechanicalRotation / twoPi;
-            onPolePairsDone(std::make_optional<std::size_t>(
-                static_cast<std::size_t>(std::round(electricalRevolutions / mechanicalRevolutions))));
+            onPolePairsDone(std::nullopt);
+            return;
         }
+
+        const float ratio = static_cast<float>(polePairsConfig.electricalRevolutions) * twoPi / mechanicalRotation;
+        const float polePairs = std::round(ratio);
+
+        if (polePairs >= 1.0f && std::abs(ratio - polePairs) <= maxPolePairsDeviation)
+            onPolePairsDone(std::make_optional<std::size_t>(static_cast<std::size_t>(polePairs)));
         else
             onPolePairsDone(std::nullopt);
     }

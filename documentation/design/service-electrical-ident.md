@@ -251,27 +251,37 @@ other is active.
 
 ### Procedure 2 — Pole Pairs Estimation
 
-Starting at electrical angle 0°, the service advances the voltage vector by a small angular
-increment each settle-timer tick. After each step, the encoder is read and the mechanical
-displacement is accumulated. Over $N_{rev}$ full electrical revolutions:
+The service applies an open-loop voltage vector at electrical angle 0° and waits one settle-timer
+tick. The rotor starts anywhere, so that first step can pull it up to half an electrical revolution
+either way; the encoder reading after it is the reference, and the snap is not counted. The vector
+then advances by a fixed increment each tick through exactly $N_{rev}$ full electrical revolutions,
+ending on the angle it started from, and the mechanical displacement is accumulated after every
+step. The rotor lags the field by the same amount at the reference and at the end, so the lag
+cancels:
 
 $$
-p = \text{round}(2\pi N_{rev} / \Delta\theta_{mech,total})
+x = 2\pi N_{rev} / \Delta\theta_{mech,total}, \qquad p = \text{round}(x)
 $$
 
-If the total mechanical rotation is below $\pi/2$ (rotor not following the field), the result is
-absent.
+The result is absent if the rotation is below $\pi/2$ (rotor not following the field), or if $x$ is
+more than a quarter from the nearest integer: a rotor that skipped or slipped part of a revolution
+must fail the calibration, not hand the loops a wrong pole-pair count. Counting the first snap, as
+an earlier version did, measured anything from 1590° to 1950° electrical for 1800° of field travel;
+on the bench motor (four pole pairs) a rotor that had to snap back more than about 170° read five,
+and the calibration that followed drove the rotor with an angle error that grew with every
+radian it turned, until the current loop saturated and pulled the supply down.
 
 ```mermaid
 flowchart TD
-    START["θe = 0°, Δθm = 0"] --> STEP["Advance θe by Δθe\napply open-loop voltage"]
+    START["θe = 0°, apply vector"] --> REF["Wait settle_time\nread encoder → reference"]
+    REF --> STEP["Advance θe by Δθe\napply open-loop voltage"]
     STEP --> SETTLE["Wait settle_time\n(TimerSingleShot)"]
     SETTLE --> READ["Read encoder\naccumulate Δθm"]
-    READ --> CHECK{"All electrical\nrevolutions complete?"}
+    READ --> CHECK{"N full electrical\nrevolutions done?"}
     CHECK -->|No| STEP
-    CHECK -->|Yes| CALC["p = round(2πN / Δθm)"]
-    CALC --> VALID{"Δθm > π/2?"}
-    VALID -->|Yes| CB_OK["onDone(p)"]
+    CHECK -->|Yes| CALC["x = 2πN / Δθm"]
+    CALC --> VALID{"Δθm > π/2 and\nx within ¼ of an integer?"}
+    VALID -->|Yes| CB_OK["onDone(round(x))"]
     VALID -->|No| CB_FAIL["onDone(nullopt)"]
 ```
 
