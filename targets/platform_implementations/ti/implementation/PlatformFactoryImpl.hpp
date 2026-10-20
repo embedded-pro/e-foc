@@ -169,11 +169,11 @@ namespace application
             static constexpr auto currentSensingOversampling = hal::tiva::Adc::Oversampling::oversampling2;
 
             // Steps 0–2 go to the ADC FIFO (phase currents A/B/C).
-            // Steps 3–4 are redirected to DCMP units 0 and 1 via the SSOP register and
+            // Steps 3–5 are redirected to DCMP units 0, 1 and 2 via the SSOP register and
             // do NOT appear in the FIFO, so AdcPhaseCurrentMeasurementImpl still receives
-            // exactly 3 samples.  DCMP0/1 outputs connect to PWM FLTSRC1 bits 0/1 and
-            // tristate all motor PWM outputs instantly when a threshold is exceeded.
-            static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 5> digitalComparators{ {
+            // exactly 3 samples.  DCMP0/1/2 outputs connect to PWM FLTSRC1 bits 0/1/2 and
+            // tristate all motor PWM outputs instantly when a threshold is crossed.
+            static constexpr std::array<hal::tiva::Adc::DigitalComparatorConfig, 6> digitalComparators{ {
                 {}, // step 0: currentPhaseA  → FIFO (noComparator)
                 {}, // step 1: currentPhaseB  → FIFO (noComparator)
                 {}, // step 2: currentPhaseC  → FIFO (noComparator)
@@ -181,11 +181,13 @@ namespace application
                     hal::tiva::Adc::ComparatorCondition::highBand, hal::tiva::Adc::ComparatorMode::always },
                 { Peripheral::OvervoltageComparatorIndex, 0, Peripheral::overvoltageThresholdCounts,
                     hal::tiva::Adc::ComparatorCondition::highBand, hal::tiva::Adc::ComparatorMode::always },
+                { Peripheral::UndervoltageComparatorIndex, Peripheral::undervoltageThresholdCounts, Peripheral::undervoltageThresholdCounts,
+                    hal::tiva::Adc::ComparatorCondition::lowBand, hal::tiva::Adc::ComparatorMode::always },
             } };
 
             hal::tiva::Adc::Config adcConfig{ false, 0, Peripheral::adcTrigger, hal::tiva::Adc::SampleAndHold::sampleAndHold8, std::make_optional(currentSensingOversampling), phaseDelay, {}, hal::cortex::InterruptPriority::highest };
             static constexpr std::size_t powerSupplyPinIndex{ 4 };
-            std::array<hal::tiva::AnalogPin, 5> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC }, hal::tiva::AnalogPin{ Pins::currentTotal }, hal::tiva::AnalogPin{ Pins::powerSupplyVoltage } } };
+            std::array<hal::tiva::AnalogPin, 6> currentPhaseAnalogPins{ { hal::tiva::AnalogPin{ Pins::currentPhaseA }, hal::tiva::AnalogPin{ Pins::currentPhaseB }, hal::tiva::AnalogPin{ Pins::currentPhaseC }, hal::tiva::AnalogPin{ Pins::currentTotal }, hal::tiva::AnalogPin{ Pins::powerSupplyVoltage }, hal::tiva::AnalogPin{ Pins::powerSupplyVoltageForUndervoltage } } };
         };
 
         struct AsyncPwmConfig
@@ -197,9 +199,9 @@ namespace application
             hal::tiva::Pwm::Config::InterruptConfig interruptConfig{
                 {},
                 infra::BoundedVector<hal::tiva::Pwm::Config::InterruptConfig::FaultConfig>::WithMaxSize<4>{ {
-                    hal::tiva::Pwm::Config::InterruptConfig::FaultConfig{ hal::tiva::Pwm::GeneratorIndex::generator1, uint8_t{ 0x00 }, uint8_t{ static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator0) | static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1) }, true, uint16_t{ 0 } },
-                    hal::tiva::Pwm::Config::InterruptConfig::FaultConfig{ hal::tiva::Pwm::GeneratorIndex::generator2, uint8_t{ 0x00 }, uint8_t{ static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator0) | static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1) }, true, uint16_t{ 0 } },
-                    hal::tiva::Pwm::Config::InterruptConfig::FaultConfig{ hal::tiva::Pwm::GeneratorIndex::generator3, uint8_t{ 0x00 }, uint8_t{ static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator0) | static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1) }, true, uint16_t{ 0 } },
+                    hal::tiva::Pwm::Config::InterruptConfig::FaultConfig{ hal::tiva::Pwm::GeneratorIndex::generator1, uint8_t{ 0x00 }, uint8_t{ static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator0) | static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1) | static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator2) }, true, uint16_t{ 0 } },
+                    hal::tiva::Pwm::Config::InterruptConfig::FaultConfig{ hal::tiva::Pwm::GeneratorIndex::generator2, uint8_t{ 0x00 }, uint8_t{ static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator0) | static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1) | static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator2) }, true, uint16_t{ 0 } },
+                    hal::tiva::Pwm::Config::InterruptConfig::FaultConfig{ hal::tiva::Pwm::GeneratorIndex::generator3, uint8_t{ 0x00 }, uint8_t{ static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator0) | static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1) | static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator2) }, true, uint16_t{ 0 } },
                 } },
                 InterruptPriorities::pwmFault,
             };

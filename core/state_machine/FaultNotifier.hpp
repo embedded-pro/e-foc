@@ -18,6 +18,33 @@ namespace state_machine
         calibrationFailed
     };
 
+    constexpr const char* FaultCodeName(FaultCode code)
+    {
+        switch (code)
+        {
+            case FaultCode::none:
+                return "none";
+            case FaultCode::overcurrent:
+                return "overcurrent";
+            case FaultCode::overvoltage:
+                return "overvoltage";
+            case FaultCode::undervoltage:
+                return "undervoltage";
+            case FaultCode::overtemperature:
+                return "overtemperature";
+            case FaultCode::encoderLoss:
+                return "encoderLoss";
+            case FaultCode::watchdogTimeout:
+                return "watchdogTimeout";
+            case FaultCode::hardwareFault:
+                return "hardwareFault";
+            case FaultCode::calibrationFailed:
+                return "calibrationFailed";
+        }
+
+        return "unknown";
+    }
+
     enum class FaultConditionState : uint8_t
     {
         clear,

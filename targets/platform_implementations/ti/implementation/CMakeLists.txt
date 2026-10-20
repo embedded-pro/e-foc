@@ -27,6 +27,7 @@ target_sources(e_foc.platform_abstraction_${E_FOC_TARGET_PLATFORM} PRIVATE
     CutPowerStage.cpp
     PlatformFactoryImpl.cpp
     PlatformFactoryImpl.hpp
+    SharedGpioPin.hpp
 )
 
 if(EMIL_INCLUDE_SEGGER_RTT)

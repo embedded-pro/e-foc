@@ -163,7 +163,9 @@ dispatched directly or from the queue.
 
 The transition table is observable: a tracer prints every transition as
 `fsm: <from> --<event>--> <to>` next to the existing `[SM]` lines, and every forbidden,
-rejected or discarded event with its state.
+rejected or discarded event with its state. Every entry into `Fault` also traces
+`[SM] Fault: <code>` with the code it was entered for, which the transition line does not carry:
+on the bench that line is the only record of why a run ended, short of a CAN telemetry request.
 
 ### Structure
 
