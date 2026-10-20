@@ -72,6 +72,8 @@ namespace application
 
     state_machine::Fault OperationFlow::EnterFault(state_machine::FaultCode code, bool wasActive, state_machine::CommandResult pendingResult)
     {
+        env.tracer.Trace() << "[SM] Fault: " << state_machine::FaultCodeName(code);
+
         if (!faultController.IsRecorded())
             lastFaultCode = code;
         else
