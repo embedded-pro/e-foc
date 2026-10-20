@@ -12,6 +12,7 @@ namespace
     constexpr float twoPi = 2.0f * std::numbers::pi_v<float>;
     constexpr std::size_t stepsPerRevolution = 12;
     constexpr float anglePerStep = twoPi / static_cast<float>(stepsPerRevolution);
+    constexpr std::size_t leadInSteps = stepsPerRevolution;
     constexpr float minRotationThreshold = std::numbers::pi_v<float> / 2.0f;
     constexpr float maxPolePairsDeviation = 0.25f;
     const hal::Hertz samplingFrequency{ 10000 };
@@ -155,7 +156,7 @@ namespace services
     {
         const auto totalSteps = polePairsConfig.electricalRevolutions * stepsPerRevolution;
 
-        if (currentSampleIndex <= totalSteps)
+        if (currentSampleIndex <= leadInSteps + totalSteps)
             RunPolePairLogic();
         else
             CalculatePolePairs();
@@ -181,9 +182,10 @@ namespace services
                 if (!polePairsRunning || polePairsFinishing)
                     return;
 
-                // The first step pulls the rotor onto the field from wherever it rested, by up to half an electrical turn.
+                // A rotor resting on the null of the first vector only moves when a later one pulls it, so the
+                // reference waits one electrical turn, and is then read one step behind the field as the end is.
                 const auto currentPosition = encoder.Read();
-                if (currentSampleIndex != 0)
+                if (currentSampleIndex > leadInSteps)
                 {
                     auto delta = currentPosition.Value() - previousPosition.Value();
                     accumulatedRotation += delta - twoPi * std::floor((delta + std::numbers::pi_v<float>) / twoPi);

@@ -37,6 +37,19 @@ namespace
         return electricalAngle / static_cast<float>(expectedPolePairs);
     }
 
+    constexpr std::size_t leadInSteps = 12;
+
+    // A four-pole-pair rotor that rests at restingElectricalAngle under the first vectorsIgnored vectors of the
+    // sweep, then lines up with every vector after them.
+    float FollowingRotor(std::size_t appliedVectors, float restingElectricalAngle, std::size_t vectorsIgnored)
+    {
+        constexpr float polePairs = 4.0f;
+        constexpr float stepAngle = 2.0f * std::numbers::pi_v<float> / 12.0f;
+        constexpr float mechanicalOffset = 1.0f;
+        const float electricalAngle = appliedVectors <= vectorsIgnored ? restingElectricalAngle : static_cast<float>(appliedVectors - 1) * stepAngle;
+        return std::fmod(mechanicalOffset + electricalAngle / polePairs, 2.0f * std::numbers::pi_v<float>);
+    }
+
     class ElectricalParametersIdentificationTest
         : public ::testing::Test
         , public infra::ClockFixture
@@ -45,6 +58,37 @@ namespace
         void TearDown() override
         {
             ExecuteAllActions();
+        }
+
+        std::optional<std::size_t> SweepFollowingRotor(float restingElectricalAngle, std::size_t vectorsIgnored)
+        {
+            constexpr std::size_t totalSteps = 5 * 12;
+            std::optional<std::size_t> result;
+            std::size_t appliedVectors = 0;
+
+            EXPECT_CALL(encoderMock, Read())
+                .WillRepeatedly([&appliedVectors, restingElectricalAngle, vectorsIgnored]()
+                    {
+                        return foc::Radians{ FollowingRotor(appliedVectors, restingElectricalAngle, vectorsIgnored) };
+                    });
+            EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, ::testing::_));
+            EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_))
+                .Times(leadInSteps + totalSteps + 1)
+                .WillRepeatedly([&appliedVectors](auto)
+                    {
+                        ++appliedVectors;
+                    });
+            EXPECT_CALL(driverMock, Stop());
+
+            identification->EstimateNumberOfPolePairs({ hal::DutyCycle::FromPercent(20), 5, std::chrono::milliseconds{ 50 } }, [&result](auto polePairs)
+                {
+                    result = polePairs;
+                });
+
+            for (std::size_t i = 0; i <= leadInSteps + totalSteps; ++i)
+                ForwardTime(std::chrono::milliseconds{ 50 });
+
+            return result;
         }
 
         void TriggerOvercurrent()
@@ -100,7 +144,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_cal
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, ::testing::_));
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_))
-        .Times(totalSteps + 1);
+        .Times(leadInSteps + totalSteps + 1);
     EXPECT_CALL(driverMock, Stop());
 
     identification->EstimateNumberOfPolePairs(config, [&](auto result)
@@ -108,7 +152,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_cal
             resultPolePairs = result;
         });
 
-    for (std::size_t i = 0; i <= totalSteps; ++i)
+    for (std::size_t i = 0; i <= leadInSteps + totalSteps; ++i)
         ForwardTime(std::chrono::milliseconds{ 50 });
 
     ASSERT_TRUE(resultPolePairs.has_value());
@@ -117,46 +161,14 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_cal
 
 TEST_F(ElectricalParametersIdentificationTest, the_snap_onto_the_first_vector_does_not_count_towards_the_pole_pairs)
 {
-    services::ElectricalParametersIdentification::PolePairsConfig config{
-        hal::DutyCycle::FromPercent(20),
-        5,
-        std::chrono::milliseconds{ 50 }
-    };
-
-    std::optional<std::size_t> resultPolePairs;
-    constexpr std::size_t totalSteps = 5 * 12;
-    constexpr float polePairs = 4.0f;
-    constexpr float stepAngle = 2.0f * std::numbers::pi_v<float> / 12.0f;
     constexpr float snapBack = 175.0f * std::numbers::pi_v<float> / 180.0f;
-    constexpr float mechanicalOffset = 1.0f;
-    std::size_t appliedSteps = 0;
 
-    EXPECT_CALL(encoderMock, Read())
-        .WillRepeatedly([&appliedSteps]()
-            {
-                const float electricalAngle = appliedSteps == 0 ? snapBack : static_cast<float>(appliedSteps - 1) * stepAngle;
-                return foc::Radians{ std::fmod(mechanicalOffset + electricalAngle / polePairs, 2.0f * std::numbers::pi_v<float>) };
-            });
+    EXPECT_EQ(SweepFollowingRotor(snapBack, 0), std::make_optional<std::size_t>(4));
+}
 
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, ::testing::_));
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_))
-        .Times(totalSteps + 1)
-        .WillRepeatedly([&appliedSteps](auto)
-            {
-                ++appliedSteps;
-            });
-    EXPECT_CALL(driverMock, Stop());
-
-    identification->EstimateNumberOfPolePairs(config, [&](auto result)
-        {
-            resultPolePairs = result;
-        });
-
-    for (std::size_t i = 0; i <= totalSteps; ++i)
-        ForwardTime(std::chrono::milliseconds{ 50 });
-
-    ASSERT_TRUE(resultPolePairs.has_value());
-    EXPECT_EQ(*resultPolePairs, 4u);
+TEST_F(ElectricalParametersIdentificationTest, a_rotor_resting_on_the_null_of_the_first_vector_still_reads_its_pole_pairs)
+{
+    EXPECT_EQ(SweepFollowingRotor(std::numbers::pi_v<float>, 1), std::make_optional<std::size_t>(4));
 }
 
 TEST_F(ElectricalParametersIdentificationTest, a_rotation_between_two_pole_pair_counts_returns_nullopt)
@@ -181,7 +193,7 @@ TEST_F(ElectricalParametersIdentificationTest, a_rotation_between_two_pole_pair_
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, ::testing::_));
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_))
-        .Times(totalSteps + 1);
+        .Times(leadInSteps + totalSteps + 1);
     EXPECT_CALL(driverMock, Stop());
 
     identification->EstimateNumberOfPolePairs(config, [&](auto result)
@@ -190,7 +202,7 @@ TEST_F(ElectricalParametersIdentificationTest, a_rotation_between_two_pole_pair_
             resultPolePairs = result;
         });
 
-    for (std::size_t i = 0; i <= totalSteps; ++i)
+    for (std::size_t i = 0; i <= leadInSteps + totalSteps; ++i)
         ForwardTime(std::chrono::milliseconds{ 50 });
 
     EXPECT_TRUE(fired);
@@ -267,7 +279,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_cal
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, ::testing::_));
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_))
-        .Times(totalSteps + 1);
+        .Times(leadInSteps + totalSteps + 1);
     EXPECT_CALL(driverMock, Stop());
 
     identification->EstimateNumberOfPolePairs(config, [&](auto result)
@@ -275,7 +287,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_cal
             resultPolePairs = result;
         });
 
-    for (std::size_t i = 0; i <= totalSteps; ++i)
+    for (std::size_t i = 0; i <= leadInSteps + totalSteps; ++i)
         ForwardTime(std::chrono::milliseconds{ 50 });
 
     ASSERT_TRUE(resultPolePairs.has_value());
@@ -298,7 +310,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_ret
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, ::testing::_));
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_))
-        .Times(totalSteps + 1);
+        .Times(leadInSteps + totalSteps + 1);
     EXPECT_CALL(driverMock, Stop());
 
     identification->EstimateNumberOfPolePairs(config, [&](auto result)
@@ -306,7 +318,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_ret
             resultPolePairs = result;
         });
 
-    for (std::size_t i = 0; i <= totalSteps; ++i)
+    for (std::size_t i = 0; i <= leadInSteps + totalSteps; ++i)
         ForwardTime(std::chrono::milliseconds{ 50 });
 
     EXPECT_FALSE(resultPolePairs.has_value());
@@ -335,7 +347,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_wit
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, ::testing::_));
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_))
-        .Times(totalSteps + 1);
+        .Times(leadInSteps + totalSteps + 1);
     EXPECT_CALL(driverMock, Stop());
 
     identification->EstimateNumberOfPolePairs(config, [&](auto result)
@@ -343,7 +355,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_wit
             resultPolePairs = result;
         });
 
-    for (std::size_t i = 0; i <= totalSteps; ++i)
+    for (std::size_t i = 0; i <= leadInSteps + totalSteps; ++i)
         ForwardTime(std::chrono::milliseconds{ 50 });
 
     ASSERT_TRUE(resultPolePairs.has_value());
@@ -493,7 +505,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_wit
 
     EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, ::testing::_));
     EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_))
-        .Times(totalSteps + 1);
+        .Times(leadInSteps + totalSteps + 1);
     EXPECT_CALL(driverMock, Stop());
 
     identification->EstimateNumberOfPolePairs(config, [&](auto result)
@@ -501,7 +513,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_number_of_pole_pairs_wit
             resultPolePairs = result;
         });
 
-    for (std::size_t i = 0; i <= totalSteps; ++i)
+    for (std::size_t i = 0; i <= leadInSteps + totalSteps; ++i)
         ForwardTime(std::chrono::milliseconds{ 50 });
 
     ASSERT_TRUE(resultPolePairs.has_value());
@@ -888,7 +900,7 @@ TEST_F(ElectricalParametersIdentificationTest, an_overcurrent_during_the_last_st
         .WillOnce(Return(foc::Radians{ 0.0f }))
         .WillRepeatedly([this, totalSteps, polePairs]()
             {
-                if (++encoderStepIndex == totalSteps)
+                if (++encoderStepIndex == leadInSteps + totalSteps)
                     TriggerOvercurrent();
                 return foc::Radians{ MechanicalAngle(encoderStepIndex, totalSteps, polePairs) };
             });
@@ -897,7 +909,7 @@ TEST_F(ElectricalParametersIdentificationTest, an_overcurrent_during_the_last_st
             {
                 driverMock.StorePhaseCurrentsCallback(cb);
             });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(totalSteps + 1);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(leadInSteps + totalSteps + 1);
     EXPECT_CALL(driverMock, Stop()).Times(2);
 
     identification->EstimateNumberOfPolePairs(config, [&](auto identified)
@@ -906,7 +918,7 @@ TEST_F(ElectricalParametersIdentificationTest, an_overcurrent_during_the_last_st
             result = identified;
         });
 
-    for (std::size_t i = 0; i <= totalSteps; ++i)
+    for (std::size_t i = 0; i <= leadInSteps + totalSteps; ++i)
         ForwardTime(std::chrono::milliseconds{ 50 });
 
     EXPECT_TRUE(fired);
