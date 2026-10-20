@@ -27,6 +27,7 @@ namespace hil
         bool WaitForPrompt(std::chrono::milliseconds timeout) override;
         void ClearSerialLines() override;
         const std::vector<std::string>& SerialLines() const override;
+        std::size_t DiscardedSerialLineCount() const override;
         const std::string& LastSerialLine() const override;
         std::chrono::milliseconds LastSerialDuration() const override;
 

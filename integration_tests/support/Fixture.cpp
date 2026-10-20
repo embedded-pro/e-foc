@@ -345,7 +345,7 @@ namespace integration
         const auto& lines = interactor.SerialLines();
         std::optional<hal::Can::Message> found;
 
-        for (std::size_t i = from.line; i < lines.size(); ++i)
+        for (std::size_t i = LineIndexOf(from.line); i < lines.size(); ++i)
         {
             hal::Can::Message payload;
             if (ParseTransmittedFrame(lines[i], id, payload))
@@ -360,11 +360,29 @@ namespace integration
 
     Fixture::CaptureMark Fixture::MarkCapture() const
     {
-        return { interactor.SerialLines().size(), interactor.ReceivedCanFrameCount() };
+        return { CapturedLineCount(), interactor.ReceivedCanFrameCount() };
     }
 
     std::size_t Fixture::CapturedLineCount() const
     {
-        return interactor.SerialLines().size();
+        return interactor.DiscardedSerialLineCount() + interactor.SerialLines().size();
+    }
+
+    std::optional<std::string> Fixture::LastCapturedLineWith(std::size_t fromMark, const std::string& needle) const
+    {
+        const auto& lines = interactor.SerialLines();
+        std::optional<std::string> found;
+
+        for (std::size_t i = LineIndexOf(fromMark); i < lines.size(); ++i)
+            if (lines[i].find(needle) != std::string::npos)
+                found = lines[i];
+
+        return found;
+    }
+
+    std::size_t Fixture::LineIndexOf(std::size_t mark) const
+    {
+        const auto discarded = interactor.DiscardedSerialLineCount();
+        return mark > discarded ? mark - discarded : 0;
     }
 }

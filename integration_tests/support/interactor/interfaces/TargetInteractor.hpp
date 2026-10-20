@@ -30,6 +30,8 @@ namespace integration
         virtual bool WaitForPrompt(std::chrono::milliseconds timeout) = 0;
         virtual void ClearSerialLines() = 0;
         virtual const std::vector<std::string>& SerialLines() const = 0;
+        // Lines dropped from SerialLines() since setup, so a line count taken before a drop still names the same line.
+        virtual std::size_t DiscardedSerialLineCount() const;
         virtual const std::string& LastSerialLine() const = 0;
         virtual std::chrono::milliseconds LastSerialDuration() const = 0;
 

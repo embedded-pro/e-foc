@@ -156,6 +156,7 @@ namespace hil
 
     void BridgeSession::ClearSerialLines()
     {
+        discardedSerialLines += serialLines.size();
         serialLines.clear();
         lastSerialLine.clear();
         serialBuffer.clear();
@@ -194,7 +195,10 @@ namespace hil
         DrainUntilQuiet(timeout);
 
         if (!serialLines.empty() && serialLines.front() == command)
+        {
             serialLines.erase(serialLines.begin());
+            ++discardedSerialLines;
+        }
 
         lastSerialLine.clear();
         for (auto it = serialLines.rbegin(); it != serialLines.rend(); ++it)

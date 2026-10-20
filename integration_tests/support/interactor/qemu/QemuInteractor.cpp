@@ -98,6 +98,7 @@ namespace sil
 
     void QemuInteractor::ClearSerialLines()
     {
+        discardedSerialLines += session.CapturedLines().size();
         lines.clear();
         lastLine.clear();
         session.ClearCapturedLines();
@@ -106,6 +107,11 @@ namespace sil
     const std::vector<std::string>& QemuInteractor::SerialLines() const
     {
         return session.CapturedLines();
+    }
+
+    std::size_t QemuInteractor::DiscardedSerialLineCount() const
+    {
+        return discardedSerialLines;
     }
 
     const std::string& QemuInteractor::LastSerialLine() const

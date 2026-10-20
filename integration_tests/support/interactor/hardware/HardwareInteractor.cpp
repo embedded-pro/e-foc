@@ -97,6 +97,11 @@ namespace hil
         return BridgeSession::Instance().LastSerialDuration();
     }
 
+    std::size_t HardwareInteractor::DiscardedSerialLineCount() const
+    {
+        return BridgeSession::Instance().DiscardedSerialLines();
+    }
+
     void HardwareInteractor::ClearCanFrames()
     {
         BridgeSession::Instance().ClearCanFrames();

@@ -48,6 +48,11 @@ namespace hil
             return serialLines;
         }
 
+        std::size_t DiscardedSerialLines() const
+        {
+            return discardedSerialLines;
+        }
+
         const std::string& LastSerialLine() const
         {
             return lastSerialLine;
@@ -130,6 +135,7 @@ namespace hil
 
         std::string serialBuffer;
         std::vector<std::string> serialLines;
+        std::size_t discardedSerialLines{ 0 };
         std::string lastSerialLine;
         bool promptSeen{ false };
         std::chrono::milliseconds lastSerialDuration{ 0 };
