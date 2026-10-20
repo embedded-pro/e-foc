@@ -17,6 +17,9 @@ namespace application
         static constexpr float overcurrentThresholdAmps{ 6.6f };
         static constexpr float maxCurrentSupportedAmps{ ratedCurrentAmps };
         static_assert(maxCurrentSupportedAmps < overcurrentThresholdAmps);
+        // Above this duty a phase's low-side window at the PWM centre is too short for its shunt to read: on the
+        // bench a phase read within 0.25 A at 71.5 % and 1 A low at 79.7 %, and the current loop lost the phase
+        static constexpr uint32_t maxReadableDutyPercent{ 70 };
 
         static constexpr float AdcToVoltsFactor(float adcReferenceVoltage, float adcResolution)
         {

@@ -162,6 +162,15 @@ plausibility or for finiteness: at 4500 cycles a frame the budget is spent on th
 shunt or ADC channel is the hardware's fault detection to catch, not the control loop's. `foc::ToDutyCycles`
 clamps each modulator output into [0, 1] and converts to percent, and does nothing else.
 
+On a board that senses its phases with low-side shunts the duty also decides whether a phase can be read at
+all: a shunt carries its phase current only while that leg's low-side switch conducts around the PWM centre,
+where the converter samples. The TI platform passes every duty set through `foc::KeepLowSideShuntsReadable`
+with the motor board's limit (70 % on E-FOC-HARDWARE, none on FRDM-MC-LVPMSM). Above it all three duties move
+down together, which keeps the line-to-line voltages and so the vector the current loop asked for; only a vector
+wider than the limit is scaled down, along its own direction. Without the limit, a current loop that saturated
+drove a leg to the rail, read that phase near zero and held it there: on the bench the real current reached
+6 A against a 3 A reference and pulled the bus into the undervoltage trip.
+
 `foc::IsFiniteValue` survives for the places where validation is affordable and worth having —
 `CurrentPlantModel::IsUsable` when the plant is configured, and the plausibility band the mechanical estimator
 applies before publishing. Both run outside the hot path. It tests the float's exponent bits rather than
