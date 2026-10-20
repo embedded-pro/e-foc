@@ -203,6 +203,8 @@ namespace application
             onFaultCallback(PlatformFactory::BoardProtectionReason::overCurrent);
         if (bits & static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator1))
             onFaultCallback(PlatformFactory::BoardProtectionReason::overVoltage);
+        if (bits & static_cast<uint8_t>(hal::tiva::Pwm::FaultInputComparator::comparator2))
+            onFaultCallback(PlatformFactory::BoardProtectionReason::underVoltage);
     }
 
     void PlatformFactoryImpl::ReconfigurePwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime)

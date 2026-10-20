@@ -77,10 +77,16 @@ performed, and on a board with no protection comparators the fault being cleared
 
 Every platform reports `unknown` today:
 
-- **TI** — the protection comparators are ADC digital comparators (`DigitalComparatorConfig`, steps 3 and 4)
+- **TI** — the protection comparators are ADC digital comparators (`DigitalComparatorConfig`, steps 3 to 5)
   whose outputs drive the PWM fault inputs. Their counts come from the motor board's `BoardCharacteristics`; the
   total-current sense is biased to mid-rail, so `OvercurrentThresholdCounts` is an offset above half scale (6.6 A,
-  80 % of the +8.25 A a 5 A/V sense spans on a 3.3 V ADC). That ADC is triggered by the PWM generator, so once the bridge is
+  80 % of the +8.25 A a 5 A/V sense spans on a 3.3 V ADC). The bus voltage is sampled twice, once against the
+  overvoltage trip and once against an undervoltage trip at 18 V, because a sequencer step feeds one comparator.
+  The board runs its gate driver and the launchpad from the same bus, so a bus pulled down by the bridge would
+  otherwise brown the controller out with nothing logged; at 18 V the gate-drive supply is still in regulation, the
+  bridge is cut and the fault reaches the state machine. The overcurrent comparator cannot see the bus current
+  on E-FOC-HARDWARE: its shunt returns the low-side current of all three legs, and the sequence converts at the
+  counter's zero, where the low sides conduct and that current sums to zero. That ADC is triggered by the PWM generator, so once the bridge is
   stopped it stops converting, the comparators stop evaluating, and no status register distinguishes a cleared
   condition from an unevaluated one. Answering this honestly needs either a sampling path that survives the
   bridge stopping — `PowerSupplyVoltage()` already runs on a separately triggered ADC and could verify

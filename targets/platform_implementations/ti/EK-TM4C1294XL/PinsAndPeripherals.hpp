@@ -5,6 +5,7 @@
 #include "hal_tiva/tiva/ClockTm4c129.hpp"
 #include "hal_tiva/tiva/Gpio.hpp"
 #include "hal_tiva/tiva/Pwm.hpp"
+#include "targets/platform_implementations/ti/implementation/SharedGpioPin.hpp"
 #include MOTOR_BOARD_CHARACTERISTICS_HEADER
 
 namespace application
@@ -15,6 +16,7 @@ namespace application
         inline hal::tiva::GpioPin currentPhaseB{ hal::tiva::Port::E, 2 };
         inline hal::tiva::GpioPin currentPhaseC{ hal::tiva::Port::E, 1 };
         inline hal::tiva::GpioPin powerSupplyVoltage{ hal::tiva::Port::B, 5 };
+        inline SharedGpioPin powerSupplyVoltageForUndervoltage{ hal::tiva::Port::B, 5 };
         inline hal::tiva::GpioPin currentTotal{ hal::tiva::Port::B, 4 };
 
         inline hal::tiva::GpioPin hallSensorA{ hal::tiva::Port::E, 4 };
@@ -64,12 +66,13 @@ namespace application
         constexpr static uint8_t CanIndex = 0;
 
         // ADC digital comparator indices mapped to PWM FLTSRC1 lines.
-        // DCMP0 (PB4 / ADC10) → overcurrent trip; DCMP1 (PB5 / ADC11) → overvoltage trip.
+        // DCMP0 (PB4 / ADC10) → overcurrent trip; DCMP1 (PB5 / ADC11) → overvoltage trip; DCMP2 (PB5 / ADC11) → undervoltage trip.
         constexpr static bool hasFaultComparators = true;
         constexpr static bool hasBoardIdPins{ true };
         constexpr static bool hasPowerStatusPin{ true };
         constexpr static uint8_t OvercurrentComparatorIndex = 0;
         constexpr static uint8_t OvervoltageComparatorIndex = 1;
+        constexpr static uint8_t UndervoltageComparatorIndex = 2;
 
         constexpr static float adcReferenceVoltage{ 3.3f };
         constexpr static float adcResolution{ 4096.0f };
@@ -79,6 +82,8 @@ namespace application
             application::BoardCharacteristics::OvervoltageThresholdCounts(adcReferenceVoltage, adcResolution);
         constexpr static uint16_t overcurrentThresholdCounts =
             application::BoardCharacteristics::OvercurrentThresholdCounts(adcReferenceVoltage, adcResolution);
+        constexpr static uint16_t undervoltageThresholdCounts =
+            application::BoardCharacteristics::UndervoltageThresholdCounts(adcReferenceVoltage, adcResolution);
 
         constexpr static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator1;
 

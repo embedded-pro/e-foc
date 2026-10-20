@@ -8,6 +8,8 @@ namespace application
     {
         static constexpr float voltageToVolts{ 21.25f };
         static constexpr float overvoltageThresholdVolts{ 58.0f };
+        // The bus also feeds the gate driver's 15 V rail and the launchpad; 18 V keeps that rail in regulation
+        static constexpr float undervoltageThresholdVolts{ 18.0f };
 
         static constexpr float voltageToCurrent{ 5.0f };
         static constexpr float ratedCurrentAmps{ 3.0f };
@@ -36,6 +38,11 @@ namespace application
             return static_cast<uint16_t>((overvoltageThresholdVolts / (adcReferenceVoltage * voltageToVolts)) * (adcResolution - 1.0f));
         }
 
+        static constexpr uint16_t UndervoltageThresholdCounts(float adcReferenceVoltage, float adcResolution)
+        {
+            return static_cast<uint16_t>((undervoltageThresholdVolts / (adcReferenceVoltage * voltageToVolts)) * (adcResolution - 1.0f));
+        }
+
         // CUR_TOTAL is biased to mid-rail like the phase currents, so zero current reads half scale
         static constexpr uint16_t OvercurrentThresholdCounts(float adcReferenceVoltage, float adcResolution)
         {
@@ -45,4 +52,5 @@ namespace application
 
     static_assert(BoardCharacteristics::OvervoltageThresholdCounts(3.3f, 4096.0f) == 3386u, "E-FOC-HARDWARE overvoltage threshold mismatch");
     static_assert(BoardCharacteristics::OvercurrentThresholdCounts(3.3f, 4096.0f) == 3685u, "E-FOC-HARDWARE overcurrent threshold mismatch");
+    static_assert(BoardCharacteristics::UndervoltageThresholdCounts(3.3f, 4096.0f) == 1051u, "E-FOC-HARDWARE undervoltage threshold mismatch");
 }

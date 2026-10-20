@@ -6,6 +6,7 @@
 #include "hal_tiva/tiva/Gpio.hpp"
 #include "hal_tiva/tiva/PinoutTableDefaultTm4c123.hpp"
 #include "hal_tiva/tiva/Pwm.hpp"
+#include "targets/platform_implementations/ti/implementation/SharedGpioPin.hpp"
 
 namespace application
 {
@@ -15,7 +16,8 @@ namespace application
         inline hal::tiva::GpioPin currentPhaseB{ hal::tiva::Port::E, 2 };
         inline hal::tiva::GpioPin currentPhaseC{ hal::tiva::Port::E, 1 };
         inline hal::tiva::GpioPin powerSupplyVoltage{ hal::tiva::Port::E, 0 };
-        inline hal::tiva::GpioPin currentTotal{ hal::tiva::Port::E, 0 }; // alias — no separate current-total pin on this board
+        inline SharedGpioPin currentTotal{ hal::tiva::Port::E, 0 }; // alias — no separate current-total pin on this board
+        inline SharedGpioPin powerSupplyVoltageForUndervoltage{ hal::tiva::Port::E, 0 };
 
         inline hal::tiva::GpioPin hallSensorA{ hal::tiva::Port::A, 4 };
         inline hal::tiva::GpioPin hallSensorB{ hal::tiva::Port::A, 5 };
@@ -68,11 +70,13 @@ namespace application
         constexpr static bool hasPowerStatusPin{ false };
         constexpr static uint8_t OvercurrentComparatorIndex{ 0 };
         constexpr static uint8_t OvervoltageComparatorIndex{ 1 };
+        constexpr static uint8_t UndervoltageComparatorIndex{ 2 };
         constexpr static float adcReferenceVoltage{ 3.3f };
         constexpr static float adcResolution{ 4096.0f };
         // Hardware comparators absent — trip counts not used; set to 0 explicitly.
         constexpr static uint16_t overvoltageThresholdCounts{ 0 };
         constexpr static uint16_t overcurrentThresholdCounts{ 0 };
+        constexpr static uint16_t undervoltageThresholdCounts{ 0 };
 
         constexpr static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator0;
 
