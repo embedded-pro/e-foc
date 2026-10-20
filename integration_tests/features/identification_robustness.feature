@@ -63,7 +63,7 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
       | motor   | counts | limit |
       | bench   | 4000   | 3     |
       | bench   | 20000  | 3     |
-      | bench   | 1000   | 10    |
+      | bench   | 1000   | 4     |
       | teknic  | 4000   | 3     |
       | anaheim | 4000   | 3     |
 

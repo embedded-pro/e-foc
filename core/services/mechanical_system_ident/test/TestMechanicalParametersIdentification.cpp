@@ -104,6 +104,8 @@ namespace
                     }));
         }
 
+        void ExpectUnbiasedInertiaOnCoarseEncoder(float countsPerRevolution, float tolerance);
+
         void GivenEncoderFollowsTheProfile()
         {
             EXPECT_CALL(encoderMock, Read())
@@ -619,10 +621,9 @@ TEST_F(MechanicalParametersIdentificationTest, a_coarse_encoder_run_converges_in
     EXPECT_NEAR(outcome.inertia->Value(), trueInertia, trueInertia * 0.3f);
 }
 
-TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_coarse_encoder_reports_the_inertia_without_bias)
+void MechanicalParametersIdentificationTest::ExpectUnbiasedInertiaOnCoarseEncoder(float countsPerRevolution, float tolerance)
 {
-    constexpr float countsPerRevolution = 4000.0f;
-    constexpr float countAngle = 2.0f * std::numbers::pi_v<float> / countsPerRevolution;
+    const float countAngle = 2.0f * std::numbers::pi_v<float> / countsPerRevolution;
 
     auto config = DefaultConfig();
     config.timeout = std::chrono::seconds{ 60 };
@@ -635,7 +636,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_coars
     std::optional<foc::NewtonMeterSecondSquared> inertia;
 
     EXPECT_CALL(encoderMock, Read())
-        .WillRepeatedly(Invoke([this]()
+        .WillRepeatedly(Invoke([this, countAngle]()
             {
                 return foc::Radians{ std::floor(position / countAngle) * countAngle };
             }));
@@ -667,7 +668,17 @@ TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_coars
 
     ASSERT_TRUE(fired);
     ASSERT_TRUE(inertia.has_value());
-    EXPECT_NEAR(inertia->Value(), trueInertia, trueInertia * 0.03f);
+    EXPECT_NEAR(inertia->Value(), trueInertia, trueInertia * tolerance);
+}
+
+TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_coarse_encoder_reports_the_inertia_without_bias)
+{
+    ExpectUnbiasedInertiaOnCoarseEncoder(4000.0f, 0.03f);
+}
+
+TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_very_coarse_encoder_reports_the_inertia_within_a_few_percent)
+{
+    ExpectUnbiasedInertiaOnCoarseEncoder(1000.0f, 0.04f);
 }
 
 TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_noisy_continuous_encoder_reports_the_inertia)

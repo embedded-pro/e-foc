@@ -106,7 +106,7 @@ from the larger of the smallest step and this equivalent step, so a noisy encode
 of the same noise, and a clean quantised encoder is unaffected because its equivalent step does not exceed one count.
 
 A clean encoder (a simulated plant, or a very fine one) has a tiny step and so a single-sample window, which is the
-sample itself. A 4000-count encoder gets about 4 ms. Until enough steps have been seen the window is one sample and no
+sample itself. A 4000-count encoder gets about 4 ms and a 1000-count one about 8 ms. The window is limited to 256 samples, which an encoder of fewer than about 400 counts reaches. Until enough steps have been seen the window is one sample and no
 speed limit is applied to it, because a quantised single-sample speed is not a speed; the current limit is checked
 on every sample throughout.
 
