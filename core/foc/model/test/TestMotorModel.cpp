@@ -4,6 +4,7 @@
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include "motor_parameters/TeknicM2310pLn04k.hpp"
+#include <array>
 #include <cmath>
 #include <gtest/gtest.h>
 
@@ -318,4 +319,33 @@ TEST_F(MotorModelTest, the_phase_currents_read_back_in_the_frame_the_rotor_has_r
     ASSERT_GT(std::abs(model->MechanicalSpeed().Value()), 5.0f);
     EXPECT_NEAR(dq.d, modelled.d, 1e-3f * std::hypot(modelled.d, modelled.q));
     EXPECT_NEAR(dq.q, modelled.q, 1e-3f * std::hypot(modelled.d, modelled.q));
+}
+
+TEST_F(MotorModelTest, the_rotor_accelerates_with_the_current_reported_at_the_same_sample)
+{
+    constexpr int kSteps = 40;
+    constexpr float kTorqueConstantFactor = 1.5f;
+    const auto& parameters = foc::M_2310P_LN_04K::parameters;
+    const float dt = 1.0f / 20000.0f;
+
+    std::array<float, kSteps> angles{};
+    std::array<float, kSteps> currents{};
+    std::array<float, kSteps> speeds{};
+
+    for (int step = 0; step != kSteps; ++step)
+    {
+        model->StepForTest(kNeutralDuty);
+        angles[step] = model->MechanicalAngle().Value();
+        currents[step] = model->LastDqCurrents().q;
+        speeds[step] = model->MechanicalSpeed().Value();
+    }
+
+    for (int step = 1; step != kSteps - 1; ++step)
+    {
+        const auto torque = kTorqueConstantFactor * static_cast<float>(parameters.p) * parameters.psi_f.Value() * currents[step];
+        const auto expected = (torque - parameters.B.Value() * speeds[step]) / parameters.J.Value() * dt * dt;
+        const auto secondDifference = angles[step + 1] - 2.0f * angles[step] + angles[step - 1];
+
+        EXPECT_NEAR(secondDifference, expected, 0.01f * std::abs(expected) + 1e-9f) << "step " << step;
+    }
 }

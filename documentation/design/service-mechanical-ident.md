@@ -97,33 +97,60 @@ acceleration quantum at a fixed target (100 rad/s²):
 T_w = sqrt( q / 100 )          q = smallest non-zero position step, in radians
 ```
 
+A continuous encoder with noise has no count: every position step is nonzero, and the smallest of them keeps shrinking
+as more are seen, which would collapse the window to one sample. The procedure therefore also tracks the second
+difference of the position, which motion barely changes at 20 kHz and noise dominates. For white noise of standard
+deviation $\sigma$ the second difference has an RMS of $\sqrt{6}\,\sigma$, and a quantiser of step $q$ has the same noise
+power at $\sigma = q/\sqrt{12}$, so $\sqrt{2}$ times that RMS is the step the encoder is equivalent to. The window is sized
+from the larger of the smallest step and this equivalent step, so a noisy encoder gets a window as long as a coarse one
+of the same noise. A clean quantised encoder measures an equivalent step of about 1.1 counts, and at most $\sqrt{2}$ counts
+for a perfectly alternating pattern, which moves the window by under 20 %. A new window is adopted only when it differs
+from the current one by more than about 6 % (any change below 16 samples), because an estimate that drifts by one sample
+would otherwise restart the pairing of windows, and so discard the data, on nearly every window.
+
 A clean encoder (a simulated plant, or a very fine one) has a tiny step and so a single-sample window, which is the
-sample itself. A 4000-count encoder gets about 4 ms. Until enough steps have been seen the window is one sample and no
+sample itself. A 4000-count encoder gets about 4 ms and a 1000-count one about 8 ms. The window is limited to 256 samples, which an encoder of fewer than about 400 counts reaches. Until enough steps have been seen the window is one sample and no
 speed limit is applied to it, because a quantised single-sample speed is not a speed; the current limit is checked
 on every sample throughout.
 
-Each window yields one observation:
+Each window yields one observation. The speed is taken between the **mean positions** of consecutive windows, not
+between their end samples:
 
 ```text
-ω_w = (θ_end − θ_start) / T_w          wrap-around compensated
+θ̄_w = mean of the positions sampled in window w     wrap-around compensated
+ω_w = (θ̄_w − θ̄_{w−1}) / T_w
 α_w = (ω_w − ω_{w−1}) / T_w
 ```
 
+An end sample carries the whole quantisation error of one reading, and the second difference of three of them puts
+noise of about $q/(\sqrt{2}\,T_w^2)$ on the acceleration: about 70 rad/s² on every window, given the window chosen above.
+Least squares does not average noise in a regressor away; it biases the coefficient toward zero by the ratio of the
+noise power to the regressor's. The acceleration of the two-level trajectory is concentrated in the few windows after
+each step, so that ratio was a few percent. The bench plant read its inertia about 1 % low at 4000 counts, and 1.4 % to
+4.4 % low at 1000 counts, varying from run to run with the speeds the windows happened to sample. A continuous encoder
+read within 0.15 %. When the rotor crosses tens of counts in a window, the quantisation error of the window's mean
+changes little from one window to the next, so with window means the bias falls to about 0.1 % at both encoder sizes.
+
 The encoder is read at every sample, because the electrical angle that turns the phase currents into the q-axis
-current needs it, and the q-axis current is accumulated over the window the way the speed is. The acceleration
-between two window means is the true acceleration weighted by a triangle that rises over the first window and falls
-over the second, so the torque it is regressed on must be weighted by the same triangle, sample by sample. A plain
-mean of the two window torques agrees with it on a ramp and differs wherever the torque bends, which at a window of
-eighty samples made the inertia read about a tenth low even on a continuous encoder (a simulation of the estimator
-alone gave 0.87 of the true value, and 0.99 with the triangle). For windows longer than a sample the regressors are
-therefore centred on one instant: the acceleration between two window speeds, the mean of the two speeds, and the
-triangle-weighted torque all belong to the boundary between their windows. A change of window length starts the
-pairing again.
+current needs it, and the q-axis current is accumulated over the window the way the position is. The second difference
+of three window means is the true acceleration weighted by a quadratic kernel over the three windows. With $u$ the
+position of a sample within its window, the kernel rises as $u^2/2$ over the first window, is $1/2 + u(1-u)$ over the
+second, and falls as $(1-u)^2/2$ over the third. The torque it is regressed on must be weighted by the same kernel,
+sample by sample. A plain mean of window torques agrees with it on a ramp and differs wherever the torque bends: at a
+window of eighty samples that made the inertia read about a tenth low even on a continuous encoder. A simulation of the
+estimator alone gave 0.87 of the true value, and 0.99 once the torque was weighted by the acceleration's kernel. For
+windows longer than a sample the regressors are therefore centred on one instant: the acceleration from three window
+means, the mean of the two speeds between them, and the kernel-weighted torque all belong to the middle of the middle
+window. A change of window length starts the run of three windows again.
 
 An estimator fed long window means makes far fewer updates per second than one fed samples, so its covariance trace falls
 too slowly in time to reach its bound within a run: on a 4000-count encoder (an 80-sample window) it was still just above
 the bound when the five-second timeout ended. For windows longer than 16 samples the bound is therefore scaled by the window
-over 16; shorter windows keep the bound unchanged. The forgetting factor itself is not rescaled with the window: doing so
+over 16; shorter windows keep the bound unchanged. The count of accelerating observations the run must reach (see
+Persistence of Excitation) is scaled the same way, so a long window needs proportionally fewer of them. This did not
+matter while speeds came from end samples, because quantisation noise alone lifted most plateau windows past the
+20 rad/s² floor and counted them as accelerating. With window means the plateaus read under 2 rad/s² and only the
+windows after a step count, so an unscaled count kept a 1000-count run going for over five seconds. The forgetting factor itself is not rescaled with the window: doing so
 shortened the memory so far that the viscous friction, which is resolved only from the difference between the two speed
 levels, was estimated from one level and came out 20 to 30 % high in simulation.
 
@@ -366,7 +393,8 @@ it through. With the duty carried as a fraction the ripple vanished, the plateau
 friction the full calibration identified moved 19–27 % off the plant.
 
 Both procedures now take every sample above the minimum speed, and count separately what the estimate
-needs before it may be published: at least 64 samples accelerating faster than 20 rad/s² (inertia), and
+needs before it may be published: at least 64 samples accelerating faster than 20 rad/s² (inertia; for the one-shot
+procedure 64 sixteen-sample windows' worth, see Speed and Acceleration Estimation), and
 observations spanning more than a quarter of the fastest speed seen (friction apart from the intercept).
 The shared `MechanicalExcitation` tracks both. The online estimator, which runs indefinitely, admits a
 non-accelerating sample only while the covariance trace is under a ceiling, so a long constant-speed run

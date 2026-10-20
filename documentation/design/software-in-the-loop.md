@@ -658,6 +658,18 @@ What the first characterisation found, in the order it was found:
   +4 %. The scenario now holds the excitation until 700 ms after enable, so every host applies
   the load at standstill, where the estimator takes no samples, and the friction reads +7 %.
 
+- **The rotor moved a sample ahead of the current it was reported with — fixed.** Each step
+  integrated the currents, then built the torque from the new end-of-step current and applied it
+  over the whole step, so the central second difference of the position at one sample was the
+  acceleration of the current reported at the next. A real rotor accelerates with the current
+  that flows at the instant the converter samples it. Fifty microseconds is invisible to the
+  loops, but a regression of torque against acceleration reads the shift as friction: a time
+  offset adds the inertia times the jerk, and the jerk correlates with the speed. The offline
+  friction read 1.3 % to 5.5 % high only because the estimator's torque weighting sat half a
+  sample late and cancelled half of the lead; aligned exactly, it read 2.6 % to 14 % high. The
+  plant now builds the torque from the start-of-step current, which makes the position a
+  Störmer–Verlet integration, and the friction identifies within 0.35 % on both motors.
+
 Every identification scenario, offline and online, runs in the default set on both motors
 (REQ-CAL-012 to REQ-CAL-014).
 
@@ -738,11 +750,17 @@ What the plant has shown so far:
 
 - **The inertia read about 10 % low on a 4000-count encoder, and the two runs agreed on it**, so
   the agreement check could not see it. A simulation of the estimator alone traced it to the
-  weighting of the torque against the acceleration, not to quantisation; it is fixed, and the
-  scenarios pin it at 3 % (`documentation/design/hardware-characterisation.md`, Part D).
-- **Encoder noise of 0.2 mrad on the light reference rotor ends the calibration in Fault**, with
-  inertia estimates a hundred times too small. The heavier bench rotor completes. This is the one
-  target still open.
+  weighting of the torque against the acceleration, not to quantisation; it is fixed
+  (`documentation/design/hardware-characterisation.md`, Part D).
+- **A residual low inertia of 1–4 % on quantised encoders varied from run to run**, so a limit
+  pinned from one run failed on CI. It was quantisation, in the end-sample speeds the
+  acceleration came from; speeds now come from window-mean positions and every quantised row
+  reads within 0.3 % (Part D).
+- **Encoder noise of 0.2 mrad on the light reference rotor ended the calibration in Fault**, with
+  inertia estimates a hundred times too small, while the heavier bench rotor completed. The
+  window was sized from the smallest position step, which a noisy continuous encoder drives to
+  zero; it is now sized from the noise the encoder shows as well, and the scenarios pin both
+  reference rotors at 10 % (`documentation/design/hardware-characterisation.md`, Part D).
 - **Dry friction does not disturb the identification**; the estimator models it.
 - **A one amp supply is enough for the calibration of the bench motor.** The electrical power of
   the identification is under half an amp, so a collapsing supply on the rig is not explained by

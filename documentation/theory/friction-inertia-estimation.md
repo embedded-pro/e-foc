@@ -303,7 +303,7 @@ graph TD
 | Source of Error                | Effect                                                               |
 |--------------------------------|----------------------------------------------------------------------|
 | $K_T$ error                    | All parameters scaled proportionally ($\tau_e$ is biased)            |
-| Encoder quantisation           | Noise on $\alpha$; use long averaging window                         |
+| Encoder quantisation           | Noise on $\alpha$ biases $J$ low; difference window-mean positions   |
 | Constant-speed operation       | $J$ unidentifiable ($\dot\omega = 0$ makes regressor rank-deficient) |
 | Very short identification time | $\mathbf{P}$ not collapsed; noisy estimates                          |
 | $\lambda$ too large            | Slow convergence to parameter changes                                |

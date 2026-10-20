@@ -105,7 +105,7 @@ the data asks for them: a periodic encoder error (amplitude and order) and a slo
 
 ### Part D — Targets
 
-The bench plant found two defects.
+The bench plant found three defects.
 
 **Fixed: the inertia read about 10 % low** on a 4000-count encoder, 22 % at 1000 counts. The
 first diagnosis was noise in the acceleration regressor. A simulation of the estimator alone
@@ -114,17 +114,36 @@ of the true inertia, and quantisation moved it by one point. The cause is the we
 acceleration between two window speeds is weighted by a triangle over both windows; the torque
 beside it was a plain mean of the two window torques, which differs wherever the torque bends.
 Weighting the torque by the same triangle gave 0.99 in the simulation and 0.03 % to 1.6 % on the
-reference motors in SIL, and is what the firmware does now. At 1000 counts the window is
-clamped at 128 samples and 7 % remains, because the speed regressor is still a plain mean.
+reference motors in SIL, and is what the firmware does now. At 1000 counts 7 % remained. The
+speed regressor being a plain mean was a guess; the simulation of the estimator showed the
+window was the cause, clamped at 128 samples where the encoder asked for 158. With the limit at
+256 samples the bench motor read 1.9 % off at 1000 counts and the reference rotors within 3.2 %.
 The scenarios are in `identification_robustness.feature`.
 
-**Open: a calibration of the light reference rotor under 0.2 mrad of encoder noise ends in
-Fault**, with inertia about 100× too small. The likely cause, not yet confirmed by a trace: the
-window is chosen from the smallest position step the encoder shows, which is one count for a
-quantised encoder and nearly zero for a noisy continuous one, so the window would collapse to
-one sample and the acceleration would be pure noise. The
-fix is a window chosen from the noise the encoder actually shows. The scenario to add is the
-teknic plant with `encoder_noise_sigma_radians` of 0.0002.
+**Fixed: a residual low inertia on quantised encoders that varied from run to run**: 1.4 % to
+4.4 % low over eight runs at 1000 counts, about 1 % at 4000 and 20000 counts, and within 0.15 %
+on a continuous encoder. CI read 4.4 % against the 4 % limit the 1.9 % run had pinned. The
+quantisation the first diagnosis suspected was real after all, but in the speeds: they were
+differences of single end samples, so every acceleration carried about 70 rad/s² of
+quantisation noise, and noise in a regressor biases a least-squares coefficient toward zero.
+Speeds now come from window-mean positions, with the torque weighted by the matching quadratic
+kernel over three windows (`service-mechanical-ident.md`). The eight 1000-count runs then read
+0.09 % to 0.17 % low, every quantised row of the scenario within 0.3 %, and the scenario pins
+them at 1 %. Aligning the torque exactly also exposed a plant whose rotor moved a sample ahead
+of its reported current, which had read as friction (`software-in-the-loop.md`, Part K). The
+quantisation noise had also been counted as excitation on the speed plateaus, so the count the
+run needs is now scaled by the window. In the estimator's unit test a 1000-count run converges
+in 20 700 samples, against 36 900 before the change and 111 000 with window means but no
+scaling.
+
+**Fixed: a calibration of the light reference rotor under 0.2 mrad of encoder noise ended in
+Fault**, with inertia about 100× too small. A trace confirmed the cause: the window is chosen
+from the smallest position step the encoder shows, which is one count for a quantised encoder and
+shrinks without bound for a noisy continuous one, so it fell to 3 to 7 samples and the
+acceleration was mostly noise. The window now comes from the larger of that step and the step
+the encoder's noise is equivalent to, measured from the second difference of the position. The
+light rotor then identifies within 2.2 %. The scenario is the teknic plant with
+`encoder_noise_sigma_radians` of 0.0002 in `identification_robustness.feature`.
 
 ### Part E — The bench motor as a first-class SIL motor
 

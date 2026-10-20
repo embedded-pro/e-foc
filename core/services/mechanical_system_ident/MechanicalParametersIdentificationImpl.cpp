@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <numbers>
 
 namespace
 {
@@ -14,8 +15,12 @@ namespace
     constexpr float slewPeriodSeconds{ 0.001f };
 
     constexpr float accelerationQuantumTarget{ 100.0f };
-    constexpr std::size_t maximumObservationWindow{ 128 };
+    constexpr std::size_t maximumObservationWindow{ 256 };
     constexpr std::size_t minimumCountSteps{ 8 };
+    constexpr std::size_t stepChangeMemory{ 4096 };
+    constexpr float stepChangeToResolution{ std::numbers::sqrt2_v<float> };
+    constexpr std::size_t windowHysteresisFloor{ 16 };
+    constexpr std::size_t windowHysteresisDivisor{ 16 };
 
     constexpr float inertiaSettlingTolerance{ 0.1f };
     constexpr std::size_t maximumSettlingInterval{ 2000 };
@@ -61,14 +66,20 @@ namespace services
         this->onDone = onDone;
         this->previousPosition = encoder.Read().Value();
         this->previousSpeed = 0.0f;
+        this->hasPreviousMean = false;
         this->hasPreviousSpeed = false;
-        this->hasPreviousTorque = false;
+        this->positionSum = 0.0f;
+        this->previousMeanToEnd = 0.0f;
         this->torqueSum = 0.0f;
         this->torqueRise = 0.0f;
+        this->torquePeak = 0.0f;
         this->torqueFall = 0.0f;
         this->lastSamplePosition = this->previousPosition;
         this->countAngle = std::numeric_limits<float>::infinity();
         this->countSteps = 0;
+        this->lastStep = 0.0f;
+        this->stepChangeEnergy = 0.0f;
+        this->stepChanges = 0;
         this->windowSamples = 1;
         this->samplesInWindow = 0;
         this->windowPeriod = samplingPeriod;
@@ -250,11 +261,23 @@ namespace services
         const auto sampleTorque = rotatingFrame.q * torqueConstant.Value();
         const auto weight = (static_cast<float>(samplesInWindow) + 0.5f) / static_cast<float>(windowSamples);
         torqueSum += sampleTorque;
-        torqueRise += sampleTorque * weight;
-        torqueFall += sampleTorque * (1.0f - weight);
+        torqueRise += sampleTorque * 0.5f * weight * weight;
+        torquePeak += sampleTorque * (0.5f + weight * (1.0f - weight));
+        torqueFall += sampleTorque * 0.5f * (1.0f - weight) * (1.0f - weight);
+        positionSum += foc::detail::PositionWithWrapAround(mechanicalPos - previousPosition);
 
-        const auto step = std::abs(foc::detail::PositionWithWrapAround(mechanicalPos - lastSamplePosition));
+        const auto signedStep = foc::detail::PositionWithWrapAround(mechanicalPos - lastSamplePosition);
+        const auto step = std::abs(signedStep);
         lastSamplePosition = mechanicalPos;
+
+        if (samplesSinceStart > 1)
+        {
+            const auto change = signedStep - lastStep;
+            ++stepChanges;
+            stepChangeEnergy += (change * change - stepChangeEnergy) / static_cast<float>(std::min(stepChanges, stepChangeMemory));
+        }
+
+        lastStep = signedStep;
 
         if (step > 0.0f)
         {
@@ -269,40 +292,50 @@ namespace services
 
         const auto windowTorque = torqueSum / static_cast<float>(windowSamples);
         const auto windowRise = torqueRise;
+        const auto windowPeak = torquePeak;
         const auto windowFall = torqueFall;
+        const auto meanOffset = positionSum / static_cast<float>(windowSamples);
         torqueSum = 0.0f;
         torqueRise = 0.0f;
+        torquePeak = 0.0f;
         torqueFall = 0.0f;
+        positionSum = 0.0f;
 
-        const auto speed = foc::detail::PositionWithWrapAround(mechanicalPos - previousPosition) / windowPeriod;
+        const auto speed = (previousMeanToEnd + meanOffset) / windowPeriod;
         const auto acceleration = (speed - previousSpeed) / windowPeriod;
+        const auto hadMean = hasPreviousMean;
         const auto hadSpeed = hasPreviousSpeed;
-        const auto hadTorque = hasPreviousTorque;
 
         const auto centred = windowSamples > 1;
         const auto centredSpeed = centred ? 0.5f * (speed + previousSpeed) : speed;
-        const auto centredTorque = centred ? (previousTorqueRise + windowFall) / static_cast<float>(windowSamples) : windowTorque;
+        const auto centredTorque = centred ? (earlierTorqueRise + previousTorquePeak + windowFall) / static_cast<float>(windowSamples) : windowTorque;
 
+        previousMeanToEnd = foc::detail::PositionWithWrapAround(mechanicalPos - previousPosition) - meanOffset;
         previousPosition = mechanicalPos;
         previousSpeed = speed;
-        hasPreviousSpeed = true;
+        hasPreviousSpeed = hadMean;
+        hasPreviousMean = true;
+        earlierTorqueRise = previousTorqueRise;
         previousTorqueRise = windowRise;
-        hasPreviousTorque = true;
+        previousTorquePeak = windowPeak;
 
         const auto countKnown = countSteps >= minimumCountSteps;
 
-        const auto wanted = countKnown ? WindowSamplesFor(countAngle, samplingPeriod) : windowSamples;
+        const auto stepChangeResolution = stepChanges >= minimumCountSteps ? stepChangeToResolution * std::sqrt(stepChangeEnergy) : 0.0f;
+        const auto wanted = countKnown ? WindowSamplesFor(std::max(countAngle, stepChangeResolution), samplingPeriod) : windowSamples;
 
-        if (wanted != windowSamples)
+        const auto windowDifference = wanted > windowSamples ? wanted - windowSamples : windowSamples - wanted;
+
+        if (windowDifference != 0 && (windowSamples < windowHysteresisFloor || windowDifference * windowHysteresisDivisor > windowSamples))
         {
             windowSamples = wanted;
             windowPeriod = samplingPeriod * static_cast<float>(wanted);
+            hasPreviousMean = false;
             hasPreviousSpeed = false;
-            hasPreviousTorque = false;
             return;
         }
 
-        if (countKnown && std::abs(speed) > currentConfig.maxSpeed.Value())
+        if (countKnown && hadMean && std::abs(speed) > currentConfig.maxSpeed.Value())
         {
             FailEnvelope();
             return;
@@ -311,7 +344,7 @@ namespace services
         if (outcome != Outcome::pending)
             return;
 
-        if (!countKnown || !hadSpeed || !hadTorque || !IsMechanicallyObservable(centredSpeed))
+        if (!countKnown || !hadSpeed || !IsMechanicallyObservable(centredSpeed))
             return;
 
         MechanicalRls::MakeRegressor(regressor, acceleration, centredSpeed);
