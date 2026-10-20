@@ -251,27 +251,43 @@ other is active.
 
 ### Procedure 2 — Pole Pairs Estimation
 
-Starting at electrical angle 0°, the service advances the voltage vector by a small angular
-increment each settle-timer tick. After each step, the encoder is read and the mechanical
-displacement is accumulated. Over $N_{rev}$ full electrical revolutions:
+The service applies an open-loop voltage vector at electrical angle 0° and advances it by a fixed
+increment each settle-timer tick. The rotor starts anywhere, so the first vector can pull it up to
+half an electrical revolution either way, and a rotor resting on that vector's torque null, 180°
+from it, does not move at all until a later vector pulls it. The first electrical revolution is
+therefore a lead-in that is not counted: by its end the rotor follows the field one step behind,
+and the encoder reading there is the reference. The vector then turns through exactly $N_{rev}$
+more electrical revolutions, ending on the angle the reference was read at, and the mechanical
+displacement is accumulated after every step. Both the reference and the end are read one step
+behind the field, so the lag cancels:
 
 $$
-p = \text{round}(2\pi N_{rev} / \Delta\theta_{mech,total})
+x = 2\pi N_{rev} / \Delta\theta_{mech,total}, \qquad p = \text{round}(x)
 $$
 
-If the total mechanical rotation is below $\pi/2$ (rotor not following the field), the result is
-absent.
+The result is absent if the rotation is below $\pi/2$ (rotor not following the field), or if $x$ is
+more than a quarter from the nearest integer: a rotor that skipped or slipped part of a revolution
+must fail the calibration, not hand the loops a wrong pole-pair count. Counting the first snap, as
+an earlier version did, measured anything from 1590° to 1950° electrical for 1800° of field travel;
+on the bench motor (four pole pairs) a rotor that had to snap back more than about 170° read five,
+and the calibration that followed drove the rotor with an angle error that grew with every
+radian it turned, until the current loop saturated and pulled the supply down. Taking the
+reference right after the first vector instead failed four bench sweeps in seventeen: the rotor rested on
+that vector's null, moved only at the next step, and the sweep measured 1620° for 1800°, a ratio
+of 4.44.
 
 ```mermaid
 flowchart TD
-    START["θe = 0°, Δθm = 0"] --> STEP["Advance θe by Δθe\napply open-loop voltage"]
+    START["θe = 0°, apply vector"] --> LEAD["Advance θe one electrical\nrevolution, uncounted"]
+    LEAD --> REF["Wait settle_time\nread encoder → reference"]
+    REF --> STEP["Advance θe by Δθe\napply open-loop voltage"]
     STEP --> SETTLE["Wait settle_time\n(TimerSingleShot)"]
     SETTLE --> READ["Read encoder\naccumulate Δθm"]
-    READ --> CHECK{"All electrical\nrevolutions complete?"}
+    READ --> CHECK{"N full electrical\nrevolutions done?"}
     CHECK -->|No| STEP
-    CHECK -->|Yes| CALC["p = round(2πN / Δθm)"]
-    CALC --> VALID{"Δθm > π/2?"}
-    VALID -->|Yes| CB_OK["onDone(p)"]
+    CHECK -->|Yes| CALC["x = 2πN / Δθm"]
+    CALC --> VALID{"Δθm > π/2 and\nx within ¼ of an integer?"}
+    VALID -->|Yes| CB_OK["onDone(round(x))"]
     VALID -->|No| CB_FAIL["onDone(nullopt)"]
 ```
 

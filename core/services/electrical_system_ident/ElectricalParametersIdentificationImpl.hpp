@@ -53,7 +53,6 @@ namespace services
         infra::AutoResetFunction<void(ResistanceInductanceResult)> onResistanceAndInductanceDone;
         infra::AutoResetFunction<void(std::optional<std::size_t>)> onPolePairsDone;
 
-        foc::Radians initialPosition{ 0.0f };
         foc::Radians previousPosition{ 0.0f };
         float accumulatedRotation{ 0.0f };
         std::size_t currentSampleIndex{ 0 };
