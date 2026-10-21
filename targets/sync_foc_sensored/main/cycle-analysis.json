@@ -13,6 +13,7 @@
         "InterruptTable::Invoke",
         "ImmediateInterruptHandler::Invoke",
         "AdcPhaseCurrentMeasurementImpl.*lambda",
+        "PlatformFactoryImpl::PhaseCurrentsReady.*lambda",
         "PhaseCurrentOffsetCompensation::PhaseCurrentsReady.*lambda",
         "DeadTimeCompensation::PhaseCurrentsReady.*lambda",
         "Runner.*::OnPhaseCurrents",

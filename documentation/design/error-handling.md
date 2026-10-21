@@ -86,7 +86,15 @@ Every platform reports `unknown` today:
   otherwise brown the controller out with nothing logged; at 18 V the gate-drive supply is still in regulation, the
   bridge is cut and the fault reaches the state machine. The overcurrent comparator cannot see the bus current
   on E-FOC-HARDWARE: its shunt returns the low-side current of all three legs, and the sequence converts at the
-  counter's zero, where the low sides conduct and that current sums to zero. That ADC is triggered by the PWM generator, so once the bridge is
+  counter's zero, where the low sides conduct and that current sums to zero. The phase currents are converted
+  at that same instant, where each winding's current crosses its own shunt, so the conversion interrupt checks
+  each of them against the same 6.6 A before handing them on (REQ-EH-014). A sample beyond it cuts the outputs
+  at once, the way the watchdog's early warning does, and from then on the platform withholds the samples and
+  refuses every duty command and start until the bridge is stopped, as the hardware fault latch would. It
+  reports the over-current from the event loop, because the state machine's response stops the control loop,
+  which re-registers the very sample callback the interrupt is running. The check sees an over-current within
+  one control period, 50 µs, in which the bench winding's current can rise by at most about 1.1 A from the
+  24 V bus. That ADC is triggered by the PWM generator, so once the bridge is
   stopped it stops converting, the comparators stop evaluating, and no status register distinguishes a cleared
   condition from an unevaluated one. Answering this honestly needs either a sampling path that survives the
   bridge stopping — `PowerSupplyVoltage()` already runs on a separately triggered ADC and could verify
