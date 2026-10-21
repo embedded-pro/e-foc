@@ -282,6 +282,11 @@ WHEN(R"(the online estimates are read)")
     ParseTraceValues(*electrical, setup.online);
     if (const auto diag = fixture.LastCapturedLineWith(mark, "[DIAG]"); diag.has_value())
         std::fprintf(stderr, "%s\n", diag->c_str());
+    for (const auto* key : { "ault", "Stop", "stop" })
+        if (const auto line = fixture.LastCapturedLineWith(0, key); line.has_value())
+            std::fprintf(stderr, "[DIAG] last '%s': %s\n", key, line->c_str());
+    if (const auto state = fixture.ReadMotorState(); state.has_value())
+        std::fprintf(stderr, "[DIAG] motor state %d\n", static_cast<int>(*state));
 }
 
 THEN(R"(the identified {word} shall be within {float} % of the plant)", (std::string quantity, float limitPercent))
