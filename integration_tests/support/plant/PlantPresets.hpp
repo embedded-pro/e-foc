@@ -2,6 +2,7 @@
 
 #include "motor_parameters/AnaheimBly172s24v4000.hpp"
 #include "motor_parameters/TeknicM2310pLn04k.hpp"
+#include "targets/platform_implementations/motor_boards/E-FOC-HARDWARE/BoardCharacteristics.hpp"
 #include "targets/platform_implementations/qemu/implementation/SilPlantConfig.hpp"
 #include <string>
 
@@ -33,6 +34,22 @@ namespace sil
         config.noiseBiasAmpereA = 0.027f;
         config.noiseBiasAmpereB = -0.018f;
         config.noiseBiasAmpereC = 0.054f;
+    }
+
+    // Fitted to the bench's dead-time sweep at the 500 ns band: the loss saturates near 0.2 % of the period past
+    // about 0.13 A, and the online resistance it biases reads about 20 % high, as it does on the rig.
+    inline void DescribeBenchPowerStage(SilPlantConfig& config)
+    {
+        config.deadTimeNanoseconds = 100.0f;
+        config.switchNodeCapacitancePicofarad = 600.0f;
+        config.switchOnResistanceOhm = 0.0125f;
+        config.diodeForwardVolts = 0.8f;
+    }
+
+    inline void DescribeBenchDeadTimeCompensation(SilPlantConfig& config)
+    {
+        config.deadTimeCompensationNanoseconds = static_cast<float>(application::BoardCharacteristics::effectiveDeadTimeNanoseconds);
+        config.deadTimeCompensationKneeAmpere = application::BoardCharacteristics::deadTimeKneeAmps;
     }
 
     inline SilPlantConfig NominalPlant()
@@ -97,6 +114,9 @@ namespace sil
             .currentFullScaleAmpere = 0.0f,
             .adcResolutionBits = 0u,
             .maxReadableDutyPercent = 0u,
+
+            .deadTimeCompensationNanoseconds = 0.0f,
+            .deadTimeCompensationKneeAmpere = 0.0f,
 
             .polePairs = 0u,
             .faultFlags = 0u,

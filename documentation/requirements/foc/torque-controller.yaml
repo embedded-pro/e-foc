@@ -61,3 +61,15 @@
     value repeated runs of its row measured, rounded up to the figure the row carries, and the row
     fails when a measurement exceeds that figure; the margin is there so that the spread between
     one run and the next cannot reach it.
+
+- id: REQ-TRQ-008
+  title: The bridge's dead-time loss is compensated
+  shall: >
+    On a board whose bridge has a dead-time loss measured at the dead band the drive runs, every
+    duty the drive commands shall be raised on a leg whose current flows out of it and lowered on
+    a leg whose current flows into it, by the effective dead time over the PWM period once the
+    current is past the measured knee and in proportion to the current below it, with the result
+    held within the period. A board with no loss measured at that dead band shall receive its
+    duties unchanged. Through the bench's power stage, whose loss reads the online resistance
+    about 18 % high when uncompensated, the online resistance estimate shall be within 5 % of
+    the plant's once the drive compensates with the bench's measured loss.

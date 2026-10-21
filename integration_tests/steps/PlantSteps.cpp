@@ -126,6 +126,10 @@ namespace
             plant.adcResolutionBits = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else if (key == "max_readable_duty_percent")
             plant.maxReadableDutyPercent = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
+        else if (key == "dead_time_compensation_ns")
+            plant.deadTimeCompensationNanoseconds = value;
+        else if (key == "dead_time_compensation_knee_ampere")
+            plant.deadTimeCompensationKneeAmpere = value;
         else if (key == "coulomb_friction_nm")
             plant.coulombFrictionNm = value;
         else if (key == "supply_source_resistance_ohm")
@@ -191,6 +195,18 @@ GIVEN(R"(the plant reads its currents through the bench's current-sense chain)")
 {
     RequireSimulatedTarget();
     sil::DescribeBenchCurrentSense(context.Get<ScenarioSetup>().plant);
+}
+
+GIVEN(R"(the plant drives its windings through the bench's power stage)")
+{
+    RequireSimulatedTarget();
+    sil::DescribeBenchPowerStage(context.Get<ScenarioSetup>().plant);
+}
+
+GIVEN(R"(the drive compensates the bench's dead time)")
+{
+    RequireSimulatedTarget();
+    sil::DescribeBenchDeadTimeCompensation(context.Get<ScenarioSetup>().plant);
 }
 
 GIVEN(R"(the motor is already calibrated)")

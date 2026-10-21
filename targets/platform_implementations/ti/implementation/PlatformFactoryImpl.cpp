@@ -125,6 +125,14 @@ namespace application
         return foc::Ampere(BoardCharacteristics::maxCurrentSupportedAmps);
     }
 
+    drivers::DeadTimeLoss PlatformFactoryImpl::InverterDeadTimeLoss(std::chrono::nanoseconds deadTime) const
+    {
+        if (deadTime != std::chrono::nanoseconds{ BoardCharacteristics::measuredDeadBandNanoseconds })
+            return {};
+
+        return { std::chrono::nanoseconds{ BoardCharacteristics::effectiveDeadTimeNanoseconds }, foc::Ampere{ BoardCharacteristics::deadTimeKneeAmps } };
+    }
+
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
     {
         return pendSvLowPriorityInterrupt;

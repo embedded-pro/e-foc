@@ -13,8 +13,9 @@ namespace application
         , configRegion{ hardware.Eeprom(), configRegionOffset, configRegionSize }
         , nvm{ calibrationRegion, configRegion }
         , currentOffsets{ hardware }
-        , electricalIdent{ *currentOffsets, hardware, vdc }
-        , motorAlignment{ *currentOffsets, hardware }
+        , deadTimeCompensation{ *currentOffsets, hardware.InverterDeadTimeLoss(std::chrono::nanoseconds{ pwmDeadTimeNs }) }
+        , electricalIdent{ deadTimeCompensation, hardware, vdc }
+        , motorAlignment{ deadTimeCompensation, hardware }
         , platformFaultNotifier{ hardware }
         , encoderPlausibility{ hardware, hardware.MaxCurrentSupported(), [this]()
             {
@@ -39,7 +40,7 @@ namespace application
 
                 controlMode.emplace(
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
-                    MotorHardware{ *currentOffsets, this->hardware, vdc },
+                    MotorHardware{ deadTimeCompensation, this->hardware, vdc },
                     nvm,
                     CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = *currentOffsets },
                     *platformFaultNotifier,

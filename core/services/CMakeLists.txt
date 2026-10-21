@@ -16,6 +16,7 @@ target_sources(e_foc.services.injection_current_limit PRIVATE
 add_subdirectory(alignment)
 add_subdirectory(cli)
 add_subdirectory(current_offsets)
+add_subdirectory(dead_time_compensation)
 add_subdirectory(electrical_system_ident)
 add_subdirectory(mechanical_system_ident)
 add_subdirectory(non_volatile_memory)

@@ -214,19 +214,20 @@ cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
 
 ### Design
 
-| Document                                                                              | Description                                  |
-|---------------------------------------------------------------------------------------|----------------------------------------------|
-| [FOC Transforms](documentation/design/foc-transforms.md)                              | Clarke and Park transform design             |
-| [FOC Torque Control](documentation/design/foc-torque.md)                              | Torque (current) control loop design         |
-| [FOC Speed Control](documentation/design/foc-speed.md)                                | Speed control loop design                    |
-| [FOC Position Control](documentation/design/foc-position.md)                          | Position control loop design                 |
-| [Alignment Service](documentation/design/service-alignment.md)                        | Motor alignment and offset detection service |
-| [CLI Service](documentation/design/service-cli.md)                                    | Command-line interface service               |
-| [Current Offsets Service](documentation/design/service-current-offsets.md)            | Current sensor offset calibration service    |
-| [Electrical Identification Service](documentation/design/service-electrical-ident.md) | Resistance and inductance estimation service |
-| [Mechanical Identification Service](documentation/design/service-mechanical-ident.md) | Friction and inertia estimation service      |
-| [NVM Service](documentation/design/service-nvm.md)                                    | Non-volatile memory persistence service      |
-| [Integration Testing Design](documentation/design/integration-testing.md)             | Fixture design, calibration flow, CAN bridge |
+| Document                                                                                 | Description                                  |
+|------------------------------------------------------------------------------------------|----------------------------------------------|
+| [FOC Transforms](documentation/design/foc-transforms.md)                                 | Clarke and Park transform design             |
+| [FOC Torque Control](documentation/design/foc-torque.md)                                 | Torque (current) control loop design         |
+| [FOC Speed Control](documentation/design/foc-speed.md)                                   | Speed control loop design                    |
+| [FOC Position Control](documentation/design/foc-position.md)                             | Position control loop design                 |
+| [Alignment Service](documentation/design/service-alignment.md)                           | Motor alignment and offset detection service |
+| [CLI Service](documentation/design/service-cli.md)                                       | Command-line interface service               |
+| [Current Offsets Service](documentation/design/service-current-offsets.md)               | Current sensor offset calibration service    |
+| [Dead-Time Compensation Service](documentation/design/service-dead-time-compensation.md) | Duty correction for the bridge's dead time   |
+| [Electrical Identification Service](documentation/design/service-electrical-ident.md)    | Resistance and inductance estimation service |
+| [Mechanical Identification Service](documentation/design/service-mechanical-ident.md)    | Friction and inertia estimation service      |
+| [NVM Service](documentation/design/service-nvm.md)                                       | Non-volatile memory persistence service      |
+| [Integration Testing Design](documentation/design/integration-testing.md)                | Fixture design, calibration flow, CAN bridge |
 
 ### Requirements
 
