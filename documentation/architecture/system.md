@@ -171,6 +171,18 @@ wider than the limit is scaled down, along its own direction. Without the limit,
 drove a leg to the rail, read that phase near zero and held it there: on the bench the real current reached
 6 A against a 3 A reference and pulled the bus into the undervoltage trip.
 
+The window also has to hold every phase's conversion. The TI converter reads the three phases one after another in
+a single sequence triggered at the PWM centre, ahead of the three fault-comparator steps, and averages each step
+over two conversions, so a step lasts two sample-and-holds plus two 12-clock conversions and the last phase is
+read the longest after the centre. With a 16-clock sample-and-hold it finished about 10 µs late, after the
+low-side window of a leg above about 50 to 60 % duty had closed: on the bench the last phase in the sequence read
+10 to 15 % low near the 50 % duty every leg holds in closed loop, and up to 34 % low at 65 %, and reversing the
+sequence moved the error to whichever phase came last. The application asks for the shortest sample-and-hold, 4
+clocks, which by the same count brings the last phase in at about 6 µs, and keeps the averaging. All three phases
+then read within 2.5 % up to 69 % duty, and the standard deviation of a zero-current sample fell from 60 to 79 mA
+per phase to 31 to 39 mA. Dropping the averaging instead read the phases as cleanly but raised that noise by 15 to
+25 %.
+
 `foc::IsFiniteValue` survives for the places where validation is affordable and worth having —
 `CurrentPlantModel::IsUsable` when the plant is configured, and the plausibility band the mechanical estimator
 applies before publishing. Both run outside the hot path. It tests the float's exponent bits rather than
