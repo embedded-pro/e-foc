@@ -133,6 +133,11 @@ namespace foc
         nonIdealities.coulombFrictionNm = friction.Value();
     }
 
+    void ThreePhaseMotorModel::SetBreakawayFriction(foc::NewtonMeter friction)
+    {
+        nonIdealities.breakawayFrictionNm = friction.Value();
+    }
+
     void ThreePhaseMotorModel::SetEncoderResolution(uint32_t countsPerRevolution)
     {
         nonIdealities.encoderCountsPerRevolution = countsPerRevolution;
@@ -456,10 +461,15 @@ namespace foc
 
         float omegaMech = motorState.omega_mech.Value() + d_omega_mech_dt * dt;
 
-        if (nonIdealities.coulombFrictionNm > 0.0f)
+        if (nonIdealities.coulombFrictionNm > 0.0f || nonIdealities.breakawayFrictionNm > 0.0f)
         {
             const float frictionStep = nonIdealities.coulombFrictionNm * dt / parameters.J.Value();
-            omegaMech = std::fabs(omegaMech) <= frictionStep ? 0.0f : omegaMech - std::copysign(frictionStep, omegaMech);
+            const float breakawayStep = std::max(nonIdealities.breakawayFrictionNm, nonIdealities.coulombFrictionNm) * dt / parameters.J.Value();
+
+            if (motorState.omega_mech.Value() == 0.0f && std::fabs(omegaMech) <= breakawayStep)
+                omegaMech = 0.0f;
+            else
+                omegaMech = std::fabs(omegaMech) <= frictionStep ? 0.0f : omegaMech - std::copysign(frictionStep, omegaMech);
         }
 
         motorState.omega_mech = foc::RadiansPerSecond{ omegaMech };

@@ -111,6 +111,7 @@ namespace foc
         void SetPowerStage(const PowerStageConfig& config);
         void SetCurrentSense(const CurrentSenseConfig& config);
         void SetCoulombFriction(foc::NewtonMeter friction);
+        void SetBreakawayFriction(foc::NewtonMeter friction);
         void SetEncoderResolution(uint32_t countsPerRevolution);
         void SetRandomSeed(uint32_t seed);
         void ResetTemperature();
@@ -199,6 +200,7 @@ namespace foc
         struct PlantNonIdealities
         {
             float coulombFrictionNm{ 0.0f };
+            float breakawayFrictionNm{ 0.0f };
             uint32_t encoderCountsPerRevolution{ 0 };
         };
 

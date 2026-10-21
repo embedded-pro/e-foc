@@ -44,6 +44,12 @@ namespace sil
         config.diodeForwardVolts = 0.8f;
     }
 
+    inline void DescribeBenchFriction(SilPlantConfig& config)
+    {
+        config.coulombFrictionNm = 0.0037f;
+        config.breakawayFrictionNm = 0.0075f;
+    }
+
     inline void DescribeBenchDeadTimeCompensation(SilPlantConfig& config)
     {
         config.deadTimeCompensationNanoseconds = static_cast<float>(application::BoardCharacteristics::effectiveDeadTimeNanoseconds);
@@ -93,6 +99,7 @@ namespace sil
             .responseMaxSamples = 0u,
 
             .coulombFrictionNm = 0.0f,
+            .breakawayFrictionNm = 0.0f,
             .supplySourceResistanceOhm = 0.0f,
             .supplyCurrentLimitAmpere = 0.0f,
             .encoderCountsPerRevolution = 0u,
