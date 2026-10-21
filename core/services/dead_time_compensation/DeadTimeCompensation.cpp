@@ -44,7 +44,6 @@ namespace services
         return inverter.MaxCurrentSupported();
     }
 
-    // The samples come at the PWM frequency, and the loss is a fixed time out of each of its periods.
     void DeadTimeCompensation::ScaleLoss(hal::Hertz baseFrequency)
     {
         const auto deadTimeSeconds = std::chrono::duration<float>(loss.effectiveDeadTime).count();

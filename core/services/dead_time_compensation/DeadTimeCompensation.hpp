@@ -29,8 +29,6 @@ namespace services
             onCurrents(currents);
         }
 
-        // A leg delivers less than its duty while its current flows out of it and more while the current flows in,
-        // so the duty moves the other way by the share of the loss the current has reached.
         OPTIMIZE_FOR_SPEED hal::DutyCycle Compensated(hal::DutyCycle duty, foc::Ampere current) const
         {
             const auto share = std::clamp(current.Value() * inverseKneeCurrent, -1.0f, 1.0f);

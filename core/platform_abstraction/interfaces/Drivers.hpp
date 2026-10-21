@@ -8,9 +8,6 @@
 
 namespace drivers
 {
-    // Past the knee a leg's current swings its switch node across the whole dead band, and the leg loses the
-    // effective dead time against the current's sign each period; below the knee the swing is partial and the
-    // loss falls in proportion to the current. A zero effective dead time means the loss is not known.
     struct DeadTimeLoss
     {
         std::chrono::nanoseconds effectiveDeadTime{ 0 };

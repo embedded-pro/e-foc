@@ -14,7 +14,6 @@ namespace
 
     const hal::Hertz baseFrequency{ 20000 };
     const drivers::DeadTimeLoss benchLoss{ 70ns, foc::Ampere{ 0.2f } };
-    // 70 ns of each 50 us period, in the duty's fixed-point counts
     constexpr float lossCounts{ 70e-9f * 20000.0f * static_cast<float>(hal::DutyCycle::fullScale) };
 
     foc::PhaseCurrents Currents(float a, float b, float c)
@@ -147,7 +146,6 @@ TEST_F(TestDeadTimeCompensation, through_a_stage_that_loses_the_dead_time_the_co
     constexpr float busVoltage{ 24.0f };
     constexpr float period{ 50e-6f };
     constexpr float current{ 2.0f };
-    // A small node capacitance puts the stage's own knee at a few milliamps, so 2 A is deep in saturation
     const foc::PowerStageConfig stage{ 70e-9f, 10e-12f, 0.0f, 0.0f, 0.0f };
     const auto commanded = hal::DutyCycle::FromPercent(40);
 

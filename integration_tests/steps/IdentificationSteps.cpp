@@ -319,7 +319,6 @@ THEN(R"(the online {word} estimate shall be within {float} % of the plant at {fl
     CompareWithPlant(setup, setup.online, "online", quantity, limitPercent, windingCelsius);
 }
 
-// Shows a plant non-ideality is there to be compensated, so the scenario that compensates it cannot pass by its absence.
 THEN(R"(the online {word} estimate shall read at least {float} % above the plant)", (std::string quantity, float minimumPercent))
 {
     const auto& setup = context.Get<ScenarioSetup>();

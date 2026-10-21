@@ -516,7 +516,6 @@ namespace application
         return model.MaxCurrentSupported();
     }
 
-    // The emulated board's loss is whatever the scenario says the drive was measured to have, whichever dead band it runs.
     drivers::DeadTimeLoss PlatformFactoryImpl::InverterDeadTimeLoss([[maybe_unused]] std::chrono::nanoseconds deadTime) const
     {
         if (!plantConfig)

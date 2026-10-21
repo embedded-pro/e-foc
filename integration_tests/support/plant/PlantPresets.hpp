@@ -36,8 +36,6 @@ namespace sil
         config.noiseBiasAmpereC = 0.054f;
     }
 
-    // Fitted to the bench's dead-time sweep at the 500 ns band: the loss saturates near 0.2 % of the period past
-    // about 0.13 A, and the online resistance it biases reads about 20 % high, as it does on the rig.
     inline void DescribeBenchPowerStage(SilPlantConfig& config)
     {
         config.deadTimeNanoseconds = 100.0f;

@@ -75,7 +75,6 @@ namespace sil
         uint32_t adcResolutionBits;
         uint32_t maxReadableDutyPercent;
 
-        // What the drive believes about its bridge, not the plant's own power stage: zero leaves the duties uncompensated.
         float deadTimeCompensationNanoseconds;
         float deadTimeCompensationKneeAmpere;
 

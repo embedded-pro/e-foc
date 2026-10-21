@@ -70,7 +70,6 @@ namespace application
 
         virtual void ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold) = 0;
 
-        // A board reports only a loss measured on its bridge at this dead band; any other leaves the duties uncompensated.
         virtual drivers::DeadTimeLoss InverterDeadTimeLoss([[maybe_unused]] std::chrono::nanoseconds deadTime) const
         {
             return {};

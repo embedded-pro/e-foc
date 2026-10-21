@@ -20,8 +20,6 @@ namespace application
         // Above this duty a phase's low-side window at the PWM centre is too short for its shunt to read: on the
         // bench a phase read within 0.25 A at 71.5 % and 1 A low at 79.7 %, and the current loop lost the phase
         static constexpr uint32_t maxReadableDutyPercent{ 70 };
-        // Swept on the bench at the 500 ns dead band and 24 V: the switches' own delays absorb all but about 70 ns of
-        // the band, and below about 0.2 A a leg's current no longer swings its switch node across what is left
         static constexpr uint32_t measuredDeadBandNanoseconds{ 500 };
         static constexpr uint32_t effectiveDeadTimeNanoseconds{ 70 };
         static constexpr float deadTimeKneeAmps{ 0.2f };

@@ -15,7 +15,6 @@ namespace application
         // 80 % of the +8.25 A that the mid-rail biased sense spans on a 3.3 V ADC
         static constexpr float overcurrentThresholdAmps{ 6.6f };
         static constexpr float maxCurrentSupportedAmps{ 15.0f };
-        // The dead-time loss of this board's bridge has not been measured, so its duties go uncompensated
         static constexpr uint32_t measuredDeadBandNanoseconds{ 0 };
         static constexpr uint32_t effectiveDeadTimeNanoseconds{ 0 };
         static constexpr float deadTimeKneeAmps{ 0.0f };
