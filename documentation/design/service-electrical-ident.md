@@ -373,7 +373,7 @@ The averages are accumulated by the control interrupt, tick by tick, and publish
   duty came from, so the command from two ticks back acted. Paired with the previous tick's command, the
   rig read the online inductance 2 to 6 times too high under the deadbeat law, whose command swings by as
   much as the $L\,\Delta I_d / T$ term it is regressed against, and 1 to 15 % high under the smoother
-  laws. The emulated board applying each duty a period late reproduces it (REQ-CAL-016).
+  laws. The emulated board applying each duty a period late reproduces it (REQ-CAL-017).
 - The applied vector is fixed in the stator for the tick while the rotor turns through $\Delta\theta_e$, so
   in the rotor frame it arrives advanced by half that angle: $V_d$ is taken as $v_d + \tfrac{1}{2}\Delta\theta_e v_q$.
 - $\overline{\omega_e I_q}$ integrates the rotation each tick actually made, $\Delta\theta_e\,\overline{I_q}/T_s$,

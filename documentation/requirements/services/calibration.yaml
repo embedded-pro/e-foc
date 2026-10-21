@@ -144,7 +144,7 @@
     them for each reference motor and for the bench motor, also when the bench motor is read
     through its current-sense chain.
 
-- id: REQ-CAL-016
+- id: REQ-CAL-017
   title: Online electrical estimates hold on a board that applies each duty a period late
   shall: >
     The platform shall state how many PWM periods after its current sample a duty takes effect,

@@ -772,7 +772,7 @@ What the plant has shown so far:
   inductance three times too high** while the estimator paired each current change with the previous
   tick's command; the plant had applied every duty at once, so the simulation never showed the rig's
   2–6×. The platform now states the delay and the estimator pairs accordingly
-  (`documentation/design/service-electrical-ident.md`; REQ-CAL-016).
+  (`documentation/design/service-electrical-ident.md`; REQ-CAL-017).
 - **A one amp supply is enough for the calibration of the bench motor.** The electrical power of
   the identification is under half an amp, so a collapsing supply on the rig is not explained by
   the motor's power alone.

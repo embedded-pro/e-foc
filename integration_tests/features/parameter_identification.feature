@@ -170,7 +170,7 @@ Feature: Parameter Identification Against a Known Plant
     And the online resistance estimate shall be within 5 % of the plant
     And the online inductance estimate shall be within 10 % of the plant
 
-  @sil @REQ-CAL-016
+  @sil @REQ-CAL-017
   Scenario Outline: The online electrical estimates hold under the <current> current law when each duty acts a period late
     Given a bench motor plant
     And the plant applies each duty a period late, as the board does
