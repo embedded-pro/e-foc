@@ -107,8 +107,9 @@ The winding and rotor group is filled from one of the two reference motors in `m
 (the Teknic M-2310P-LN-04K on its 40 V bus is the nominal plant, the Anaheim BLY172S-24V-4000 on
 24 V the other), whose parameters and sources are in the plant theory document. A scenario names
 the motor as a preset; every other preset is a variation on the nominal one. The stored calibration
-a scenario boots from is derived from the same description, so "already calibrated" means
-calibrated to the plant, and a scenario that wants a wrong seed says by how much.
+a scenario boots from is derived from the same description, current sensor offsets included, so
+"already calibrated" means calibrated to the plant, and a scenario that wants a wrong seed says by
+how much.
 
 The seed matters more than it looks: the emulated target cannot obtain entropy, so without an
 explicit seed the noise generators are not merely unpredictable, they are unreliable.
@@ -892,12 +893,15 @@ What the plant showed through the bench chain:
   4-clock sample-and-hold the firmware now asks for reads them within 0.03 % and 6 %.
 - **The electrical identification is immune at its duties.** It runs near 50 % duty, inside every
   window, and reads the resistance within 2 % through the chain with either sample-and-hold.
-- **The offsets hide the friction.** The bench rotor's viscous friction is about 6 mA of q-axis
-  current at 50 rad/s. The rig's offsets put 42 mA into the stationary frame, which the rotation
-  turns into a ripple at the electrical frequency; on four seeds they bias the online friction
-  14–24 % low on their own and up to 63 % with the noise, while the noise alone leaves it within
-  5 %. Inertia, resistance and inductance hold within 1.1 %, 0.6 % and 9 %. The scenario through
-  the chain therefore pins those three; the friction waits for a calibration of the offsets.
+- **The offsets hide the friction until the calibration removes them.** The bench rotor's viscous
+  friction is about 6 mA of q-axis current at 50 rad/s. The rig's offsets put 42 mA into the
+  stationary frame, which the rotation turns into a ripple at the electrical frequency; on four
+  seeds they biased the online friction 14–24 % low on their own and up to 63 % with the noise,
+  while the noise alone left it within 5 %. The full calibration now measures them and every
+  sample has them removed (`service-current-offsets.md`). Through the chain it traces them within
+  2.1 mA, the converter's truncating averager included, and on five seeds the online friction
+  reads within 8 %, the inertia within 0.1 %, the resistance within 0.6 % and the inductance
+  within 4 %.
 
 The chain leaves out the current ripple within a period (a sample at the centre of the zero
 vector reads its mean), the other legs' switching edges coupling into the amplifiers, and gain

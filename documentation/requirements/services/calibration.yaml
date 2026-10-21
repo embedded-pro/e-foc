@@ -141,4 +141,5 @@
     shall be stored and traced with the calibration record, applied whenever the record is
     loaded, cleared with it, and kept by an electrical identification that arrives over CAN.
     Against a plant whose phase biases are known, the traced offsets shall be within 5 mA of
-    them for each reference motor and for the bench motor.
+    them for each reference motor and for the bench motor, also when the bench motor is read
+    through its current-sense chain.
