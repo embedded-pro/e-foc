@@ -3,8 +3,8 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
   never sags. The bench motor is not. Its winding, rotor, supply and 4000-count encoder come
   from the identified values of the real test rig, and it adds the dry friction, the encoder
   quantisation and the supply impedance real hardware has. Nothing here is a datasheet value
-  except the power stage's switches and diodes; see Parts K and L of
-  documentation/design/software-in-the-loop.md.
+  except the power stage's switches and diodes and the current-sense chain's converter and
+  amplifiers; see Parts K, L and M of documentation/design/software-in-the-loop.md.
 
   The limits are pinned from measured runs with a margin.
 
@@ -49,6 +49,16 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
       | 0    | 5          |
       | 50   | 5          |
       | 270  | 15         |
+
+  @sil @REQ-CAL-012
+  Scenario: The electrical identification reads through the bench's current-sense chain
+    Given a bench motor plant
+    And the plant reads its currents through the bench's current-sense chain
+    And the motor boots in torque mode
+    When the target boots
+    And electrical identification is run
+    Then the identified resistance shall be within 5 % of the plant
+    And the identified pole pairs shall match the plant
 
   @sil @REQ-CAL-013
   Scenario: The calibration of the bench motor fits inside a current-limited supply

@@ -5,6 +5,8 @@ target_include_directories(e_foc.foc.model PUBLIC
 )
 
 target_sources(e_foc.foc.model PRIVATE
+    CurrentSense.cpp
+    CurrentSense.hpp
     EncoderFreezeScheduler.hpp
     PlantResponseRecorder.hpp
     PowerStage.cpp

@@ -78,3 +78,34 @@ TEST_F(TestPowerStage, a_duty_at_either_rail_switches_nothing)
     EXPECT_NEAR(foc::PowerStageLegVoltage(stage, 0.0f, -2.0f, busVoltage, period), 0.0f, 1e-6f);
     EXPECT_NEAR(foc::PowerStageLegVoltage(stage, 1.0f, 2.0f, busVoltage, period), busVoltage, 1e-6f);
 }
+
+TEST_F(TestPowerStage, the_low_side_conducts_for_the_low_pulse_around_the_period_centre)
+{
+    const auto window = foc::LowSideConduction({}, 0.6f, 1.0f, period);
+
+    EXPECT_NEAR(window.start, -10e-6f, 1e-10f);
+    EXPECT_NEAR(window.end, 10e-6f, 1e-10f);
+}
+
+TEST_F(TestPowerStage, a_current_out_of_the_leg_keeps_the_low_side_diode_conducting_through_the_dead_time)
+{
+    const auto half = 0.5f * (0.4f * period - deadTime);
+
+    EXPECT_NEAR(foc::LowSideConduction(stage, 0.6f, 1.0f, period).end, half + deadTime, 1e-10f);
+    EXPECT_NEAR(foc::LowSideConduction(stage, 0.6f, -1.0f, period).end, half, 1e-10f);
+}
+
+TEST_F(TestPowerStage, a_low_pulse_shorter_than_the_minimum_leaves_only_the_diode_to_conduct)
+{
+    stage.minimumPulseSeconds = 1e-6f;
+    const auto duty = 0.98f;
+
+    EXPECT_NEAR(foc::LowSideConduction(stage, duty, 1.0f, period).end, 0.5f * ((1.0f - duty) * period + deadTime), 1e-10f);
+    EXPECT_FLOAT_EQ(foc::LowSideConduction(stage, duty, -1.0f, period).end, 0.0f);
+}
+
+TEST_F(TestPowerStage, the_low_side_conducts_all_period_at_zero_duty_and_never_at_full_duty)
+{
+    EXPECT_NEAR(foc::LowSideConduction(stage, 0.0f, -1.0f, period).end, period, 1e-10f);
+    EXPECT_FLOAT_EQ(foc::LowSideConduction(stage, 1.0f, 1.0f, period).end, 0.0f);
+}

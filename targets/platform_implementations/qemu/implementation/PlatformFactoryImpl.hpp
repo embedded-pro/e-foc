@@ -185,6 +185,7 @@ namespace application
         static hal::Hertz BaseFrequencyFrom(const std::optional<sil::SilPlantConfig>& config);
 
         void ApplyPlantConfig();
+        void ApplyCurrentSense(SampleAndHold requested);
 
         const std::optional<sil::SilPlantConfig> plantConfig;
         const ResetCause resetCause;
@@ -220,6 +221,7 @@ namespace application
         uint32_t samplePhase{ 0 };
         infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         foc::PhasePwmDutyCycles lastDutyPhases{};
+        hal::DutyCycle maxReadableDuty{ hal::DutyCycle::FromPercent(100) };
         foc::PhaseCurrents lastCurrents{};
     };
 }

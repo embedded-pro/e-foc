@@ -90,6 +90,7 @@ The description covers everything the plant needs:
 | Fault injection   | Open phase per phase, stuck encoder, when it freezes, supply voltage scaling                |
 | Non-idealities    | Coulomb friction, encoder counts per revolution, supply source resistance and current limit |
 | Power stage       | Dead time, switch-node capacitance, switch on-resistance, diode drop, minimum pulse         |
+| Current sensing   | Converter clock and timing, averaging, trigger delay, amplifier lag, full scale, resolution |
 | Reproducibility   | The seed both noise generators start from                                                   |
 | Disturbance       | A signed shaft torque and the delay after enabling at which it steps in                     |
 | Recording         | The rate at which the plant reports its trajectory, and how many samples                    |
@@ -830,8 +831,77 @@ dead-time voltage against a few volts. The online estimator excites ±2.5 % of t
 resistance is the one the dead time hurts. The rig reads its calibration resistance 10 % and its
 online resistance 25 % above the winding's 1.00 Ω, which fits a dead time at the node under about
 100 ns, well under the 500 ns band the controller asks for. The driver's and the switches'
-delays take most of it back. The `bench` plant keeps an ideal stage until the current-sensing
-chain is modelled too and both are fitted to the rig together.
+delays take most of it back. The `bench` plant keeps an ideal stage until it and the
+current-sense chain (Part M) are fitted to the rig together.
+
+### Part M — The current-sense chain between the winding and the controller
+
+An ideal plant reports each phase current as it flows, plus a bias and white noise. E-FOC-HARDWARE
+reads it through a shunt under each low-side switch, an amplifier, and one converter that takes the
+three phases one after another from a trigger at the PWM centre. A shunt carries its phase only
+while the low side conducts, and the converter reaches the last phase microseconds after the
+trigger, so a phase reads only while its leg's low-side pulse is still on. The plant description
+therefore carries the chain as optional fields; with the converter clock at zero the plant reports
+as before.
+
+| Field                   | Meaning                                                                                |
+|-------------------------|----------------------------------------------------------------------------------------|
+| Converter clock         | Of the converter; zero leaves the chain out                                            |
+| Sample-and-hold clocks  | The converter tracks for these before it holds; zero takes what the firmware asks for  |
+| Conversion clocks       | From the hold to the result                                                            |
+| Averaged conversions    | Consecutive conversions averaged into each step's result                               |
+| Trigger delay           | From the centre of the low-side pulse to the start of the sequence                     |
+| Amplifier time constant | Of the shunt amplifier and its filter, as one first-order lag                          |
+| Full scale              | The current at either end of the converter's range around mid-rail                    |
+| Resolution              | Bits of the converter                                                                  |
+| Readable duty           | The board's limit, above which the platform lowers all three duties together           |
+
+With the chain on, the noise deviation is that of one conversion, and the per-phase bias is the
+amplifier's offset, present whether the shunt conducts or not.
+
+The low side of a leg at duty $d$ conducts for $(1 - d)T - t_d$ around the period's edge, and its
+body diode for a dead time more on each side when the current flows out of the leg. Conversion $k$
+of the sequence holds its sample at
+
+$$t_k = t_{trig} + \frac{k\,(N_{sh} + N_{conv}) + N_{sh}}{f_{adc}}$$
+
+after the trigger: phase A first, then B, then C, each step averaging $n$ conversions. The
+amplifier rises into the window and decays after it with its time constant. Each conversion adds
+its noise and offset, rounds to a code and clips to the range, and the step averages its codes and
+drops the remainder, as the converter's averager does. The firmware's sample-and-hold request maps
+to 4, 16, 32, 64 or 256 clocks, as the TI platform maps it, and the emulated platform applies the
+readable-duty limit as the TI platform does.
+
+On E-FOC-HARDWARE the converter is ADC0 of the TM4C1294 at 16 MHz, with 12 conversion clocks and
+two averaged conversions. The TLV9064 amplifiers at gain 10, behind 200 Ω and 150 pF, lag by about
+200 ns. The range is ±8.25 A, from 5 A/V around the 3.3 V mid-rail, in 12-bit codes of 4 mA, and
+the board's readable duty is 70 %. The rig's offsets measured +27, −18 and +54 mA, and its noise of
+31–39 mA per averaged sample is about 50 mA per conversion. Scenarios add this chain to the `bench`
+plant by name. The last phase holds at:
+
+| Sample-and-hold | Last phase holds at | Readable up to |
+|-----------------|---------------------|----------------|
+| 4 clocks        | 5.25 µs             | 79 % duty      |
+| 16 clocks       | 9.75 µs             | 61 % duty      |
+
+What the plant showed through the bench chain:
+
+- **With the 16-clock sample-and-hold the last phase drops out of its window.** The speed steps
+  of the online estimator scenarios drive a leg past 61 %, the torque reads low while the rotor
+  accelerates, and the online inertia read 9 % and the friction 62 % low, the rig's symptoms. The
+  4-clock sample-and-hold the firmware now asks for reads them within 0.03 % and 6 %.
+- **The electrical identification is immune at its duties.** It runs near 50 % duty, inside every
+  window, and reads the resistance within 2 % through the chain with either sample-and-hold.
+- **The offsets hide the friction.** The bench rotor's viscous friction is about 6 mA of q-axis
+  current at 50 rad/s. The rig's offsets put 42 mA into the stationary frame, which the rotation
+  turns into a ripple at the electrical frequency; on four seeds they bias the online friction
+  14–24 % low on their own and up to 63 % with the noise, while the noise alone leaves it within
+  5 %. Inertia, resistance and inductance hold within 1.1 %, 0.6 % and 9 %. The scenario through
+  the chain therefore pins those three; the friction waits for a calibration of the offsets.
+
+The chain leaves out the current ripple within a period (a sample at the centre of the zero
+vector reads its mean), the other legs' switching edges coupling into the amplifiers, and gain
+mismatch between the phases.
 
 What the plant cannot show: interrupt preemption at an arbitrary instruction, the vendor HAL
 drivers, the event queue under a hardware error storm, and power-rail behaviour. The emulated

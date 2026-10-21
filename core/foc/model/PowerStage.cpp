@@ -69,4 +69,28 @@ namespace foc
 
         return ((busVoltage - conductionDrop) * highTime - conductionDrop * lowTime + rising + falling) / period;
     }
+
+    ConductionWindow LowSideConduction(const PowerStageConfig& config, float duty, float current, float period)
+    {
+        const auto d = std::clamp(duty, 0.0f, 1.0f);
+        const auto deadTime = std::max(config.deadTimeSeconds, 0.0f);
+        const auto diodeConducts = current > 0.0f;
+        const auto highTime = d * period - deadTime;
+        const auto lowTime = period - d * period - deadTime;
+
+        if (d <= 0.0f || (diodeConducts && highTime < config.minimumPulseSeconds))
+            return { -period, period };
+
+        if (d >= 1.0f)
+            return {};
+
+        if (lowTime < config.minimumPulseSeconds)
+        {
+            const auto halfFloating = 0.5f * std::min(period - d * period + deadTime, period);
+            return diodeConducts ? ConductionWindow{ -halfFloating, halfFloating } : ConductionWindow{};
+        }
+
+        const auto half = 0.5f * lowTime + (diodeConducts ? deadTime : 0.0f);
+        return { -half, half };
+    }
 }
