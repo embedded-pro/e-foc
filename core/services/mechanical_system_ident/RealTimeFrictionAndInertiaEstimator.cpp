@@ -112,6 +112,7 @@ namespace services
             return;
 
         MotorRLS::MakeRegressor(onlineRegressor, observation->acceleration * columnScale, observation->speed * columnScale);
+        onlineRegressor.at(0, 0) = std::copysign(1.0f, observation->speed);
         math::Matrix<float, 1, 1> output;
         output.at(0, 0) = torqueConstant.Value() * observation->iq * outputScale;
 
@@ -128,6 +129,8 @@ namespace services
     bool RealTimeFrictionAndInertiaEstimator::IsOnlineObservationInformative(float acceleration, float speed) const
     {
         if (!IsMechanicallyObservable(speed))
+            return false;
+        if (std::abs(speed) <= std::abs(acceleration) * static_cast<float>(kinematics.WindowsPerObservation()) / samplingFrequency)
             return false;
 
         return std::abs(acceleration) >= mechanical_estimate::minimumAcceleration || onlineMetrics.uncertainty <= onlineCovarianceCeiling;
