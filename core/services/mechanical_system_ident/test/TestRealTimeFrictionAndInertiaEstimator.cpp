@@ -348,3 +348,19 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, reversing_at_one_speed_cannot_te
 
     EXPECT_FLOAT_EQ(production.CurrentFriction().Value(), 0.5f * rotor.friction);
 }
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_shaft_torque_that_turns_the_rotor_backwards_before_the_excitation_is_not_read_as_viscous_friction)
+{
+    services::RealTimeFrictionAndInertiaEstimator production{ services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, hal::Hertz{ 1000 } };
+    ReferenceRotor rotor;
+    rotor.shaftTorque = 0.01f;
+    production.SetTorqueConstant(foc::NewtonMeter{ rotor.torqueConstant });
+    production.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 2.0f * rotor.inertia }, foc::NewtonMeterSecondPerRadian{ 0.5f * rotor.friction });
+
+    WindowedRotorRun run{ rotor, production };
+    run.Run(std::array<float, 1>{ 0.0f }, 700, 700);
+    run.Run(26.0f, 52.0f, 250, 6000);
+
+    EXPECT_NEAR(production.CurrentInertia().Value(), rotor.inertia, 0.02f * rotor.inertia);
+    EXPECT_NEAR(production.CurrentFriction().Value(), rotor.friction, 0.15f * rotor.friction);
+}
