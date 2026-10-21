@@ -852,7 +852,7 @@ as before.
 | Averaged conversions    | Consecutive conversions averaged into each step's result                               |
 | Trigger delay           | From the centre of the low-side pulse to the start of the sequence                     |
 | Amplifier time constant | Of the shunt amplifier and its filter, as one first-order lag                          |
-| Full scale              | The current at either end of the converter's range around mid-rail                    |
+| Full scale              | The current at either end of the converter's range around mid-rail                     |
 | Resolution              | Bits of the converter                                                                  |
 | Readable duty           | The board's limit, above which the platform lowers all three duties together           |
 
