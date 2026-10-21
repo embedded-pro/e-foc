@@ -143,3 +143,14 @@
     Against a plant whose phase biases are known, the traced offsets shall be within 5 mA of
     them for each reference motor and for the bench motor, also when the bench motor is read
     through its current-sense chain.
+
+- id: REQ-CAL-016
+  title: The online friction estimate tells dry friction from viscous friction in both directions
+  shall: >
+    The online mechanical estimator shall model the dry friction as a torque against the direction
+    of motion, take no observation whose speed may change sign within it, and publish no friction
+    until it has seen two distinct speed levels held at a constant speed. On the bench motor with
+    3.7 mN·m of dry friction, seeded with an inertia twice and a viscous friction half the plant's,
+    and excited by a speed reference alternating between 30 and 60 rad/s every second for four
+    seconds and then between -30 and -60 rad/s for four more, it shall report a viscous friction
+    within 10 % and an inertia within 2 % of the plant's.

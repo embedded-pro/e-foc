@@ -360,11 +360,30 @@ In addition to the one-shot timed procedure above, a continuous online estimator
 
 The mechanical equation of motion for the motor shaft is:
 
-$$T_e = J \cdot \dot{\omega} + B \cdot \omega + \tau_c$$
+$$T_e = J \cdot \dot{\omega} + B \cdot \omega + \tau_c \cdot \mathrm{sgn}(\omega)$$
 
 The electromagnetic torque is approximated as $T_e = I_q \cdot k_t$, where $k_t = \tfrac{3}{2} p \psi_f$ is derived from the calibration record's pole pairs and flux linkage. Angular acceleration $\dot{\omega}$ and speed $\omega$ come from the window-mean positions of three consecutive observation windows (see Window Kinematics below).
 
-The regressor vector is $\phi = [1,\ \dot{\omega},\ \omega]^T$, and the parameter vector is $\theta = [\tau_c,\ J,\ B]^T$. The scalar output is $T_e$. An RLS algorithm with a forgetting factor of 0.9995 updates $\theta$ once per observation window from what the control interrupt accumulates over each outer-loop period.
+The regressor vector is $\phi = [\mathrm{sgn}(\omega),\ \dot{\omega},\ \omega]^T$, and the parameter vector is $\theta = [\tau_c,\ J,\ B]^T$. The scalar output is $T_e$. An RLS algorithm with a forgetting factor of 0.9995 updates $\theta$ once per observation window from what the control interrupt accumulates over each outer-loop period.
+
+The dry friction turns with the rotor. The first column used to be a constant, as in the one-shot
+procedure, which runs in one direction only and where the two are the same. Through a reversal the
+constant cannot follow the friction's sign, and the fit put the step in torque on the viscous
+column instead, since $\omega$ changes sign too: the speed sweep on the rig, 30, 60, −30 and 0 rad/s,
+read the viscous friction 70 to 100 µN·m·s against the calibration's 9 to 11, and the plant with
+the rig's 3.7 mN·m of dry friction read it 94 against 5. A constant shaft torque in one direction is
+still absorbed, by the same column. A torque that keeps its sign while the rotor reverses, such as
+gravity on an arm, is now the one that leaks.
+
+An observation whose speed is smaller than its acceleration times one observation window may cross
+zero inside the window, where the friction's sign is not that of the mean speed. It is refused.
+
+With $\mathrm{sgn}(\omega)$ and $\omega$ both in the regressor, reversing at one speed carries no
+information that tells dry from viscous friction: $\omega$ is then $|\omega|\,\mathrm{sgn}(\omega)$ and the
+columns are collinear. The span of speeds the publication waits for (Persistence of Excitation
+below) is therefore taken from the observations at a constant speed only, those accelerating slower
+than 20 rad/s², so that the transients through a reversal do not count as a second speed level. The
+one-shot procedure, which runs in one direction, counts every observation as before.
 
 ### Window Kinematics
 
@@ -449,7 +468,7 @@ fit is still moving. An estimate that fails any gate is discarded and the last a
 
 When calibration data is loaded (from NVM or after a fresh calibration run), the online estimator is seeded
 with the calibration values $(J_{cal}, B_{cal})$. This initialises the RLS coefficient vector to $\theta =
-[0,\ J_{cal},\ B_{cal}]^T$, setting the Coulomb-friction intercept to zero and warm-starting the inertia and
+[0,\ J_{cal},\ B_{cal}]^T$, setting the dry friction to zero and warm-starting the inertia and
 viscous-friction estimates at the identified operating point. This avoids a cold-start transient where
 estimates are physically meaningless during the initial operating period.
 
