@@ -11,7 +11,7 @@ namespace foc
         , protected CascadeWithSpeedLoop
     {
     public:
-        explicit SpeedCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency = hal::Hertz{ 1000 });
+        explicit SpeedCascade(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency = hal::Hertz{ 1000 }, uint32_t dutyUpdateDelayPeriods = 0);
 
         bool Configure(const MotorModelParameters& parameters) override;
         bool ConfigureMechanics(const MechanicalModelParameters& parameters) override;

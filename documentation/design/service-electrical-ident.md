@@ -2,9 +2,9 @@
 title: "Service: Electrical Parameters Identification"
 type: design
 status: draft
-version: 0.2.0
+version: 0.3.0
 component: service-electrical-ident
-date: 2026-08-30
+date: 2026-10-21
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-08-30
 | Title     | Service: Electrical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.2.0                                         |
+| Version   | 0.3.0                                         |
 | Component | service-electrical-ident                      |
-| Date      | 2026-08-30                                    |
+| Date      | 2026-10-21                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -364,9 +364,16 @@ the ordinary RLS one.
 
 The averages are accumulated by the control interrupt, tick by tick, and published with each window:
 
-- $\overline{V_d}$ pairs each current sample with the voltage *applied during the tick that produced it* —
-  the previous tick's command, not the one just computed from that same sample. Regressing the same-tick
-  command put the PI's own $-K_p I_d$ into the output and pulled the resistance negative, by about $K_p$.
+- $\overline{V_d}$ pairs each current sample with the voltage *applied during the tick that produced it*,
+  not the command just computed from that same sample. Regressing the same-tick command put the PI's own
+  $-K_p I_d$ into the output and pulled the resistance negative, by about $K_p$. Which command acted
+  across a tick depends on when the bridge takes a new duty, and the platform states it as a number of
+  periods. The emulated board applies a duty the moment it is written, so the previous tick's command
+  acted. E-FOC-HARDWARE loads its compare registers at the counter's zero, a period after the sample the
+  duty came from, so the command from two ticks back acted. Paired with the previous tick's command, the
+  rig read the online inductance 2 to 6 times too high under the deadbeat law, whose command swings by as
+  much as the $L\,\Delta I_d / T$ term it is regressed against, and 1 to 15 % high under the smoother
+  laws. The emulated board applying each duty a period late reproduces it (REQ-CAL-016).
 - The applied vector is fixed in the stator for the tick while the rotor turns through $\Delta\theta_e$, so
   in the rotor frame it arrives advanced by half that angle: $V_d$ is taken as $v_d + \tfrac{1}{2}\Delta\theta_e v_q$.
 - $\overline{\omega_e I_q}$ integrates the rotation each tick actually made, $\Delta\theta_e\,\overline{I_q}/T_s$,

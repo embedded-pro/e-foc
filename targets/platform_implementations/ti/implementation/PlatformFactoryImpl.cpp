@@ -145,6 +145,11 @@ namespace application
         return { std::chrono::nanoseconds{ BoardCharacteristics::effectiveDeadTimeNanoseconds }, foc::Ampere{ BoardCharacteristics::deadTimeKneeAmps } };
     }
 
+    uint32_t PlatformFactoryImpl::DutyUpdateDelayPeriods() const
+    {
+        return 1;
+    }
+
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
     {
         return pendSvLowPriorityInterrupt;

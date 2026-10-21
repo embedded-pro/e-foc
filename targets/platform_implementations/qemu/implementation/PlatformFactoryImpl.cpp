@@ -526,6 +526,11 @@ namespace application
         return { std::chrono::nanoseconds{ static_cast<int64_t>(plantConfig->deadTimeCompensationNanoseconds + 0.5f) }, foc::Ampere{ plantConfig->deadTimeCompensationKneeAmpere } };
     }
 
+    uint32_t PlatformFactoryImpl::DutyUpdateDelayPeriods() const
+    {
+        return dutyDelayed ? 1 : 0;
+    }
+
     foc::Radians PlatformFactoryImpl::Read()
     {
         return model.Read();

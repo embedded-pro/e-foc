@@ -29,7 +29,7 @@ namespace foc
     class EstimatorWindowAccumulator
     {
     public:
-        EstimatorWindowAccumulator(hal::Hertz tickFrequency, uint32_t ticksPerWindow);
+        EstimatorWindowAccumulator(hal::Hertz tickFrequency, uint32_t ticksPerWindow, uint32_t dutyUpdateDelayPeriods = 0);
 
         void Restart();
 
@@ -44,13 +44,16 @@ namespace foc
 
             const auto meanIq = 0.5f * (measured.q + previousIq);
 
+            const auto& applied = dutyLate ? earlierNormalizedVoltage : previousNormalizedVoltage;
+
             iqSum += meanIq;
             idSum += 0.5f * (measured.d + previousId);
-            vdSum += previousNormalizedVoltage.d + 0.5f * electricalRotation * previousNormalizedVoltage.q;
+            vdSum += applied.d + 0.5f * electricalRotation * applied.q;
             rotationTimesIqSum += electricalRotation * meanIq;
 
             previousIq = measured.q;
             previousId = measured.d;
+            earlierNormalizedVoltage = previousNormalizedVoltage;
             previousNormalizedVoltage = normalizedVoltage;
             ++ticks;
         }
@@ -77,10 +80,12 @@ namespace foc
         float previousIq{ 0.0f };
         float previousId{ 0.0f };
         RotatingFrame previousNormalizedVoltage{};
+        RotatingFrame earlierNormalizedVoltage{};
         float previousMechanicalAngle{ 0.0f };
         bool rotationPrimed{ false };
         float tickFrequency{ 0.0f };
         uint32_t ticksPerWindow;
+        bool dutyLate;
         MechanicalWindowAccumulator mechanical;
         uint32_t ticks{ 0 };
     };
@@ -155,7 +160,7 @@ namespace foc
     class CascadeWithSpeedLoop
     {
     protected:
-        explicit CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency);
+        explicit CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods);
         ~CascadeWithSpeedLoop();
 
         bool ConfigureImpl(const MotorModelParameters& parameters);

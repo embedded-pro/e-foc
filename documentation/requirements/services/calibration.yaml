@@ -143,3 +143,13 @@
     Against a plant whose phase biases are known, the traced offsets shall be within 5 mA of
     them for each reference motor and for the bench motor, also when the bench motor is read
     through its current-sense chain.
+
+- id: REQ-CAL-016
+  title: Online electrical estimates hold on a board that applies each duty a period late
+  shall: >
+    The platform shall state how many PWM periods after its current sample a duty takes effect,
+    and the online electrical estimators shall pair each current change with the voltage that
+    acted across it. On the bench motor with every duty applied a period late, as E-FOC-HARDWARE
+    applies it, seeded with a resistance 1.3 times and an inductance 0.7 times the plant's and
+    excited as in REQ-CAL-014, the online resistance shall be within 5 % and the online
+    inductance within 10 % of the plant's under every current control law, deadbeat included.

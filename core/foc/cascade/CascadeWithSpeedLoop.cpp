@@ -41,15 +41,18 @@ namespace foc
         const hal::Hertz excitationFrequency{ 10 };
     }
 
-    EstimatorWindowAccumulator::EstimatorWindowAccumulator(hal::Hertz tickFrequency, uint32_t ticksPerWindow)
+    EstimatorWindowAccumulator::EstimatorWindowAccumulator(hal::Hertz tickFrequency, uint32_t ticksPerWindow, uint32_t dutyUpdateDelayPeriods)
         : tickFrequency{ static_cast<float>(tickFrequency.Value()) }
         , ticksPerWindow{ ticksPerWindow }
+        , dutyLate{ dutyUpdateDelayPeriods != 0 }
         , mechanical{ ticksPerWindow }
-    {}
+    {
+        really_assert(dutyUpdateDelayPeriods <= 1);
+    }
 
     void EstimatorWindowAccumulator::Restart()
     {
-        *this = EstimatorWindowAccumulator{ hal::Hertz{ static_cast<uint32_t>(tickFrequency) }, ticksPerWindow };
+        *this = EstimatorWindowAccumulator{ hal::Hertz{ static_cast<uint32_t>(tickFrequency) }, ticksPerWindow, dutyLate ? 1u : 0u };
     }
 
     DirectAxisExcitation::DirectAxisExcitation(Ampere amplitude, hal::Hertz frequency, hal::Hertz outerLoopFrequency)
@@ -109,13 +112,13 @@ namespace foc
         electrical->Update(ElectricalWindow{ Volts{ snapshot.meanNormalizedVd * vdcInvScale }, Ampere{ snapshot.meanId }, Ampere{ snapshot.idAtEnd }, snapshot.meanElectricalSpeedTimesIq, directCurrentReference });
     }
 
-    CascadeWithSpeedLoop::CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)
+    CascadeWithSpeedLoop::CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency, uint32_t dutyUpdateDelayPeriods)
         : lowPriorityInterrupt(lowPriorityInterrupt)
         , maxCurrent{ maxCurrent }
         , outerLoopFrequency{ lowPriorityFrequency }
         , speedDifferentiator{ lowPriorityFrequency }
         , prescaler{ baseFrequency.Value() / lowPriorityFrequency.Value() }
-        , estimatorWindow{ baseFrequency, prescaler }
+        , estimatorWindow{ baseFrequency, prescaler, dutyUpdateDelayPeriods }
         , directAxisExcitation{ Ampere{ maxCurrent.Value() * excitationCurrentFraction }, excitationFrequency, lowPriorityFrequency }
     {
         really_assert(maxCurrent.Value() > 0);
