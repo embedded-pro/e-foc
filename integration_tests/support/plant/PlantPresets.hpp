@@ -44,10 +44,11 @@ namespace sil
         config.diodeForwardVolts = 0.8f;
     }
 
-    inline void DescribeBenchFriction(SilPlantConfig& config)
+    inline void DescribeBenchFrictionAndCogging(SilPlantConfig& config)
     {
         config.coulombFrictionNm = 0.0037f;
-        config.breakawayFrictionNm = 0.0075f;
+        config.coggingTorqueNm = 0.004f;
+        config.coggingCyclesPerRevolution = 24u;
     }
 
     inline void DescribeBenchDeadTimeCompensation(SilPlantConfig& config)
@@ -99,7 +100,6 @@ namespace sil
             .responseMaxSamples = 0u,
 
             .coulombFrictionNm = 0.0f,
-            .breakawayFrictionNm = 0.0f,
             .coggingTorqueNm = 0.0f,
             .coggingCyclesPerRevolution = 0u,
             .supplySourceResistanceOhm = 0.0f,

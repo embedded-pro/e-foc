@@ -115,40 +115,6 @@ TEST_F(TestPlantNonidealities, coulomb_friction_lowers_the_speed_the_same_drive_
     EXPECT_GT(std::abs(frictionless.MechanicalSpeed().Value()), 0.1f);
 }
 
-TEST_F(TestPlantNonidealities, a_torque_between_the_running_and_the_breakaway_friction_leaves_a_resting_rotor_still)
-{
-    model.SetCoulombFriction(foc::NewtonMeter{ 0.004f });
-    model.SetBreakawayFriction(foc::NewtonMeter{ 0.008f });
-    model.SetExternalTorque(foc::NewtonMeter{ -0.006f });
-    model.Start();
-    DriveCycles(2000, 50, 50, 50);
-
-    EXPECT_EQ(model.MechanicalSpeed().Value(), 0.0f);
-}
-
-TEST_F(TestPlantNonidealities, once_broken_away_the_rotor_keeps_turning_under_a_torque_that_would_have_held_it)
-{
-    model.SetCoulombFriction(foc::NewtonMeter{ 0.004f });
-    model.SetBreakawayFriction(foc::NewtonMeter{ 0.008f });
-    model.SetExternalTorque(foc::NewtonMeter{ -0.009f });
-    model.Start();
-    DriveCycles(20, 50, 50, 50);
-    model.SetExternalTorque(foc::NewtonMeter{ -0.006f });
-    DriveCycles(2000, 50, 50, 50);
-
-    EXPECT_GT(model.MechanicalSpeed().Value(), 0.1f);
-}
-
-TEST_F(TestPlantNonidealities, without_a_breakaway_figure_the_running_friction_is_the_breakaway)
-{
-    model.SetCoulombFriction(foc::NewtonMeter{ 0.004f });
-    model.SetExternalTorque(foc::NewtonMeter{ -0.006f });
-    model.Start();
-    DriveCycles(200, 50, 50, 50);
-
-    EXPECT_GT(model.MechanicalSpeed().Value(), 0.0f);
-}
-
 TEST_F(TestPlantNonidealities, cogging_holds_the_rotor_in_a_detent_against_a_torque_below_its_amplitude)
 {
     model.SetCogging(foc::NewtonMeter{ 0.004f }, 24);

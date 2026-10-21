@@ -9,6 +9,7 @@ namespace
     constexpr float tolerance = 1e-4f;
     constexpr uint32_t samplingFrequency = 1000;
     constexpr float samplePeriod = 1.0f / static_cast<float>(samplingFrequency);
+    constexpr float movingSpeed = 10.0f;
 
     foc::MechanicalModelParameters ValidParameters()
     {
@@ -48,12 +49,12 @@ namespace
         : public ::testing::Test
     {
     public:
-        float Command(float reference, float measured)
+        float Command(float reference, float measured, float speed = 0.0f)
         {
-            return controller.Compute({ foc::Radians{ measured }, foc::Radians{ reference }, foc::RadiansPerSecond{ 0.0f } }).value;
+            return controller.Compute({ foc::Radians{ measured }, foc::Radians{ reference }, foc::RadiansPerSecond{ speed } }).value;
         }
 
-        float PositionErrorAfterStep(float step, float disturbanceSpeed, std::size_t samples)
+        float PositionErrorAfterStep(float step, std::size_t samples)
         {
             constexpr float speedLoopBandwidth = 100.0f;
             float position{ 0.0f };
@@ -61,12 +62,30 @@ namespace
 
             for (std::size_t sample = 0; sample != samples; ++sample)
             {
-                const auto reference = Command(step, position);
+                const auto reference = Command(step, position, speed);
                 speed += (reference - speed) * speedLoopBandwidth * samplePeriod;
-                position += (speed + disturbanceSpeed) * samplePeriod;
+                position += speed * samplePeriod;
             }
 
             return step - position;
+        }
+
+        float PositionErrorWhileFollowing(float rate, float disturbanceSpeed, std::size_t samples)
+        {
+            constexpr float speedLoopBandwidth = 100.0f;
+            float reference{ 0.0f };
+            float position{ 0.0f };
+            float speed{ 0.0f };
+
+            for (std::size_t sample = 0; sample != samples; ++sample)
+            {
+                reference += rate * samplePeriod;
+                const auto command = Command(reference, position, speed + disturbanceSpeed);
+                speed += (command - speed) * speedLoopBandwidth * samplePeriod;
+                position += (speed + disturbanceSpeed) * samplePeriod;
+            }
+
+            return reference - position;
         }
 
         float PeakOvershootAfterStep(float step, std::size_t samples)
@@ -78,7 +97,7 @@ namespace
 
             for (std::size_t sample = 0; sample != samples; ++sample)
             {
-                const auto reference = Command(step, position);
+                const auto reference = Command(step, position, speed);
                 speed += (reference - speed) * speedLoopBandwidth * samplePeriod;
                 position += speed * samplePeriod;
                 peak = std::max(peak, position);
@@ -138,7 +157,7 @@ TEST_F(TestPidPositionController, a_step_settles_without_a_slow_tail)
 {
     controller.Configure(ValidParameters());
 
-    EXPECT_LT(std::abs(PositionErrorAfterStep(1.5f, 0.0f, 450)), 0.02f);
+    EXPECT_LT(std::abs(PositionErrorAfterStep(1.5f, 450)), 0.02f);
 }
 
 TEST_F(TestPidPositionController, a_step_overshoots_by_less_than_five_percent)
@@ -148,21 +167,24 @@ TEST_F(TestPidPositionController, a_step_overshoots_by_less_than_five_percent)
     EXPECT_LT(PeakOvershootAfterStep(1.5f, 1000), 0.05f);
 }
 
-TEST_F(TestPidPositionController, a_constant_disturbance_speed_is_integrated_away)
+TEST_F(TestPidPositionController, while_the_rotor_moves_a_constant_disturbance_speed_is_integrated_away)
 {
     controller.Configure(ValidParameters());
+    const auto undisturbed = PositionErrorWhileFollowing(2.0f, 0.0f, 3000);
+    controller.Reset();
+    const auto disturbed = PositionErrorWhileFollowing(2.0f, 0.5f, 3000);
 
-    EXPECT_LT(std::abs(PositionErrorAfterStep(1.5f, 0.5f, 2000)), 1e-3f);
+    EXPECT_NEAR(disturbed, undisturbed, 1e-3f);
 }
 
-TEST_F(TestPidPositionController, a_standing_error_adds_exactly_one_integral_step_per_sample)
+TEST_F(TestPidPositionController, while_the_rotor_moves_a_standing_error_adds_exactly_one_integral_step_per_sample)
 {
     const auto tunings = foc::PositionLoopTunings{};
     const float error = 0.1f;
 
     controller.Configure(ValidParameters());
-    const float first = Command(error, 0.0f);
-    const float second = Command(error, 0.0f);
+    const float first = Command(error, 0.0f, movingSpeed);
+    const float second = Command(error, 0.0f, movingSpeed);
 
     EXPECT_NEAR(second - first, IntegralGain(tunings) * error * SpeedEnvelope(tunings), tolerance);
 }
@@ -172,9 +194,9 @@ TEST_F(TestPidPositionController, a_sustained_error_saturates_at_one_bandwidth_o
     controller.Configure(ValidParameters());
 
     for (int sample = 0; sample != 100; ++sample)
-        Command(pi, 0.0f);
+        Command(pi, 0.0f, movingSpeed);
 
-    EXPECT_NEAR(Command(pi, 0.0f), SpeedEnvelope(foc::PositionLoopTunings{}), tolerance);
+    EXPECT_NEAR(Command(pi, 0.0f, movingSpeed), SpeedEnvelope(foc::PositionLoopTunings{}), tolerance);
 }
 
 TEST_F(TestPidPositionController, a_sustained_negative_error_saturates_symmetrically)
@@ -182,9 +204,35 @@ TEST_F(TestPidPositionController, a_sustained_negative_error_saturates_symmetric
     controller.Configure(ValidParameters());
 
     for (int sample = 0; sample != 100; ++sample)
-        Command(-pi, 0.0f);
+        Command(-pi, 0.0f, -movingSpeed);
 
-    EXPECT_NEAR(Command(-pi, 0.0f), -SpeedEnvelope(foc::PositionLoopTunings{}), tolerance);
+    EXPECT_NEAR(Command(-pi, 0.0f, -movingSpeed), -SpeedEnvelope(foc::PositionLoopTunings{}), tolerance);
+}
+
+TEST_F(TestPidPositionController, a_stationary_rotor_is_asked_for_no_more_speed_than_its_error_alone_calls_for)
+{
+    const auto tunings = foc::PositionLoopTunings{};
+    const float error = 0.05f;
+
+    controller.Configure(ValidParameters());
+    for (int sample = 0; sample != 5000; ++sample)
+        Command(error, 0.0f);
+
+    EXPECT_NEAR(Command(error, 0.0f), ProportionalGain() * error * SpeedEnvelope(tunings), tolerance);
+}
+
+TEST_F(TestPidPositionController, a_rotor_that_stops_on_its_setpoint_lets_go_of_the_command_left_from_the_move)
+{
+    controller.Configure(ValidParameters());
+    for (int sample = 0; sample != 200; ++sample)
+        Command(0.5f, 0.0f, movingSpeed);
+
+    const float left = Command(0.5f, 0.5f);
+    for (int sample = 0; sample != 5000; ++sample)
+        Command(0.5f, 0.5f);
+
+    EXPECT_GT(std::abs(left), 1.0f);
+    EXPECT_NEAR(Command(0.5f, 0.5f), 0.0f, tolerance);
 }
 
 TEST_F(TestPidPositionController, reset_clears_the_accumulated_command)

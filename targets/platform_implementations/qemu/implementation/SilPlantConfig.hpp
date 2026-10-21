@@ -55,7 +55,6 @@ namespace sil
         uint32_t responseMaxSamples;
 
         float coulombFrictionNm;
-        float breakawayFrictionNm;
         float coggingTorqueNm;
         uint32_t coggingCyclesPerRevolution;
         float supplySourceResistanceOhm;
@@ -91,7 +90,7 @@ namespace sil
         uint8_t reserved1;
     };
 
-    static_assert(sizeof(SilPlantConfig) == 220, "SilPlantConfig layout must be free of implicit padding");
+    static_assert(sizeof(SilPlantConfig) == 216, "SilPlantConfig layout must be free of implicit padding");
 
     static constexpr uint32_t plantConfigMagic = 0x504C4E54;
     static constexpr uint8_t plantConfigLayoutVersion = 7;

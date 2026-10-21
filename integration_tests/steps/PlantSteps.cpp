@@ -132,8 +132,6 @@ namespace
             plant.deadTimeCompensationKneeAmpere = value;
         else if (key == "coulomb_friction_nm")
             plant.coulombFrictionNm = value;
-        else if (key == "breakaway_friction_nm")
-            plant.breakawayFrictionNm = value;
         else if (key == "cogging_torque_nm")
             plant.coggingTorqueNm = value;
         else if (key == "cogging_cycles_per_revolution")
@@ -209,10 +207,10 @@ GIVEN(R"(the plant drives its windings through the bench's power stage)")
     sil::DescribeBenchPowerStage(context.Get<ScenarioSetup>().plant);
 }
 
-GIVEN(R"(the plant's shaft has the bench's dry friction)")
+GIVEN(R"(the plant's shaft has the bench's dry friction and cogging)")
 {
     RequireSimulatedTarget();
-    sil::DescribeBenchFriction(context.Get<ScenarioSetup>().plant);
+    sil::DescribeBenchFrictionAndCogging(context.Get<ScenarioSetup>().plant);
 }
 
 GIVEN(R"(the drive compensates the bench's dead time)")

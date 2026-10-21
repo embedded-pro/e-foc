@@ -135,7 +135,6 @@ namespace application
         if (plantConfig->maxReadableDutyPercent != 0)
             maxReadableDuty = hal::DutyCycle::FromPercent(plantConfig->maxReadableDutyPercent);
         model.SetCoulombFriction(foc::NewtonMeter{ plantConfig->coulombFrictionNm });
-        model.SetBreakawayFriction(foc::NewtonMeter{ plantConfig->breakawayFrictionNm });
         model.SetCogging(foc::NewtonMeter{ plantConfig->coggingTorqueNm }, plantConfig->coggingCyclesPerRevolution);
         model.SetEncoderResolution(plantConfig->encoderCountsPerRevolution);
         model.ResetTemperature();

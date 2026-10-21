@@ -24,6 +24,13 @@ Feature: Control Robustness Against Off-Nominal Plants
   scenario asserted it, so a law that reached its setpoint by crawling there
   passed. See documentation/design/software-in-the-loop.md.
 
+  The bench's shaft is not the smooth one the nominal plant has. Its rotor rests
+  in 24 detents a revolution, about 4 mN·m deep, and it runs against 3.7 mN·m of
+  dry friction. On it the PID and two-DOF laws once hunted around 1 rad: the
+  position integral kept winding while a detent held the rotor, the rotor broke
+  away and overshot, and the cycle repeated about every one and a half seconds.
+  The same calibration that the rig runs gives the loops the gains that showed it.
+
   @sil @REQ-CTRL-014 @REQ-SPD-008
   Scenario Outline: The speed loop holds its envelope on a <label> plant
     Given a <preset> motor plant
@@ -122,3 +129,29 @@ Feature: Control Robustness Against Off-Nominal Plants
       | lqr       | anaheim | 30      | 1        |
       | lqi       | anaheim | 12      | 1        |
       | twodof    | anaheim | 310     | 8        |
+
+  @sil @REQ-POS-011
+  Scenario Outline: The <algorithm> position law settles and holds against the bench's cogging and dry friction
+    Given a bench motor plant
+    And the plant's shaft has the bench's dry friction and cogging
+    And the motor boots in position mode
+    And the position loop runs the <algorithm> algorithm
+    When the target boots
+    And the position motor system is initialised with no valid calibration data
+    And the full calibration is run from the terminal
+    And the motor is enabled
+    And a position setpoint of 1.0 rad is applied
+    Then the measured position shall settle at 1.0 rad within 0.03 rad in 4000 ms
+    And the measured position shall hold at 1.0 rad within 0.03 rad for 2000 ms
+    When a position setpoint of -1.0 rad is applied
+    Then the measured position shall settle at -1.0 rad within 0.03 rad in 4000 ms
+    And the measured position shall hold at -1.0 rad within 0.03 rad for 2000 ms
+    And the motor shall not report a fault
+
+    Examples:
+      | algorithm |
+      | pid       |
+      | twodof    |
+      | cascadep  |
+      | lqr       |
+      | lqi       |
