@@ -134,6 +134,10 @@ namespace
             plant.coulombFrictionNm = value;
         else if (key == "breakaway_friction_nm")
             plant.breakawayFrictionNm = value;
+        else if (key == "cogging_torque_nm")
+            plant.coggingTorqueNm = value;
+        else if (key == "cogging_cycles_per_revolution")
+            plant.coggingCyclesPerRevolution = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else if (key == "supply_source_resistance_ohm")
             plant.supplySourceResistanceOhm = value;
         else if (key == "supply_current_limit_ampere")

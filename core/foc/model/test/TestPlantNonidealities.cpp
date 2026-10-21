@@ -149,6 +149,28 @@ TEST_F(TestPlantNonidealities, without_a_breakaway_figure_the_running_friction_i
     EXPECT_GT(model.MechanicalSpeed().Value(), 0.0f);
 }
 
+TEST_F(TestPlantNonidealities, cogging_holds_the_rotor_in_a_detent_against_a_torque_below_its_amplitude)
+{
+    model.SetCogging(foc::NewtonMeter{ 0.004f }, 24);
+    model.SetExternalTorque(foc::NewtonMeter{ -0.003f });
+    model.Start();
+    DriveCycles(20000, 50, 50, 50);
+
+    const auto detent = 2.0f * std::numbers::pi_v<float> / 24.0f;
+    EXPECT_GT(model.MechanicalAngle().Value(), 0.0f);
+    EXPECT_LT(model.MechanicalAngle().Value(), detent / 4.0f);
+}
+
+TEST_F(TestPlantNonidealities, a_torque_beyond_the_cogging_amplitude_carries_the_rotor_past_its_detents)
+{
+    model.SetCogging(foc::NewtonMeter{ 0.004f }, 24);
+    model.SetExternalTorque(foc::NewtonMeter{ -0.006f });
+    model.Start();
+    DriveCycles(20000, 50, 50, 50);
+
+    EXPECT_GT(model.MechanicalSpeed().Value(), 0.1f);
+}
+
 TEST_F(TestPlantNonidealities, a_quantised_encoder_reports_whole_counts)
 {
     constexpr uint32_t counts{ 4000 };

@@ -100,6 +100,8 @@ namespace sil
 
             .coulombFrictionNm = 0.0f,
             .breakawayFrictionNm = 0.0f,
+            .coggingTorqueNm = 0.0f,
+            .coggingCyclesPerRevolution = 0u,
             .supplySourceResistanceOhm = 0.0f,
             .supplyCurrentLimitAmpere = 0.0f,
             .encoderCountsPerRevolution = 0u,
