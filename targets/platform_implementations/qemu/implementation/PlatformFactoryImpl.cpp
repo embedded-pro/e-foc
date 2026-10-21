@@ -122,6 +122,13 @@ namespace application
             .sourceResistanceOhm = plantConfig->supplySourceResistanceOhm,
             .currentLimitAmpere = plantConfig->supplyCurrentLimitAmpere,
         });
+        model.SetPowerStage({
+            .deadTimeSeconds = plantConfig->deadTimeNanoseconds * 1e-9f,
+            .switchNodeCapacitanceFarad = plantConfig->switchNodeCapacitancePicofarad * 1e-12f,
+            .onResistanceOhm = plantConfig->switchOnResistanceOhm,
+            .diodeForwardVolts = plantConfig->diodeForwardVolts,
+            .minimumPulseSeconds = plantConfig->minimumPulseNanoseconds * 1e-9f,
+        });
         model.SetCoulombFriction(foc::NewtonMeter{ plantConfig->coulombFrictionNm });
         model.SetEncoderResolution(plantConfig->encoderCountsPerRevolution);
         model.ResetTemperature();

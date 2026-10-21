@@ -2,8 +2,9 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
   The reference motors are ideal: continuous encoder, viscous friction only, a supply that
   never sags. The bench motor is not. Its winding, rotor, supply and 4000-count encoder come
   from the identified values of the real test rig, and it adds the dry friction, the encoder
-  quantisation and the supply impedance real hardware has. Nothing here is a datasheet value;
-  see Part K of documentation/design/software-in-the-loop.md.
+  quantisation and the supply impedance real hardware has. Nothing here is a datasheet value
+  except the power stage's switches and diodes; see Parts K and L of
+  documentation/design/software-in-the-loop.md.
 
   The limits are pinned from measured runs with a margin.
 
@@ -28,6 +29,26 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
       | 0.0     |
       | 0.0005  |
       | 0.002   |
+
+  @sil @REQ-CAL-012
+  Scenario Outline: The electrical identification reads through a non-ideal power stage (<dead> ns dead time)
+    Given a bench motor plant
+    And a motor plant with:
+      | dead_time_ns               | <dead> |
+      | switch_node_capacitance_pf | 300    |
+      | switch_on_resistance_ohm   | 0.0125 |
+      | diode_forward_volts        | 0.8    |
+    And the motor boots in torque mode
+    When the target boots
+    And electrical identification is run
+    Then the identified resistance shall be within <resistance> % of the plant
+    And the identified pole pairs shall match the plant
+
+    Examples:
+      | dead | resistance |
+      | 0    | 5          |
+      | 50   | 5          |
+      | 270  | 15         |
 
   @sil @REQ-CAL-013
   Scenario: The calibration of the bench motor fits inside a current-limited supply

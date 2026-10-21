@@ -219,11 +219,7 @@ namespace foc
         currentNoise.icLast = icNoise;
         encoderNoise.lastSample = SampleEncoderNoise();
 
-        const auto supply = EffectiveSupplyVoltage().Value();
-        const auto va = (foc::DutyFraction(dutyPhases.a) - half) * supply;
-        const auto vb = (foc::DutyFraction(dutyPhases.b) - half) * supply;
-        const auto vc = (foc::DutyFraction(dutyPhases.c) - half) * supply;
-        const foc::ThreePhase vAbc{ va, vb, vc };
+        const auto vAbc = lastPhaseVoltages;
         const auto vAlphaBeta = clarke.Forward(vAbc);
 
         NotifyObservers([this, &vAbc, &vAlphaBeta](auto& observer)
@@ -347,17 +343,31 @@ namespace foc
         motorState.theta = foc::Radians{ 0.0f };
     }
 
+    void ThreePhaseMotorModel::SetPowerStage(const PowerStageConfig& config)
+    {
+        powerStage = config;
+    }
+
+    foc::ThreePhase ThreePhaseMotorModel::PhaseVoltages(const foc::PhasePwmDutyCycles& dutyPhases, foc::Volts supply) const
+    {
+        const auto period = 1.0f / static_cast<float>(baseFrequency.Value());
+        const auto bus = supply.Value();
+        const auto leg = [this, period, bus](hal::DutyCycle duty, foc::Ampere current)
+        {
+            return PowerStageLegVoltage(powerStage, foc::DutyFraction(duty), current.Value(), bus, period) - half * bus;
+        };
+
+        return foc::ThreePhase{ leg(dutyPhases.a, motorState.ia), leg(dutyPhases.b, motorState.ib), leg(dutyPhases.c, motorState.ic) };
+    }
+
     void ThreePhaseMotorModel::Model(const foc::PhasePwmDutyCycles& dutyPhases)
     {
         auto dt = 1.0f / static_cast<float>(baseFrequency.Value());
-        auto duty_a = foc::DutyFraction(dutyPhases.a);
-        auto duty_b = foc::DutyFraction(dutyPhases.b);
-        auto duty_c = foc::DutyFraction(dutyPhases.c);
-
         const auto supply = EffectiveSupplyVoltage();
-        auto va = (duty_a - half) * supply;
-        auto vb = (duty_b - half) * supply;
-        auto vc = (duty_c - half) * supply;
+        lastPhaseVoltages = PhaseVoltages(dutyPhases, supply);
+        const auto va = foc::Volts{ lastPhaseVoltages.a };
+        const auto vb = foc::Volts{ lastPhaseVoltages.b };
+        const auto vc = foc::Volts{ lastPhaseVoltages.c };
 
         const auto stepRotation = motorState.omega.Value() * dt;
         auto cos_theta = foc::FastTrigonometry::Cosine(motorState.theta.Value());
