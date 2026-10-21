@@ -7,6 +7,7 @@
 #include "infra/util/AutoResetFunction.hpp"
 #include "infra/util/HotSwapFunction.hpp"
 #include "infra/util/SharedPtr.hpp"
+#include "numerical/math/CompilerOptimizations.hpp"
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -50,6 +51,14 @@ namespace services
             float b{ 0.0f };
             float c{ 0.0f };
         };
+
+        OPTIMIZE_FOR_SPEED void ForwardCorrected(const foc::PhaseCurrents& currents)
+        {
+            onCorrectedCurrents(foc::PhaseCurrents{
+                foc::Ampere{ currents.a.Value() - offsets.a.Value() },
+                foc::Ampere{ currents.b.Value() - offsets.b.Value() },
+                foc::Ampere{ currents.c.Value() - offsets.c.Value() } });
+        }
 
         void OnMeasurementSample(foc::PhaseCurrents currents);
         void StartSampleWatchdog();

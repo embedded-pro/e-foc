@@ -26,7 +26,7 @@ namespace services
         onCorrectedCurrents.Set(onDone);
         inverter.PhaseCurrentsReady(baseFrequency, [this](foc::PhaseCurrents currents)
             {
-                onCorrectedCurrents(foc::PhaseCurrents{ currents.a - offsets.a, currents.b - offsets.b, currents.c - offsets.c });
+                ForwardCorrected(currents);
             });
     }
 

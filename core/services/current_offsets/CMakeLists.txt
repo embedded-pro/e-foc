@@ -12,6 +12,7 @@ target_link_libraries(e_foc.services.current_offsets PUBLIC
     e_foc.platform_abstraction
     e_foc.foc.interfaces
     e_foc.services.injection_current_limit
+    numerical.math
 )
 
 target_sources(e_foc.services.current_offsets PRIVATE
