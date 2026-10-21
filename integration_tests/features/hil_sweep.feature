@@ -70,7 +70,7 @@ Feature: Controller sweep on the connected motor
       | sliding   | adrc   |
       | sliding   | twodof |
 
-  @hil_sweep
+  @hil_sweep @hil_sweep_position
   Scenario Outline: Position mode with the <position> position loop
     Given the position motor system is initialised with no valid calibration data
     When the position control mode is selected
@@ -79,12 +79,15 @@ Feature: Controller sweep on the connected motor
     And the motor is enabled
     And a position setpoint of 1.0 rad is applied
     Then the measured position shall settle at 1.0 rad within 0.3 rad in 4000 ms
+    And the measured position shall settle at 1.0 rad within 0.03 rad in 4000 ms
     And the measured position shall hold at 1.0 rad within 0.3 rad for 2000 ms
     When a position setpoint of -1.0 rad is applied
     Then the measured position shall settle at -1.0 rad within 0.3 rad in 4000 ms
+    And the measured position shall settle at -1.0 rad within 0.03 rad in 4000 ms
     And the measured position shall hold at -1.0 rad within 0.3 rad for 2000 ms
     When a position setpoint of 3.0 rad is applied
     Then the measured position shall settle at 3.0 rad within 0.3 rad in 4000 ms
+    And the measured position shall settle at 3.0 rad within 0.03 rad in 4000 ms
     And the measured position shall hold at 3.0 rad within 0.3 rad for 2000 ms
     And the motor shall not report a fault
     When the motor is disabled
