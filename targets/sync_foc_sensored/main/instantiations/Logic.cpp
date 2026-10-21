@@ -20,7 +20,7 @@ namespace application
                 platformFaultNotifier->Raise(state_machine::FaultCode::encoderLoss);
             } }
     {
-        hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shorter);
+        hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shortest);
 
         nvm.LoadConfig(configData, [this](services::NvmStatus status)
             {
