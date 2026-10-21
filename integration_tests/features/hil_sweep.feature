@@ -100,3 +100,35 @@ Feature: Controller sweep on the connected motor
       | lqr      |
       | lqi      |
       | twodof   |
+
+  @hil_breakaway
+  Scenario: Breakaway current around the shaft
+    Given the torque motor system is initialised with no valid calibration data
+    When the torque control mode is selected
+    And electrical identification is run
+    And the motor is enabled
+    Then the breakaway current is mapped over 24 trials in steps of 0.005 A up to 0.3 A held for 150 ms
+    When the motor is disabled
+    Then the state machine shall be in the Ready state
+
+  @hil_hunt_trace
+  Scenario Outline: The <position> position loop holds, traced
+    Given the position motor system is initialised with no valid calibration data
+    When the position control mode is selected
+    And the full calibration is run from the terminal
+    And the position loop algorithm is set to <position>
+    And the motor is enabled
+    And a position setpoint of 1.0 rad is applied
+    Then the measured position shall settle at 1.0 rad within 0.3 rad in 4000 ms
+    And the measured position and speed are traced for 3000 ms
+    When a position setpoint of -1.0 rad is applied
+    Then the measured position shall settle at -1.0 rad within 0.3 rad in 4000 ms
+    And the measured position and speed are traced for 3000 ms
+    And the motor shall not report a fault
+    When the motor is disabled
+    Then the state machine shall be in the Ready state
+
+    Examples:
+      | position |
+      | pid      |
+      | cascadep |

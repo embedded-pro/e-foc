@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 #include <numbers>
 #include <optional>
+#include <string>
 #include <thread>
 
 using namespace integration;
@@ -77,6 +78,34 @@ namespace
             return std::sqrt(std::fmax(sumOfSquares / samples - Mean() * Mean(), 0.0));
         }
     };
+
+    bool SetTorque(Fixture& fixture, float iq)
+    {
+        char command[32];
+        std::snprintf(command, sizeof(command), "set_torque %.3f", iq);
+        return fixture.SendCommand(command);
+    }
+
+    std::optional<float> WaitUntilStill(Fixture& fixture)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{ 5 };
+        std::optional<float> previous;
+        int still = 0;
+
+        while (std::chrono::steady_clock::now() < deadline)
+        {
+            const auto position = fixture.ReadMeasuredPosition();
+            if (!position.has_value())
+                return std::nullopt;
+            still = previous.has_value() && std::fabs(WrappedDifference(*position, *previous)) < 0.005f ? still + 1 : 0;
+            if (still >= 10)
+                return position;
+            previous = position;
+            std::this_thread::sleep_for(kPollInterval);
+        }
+
+        return std::nullopt;
+    }
 
     template<class Read, class Error>
     Hold Sample(Read read, Error error, int durationMs)
@@ -279,4 +308,61 @@ THEN(R"(the measured position shall hold at {float} rad within {float} rad for {
     std::fprintf(stderr, "[METRIC] hil position hold target=%.3f n=%d mean_err=%.4f std=%.4f min_err=%.4f max_err=%.4f\n",
         expected, hold.samples, hold.Mean(), hold.Deviation(), hold.lowest, hold.highest);
     EXPECT_LE(hold.worst, tolerance) << "The position left " << expected << " rad by " << hold.worst << " rad";
+}
+
+THEN(R"(the breakaway current is mapped over {int} trials in steps of {float} A up to {float} A held for {int} ms)", (int trials, float step, float limit, int heldMs))
+{
+    auto& fixture = context.Get<Fixture>();
+    constexpr float breakawayDisplacement{ 0.05f };
+
+    for (int trial = 0; trial < trials; ++trial)
+    {
+        const float direction = trial % 2 == 0 ? 1.0f : -1.0f;
+        ASSERT_TRUE(SetTorque(fixture, 0.0f)) << "set_torque rejected";
+        const auto start = WaitUntilStill(fixture);
+        ASSERT_TRUE(start.has_value()) << "The rotor did not come to rest";
+
+        float iq = 0.0f;
+        float creep = 0.0f;
+        bool broke = false;
+        for (int level = 1; static_cast<float>(level) * step <= limit + 1.0e-6f && !broke; ++level)
+        {
+            iq = direction * static_cast<float>(level) * step;
+            ASSERT_TRUE(SetTorque(fixture, iq)) << "set_torque rejected";
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds{ heldMs };
+            while (std::chrono::steady_clock::now() < deadline)
+            {
+                const auto position = fixture.ReadMeasuredPosition();
+                ASSERT_TRUE(position.has_value()) << "No position telemetry";
+                const float displacement = WrappedDifference(*position, *start);
+                if (std::fabs(displacement) >= breakawayDisplacement)
+                {
+                    broke = true;
+                    break;
+                }
+                creep = displacement;
+                std::this_thread::sleep_for(kPollInterval);
+            }
+        }
+
+        ASSERT_TRUE(SetTorque(fixture, 0.0f)) << "set_torque rejected";
+        std::fprintf(stderr, "[METRIC] hil breakaway trial=%d dir=%+.0f start=%.3f iq=%.3f creep=%.3f broke=%d\n",
+            trial, direction, *start, iq, creep, broke ? 1 : 0);
+    }
+}
+
+THEN(R"(the measured position and speed are traced for {int} ms)", (int durationMs))
+{
+    auto& fixture = context.Get<Fixture>();
+    const auto start = std::chrono::steady_clock::now();
+    const auto deadline = start + std::chrono::milliseconds{ durationMs };
+
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        const auto position = fixture.ReadMeasuredPosition();
+        const auto speed = fixture.ReadMeasuredSpeed();
+        ASSERT_TRUE(position.has_value() && speed.has_value()) << "No telemetry";
+        std::fprintf(stderr, "[TRACE] t=%lld pos=%.2f speed=%.0f\n", MillisecondsSince(start), *position, *speed);
+        std::this_thread::sleep_for(kPollInterval);
+    }
 }
