@@ -310,10 +310,9 @@ THEN(R"(the measured position shall hold at {float} rad within {float} rad for {
     EXPECT_LE(hold.worst, tolerance) << "The position left " << expected << " rad by " << hold.worst << " rad";
 }
 
-THEN(R"(the breakaway current is mapped over {int} trials in steps of {float} A up to {float} A held for {int} ms)", (int trials, float step, float limit, int heldMs))
+THEN(R"(the current that turns the rotor {float} rad is mapped over {int} trials in steps of {float} A up to {float} A held for {int} ms)", (float breakawayDisplacement, int trials, float step, float limit, int heldMs))
 {
     auto& fixture = context.Get<Fixture>();
-    constexpr float breakawayDisplacement{ 0.05f };
 
     for (int trial = 0; trial < trials; ++trial)
     {
@@ -365,4 +364,22 @@ THEN(R"(the measured position and speed are traced for {int} ms)", (int duration
         std::fprintf(stderr, "[TRACE] t=%lld pos=%.2f speed=%.0f\n", MillisecondsSince(start), *position, *speed);
         std::this_thread::sleep_for(kPollInterval);
     }
+}
+
+THEN(R"(the rest positions are surveyed over {int} pulses of {float} A for {int} ms)", (int pulses, float iq, int pulseMs))
+{
+    auto& fixture = context.Get<Fixture>();
+
+    for (int pulse = 0; pulse < pulses; ++pulse)
+    {
+        ASSERT_TRUE(SetTorque(fixture, 0.0f)) << "set_torque rejected";
+        const auto rest = WaitUntilStill(fixture);
+        ASSERT_TRUE(rest.has_value()) << "The rotor did not come to rest";
+        std::fprintf(stderr, "[METRIC] hil rest pulse=%d iq=%.3f pos=%.3f\n", pulse, iq, *rest);
+
+        ASSERT_TRUE(SetTorque(fixture, iq)) << "set_torque rejected";
+        std::this_thread::sleep_for(std::chrono::milliseconds{ pulseMs });
+    }
+
+    ASSERT_TRUE(SetTorque(fixture, 0.0f)) << "set_torque rejected";
 }

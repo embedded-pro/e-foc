@@ -107,7 +107,7 @@ Feature: Controller sweep on the connected motor
     When the torque control mode is selected
     And electrical identification is run
     And the motor is enabled
-    Then the breakaway current is mapped over 24 trials in steps of 0.005 A up to 0.3 A held for 150 ms
+    Then the current that turns the rotor 0.05 rad is mapped over 24 trials in steps of 0.005 A up to 0.3 A held for 150 ms
     When the motor is disabled
     Then the state machine shall be in the Ready state
 
@@ -132,3 +132,15 @@ Feature: Controller sweep on the connected motor
       | position |
       | pid      |
       | cascadep |
+
+  @hil_cogging
+  Scenario: Rest positions and the current that turns the rotor past a detent
+    Given the torque motor system is initialised with no valid calibration data
+    When the torque control mode is selected
+    And electrical identification is run
+    And the motor is enabled
+    Then the rest positions are surveyed over 48 pulses of 0.25 A for 40 ms
+    And the rest positions are surveyed over 48 pulses of -0.25 A for 40 ms
+    And the current that turns the rotor 0.4 rad is mapped over 16 trials in steps of 0.005 A up to 0.3 A held for 150 ms
+    When the motor is disabled
+    Then the state machine shall be in the Ready state
