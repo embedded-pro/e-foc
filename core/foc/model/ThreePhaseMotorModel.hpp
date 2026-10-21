@@ -2,6 +2,7 @@
 
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/interfaces/Units.hpp"
+#include "core/foc/model/CurrentSense.hpp"
 #include "core/foc/model/PowerStage.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
@@ -108,6 +109,7 @@ namespace foc
         void SetFaultInjection(const FaultInjectionConfig& config);
         void SetSupply(const SupplyConfig& config);
         void SetPowerStage(const PowerStageConfig& config);
+        void SetCurrentSense(const CurrentSenseConfig& config);
         void SetCoulombFriction(foc::NewtonMeter friction);
         void SetEncoderResolution(uint32_t countsPerRevolution);
         void SetRandomSeed(uint32_t seed);
@@ -144,6 +146,7 @@ namespace foc
         float SampleEncoderNoise();
         void ApplyOpenPhases();
         foc::ThreePhase PhaseVoltages(const foc::PhasePwmDutyCycles& dutyPhases, foc::Volts supply) const;
+        foc::PhaseCurrents MeasuredCurrents(const foc::PhasePwmDutyCycles& dutyPhases);
 
     private:
         struct MotorState
@@ -235,6 +238,7 @@ namespace foc
         SupplyState supplyState;
         PlantNonIdealities nonIdealities;
         PowerStageConfig powerStage;
+        CurrentSenseConfig currentSense;
         foc::ThreePhase lastPhaseVoltages{};
         SelfDriveState selfDrive;
     };

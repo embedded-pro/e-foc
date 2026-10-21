@@ -108,6 +108,24 @@ namespace
             plant.diodeForwardVolts = value;
         else if (key == "minimum_pulse_ns")
             plant.minimumPulseNanoseconds = value;
+        else if (key == "adc_clock_mhz")
+            plant.adcClockMegahertz = value;
+        else if (key == "adc_sample_hold_clocks")
+            plant.adcSampleHoldClocks = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
+        else if (key == "adc_conversion_clocks")
+            plant.adcConversionClocks = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
+        else if (key == "adc_averaged_conversions")
+            plant.adcAveragedConversions = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
+        else if (key == "adc_trigger_delay_ns")
+            plant.adcTriggerDelayNanoseconds = value;
+        else if (key == "current_amplifier_time_constant_ns")
+            plant.currentAmplifierTimeConstantNanoseconds = value;
+        else if (key == "current_full_scale_ampere")
+            plant.currentFullScaleAmpere = value;
+        else if (key == "adc_resolution_bits")
+            plant.adcResolutionBits = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
+        else if (key == "max_readable_duty_percent")
+            plant.maxReadableDutyPercent = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else if (key == "coulomb_friction_nm")
             plant.coulombFrictionNm = value;
         else if (key == "supply_source_resistance_ohm")
@@ -167,6 +185,12 @@ GIVEN(R"(a motor plant with:)")
         ASSERT_TRUE(ApplyPlantOverride(setup.plant, row.cells[0].value, row.cells[1].value))
             << "Unknown motor plant characteristic: " << row.cells[0].value;
     }
+}
+
+GIVEN(R"(the plant reads its currents through the bench's current-sense chain)")
+{
+    RequireSimulatedTarget();
+    sil::DescribeBenchCurrentSense(context.Get<ScenarioSetup>().plant);
 }
 
 GIVEN(R"(the motor is already calibrated)")

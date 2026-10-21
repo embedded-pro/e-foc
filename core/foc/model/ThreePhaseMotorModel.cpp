@@ -211,12 +211,10 @@ namespace foc
             running = !justFinished;
         }
 
-        const auto iaNoise = foc::Ampere{ motorState.ia.Value() + currentNoise.config.biasAmpereA + SampleNoise() };
-        const auto ibNoise = foc::Ampere{ motorState.ib.Value() + currentNoise.config.biasAmpereB + SampleNoise() };
-        const auto icNoise = foc::Ampere{ motorState.ic.Value() + currentNoise.config.biasAmpereC + SampleNoise() };
-        currentNoise.iaLast = iaNoise;
-        currentNoise.ibLast = ibNoise;
-        currentNoise.icLast = icNoise;
+        const auto measured = MeasuredCurrents(dutyPhases);
+        currentNoise.iaLast = measured.a;
+        currentNoise.ibLast = measured.b;
+        currentNoise.icLast = measured.c;
         encoderNoise.lastSample = SampleEncoderNoise();
 
         const auto vAbc = lastPhaseVoltages;
@@ -346,6 +344,34 @@ namespace foc
     void ThreePhaseMotorModel::SetPowerStage(const PowerStageConfig& config)
     {
         powerStage = config;
+    }
+
+    void ThreePhaseMotorModel::SetCurrentSense(const CurrentSenseConfig& config)
+    {
+        currentSense = config;
+    }
+
+    foc::PhaseCurrents ThreePhaseMotorModel::MeasuredCurrents(const foc::PhasePwmDutyCycles& dutyPhases)
+    {
+        const auto& noise = currentNoise.config;
+
+        if (!CurrentSenseEnabled(currentSense))
+            return { foc::Ampere{ motorState.ia.Value() + noise.biasAmpereA + SampleNoise() },
+                foc::Ampere{ motorState.ib.Value() + noise.biasAmpereB + SampleNoise() },
+                foc::Ampere{ motorState.ic.Value() + noise.biasAmpereC + SampleNoise() } };
+
+        const auto period = 1.0f / static_cast<float>(baseFrequency.Value());
+        const infra::Function<float()> conversionNoise{ [this]()
+            {
+                return SampleNoise();
+            } };
+        const auto read = [this, period, &conversionNoise](uint32_t step, hal::DutyCycle duty, foc::Ampere current, float offset)
+        {
+            const ShuntSample sample{ LowSideConduction(powerStage, foc::DutyFraction(duty), current.Value(), period), current.Value(), offset };
+            return foc::Ampere{ ShuntReading(currentSense, sample, step, conversionNoise) };
+        };
+
+        return { read(0, dutyPhases.a, motorState.ia, noise.biasAmpereA), read(1, dutyPhases.b, motorState.ib, noise.biasAmpereB), read(2, dutyPhases.c, motorState.ic, noise.biasAmpereC) };
     }
 
     foc::ThreePhase ThreePhaseMotorModel::PhaseVoltages(const foc::PhasePwmDutyCycles& dutyPhases, foc::Volts supply) const

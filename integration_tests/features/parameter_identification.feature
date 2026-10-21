@@ -118,6 +118,27 @@ Feature: Parameter Identification Against a Known Plant
     And the online inductance estimate shall be within 10 % of the plant
 
   @sil @REQ-CAL-014
+  Scenario: The online electrical and inertia estimates converge through the bench's current-sense chain
+    Given a bench motor plant
+    And the plant reads its currents through the bench's current-sense chain
+    And the plant response is recorded at 100 Hz for up to 2000 samples
+    And the motor is already calibrated
+    And the stored calibration is off by:
+      | resistance | 1.3 |
+      | inductance | 0.7 |
+      | inertia    | 2.0 |
+      | friction   | 0.5 |
+    And the motor boots in speed mode
+    When the target boots
+    And the rotor is aligned
+    And the motor is enabled
+    And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
+    And the online estimates are read
+    Then the online inertia estimate shall be within 2 % of the plant
+    And the online resistance estimate shall be within 5 % of the plant
+    And the online inductance estimate shall be within 15 % of the plant
+
+  @sil @REQ-CAL-014
   Scenario Outline: The online resistance estimate follows the plant (<motor>)
     Given a <motor> motor plant
     And the plant response is recorded at 100 Hz for up to 2000 samples

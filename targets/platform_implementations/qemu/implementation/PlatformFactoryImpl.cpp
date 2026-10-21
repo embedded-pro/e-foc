@@ -1,7 +1,9 @@
 #include "targets/platform_implementations/qemu/implementation/PlatformFactoryImpl.hpp"
+#include "core/foc/math/LowSideShuntWindow.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include "targets/platform_implementations/qemu/implementation/SemihostingFile.hpp"
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -129,6 +131,9 @@ namespace application
             .diodeForwardVolts = plantConfig->diodeForwardVolts,
             .minimumPulseSeconds = plantConfig->minimumPulseNanoseconds * 1e-9f,
         });
+        ApplyCurrentSense(SampleAndHold::shortest);
+        if (plantConfig->maxReadableDutyPercent != 0)
+            maxReadableDuty = hal::DutyCycle::FromPercent(plantConfig->maxReadableDutyPercent);
         model.SetCoulombFriction(foc::NewtonMeter{ plantConfig->coulombFrictionNm });
         model.SetEncoderResolution(plantConfig->encoderCountsPerRevolution);
         model.ResetTemperature();
@@ -288,8 +293,31 @@ namespace application
         return diagnostics;
     }
 
-    void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz, std::chrono::nanoseconds, SampleAndHold)
+    // The converter takes its sample-and-hold from the firmware, as the TI platform maps it, unless a scenario pins
+    // it in the plant.
+    void PlatformFactoryImpl::ApplyCurrentSense(SampleAndHold requested)
     {
+        if (!plantConfig.has_value())
+            return;
+
+        static constexpr std::array<uint32_t, 5> sampleHoldClocks{ 4, 16, 32, 64, 256 };
+
+        model.SetCurrentSense({
+            .adcClockHertz = plantConfig->adcClockMegahertz * 1e6f,
+            .sampleHoldClocks = plantConfig->adcSampleHoldClocks != 0 ? plantConfig->adcSampleHoldClocks : sampleHoldClocks.at(static_cast<std::size_t>(requested)),
+            .conversionClocks = plantConfig->adcConversionClocks,
+            .averagedConversions = plantConfig->adcAveragedConversions,
+            .triggerDelaySeconds = plantConfig->adcTriggerDelayNanoseconds * 1e-9f,
+            .amplifierTimeConstantSeconds = plantConfig->currentAmplifierTimeConstantNanoseconds * 1e-9f,
+            .fullScaleAmpere = plantConfig->currentFullScaleAmpere,
+            .resolutionBits = plantConfig->adcResolutionBits,
+        });
+    }
+
+    void PlatformFactoryImpl::ConfigureAdcAndPwm(hal::Hertz, std::chrono::nanoseconds, SampleAndHold sampleAndHold)
+    {
+        ApplyCurrentSense(sampleAndHold);
+
         const auto freq = baseFrequency;
 
         const auto periodCycles = freq.Value() == 0
@@ -342,7 +370,7 @@ namespace application
 
     void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        lastDutyPhases = dutyPhases;
+        lastDutyPhases = foc::KeepLowSideShuntsReadable(dutyPhases, maxReadableDuty);
     }
 
     void PlatformFactoryImpl::FocTimerIsr()

@@ -20,6 +20,21 @@ namespace sil
         config.polePairs = motor.p;
     }
 
+    inline void DescribeBenchCurrentSense(SilPlantConfig& config)
+    {
+        config.adcClockMegahertz = 16.0f;
+        config.adcConversionClocks = 12u;
+        config.adcAveragedConversions = 2u;
+        config.currentAmplifierTimeConstantNanoseconds = 200.0f;
+        config.currentFullScaleAmpere = 8.25f;
+        config.adcResolutionBits = 12u;
+        config.maxReadableDutyPercent = 70u;
+        config.noiseSigmaAmpere = 0.05f;
+        config.noiseBiasAmpereA = 0.027f;
+        config.noiseBiasAmpereB = -0.018f;
+        config.noiseBiasAmpereC = 0.054f;
+    }
+
     inline SilPlantConfig NominalPlant()
     {
         SilPlantConfig config{
@@ -72,6 +87,16 @@ namespace sil
             .switchOnResistanceOhm = 0.0f,
             .diodeForwardVolts = 0.0f,
             .minimumPulseNanoseconds = 0.0f,
+
+            .adcClockMegahertz = 0.0f,
+            .adcSampleHoldClocks = 0u,
+            .adcConversionClocks = 0u,
+            .adcAveragedConversions = 0u,
+            .adcTriggerDelayNanoseconds = 0.0f,
+            .currentAmplifierTimeConstantNanoseconds = 0.0f,
+            .currentFullScaleAmpere = 0.0f,
+            .adcResolutionBits = 0u,
+            .maxReadableDutyPercent = 0u,
 
             .polePairs = 0u,
             .faultFlags = 0u,
