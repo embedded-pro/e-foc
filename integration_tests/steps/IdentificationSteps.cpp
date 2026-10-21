@@ -318,3 +318,20 @@ THEN(R"(the online {word} estimate shall be within {float} % of the plant at {fl
     const auto& setup = context.Get<ScenarioSetup>();
     CompareWithPlant(setup, setup.online, "online", quantity, limitPercent, windingCelsius);
 }
+
+THEN(R"(the online {word} estimate shall read at least {float} % above the plant)", (std::string quantity, float minimumPercent))
+{
+    const auto& setup = context.Get<ScenarioSetup>();
+    const auto truth = PlantTruth(setup, quantity, kReferenceCelsius);
+    ASSERT_TRUE(truth.has_value()) << "Unknown quantity: " << quantity;
+    ASSERT_NE(*truth, 0.0f) << "The plant's " << quantity << " is zero; a relative error is undefined";
+
+    const auto value = Estimate(setup.online, quantity);
+    ASSERT_TRUE(value.has_value()) << "No online " << quantity << " was captured";
+
+    const float excessPercent = (*value - *truth) / std::fabs(*truth) * 100.0f;
+    std::fprintf(stderr, "[METRIC] ident online %s %s plant=%.6g value=%.6g excess_pct=%.2f\n",
+        quantity.c_str(), setup.plantName.c_str(), *truth, *value, excessPercent);
+
+    EXPECT_GE(excessPercent, minimumPercent) << "online " << quantity << " is " << *value << " against a plant of " << *truth;
+}

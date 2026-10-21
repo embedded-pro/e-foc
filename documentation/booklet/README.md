@@ -32,7 +32,7 @@ files.
 | 17 | [Position Loop — Friction Compensation](../theory/position-loop-friction.md)          | Coulomb + Stribeck feedforward; eliminates hunting at rest         |
 | 18 | [Resistance and Inductance Estimation](../theory/resistance-inductance-estimation.md) | RLS-based online electrical parameter identification               |
 | 19 | [Friction and Inertia Estimation](../theory/friction-inertia-estimation.md)           | RLS-based online mechanical parameter identification               |
-| 20 | [Motor Alignment](../theory/alignment.md)                                             | Rotor flux alignment procedure and angle offset calibration        |
+| 21 | [Motor Alignment](../theory/alignment.md)                                             | Rotor flux alignment procedure and angle offset calibration        |
 
 ## Part II — Architecture
 
@@ -53,13 +53,14 @@ files.
 | 17 | [Service: Motor Alignment](../design/service-alignment.md)                             | Alignment sequence, completion signalling, error handling                     |
 | 18 | [Service: Electrical Parameters Identification](../design/service-electrical-ident.md) | RLS service design, result storage, calibration lifecycle                     |
 | 19 | [Service: Current Sensor Offsets](../design/service-current-offsets.md)                | Offset measurement at calibration, correction of every phase-current sample   |
-| 20 | [Service: Mechanical Parameters Identification](../design/service-mechanical-ident.md) | Mechanical RLS service design and excitation strategy                         |
-| 21 | [Service: Non-Volatile Memory](../design/service-nvm.md)                               | NVM layout, versioning, parameter persistence                                 |
-| 22 | [Service: Command-Line Interface](../design/service-cli.md)                            | CLI command routing, parameter read/write, observer interface                 |
-| 23 | [CAN Service Layer](../design/service-can.md)                                          | CAN service design, message dispatch, FOC command/response flow               |
-| 24 | [Error Handling](../design/error-handling.md)                                          | Error taxonomy, propagation, recovery, and safe-state entry                   |
-| 25 | [Watchdog](../design/watchdog.md)                                                      | Event dispatcher supervised by the MCU watchdog, power-stage cutoff on expiry |
-| 26 | [Integration Testing Design](../design/integration-testing.md)                         | Test architecture, fixture composition, coverage strategy                     |
+| 20 | [Service: Dead-Time Compensation](../design/service-dead-time-compensation.md)         | Correction of every duty for the bridge's dead-time loss, the board's figures |
+| 21 | [Service: Mechanical Parameters Identification](../design/service-mechanical-ident.md) | Mechanical RLS service design and excitation strategy                         |
+| 22 | [Service: Non-Volatile Memory](../design/service-nvm.md)                               | NVM layout, versioning, parameter persistence                                 |
+| 23 | [Service: Command-Line Interface](../design/service-cli.md)                            | CLI command routing, parameter read/write, observer interface                 |
+| 24 | [CAN Service Layer](../design/service-can.md)                                          | CAN service design, message dispatch, FOC command/response flow               |
+| 25 | [Error Handling](../design/error-handling.md)                                          | Error taxonomy, propagation, recovery, and safe-state entry                   |
+| 26 | [Watchdog](../design/watchdog.md)                                                      | Event dispatcher supervised by the MCU watchdog, power-stage cutoff on expiry |
+| 27 | [Integration Testing Design](../design/integration-testing.md)                         | Test architecture, fixture composition, coverage strategy                     |
 
 ## Building the booklet
 

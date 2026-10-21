@@ -41,6 +41,7 @@ namespace application
             const infra::Function<void()>& onInitialized);
 
         void ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold) override;
+        drivers::DeadTimeLoss InverterDeadTimeLoss(std::chrono::nanoseconds deadTime) const override;
         void SetEncoderResolution(uint32_t resolution) override;
         void ConfigureCanBus(uint32_t bitRate, bool testMode) override;
         CanBusAdapter& CanBus() override;

@@ -4,9 +4,16 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
 #include "infra/util/Function.hpp"
+#include <chrono>
 
 namespace drivers
 {
+    struct DeadTimeLoss
+    {
+        std::chrono::nanoseconds effectiveDeadTime{ 0 };
+        foc::Ampere kneeCurrent{ 0.0f };
+    };
+
     class Encoder
     {
     public:

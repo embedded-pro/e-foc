@@ -75,6 +75,9 @@ namespace sil
         uint32_t adcResolutionBits;
         uint32_t maxReadableDutyPercent;
 
+        float deadTimeCompensationNanoseconds;
+        float deadTimeCompensationKneeAmpere;
+
         uint8_t polePairs;
         uint8_t faultFlags;
         // Carried in centiseconds so it fits the byte this record already reserved; zero means the
@@ -85,10 +88,10 @@ namespace sil
         uint8_t reserved1;
     };
 
-    static_assert(sizeof(SilPlantConfig) == 200, "SilPlantConfig layout must be free of implicit padding");
+    static_assert(sizeof(SilPlantConfig) == 208, "SilPlantConfig layout must be free of implicit padding");
 
     static constexpr uint32_t plantConfigMagic = 0x504C4E54;
-    static constexpr uint8_t plantConfigLayoutVersion = 5;
+    static constexpr uint8_t plantConfigLayoutVersion = 6;
 
     static constexpr std::size_t plantConfigRecordSize =
         sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t) + sizeof(SilPlantConfig);

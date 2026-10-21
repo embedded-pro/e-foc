@@ -14,6 +14,7 @@
 #include "core/services/cli/TerminalDiagnostics.hpp"
 #include "core/services/cli/TerminalWithBanner.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsetCompensation.hpp"
+#include "core/services/dead_time_compensation/DeadTimeCompensation.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
@@ -51,6 +52,7 @@ namespace application
         services::NvmEepromRegion configRegion;
         services::NonVolatileMemoryImpl nvm;
         infra::WithSharedAccess<services::PhaseCurrentOffsetCompensation> currentOffsets;
+        services::DeadTimeCompensation deadTimeCompensation;
         infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent;
         infra::WithSharedAccess<services::MotorAlignmentImpl> motorAlignment;
         infra::WithSharedAccess<state_machine::PlatformFaultNotifier> platformFaultNotifier;

@@ -69,6 +69,12 @@ namespace application
         };
 
         virtual void ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold) = 0;
+
+        virtual drivers::DeadTimeLoss InverterDeadTimeLoss([[maybe_unused]] std::chrono::nanoseconds deadTime) const
+        {
+            return {};
+        }
+
         virtual void SetEncoderResolution(uint32_t resolution) = 0;
         virtual void ConfigureCanBus(uint32_t bitRate, bool testMode) = 0;
         virtual CanBusAdapter& CanBus() = 0;

@@ -516,6 +516,14 @@ namespace application
         return model.MaxCurrentSupported();
     }
 
+    drivers::DeadTimeLoss PlatformFactoryImpl::InverterDeadTimeLoss([[maybe_unused]] std::chrono::nanoseconds deadTime) const
+    {
+        if (!plantConfig)
+            return {};
+
+        return { std::chrono::nanoseconds{ static_cast<int64_t>(plantConfig->deadTimeCompensationNanoseconds + 0.5f) }, foc::Ampere{ plantConfig->deadTimeCompensationKneeAmpere } };
+    }
+
     foc::Radians PlatformFactoryImpl::Read()
     {
         return model.Read();

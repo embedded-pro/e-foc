@@ -190,9 +190,10 @@ mode and the decoupled law in speed and position mode. The calibration scenario 
 a full calibration is run from the terminal, so the window covers every identification procedure
 and the alignment between them. Each requires at least one execution, a non-zero shortest one (a
 dead counter reads zero), no overrun, deadline miss or re-entry, and a slowest execution under a
-pinned limit. The slowest execution measured 103 to 104 cycles for every law in torque mode, 119 in
-speed and position mode and 236 through a full calibration, about 520, 600 and 1180 instructions,
-the same to within a cycle across runs. The limits are one and a half times that, rounded up to
+pinned limit. With the current-offset and dead-time corrections in the path, the slowest execution
+measured 116 to 127 cycles for the laws in torque mode, 160 in speed and position mode and 377
+through a full calibration, about 640, 800 and 1890 instructions, the same to within a cycle across
+runs. The limits are one and a half times that, rounded up to
 ten, so a regression trips them long before it reaches the budget; a change that makes the callback
 slower on purpose re-pins them by the same rule.
 
@@ -829,11 +830,24 @@ diodes:
 The calibration measures with 1 to 2 A, where the node swings at once and the error is the fixed
 dead-time voltage against a few volts. The online estimator excites ±2.5 % of the current limit,
 75 mA on the bench, where the node is still swinging when the complement turns on: its
-resistance is the one the dead time hurts. The rig reads its calibration resistance 10 % and its
-online resistance 25 % above the winding's 1.00 Ω, which fits a dead time at the node under about
-100 ns, well under the 500 ns band the controller asks for. The driver's and the switches'
-delays take most of it back. The `bench` plant keeps an ideal stage until it and the
-current-sense chain (Part M) are fitted to the rig together.
+resistance is the one the dead time hurts.
+
+A sweep on the rig settled the bench's stage. One leg was stepped from 50 % in single PWM counts
+with the other two at 50 %, and each point compared the applied voltage with the offset-corrected
+current. Through the 500 ns band the winding reads 1.02 to 1.06 Ω above 1 A. The loss grows with
+the current up to about 0.13 to 0.2 A and saturates near 0.2 % of the period past it. Widening the
+band moves that loss up in 500 ns steps, each about 420 ns short of the band: the driver's and the
+switches' delays take that much back, and the node sees about 100 ns. A bench scenario can drive
+its windings through that stage, 100 ns at the node and 600 pF, which reproduces both the sweep
+and the rig's online resistance, about 20 % above the winding. Uncompensated, the online
+resistance reads 18 % high through it. The drive compensates the loss
+(`service-dead-time-compensation.md`), and a scenario can give the emulated drive the bench's
+compensation figures while the plant's stage stays as it is.
+
+The stage and the current-sense chain (Part M) are not used together while the loop runs closed.
+With both, the plant alone takes about 85 % of the emulated core's control period, and the drive's
+interrupt fills the rest, so the event loop starves and the watchdog resets the target. With the
+stage alone the interrupt takes about 40 % of the period.
 
 ### Part M — The current-sense chain between the winding and the controller
 

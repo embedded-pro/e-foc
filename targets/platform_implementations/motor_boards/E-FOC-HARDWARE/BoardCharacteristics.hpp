@@ -20,6 +20,9 @@ namespace application
         // Above this duty a phase's low-side window at the PWM centre is too short for its shunt to read: on the
         // bench a phase read within 0.25 A at 71.5 % and 1 A low at 79.7 %, and the current loop lost the phase
         static constexpr uint32_t maxReadableDutyPercent{ 70 };
+        static constexpr uint32_t measuredDeadBandNanoseconds{ 500 };
+        static constexpr uint32_t effectiveDeadTimeNanoseconds{ 70 };
+        static constexpr float deadTimeKneeAmps{ 0.2f };
 
         static constexpr float AdcToVoltsFactor(float adcReferenceVoltage, float adcResolution)
         {

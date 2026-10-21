@@ -227,12 +227,18 @@ fitQuality falls below 0.5.
 #### 3.6 Hardware Note — Dead-Time Voltage Error
 
 Inverter dead-time introduces a voltage error at the switching frequency that corrupts the injection
-signal. At 500 ns dead-time and 20 kHz PWM the error voltage is approximately
-$2 \cdot t_{dt} \cdot f_{sw} \cdot V_{dc} \approx 0.48\,\text{V}$ at $V_{dc} = 24\,\text{V}$.
-At 10 % injection ($V_{inj} = 2.4\,\text{V}$) this represents 20 % distortion; at 15 %
-($V_{inj} = 3.6\,\text{V}$) it falls to 13 %. The minimum recommended injection voltage is
-**15 % of bus** to keep dead-time distortion below 15 % of the injected signal. The software model
-does not reproduce dead-time; simulation results will be optimistic relative to hardware.
+signal. For a dead time $t_{dt}$ at the switch node and 20 kHz PWM the error voltage is approximately
+$2 \cdot t_{dt} \cdot f_{sw} \cdot V_{dc}$, which would be $0.48\,\text{V}$ at $V_{dc} = 24\,\text{V}$ if
+the node saw the whole 500 ns band. At 10 % injection ($V_{inj} = 2.4\,\text{V}$) that would be 20 %
+distortion; at 15 % ($V_{inj} = 3.6\,\text{V}$) it falls to 13 %. The minimum recommended injection
+voltage is **15 % of bus** to keep dead-time distortion below 15 % of the injected signal in that worst
+case.
+
+On E-FOC-HARDWARE the gate driver's and the switches' delays take back most of the band: the node sees
+about 70 to 100 ns, an error near $0.07\,\text{V}$, and the drive corrects every duty for it
+(`documentation/design/service-dead-time-compensation.md`). The simulated plant reproduces the dead
+time and the switch node's partial swing at small currents (`documentation/design/software-in-the-loop.md`,
+Part L).
 
 #### Signal Flow
 

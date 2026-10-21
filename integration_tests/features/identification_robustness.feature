@@ -50,6 +50,39 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
       | 50   | 5          |
       | 270  | 15         |
 
+  @sil @REQ-TRQ-008
+  Scenario: Uncompensated, the bench's dead time reads the online resistance high
+    Given a bench motor plant
+    And the plant drives its windings through the bench's power stage
+    And the plant response is recorded at 100 Hz for up to 2000 samples
+    And the motor is already calibrated
+    And the stored calibration is off by:
+      | resistance | 1.3 |
+    And the motor boots in speed mode
+    When the target boots
+    And the rotor is aligned
+    And the motor is enabled
+    And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
+    And the online estimates are read
+    Then the online resistance estimate shall read at least 12 % above the plant
+
+  @sil @REQ-TRQ-008
+  Scenario: Compensating the bench's dead time keeps the online resistance on the winding
+    Given a bench motor plant
+    And the plant drives its windings through the bench's power stage
+    And the drive compensates the bench's dead time
+    And the plant response is recorded at 100 Hz for up to 2000 samples
+    And the motor is already calibrated
+    And the stored calibration is off by:
+      | resistance | 1.3 |
+    And the motor boots in speed mode
+    When the target boots
+    And the rotor is aligned
+    And the motor is enabled
+    And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
+    And the online estimates are read
+    Then the online resistance estimate shall be within 5 % of the plant
+
   @sil @REQ-CAL-012
   Scenario: The electrical identification reads through the bench's current-sense chain
     Given a bench motor plant
