@@ -190,9 +190,10 @@ mode and the decoupled law in speed and position mode. The calibration scenario 
 a full calibration is run from the terminal, so the window covers every identification procedure
 and the alignment between them. Each requires at least one execution, a non-zero shortest one (a
 dead counter reads zero), no overrun, deadline miss or re-entry, and a slowest execution under a
-pinned limit. The slowest execution measured 103 to 104 cycles for every law in torque mode, 119 in
-speed and position mode and 236 through a full calibration, about 520, 600 and 1180 instructions,
-the same to within a cycle across runs. The limits are one and a half times that, rounded up to
+pinned limit. With the current-offset and dead-time corrections in the path, the slowest execution
+measured 116 to 127 cycles for the laws in torque mode, 160 in speed and position mode and 377
+through a full calibration, about 640, 800 and 1890 instructions, the same to within a cycle across
+runs. The limits are one and a half times that, rounded up to
 ten, so a regression trips them long before it reaches the budget; a change that makes the callback
 slower on purpose re-pins them by the same rule.
 

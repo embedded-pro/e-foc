@@ -19,11 +19,12 @@ Feature: Control Loop Timing
 
   The budget alone would let the callback grow some eightfold before failing,
   so each row also pins its slowest execution, at one and a half times the
-  worst value repeated runs measured for the row, rounded up to ten. Those runs
-  measured 103 to 104 cycles for every current law in torque mode, 119 in speed
-  and position mode and 236 through a full calibration, the same to within a
-  cycle from run to run. A change that makes the callback slower on purpose
-  re-pins by the same rule. See documentation/design/software-in-the-loop.md,
+  worst value repeated runs measured for the row, rounded up to ten. With the
+  current-offset and dead-time corrections in the path, those runs measured
+  116 to 127 cycles for the current laws in torque mode, 160 in speed and
+  position mode and 377 through a full calibration, the same to within a cycle
+  from run to run. A change that makes the callback slower on purpose re-pins
+  by the same rule. See documentation/design/software-in-the-loop.md,
   Part B3.
 
   @sil @REQ-PERF-004 @REQ-PERF-008
@@ -45,12 +46,12 @@ Feature: Control Loop Timing
 
     Examples:
       | mode     | current   | setpoint                                  | max_cycles |
-      | torque   | pid       | a torque setpoint of 0.5 A is applied     | 160        |
-      | torque   | decoupled | a torque setpoint of 0.5 A is applied     | 160        |
-      | torque   | deadbeat  | a torque setpoint of 0.5 A is applied     | 160        |
-      | torque   | sliding   | a torque setpoint of 0.5 A is applied     | 160        |
-      | speed    | decoupled | a speed setpoint of 20 rad/s is applied   | 180        |
-      | position | decoupled | a position setpoint of 1.5 rad is applied | 180        |
+      | torque   | pid       | a torque setpoint of 0.5 A is applied     | 200        |
+      | torque   | decoupled | a torque setpoint of 0.5 A is applied     | 200        |
+      | torque   | deadbeat  | a torque setpoint of 0.5 A is applied     | 200        |
+      | torque   | sliding   | a torque setpoint of 0.5 A is applied     | 200        |
+      | speed    | decoupled | a speed setpoint of 20 rad/s is applied   | 240        |
+      | position | decoupled | a position setpoint of 1.5 rad is applied | 240        |
 
   @sil @REQ-PERF-004 @REQ-PERF-008
   Scenario: The control interrupt stays within its budget through a full calibration
@@ -61,4 +62,4 @@ Feature: Control Loop Timing
     And the control loop statistics are cleared
     And the full calibration is run from the terminal
     Then the control loop shall have stayed within its budget
-    And no control loop execution shall have taken more than 360 cycles
+    And no control loop execution shall have taken more than 570 cycles
