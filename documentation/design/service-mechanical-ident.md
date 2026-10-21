@@ -364,13 +364,29 @@ $$T_e = J \cdot \dot{\omega} + B \cdot \omega + c_\pm, \qquad c_\pm = \tau_L \pm
 
 The electromagnetic torque is approximated as $T_e = I_q \cdot k_t$, where $k_t = \tfrac{3}{2} p \psi_f$ is derived from the calibration record's pole pairs and flux linkage. Angular acceleration $\dot{\omega}$ and speed $\omega$ come from the window-mean positions of three consecutive observation windows (see Window Kinematics below).
 
-The intercept is whatever torque does not scale with the motion: a shaft load $\tau_L$ that keeps its sign, plus a dry friction $\tau_c$ that turns with the rotor. Their sum differs by $2\tau_c$ between the two directions of rotation, and nothing in one direction's data says how it splits. The estimator therefore keeps **one fit per direction**. Each carries the regressor $\phi = [1,\ \dot{\omega},\ \omega]^T$ and the parameters $\theta = [c_\pm,\ J,\ B]^T$, with the scalar output $T_e$, and an RLS with a forgetting factor of 0.9995 updates the fit of the direction an observation moves in, once per observation window. Each fit has its own covariance, excitation count, residual and settled state, and whichever fit settles publishes $J$ and $B$.
+The intercept is whatever torque does not scale with the motion: a shaft load $\tau_L$ that keeps its sign,
+plus a dry friction $\tau_c$ that turns with the rotor. Their sum differs by $2\tau_c$ between the two
+directions of rotation, and nothing in one direction's data says how it splits. The estimator therefore keeps
+**one fit per direction**. Each carries the regressor $\phi = [1,\ \dot{\omega},\ \omega]^T$ and the
+parameters $\theta = [c_\pm,\ J,\ B]^T$, with the scalar output $T_e$, and an RLS with a forgetting factor of
+0.9995 updates the fit of the direction an observation moves in, once per observation window. Each fit has its
+own covariance, excitation count, residual and settled state, and whichever fit settles publishes $J$ and $B$.
 
-One fit for both directions used to read a reversal wrongly. Its intercept could not follow the step of $2\tau_c$, so the fit put it on the viscous column, whose speed reverses too: the speed sweep on the rig, 30, 60, −30 and 0 rad/s, read the viscous friction 70 to 100 µN·m·s against the calibration's 9 to 11, and the plant with the rig's 3.7 mN·m of dry friction read it 94 against 5. A dry friction modelled as $\tau_c\,\mathrm{sgn}(\omega)$ instead fixed that but read a constant shaft torque that turned the rotor backwards wrongly instead, 3 to 5 times the plant's friction. Two fits read both.
+One fit for both directions used to read a reversal wrongly. Its intercept could not follow the step of
+$2\tau_c$, so the fit put it on the viscous column, whose speed reverses too: the speed sweep on the rig, 30,
+60, −30 and 0 rad/s, read the viscous friction 70 to 100 µN·m·s against the calibration's 9 to 11, and the
+plant with the rig's 3.7 mN·m of dry friction read it 94 against 5. A dry friction modelled as
+$\tau_c\,\mathrm{sgn}(\omega)$ instead fixed that but read a constant shaft torque that turned the rotor
+backwards wrongly instead, 3 to 5 times the plant's friction. Two fits read both.
 
 An observation whose speed is smaller than its acceleration times one observation window may cross zero inside the window, where it belongs to neither direction. It is refused.
 
-A fit that only ever sees one speed cannot tell its intercept from its viscous friction, since $\omega$ is then constant. The span of speeds a publication waits for (Persistence of Excitation below) is therefore taken per fit, and from the observations at a constant speed only, those accelerating slower than 20 rad/s², so that the transients into and out of a reversal do not count as a second speed level. Reversing between +30 and −30 rad/s publishes nothing. The one-shot procedure, which runs in one direction, counts every observation as before.
+A fit that only ever sees one speed cannot tell its intercept from its viscous friction, since $\omega$ is
+then constant. The span of speeds a publication waits for (Persistence of Excitation below) is therefore taken
+per fit, and from the observations at a constant speed only, those accelerating slower than 20 rad/s², so that
+the transients into and out of a reversal do not count as a second speed level. Reversing between +30 and −30
+rad/s publishes nothing. The one-shot procedure, which runs in one direction, counts every observation as
+before.
 
 ### Window Kinematics
 
