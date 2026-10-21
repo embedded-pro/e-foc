@@ -136,6 +136,8 @@ namespace
             plant.supplySourceResistanceOhm = value;
         else if (key == "supply_current_limit_ampere")
             plant.supplyCurrentLimitAmpere = value;
+        else if (key == "duty_delay_periods")
+            plant.dutyDelayPeriods = static_cast<uint8_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else if (key == "encoder_counts_per_revolution")
             plant.encoderCountsPerRevolution = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else if (key == "random_seed")
@@ -201,6 +203,12 @@ GIVEN(R"(the plant drives its windings through the bench's power stage)")
 {
     RequireSimulatedTarget();
     sil::DescribeBenchPowerStage(context.Get<ScenarioSetup>().plant);
+}
+
+GIVEN(R"(the plant applies each duty a period late, as the board does)")
+{
+    RequireSimulatedTarget();
+    sil::DescribeBoardPwmUpdate(context.Get<ScenarioSetup>().plant);
 }
 
 GIVEN(R"(the drive compensates the bench's dead time)")

@@ -222,6 +222,8 @@ namespace application
         uint32_t samplePhase{ 0 };
         infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         foc::PhasePwmDutyCycles lastDutyPhases{};
+        foc::PhasePwmDutyCycles appliedDutyPhases{};
+        bool dutyDelayed{ false };
         hal::DutyCycle maxReadableDuty{ hal::DutyCycle::FromPercent(100) };
         foc::PhaseCurrents lastCurrents{};
     };

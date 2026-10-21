@@ -44,6 +44,11 @@ namespace sil
         config.diodeForwardVolts = 0.8f;
     }
 
+    inline void DescribeBoardPwmUpdate(SilPlantConfig& config)
+    {
+        config.dutyDelayPeriods = 1u;
+    }
+
     inline void DescribeBenchDeadTimeCompensation(SilPlantConfig& config)
     {
         config.deadTimeCompensationNanoseconds = static_cast<float>(application::BoardCharacteristics::effectiveDeadTimeNanoseconds);
@@ -119,7 +124,7 @@ namespace sil
             .polePairs = 0u,
             .faultFlags = 0u,
             .encoderFreezeDelayCentiseconds = 0u,
-            .reserved1 = 0u,
+            .dutyDelayPeriods = 0u,
         };
 
         DescribeMotor(config, foc::M_2310P_LN_04K::parameters, foc::M_2310P_LN_04K::ratedSupply);
