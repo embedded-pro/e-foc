@@ -120,7 +120,9 @@ namespace services
         residualPower += residualAveragingWeight * (onlineMetrics.residual * onlineMetrics.residual - residualPower);
         outputPower += residualAveragingWeight * (output.at(0, 0) * output.at(0, 0) - outputPower);
 
-        onlineExcitation.Count(observation->acceleration, observation->speed);
+        onlineExcitation.CountAcceleration(observation->acceleration);
+        if (std::abs(observation->acceleration) < mechanical_estimate::minimumAcceleration)
+            onlineExcitation.CountSpeed(observation->speed);
         onlinePeriods = static_cast<uint16_t>(std::min<uint32_t>(onlinePeriods + kinematics.WindowsPerObservation(), onlineMinimumPeriods));
 
         PublishOnlineEstimate();

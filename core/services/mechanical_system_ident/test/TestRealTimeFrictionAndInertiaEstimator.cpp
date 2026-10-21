@@ -2,6 +2,7 @@
 #include "core/foc/math/MechanicalWindowAccumulator.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/services/mechanical_system_ident/RealTimeFrictionAndInertiaEstimator.hpp"
+#include <array>
 #include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
@@ -45,6 +46,7 @@ namespace
         float friction{ 1.5e-5f };
         float torqueConstant{ 0.0384f };
         float shaftTorque{ 0.0f };
+        float dryFriction{ 0.0f };
         float currentNoise{ 0.0f };
         float torqueDisturbance{ 0.0f };
     };
@@ -68,14 +70,20 @@ namespace
 
         void Run(float lowSpeed, float highSpeed, int samplesPerLevel, int samples)
         {
+            Run(std::array<float, 2>{ lowSpeed, highSpeed }, samplesPerLevel, samples);
+        }
+
+        template<std::size_t Levels>
+        void Run(const std::array<float, Levels>& levels, int samplesPerLevel, int samples)
+        {
             constexpr float dt{ 1.0f / outerLoopFrequency / substeps };
             const float gain{ 2.0f * rotor.inertia * 200.0f / rotor.torqueConstant };
             const float currentResponse{ 1.0f - std::exp(-dt / currentLoopTimeConstant) };
 
             for (int sample = 0; sample != samples; ++sample)
             {
-                const auto reference = (sample / samplesPerLevel) % 2 == 0 ? lowSpeed : highSpeed;
-                const auto currentReference = gain * (reference - measuredSpeed) + rotor.friction * reference / rotor.torqueConstant;
+                const auto reference = levels[static_cast<std::size_t>(sample / samplesPerLevel) % Levels];
+                const auto currentReference = gain * (reference - measuredSpeed) + (rotor.friction * reference + std::copysign(rotor.dryFriction, reference)) / rotor.torqueConstant;
 
                 const auto startAngle = measuredAngle;
                 const auto disturbance = noise(engine) * rotor.torqueDisturbance;
@@ -85,7 +93,7 @@ namespace
                     window.Accumulate(current + noise(engine) * rotor.currentNoise, measured - measuredAngle);
                     measuredAngle = measured;
 
-                    const auto acceleration = (rotor.torqueConstant * current - rotor.friction * speed - rotor.shaftTorque - disturbance) / rotor.inertia;
+                    const auto acceleration = (rotor.torqueConstant * current - rotor.friction * speed - std::copysign(rotor.dryFriction, speed) - rotor.shaftTorque - disturbance) / rotor.inertia;
                     angle += speed * dt + 0.5f * acceleration * dt * dt;
                     speed += acceleration * dt;
                     current += (currentReference - current) * currentResponse;
@@ -253,7 +261,7 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_two_level_speed_reference_iden
     EXPECT_NEAR(estimator.CurrentFriction().Value(), rotor.friction, 0.1f * rotor.friction);
 }
 
-TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_constant_shaft_torque_is_absorbed_by_the_intercept)
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_constant_shaft_torque_in_one_direction_is_absorbed_by_the_dry_friction_term)
 {
     ReferenceRotor rotor;
     rotor.shaftTorque = 0.01f;
@@ -309,4 +317,34 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, the_bench_rotor_is_identified_th
 
     EXPECT_NEAR(production.CurrentInertia().Value(), rotor.inertia, 0.02f * rotor.inertia);
     EXPECT_NEAR(production.CurrentFriction().Value(), rotor.friction, 0.3f * rotor.friction);
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_dry_friction_that_turns_with_the_rotor_is_not_read_as_viscous_friction)
+{
+    services::RealTimeFrictionAndInertiaEstimator production{ services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, hal::Hertz{ 1000 } };
+    ReferenceRotor rotor;
+    rotor.inertia = 13.9e-6f;
+    rotor.friction = 7e-6f;
+    rotor.torqueConstant = 0.042f;
+    rotor.dryFriction = 3.7e-3f;
+    production.SetTorqueConstant(foc::NewtonMeter{ rotor.torqueConstant });
+    production.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 2.0f * rotor.inertia }, foc::NewtonMeterSecondPerRadian{ 0.5f * rotor.friction });
+
+    WindowedRotorRun{ rotor, production, 4000 }.Run(std::array<float, 4>{ 30.0f, 60.0f, -30.0f, -60.0f }, 500, 8000);
+
+    EXPECT_NEAR(production.CurrentInertia().Value(), rotor.inertia, 0.02f * rotor.inertia);
+    EXPECT_NEAR(production.CurrentFriction().Value(), rotor.friction, 0.1f * rotor.friction);
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, reversing_at_one_speed_cannot_tell_dry_from_viscous_friction_and_publishes_neither)
+{
+    services::RealTimeFrictionAndInertiaEstimator production{ services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, hal::Hertz{ 1000 } };
+    ReferenceRotor rotor;
+    rotor.dryFriction = 3.7e-3f;
+    production.SetTorqueConstant(foc::NewtonMeter{ rotor.torqueConstant });
+    production.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 2.0f * rotor.inertia }, foc::NewtonMeterSecondPerRadian{ 0.5f * rotor.friction });
+
+    WindowedRotorRun{ rotor, production, 4000 }.Run(std::array<float, 2>{ 30.0f, -30.0f }, 500, 8000);
+
+    EXPECT_FLOAT_EQ(production.CurrentFriction().Value(), 0.5f * rotor.friction);
 }
