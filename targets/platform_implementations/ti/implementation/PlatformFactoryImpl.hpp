@@ -223,6 +223,7 @@ namespace application
         void ReconfigureAdc(SampleAndHold sampleAndHold);
         void ReconfigurePwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime);
         void OnPwmFault(hal::tiva::Pwm::FaultEvent event);
+        void TripOverCurrent();
 
         // Condition must depend on Config: a discarded if constexpr branch is still type-checked otherwise.
         template<typename Config>
@@ -317,6 +318,7 @@ namespace application
         ControlLoopMetrics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
         volatile bool controlLoopEntered{ false };
+        volatile bool overCurrentTripped{ false };
         infra::BoundedString::WithStorage<Resources::faultStatusSize> faultStatusString;
         hal::Hertz pwmBaseFrequency{ 20000 };
         foc::Radians encoderOffset{ 0.0f };

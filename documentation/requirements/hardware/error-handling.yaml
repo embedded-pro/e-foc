@@ -125,3 +125,14 @@
     observe the condition, including where its protection comparators are driven by a
     peripheral that stops evaluating once the power stage is stopped; reporting clear in
     that case would assert a verification the hardware has not made.
+
+- id: REQ-EH-014
+  title: Every phase-current sample is checked against the board's over-current trip
+  shall: >
+    On a board whose over-current comparator watches a current that the phase-current sampling
+    instant cannot see, the platform shall compare each phase-current sample with the board's
+    over-current threshold in the conversion interrupt, before any consumer receives it. A sample
+    beyond the threshold shall cut the power stage at once, withhold that and every later sample
+    from the consumers, and refuse every duty command and start until the power stage is
+    stopped, and the platform shall report an over-current board-protection fault from the event
+    loop.

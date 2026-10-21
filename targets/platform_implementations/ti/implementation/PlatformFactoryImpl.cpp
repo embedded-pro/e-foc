@@ -1,11 +1,13 @@
 #include "targets/platform_implementations/ti/implementation/PlatformFactoryImpl.hpp"
 #include "core/foc/math/LowSideShuntWindow.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
+#include "infra/event/EventDispatcher.hpp"
 #include "services/tracer/GlobalTracer.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/CutPowerStage.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
 #include <atomic>
+#include <cmath>
 
 namespace
 {
@@ -36,6 +38,16 @@ namespace
 
 namespace application
 {
+    namespace
+    {
+        bool ExceedsOverCurrent(foc::Ampere a, foc::Ampere b, foc::Ampere c)
+        {
+            constexpr float limit{ BoardCharacteristics::overcurrentThresholdAmps };
+
+            return std::abs(a.Value()) > limit || std::abs(b.Value()) > limit || std::abs(c.Value()) > limit;
+        }
+    }
+
     extern "C" uint32_t SystemCoreClock;
 
     PlatformFactoryImpl::PlatformFactoryImpl(const infra::Function<void()>& onInitialized)
@@ -276,7 +288,10 @@ namespace application
                 controlLoopEntered = true;
                 const auto entryCycles = CycleCounter::Now();
 
-                onPhaseCurrentsReady(foc::PhaseCurrents{ a, b, c });
+                if (overCurrentTripped || ExceedsOverCurrent(a, b, c))
+                    TripOverCurrent();
+                else
+                    onPhaseCurrentsReady(foc::PhaseCurrents{ a, b, c });
 
                 controlLoopMetrics.Record(CycleCounter::Now() - entryCycles);
                 controlLoopEntered = false;
@@ -285,20 +300,32 @@ namespace application
 
     void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
+        if (overCurrentTripped)
+            return;
+
         const auto readable = foc::KeepLowSideShuntsReadable(dutyPhases, Peripheral::maxReadableDuty);
 
         WithPwm([&readable](auto& pwm)
             {
                 pwm.Start(readable.a, readable.b, readable.c);
             });
+
+        if (overCurrentTripped)
+            CutPowerStage();
     }
 
     void PlatformFactoryImpl::Start()
     {
+        if (overCurrentTripped)
+            return;
+
         WithPwm([](auto& pwm)
             {
                 pwm.Start(hal::DutyCycle::FromPercent(1), hal::DutyCycle::FromPercent(1), hal::DutyCycle::FromPercent(1));
             });
+
+        if (overCurrentTripped)
+            CutPowerStage();
     }
 
     void PlatformFactoryImpl::Stop()
@@ -306,6 +333,22 @@ namespace application
         WithPwm([](auto& pwm)
             {
                 pwm.Stop();
+            });
+        overCurrentTripped = false;
+    }
+
+    void PlatformFactoryImpl::TripOverCurrent()
+    {
+        CutPowerStage();
+
+        if (overCurrentTripped)
+            return;
+
+        overCurrentTripped = true;
+        infra::EventDispatcher::Instance().Schedule([this]()
+            {
+                if (onFaultCallback)
+                    onFaultCallback(PlatformFactory::BoardProtectionReason::overCurrent);
             });
     }
 
