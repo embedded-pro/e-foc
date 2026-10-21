@@ -50,6 +50,37 @@ Feature: Parameter Identification Against a Known Plant
       | teknic  |
       | anaheim |
 
+  @sil @REQ-CAL-015
+  Scenario Outline: The full calibration measures the current sensors' offsets (<motor>)
+    Given a <motor> motor plant
+    And a motor plant with:
+      | adc_noise_sigma_ampere | 0.035  |
+      | adc_bias_ampere_a      | 0.027  |
+      | adc_bias_ampere_b      | -0.018 |
+      | adc_bias_ampere_c      | 0.054  |
+    And the motor boots in torque mode
+    When the target boots
+    And the full calibration is run from the terminal
+    Then the identified current offsets shall be within 5 mA of the plant
+    And the identified resistance shall be within 5 % of the plant
+    And the identified pole pairs shall match the plant
+
+    Examples:
+      | motor   |
+      | teknic  |
+      | anaheim |
+      | bench   |
+
+  @sil @REQ-CAL-015
+  Scenario: The full calibration measures the offsets through the bench's current-sense chain
+    Given a bench motor plant
+    And the plant reads its currents through the bench's current-sense chain
+    And the motor boots in torque mode
+    When the target boots
+    And the full calibration is run from the terminal
+    Then the identified current offsets shall be within 5 mA of the plant
+    And the identified resistance shall be within 5 % of the plant
+
   @sil @REQ-CAL-013
   Scenario Outline: The full calibration identifies the mechanical parameters (<motor>)
     Given a <motor> motor plant
@@ -118,7 +149,7 @@ Feature: Parameter Identification Against a Known Plant
     And the online inductance estimate shall be within 10 % of the plant
 
   @sil @REQ-CAL-014
-  Scenario: The online electrical and inertia estimates converge through the bench's current-sense chain
+  Scenario: The online estimators converge through the bench's current-sense chain
     Given a bench motor plant
     And the plant reads its currents through the bench's current-sense chain
     And the plant response is recorded at 100 Hz for up to 2000 samples
@@ -135,8 +166,9 @@ Feature: Parameter Identification Against a Known Plant
     And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
     And the online estimates are read
     Then the online inertia estimate shall be within 2 % of the plant
+    And the online friction estimate shall be within 15 % of the plant
     And the online resistance estimate shall be within 5 % of the plant
-    And the online inductance estimate shall be within 15 % of the plant
+    And the online inductance estimate shall be within 10 % of the plant
 
   @sil @REQ-CAL-014
   Scenario Outline: The online resistance estimate follows the plant (<motor>)

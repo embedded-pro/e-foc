@@ -142,6 +142,36 @@ TEST_F(CalibrationContextTest, apply_calls_foc_configure_and_sets_current_tuning
     context.Apply(foc, foc);
 }
 
+TEST_F(CalibrationContextTest, apply_pushes_the_stored_current_offsets_and_invalidate_clears_them)
+{
+    StrictMock<services::PhaseCurrentOffsetsMock> currentOffsets;
+    application::CalibrationContext withOffsets{ inverter, foc::Volts{ 24.0f }, foc::Weber{ 0.005f }, std::ref(currentOffsets) };
+    auto d = CompleteData();
+    d.currentOffsetA = 0.027f;
+    d.currentOffsetB = -0.018f;
+    d.currentOffsetC = 0.054f;
+    withOffsets.SetData(d);
+    StrictMock<foc::FocTorqueMock> foc;
+    EXPECT_CALL(foc, Configure(_)).WillOnce(Return(true));
+    EXPECT_CALL(foc, SetCurrentTunings(_));
+
+    EXPECT_CALL(currentOffsets, Apply(_)).WillOnce(Invoke([](const foc::PhaseCurrents& offsets)
+        {
+            EXPECT_FLOAT_EQ(offsets.a.Value(), 0.027f);
+            EXPECT_FLOAT_EQ(offsets.b.Value(), -0.018f);
+            EXPECT_FLOAT_EQ(offsets.c.Value(), 0.054f);
+        }));
+    withOffsets.Apply(foc, foc);
+
+    EXPECT_CALL(currentOffsets, Apply(_)).WillOnce(Invoke([](const foc::PhaseCurrents& offsets)
+        {
+            EXPECT_FLOAT_EQ(offsets.a.Value(), 0.0f);
+            EXPECT_FLOAT_EQ(offsets.b.Value(), 0.0f);
+            EXPECT_FLOAT_EQ(offsets.c.Value(), 0.0f);
+        }));
+    withOffsets.Invalidate();
+}
+
 TEST_F(CalibrationContextTest, default_current_loop_bandwidth_uses_nyquist_factor)
 {
     const float expected = (10000.0f / 15.0f) * 2.0f * 3.14159265f;

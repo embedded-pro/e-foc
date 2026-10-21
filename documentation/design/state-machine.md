@@ -226,12 +226,16 @@ When `CmdCalibrate` is issued from `Idle` or `Ready`, the state machine enters `
 ```mermaid
 sequenceDiagram
     participant SM as FOC State Machine
+    participant CO as Current Offsets
     participant EI as Electrical Ident
     participant MA as Motor Alignment
     participant MI as Mech Ident (speed modes)
     participant FOC as FOC Controller
     participant NVM as Non-Volatile Memory
 
+    SM->>CO: Measure (all legs at 50 % duty)
+    CO-->>SM: result (three offsets or failure)
+    SM->>CO: Apply(offsets)
     SM->>EI: EstimateNumberOfPolePairs
     EI-->>SM: result (polePairs or failure)
     SM->>EI: EstimateResistanceAndInductance
@@ -254,6 +258,7 @@ sequenceDiagram
 
 | Step                                           | Service             | Data stored                                               |
 |------------------------------------------------|---------------------|-----------------------------------------------------------|
+| 0. Current sensor offsets                      | Current Offsets     | `currentOffsetA`, `currentOffsetB`, `currentOffsetC`      |
 | 1. Pole pairs                                  | Electrical Ident    | `polePairs`                                               |
 | 2. Resistance and inductance                   | Electrical Ident    | `rPhase`, `lD`, `lQ`                                      |
 | 3. Alignment                                   | Motor Alignment     | `encoderZeroOffset`                                       |
@@ -261,9 +266,13 @@ sequenceDiagram
 | 5. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth`        |
 | 6. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                        |
 
+The offsets apply as soon as they are measured, so the identification and alignment steps after
+them read corrected currents (`service-current-offsets.md`). An electrical identification that
+arrives over CAN does not measure them and keeps the ones in force.
+
 After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`. The encoder zero offset is not written back to the encoder at this point; it is established only by the alignment step itself during the calibration sequence.
 
-Every record handed to the NVM is traced first as `[SM] Calibration record: R=… L_mH=… p=… J_uNms2=… B_uNms=…`. Inertia and viscous friction are traced in micro-units because the tracer prints three decimals, which cannot show values around 1e-6 and 1e-5; the same convention applies to the `[EST]` lines and the `[SM] Applying mechanical estimates` line below.
+Every record handed to the NVM is traced first as `[SM] Calibration record: R=… L_mH=… p=… J_uNms2=… B_uNms=… Ia_mA=… Ib_mA=… Ic_mA=…`. Inertia and viscous friction are traced in micro-units because the tracer prints three decimals, which cannot show values around 1e-6 and 1e-5; the same convention applies to the `[EST]` lines and the `[SM] Applying mechanical estimates` line below.
 
 The calibration record line is what an external observer, the software-in-the-loop suite included, compares against the plant it configured.
 

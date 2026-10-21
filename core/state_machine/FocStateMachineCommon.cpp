@@ -12,7 +12,7 @@ namespace application
         NvmActivity& nvmActivity)
         : terminal(terminalAndTracer.terminal)
         , tracer(terminalAndTracer.tracer)
-        , calibrationContext(hardware.inverter, hardware.vdc, calibServices.fluxLinkage)
+        , calibrationContext(hardware.inverter, hardware.vdc, calibServices.fluxLinkage, calibServices.currentOffsets)
         , nvmActivity(nvmActivity)
         , environment{ stateMachine, calibrationContext, nvm, nvmActivity, pendingCommand, *this, tracer }
         , calibration(environment, calibServices)

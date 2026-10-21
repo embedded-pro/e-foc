@@ -36,7 +36,10 @@ namespace application
         if (status != services::NvmStatus::Ok)
             env.tracer.Trace() << "[SM] NVM load failed, starting in Idle";
         else if (!calibration.HasValidCalibration())
+        {
             env.tracer.Trace() << "[SM] NVM data incomplete, starting in Idle";
+            env.context.ApplyCurrentOffsets();
+        }
         else
         {
             env.tracer.Trace() << "[SM] Electrical parameters restored; run alignment before enabling";

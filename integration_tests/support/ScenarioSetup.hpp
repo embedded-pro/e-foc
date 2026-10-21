@@ -22,6 +22,9 @@ namespace integration
         std::optional<float> inertiaKgM2;
         std::optional<float> frictionNmSPerRad;
         std::optional<unsigned> polePairs;
+        std::optional<float> currentOffsetAmpereA;
+        std::optional<float> currentOffsetAmpereB;
+        std::optional<float> currentOffsetAmpereC;
     };
 
     struct ScenarioSetup

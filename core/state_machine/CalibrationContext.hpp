@@ -3,7 +3,10 @@
 #include "core/foc/interfaces/Foc.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
+#include "core/services/current_offsets/PhaseCurrentOffsets.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
+#include <functional>
+#include <optional>
 
 namespace application
 {
@@ -13,7 +16,8 @@ namespace application
         CalibrationContext(
             drivers::ThreePhaseInverter& inverter,
             foc::Volts vdc,
-            foc::Weber configuredFluxLinkage);
+            foc::Weber configuredFluxLinkage,
+            std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets = std::nullopt);
 
         const services::CalibrationData& Data() const;
         services::CalibrationData& MutableData();
@@ -33,6 +37,7 @@ namespace application
         void CommitPendingFluxLinkage();
 
         bool Apply(foc::FocBase& foc, foc::CurrentLoopTunable& tunable);
+        void ApplyCurrentOffsets();
         bool ApplyModel(
             foc::Ohm resistance,
             foc::MilliHenry inductance,
@@ -56,6 +61,7 @@ namespace application
         drivers::ThreePhaseInverter& inverter;
         foc::Volts vdc;
         foc::Weber configuredFluxLinkage;
+        std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets;
 
         services::CalibrationData calibrationData{};
         float pendingFluxLinkage{ 0.0f };

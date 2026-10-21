@@ -158,6 +158,8 @@ namespace simulator
                 {
                     switch (s.step)
                     {
+                        case state_machine::CalibrationStep::currentOffsets:
+                            return QStringLiteral("Calibrating: current offsets\xe2\x80\xa6");
                         case state_machine::CalibrationStep::polePairs:
                             return QStringLiteral("Calibrating: pole pairs\xe2\x80\xa6");
                         case state_machine::CalibrationStep::resistanceAndInductance:

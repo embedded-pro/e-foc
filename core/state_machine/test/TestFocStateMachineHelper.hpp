@@ -3,6 +3,7 @@
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
 #include "core/services/alignment/test_doubles/MotorAlignmentMock.hpp"
+#include "core/services/current_offsets/test_doubles/PhaseCurrentOffsetsMock.hpp"
 #include "core/services/electrical_system_ident/test_doubles/ElectricalParametersIdentificationMock.hpp"
 #include "core/services/mechanical_system_ident/test_doubles/MechanicalParametersIdentificationMock.hpp"
 #include "core/services/non_volatile_memory/test_doubles/NonVolatileMemoryMock.hpp"

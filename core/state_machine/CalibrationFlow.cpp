@@ -7,6 +7,7 @@
 namespace
 {
     constexpr float microPerUnit = 1.0e6f;
+    constexpr float milliPerUnit = 1.0e3f;
 }
 
 namespace application
@@ -14,7 +15,7 @@ namespace application
     CalibrationFlow::CalibrationFlow(const LifecycleEnvironment& environment, const CalibrationServices& services)
         : env(environment)
         , agreeingRuns(services.agreeingMechanicalRuns)
-        , orchestrator(services.electricalIdent, services.motorAlignment, environment.tracer)
+        , orchestrator(services.electricalIdent, services.motorAlignment, environment.tracer, services.currentOffsets)
     {}
 
     state_machine::Calibrating CalibrationFlow::Begin(const state_machine::Calibrate& command)
@@ -55,10 +56,14 @@ namespace application
         return false;
     }
 
+    // An external identification does not measure the current sensors, so the record keeps the offsets in force.
     void CalibrationFlow::BeginExternal(state_machine::Calibrating& calibrating, const state_machine::CompleteExternalCalibration& command)
     {
         env.pending.Accept(command.onDone);
         calibrating.pendingData = command.data;
+        calibrating.pendingData.currentOffsetA = env.context.Data().currentOffsetA;
+        calibrating.pendingData.currentOffsetB = env.context.Data().currentOffsetB;
+        calibrating.pendingData.currentOffsetC = env.context.Data().currentOffsetC;
         RunAlignmentOnly(calibrating);
     }
 
@@ -197,7 +202,10 @@ namespace application
                            << " L_mH=" << data.lD
                            << " p=" << static_cast<uint32_t>(data.polePairs)
                            << " J_uNms2=" << data.inertia * microPerUnit
-                           << " B_uNms=" << data.frictionViscous * microPerUnit;
+                           << " B_uNms=" << data.frictionViscous * microPerUnit
+                           << " Ia_mA=" << data.currentOffsetA * milliPerUnit
+                           << " Ib_mA=" << data.currentOffsetB * milliPerUnit
+                           << " Ic_mA=" << data.currentOffsetC * milliPerUnit;
     }
 
     // Busy is contention with another writer of the shared NVM, not a failure of this record
