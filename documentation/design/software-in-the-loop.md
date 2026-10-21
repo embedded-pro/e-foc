@@ -844,17 +844,17 @@ trigger, so a phase reads only while its leg's low-side pulse is still on. The p
 therefore carries the chain as optional fields; with the converter clock at zero the plant reports
 as before.
 
-| Field                   | Meaning                                                                                |
-|-------------------------|----------------------------------------------------------------------------------------|
-| Converter clock         | Of the converter; zero leaves the chain out                                            |
-| Sample-and-hold clocks  | The converter tracks for these before it holds; zero takes what the firmware asks for  |
-| Conversion clocks       | From the hold to the result                                                            |
-| Averaged conversions    | Consecutive conversions averaged into each step's result                               |
-| Trigger delay           | From the centre of the low-side pulse to the start of the sequence                     |
-| Amplifier time constant | Of the shunt amplifier and its filter, as one first-order lag                          |
-| Full scale              | The current at either end of the converter's range around mid-rail                     |
-| Resolution              | Bits of the converter                                                                  |
-| Readable duty           | The board's limit, above which the platform lowers all three duties together           |
+| Field                   | Meaning                                                                               |
+|-------------------------|---------------------------------------------------------------------------------------|
+| Converter clock         | Of the converter; zero leaves the chain out                                           |
+| Sample-and-hold clocks  | The converter tracks for these before it holds; zero takes what the firmware asks for |
+| Conversion clocks       | From the hold to the result                                                           |
+| Averaged conversions    | Consecutive conversions averaged into each step's result                              |
+| Trigger delay           | From the centre of the low-side pulse to the start of the sequence                    |
+| Amplifier time constant | Of the shunt amplifier and its filter, as one first-order lag                         |
+| Full scale              | The current at either end of the converter's range around mid-rail                    |
+| Resolution              | Bits of the converter                                                                 |
+| Readable duty           | The board's limit, above which the platform lowers all three duties together          |
 
 With the chain on, the noise deviation is that of one conversion, and the per-phase bias is the
 amplifier's offset, present whether the shunt conducts or not.
