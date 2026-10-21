@@ -67,6 +67,12 @@ namespace sil
             .supplyCurrentLimitAmpere = 0.0f,
             .encoderCountsPerRevolution = 0u,
 
+            .deadTimeNanoseconds = 0.0f,
+            .switchNodeCapacitancePicofarad = 0.0f,
+            .switchOnResistanceOhm = 0.0f,
+            .diodeForwardVolts = 0.0f,
+            .minimumPulseNanoseconds = 0.0f,
+
             .polePairs = 0u,
             .faultFlags = 0u,
             .encoderFreezeDelayCentiseconds = 0u,

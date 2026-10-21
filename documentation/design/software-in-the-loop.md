@@ -89,6 +89,7 @@ The description covers everything the plant needs:
 | Protection        | Over-current, over-voltage, under-voltage and over-temperature trips                        |
 | Fault injection   | Open phase per phase, stuck encoder, when it freezes, supply voltage scaling                |
 | Non-idealities    | Coulomb friction, encoder counts per revolution, supply source resistance and current limit |
+| Power stage       | Dead time, switch-node capacitance, switch on-resistance, diode drop, minimum pulse         |
 | Reproducibility   | The seed both noise generators start from                                                   |
 | Disturbance       | A signed shaft torque and the delay after enabling at which it steps in                     |
 | Recording         | The rate at which the plant reports its trajectory, and how many samples                    |
@@ -766,6 +767,71 @@ What the plant has shown so far:
 - **A one amp supply is enough for the calibration of the bench motor.** The electrical power of
   the identification is under half an amp, so a collapsing supply on the rig is not explained by
   the motor's power alone.
+
+### Part L — The power stage between the duty and the winding
+
+An ideal plant puts $(d - \tfrac{1}{2})V_{bus}$ on each phase for the whole control period. A
+real leg does not: each of its two switches waits for the other to stop conducting before it
+turns on, and during that dead time the phase current alone decides where the switch node goes.
+At the currents the online estimators excite the node does not even complete its swing. The
+plant description therefore carries the power stage as optional fields, each off when zero:
+
+| Field                   | Meaning                                                                                   |
+|-------------------------|-------------------------------------------------------------------------------------------|
+| Dead time               | Both switches off between one turning off and the other on, as the node sees it           |
+| Switch-node capacitance | The charge the phase current must move to swing the node: both switches' output and board |
+| Switch on-resistance    | Of whichever switch conducts, in series with the phase                                    |
+| Diode forward voltage   | Of the body diode that carries the phase current while both switches are off              |
+| Minimum pulse           | A commanded conduction shorter than this does not happen                                  |
+
+The dead time is the one the node sees: the controller's dead band plus the gate driver's
+turn-on delay, minus its turn-off delay. On E-FOC-HARDWARE that is the MCU's band, the FAN7888
+driver (270 ns built-in dead time, about 130 ns on and 150 ns off) and CSD88537ND switches
+(12.5 mΩ, a 0.8 V body diode, 133 pF and 25 nC of output charge each).
+
+Each control period is one centre-aligned PWM period $T$, with the low-side window centred on the
+period's edges, where the converter samples. For a leg commanded to duty $d$ the controller
+releases the low switch at $t_r = \tfrac{T}{2}(1 - d)$ and the high one at $t_f = \tfrac{T}{2}(1 + d)$,
+and turns each complement on a dead time $t_d$ later. The leg is low, floating, high, floating and
+low again. While it floats with phase current $i$ (positive out of the leg), the node moves at
+$-i/C$ from where the conducting switch left it, until the opposite body diode clamps it at $-V_f$
+or $V_{bus} + V_f$. A conduction shorter than the minimum pulse vanishes, and the two floating
+intervals around it become one. The leg's mean voltage over the period is
+
+$$\bar v = \frac{1}{T}\Big(\int_{\text{high}} (V_{bus} - i R_{on})\,dt + \int_{\text{low}} (-i R_{on})\,dt + \int_{\text{floating}} v_{node}\,dt\Big)$$
+
+which the plant puts on the winding in place of $d\,V_{bus}$. Three regimes follow from it:
+
+- **Zero current:** the node stays wherever the last switch left it, and the leg delivers $d\,V_{bus}$.
+- **Small current**, $|i| < C V_{bus} / t_d$: on the edge that has to cross the bus the node swings
+  only part of the way, and the leg loses $i\,t_d^2 / (2C\,T)$ there, in proportion to the current.
+  The winding sees it as extra resistance. The other edge only has to reach the body diode and
+  clamps there, adding $\operatorname{sign}(i)\,V_f\,t_d / T$. Below $V_f C / t_d$ neither edge
+  reaches a diode, and the whole loss is $i\,t_d^2 / (C\,T)$.
+- **Large current:** the node is clamped almost at once, and the leg loses
+  $\operatorname{sign}(i)\,(V_{bus} + 2V_f)\,t_d / T$, the textbook dead-time error.
+
+The mean is computed once per control period from the phase current at its start, which the
+winding's time constant holds nearly constant across a period. Its cost is a handful of
+operations per leg. The voltages the plant reports to its observers are these real leg voltages.
+
+What the plant showed with the bench winding, 300 pF at the node, 12.5 mΩ switches and 0.8 V
+diodes:
+
+| Dead time at the node | Calibration resistance | Online resistance |
+|-----------------------|------------------------|-------------------|
+| 0                     | +1.6 %                 | +1.2 %            |
+| 50 ns                 | +2.7 %                 | +9.6 %            |
+| 270 ns                | +10 %                  | +151 %            |
+
+The calibration measures with 1 to 2 A, where the node swings at once and the error is the fixed
+dead-time voltage against a few volts. The online estimator excites ±2.5 % of the current limit,
+75 mA on the bench, where the node is still swinging when the complement turns on: its
+resistance is the one the dead time hurts. The rig reads its calibration resistance 10 % and its
+online resistance 25 % above the winding's 1.00 Ω, which fits a dead time at the node under about
+100 ns, well under the 500 ns band the controller asks for. The driver's and the switches'
+delays take most of it back. The `bench` plant keeps an ideal stage until the current-sensing
+chain is modelled too and both are fitted to the rig together.
 
 What the plant cannot show: interrupt preemption at an arbitrary instruction, the vendor HAL
 drivers, the event queue under a hardware error storm, and power-rail behaviour. The emulated

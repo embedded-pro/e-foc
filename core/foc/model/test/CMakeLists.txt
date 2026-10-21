@@ -16,6 +16,7 @@ target_sources(e_foc.foc.model_test PRIVATE
     TestMotorModel.cpp
     TestPlantNonidealities.cpp
     TestPlantResponseRecorder.cpp
+    TestPowerStage.cpp
     TestThermalModel.cpp
     TestTorqueStepScheduler.cpp
 )

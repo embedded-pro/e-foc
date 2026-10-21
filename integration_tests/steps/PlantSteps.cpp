@@ -98,6 +98,16 @@ namespace
             plant.overTemperatureTripCelsius = value;
         else if (key == "supply_voltage_scale")
             plant.supplyVoltageScale = value;
+        else if (key == "dead_time_ns")
+            plant.deadTimeNanoseconds = value;
+        else if (key == "switch_node_capacitance_pf")
+            plant.switchNodeCapacitancePicofarad = value;
+        else if (key == "switch_on_resistance_ohm")
+            plant.switchOnResistanceOhm = value;
+        else if (key == "diode_forward_volts")
+            plant.diodeForwardVolts = value;
+        else if (key == "minimum_pulse_ns")
+            plant.minimumPulseNanoseconds = value;
         else if (key == "coulomb_friction_nm")
             plant.coulombFrictionNm = value;
         else if (key == "supply_source_resistance_ohm")
