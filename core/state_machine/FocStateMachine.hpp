@@ -14,6 +14,7 @@ namespace state_machine
 {
     enum class CalibrationStep : uint8_t
     {
+        currentOffsets,
         polePairs,
         resistanceAndInductance,
         alignment,

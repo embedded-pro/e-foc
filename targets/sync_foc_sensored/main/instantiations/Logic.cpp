@@ -12,8 +12,9 @@ namespace application
         , calibrationRegion{ hardware.Eeprom(), calibrationRegionOffset, calibrationRegionSize }
         , configRegion{ hardware.Eeprom(), configRegionOffset, configRegionSize }
         , nvm{ calibrationRegion, configRegion }
-        , electricalIdent{ hardware, hardware, vdc }
-        , motorAlignment{ hardware, hardware }
+        , currentOffsets{ hardware }
+        , electricalIdent{ *currentOffsets, hardware, vdc }
+        , motorAlignment{ *currentOffsets, hardware }
         , platformFaultNotifier{ hardware }
         , encoderPlausibility{ hardware, hardware.MaxCurrentSupported(), [this]()
             {
@@ -38,9 +39,9 @@ namespace application
 
                 controlMode.emplace(
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
-                    MotorHardware{ this->hardware, this->hardware, vdc },
+                    MotorHardware{ *currentOffsets, this->hardware, vdc },
                     nvm,
-                    CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2 },
+                    CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = *currentOffsets },
                     *platformFaultNotifier,
                     configData,
                     ControlMode::OuterLoopArgs{

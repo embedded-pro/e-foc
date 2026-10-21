@@ -50,6 +50,27 @@ Feature: Parameter Identification Against a Known Plant
       | teknic  |
       | anaheim |
 
+  @sil @REQ-CAL-015
+  Scenario Outline: The full calibration measures the current sensors' offsets (<motor>)
+    Given a <motor> motor plant
+    And a motor plant with:
+      | adc_noise_sigma_ampere | 0.035  |
+      | adc_bias_ampere_a      | 0.027  |
+      | adc_bias_ampere_b      | -0.018 |
+      | adc_bias_ampere_c      | 0.054  |
+    And the motor boots in torque mode
+    When the target boots
+    And the full calibration is run from the terminal
+    Then the identified current offsets shall be within 5 mA of the plant
+    And the identified resistance shall be within 5 % of the plant
+    And the identified pole pairs shall match the plant
+
+    Examples:
+      | motor   |
+      | teknic  |
+      | anaheim |
+      | bench   |
+
   @sil @REQ-CAL-013
   Scenario Outline: The full calibration identifies the mechanical parameters (<motor>)
     Given a <motor> motor plant

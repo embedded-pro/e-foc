@@ -7,10 +7,12 @@ namespace application
     CalibrationContext::CalibrationContext(
         drivers::ThreePhaseInverter& inverter,
         foc::Volts vdc,
-        foc::Weber configuredFluxLinkage)
+        foc::Weber configuredFluxLinkage,
+        std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets)
         : inverter(inverter)
         , vdc(vdc)
         , configuredFluxLinkage(configuredFluxLinkage)
+        , currentOffsets(currentOffsets)
     {}
 
     const services::CalibrationData& CalibrationContext::Data() const
@@ -32,6 +34,7 @@ namespace application
     {
         calibrationData = services::CalibrationData{};
         rotorReferenceValid_ = false;
+        ApplyCurrentOffsets();
     }
 
     bool CalibrationContext::HasFiniteElectricalParameters(const services::CalibrationData& data)
@@ -83,6 +86,8 @@ namespace application
 
     bool CalibrationContext::Apply(foc::FocBase& controller, foc::CurrentLoopTunable& tunable)
     {
+        ApplyCurrentOffsets();
+
         return ApplyModel(
             foc::Ohm{ calibrationData.rPhase },
             foc::MilliHenry{ calibrationData.lD },
@@ -91,6 +96,15 @@ namespace application
             EffectiveFluxLinkage(),
             controller,
             tunable);
+    }
+
+    void CalibrationContext::ApplyCurrentOffsets()
+    {
+        if (currentOffsets)
+            currentOffsets->get().Apply(foc::PhaseCurrents{
+                foc::Ampere{ calibrationData.currentOffsetA },
+                foc::Ampere{ calibrationData.currentOffsetB },
+                foc::Ampere{ calibrationData.currentOffsetC } });
     }
 
     bool CalibrationContext::ApplyModel(

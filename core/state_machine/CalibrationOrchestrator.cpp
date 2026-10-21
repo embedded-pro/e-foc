@@ -6,10 +6,12 @@ namespace application
     CalibrationOrchestrator::CalibrationOrchestrator(
         services::ElectricalParametersIdentification& electricalIdent,
         services::MotorAlignment& motorAlignment,
-        services::Tracer& tracer)
+        services::Tracer& tracer,
+        std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets)
         : electricalIdent(electricalIdent)
         , motorAlignment(motorAlignment)
         , tracer(tracer)
+        , currentOffsets(currentOffsets)
     {}
 
     void CalibrationOrchestrator::Start(
@@ -25,7 +27,11 @@ namespace application
         aborted = false;
         running = true;
         ++runToken;
-        RunPolePairsStep();
+
+        if (currentOffsets)
+            RunCurrentOffsetsStep();
+        else
+            RunPolePairsStep();
     }
 
     void CalibrationOrchestrator::StartAlignmentOnly(
@@ -50,16 +56,44 @@ namespace application
         running = false;
         electricalIdent.Abort();
         motorAlignment.Abort();
+
+        if (currentOffsets)
+            currentOffsets->get().Abort();
     }
 
     bool CalibrationOrchestrator::IsRunning() const
     {
-        return running || electricalIdent.IsRunning();
+        return running || electricalIdent.IsRunning() || (currentOffsets && currentOffsets->get().IsRunning());
     }
 
     bool CalibrationOrchestrator::HasRunInFlight() const
     {
         return running;
+    }
+
+    // The steps after this one read the phase currents, so the offsets apply as soon as they are known.
+    void CalibrationOrchestrator::RunCurrentOffsetsStep()
+    {
+        tracer.Trace() << "[SM] Measuring current sensor offsets";
+        onStepChanged(state_machine::CalibrationStep::currentOffsets);
+
+        const auto token = runToken;
+        currentOffsets->get().Measure([this, token](std::optional<foc::PhaseCurrents> offsets)
+            {
+                if (aborted || token != runToken)
+                    return;
+
+                if (!offsets.has_value())
+                    Fail();
+                else
+                {
+                    pendingData->currentOffsetA = offsets->a.Value();
+                    pendingData->currentOffsetB = offsets->b.Value();
+                    pendingData->currentOffsetC = offsets->c.Value();
+                    currentOffsets->get().Apply(*offsets);
+                    RunPolePairsStep();
+                }
+            });
     }
 
     void CalibrationOrchestrator::RunPolePairsStep()

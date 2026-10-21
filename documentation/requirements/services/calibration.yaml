@@ -129,3 +129,16 @@
     motor seen through its 4000-count encoder and 10 mA of current noise. With a constant shaft torque of 0.01 N·m applied during the excitation
     they shall hold the inertia within 2 % and the viscous friction within 15 %. The estimates
     shall be readable through the product's own terminal command.
+
+- id: REQ-CAL-015
+  title: The full calibration measures and removes the current sensors' offsets
+  shall: >
+    The full calibration sequence shall begin by holding all three legs at 50 % duty and
+    averaging each phase current, once the bridge has settled, into a per-phase offset, and
+    shall fail if an offset exceeds 0.5 A or a sample exceeds the inverter's maximum supported
+    current. From then on every phase-current sample the current loop, the online estimators
+    and the identification procedures receive shall have these offsets removed. The offsets
+    shall be stored and traced with the calibration record, applied whenever the record is
+    loaded, cleared with it, and kept by an electrical identification that arrives over CAN.
+    Against a plant whose phase biases are known, the traced offsets shall be within 5 mA of
+    them for each reference motor and for the bench motor.

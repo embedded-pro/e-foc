@@ -267,3 +267,93 @@ TEST_F(CalibrationOrchestratorTest, stale_alignment_callback_after_new_run_is_su
     EXPECT_FALSE(alignedCalled);
     EXPECT_FALSE(failedCalled);
 }
+
+namespace
+{
+    MATCHER_P(OffsetsEq, expected, "")
+    {
+        return arg.a == expected.a && arg.b == expected.b && arg.c == expected.c;
+    }
+
+    class CalibrationOrchestratorWithCurrentOffsetsTest
+        : public CalibrationOrchestratorTest
+    {
+    public:
+        void StartWithOffsets()
+        {
+            EXPECT_CALL(currentOffsets, Measure(_)).WillOnce(Invoke([this](const infra::Function<void(std::optional<foc::PhaseCurrents>)>& cb)
+                {
+                    storedOffsetsCb = cb;
+                }));
+
+            withOffsets.Start(
+                pendingData,
+                [this](state_machine::CalibrationStep step)
+                {
+                    steps.push_back(step);
+                },
+                [this](foc::Radians)
+                {
+                    alignedCalled = true;
+                },
+                [this]
+                {
+                    failedCalled = true;
+                });
+        }
+
+        StrictMock<services::PhaseCurrentOffsetsMock> currentOffsets;
+        application::CalibrationOrchestrator withOffsets{ electricalIdent, motorAlignment, tracer, std::ref(currentOffsets) };
+        infra::Function<void(std::optional<foc::PhaseCurrents>)> storedOffsetsCb;
+        infra::BoundedVector<state_machine::CalibrationStep>::WithMaxSize<4> steps;
+        const foc::PhaseCurrents offsets{ foc::Ampere{ 0.027f }, foc::Ampere{ -0.018f }, foc::Ampere{ 0.054f } };
+    };
+}
+
+TEST_F(CalibrationOrchestratorWithCurrentOffsetsTest, the_offsets_are_measured_first_and_applied_before_the_pole_pairs)
+{
+    StartWithOffsets();
+
+    ASSERT_EQ(steps.size(), 1u);
+    EXPECT_EQ(steps.front(), state_machine::CalibrationStep::currentOffsets);
+
+    InSequence sequence;
+    EXPECT_CALL(currentOffsets, Apply(OffsetsEq(offsets)));
+    ExpectPolePairCall();
+    storedOffsetsCb(offsets);
+
+    EXPECT_EQ(steps.back(), state_machine::CalibrationStep::polePairs);
+    EXPECT_FLOAT_EQ(pendingData.currentOffsetA, 0.027f);
+    EXPECT_FLOAT_EQ(pendingData.currentOffsetB, -0.018f);
+    EXPECT_FLOAT_EQ(pendingData.currentOffsetC, 0.054f);
+}
+
+TEST_F(CalibrationOrchestratorWithCurrentOffsetsTest, a_failed_offset_measurement_fails_the_calibration)
+{
+    StartWithOffsets();
+
+    storedOffsetsCb(std::nullopt);
+
+    EXPECT_TRUE(failedCalled);
+    EXPECT_FALSE(alignedCalled);
+}
+
+TEST_F(CalibrationOrchestratorWithCurrentOffsetsTest, abort_stops_the_offset_measurement_and_drops_its_result)
+{
+    StartWithOffsets();
+
+    EXPECT_CALL(electricalIdent, Abort());
+    EXPECT_CALL(motorAlignment, Abort());
+    EXPECT_CALL(currentOffsets, Abort());
+    withOffsets.Abort();
+    storedOffsetsCb(offsets);
+
+    EXPECT_FALSE(failedCalled);
+}
+
+TEST_F(CalibrationOrchestratorWithCurrentOffsetsTest, is_running_while_the_offsets_are_measured)
+{
+    EXPECT_CALL(electricalIdent, IsRunning()).WillOnce(Return(false));
+    EXPECT_CALL(currentOffsets, IsRunning()).WillOnce(Return(true));
+    EXPECT_TRUE(withOffsets.IsRunning());
+}

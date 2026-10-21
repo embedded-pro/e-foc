@@ -222,6 +222,7 @@ cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
 | [FOC Position Control](documentation/design/foc-position.md)                          | Position control loop design                 |
 | [Alignment Service](documentation/design/service-alignment.md)                        | Motor alignment and offset detection service |
 | [CLI Service](documentation/design/service-cli.md)                                    | Command-line interface service               |
+| [Current Offsets Service](documentation/design/service-current-offsets.md)            | Current sensor offset calibration service    |
 | [Electrical Identification Service](documentation/design/service-electrical-ident.md) | Resistance and inductance estimation service |
 | [Mechanical Identification Service](documentation/design/service-mechanical-ident.md) | Friction and inertia estimation service      |
 | [NVM Service](documentation/design/service-nvm.md)                                    | Non-volatile memory persistence service      |

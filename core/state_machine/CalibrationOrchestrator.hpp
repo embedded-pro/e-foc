@@ -2,19 +2,23 @@
 
 #include "core/foc/interfaces/Units.hpp"
 #include "core/services/alignment/MotorAlignment.hpp"
+#include "core/services/current_offsets/PhaseCurrentOffsets.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include "infra/util/AutoResetFunction.hpp"
 #include "infra/util/Function.hpp"
 #include "services/tracer/Tracer.hpp"
+#include <functional>
+#include <optional>
 
 namespace application
 {
     class CalibrationOrchestrator
     {
     public:
-        CalibrationOrchestrator(services::ElectricalParametersIdentification& electricalIdent, services::MotorAlignment& motorAlignment, services::Tracer& tracer);
+        CalibrationOrchestrator(services::ElectricalParametersIdentification& electricalIdent, services::MotorAlignment& motorAlignment, services::Tracer& tracer,
+            std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets = std::nullopt);
 
         void Start(
             services::CalibrationData& pendingData,
@@ -33,6 +37,7 @@ namespace application
         bool HasRunInFlight() const;
 
     private:
+        void RunCurrentOffsetsStep();
         void RunPolePairsStep();
         void RunResistanceAndInductanceStep();
         void RunAlignmentStep();
@@ -41,6 +46,7 @@ namespace application
         services::ElectricalParametersIdentification& electricalIdent;
         services::MotorAlignment& motorAlignment;
         services::Tracer& tracer;
+        std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets;
 
         services::CalibrationData* pendingData{ nullptr };
         infra::Function<void(state_machine::CalibrationStep)> onStepChanged;

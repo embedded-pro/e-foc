@@ -80,6 +80,23 @@ namespace
             out.inertiaKgM2 = *j / kMicroPerUnit;
         if (const auto b = ValueAfter(line, " B_uNms="))
             out.frictionNmSPerRad = *b / kMicroPerUnit;
+        if (const auto a = ValueAfter(line, " Ia_mA="))
+            out.currentOffsetAmpereA = *a / kMilliPerUnit;
+        if (const auto b = ValueAfter(line, " Ib_mA="))
+            out.currentOffsetAmpereB = *b / kMilliPerUnit;
+        if (const auto c = ValueAfter(line, " Ic_mA="))
+            out.currentOffsetAmpereC = *c / kMilliPerUnit;
+    }
+
+    void CompareOffsetWithPlant(const ScenarioSetup& setup, const char* phase, std::optional<float> identified, float bias, float limitMilliAmpere)
+    {
+        ASSERT_TRUE(identified.has_value()) << "No current offset was captured for phase " << phase;
+
+        const float errorMilliAmpere = std::fabs(*identified - bias) * kMilliPerUnit;
+        std::fprintf(stderr, "[METRIC] ident identified currentOffset%s %s plant_mA=%.3f value_mA=%.3f error_mA=%.3f\n",
+            phase, setup.plantName.c_str(), bias * kMilliPerUnit, *identified * kMilliPerUnit, errorMilliAmpere);
+
+        EXPECT_LE(errorMilliAmpere, limitMilliAmpere) << "phase " << phase << " offset is " << *identified << " A against a bias of " << bias << " A";
     }
 
     std::optional<float> PlantTruth(const ScenarioSetup& setup, const std::string& quantity, float windingCelsius)
@@ -269,6 +286,14 @@ THEN(R"(the identified {word} shall be within {float} % of the plant)", (std::st
 {
     const auto& setup = context.Get<ScenarioSetup>();
     CompareWithPlant(setup, setup.identified, "identified", quantity, limitPercent, kReferenceCelsius);
+}
+
+THEN(R"(the identified current offsets shall be within {float} mA of the plant)", (float limitMilliAmpere))
+{
+    const auto& setup = context.Get<ScenarioSetup>();
+    CompareOffsetWithPlant(setup, "A", setup.identified.currentOffsetAmpereA, setup.plant.noiseBiasAmpereA, limitMilliAmpere);
+    CompareOffsetWithPlant(setup, "B", setup.identified.currentOffsetAmpereB, setup.plant.noiseBiasAmpereB, limitMilliAmpere);
+    CompareOffsetWithPlant(setup, "C", setup.identified.currentOffsetAmpereC, setup.plant.noiseBiasAmpereC, limitMilliAmpere);
 }
 
 THEN(R"(the identified pole pairs shall match the plant)")

@@ -205,7 +205,7 @@ stateDiagram-v2
 | rPhase               | Ω             | Measured phase resistance                           |
 | lD                   | H             | Measured d-axis inductance                          |
 | lQ                   | H             | Measured q-axis inductance                          |
-| currentOffsetA/B/C   | A             | ADC current sensor zero offsets per phase           |
+| currentOffsetA/B/C   | A             | Zero-current reading of each phase current sensor   |
 | inertia              | kg·m²         | Estimated rotor inertia                             |
 | frictionCoulomb      | N·m           | Coulomb (constant) friction                         |
 | frictionViscous      | N·m·s/rad     | Viscous friction coefficient                        |

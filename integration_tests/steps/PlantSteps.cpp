@@ -208,6 +208,9 @@ GIVEN(R"(the motor is already calibrated)")
     setup.nvm.calibration.fluxLinkage = setup.plant.fluxLinkageWeber;
     setup.nvm.calibration.inertia = setup.plant.rotorInertiaKgM2;
     setup.nvm.calibration.frictionViscous = setup.plant.viscousDampingNmSPerRad;
+    setup.nvm.calibration.currentOffsetA = setup.plant.noiseBiasAmpereA;
+    setup.nvm.calibration.currentOffsetB = setup.plant.noiseBiasAmpereB;
+    setup.nvm.calibration.currentOffsetC = setup.plant.noiseBiasAmpereC;
 }
 
 GIVEN(R"(the stored calibration is off by:)")
