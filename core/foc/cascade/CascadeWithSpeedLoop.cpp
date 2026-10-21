@@ -100,13 +100,13 @@ namespace foc
         mechanical->Update(buffer.Acquire().mechanical);
     }
 
-    void EstimatorChannel::UpdateElectrical(float vdcInvScale)
+    void EstimatorChannel::UpdateElectrical(float vdcInvScale, Ampere directCurrentReference)
     {
         if (electrical == nullptr)
             return;
 
         const auto& snapshot = buffer.Acquire();
-        electrical->Update(ElectricalWindow{ Volts{ snapshot.meanNormalizedVd * vdcInvScale }, Ampere{ snapshot.meanId }, Ampere{ snapshot.idAtEnd }, snapshot.meanElectricalSpeedTimesIq });
+        electrical->Update(ElectricalWindow{ Volts{ snapshot.meanNormalizedVd * vdcInvScale }, Ampere{ snapshot.meanId }, Ampere{ snapshot.idAtEnd }, snapshot.meanElectricalSpeedTimesIq, directCurrentReference });
     }
 
     CascadeWithSpeedLoop::CascadeWithSpeedLoop(foc::Ampere maxCurrent, hal::Hertz baseFrequency, LowPriorityInterrupt& lowPriorityInterrupt, hal::Hertz lowPriorityFrequency)
@@ -301,7 +301,7 @@ namespace foc
         if (!estimators.HasElectrical())
             return;
 
-        estimators.UpdateElectrical(vdcInvScale);
+        estimators.UpdateElectrical(vdcInvScale, Ampere{ directCurrentReference });
         directCurrentReference = directAxisExcitation.Advance();
     }
 

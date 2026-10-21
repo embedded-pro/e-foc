@@ -37,7 +37,8 @@ namespace simulator
             return;
 
         const float count = static_cast<float>(samplesInWindow);
-        estimator.Update(foc::ElectricalWindow{ foc::Volts{ sumVd / count }, foc::Ampere{ sumId / count }, foc::Ampere{ idq.d }, sumSpeedTimesIq / count });
+        // The model's currents carry no sensor noise, so the window's own mean current serves as the instrument.
+        estimator.Update(foc::ElectricalWindow{ foc::Volts{ sumVd / count }, foc::Ampere{ sumId / count }, foc::Ampere{ idq.d }, sumSpeedTimesIq / count, foc::Ampere{ sumId / count } });
         Started();
 
         emit electricalEstimatesChanged(estimator.CurrentResistance().Value(),

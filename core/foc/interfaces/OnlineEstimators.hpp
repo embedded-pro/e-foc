@@ -25,6 +25,7 @@ namespace foc
         Ampere meanId;
         Ampere idAtEnd;
         float meanElectricalSpeedTimesIq;
+        Ampere directCurrentReference;
     };
 
     class OnlineMechanicalEstimator

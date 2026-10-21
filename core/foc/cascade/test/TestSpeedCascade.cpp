@@ -430,6 +430,33 @@ TEST_F(TestSpeedCascade, registered_online_estimators_are_fed_from_the_outer_loo
     lowPriorityInterruptMock.TriggerHandler();
 }
 
+TEST_F(TestSpeedCascade, the_electrical_window_carries_the_direct_axis_reference_it_ran_with)
+{
+    testing::StrictMock<foc::OnlineElectricalEstimatorMock> electricalEstimator;
+    const auto reference = [](float value)
+    {
+        return testing::ResultOf([](const foc::ElectricalWindow& window)
+            {
+                return window.directCurrentReference.Value();
+            },
+            testing::FloatEq(value));
+    };
+
+    focSpeed->SetOnlineElectricalEstimator(electricalEstimator);
+    focSpeed->Enable();
+
+    testing::InSequence sequence;
+    EXPECT_CALL(electricalEstimator, Update(reference(0.0f)));
+    EXPECT_CALL(electricalEstimator, Update(reference(0.25f)));
+
+    foc::Radians position{ 0.0f };
+    for (int window = 0; window != 2; ++window)
+    {
+        focSpeed->Calculate(ZeroCurrents(), position);
+        lowPriorityInterruptMock.TriggerHandler();
+    }
+}
+
 TEST_F(TestSpeedCascade, enable_speed_command_drives_the_motor_at_commanded_speed)
 {
     focSpeed->EnableSpeedCommand();
