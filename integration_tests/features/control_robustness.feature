@@ -155,3 +155,29 @@ Feature: Control Robustness Against Off-Nominal Plants
       | cascadep  |
       | lqr       |
       | lqi       |
+
+  @sil @REQ-POS-012
+  Scenario Outline: With the cogging map the <algorithm> position law holds on a cogging hill top
+    Given a bench motor plant
+    And the plant's shaft has the bench's dry friction and cogging
+    And the motor boots in position mode
+    And the position loop runs the <algorithm> algorithm
+    When the target boots
+    And the position motor system is initialised with no valid calibration data
+    And the full calibration is run from the terminal
+    And the motor is enabled
+    And a position setpoint of 3.0 rad is applied
+    Then the measured position shall settle at 3.0 rad within 0.03 rad in 4000 ms
+    And the measured position shall hold at 3.0 rad within 0.03 rad for 2000 ms
+    When a position setpoint of 1.0 rad is applied
+    Then the measured position shall settle at 1.0 rad within 0.03 rad in 4000 ms
+    And the measured position shall hold at 1.0 rad within 0.03 rad for 2000 ms
+    And the motor shall not report a fault
+
+    Examples:
+      | algorithm |
+      | pid       |
+      | twodof    |
+      | cascadep  |
+      | lqr       |
+      | lqi       |

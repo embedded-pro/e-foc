@@ -6,6 +6,8 @@
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "hal/synchronous_interfaces/SynchronousPwm.hpp"
+#include "infra/util/MemoryRange.hpp"
+#include <cstdint>
 
 namespace foc
 {
@@ -102,6 +104,15 @@ namespace foc
 
         virtual void SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator) = 0;
         virtual void SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator) = 0;
+    };
+
+    class CoggingCompensable
+    {
+    public:
+        virtual ~CoggingCompensable() = default;
+
+        virtual void LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant) = 0;
+        virtual void ClearCoggingMap() = 0;
     };
 
     class SpeedCommandable

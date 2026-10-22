@@ -5,6 +5,7 @@
 #include "core/foc/math/DutyConversion.hpp"
 #include "core/foc/position_loop/PidPositionController.hpp"
 #include "numerical/math/Tolerance.hpp"
+#include <array>
 #include <gmock/gmock.h>
 #include <numbers>
 
@@ -599,4 +600,26 @@ TEST_F(TestPositionCascade, the_observed_motion_carries_the_position_error_left_
     }
 
     EXPECT_NEAR(focPosition->ObserveMotion().positionError.Value(), 0.75f, 1e-5f);
+}
+
+TEST_F(TestPositionCascade, a_loaded_cogging_map_drives_the_winding_while_the_rotor_holds_its_setpoint)
+{
+    auto tunings = foc::CurrentLoopTunings{};
+    tunings.bandwidth = 628.3185f;
+    focPosition->SetCurrentTunings(tunings);
+    focPosition->Enable();
+    focPosition->SetPoint(foc::Radians{ 0.03f });
+
+    foc::Radians position{ 0.03f };
+    const auto withoutMap = focPosition->Calculate(ZeroCurrents(), position);
+
+    std::array<int8_t, 48> torque{};
+    torque.fill(100);
+    focPosition->LoadCoggingMap(infra::MakeRange(torque), 1.0e-3f, foc::NewtonMeter{ 0.1f });
+    const auto withMap = focPosition->Calculate(ZeroCurrents(), position);
+
+    EXPECT_NEAR(DutyPercent(withoutMap.a), 50.0f, 1.0f);
+    EXPECT_GT(std::abs(DutyPercent(withMap.a) - DutyPercent(withoutMap.a)) + std::abs(DutyPercent(withMap.b) - DutyPercent(withoutMap.b)), 1.0f);
+
+    focPosition->ClearCoggingMap();
 }

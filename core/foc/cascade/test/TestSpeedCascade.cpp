@@ -2,6 +2,8 @@
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/foc/interfaces/test_doubles/OnlineEstimatorsMock.hpp"
 #include "core/foc/math/DutyConversion.hpp"
+#include <array>
+#include <cmath>
 #include <gmock/gmock.h>
 #include <numbers>
 
@@ -541,4 +543,37 @@ TEST_F(TestSpeedCascade, a_disabled_cascade_observes_no_motion)
     const auto observation = focSpeed->ObserveMotion();
     EXPECT_NEAR(observation.measuredSpeed.Value(), 0.0f, 1e-6f);
     EXPECT_NEAR(observation.measuredTorqueCurrent.Value(), 0.0f, 1e-6f);
+}
+
+namespace
+{
+    std::array<int8_t, 48> CoggingWave()
+    {
+        std::array<int8_t, 48> torque{};
+        for (std::size_t bin = 0; bin != torque.size(); ++bin)
+            torque[bin] = static_cast<int8_t>(std::lround(127.0f * std::sin(6.0f * (static_cast<float>(bin) + 0.5f) * 2.0f * std::numbers::pi_v<float> / 48.0f)));
+        return torque;
+    }
+}
+
+TEST_F(TestSpeedCascade, a_loaded_cogging_map_asks_the_winding_for_the_cogging_torque_at_standstill)
+{
+    SpeedCascadeUnderTest withoutMap{ polePairs, foc::SpeedLoopTunings{} };
+    SpeedCascadeUnderTest withMap{ polePairs, foc::SpeedLoopTunings{} };
+    const auto torque = CoggingWave();
+    withMap.cascade->LoadCoggingMap(infra::MakeRange(torque), 0.05f / 127.0f, foc::NewtonMeter{ 0.1f });
+
+    ExpectCentredDuty(FirstDutyAtStandstill(withoutMap, 0.03f));
+    ExpectOffCentreDuty(FirstDutyAtStandstill(withMap, 0.03f));
+}
+
+TEST_F(TestSpeedCascade, a_cleared_cogging_map_no_longer_drives_the_winding)
+{
+    SpeedCascadeUnderTest speedCascade{ polePairs, foc::SpeedLoopTunings{} };
+    const auto torque = CoggingWave();
+    speedCascade.cascade->LoadCoggingMap(infra::MakeRange(torque), 0.05f / 127.0f, foc::NewtonMeter{ 0.1f });
+
+    speedCascade.cascade->ClearCoggingMap();
+
+    ExpectCentredDuty(FirstDutyAtStandstill(speedCascade, 0.03f));
 }

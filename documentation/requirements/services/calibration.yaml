@@ -165,3 +165,15 @@
     applies it, seeded with a resistance 1.3 times and an inductance 0.7 times the plant's and
     excited as in REQ-CAL-014, the online resistance shall be within 5 % and the online
     inductance within 10 % of the plant's under every current control law, deadbeat included.
+
+- id: REQ-CAL-018
+  title: The full calibration maps the cogging torque over one electrical period
+  shall: >
+    In speed and position mode, the full calibration shall, once the mechanical parameters are
+    agreed, turn the rotor slowly through at least two revolutions in each direction and store with
+    the calibration record a map of the cogging torque over one electrical period. In each part of
+    the period it shall take the torque the winding gave less the torque that accelerated the
+    rotor, by the identified inertia, and average the two directions, so that the friction cancels.
+    A calibration whose map cannot be measured shall complete without one. On the bench plant with
+    the bench's cogging (24 detents a revolution, 4 mN·m deep) and dry friction (3.7 mN·m), the
+    stored map's peak shall be within 10 % of the plant's cogging.

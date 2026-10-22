@@ -168,6 +168,8 @@ namespace simulator
                             return QStringLiteral("Calibrating: alignment\xe2\x80\xa6");
                         case state_machine::CalibrationStep::frictionAndInertia:
                             return QStringLiteral("Calibrating: B/J\xe2\x80\xa6");
+                        case state_machine::CalibrationStep::coggingMap:
+                            return QStringLiteral("Calibrating: cogging\xe2\x80\xa6");
                     }
                     return QStringLiteral("Calibrating\xe2\x80\xa6");
                 }

@@ -101,3 +101,14 @@
     within 0.03 rad of a 1.0 rad setpoint within 4 s and stay there for 2 s, and then do the same
     at -1.0 rad. A law that integrates the position error shall not wind its integral while the
     rotor stands still: a stationary rotor is asked for the speed its error alone calls for.
+
+- id: REQ-POS-012
+  title: Position hold on a cogging hill top with the cogging map applied
+  shall: >
+    With a cogging map in the calibration record, the speed and position cascades shall add the
+    map's torque at the rotor's electrical angle, over the torque constant, to the quadrature
+    current they ask for, and the online mechanical estimator shall regress on the current without
+    that addition. Against the bench plant with the bench's cogging and dry friction, after the
+    full calibration, every position control law shall settle within 0.03 rad of a 3.0 rad
+    setpoint, which sits where the cogging pushes the rotor away, within 4 s and hold it for 2 s,
+    and then do the same at 1.0 rad.

@@ -221,11 +221,13 @@ namespace foc
         auto sinTheta = FastTrigonometry::Sine(electricalAngle);
 
         auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
-        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ directCurrentReference, lastSpeedLoopOutput }, lastElectricalSpeed });
+        const auto coggingCurrent = coggingFeedForward.CurrentAt(electricalAngle);
+        const auto quadratureReference = std::clamp(lastSpeedLoopOutput + coggingCurrent, -maxCurrent.Value(), maxCurrent.Value());
+        auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ directCurrentReference, quadratureReference }, lastElectricalSpeed });
 
         auto output = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
 
-        estimatorWindow.Accumulate(idAndIq, voltage, mechanicalAngle, polePairs);
+        estimatorWindow.Accumulate(idAndIq, voltage, mechanicalAngle, polePairs, coggingCurrent);
 
         ++triggerCounter;
         if (triggerCounter >= prescaler)
@@ -311,5 +313,15 @@ namespace foc
     void CascadeWithSpeedLoop::SetDirectAxisExcitation(Ampere amplitude, hal::Hertz frequency)
     {
         directAxisExcitation = DirectAxisExcitation{ amplitude, frequency, outerLoopFrequency };
+    }
+
+    void CascadeWithSpeedLoop::LoadCoggingMapImpl(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant)
+    {
+        coggingFeedForward.Load(torque, torqueScale, torqueConstant);
+    }
+
+    void CascadeWithSpeedLoop::ClearCoggingMapImpl()
+    {
+        coggingFeedForward.Clear();
     }
 }

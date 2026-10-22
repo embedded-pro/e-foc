@@ -25,6 +25,7 @@ namespace integration
         std::optional<float> currentOffsetAmpereA;
         std::optional<float> currentOffsetAmpereB;
         std::optional<float> currentOffsetAmpereC;
+        std::optional<float> coggingPeakNm;
     };
 
     struct ScenarioSetup

@@ -1,4 +1,5 @@
 #include "core/state_machine/CalibrationFlow.hpp"
+#include "core/services/cogging_compensation/CoggingMap.hpp"
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include <bit>
@@ -56,7 +57,7 @@ namespace application
         return false;
     }
 
-    // An external identification does not measure the current sensors, so the record keeps the offsets in force.
+    // An external identification measures neither the current sensors nor the cogging, so the record keeps both in force.
     void CalibrationFlow::BeginExternal(state_machine::Calibrating& calibrating, const state_machine::CompleteExternalCalibration& command)
     {
         env.pending.Accept(command.onDone);
@@ -64,6 +65,8 @@ namespace application
         calibrating.pendingData.currentOffsetA = env.context.Data().currentOffsetA;
         calibrating.pendingData.currentOffsetB = env.context.Data().currentOffsetB;
         calibrating.pendingData.currentOffsetC = env.context.Data().currentOffsetC;
+        calibrating.pendingData.coggingTorque = env.context.Data().coggingTorque;
+        calibrating.pendingData.coggingTorqueScale = env.context.Data().coggingTorqueScale;
         RunAlignmentOnly(calibrating);
     }
 
@@ -155,7 +158,8 @@ namespace application
             calibrating.pendingData.inertia = agreed->inertia;
             calibrating.pendingData.frictionViscous = agreed->friction;
             calibrating.pendingData.speedLoopBandwidth = event.speedLoopBandwidth;
-            Save(calibrating);
+            if (!env.mode.RunPostMechanicalStep(calibrating))
+                Save(calibrating);
             return;
         }
 
@@ -171,6 +175,20 @@ namespace application
         }
 
         env.machine.Dispatch(state_machine::CalibrationStepFailed{});
+    }
+
+    void CalibrationFlow::OnCoggingMapped(state_machine::Calibrating& calibrating, const state_machine::CoggingMapped& event)
+    {
+        if (event.map)
+        {
+            calibrating.pendingData.coggingTorque = event.map->torque;
+            calibrating.pendingData.coggingTorqueScale = event.map->torqueScale;
+            env.tracer.Trace() << "[SM] Cogging map: peak_mNm=" << event.map->peak.Value() * milliPerUnit;
+        }
+        else
+            env.tracer.Trace() << "[SM] Cogging map: none";
+
+        Save(calibrating);
     }
 
     void CalibrationFlow::Save(state_machine::Calibrating& calibrating)
@@ -205,7 +223,8 @@ namespace application
                            << " B_uNms=" << data.frictionViscous * microPerUnit
                            << " Ia_mA=" << data.currentOffsetA * milliPerUnit
                            << " Ib_mA=" << data.currentOffsetB * milliPerUnit
-                           << " Ic_mA=" << data.currentOffsetC * milliPerUnit;
+                           << " Ic_mA=" << data.currentOffsetC * milliPerUnit
+                           << " cog_mNm=" << services::CoggingPeak(data.coggingTorque, data.coggingTorqueScale).Value() * milliPerUnit;
     }
 
     // Busy is contention with another writer of the shared NVM, not a failure of this record

@@ -779,6 +779,10 @@ What the plant has shown so far:
 - **The bench's cogging and dry friction made the PID and two-DOF position laws hunt**, ±0.17 rad
   every 1.5 s at 1 rad on the rig and in the plant alike, while Cascade P, LQR and LQI held
   (`documentation/theory/position-loop-pid.md`, *A rotor that stands still*; REQ-POS-011).
+- **The same cogging left the PID, two-DOF and Cascade P laws unable to hold a setpoint on a hill top**,
+  3.0 rad, where they stopped at 3.02 to 3.13 rad. The calibration's cogging map, which read the plant's
+  4 mN·m within 4 %, lets every law hold it (`documentation/design/service-cogging-compensation.md`;
+  REQ-CAL-018, REQ-POS-012).
 - **A duty that acts a period late, as E-FOC-HARDWARE's PWM applies it, read the deadbeat law's online
   inductance three times too high** while the estimator paired each current change with the previous
   tick's command; the plant had applied every duty at once, so the simulation never showed the rig's

@@ -82,8 +82,10 @@ namespace
         EXPECT_EQ(actual.encoderZeroOffset, expected.encoderZeroOffset);
         EXPECT_EQ(actual.currentLoopBandwidth, expected.currentLoopBandwidth);
         EXPECT_EQ(actual.speedLoopBandwidth, expected.speedLoopBandwidth);
+        EXPECT_EQ(actual.coggingTorqueScale, expected.coggingTorqueScale);
         EXPECT_EQ(actual.encoderDirection, expected.encoderDirection);
         EXPECT_EQ(actual.polePairs, expected.polePairs);
+        EXPECT_EQ(actual.coggingTorque, expected.coggingTorque);
     }
 
     void ExpectConfigDataEqual(const services::ConfigData& actual,
@@ -123,6 +125,9 @@ namespace
             d.polePairs = 7;
             d.currentLoopBandwidth = 8377.6f;
             d.speedLoopBandwidth = 50.0f;
+            d.coggingTorqueScale = 3.0e-5f;
+            for (std::size_t bin = 0; bin != d.coggingTorque.size(); ++bin)
+                d.coggingTorque[bin] = static_cast<int8_t>(static_cast<int>(bin * 5) % 255 - 127);
             return d;
         }
 
