@@ -2,7 +2,7 @@
 title: "Service: Cogging Compensation"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: service-cogging-compensation
 date: 2026-10-22
 ---
@@ -86,6 +86,28 @@ Without the inertia term the map missed most of the cogging. The two directions 
 the cogging follows the angle and stays, the friction follows the motion and cancels, and so does
 the viscous term at equal speeds. The mean is taken out. A direction that left a bin with fewer
 than 16 samples, or turned the wrong way, yields no map.
+
+A motor without cogging still gave a map: noise alone, 0.13 to 0.26 mN·m on the bench plant, which
+the feed-forward then applied as a torque ripple of its own. The two directions tell the cogging
+from the noise. The cogging is the same in both, while the noise in one is independent of the noise
+in the other. So the builder compares the two profiles, each with its mean removed: the root mean
+square of their sum against that of their difference, which it calls the agreement. Noise alone
+agrees to about 1, and the builder keeps a map only from an agreement of 3. In simulation, through
+full calibrations:
+
+| Plant                                    | Agreement   | Map            |
+|------------------------------------------|-------------|----------------|
+| Bench, no cogging, four noise seeds      | 0.99 – 1.20 | none           |
+| Bench, 3.7 mN·m dry friction, no cogging | 0.85        | none           |
+| Teknic and anaheim reference motors      | 0.76 – 0.78 | none           |
+| Bench, 0.5 mN·m cogging                  | 6.6         | 0.60 mN·m peak |
+| Bench, 1 mN·m cogging                    | 9.1         | 1.08 mN·m peak |
+| Bench, the bench's 4 mN·m cogging        | 26          | 3.87 mN·m peak |
+
+The agreement also refuses a map built with the wrong inertia: without the inertia term, the
+simulated rotor's two directions agree to 0.14, against 52 with it, because the current the speed
+loop gives each detent leads the rotor in one direction and lags it in the other. The calibration
+traces the agreement with the map's peak.
 
 The run stops the bridge if any phase current passes the identification envelope, and gives up
 after 10 s. Neither ends the calibration: a calibration without a map completes and is stored
@@ -193,8 +215,10 @@ sequenceDiagram
 - **Unit tests.**
   - The builder recovers a 4 mN·m, 24-detent cogging from a simulated rotor under a 50 rad/s speed
     loop, read through a 4000-count encoder, within 4 % in every bin and its peak within 5 %, and
-    without the inertia term misses it by 88 %.
+    without the inertia term refuses it.
   - It refuses a run that left a bin empty or turned the wrong way.
+  - It refuses noise alone in both directions, and a profile only one direction shows, and keeps
+    a cogging smaller than the noise when both directions share it.
   - The mapping service turns both ways and reports the map, stops the bridge past the current
     envelope, times out with no map when the rotor does not turn, and stays silent once aborted.
   - The feed-forward reproduces a cogging sampled eight times a cycle within 3 %, wraps in either
@@ -204,6 +228,9 @@ sequenceDiagram
 - **SIL.** On the bench plant with the bench's cogging and dry friction:
   - the full calibration measures the cogging's peak within 10 % (REQ-CAL-018); it read 3.83 to
     3.90 mN·m against 4.0 across runs;
+  - a cogging a quarter as deep, with the dry friction, is mapped within 30 % (it read 14.5 % high,
+    the noise adding to a small map's peak), and with the dry friction and no cogging no map is
+    stored (REQ-CAL-018);
   - every position law then settles within 0.03 rad of a 3.0 rad setpoint on a cogging hill top
     within 4 s and holds it for 2 s, and then 1.0 rad (REQ-POS-012). Without the map the PID,
     two-DOF and Cascade P laws stop at 3.02 to 3.13 rad.

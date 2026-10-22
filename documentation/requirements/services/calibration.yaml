@@ -174,9 +174,12 @@
     the calibration record a map of the cogging torque over one electrical period. In each part of
     the period it shall take the torque the winding gave less the torque that accelerated the
     rotor, by the identified inertia, and average the two directions, so that the friction cancels.
-    A calibration whose map cannot be measured shall complete without one. On the bench plant with
-    the bench's cogging (24 detents a revolution, 4 mN·m deep) and dry friction (3.7 mN·m), the
-    stored map's peak shall be within 10 % of the plant's cogging.
+    It shall keep the map only when the two directions agree on it: the root mean square of their
+    sum, each with its mean removed, at least three times that of their difference. A calibration
+    whose map cannot be measured, or whose two directions disagree, shall complete without one. On
+    the bench plant with the bench's cogging (24 detents a revolution, 4 mN·m deep) and dry friction
+    (3.7 mN·m), the stored map's peak shall be within 10 % of the plant's cogging, and within 30 %
+    for a cogging a quarter as deep, where the noise left in the map is a larger part of its peak. With the dry friction and no cogging, no map shall be stored.
 
 - id: REQ-CAL-019
   title: The online electrical estimator's d-axis test current runs in bursts

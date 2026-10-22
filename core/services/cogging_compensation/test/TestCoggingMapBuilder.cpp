@@ -130,14 +130,12 @@ TEST_F(TestCoggingMapBuilder, a_rotor_carried_through_its_detents_both_ways_yiel
     ASSERT_TRUE(map.has_value());
     EXPECT_NEAR(map->peak.Value(), rotor.coggingTorque, 0.1f * rotor.coggingTorque);
     EXPECT_LT(WorstBinError(*map), 0.1f * rotor.coggingTorque);
+    EXPECT_GT(map->agreement, services::CoggingMapBuilder::minimumAgreement);
 }
 
-TEST_F(TestCoggingMapBuilder, without_the_rotor_inertia_the_map_misses_the_cogging_that_went_into_acceleration)
+TEST_F(TestCoggingMapBuilder, without_the_rotor_inertia_the_two_directions_disagree_and_yield_no_map)
 {
-    const auto map = TurnBothWaysAndBuild(0.0f);
-
-    ASSERT_TRUE(map.has_value());
-    EXPECT_GT(WorstBinError(*map), 0.3f * rotor.coggingTorque);
+    EXPECT_FALSE(TurnBothWaysAndBuild(0.0f).has_value());
 }
 
 TEST_F(TestCoggingMapBuilder, a_rotor_that_did_not_cover_every_bin_yields_no_map)
@@ -156,4 +154,72 @@ TEST_F(TestCoggingMapBuilder, a_rotor_that_turned_the_wrong_way_for_a_direction_
     run.Turn(builder, Direction::backward, 10.0f, 0.0f, 3.0f);
 
     EXPECT_FALSE(builder.Build(foc::NewtonMeter{ rotor.torqueConstant }, foc::NewtonMeterSecondSquared{ rotor.inertia }, polePairs, samplePeriod).has_value());
+}
+
+namespace
+{
+    class TestCoggingMapAgreement
+        : public ::testing::Test
+    {
+    public:
+        using Direction = services::CoggingMapBuilder::Direction;
+
+        static constexpr float torqueConstant{ 0.042f };
+        static constexpr float rotationPerSample{ 1.0e-4f };
+        static constexpr int samplesPerRun{ 31416 };
+
+        void Run(Direction direction, float coggingCurrent, float noiseCurrent)
+        {
+            const auto sign = direction == Direction::forward ? 1.0f : -1.0f;
+            for (int sample = 0; sample != samplesPerRun; ++sample)
+            {
+                const auto electricalAngle = sign * rotationPerSample * static_cast<float>(sample) * static_cast<float>(polePairs);
+                const auto current = coggingCurrent * std::sin(6.0f * electricalAngle) + noiseCurrent * Noise();
+                builder.Add(direction, electricalAngle, current, sign * rotationPerSample);
+            }
+        }
+
+        std::optional<services::CoggingMap> Build()
+        {
+            return builder.Build(foc::NewtonMeter{ torqueConstant }, foc::NewtonMeterSecondSquared{ 14.0e-6f }, polePairs, samplePeriod);
+        }
+
+        services::CoggingMapBuilder builder;
+
+    private:
+        float Noise()
+        {
+            state = state * 1664525u + 1013904223u;
+            return static_cast<float>(state >> 8) / static_cast<float>(1u << 24) - 0.5f;
+        }
+
+        uint32_t state{ 20261022u };
+    };
+}
+
+TEST_F(TestCoggingMapAgreement, noise_alone_in_both_directions_yields_no_map)
+{
+    Run(Direction::forward, 0.0f, 1.0f);
+    Run(Direction::backward, 0.0f, 1.0f);
+
+    EXPECT_FALSE(Build().has_value());
+}
+
+TEST_F(TestCoggingMapAgreement, a_cogging_both_directions_share_yields_a_map_through_the_noise)
+{
+    Run(Direction::forward, 0.05f, 0.3f);
+    Run(Direction::backward, 0.05f, 0.3f);
+
+    const auto map = Build();
+    ASSERT_TRUE(map.has_value());
+    EXPECT_GT(map->agreement, services::CoggingMapBuilder::minimumAgreement);
+    EXPECT_NEAR(map->peak.Value(), 0.05f * torqueConstant, 0.2f * 0.05f * torqueConstant);
+}
+
+TEST_F(TestCoggingMapAgreement, a_profile_only_one_direction_shows_yields_no_map)
+{
+    Run(Direction::forward, 0.05f, 1.0f);
+    Run(Direction::backward, 0.0f, 1.0f);
+
+    EXPECT_FALSE(Build().has_value());
 }

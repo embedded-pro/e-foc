@@ -239,6 +239,29 @@ Feature: Parameter Identification Against a Known Plant
     Then the identified cogging shall be within 10 % of the plant
     And the identified inertia shall be within 5 % of the plant
 
+  @sil @REQ-CAL-018
+  Scenario: The full calibration maps a cogging a quarter of the bench's
+    Given a bench motor plant
+    And a motor plant with:
+      | coulomb_friction_nm           | 0.0037 |
+      | cogging_torque_nm             | 0.001  |
+      | cogging_cycles_per_revolution | 24     |
+    And the motor boots in speed mode
+    When the target boots
+    And the full calibration is run from the terminal
+    Then the identified cogging shall be within 30 % of the plant
+
+  @sil @REQ-CAL-018
+  Scenario: The full calibration stores no cogging map for a motor without cogging
+    Given a bench motor plant
+    And a motor plant with:
+      | coulomb_friction_nm | 0.0037 |
+    And the motor boots in speed mode
+    When the target boots
+    And the full calibration is run from the terminal
+    Then the calibration shall store no cogging map
+    And the identified inertia shall be within 5 % of the plant
+
   @sil @REQ-CAL-014
   Scenario Outline: The online resistance estimate follows the plant (<motor>)
     Given a <motor> motor plant

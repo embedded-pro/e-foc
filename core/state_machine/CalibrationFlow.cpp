@@ -183,7 +183,7 @@ namespace application
         {
             calibrating.pendingData.coggingTorque = event.map->torque;
             calibrating.pendingData.coggingTorqueScale = event.map->torqueScale;
-            env.tracer.Trace() << "[SM] Cogging map: peak_mNm=" << event.map->peak.Value() * milliPerUnit;
+            env.tracer.Trace() << "[SM] Cogging map: peak_mNm=" << event.map->peak.Value() * milliPerUnit << " agreement=" << event.map->agreement;
         }
         else
             env.tracer.Trace() << "[SM] Cogging map: none";

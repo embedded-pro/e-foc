@@ -43,6 +43,10 @@ namespace services
         if (!forward || !backward)
             return std::nullopt;
 
+        const auto agreement = Agreement(*forward, *backward);
+        if (agreement < minimumAgreement)
+            return std::nullopt;
+
         Profile cogging{};
         float mean{ 0.0f };
         for (std::size_t bin = 0; bin != bins; ++bin)
@@ -67,8 +71,38 @@ namespace services
         for (std::size_t bin = 0; bin != bins; ++bin)
             map.torque[bin] = static_cast<int8_t>(std::lround(cogging[bin] / map.torqueScale));
         map.peak = CoggingPeak(map.torque, map.torqueScale);
+        map.agreement = agreement;
 
         return map;
+    }
+
+    float CoggingMapBuilder::Agreement(const Profile& forward, const Profile& backward)
+    {
+        float forwardMean{ 0.0f };
+        float backwardMean{ 0.0f };
+        for (std::size_t bin = 0; bin != bins; ++bin)
+        {
+            forwardMean += forward[bin];
+            backwardMean += backward[bin];
+        }
+        forwardMean /= static_cast<float>(bins);
+        backwardMean /= static_cast<float>(bins);
+
+        float shared{ 0.0f };
+        float differing{ 0.0f };
+        for (std::size_t bin = 0; bin != bins; ++bin)
+        {
+            const auto sum = (forward[bin] - forwardMean) + (backward[bin] - backwardMean);
+            const auto difference = (forward[bin] - forwardMean) - (backward[bin] - backwardMean);
+            shared += sum * sum;
+            differing += difference * difference;
+        }
+
+        if (!foc::IsFiniteValue(shared) || !foc::IsFiniteValue(differing) || shared <= 0.0f)
+            return 0.0f;
+
+        constexpr float largestAgreementSquared{ 1.0e6f };
+        return std::sqrt(shared / std::max(differing, shared / largestAgreementSquared));
     }
 
     std::optional<CoggingMapBuilder::Profile> CoggingMapBuilder::DirectionTorque(Direction direction, float torqueConstant, float inertia, float binWidth, float samplePeriod) const

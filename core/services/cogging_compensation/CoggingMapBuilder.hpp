@@ -16,6 +16,8 @@ namespace services
     public:
         static constexpr std::size_t bins{ coggingMapBins };
         static constexpr uint32_t minimumSamplesPerBin{ 16 };
+        // A map of noise alone agrees with itself to about 1; the bench motor's 0.5 mN·m of cogging already reads 6.6
+        static constexpr float minimumAgreement{ 3.0f };
 
         enum class Direction : uint8_t
         {
@@ -55,6 +57,7 @@ namespace services
         }
 
         std::optional<Profile> DirectionTorque(Direction direction, float torqueConstant, float inertia, float binWidth, float samplePeriod) const;
+        static float Agreement(const Profile& forward, const Profile& backward);
 
         std::array<std::array<Bin, bins>, 2> accumulated{};
     };

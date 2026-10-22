@@ -12,6 +12,7 @@ namespace services
         std::array<int8_t, coggingMapBins> torque{};
         float torqueScale{ 0.0f };
         foc::NewtonMeter peak{ 0.0f };
+        float agreement{ 0.0f };
     };
 
     foc::NewtonMeter CoggingPeak(const std::array<int8_t, coggingMapBins>& torque, float torqueScale);
