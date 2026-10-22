@@ -144,6 +144,18 @@
     them for each reference motor and for the bench motor, also when the bench motor is read
     through its current-sense chain.
 
+- id: REQ-CAL-016
+  title: The online friction estimate tells dry friction and shaft loads from viscous friction in both directions
+  shall: >
+    The online mechanical estimator shall fit each direction of rotation separately, so that a dry
+    friction and a shaft load each appear only in that direction's torque intercept, take no
+    observation whose speed may change sign within it, and publish from a direction only once that
+    direction has been held at two distinct constant speeds. On the bench motor with 3.7 mN·m of
+    dry friction, seeded with an inertia twice and a viscous friction half the plant's, and excited
+    by a speed reference alternating between 30 and 60 rad/s every second for four seconds and then
+    between -30 and -60 rad/s for four more, it shall report a viscous friction within 10 % and an
+    inertia within 2 % of the plant's.
+
 - id: REQ-CAL-017
   title: Online electrical estimates hold on a board that applies each duty a period late
   shall: >

@@ -25,9 +25,9 @@ namespace services
         : samplingFrequency(static_cast<float>(samplingFrequency.Value()))
         , forgettingFactor(forgettingFactor)
         , rls(std::in_place, 1000.0f, forgettingFactor)
-        , onlineRls(std::in_place, onlineInitialCovariance, forgettingFactor)
         , kinematics(1.0f / this->samplingFrequency)
     {
+        ReseedOnline();
     }
 
     RealTimeFrictionAndInertiaEstimator::Result RealTimeFrictionAndInertiaEstimator::Update(foc::PhaseCurrents currentPhases, foc::RadiansPerSecond speed, foc::Radians electricalAngle, foc::NewtonMeter targetTorque)
@@ -90,64 +90,71 @@ namespace services
 
     void RealTimeFrictionAndInertiaEstimator::ReseedOnline()
     {
-        onlineRls.emplace(onlineInitialCovariance, forgettingFactor);
-
         MotorRLS::CoefficientsMatrix initial{};
         initial.at(1, 0) = currentInertia.Value() * parameterScale;
         initial.at(2, 0) = currentFriction.Value() * parameterScale;
-        onlineRls->SetCoefficients(initial);
 
-        onlineMetrics = MotorRLS::EstimationMetrics{};
+        for (auto& fit : onlineFits)
+        {
+            fit = DirectionalFit{};
+            fit.rls.emplace(onlineInitialCovariance, forgettingFactor);
+            fit.rls->SetCoefficients(initial);
+        }
+
         kinematics.Restart();
-        onlinePeriods = 0;
-        onlineExcitation.Restart();
-        residualPower = 0.0f;
-        outputPower = 0.0f;
     }
 
     void RealTimeFrictionAndInertiaEstimator::Update(const foc::MechanicalWindow& window)
     {
         const auto observation = kinematics.Add(window);
-        if (!observation.has_value() || !IsOnlineObservationInformative(observation->acceleration, observation->speed))
+        if (!observation.has_value())
+            return;
+
+        auto& fit = onlineFits[observation->speed >= 0.0f ? 0 : 1];
+        if (!IsOnlineObservationInformative(observation->acceleration, observation->speed, fit))
             return;
 
         MotorRLS::MakeRegressor(onlineRegressor, observation->acceleration * columnScale, observation->speed * columnScale);
         math::Matrix<float, 1, 1> output;
         output.at(0, 0) = torqueConstant.Value() * observation->iq * outputScale;
 
-        onlineMetrics = onlineRls->Update(onlineRegressor, output);
-        residualPower += residualAveragingWeight * (onlineMetrics.residual * onlineMetrics.residual - residualPower);
-        outputPower += residualAveragingWeight * (output.at(0, 0) * output.at(0, 0) - outputPower);
+        fit.metrics = fit.rls->Update(onlineRegressor, output);
+        fit.residualPower += residualAveragingWeight * (fit.metrics.residual * fit.metrics.residual - fit.residualPower);
+        fit.outputPower += residualAveragingWeight * (output.at(0, 0) * output.at(0, 0) - fit.outputPower);
 
-        onlineExcitation.Count(observation->acceleration, observation->speed);
-        onlinePeriods = static_cast<uint16_t>(std::min<uint32_t>(onlinePeriods + kinematics.WindowsPerObservation(), onlineMinimumPeriods));
+        fit.excitation.CountAcceleration(observation->acceleration);
+        if (std::abs(observation->acceleration) < mechanical_estimate::minimumAcceleration)
+            fit.excitation.CountSpeed(observation->speed);
+        fit.periods = static_cast<uint16_t>(std::min<uint32_t>(fit.periods + kinematics.WindowsPerObservation(), onlineMinimumPeriods));
 
-        PublishOnlineEstimate();
+        PublishOnlineEstimate(fit);
     }
 
-    bool RealTimeFrictionAndInertiaEstimator::IsOnlineObservationInformative(float acceleration, float speed) const
+    bool RealTimeFrictionAndInertiaEstimator::IsOnlineObservationInformative(float acceleration, float speed, const DirectionalFit& fit) const
     {
         if (!IsMechanicallyObservable(speed))
             return false;
+        if (std::abs(speed) <= std::abs(acceleration) * static_cast<float>(kinematics.WindowsPerObservation()) / samplingFrequency)
+            return false;
 
-        return std::abs(acceleration) >= mechanical_estimate::minimumAcceleration || onlineMetrics.uncertainty <= onlineCovarianceCeiling;
+        return std::abs(acceleration) >= mechanical_estimate::minimumAcceleration || fit.metrics.uncertainty <= onlineCovarianceCeiling;
     }
 
-    bool RealTimeFrictionAndInertiaEstimator::HasOnlineEstimateSettled() const
+    bool RealTimeFrictionAndInertiaEstimator::HasOnlineEstimateSettled(const DirectionalFit& fit) const
     {
-        return onlinePeriods >= onlineMinimumPeriods &&
-               onlineExcitation.AcceleratingObservations() * kinematics.WindowsPerObservation() >= mechanical_estimate::minimumExcitedUpdates &&
-               onlineExcitation.HasSpannedDistinctSpeeds() &&
-               residualPower <= settledResidualRatio * settledResidualRatio * outputPower;
+        return fit.periods >= onlineMinimumPeriods &&
+               fit.excitation.AcceleratingObservations() * kinematics.WindowsPerObservation() >= mechanical_estimate::minimumExcitedUpdates &&
+               fit.excitation.HasSpannedDistinctSpeeds() &&
+               fit.residualPower <= settledResidualRatio * settledResidualRatio * fit.outputPower;
     }
 
-    void RealTimeFrictionAndInertiaEstimator::PublishOnlineEstimate()
+    void RealTimeFrictionAndInertiaEstimator::PublishOnlineEstimate(const DirectionalFit& fit)
     {
-        if (!HasOnlineEstimateSettled())
+        if (!HasOnlineEstimateSettled(fit))
             return;
 
-        const auto inertia = onlineRls->Coefficients().at(1, 0) / parameterScale;
-        const auto friction = SettledFriction(onlineRls->Coefficients().at(2, 0) / parameterScale);
+        const auto inertia = fit.rls->Coefficients().at(1, 0) / parameterScale;
+        const auto friction = SettledFriction(fit.rls->Coefficients().at(2, 0) / parameterScale);
 
         if (!IsPlausibleMechanics(inertia, friction))
             return;
