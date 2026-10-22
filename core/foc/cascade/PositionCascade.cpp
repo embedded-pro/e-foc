@@ -138,6 +138,10 @@ namespace foc
         auto observation = ObserveSpeedLoopMotion();
         observation.positionError = Radians{ WrappedPositionError(lastPositionSetPoint, Radians{ CurrentMechanicalAngle() }) };
 
+        // A law that commands the current leaves the speed reference wherever the speed loop's last user put it
+        if (commandsCurrent)
+            observation.demandedSpeed = RadiansPerSecond{ 0.0f };
+
         return observation;
     }
 
@@ -147,6 +151,7 @@ namespace foc
 
         if (speedCommandActive)
         {
+            commandsCurrent = false;
             SetSpeedReference(speedCommand);
             RunSpeedLoop(mechanicalSpeed);
             UpdateOnlineMechanicalEstimator();
@@ -155,6 +160,7 @@ namespace foc
         }
 
         auto command = positionLoop.Compute(PositionControlContext{ Radians{ CurrentMechanicalAngle() }, lastPositionSetPoint, RadiansPerSecond{ mechanicalSpeed } });
+        commandsCurrent = command.kind != PositionOutputKind::speedReference;
 
         if (command.kind == PositionOutputKind::speedReference)
         {

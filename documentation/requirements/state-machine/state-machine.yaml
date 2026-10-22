@@ -243,8 +243,11 @@
     the drive demands motion — a speed reference, or a position error it has not closed, above
     configured thresholds — while the encoder reading stays within a configured excursion for
     a whole configured window, the supervisor shall raise FaultCode::encoderLoss through the
-    fault notifier, exactly as a board protection trip is raised. A drive that is not Enabled,
-    that carries no current, or that holds its position against a load shall not be reported.
+    fault notifier, exactly as a board protection trip is raised. The demanded speed shall be the
+    one the active law asks for: a position law that commands the current demands none, whatever
+    speed the speed loop was last given. A drive that is not Enabled, that carries no current, or
+    that holds its position against a load shall not be reported, also after a full calibration
+    has run the speed loop.
     A mechanically locked rotor meets the same condition and is reported the same way. The
     check shall not run in the 20 kHz control interrupt (REQ-PERF-003).
 

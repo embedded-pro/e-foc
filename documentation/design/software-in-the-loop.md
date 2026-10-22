@@ -2,7 +2,7 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.5.0
+version: 1.5.1
 component: "software-in-the-loop"
 date: 2026-10-22
 ---
@@ -287,6 +287,12 @@ Two results are worth recording because they are not obvious:
   raise. A disconnected motor carries no current and is not misreported; a position held
   against a load demands no motion and is not reported either; a mechanically locked rotor is
   indistinguishable and is reported the same way.
+- **A position held against a load was reported after a calibration, under LQR and LQI.** These
+  laws command the current, so nothing updated the speed reference, which kept the −10 rad/s the
+  cogging mapping last asked for. The monitor read it as a demanded speed, and a held shaft load of
+  0.01 N·m, 0.24 A, raised the sensor fault within the window; the rig saw the same in its LQI
+  row with the shaft free. The position cascade now reports no demanded speed while its law
+  commands the current, so the position error alone stands for the demand (REQ-SM-028).
 
 An encoder can also be told to freeze a set time after the motor is enabled rather than to have
 been dead all along, scheduled the same way as the shaft torque of Part H and on the same

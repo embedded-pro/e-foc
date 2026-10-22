@@ -623,3 +623,28 @@ TEST_F(TestPositionCascade, a_loaded_cogging_map_drives_the_winding_while_the_ro
 
     focPosition->ClearCoggingMap();
 }
+
+TEST_F(TestPositionCascade, a_current_commanding_algorithm_demands_no_speed_whatever_the_speed_loop_was_last_given)
+{
+    PositionCascadeUnderTest stateFeedback{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::lqi };
+
+    stateFeedback.cascade->EnableSpeedCommand();
+    stateFeedback.cascade->CommandSpeed(foc::RadiansPerSecond{ -10.0f });
+    foc::Radians position{ 0.0f };
+    stateFeedback.cascade->Calculate(ZeroCurrents(), position);
+    stateFeedback.lowPriorityInterrupt.TriggerHandler();
+    stateFeedback.cascade->DisableSpeedCommand();
+
+    DutyAfterOuterCycles(stateFeedback, 0.01f, 0.0f);
+
+    EXPECT_FLOAT_EQ(stateFeedback.cascade->ObserveMotion().demandedSpeed.Value(), 0.0f);
+}
+
+TEST_F(TestPositionCascade, a_speed_commanding_algorithm_reports_the_speed_it_demands)
+{
+    PositionCascadeUnderTest speedCommanding{ polePairs, foc::SpeedLoopTunings{}, foc::PositionLoopTunings{}, foc::PositionAlgorithm::cascadeP };
+
+    DutyAfterOuterCycles(speedCommanding, 0.5f, 0.0f);
+
+    EXPECT_GT(speedCommanding.cascade->ObserveMotion().demandedSpeed.Value(), 0.0f);
+}

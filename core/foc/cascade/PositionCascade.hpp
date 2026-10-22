@@ -50,6 +50,7 @@ namespace foc
         Radians lastPositionSetPoint{ 0.0f };
         RadiansPerSecond speedCommand{ 0.0f };
         bool speedCommandActive{ false };
+        volatile bool commandsCurrent{ false };
         bool enabled{ false };
     };
 }
