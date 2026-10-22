@@ -42,6 +42,7 @@ namespace application
 
         void ConfigureAdcAndPwm(hal::Hertz baseFrequency, std::chrono::nanoseconds deadTime, SampleAndHold sampleAndHold) override;
         drivers::DeadTimeLoss InverterDeadTimeLoss(std::chrono::nanoseconds deadTime) const override;
+        uint32_t DutyUpdateDelayPeriods() const override;
         void SetEncoderResolution(uint32_t resolution) override;
         void ConfigureCanBus(uint32_t bitRate, bool testMode) override;
         CanBusAdapter& CanBus() override;
@@ -222,6 +223,8 @@ namespace application
         uint32_t samplePhase{ 0 };
         infra::HotSwapFunction<void(foc::PhaseCurrents)> onPhaseCurrentsReady;
         foc::PhasePwmDutyCycles lastDutyPhases{};
+        foc::PhasePwmDutyCycles appliedDutyPhases{};
+        bool dutyDelayed{ false };
         hal::DutyCycle maxReadableDuty{ hal::DutyCycle::FromPercent(100) };
         foc::PhaseCurrents lastCurrents{};
     };
