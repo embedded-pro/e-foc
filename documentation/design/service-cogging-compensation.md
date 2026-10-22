@@ -95,14 +95,14 @@ square of their sum against that of their difference, which it calls the agreeme
 agrees to about 1, and the builder keeps a map only from an agreement of 3. In simulation, through
 full calibrations:
 
-| Plant                                    | Agreement   | Map                  |
-|------------------------------------------|-------------|----------------------|
-| Bench, no cogging, four noise seeds      | 0.99 – 1.20 | none                 |
-| Bench, 3.7 mN·m dry friction, no cogging | 0.85        | none                 |
-| Teknic and anaheim reference motors      | 0.76 – 0.78 | none                 |
-| Bench, 0.5 mN·m cogging                  | 6.6         | 0.60 mN·m peak       |
-| Bench, 1 mN·m cogging                    | 9.1         | 1.08 mN·m peak       |
-| Bench, the bench's 4 mN·m cogging        | 26          | 3.87 mN·m peak       |
+| Plant                                    | Agreement   | Map            |
+|------------------------------------------|-------------|----------------|
+| Bench, no cogging, four noise seeds      | 0.99 – 1.20 | none           |
+| Bench, 3.7 mN·m dry friction, no cogging | 0.85        | none           |
+| Teknic and anaheim reference motors      | 0.76 – 0.78 | none           |
+| Bench, 0.5 mN·m cogging                  | 6.6         | 0.60 mN·m peak |
+| Bench, 1 mN·m cogging                    | 9.1         | 1.08 mN·m peak |
+| Bench, the bench's 4 mN·m cogging        | 26          | 3.87 mN·m peak |
 
 The agreement also refuses a map built with the wrong inertia: without the inertia term, the
 simulated rotor's two directions agree to 0.14, against 52 with it, because the current the speed
