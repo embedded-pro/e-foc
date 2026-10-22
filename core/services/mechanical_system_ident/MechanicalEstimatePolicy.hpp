@@ -65,9 +65,18 @@ namespace services
 
         void Count(float acceleration, float speed)
         {
+            CountAcceleration(acceleration);
+            CountSpeed(speed);
+        }
+
+        void CountAcceleration(float acceleration)
+        {
             if (std::abs(acceleration) >= mechanical_estimate::minimumAcceleration && accelerating != mechanical_estimate::minimumExcitedUpdates)
                 ++accelerating;
+        }
 
+        void CountSpeed(float speed)
+        {
             const auto magnitude = std::abs(speed);
             slowest = seen ? std::min(slowest, magnitude) : magnitude;
             fastest = seen ? std::max(fastest, magnitude) : magnitude;

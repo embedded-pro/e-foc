@@ -8,6 +8,8 @@
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
 #include "core/services/mechanical_system_ident/MechanicalWindowKinematics.hpp"
 #include "numerical/estimators/online/RecursiveLeastSquares.hpp"
+#include <array>
+#include <optional>
 
 namespace services
 {
@@ -37,10 +39,20 @@ namespace services
     private:
         using MotorRLS = MechanicalRls;
 
+        struct DirectionalFit
+        {
+            std::optional<MotorRLS> rls;
+            MotorRLS::EstimationMetrics metrics{};
+            uint16_t periods{ 0 };
+            MechanicalExcitation excitation;
+            float residualPower{ 0.0f };
+            float outputPower{ 0.0f };
+        };
+
         void ReseedOnline();
-        bool IsOnlineObservationInformative(float acceleration, float speed) const;
-        bool HasOnlineEstimateSettled() const;
-        void PublishOnlineEstimate();
+        bool IsOnlineObservationInformative(float acceleration, float speed, const DirectionalFit& fit) const;
+        bool HasOnlineEstimateSettled(const DirectionalFit& fit) const;
+        void PublishOnlineEstimate(const DirectionalFit& fit);
 
         float samplingFrequency;
         float forgettingFactor;
@@ -52,14 +64,9 @@ namespace services
         MotorRLS::EstimationMetrics lastMetrics{};
         MechanicalExcitation excitation;
 
-        std::optional<MotorRLS> onlineRls;
+        std::array<DirectionalFit, 2> onlineFits;
         MotorRLS::InputMatrix onlineRegressor;
-        MotorRLS::EstimationMetrics onlineMetrics{};
         MechanicalWindowKinematics kinematics;
-        uint16_t onlinePeriods{ 0 };
-        MechanicalExcitation onlineExcitation;
-        float residualPower{ 0.0f };
-        float outputPower{ 0.0f };
 
         foc::NewtonMeter torqueConstant{ 1.0f };
         foc::NewtonMeterSecondSquared currentInertia{ 0.0f };
