@@ -202,8 +202,8 @@ sequenceDiagram
   - The cascade asks for the cogging current at standstill once a map is loaded and stops when it
     is cleared, and the mechanical estimator's window leaves the compensation out.
 - **SIL.** On the bench plant with the bench's cogging and dry friction:
-  - the full calibration measures the cogging's peak within 10 % (REQ-CAL-018); it read 3.83 mN·m
-    against 4.0;
+  - the full calibration measures the cogging's peak within 10 % (REQ-CAL-018); it read 3.83 to
+    3.90 mN·m against 4.0 across runs;
   - every position law then settles within 0.03 rad of a 3.0 rad setpoint on a cogging hill top
     within 4 s and holds it for 2 s, and then 1.0 rad (REQ-POS-012). Without the map the PID,
     two-DOF and Cascade P laws stop at 3.02 to 3.13 rad.
