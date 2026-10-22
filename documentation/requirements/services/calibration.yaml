@@ -155,3 +155,13 @@
     by a speed reference alternating between 30 and 60 rad/s every second for four seconds and then
     between -30 and -60 rad/s for four more, it shall report a viscous friction within 10 % and an
     inertia within 2 % of the plant's.
+
+- id: REQ-CAL-017
+  title: Online electrical estimates hold on a board that applies each duty a period late
+  shall: >
+    The platform shall state how many PWM periods after its current sample a duty takes effect,
+    and the online electrical estimators shall pair each current change with the voltage that
+    acted across it. On the bench motor with every duty applied a period late, as E-FOC-HARDWARE
+    applies it, seeded with a resistance 1.3 times and an inductance 0.7 times the plant's and
+    excited as in REQ-CAL-014, the online resistance shall be within 5 % and the online
+    inductance within 10 % of the plant's under every current control law, deadbeat included.

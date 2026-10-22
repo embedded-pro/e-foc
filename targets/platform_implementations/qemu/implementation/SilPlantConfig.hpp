@@ -85,7 +85,7 @@ namespace sil
         // for it writes. The boot-time encoderStuck flag is the separate case of an encoder that
         // was already dead before the drive aligned.
         uint8_t encoderFreezeDelayCentiseconds;
-        uint8_t reserved1;
+        uint8_t dutyDelayPeriods;
     };
 
     static_assert(sizeof(SilPlantConfig) == 208, "SilPlantConfig layout must be free of implicit padding");

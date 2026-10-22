@@ -75,6 +75,11 @@ namespace application
             return {};
         }
 
+        virtual uint32_t DutyUpdateDelayPeriods() const
+        {
+            return 0;
+        }
+
         virtual void SetEncoderResolution(uint32_t resolution) = 0;
         virtual void ConfigureCanBus(uint32_t bitRate, bool testMode) = 0;
         virtual CanBusAdapter& CanBus() = 0;

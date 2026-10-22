@@ -742,6 +742,7 @@ description therefore carries the non-idealities as optional fields, each off wh
 | Encoder counts per rev   | The reported angle is floored to whole counts                           |
 | Supply source resistance | The bus falls by resistance times the current the motor draws           |
 | Supply current limit     | Past the limit the bus folds back in proportion, as a bench supply does |
+| Duty delay               | Each duty acts from the period after the one it was written in          |
 
 The bus current is the electrical power the inverter delivers, divided by the bus voltage and
 smoothed by a one millisecond bulk capacitor. Regeneration is ignored: a supply cannot absorb it.
@@ -767,6 +768,11 @@ What the plant has shown so far:
   zero; it is now sized from the noise the encoder shows as well, and the scenarios pin both
   reference rotors at 10 % (`documentation/design/hardware-characterisation.md`, Part D).
 - **Dry friction does not disturb the identification**; the estimator models it.
+- **A duty that acts a period late, as E-FOC-HARDWARE's PWM applies it, read the deadbeat law's online
+  inductance three times too high** while the estimator paired each current change with the previous
+  tick's command; the plant had applied every duty at once, so the simulation never showed the rig's
+  2–6×. The platform now states the delay and the estimator pairs accordingly
+  (`documentation/design/service-electrical-ident.md`; REQ-CAL-017).
 - **A one amp supply is enough for the calibration of the bench motor.** The electrical power of
   the identification is under half an amp, so a collapsing supply on the rig is not explained by
   the motor's power alone.
