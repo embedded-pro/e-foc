@@ -2,9 +2,9 @@
 title: "Service: Electrical Parameters Identification"
 type: design
 status: draft
-version: 0.3.0
+version: 0.3.1
 component: service-electrical-ident
-date: 2026-10-21
+date: 2026-10-22
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-10-21
 | Title     | Service: Electrical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.3.0                                         |
+| Version   | 0.3.1                                         |
 | Component | service-electrical-ident                      |
-| Date      | 2026-10-21                                    |
+| Date      | 2026-10-22                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -341,7 +341,11 @@ $$\overline{V_d} = R\,\overline{I_d} + L\left(\frac{I_{d,end} - I_{d,start}}{T} 
 
 The regressor vector is $\phi = [\overline{I_d},\ (\Delta I_d / T - \overline{\omega_e I_q})]^T$ in amperes and
 amperes per millisecond, and the parameter vector is $\theta = [R,\ L]^T$ in ohms and millihenries. A recursive
-instrumental-variable estimator with forgetting factor 0.999 updates $\theta$ once per outer-loop period (1 kHz).
+instrumental-variable estimator with forgetting factor 0.9995 updates $\theta$ once per outer-loop period (1 kHz),
+which gives it a memory of about 2 s. With half that memory the estimate wandered within a run: through the bench's
+current-sense chain the inductance moved by 5 % (one standard deviation) about the winding's, so a single reading
+fell more than 10 % off about once in twenty; the bench read 0.93 to 1.12 times the calibration. Doubling the memory
+halves that wander, and a warming winding, whose resistance changes over minutes, is still tracked.
 
 ### Instrumental Variables
 

@@ -1,4 +1,5 @@
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
+#include <algorithm>
 #include <cmath>
 #include <gtest/gtest.h>
 #include <random>
@@ -139,4 +140,23 @@ TEST_F(TestRealTimeResistanceAndInductanceEstimator, sensor_noise_on_the_current
 
     EXPECT_NEAR(estimator.CurrentResistance().Value(), winding.resistance, 0.03f * winding.resistance);
     EXPECT_NEAR(estimator.CurrentInductance().Value(), winding.inductance * 1000.0f, 0.05f * winding.inductance * 1000.0f);
+}
+
+TEST_F(TestRealTimeResistanceAndInductanceEstimator, under_sensor_noise_the_settled_inductance_holds_within_two_percent)
+{
+    Winding winding;
+    winding.currentNoise = 0.05f;
+    estimator.SetInitialEstimate(foc::Ohm{ winding.resistance }, foc::MilliHenry{ winding.inductance * 1000.0f });
+
+    WindowedWindingRun run{ winding, estimator };
+    run.Run(0.5f, 3000);
+
+    float worst{ 0.0f };
+    for (int sample = 0; sample != 80; ++sample)
+    {
+        run.Run(0.5f, 250);
+        worst = std::max(worst, std::abs(estimator.CurrentInductance().Value() / (winding.inductance * 1000.0f) - 1.0f));
+    }
+
+    EXPECT_LT(worst, 0.02f);
 }
