@@ -2,7 +2,7 @@
 title: "FOC Position Control"
 type: design
 status: draft
-version: 0.1.1
+version: 0.1.2
 component: foc-position
 date: 2026-10-22
 ---
@@ -97,7 +97,8 @@ When a speed-reference position law is active, the speed setpoint consumed by th
 The inner loop is functionally identical to the FOC Torque Control design document: Clarke, Park, d-axis PID, q-axis PID, inverse Park, and SVM. It runs independently at 20 kHz and reads its Iq setpoint from the value most recently written by the middle loop.
 
 The d-axis setpoint is 0 A, except while an online electrical estimator is attached: the cascade then
-adds a ±2.5 % of maxCurrent, 50 Hz square wave so the winding resistance stays observable (see
+adds a ±2.5 % of maxCurrent, 50 Hz square wave so the winding resistance stays observable. It runs in
+bursts, the first 4 s of every 60 s from each enable, and the setpoint is 0 A in between (see
 `service-electrical-ident.md`, Excitation).
 
 ### Enable and Disable

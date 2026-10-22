@@ -14,6 +14,7 @@
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
 #include <atomic>
+#include <chrono>
 
 namespace foc
 {
@@ -94,7 +95,7 @@ namespace foc
     class DirectAxisExcitation
     {
     public:
-        DirectAxisExcitation(Ampere amplitude, hal::Hertz frequency, hal::Hertz outerLoopFrequency);
+        DirectAxisExcitation(Ampere amplitude, hal::Hertz frequency, hal::Hertz outerLoopFrequency, std::chrono::seconds burst, std::chrono::seconds cycle);
 
         void Restart();
         float Advance();
@@ -102,7 +103,10 @@ namespace foc
     private:
         float amplitude;
         uint32_t halfPeriodSamples;
+        uint32_t burstSamples;
+        uint32_t cycleSamples;
         uint32_t sample{ 0 };
+        uint32_t cycleSample{ 0 };
         bool positive{ true };
     };
 

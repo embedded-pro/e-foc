@@ -6,6 +6,7 @@
 #include "integration_tests/support/response/ResponseWindow.hpp"
 #include "integration_tests/support/response/StepMetrics.hpp"
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <gtest/gtest.h>
 #include <string>
@@ -17,6 +18,7 @@ namespace
 {
     constexpr auto kCaptureWallClockTimeout = std::chrono::seconds{ 120 };
     constexpr float kMilliPerSecond = 1000.0f;
+    constexpr float kMilliPerAmpere = 1000.0f;
 
     uint32_t CommandRawId(uint8_t messageType)
     {
@@ -75,6 +77,28 @@ namespace
         const auto signal = ParseSignal(word);
         EXPECT_TRUE(signal.has_value()) << "Unknown response signal: " << word;
         return signal.value_or(Signal::speed);
+    }
+
+    std::optional<float> DirectCurrentRmsMilliAmpere(const ScenarioSetup& setup, int fromMs, int toMs)
+    {
+        const auto start = setup.trace.StartTick();
+        if (!start)
+            return std::nullopt;
+
+        const auto from = *start + TicksFromMilliseconds(setup, static_cast<float>(fromMs));
+        const auto to = *start + TicksFromMilliseconds(setup, static_cast<float>(toMs));
+        float sumOfSquares{ 0.0f };
+        std::size_t count{ 0 };
+        for (const auto& sample : setup.trace.Samples())
+            if (sample.tick >= from && sample.tick < to)
+            {
+                sumOfSquares += sample.id * sample.id;
+                ++count;
+            }
+
+        if (count == 0)
+            return std::nullopt;
+        return std::sqrt(sumOfSquares / static_cast<float>(count)) * kMilliPerAmpere;
     }
 
     void RequireCapturedTrace(const ScenarioSetup& setup)
@@ -313,6 +337,26 @@ THEN(R"(the {word} shall recover to within {float} {word} of the setpoint within
 
     EXPECT_LE(metrics->recoveryTimeS * kMilliPerSecond, recoveryMs) << SignalName(signal) << " did not recover in time";
     EXPECT_LT(std::abs(metrics->steadyStateError), band) << SignalName(signal) << " did not return to the setpoint";
+}
+
+THEN(R"(the d-axis current shall be above {int} mA RMS from {int} to {int} ms after enable)", (int limitMa, int fromMs, int toMs))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    FeedNewLines(setup);
+
+    const auto rms = DirectCurrentRmsMilliAmpere(setup, fromMs, toMs);
+    ASSERT_TRUE(rms.has_value()) << "No plant samples between " << fromMs << " and " << toMs << " ms after enable";
+    EXPECT_GT(*rms, static_cast<float>(limitMa)) << "d-axis current " << *rms << " mA RMS between " << fromMs << " and " << toMs << " ms";
+}
+
+THEN(R"(the d-axis current shall be below {int} mA RMS from {int} to {int} ms after enable)", (int limitMa, int fromMs, int toMs))
+{
+    auto& setup = context.Get<ScenarioSetup>();
+    FeedNewLines(setup);
+
+    const auto rms = DirectCurrentRmsMilliAmpere(setup, fromMs, toMs);
+    ASSERT_TRUE(rms.has_value()) << "No plant samples between " << fromMs << " and " << toMs << " ms after enable";
+    EXPECT_LT(*rms, static_cast<float>(limitMa)) << "d-axis current " << *rms << " mA RMS between " << fromMs << " and " << toMs << " ms";
 }
 
 THEN(R"(the response shall have no dropped samples)")
