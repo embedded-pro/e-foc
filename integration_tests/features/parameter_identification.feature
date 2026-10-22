@@ -218,7 +218,7 @@ Feature: Parameter Identification Against a Known Plant
   @sil @REQ-CAL-019
   Scenario: The d-axis test current runs in a burst after enable and then pauses
     Given a bench motor plant
-    And the plant response is recorded at 100 Hz for up to 1000 samples
+    And the plant response is recorded at 100 Hz for up to 2000 samples
     And the motor is already calibrated
     And the motor boots in speed mode
     When the target boots
