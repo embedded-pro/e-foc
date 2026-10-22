@@ -19,7 +19,7 @@ namespace services
     public:
         struct Config
         {
-            hal::DutyCycle testVoltage{ hal::DutyCycle::FromPercent(15) };
+            hal::DutyCycle testVoltage{ hal::DutyCycle::FromPercent(14) };
             infra::Duration settleTime{ std::chrono::seconds{ 2 } };
             WindingConfiguration windingConfig{ WindingConfiguration::Wye };
             infra::Duration noSampleTimeout{ std::chrono::milliseconds{ 100 } };
@@ -47,7 +47,6 @@ namespace services
         void Complete();
         Result Measure() const;
 
-        static constexpr hal::DutyCycle neutralDuty{ hal::DutyCycle::FromPercent(1) };
         static constexpr float wyeTerminalFactor = 1.5f;
         static constexpr float deltaTerminalFactor = 0.5f;
         static constexpr std::size_t averageFilterSize = 5;
@@ -57,6 +56,7 @@ namespace services
         foc::Volts vdc;
 
         Config activeConfig;
+        foc::PhasePwmDutyCycles heldDuties{};
         infra::AutoResetFunction<void(Result)> onDone;
         infra::BoundedDeque<float>::WithMaxSize<averageFilterSize> currentSamples;
         infra::BoundedVector<float>::WithMaxSize<steadyStateSamplesSize> filteredSamples;

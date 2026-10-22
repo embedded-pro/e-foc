@@ -25,7 +25,10 @@ namespace services
     {
         noSampleTimer.Cancel();
         if (onDone)
+        {
+            finishing = true;
             driver.Stop();
+        }
     }
 
     void SinusoidalInductanceEstimator::Start(const Config& config, const infra::Function<void(Result)>& onDone)
@@ -97,6 +100,8 @@ namespace services
         if (!onDone)
             return;
 
+        // Ended before the bridge stops: a sample taken in between would write the injection and re-arm it
+        finishing = true;
         noSampleTimer.Cancel();
         driver.Stop();
         onDone = nullptr;
@@ -145,6 +150,7 @@ namespace services
         if (finishing)
             return;
 
+        finishing = true;
         noSampleTimer.Cancel();
         driver.Stop();
         if (onDone)

@@ -22,7 +22,7 @@ namespace services
 
         struct ResistanceAndInductanceConfig
         {
-            hal::DutyCycle testVoltage{ hal::DutyCycle::FromPercent(15) };
+            hal::DutyCycle testVoltage{ hal::DutyCycle::FromPercent(14) };
             infra::Duration settleTime{ std::chrono::seconds{ 2 } };
             WindingConfiguration windingConfig{ WindingConfiguration::Wye };
             hal::Hertz injectionFrequency{ 700 };

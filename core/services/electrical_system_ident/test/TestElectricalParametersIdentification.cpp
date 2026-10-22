@@ -55,6 +55,12 @@ namespace
         , public infra::ClockFixture
     {
     public:
+        ElectricalParametersIdentificationTest()
+        {
+            ON_CALL(driverMock, BaseFrequency()).WillByDefault(Return(hal::Hertz{ 20000 }));
+            EXPECT_CALL(driverMock, BaseFrequency()).Times(AnyNumber());
+        }
+
         void TearDown() override
         {
             ExecuteAllActions();
@@ -536,7 +542,7 @@ TEST_F(ElectricalParametersIdentificationTest, estimate_rl_resistance_fails_call
             {
                 driverMock.StorePhaseCurrentsCallback(cb);
             });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_));
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(::testing::_)).Times(numberOfSamples);
     EXPECT_CALL(driverMock, Stop());
 
     identification->EstimateResistanceAndInductance(config, [&](auto result)

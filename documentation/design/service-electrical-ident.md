@@ -2,7 +2,7 @@
 title: "Service: Electrical Parameters Identification"
 type: design
 status: draft
-version: 0.4.0
+version: 0.5.0
 component: service-electrical-ident
 date: 2026-10-22
 ---
@@ -12,7 +12,7 @@ date: 2026-10-22
 | Title     | Service: Electrical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.3.1                                         |
+| Version   | 0.5.0                                         |
 | Component | service-electrical-ident                      |
 | Date      | 2026-10-22                                    |
 
@@ -112,14 +112,22 @@ pole-pair count, which the sweep computes on its step timer, and a no-sample fai
 unless an over-current outcome is already queued, which they then leave to be delivered. The interrupt can
 also trip while the event loop is between its check and a write to the bridge — the sweep's next step, or the
 first duty a procedure applies — and that write would re-arm the bridge the interrupt had just stopped, so each
-such write is followed by a second check that stops the bridge again.
+such write is followed by a second check that stops the bridge again. The reverse holds for a procedure whose
+sample callback writes the bridge, the resistance step and the inductance injection: when the event loop ends it,
+by an abort, a no-sample failure or its destruction, it marks the run ended before it stops the bridge, so a
+sample taken between the two is discarded instead of writing a duty that would re-arm it.
 
 Every estimator is also RAII-safe: if destroyed while active, the destructor cancels all timers and stops
 the driver without invoking the completion callback.
 
 ### ResistanceEstimator
 
-Applies a DC differential voltage across phase A versus phases B and C held at neutral. A
+Applies a DC differential voltage across phase A versus phases B and C, held around mid-rail: A
+above the middle by two thirds of the test duty, B and C below it by one third. Every leg switches
+near the middle of the period, and the duties are written again on every sample, settling and
+measuring alike, sampled at the PWM's own rate, so the dead-time correction below the estimator follows the current as it rises
+and the winding receives the test voltage (`service-dead-time-compensation.md`). Held once from
+legs at 1 %, a pulse as short as the dead band, the step read the rig's winding about 4 % high. A
 `TimerSingleShot` fires after the configured settle time to allow the current to reach steady state.
 A 5-sample moving-average filter (using a bounded deque of capacity 5) is applied in-flight to each
 ADC sample before it is pushed to the measurement buffer (bounded vector, capacity 123).

@@ -6,8 +6,6 @@
 
 namespace
 {
-    const hal::Hertz samplingFrequency{ 10000 };
-
     float AverageAndRemoveFront(infra::BoundedDeque<float>& deque)
     {
         float sum = 0.0f;
@@ -23,6 +21,13 @@ namespace
         const auto lastQuarter = static_cast<std::size_t>(static_cast<float>(samples.size()) * 0.9f);
         return std::accumulate(samples.begin() + lastQuarter, samples.end(), 0.0f) / static_cast<float>(samples.size() - lastQuarter);
     }
+
+    foc::PhasePwmDutyCycles AroundMidRail(hal::DutyCycle testVoltage)
+    {
+        const auto step = foc::DutyFraction(testVoltage);
+
+        return foc::ToDutyCycles(foc::ThreePhase{ 0.5f + step * (2.0f / 3.0f), 0.5f - step / 3.0f, 0.5f - step / 3.0f });
+    }
 }
 
 namespace services
@@ -37,12 +42,16 @@ namespace services
         settleTimer.Cancel();
         noSampleTimer.Cancel();
         if (onDone)
+        {
+            finishing = true;
             driver.Stop();
+        }
     }
 
     void ResistanceEstimator::Start(const Config& config, const infra::Function<void(Result)>& onDone)
     {
         activeConfig = config;
+        heldDuties = AroundMidRail(config.testVoltage);
         ++run;
         finishing = false;
         currentSamples.clear();
@@ -53,7 +62,8 @@ namespace services
 
     void ResistanceEstimator::StartSettlePhase()
     {
-        driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
+        // At the PWM's own rate on every platform: a slower rate re-clocks the target's PWM but only decimates the emulator's, and the dead-time correction takes its scale from it
+        driver.PhaseCurrentsReady(driver.BaseFrequency(), [this](auto currents)
             {
                 if (!this->onDone || finishing)
                     return;
@@ -62,11 +72,10 @@ namespace services
 
                 if (ExceedsInjectionLimit(currents, driver.MaxCurrentSupported()))
                     Finish(false);
+                else
+                    driver.ThreePhasePwmOutput(heldDuties);
             });
-        driver.ThreePhasePwmOutput(foc::PhasePwmDutyCycles{
-            activeConfig.testVoltage,
-            neutralDuty,
-            neutralDuty });
+        driver.ThreePhasePwmOutput(heldDuties);
 
         // The interrupt can trip between registering the callback and the write above, which would re-arm the bridge it stopped.
         if (finishing)
@@ -88,7 +97,7 @@ namespace services
     void ResistanceEstimator::StartMeasurementPhase()
     {
         StartSampleWatchdog();
-        driver.PhaseCurrentsReady(samplingFrequency, [this](auto currents)
+        driver.PhaseCurrentsReady(driver.BaseFrequency(), [this](auto currents)
             {
                 OnMeasurementSample(currents);
             });
@@ -114,6 +123,8 @@ namespace services
 
         if (filteredSamples.full())
             Finish(true);
+        else
+            driver.ThreePhasePwmOutput(heldDuties);
     }
 
     void ResistanceEstimator::Abort()
@@ -121,6 +132,8 @@ namespace services
         if (!onDone)
             return;
 
+        // Ended before the bridge stops: a sample taken in between would write the held duties and re-arm it
+        finishing = true;
         settleTimer.Cancel();
         noSampleTimer.Cancel();
         driver.Stop();
@@ -144,6 +157,7 @@ namespace services
         if (finishing)
             return;
 
+        finishing = true;
         settleTimer.Cancel();
         noSampleTimer.Cancel();
         driver.Stop();
@@ -186,7 +200,7 @@ namespace services
         if (steadyStateCurrent <= 0.0f)
             return Result{};
 
-        const auto appliedDuty = foc::DutyFraction(activeConfig.testVoltage) - foc::DutyFraction(neutralDuty);
+        const auto appliedDuty = foc::DutyFraction(heldDuties.a) - foc::DutyFraction(heldDuties.b);
         const float terminalVoltage = appliedDuty * vdc.Value();
         const float terminalFactor = activeConfig.windingConfig == WindingConfiguration::Delta
                                          ? deltaTerminalFactor

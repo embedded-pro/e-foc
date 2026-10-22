@@ -598,3 +598,39 @@ TEST_F(SinusoidalInductanceEstimatorTest, an_overcurrent_before_the_injection_st
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->inductance.has_value());
 }
+
+TEST_F(SinusoidalInductanceEstimatorTest, a_sample_between_an_abort_and_the_bridge_stopping_does_not_write_the_injection)
+{
+    ExpectAnInjection();
+    EXPECT_CALL(driverMock, Stop())
+        .WillOnce([this]()
+            {
+                driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+                    foc::Ampere{ 0.1f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+            });
+
+    estimator->Start(shortConfig, [](auto) {});
+    estimator->Abort();
+}
+
+TEST_F(SinusoidalInductanceEstimatorTest, a_sample_between_a_no_sample_failure_and_the_bridge_stopping_does_not_write_the_injection)
+{
+    std::optional<services::SinusoidalInductanceEstimator::Result> result;
+
+    ExpectAnInjection();
+    EXPECT_CALL(driverMock, Stop())
+        .WillOnce([this]()
+            {
+                driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+                    foc::Ampere{ 0.1f }, foc::Ampere{ 0.0f }, foc::Ampere{ 0.0f } });
+            });
+
+    estimator->Start(shortConfig, [&result](auto r)
+        {
+            result = r;
+        });
+    ForwardTime(2 * shortConfig.noSampleTimeout + std::chrono::milliseconds{ 1 });
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->inductance.has_value());
+}

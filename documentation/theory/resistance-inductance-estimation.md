@@ -2,9 +2,9 @@
 title: "Electrical Parameters Identification — Resistance and Inductance"
 type: theory
 status: approved
-version: 2.1.0
+version: 2.2.0
 component: "service-electrical-ident"
-date: 2026-09-21
+date: 2026-10-22
 ---
 
 | Field     | Value                                          |
@@ -12,9 +12,9 @@ date: 2026-09-21
 | Title     | Electrical Parameters Identification — R and L |
 | Type      | theory                                         |
 | Status    | approved                                       |
-| Version   | 2.1.0                                          |
+| Version   | 2.2.0                                          |
 | Component | service-electrical-ident                       |
-| Date      | 2026-09-21                                     |
+| Date      | 2026-10-22                                     |
 
 ## Overview
 
@@ -73,7 +73,8 @@ L_{terminal} = \begin{cases} \tfrac{3}{2} L_s & \text{wye} \\[2pt] \tfrac{1}{2} 
 $$
 
 The same topology factor applies to both parameters. The applied voltage is the *differential* duty
-$(D_{test} - D_{neutral}) \cdot V_{dc}$ for the DC step, and for the sinusoidal injection the
+$D_{test} \cdot V_{dc}$ for the DC step, held around mid-rail: terminal A at
+$\tfrac{1}{2} + \tfrac{2}{3} D_{test}$ and B and C at $\tfrac{1}{2} - \tfrac{1}{3} D_{test}$. For the sinusoidal injection the
 Clarke inverse of $\{v, 0\}$ maps to three-phase duties $\{v, -v/2, -v/2\}$ (phases relative to
 midpoint), which produces a terminal A-to-BC amplitude of $v \cdot 0.75 \cdot V_{dc}$.
 
@@ -89,6 +90,13 @@ $$
 
 where $F_{terminal}$ is the winding topology factor above and $I_{ss}$ is the mean of the last 10 %
 of the sample buffer.
+
+A single step measures whatever voltage the bridge loses along with the winding, so the step is
+built for the dead-time correction (`documentation/design/service-dead-time-compensation.md`) to
+remove that loss. Every leg switches near the middle of the period, never a pulse as short as the
+dead band, and the duties are written again on every sample at the PWM's own rate, so the
+correction follows the current as it rises. On the rig a step from 1 % legs read the winding about 4 % high, against the 1.02 to
+1.06 Ω the dead-time sweep measured at mid-rail.
 
 **Why this fails for L:** the DC step reveals only the time constant $\tau = L_s/R_s$. For the
 Anaheim BLY172S ($L_s = 0.64\,\text{mH}$, $R_s = 0.405\,\Omega$) $\tau = 1.58\,\text{ms}$, which
@@ -270,7 +278,7 @@ absent.
 
 | Property              | DC Step (R)                        | HF Sinusoidal (L)                                    |
 |-----------------------|------------------------------------|------------------------------------------------------|
-| Sampling rate         | 10 kHz                             | 10 kHz                                               |
+| Sampling rate         | PWM rate (20 kHz)                  | 10 kHz                                               |
 | Excitation            | Differential DC step (testVoltage) | Alpha-axis sine at $f_{inj}$ (default 700 Hz)        |
 | Working memory        | 5-sample deque + 123-sample buffer | 3 floats (Goertzel state) + sumSquared + sampleCount |
 | Settling required     | $\geq 5\tau$ before R is valid     | warmupPeriods full cycles (rotor transient decay)    |
