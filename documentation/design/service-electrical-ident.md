@@ -343,9 +343,9 @@ The regressor vector is $\phi = [\overline{I_d},\ (\Delta I_d / T - \overline{\o
 amperes per millisecond, and the parameter vector is $\theta = [R,\ L]^T$ in ohms and millihenries. A recursive
 instrumental-variable estimator with forgetting factor 0.9995 updates $\theta$ once per outer-loop period (1 kHz),
 which gives it a memory of about 2 s. With half that memory the estimate wandered within a run: through the bench's
-current-sense chain the inductance moved by 5 % (one standard deviation) about the winding's, so a single reading
-fell more than 10 % off about once in twenty; the bench read 0.93 to 1.12 times the calibration. Doubling the memory
-halves that wander, and a warming winding, whose resistance changes over minutes, is still tracked.
+current-sense chain the inductance moved by 5 % (one standard deviation) about the winding's, and the bench read
+0.93 to 1.12 times the calibration. Doubling the memory halves that wander, and a warming winding, whose resistance
+changes over minutes, is still tracked. How many steps of the excitation the memory holds sets the rest (Excitation).
 
 ### Instrumental Variables
 
@@ -388,9 +388,16 @@ The averages are accumulated by the control interrupt, tick by tick, and publish
 The product regulates $I_d$ to zero, so the resistance column is never excited on its own: the recursion
 drifted, read $-0.68\ \Omega$ for a $0.36\ \Omega$ winding, and could not by construction track a warming
 one. The speed and position cascades therefore add a d-axis square wave to the current reference while the
-estimator is attached: $\pm 2.5\,\%$ of the drive's current limit at 10 Hz. It produces no torque on a
+estimator is attached: $\pm 2.5\,\%$ of the drive's current limit at 50 Hz. It produces no torque on a
 non-salient machine and a copper loss proportional to its square. An update is taken only while the
 reference exceeds 50 mA, so an amplitude of zero switches both the injection and resistance tracking off.
+
+Only the steps of the square wave tell the inductance: between them the current is held, and its change over a
+window is the sensor's noise alone. Each step is read through two single samples, so the estimate's scatter falls
+with the number of steps its memory holds. Through the bench's current-sense chain, with 50 mA of noise in each
+phase, readings at 10 Hz scattered by 3.6 % (one standard deviation) from one run to the next and reached 8 % low,
+at 20 Hz by 1.9 %, and at 50 Hz by 1.1 %. With the noise removed, the same chain read within 0.2 % from run to run.
+The 10 ms half-period is still six or more times the L/R of the reference motors and the bench motor, 0.6 to 1.6 ms.
 
 ### Publication
 
