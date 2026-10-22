@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/foc/math/LowSideShuntWindow.hpp"
 #include "core/foc/model/EncoderFreezeScheduler.hpp"
 #include "core/foc/model/PlantResponseRecorder.hpp"
 #include "core/foc/model/ThreePhaseMotorModel.hpp"
@@ -226,6 +227,8 @@ namespace application
         foc::PhasePwmDutyCycles appliedDutyPhases{};
         bool dutyDelayed{ false };
         hal::DutyCycle maxReadableDuty{ hal::DutyCycle::FromPercent(100) };
+        hal::DutyCycle maxDuty{ hal::DutyCycle::FromPercent(100) };
+        foc::LowSideShuntReadout shuntReadout{ maxReadableDuty };
         foc::PhaseCurrents lastCurrents{};
     };
 }

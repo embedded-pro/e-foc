@@ -73,3 +73,17 @@
     duties unchanged. Through the bench's power stage, whose loss reads the online resistance
     about 18 % high when uncompensated, the online resistance estimate shall be within 5 % of
     the plant's once the drive compensates with the bench's measured loss.
+
+- id: REQ-TRQ-009
+  title: Two readable phases give the third phase's current
+  shall: >
+    On a board that reads its phases through low-side shunts, the platform shall keep the middle
+    of the three duties within the board's readable limit, moving all three together where that
+    keeps the line-to-line voltages, and shall let the highest duty go up to the board's maximum
+    duty. A phase whose duty was above the readable limit in the period that ends at the sample
+    or in the one that starts there shall have its current given as the negative sum of the other
+    two. Only a vector whose middle duty, or whose highest duty, would still be above its limit
+    shall be scaled down, along its own direction. Through the bench's current-sense chain, with
+    the board's 70 % readable limit and 95 % maximum duty, the bench motor shall hold a speed
+    setpoint of 400 rad/s within 0.5 rad/s, where keeping all three phases readable stops it
+    near 356 rad/s.

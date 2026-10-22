@@ -2,9 +2,9 @@
 title: "Service: Dead-Time Compensation"
 type: design
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: service-dead-time-compensation
-date: 2026-10-21
+date: 2026-10-22
 ---
 
 | Field     | Value                           |
@@ -58,8 +58,8 @@ correction always uses the current of that period.
 
 The voltage the current loop asks for is unchanged. The anti-windup limits and the online
 estimators see that voltage, and the correction makes the winding receive it, which is why the
-online resistance estimate then measures the winding alone. The platform's rule that keeps every
-low-side shunt readable shifts all three corrected duties together, after the correction.
+online resistance estimate then measures the winding alone. The platform's rule that keeps the
+low-side shunts readable shifts all three corrected duties together, after the correction.
 
 ### Part B — The correction
 
