@@ -13,6 +13,7 @@ namespace foc
         static constexpr PositionAlgorithm algorithm{ PositionAlgorithm::pid };
         static constexpr float integralZeroRatio{ 0.2f };
         static constexpr float referenceWeight{ 0.75f };
+        static constexpr float stationarySpeedRatio{ 0.02f };
 
         bool Configure(const MechanicalModelParameters& motorParameters);
         bool SetTunings(const PositionLoopTunings& tunings);
@@ -28,6 +29,7 @@ namespace foc
 
         float proportionalGain{ 0.0f };
         float integralGain{ 0.0f };
+        float relaxationRate{ 0.0f };
         float output{ 0.0f };
         float previousReference{ 0.0f };
         float previousMeasured{ 0.0f };

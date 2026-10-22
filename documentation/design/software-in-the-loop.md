@@ -739,6 +739,7 @@ description therefore carries the non-idealities as optional fields, each off wh
 | Field                    | Effect in the plant                                                     |
 |--------------------------|-------------------------------------------------------------------------|
 | Coulomb friction         | A constant opposing torque that holds the rotor still below break-away  |
+| Cogging                  | A torque of the given depth that repeats the given times a revolution   |
 | Encoder counts per rev   | The reported angle is floored to whole counts                           |
 | Supply source resistance | The bus falls by resistance times the current the motor draws           |
 | Supply current limit     | Past the limit the bus folds back in proportion, as a bench supply does |
@@ -750,7 +751,14 @@ The existing under-voltage trip reads the sagging bus, so a scenario sees a coll
 
 The `bench` plant takes its winding, rotor, supply and encoder from the values the firmware
 identified on the real test rig (1.10 Ω, 1.07 mH, four pole pairs, about 12.4 µkg·m², 24 V, 3 A,
-4000 counts), not from a datasheet. Its dry friction is a guess until the rig is measured.
+4000 counts), not from a datasheet. Its dry friction is a guess. The rig's measured shaft is a
+separate step, `the plant's shaft has the bench's dry friction and cogging`: 3.7 mN·m of dry
+friction, the intercept the online estimator settles on at a constant speed, and 24 detents a
+revolution 4 mN·m deep. The detents came from 96 torque pulses that scattered the rotor round the
+shaft: its rest positions cluster at 24 a revolution, the slot and pole count of a 12-slot, 8-pole
+motor, and carrying it past one took 0.135 to 0.23 A, 5.7 to 9.7 mN·m. Through the depth the
+breakaway is the cogging and the dry friction together, so the plant needs no friction of its own
+at rest.
 
 What the plant has shown so far:
 
@@ -768,6 +776,9 @@ What the plant has shown so far:
   zero; it is now sized from the noise the encoder shows as well, and the scenarios pin both
   reference rotors at 10 % (`documentation/design/hardware-characterisation.md`, Part D).
 - **Dry friction does not disturb the identification**; the estimator models it.
+- **The bench's cogging and dry friction made the PID and two-DOF position laws hunt**, ±0.17 rad
+  every 1.5 s at 1 rad on the rig and in the plant alike, while Cascade P, LQR and LQI held
+  (`documentation/theory/position-loop-pid.md`, *A rotor that stands still*; REQ-POS-011).
 - **A duty that acts a period late, as E-FOC-HARDWARE's PWM applies it, read the deadbeat law's online
   inductance three times too high** while the estimator paired each current change with the previous
   tick's command; the plant had applied every duty at once, so the simulation never showed the rig's

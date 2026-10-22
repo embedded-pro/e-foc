@@ -132,6 +132,10 @@ namespace
             plant.deadTimeCompensationKneeAmpere = value;
         else if (key == "coulomb_friction_nm")
             plant.coulombFrictionNm = value;
+        else if (key == "cogging_torque_nm")
+            plant.coggingTorqueNm = value;
+        else if (key == "cogging_cycles_per_revolution")
+            plant.coggingCyclesPerRevolution = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else if (key == "supply_source_resistance_ohm")
             plant.supplySourceResistanceOhm = value;
         else if (key == "supply_current_limit_ampere")
@@ -203,6 +207,12 @@ GIVEN(R"(the plant drives its windings through the bench's power stage)")
 {
     RequireSimulatedTarget();
     sil::DescribeBenchPowerStage(context.Get<ScenarioSetup>().plant);
+}
+
+GIVEN(R"(the plant's shaft has the bench's dry friction and cogging)")
+{
+    RequireSimulatedTarget();
+    sil::DescribeBenchFrictionAndCogging(context.Get<ScenarioSetup>().plant);
 }
 
 GIVEN(R"(the plant applies each duty a period late, as the board does)")

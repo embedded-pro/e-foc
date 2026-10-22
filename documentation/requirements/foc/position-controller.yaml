@@ -92,3 +92,12 @@
     within 50 ms of the step shall return the rotor to within 0.08 rad of the setpoint and hold
     it there. The LQI law, which carries integral action on the position error, shall hold within
     0.05 rad and return to within 0.02 rad.
+
+- id: REQ-POS-011
+  title: Position hold against cogging and dry friction
+  shall: >
+    Against the bench plant with the bench's cogging (24 detents a revolution, 4 mN·m deep) and
+    dry friction (3.7 mN·m), after the full calibration, every position control law shall settle
+    within 0.03 rad of a 1.0 rad setpoint within 4 s and stay there for 2 s, and then do the same
+    at -1.0 rad. A law that integrates the position error shall not wind its integral while the
+    rotor stands still: a stationary rotor is asked for the speed its error alone calls for.
