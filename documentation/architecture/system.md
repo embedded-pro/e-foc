@@ -2,9 +2,9 @@
 title: "e-foc System Architecture"
 type: architecture
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: system
-date: 2026-04-07
+date: 2026-10-22
 ---
 
 | Field     | Value                     |
@@ -166,10 +166,22 @@ On a board that senses its phases with low-side shunts the duty also decides whe
 all: a shunt carries its phase current only while that leg's low-side switch conducts around the PWM centre,
 where the converter samples. The TI platform passes every duty set through `foc::KeepLowSideShuntsReadable`
 with the motor board's limit (70 % on E-FOC-HARDWARE, none on FRDM-MC-LVPMSM). Above it all three duties move
-down together, which keeps the line-to-line voltages and so the vector the current loop asked for; only a vector
-wider than the limit is scaled down, along its own direction. Without the limit, a current loop that saturated
-drove a leg to the rail, read that phase near zero and held it there: on the bench the real current reached
-6 A against a 3 A reference and pulled the bus into the undervoltage trip.
+down together, which keeps the line-to-line voltages and so the vector the current loop asked for. Without the
+limit, a current loop that saturated drove a leg to the rail, read that phase near zero and held it there: on
+the bench the real current reached 6 A against a 3 A reference and pulled the bus into the undervoltage trip.
+
+Only two phases need to be read, since the winding's three currents sum to zero. A vector wider than the limit
+takes the lowest duty to zero and keeps the middle one within the limit, and the highest may go up to the
+board's maximum duty, 95 % on E-FOC-HARDWARE, where the FAN7888's bootstrap capacitors still charge in every
+period. `foc::LowSideShuntReadout` remembers the duties of the last two periods, because the samples at a PWM
+centre fall in the low-side pulse the period ending there shares with the one starting there, and gives a phase
+that had a duty above the limit in either the negative sum of the other two. Only a vector whose middle duty, or
+whose highest, is still above its limit is scaled down, along its own direction. With all three phases kept
+readable the circle the modulator can trace shrank to 70 % of the hexagon's inner circle; now only the directions
+where two phases share the highest duty are held to the limit. The bench motor in simulation, which stopped near
+356 rad/s, reaches 420 rad/s with the same current ripple as at 340 rad/s and holds 460 rad/s within 1 rad/s
+(REQ-TRQ-009). The over-current check of each sample uses the rebuilt current, since the hidden phase reads
+whatever its shunt shows outside the pulse.
 
 The window also has to hold every phase's conversion. The TI converter reads the three phases one after another in
 a single sequence triggered at the PWM centre, ahead of the three fault-comparator steps, and averages each step

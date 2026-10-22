@@ -20,6 +20,9 @@ namespace application
         // Above this duty a phase's low-side window at the PWM centre is too short for its shunt to read: on the
         // bench a phase read within 0.25 A at 71.5 % and 1 A low at 79.7 %, and the current loop lost the phase
         static constexpr uint32_t maxReadableDutyPercent{ 70 };
+        // The FAN7888 feeds each high-side gate from a bootstrap capacitor that charges only while the low side
+        // conducts, so no leg may stay at full duty; 95 % leaves the low side 2.5 µs of every period, less the dead band
+        static constexpr uint32_t maxDutyPercent{ 95 };
         static constexpr uint32_t measuredDeadBandNanoseconds{ 500 };
         static constexpr uint32_t effectiveDeadTimeNanoseconds{ 70 };
         static constexpr float deadTimeKneeAmps{ 0.2f };

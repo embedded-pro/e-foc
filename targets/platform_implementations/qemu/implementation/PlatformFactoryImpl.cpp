@@ -134,6 +134,9 @@ namespace application
         ApplyCurrentSense(SampleAndHold::shortest);
         if (plantConfig->maxReadableDutyPercent != 0)
             maxReadableDuty = hal::DutyCycle::FromPercent(plantConfig->maxReadableDutyPercent);
+        if (plantConfig->maxDutyPercent != 0)
+            maxDuty = hal::DutyCycle::FromPercent(plantConfig->maxDutyPercent);
+        shuntReadout = foc::LowSideShuntReadout{ maxReadableDuty };
         dutyDelayed = plantConfig->dutyDelayPeriods != 0;
         model.SetCoulombFriction(foc::NewtonMeter{ plantConfig->coulombFrictionNm });
         model.SetCogging(foc::NewtonMeter{ plantConfig->coggingTorqueNm }, plantConfig->coggingCyclesPerRevolution);
@@ -372,7 +375,7 @@ namespace application
 
     void PlatformFactoryImpl::ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases)
     {
-        lastDutyPhases = foc::KeepLowSideShuntsReadable(dutyPhases, maxReadableDuty);
+        lastDutyPhases = foc::KeepLowSideShuntsReadable(dutyPhases, maxReadableDuty, maxDuty);
     }
 
     void PlatformFactoryImpl::FocTimerIsr()
@@ -394,7 +397,9 @@ namespace application
             responseRecorder.Note(foc::PlantResponseKind::encoderFreeze, PlantSampleAt(tick));
         }
 
-        model.StepForTest(dutyDelayed ? appliedDutyPhases : lastDutyPhases);
+        const auto& stepDuty = dutyDelayed ? appliedDutyPhases : lastDutyPhases;
+        model.StepForTest(stepDuty);
+        shuntReadout.Applied(stepDuty);
         appliedDutyPhases = lastDutyPhases;
         responseRecorder.Capture(PlantSampleAt(tick));
 
@@ -412,7 +417,7 @@ namespace application
             controlLoopEntered = true;
             const auto entryCycles = QemuCycleCounter::Now();
 
-            onPhaseCurrentsReady(lastCurrents);
+            onPhaseCurrentsReady(shuntReadout.Read(lastCurrents));
 
             controlLoopMetrics.Record(QemuCycleCounter::Now() - entryCycles);
             controlLoopEntered = false;

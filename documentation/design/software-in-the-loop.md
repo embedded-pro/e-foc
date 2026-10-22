@@ -2,7 +2,7 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.4.1
+version: 1.5.0
 component: "software-in-the-loop"
 date: 2026-10-22
 ---
@@ -891,6 +891,7 @@ as before.
 | Full scale              | The current at either end of the converter's range around mid-rail                    |
 | Resolution              | Bits of the converter                                                                 |
 | Readable duty           | The board's limit, above which the platform lowers all three duties together          |
+| Maximum duty            | The board's limit on the highest duty; zero leaves it at full scale                   |
 
 With the chain on, the noise deviation is that of one conversion, and the per-phase bias is the
 amplifier's offset, present whether the shunt conducts or not.
@@ -906,12 +907,12 @@ amplifier rises into the window and decays after it with its time constant. Each
 its noise and offset, rounds to a code and clips to the range, and the step averages its codes and
 drops the remainder, as the converter's averager does. The firmware's sample-and-hold request maps
 to 4, 16, 32, 64 or 256 clocks, as the TI platform maps it, and the emulated platform applies the
-readable-duty limit as the TI platform does.
+readable-duty and maximum-duty limits and rebuilds a hidden phase from the other two as the TI platform does.
 
 On E-FOC-HARDWARE the converter is ADC0 of the TM4C1294 at 16 MHz, with 12 conversion clocks and
 two averaged conversions. The TLV9064 amplifiers at gain 10, behind 200 Ω and 150 pF, lag by about
 200 ns. The range is ±8.25 A, from 5 A/V around the 3.3 V mid-rail, in 12-bit codes of 4 mA, and
-the board's readable duty is 70 %. The rig's offsets measured +27, −18 and +54 mA, and its noise of
+the board's readable duty is 70 % and its maximum duty 95 %. The rig's offsets measured +27, −18 and +54 mA, and its noise of
 31–39 mA per averaged sample is about 50 mA per conversion. Scenarios add this chain to the `bench`
 plant by name. The last phase holds at:
 
@@ -926,6 +927,11 @@ What the plant showed through the bench chain:
   of the online estimator scenarios drive a leg past 61 %, the torque reads low while the rotor
   accelerates, and the online inertia read 9 % and the friction 62 % low, the rig's symptoms. The
   4-clock sample-and-hold the firmware now asks for reads them within 0.03 % and 6 %.
+- **Two readable phases are enough.** Holding all three phases readable stopped the bench motor near
+  356 rad/s, 24 rad/s short of 380. Keeping the two lowest duties readable and rebuilding the
+  highest phase from them, the motor reaches 420 rad/s with the q- and d-axis current ripple it
+  has at 340 rad/s, and holds 460 rad/s within 1 rad/s, where the modulator leaves its circle
+  (REQ-TRQ-009).
 - **The electrical identification is immune at its duties.** It runs near 50 % duty, inside every
   window, and reads the resistance within 2 % through the chain with either sample-and-hold.
 - **The offsets hide the friction until the calibration removes them.** The bench rotor's viscous

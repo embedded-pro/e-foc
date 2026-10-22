@@ -233,3 +233,17 @@ Feature: FOC Control Performance
     Examples:
       | algorithm | target | band_pct | settle_ms | overshoot_pct | rise_ms | tail_pct | error |
       | pid       | -0.5   | 40       | 12        | 30            | 6       | 65       | 0.2   |
+
+  @sil @REQ-TRQ-009
+  Scenario: The bench motor reaches 400 rad/s with two of its three phases readable
+    Given a bench motor plant
+    And the plant reads its currents through the bench's current-sense chain
+    And the plant response is recorded at 1000 Hz for up to 2000 samples
+    And the motor is already calibrated
+    And the motor boots in speed mode
+    When the target boots
+    And the rotor is aligned
+    When a speed setpoint of 400 rad/s is applied
+    And the motor is enabled
+    And the response is captured for 1500 ms after enable
+    Then the steady-state speed error shall be below 0.5 rad/s

@@ -126,6 +126,8 @@ namespace
             plant.adcResolutionBits = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else if (key == "max_readable_duty_percent")
             plant.maxReadableDutyPercent = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
+        else if (key == "max_duty_percent")
+            plant.maxDutyPercent = static_cast<uint32_t>(std::strtoul(rawValue.c_str(), nullptr, 10));
         else if (key == "dead_time_compensation_ns")
             plant.deadTimeCompensationNanoseconds = value;
         else if (key == "dead_time_compensation_knee_ampere")

@@ -88,6 +88,7 @@ namespace application
 
         constexpr static hal::tiva::Adc::Trigger adcTrigger = hal::tiva::Adc::Trigger::pwmGenerator1;
         constexpr static hal::DutyCycle maxReadableDuty{ hal::DutyCycle::FromPercent(application::BoardCharacteristics::maxReadableDutyPercent) };
+        constexpr static hal::DutyCycle maxDuty{ hal::DutyCycle::FromPercent(application::BoardCharacteristics::maxDutyPercent) };
 
         inline std::array<hal_pwm::PinChannel, 3> pwmPhases{ {
             { hal_pwm::GeneratorIndex::generator1, Pins::pwmPhase1a, Pins::pwmPhase1b, true, true, std::make_optional(hal_pwm::PinChannel::Trigger::countZero) },

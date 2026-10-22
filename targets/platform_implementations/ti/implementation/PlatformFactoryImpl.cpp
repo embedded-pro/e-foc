@@ -1,5 +1,4 @@
 #include "targets/platform_implementations/ti/implementation/PlatformFactoryImpl.hpp"
-#include "core/foc/math/LowSideShuntWindow.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "infra/event/EventDispatcher.hpp"
 #include "services/tracer/GlobalTracer.hpp"
@@ -301,10 +300,12 @@ namespace application
                 controlLoopEntered = true;
                 const auto entryCycles = CycleCounter::Now();
 
-                if (overCurrentTripped || ExceedsOverCurrent(a, b, c))
+                const auto currents = shuntReadout.Read(foc::PhaseCurrents{ a, b, c });
+
+                if (overCurrentTripped || ExceedsOverCurrent(currents.a, currents.b, currents.c))
                     TripOverCurrent();
                 else
-                    onPhaseCurrentsReady(foc::PhaseCurrents{ a, b, c });
+                    onPhaseCurrentsReady(currents);
 
                 controlLoopMetrics.Record(CycleCounter::Now() - entryCycles);
                 controlLoopEntered = false;
@@ -316,7 +317,8 @@ namespace application
         if (overCurrentTripped)
             return;
 
-        const auto readable = foc::KeepLowSideShuntsReadable(dutyPhases, Peripheral::maxReadableDuty);
+        const auto readable = foc::KeepLowSideShuntsReadable(dutyPhases, Peripheral::maxReadableDuty, Peripheral::maxDuty);
+        shuntReadout.Applied(readable);
 
         WithPwm([&readable](auto& pwm)
             {

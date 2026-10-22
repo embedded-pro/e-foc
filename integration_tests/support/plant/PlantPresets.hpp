@@ -30,6 +30,7 @@ namespace sil
         config.currentFullScaleAmpere = 8.25f;
         config.adcResolutionBits = 12u;
         config.maxReadableDutyPercent = 70u;
+        config.maxDutyPercent = application::BoardCharacteristics::maxDutyPercent;
         config.noiseSigmaAmpere = 0.05f;
         config.noiseBiasAmpereA = 0.027f;
         config.noiseBiasAmpereB = -0.018f;
@@ -126,6 +127,7 @@ namespace sil
             .currentFullScaleAmpere = 0.0f,
             .adcResolutionBits = 0u,
             .maxReadableDutyPercent = 0u,
+            .maxDutyPercent = 0u,
 
             .deadTimeCompensationNanoseconds = 0.0f,
             .deadTimeCompensationKneeAmpere = 0.0f,
