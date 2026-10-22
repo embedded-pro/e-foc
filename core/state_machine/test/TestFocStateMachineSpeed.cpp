@@ -110,12 +110,21 @@ namespace
             EXPECT_CALL(encoderMock, Set(_)).Times(AnyNumber());
         }
 
+        struct MechanicalResult
+        {
+            std::optional<foc::NewtonMeterSecondPerRadian> friction;
+            std::optional<foc::NewtonMeterSecondSquared> inertia;
+        };
+
+        std::size_t mechanicalPassesRun{ 0 };
+
         void ExpectSpeedCalibrationSequence(bool polePairsOk = true,
             bool resistanceOk = true,
             bool alignmentOk = true,
             bool mechOk = true,
             bool nvmSaveOk = true,
-            bool reachesSave = true)
+            bool reachesSave = true,
+            std::optional<MechanicalResult> compensatedPass = std::nullopt)
         {
             if (polePairsOk)
                 EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
@@ -175,15 +184,25 @@ namespace
             if (mechOk)
             {
                 EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
-                    .WillOnce(Invoke([](const foc::NewtonMeter&,
-                                         std::size_t,
-                                         const services::MechanicalParametersIdentification::Config&,
-                                         const infra::Function<void(
-                                             std::optional<foc::NewtonMeterSecondPerRadian>,
-                                             std::optional<foc::NewtonMeterSecondSquared>)>& cb)
+                    .Times(compensatedPass ? 2 : 1)
+                    .WillRepeatedly(Invoke([this, compensatedPass](const foc::NewtonMeter&,
+                                               std::size_t,
+                                               const services::MechanicalParametersIdentification::Config& config,
+                                               const infra::Function<void(
+                                                   std::optional<foc::NewtonMeterSecondPerRadian>,
+                                                   std::optional<foc::NewtonMeterSecondSquared>)>& cb)
                         {
-                            cb(foc::NewtonMeterSecondPerRadian{ 0.01f },
-                                foc::NewtonMeterSecondSquared{ 0.005f });
+                            if (mechanicalPassesRun++ == 0)
+                            {
+                                EXPECT_EQ(config.coggingCompensation, nullptr);
+                                cb(foc::NewtonMeterSecondPerRadian{ 0.01f },
+                                    foc::NewtonMeterSecondSquared{ 0.005f });
+                            }
+                            else
+                            {
+                                EXPECT_NE(config.coggingCompensation, nullptr);
+                                cb(compensatedPass->friction, compensatedPass->inertia);
+                            }
                         }));
             }
             else
@@ -2861,7 +2880,7 @@ TEST_F(FocStateMachineSpeedCoggingTest, calibration_maps_the_cogging_with_the_ag
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
-    ExpectSpeedCalibrationSequence();
+    ExpectSpeedCalibrationSequence(true, true, true, true, true, true, MechanicalResult{ foc::NewtonMeterSecondPerRadian{ 0.012f }, foc::NewtonMeterSecondSquared{ 0.0055f } });
     auto sm = CreateStateMachineMappingCogging();
 
     EXPECT_CALL(coggingMock, Measure(_, _, 4, _, _))
@@ -2878,6 +2897,70 @@ TEST_F(FocStateMachineSpeedCoggingTest, calibration_maps_the_cogging_with_the_ag
     const auto& data = std::get<state_machine::Ready>(sm.CurrentState()).loadedData;
     EXPECT_EQ(data.coggingTorque, AMap().torque);
     EXPECT_FLOAT_EQ(data.coggingTorqueScale, AMap().torqueScale);
+}
+
+TEST_F(FocStateMachineSpeedCoggingTest, the_mechanics_measured_with_the_cogging_compensated_replace_the_first_estimate)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    ExpectSpeedCalibrationSequence(true, true, true, true, true, true, MechanicalResult{ foc::NewtonMeterSecondPerRadian{ 0.012f }, foc::NewtonMeterSecondSquared{ 0.0055f } });
+    auto sm = CreateStateMachineMappingCogging();
+
+    EXPECT_CALL(coggingMock, Measure(_, _, _, _, _))
+        .WillOnce(Invoke([](foc::NewtonMeter, foc::NewtonMeterSecondSquared, std::size_t, const services::CoggingMapping::Config&, const infra::Function<void(std::optional<services::CoggingMap>)>& onDone)
+            {
+                onDone(AMap());
+            }));
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    const auto& data = std::get<state_machine::Ready>(sm.CurrentState()).loadedData;
+    EXPECT_FLOAT_EQ(data.inertia, 0.0055f);
+    EXPECT_FLOAT_EQ(data.frictionViscous, 0.012f);
+}
+
+TEST_F(FocStateMachineSpeedCoggingTest, a_compensated_estimate_that_disagrees_with_the_first_keeps_the_first)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    ExpectSpeedCalibrationSequence(true, true, true, true, true, true, MechanicalResult{ foc::NewtonMeterSecondPerRadian{ 0.03f }, foc::NewtonMeterSecondSquared{ 0.02f } });
+    auto sm = CreateStateMachineMappingCogging();
+
+    EXPECT_CALL(coggingMock, Measure(_, _, _, _, _))
+        .WillOnce(Invoke([](foc::NewtonMeter, foc::NewtonMeterSecondSquared, std::size_t, const services::CoggingMapping::Config&, const infra::Function<void(std::optional<services::CoggingMap>)>& onDone)
+            {
+                onDone(AMap());
+            }));
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    const auto& data = std::get<state_machine::Ready>(sm.CurrentState()).loadedData;
+    EXPECT_FLOAT_EQ(data.inertia, 0.005f);
+    EXPECT_FLOAT_EQ(data.frictionViscous, 0.01f);
+    EXPECT_EQ(data.coggingTorque, AMap().torque);
+}
+
+TEST_F(FocStateMachineSpeedCoggingTest, a_compensated_pass_that_yields_no_estimate_keeps_the_first)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    ExpectSpeedCalibrationSequence(true, true, true, true, true, true, MechanicalResult{});
+    auto sm = CreateStateMachineMappingCogging();
+
+    EXPECT_CALL(coggingMock, Measure(_, _, _, _, _))
+        .WillOnce(Invoke([](foc::NewtonMeter, foc::NewtonMeterSecondSquared, std::size_t, const services::CoggingMapping::Config&, const infra::Function<void(std::optional<services::CoggingMap>)>& onDone)
+            {
+                onDone(AMap());
+            }));
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    const auto& data = std::get<state_machine::Ready>(sm.CurrentState()).loadedData;
+    EXPECT_FLOAT_EQ(data.inertia, 0.005f);
+    EXPECT_FLOAT_EQ(data.frictionViscous, 0.01f);
 }
 
 TEST_F(FocStateMachineSpeedCoggingTest, a_cogging_map_that_cannot_be_measured_leaves_the_calibration_complete_without_one)

@@ -2,7 +2,7 @@
 title: "Service: Cogging Compensation"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: service-cogging-compensation
 date: 2026-10-22
 ---
@@ -12,7 +12,7 @@ date: 2026-10-22
 | Title     | Service: Cogging Compensation |
 | Type      | design                        |
 | Status    | draft                         |
-| Version   | 0.1.0                         |
+| Version   | 0.2.0                         |
 | Component | service-cogging-compensation  |
 | Date      | 2026-10-22                    |
 
@@ -41,7 +41,8 @@ between the neighbouring detents instead (`documentation/theory/position-loop-pi
   and position mode, and storing it with the calibration record
 - Adding the measured torque, as current, to what the speed and position cascades ask of the
   winding at every control interrupt
-- Keeping that addition out of the torque the online mechanical estimator regresses
+- Keeping that addition out of the torque the online mechanical estimator regresses, and out of
+  the torque the calibration regresses when it measures the mechanics again with the map applied
 
 **Is NOT responsible for:**
 - Torque mode, which runs no mechanical identification and so measures no map
@@ -115,7 +116,11 @@ Through 48 bins the curve reproduces a cogging that repeats six times a period w
 depth. The bins average the torque across their width, which takes about 2.5 % off the fundamental.
 
 The map is cleared before the mechanical identification runs, so a calibration measures the plant
-without the compensation from an earlier one.
+without the compensation from an earlier one. That first measurement then reads through the cogging,
+and on the bench plant it read the viscous friction 14 to 23 % low. Once the map is measured, the
+calibration therefore loads it and identifies the mechanics once more, taking the map's current out of
+the torque it regresses, and stores that result when its inertia agrees with the first within 20 %
+(`state-machine.md`, Calibration Sequence; `service-mechanical-ident.md`, Torque Estimation).
 
 The online mechanical estimator regresses the current without the compensation's share. The
 compensation and the plant's cogging cancel in the torque balance, so what the estimator sees is
@@ -161,6 +166,10 @@ sequenceDiagram
     note over CM: per bin, torque less inertia times acceleration, averaged over both directions
     CM-->>OL: map, or none
     OL-->>CF: cogging mapped
+    CF->>OL: identify the mechanics again
+    OL->>ISR: load the map into the cascade's feed-forward
+    note over OL: identification regresses the current less the map's
+    OL-->>CF: inertia and friction, or none
     CF->>NVM: save the record with the map
     CF->>OL: apply the calibration
     OL->>ISR: load the map into the cascade's feed-forward
@@ -201,9 +210,16 @@ sequenceDiagram
     direction and scales with the torque constant.
   - The cascade asks for the cogging current at standstill once a map is loaded and stops when it
     is cleared, and the mechanical estimator's window leaves the compensation out.
+  - The mechanical identification, given the compensation, reports the inertia and friction within
+    2 % of a plant whose current carries it, and the inertia 4 % high without taking it out.
+  - With a map measured, the calibration identifies the mechanics again and stores that result, and
+    keeps the first when the second yields none or disagrees in inertia.
 - **SIL.** On the bench plant with the bench's cogging and dry friction:
   - the full calibration measures the cogging's peak within 10 % (REQ-CAL-018); it read 3.83 to
     3.90 mN·m against 4.0 across runs;
   - every position law then settles within 0.03 rad of a 3.0 rad setpoint on a cogging hill top
     within 4 s and holds it for 2 s, and then 1.0 rad (REQ-POS-012). Without the map the PID,
-    two-DOF and Cascade P laws stop at 3.02 to 3.13 rad.
+    two-DOF and Cascade P laws stop at 3.02 to 3.13 rad;
+  - the stored viscous friction is within 10 % and the inertia within 2 % of the plant's
+    (REQ-CAL-019). They read −3 to +5 % and within 0.1 %, against 14 to 23 % and 2.5 % low before
+    the mechanics were measured again with the map applied.

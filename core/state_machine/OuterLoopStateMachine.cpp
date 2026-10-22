@@ -225,11 +225,12 @@ namespace application
         return ApplyMechanics(foc::NewtonMeterSecondSquared{ provisionalInertia }, foc::NewtonMeterSecondPerRadian{ provisionalFriction }, identificationBandwidthRadPerSec, torqueConstant);
     }
 
-    services::MechanicalParametersIdentification::Config OuterLoopStateMachine::ExcitationConfig() const
+    services::MechanicalParametersIdentification::Config OuterLoopStateMachine::ExcitationConfig(const foc::CoggingFeedForward* compensation) const
     {
         auto config = services::MechanicalParametersIdentification::Config{};
         config.maxCurrent = foc::Ampere{ driveCurrentLimit.Value() * services::identificationCurrentMargin };
         config.maxSpeed = foc::RadiansPerSecond{ config.targetSpeed.Value() * identificationSpeedMarginFactor };
+        config.coggingCompensation = compensation;
         return config;
     }
 
@@ -243,10 +244,9 @@ namespace application
     void OuterLoopStateMachine::RunMechanicalIdentStep(state_machine::Calibrating& calibrating)
     {
         calibrating.step = state_machine::CalibrationStep::frictionAndInertia;
-        const auto pending = calibrating.pendingData;
         ClearCoggingCompensation();
 
-        if (!ApplyIdentificationControl(pending))
+        if (!ApplyIdentificationControl(calibrating.pendingData))
         {
             GetTracer().Trace() << "[SM] Mechanical identification refused: control loops would not move the rotor";
             Dispatch(state_machine::CalibrationStepFailed{});
@@ -254,8 +254,29 @@ namespace application
         }
 
         GetTracer().Trace() << "[SM] Estimating mechanical parameters";
+        EstimateMechanics(calibrating.pendingData, nullptr);
+    }
 
-        MechIdentImpl().EstimateFrictionAndInertia(TorqueConstantFor(pending), static_cast<std::size_t>(pending.polePairs), ExcitationConfig(), [this](auto friction, auto inertia)
+    bool OuterLoopStateMachine::RunPostCoggingStep(state_machine::Calibrating& calibrating)
+    {
+        const auto& pending = calibrating.pendingData;
+
+        if (!ApplyIdentificationControl(pending))
+        {
+            GetTracer().Trace() << "[SM] Mechanics with cogging compensation skipped: control loops would not move the rotor";
+            return false;
+        }
+
+        calibrating.step = state_machine::CalibrationStep::compensatedMechanics;
+        ApplyCoggingMap(pending);
+        GetTracer().Trace() << "[SM] Estimating mechanical parameters with cogging compensation";
+        EstimateMechanics(pending, CoggingCompensation());
+        return true;
+    }
+
+    void OuterLoopStateMachine::EstimateMechanics(const services::CalibrationData& pending, const foc::CoggingFeedForward* compensation)
+    {
+        MechIdentImpl().EstimateFrictionAndInertia(TorqueConstantFor(pending), static_cast<std::size_t>(pending.polePairs), ExcitationConfig(compensation), [this](auto friction, auto inertia)
             {
                 Dispatch(state_machine::MechanicalParametersIdentified{ friction, inertia, velocityBandwidthRadPerSec });
             });

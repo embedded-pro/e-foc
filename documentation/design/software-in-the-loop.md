@@ -2,7 +2,7 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.4.1
+version: 1.4.2
 component: "software-in-the-loop"
 date: 2026-10-22
 ---
@@ -12,7 +12,7 @@ date: 2026-10-22
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.4.1                       |
+| Version   | 1.4.2                       |
 | Component | software-in-the-loop        |
 | Date      | 2026-10-22                  |
 
@@ -783,6 +783,11 @@ What the plant has shown so far:
   3.0 rad, where they stopped at 3.02 to 3.13 rad. The calibration's cogging map, which read the plant's
   4 mN·m within 4 %, lets every law hold it (`documentation/design/service-cogging-compensation.md`;
   REQ-CAL-018, REQ-POS-012).
+- **The same cogging read the calibration's viscous friction 14 to 23 % low**, with the bench's dry
+  friction alongside it, and its inertia 2.5 % low, while the online estimator, running with the map
+  applied, read both within 2 %. The rig showed the same split, its online friction 17 % above the
+  calibration's. The calibration now measures the mechanics once more with the map applied and reads them
+  3 % low to 5 % high and within 0.1 % (`documentation/design/service-mechanical-ident.md`; REQ-CAL-019).
 - **A duty that acts a period late, as E-FOC-HARDWARE's PWM applies it, read the deadbeat law's online
   inductance three times too high** while the estimator paired each current change with the previous
   tick's command; the plant had applied every duty at once, so the simulation never showed the rig's

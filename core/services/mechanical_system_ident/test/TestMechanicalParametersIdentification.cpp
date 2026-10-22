@@ -1,6 +1,7 @@
 #include "core/foc/interfaces/test_doubles/ExecutionMock.hpp"
 #include "core/foc/interfaces/test_doubles/FocMock.hpp"
 #include "core/foc/math/AngleWrap.hpp"
+#include "core/foc/math/CoggingFeedForward.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/transforms/TransformsClarkePark.hpp"
 #include "core/platform_abstraction/interfaces/test_doubles/DriversMock.hpp"
@@ -8,6 +9,7 @@
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "infra/util/WithSharedAccess.hpp"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <gmock/gmock.h>
 #include <limits>
@@ -576,6 +578,57 @@ TEST_F(MechanicalParametersIdentificationTest, a_consistent_excited_run_reports_
     EXPECT_NEAR(outcome.inertia->Value(), trueInertia, trueInertia * 0.2f);
     EXPECT_NEAR(outcome.friction->Value(), trueFriction, trueFriction * 0.2f);
     EXPECT_FALSE(observableMock.HasObserver());
+}
+
+TEST_F(MechanicalParametersIdentificationTest, the_cogging_compensation_current_is_left_out_of_the_torque_regressed)
+{
+    constexpr std::size_t bins = 48;
+    constexpr float compensationTorque = 2.0e-2f;
+
+    std::array<int8_t, bins> map{};
+    for (std::size_t bin = 0; bin != bins; ++bin)
+        map[bin] = static_cast<int8_t>(std::lround(127.0f * std::sin(6.0f * (static_cast<float>(bin) + 0.5f) * 2.0f * std::numbers::pi_v<float> / bins)));
+
+    foc::CoggingFeedForward compensation;
+    compensation.Load(infra::MakeRange(map), compensationTorque / 127.0f, foc::NewtonMeter{ torqueConstant });
+
+    auto config = DefaultConfig();
+    config.timeout = std::chrono::seconds{ 60 };
+    config.coggingCompensation = &compensation;
+
+    struct Outcome
+    {
+        bool fired = false;
+        std::optional<foc::NewtonMeterSecondPerRadian> friction;
+        std::optional<foc::NewtonMeterSecondSquared> inertia;
+    } outcome;
+
+    GivenEncoderFollowsTheProfile();
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
+    ExpectDriveReleased();
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config,
+        [&outcome](auto b, auto j)
+        {
+            outcome.fired = true;
+            outcome.friction = b;
+            outcome.inertia = j;
+        });
+
+    for (std::size_t i = 0; i != 400000 && !outcome.fired; ++i)
+    {
+        AdvanceProfile();
+        const auto torque = trueCoulomb + trueInertia * lastAcceleration + trueFriction * lastSpeed;
+        observableMock.Publish(CurrentsProducing(torque + torqueConstant * compensation.CurrentAt(position * polePairs), position));
+        ExecuteAllActions();
+    }
+
+    ASSERT_TRUE(outcome.fired);
+    ASSERT_TRUE(outcome.inertia.has_value());
+    ASSERT_TRUE(outcome.friction.has_value());
+    EXPECT_NEAR(outcome.inertia->Value(), trueInertia, trueInertia * 0.02f);
+    EXPECT_NEAR(outcome.friction->Value(), trueFriction, trueFriction * 0.02f);
 }
 
 TEST_F(MechanicalParametersIdentificationTest, a_coarse_encoder_run_converges_inside_the_default_timeout)

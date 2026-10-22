@@ -2,7 +2,7 @@
 title: "Service: Mechanical Parameters Identification"
 type: design
 status: draft
-version: 0.2.1
+version: 0.3.0
 component: service-mechanical-ident
 date: 2026-10-22
 ---
@@ -12,7 +12,7 @@ date: 2026-10-22
 | Title     | Service: Mechanical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.2.1                                         |
+| Version   | 0.3.0                                         |
 | Component | service-mechanical-ident                      |
 | Date      | 2026-10-22                                    |
 
@@ -78,6 +78,17 @@ At each sampling callback, the instantaneous electromagnetic torque is estimated
 ```
 
 where `Kt` is the torque constant (N·m/A) provided by the caller. The q-axis current `Iq` is the measured value the control loop is already sampling — the same current feedback path used by the FOC current controller.
+
+The caller may pass the cogging compensation the cascade applies. The current it adds at the rotor's angle is
+then taken out of `Iq` first, since it only cancels the cogging and accelerates nothing
+(`service-cogging-compensation.md`). The calibration's first passes run without a map, and on the bench plant
+with the bench's cogging and dry friction they read the viscous friction 14 to 23 % low and the inertia 2.5 %
+low. Between the detents the cogging speeds the rotor up and slows it down faster than the speed loop answers,
+so the acceleration carries a ripple that the current does not, and least squares reads it against the
+regressors. Measured again with the map applied and its current taken out, the calibration reads the friction
+3 % low to 5 % high and the inertia within 0.1 %. With the map applied but its current left in, the friction read 1 to
+14 % high: that current's share of a 250 ms dwell does not average away against a friction term that differs
+by only 0.13 mN·m between the two dwell speeds.
 
 The d-axis contribution to torque is zero for surface PMSM under the Id = 0 operating condition assumed during identification. For interior PMSM with reluctance torque, this approximation introduces a small systematic error in the torque estimate; the caller should account for this if Ld ≠ Lq.
 
@@ -349,6 +360,7 @@ or pole-pair count is not positive.
 | `FocSpeed`           | Commands the two speed setpoints that excite the mechanical dynamics                    | Must already be active and in control of the motor before the procedure begins, with an electrical model and mechanics applied so its gains and current envelope are not inert |
 | `ThreePhaseInverter` | Source of ADC current callbacks that supply the Iq measurement on each computation step | Must not be stopped during the estimation procedure                                                                                                                            |
 | `Encoder`            | Supplies mechanical angle samples for speed and acceleration estimation                 | Must be tracking position at the configured sampling rate                                                                                                                      |
+| Cogging compensation | Optional: the current the cascade adds to cancel the cogging, by electrical angle       | Not changed while the run is in flight                                                                                                                                         |
 
 ---
 

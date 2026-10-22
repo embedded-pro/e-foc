@@ -120,6 +120,14 @@ namespace application
                 focController.ClearCoggingMap();
         }
 
+        const foc::CoggingFeedForward* CoggingCompensation() const override
+        {
+            if constexpr (std::is_base_of_v<foc::CoggingCompensable, Cascade>)
+                return &focController.CoggingCompensation();
+            else
+                return nullptr;
+        }
+
     private:
         Cascade focController;
         services::RealTimeFrictionAndInertiaEstimator onlineMechEstimator;

@@ -324,4 +324,9 @@ namespace foc
     {
         coggingFeedForward.Clear();
     }
+
+    const CoggingFeedForward& CascadeWithSpeedLoop::CoggingCompensation() const
+    {
+        return coggingFeedForward;
+    }
 }

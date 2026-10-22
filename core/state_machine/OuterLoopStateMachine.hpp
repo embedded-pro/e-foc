@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/foc/interfaces/Foc.hpp"
+#include "core/foc/math/CoggingFeedForward.hpp"
 #include "core/services/cogging_compensation/CoggingMapping.hpp"
 #include "core/services/cogging_compensation/CoggingMappingImpl.hpp"
 #include "core/services/electrical_system_ident/RealTimeResistanceAndInductanceEstimator.hpp"
@@ -45,6 +46,7 @@ namespace application
         void RegisterModeSpecificCli(services::TerminalWithStorage& terminal) override;
         void RunPostAlignmentStep(state_machine::Calibrating& calibrating) override;
         bool RunPostMechanicalStep(state_machine::Calibrating& calibrating) override;
+        bool RunPostCoggingStep(state_machine::Calibrating& calibrating) override;
         void AbortModeSpecificServices() override;
 
         void RunMechanicalIdentStep(state_machine::Calibrating& calibrating);
@@ -76,12 +78,14 @@ namespace application
         virtual const services::CoggingMapping* CoggingMappingImpl() const = 0;
         virtual void LoadCoggingCompensation(infra::MemoryRange<const int8_t> torque, float torqueScale, foc::NewtonMeter torqueConstant) = 0;
         virtual void ClearCoggingCompensation() = 0;
+        virtual const foc::CoggingFeedForward* CoggingCompensation() const = 0;
 
     private:
         bool ApplyMechanics(foc::NewtonMeterSecondSquared inertia, foc::NewtonMeterSecondPerRadian friction, float bandwidth, foc::NewtonMeter torqueConstant);
         bool ApplyIdentificationControl(const services::CalibrationData& pending);
+        void EstimateMechanics(const services::CalibrationData& pending, const foc::CoggingFeedForward* compensation);
         foc::NewtonMeter TorqueConstantFor(const services::CalibrationData& data) const;
-        services::MechanicalParametersIdentification::Config ExcitationConfig() const;
+        services::MechanicalParametersIdentification::Config ExcitationConfig(const foc::CoggingFeedForward* compensation) const;
         services::CoggingMapping::Config CoggingConfig() const;
         void ApplyCoggingMap(const services::CalibrationData& data);
 

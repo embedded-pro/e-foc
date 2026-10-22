@@ -7,6 +7,11 @@
 #include <chrono>
 #include <optional>
 
+namespace foc
+{
+    class CoggingFeedForward;
+}
+
 namespace services
 {
     inline constexpr float identificationCurrentMargin{ 2.0f };
@@ -27,7 +32,9 @@ namespace services
         // regressor. maxCurrent and maxSpeed bound the motion the trajectory is allowed to produce, and
         // timeout bounds its duration. The forgetting factor is near unity because the plant does not drift
         // within one short run, and a shorter memory leaves the steady-state covariance above the
-        // convergence threshold this run must reach.
+        // convergence threshold this run must reach. coggingCompensation, when given, is the feed-forward the
+        // cascade adds to the quadrature reference; its current is taken out of the torque regressed, since
+        // it only cancels the cogging and accelerates nothing.
         struct Config
         {
             foc::RadiansPerSecond targetSpeed{ 52.36f };
@@ -38,6 +45,7 @@ namespace services
             foc::Ampere maxCurrent{ 10.0f };
             foc::RadiansPerSecond maxSpeed{ 104.72f };
             float speedSlewRate{ 5000.0f };
+            const foc::CoggingFeedForward* coggingCompensation{ nullptr };
         };
 
         virtual void EstimateFrictionAndInertia(const foc::NewtonMeter& torqueConstant, std::size_t numberOfPolePairs, const Config& config, const infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)>& onDone) = 0;

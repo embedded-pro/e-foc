@@ -1,6 +1,7 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/AngleWrap.hpp"
+#include "core/foc/math/CoggingFeedForward.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/InjectionCurrentLimit.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
@@ -258,7 +259,8 @@ namespace services
         const auto electricalAngle = mechanicalPos * polePairs;
         const auto rotatingFrame = transform.Forward(foc::ThreePhase{ currentPhases.a.Value(), currentPhases.b.Value(), currentPhases.c.Value() }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle));
 
-        const auto sampleTorque = rotatingFrame.q * torqueConstant.Value();
+        const auto compensation = currentConfig.coggingCompensation != nullptr ? currentConfig.coggingCompensation->CurrentAt(electricalAngle) : 0.0f;
+        const auto sampleTorque = (rotatingFrame.q - compensation) * torqueConstant.Value();
         const auto weight = (static_cast<float>(samplesInWindow) + 0.5f) / static_cast<float>(windowSamples);
         torqueSum += sampleTorque;
         torqueRise += sampleTorque * 0.5f * weight * weight;

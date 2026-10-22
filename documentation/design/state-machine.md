@@ -2,7 +2,7 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.3.1
+version: 0.4.0
 component: state-machine
 date: 2026-10-22
 ---
@@ -12,7 +12,7 @@ date: 2026-10-22
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.3.1                      |
+| Version   | 0.4.0                      |
 | Component | state-machine              |
 | Date      | 2026-10-22                 |
 
@@ -252,6 +252,10 @@ sequenceDiagram
     SM->>FOC: ConfigureMechanics(identified J, B)
     SM->>CM: Measure(two turns each way)
     CM-->>SM: cogging map, or none
+    note over SM,MI: Only when a map was measured
+    SM->>FOC: ConfigureMechanics(provisional J, B), LoadCoggingMap(map)
+    SM->>MI: EstimateFrictionAndInertia(bounded excitation, the map's current left out)
+    MI-->>SM: result (B, J or failure)
     SM->>NVM: SaveCalibration(data)
     NVM-->>SM: status
     note over SM: On success: apply data, enter Ready
@@ -269,7 +273,8 @@ sequenceDiagram
 | 4. Apply measured model + provisional plant    | FOC controller      | Nothing persisted; makes the loops able to move the rotor |
 | 5. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth`        |
 | 6. Cogging map (speed/position only)           | Cogging Mapping     | `coggingTorque`, `coggingTorqueScale`; none if unmeasured |
-| 7. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                        |
+| 7. Mechanics with the map applied (if mapped)  | Mechanical Ident    | `inertia`, `frictionViscous`, replacing step 5's          |
+| 8. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                        |
 
 The offsets apply as soon as they are measured, so the identification and alignment steps after
 them read corrected currents (`service-current-offsets.md`). An electrical identification that
@@ -277,6 +282,13 @@ arrives over CAN does not measure them and keeps the ones in force, and keeps th
 
 The cogging map is measured with the speed loop configured from the identified mechanics, and a
 run that measures no map does not fail the calibration (`service-cogging-compensation.md`).
+
+A measured map is then loaded into the cascade and the mechanics are identified once more, under the same
+provisional plant as step 5, with the map's current taken out of the torque regressed. Step 5 measures through
+the cogging, which reads the viscous friction low (`service-mechanical-ident.md`, Torque Estimation). The
+result replaces step 5's when it is usable and its inertia agrees with step 5's within 20 %, and is traced as
+`[SM] Mechanics with cogging compensation: J_uNms2=… B_uNms=…`. Otherwise step 5's values are kept, and the
+calibration completes with them.
 
 After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`. The encoder zero offset is not written back to the encoder at this point; it is established only by the alignment step itself during the calibration sequence.
 

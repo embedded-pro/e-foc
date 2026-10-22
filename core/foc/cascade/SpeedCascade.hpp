@@ -38,6 +38,7 @@ namespace foc
 
         void LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant) override;
         void ClearCoggingMap() override;
+        using CascadeWithSpeedLoop::CoggingCompensation;
 
     private:
         void LowPriorityHandler();

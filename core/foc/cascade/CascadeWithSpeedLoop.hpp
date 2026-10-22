@@ -194,6 +194,7 @@ namespace foc
         void SetDirectAxisExcitation(Ampere amplitude, hal::Hertz frequency);
         void LoadCoggingMapImpl(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant);
         void ClearCoggingMapImpl();
+        const CoggingFeedForward& CoggingCompensation() const;
 
     private:
         [[no_unique_address]] Park park;

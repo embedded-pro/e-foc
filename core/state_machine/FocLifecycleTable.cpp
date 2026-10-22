@@ -50,7 +50,7 @@ namespace application
         };
     }
 
-    constexpr std::array<FocLifecycleTable::Transition, 13> FocLifecycleTable::CalibrationRows()
+    constexpr std::array<FocLifecycleTable::Transition, 14> FocLifecycleTable::CalibrationRows()
     {
         return services::JoinRows(CalibrationEntryRows<state_machine::Idle>(), CalibrationEntryRows<state_machine::Ready>(),
             std::array{
@@ -91,6 +91,15 @@ namespace application
                     [](const LifecycleContext&, const state_machine::Calibrating& calibrating, const state_machine::MechanicalParametersIdentified&)
                     {
                         return calibrating.step == state_machine::CalibrationStep::frictionAndInertia;
+                    }),
+                Machine::InternalRow<state_machine::Calibrating, state_machine::MechanicalParametersIdentified>(
+                    [](LifecycleContext& context, state_machine::Calibrating& calibrating, const state_machine::MechanicalParametersIdentified& event)
+                    {
+                        context.calibration.OnCompensatedMechanicsIdentified(calibrating, event);
+                    },
+                    [](const LifecycleContext&, const state_machine::Calibrating& calibrating, const state_machine::MechanicalParametersIdentified&)
+                    {
+                        return calibrating.step == state_machine::CalibrationStep::compensatedMechanics;
                     }),
                 Machine::InternalRow<state_machine::Calibrating, state_machine::CoggingMapped>(
                     [](LifecycleContext& context, state_machine::Calibrating& calibrating, const state_machine::CoggingMapped& event)
@@ -326,7 +335,7 @@ namespace application
         };
     }
 
-    constexpr std::array<LifecycleMachine::Transition, 46> FocLifecycleTable::Rows()
+    constexpr std::array<LifecycleMachine::Transition, 47> FocLifecycleTable::Rows()
     {
         return services::JoinRows(CalibrationRows(), CalibrationCompletionRows(), OperationRows(), SafetyRows(), MaintenanceRows(), BootRows());
     }

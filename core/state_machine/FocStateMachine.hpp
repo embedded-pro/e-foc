@@ -19,7 +19,8 @@ namespace state_machine
         resistanceAndInductance,
         alignment,
         frictionAndInertia,
-        coggingMap
+        coggingMap,
+        compensatedMechanics
     };
 
     struct Idle

@@ -76,6 +76,7 @@ namespace application
         void MarkProvisionalControlApplied();
 
         bool RunPostMechanicalStep(state_machine::Calibrating& calibrating) override;
+        bool RunPostCoggingStep(state_machine::Calibrating& calibrating) override;
         void ApplyModeSpecificCalibration(const services::CalibrationData& data) override;
         bool HasValidModeSpecificCalibration(const services::CalibrationData& data) const override;
         void PrepareForEnabled() override;

@@ -198,6 +198,11 @@ namespace application
         return false;
     }
 
+    bool FocStateMachineCommon::RunPostCoggingStep(state_machine::Calibrating& /*calibrating*/)
+    {
+        return false;
+    }
+
     void FocStateMachineCommon::ApplyModeSpecificCalibration(const services::CalibrationData& /*data*/)
     {}
 

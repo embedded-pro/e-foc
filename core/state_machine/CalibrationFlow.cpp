@@ -188,6 +188,24 @@ namespace application
         else
             env.tracer.Trace() << "[SM] Cogging map: none";
 
+        if (!event.map || !env.mode.RunPostCoggingStep(calibrating))
+            Save(calibrating);
+    }
+
+    void CalibrationFlow::OnCompensatedMechanicsIdentified(state_machine::Calibrating& calibrating, const state_machine::MechanicalParametersIdentified& event)
+    {
+        auto& pending = calibrating.pendingData;
+        const bool usable = event.friction && event.inertia && services::IsPlausibleMechanics(event.inertia->Value(), event.friction->Value());
+
+        if (usable && services::EstimatesAgree(event.inertia->Value(), pending.inertia))
+        {
+            pending.inertia = event.inertia->Value();
+            pending.frictionViscous = event.friction->Value();
+            env.tracer.Trace() << "[SM] Mechanics with cogging compensation: J_uNms2=" << pending.inertia * microPerUnit << " B_uNms=" << pending.frictionViscous * microPerUnit;
+        }
+        else
+            env.tracer.Trace() << "[SM] Mechanics with cogging compensation not usable, keeping J_uNms2=" << pending.inertia * microPerUnit << " B_uNms=" << pending.frictionViscous * microPerUnit;
+
         Save(calibrating);
     }
 
