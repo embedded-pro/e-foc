@@ -44,6 +44,13 @@ namespace sil
         config.diodeForwardVolts = 0.8f;
     }
 
+    inline void DescribeBenchFrictionAndCogging(SilPlantConfig& config)
+    {
+        config.coulombFrictionNm = 0.0037f;
+        config.coggingTorqueNm = 0.004f;
+        config.coggingCyclesPerRevolution = 24u;
+    }
+
     inline void DescribeBoardPwmUpdate(SilPlantConfig& config)
     {
         config.dutyDelayPeriods = 1u;
@@ -98,6 +105,8 @@ namespace sil
             .responseMaxSamples = 0u,
 
             .coulombFrictionNm = 0.0f,
+            .coggingTorqueNm = 0.0f,
+            .coggingCyclesPerRevolution = 0u,
             .supplySourceResistanceOhm = 0.0f,
             .supplyCurrentLimitAmpere = 0.0f,
             .encoderCountsPerRevolution = 0u,

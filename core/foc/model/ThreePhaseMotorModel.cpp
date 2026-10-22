@@ -133,6 +133,12 @@ namespace foc
         nonIdealities.coulombFrictionNm = friction.Value();
     }
 
+    void ThreePhaseMotorModel::SetCogging(foc::NewtonMeter amplitude, uint32_t cyclesPerRevolution)
+    {
+        nonIdealities.coggingTorqueNm = amplitude.Value();
+        nonIdealities.coggingCyclesPerRevolution = cyclesPerRevolution;
+    }
+
     void ThreePhaseMotorModel::SetEncoderResolution(uint32_t countsPerRevolution)
     {
         nonIdealities.encoderCountsPerRevolution = countsPerRevolution;
@@ -452,7 +458,11 @@ namespace foc
 
         lastDqCurrents = foc::RotatingFrame{ id, iq };
 
-        auto d_omega_mech_dt = (torqueElec - parameters.B.Value() * motorState.omega_mech.Value() - loadOpposing - loads.externalTorque.Value()) / parameters.J.Value();
+        const auto cogging = nonIdealities.coggingTorqueNm != 0.0f
+                                 ? nonIdealities.coggingTorqueNm * foc::FastTrigonometry::Sine(static_cast<float>(nonIdealities.coggingCyclesPerRevolution) * motorState.theta_mech.Value())
+                                 : 0.0f;
+
+        auto d_omega_mech_dt = (torqueElec - parameters.B.Value() * motorState.omega_mech.Value() - loadOpposing - loads.externalTorque.Value() - cogging) / parameters.J.Value();
 
         float omegaMech = motorState.omega_mech.Value() + d_omega_mech_dt * dt;
 

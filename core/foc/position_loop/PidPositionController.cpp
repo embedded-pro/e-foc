@@ -3,6 +3,7 @@
 #include "core/foc/position_loop/PositionPlantModel.hpp"
 #include "core/foc/speed_loop/SpeedPlantModel.hpp"
 #include <algorithm>
+#include <cmath>
 
 namespace foc
 {
@@ -34,7 +35,9 @@ namespace foc
         previousMeasured = context.measured.Value();
         primed = true;
 
-        output = std::clamp(output + proportionalGain * (referenceWeight * referenceStep - measuredStep) + integralGain * error, -1.0f, 1.0f);
+        const auto stationary = std::abs(context.measuredSpeed.Value()) < stationarySpeedRatio * SpeedEnvelope();
+        const auto integral = stationary ? relaxationRate * (proportionalGain * error - output) : integralGain * error;
+        output = std::clamp(output + proportionalGain * (referenceWeight * referenceStep - measuredStep) + integral, -1.0f, 1.0f);
 
         return { PositionOutputKind::speedReference, output * SpeedEnvelope() };
     }
@@ -50,7 +53,8 @@ namespace foc
             return false;
 
         proportionalGain = 1.0f / maximumErrorInRadians;
-        integralGain = proportionalGain * integralZeroRatio * tunings.bandwidth * OuterSamplePeriod(samplingFrequency);
+        relaxationRate = integralZeroRatio * tunings.bandwidth * OuterSamplePeriod(samplingFrequency);
+        integralGain = proportionalGain * relaxationRate;
         return true;
     }
 }

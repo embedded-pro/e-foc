@@ -136,6 +136,7 @@ namespace application
             maxReadableDuty = hal::DutyCycle::FromPercent(plantConfig->maxReadableDutyPercent);
         dutyDelayed = plantConfig->dutyDelayPeriods != 0;
         model.SetCoulombFriction(foc::NewtonMeter{ plantConfig->coulombFrictionNm });
+        model.SetCogging(foc::NewtonMeter{ plantConfig->coggingTorqueNm }, plantConfig->coggingCyclesPerRevolution);
         model.SetEncoderResolution(plantConfig->encoderCountsPerRevolution);
         model.ResetTemperature();
 

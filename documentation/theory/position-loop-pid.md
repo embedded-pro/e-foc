@@ -2,9 +2,9 @@
 title: "Position Loop — P (Baseline)"
 type: theory
 status: draft
-version: 1.0.0
+version: 1.1.0
 component: "position-loop-pid"
-date: 2026-08-31
+date: 2026-10-21
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-08-31
 | Title     | Position Loop — P (Baseline) |
 | Type      | theory                       |
 | Status    | draft                        |
-| Version   | 1.0.0                        |
+| Version   | 1.1.0                        |
 | Component | position-loop-pid            |
-| Date      | 2026-08-31                   |
+| Date      | 2026-10-21                   |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -32,9 +32,10 @@ required.
 
 The law is a **PI**, not the pure P this chapter derives. The derivation below is the P design the
 cascade shipped with and still the way to read the proportional path; the integral term removes the
-standing error the P design leaves under a constant velocity reference. Its zero and the weight the
+standing error a speed disturbance leaves while the rotor moves. Its zero and the weight the
 proportional term gives the reference are fixed by the design in *Integral zero and reference
-weighting* below, not by the loop tunings.
+weighting* below, not by the loop tunings, and a rotor that stands still is treated as *A rotor that
+stands still* describes.
 
 Operates exclusively in the **1 kHz outer handler**.
 
@@ -139,6 +140,35 @@ of the reference path without touching disturbance rejection, which sees the ful
 $\Delta\theta_m$. With $b = 0.75$ a 1.5 rad step overshoots by well under 1 % and is within 0.01 rad
 of the setpoint 450 ms after the step.
 
+The weight has a price under a moving setpoint. A constant velocity reference $\dot{\theta}^*$ leaves
+the proportional term $(1 - b)\,K_p\,\dot{\theta}^* T_s^o$ short every period, and the integral can
+only make that up from a standing error, $e_\theta = (1 - b)\,\dot{\theta}^* / (0.2\,\omega_{bw}^p)$:
+0.13 rad at 2 rad/s, a quarter more than the P design's $\dot{\theta}^* / \omega_{bw}^p$.
+
+### A rotor that stands still
+
+While the measured speed is under 2 % of the speed envelope, about 1.2 rad/s at the default bandwidth
+and less than one count per period on a 4000-count encoder, the integral step is replaced by a
+relaxation of the command towards the speed the error alone calls for, at the integral's own rate:
+
+$$
+\omega_m^*[k] = \omega_m^*[k-1] + K_p\left(b\,\Delta\theta^*[k] - \Delta\theta_m[k]\right) + \alpha\left(K_p\, e_\theta[k] - \omega_m^*[k-1]\right), \qquad \alpha = 0.2\,\omega_{bw}^p T_s^o
+$$
+
+From a zero command the relaxation is exactly the integral step, so a step from rest starts as before.
+What it removes is the integral's memory while nothing moves. The weighted proportional term leaves
+$(1 - b)\,K_p$ of every setpoint change for the integral to supply, and on a smooth shaft the
+integral finishes that while the rotor approaches. A detent or dry friction that stops the rotor near
+the setpoint used to leave it unfinished, or winding: the command grew while the rotor stood still,
+the speed loop's integral raised the torque until the rotor broke away, the excess carried it past the
+setpoint, and the cycle repeated. On the bench, 24 detents a revolution about 4 mN·m deep and
+3.7 mN·m of dry friction made it a limit cycle of ±0.17 rad every 1.5 s at 1 rad.
+
+Relaxed, the command settles at $K_p e_\theta$, the speed loop's integral supplies whatever torque
+holds the rotor, and the rotor creeps onto the setpoint as it does under Cascade P. Nothing is lost at
+rest: every speed law rejects a constant torque with no speed error, so no disturbance needs the
+position integral to hold a stationary rotor.
+
 ### Output Limiting
 
 The speed reference is clamped to $\pm\omega_{m,max}$ to prevent demanding speeds beyond the
@@ -152,22 +182,27 @@ $$
 
 ## Numerical Properties
 
-| Property                    | Value                                                                                     |
-|-----------------------------|-------------------------------------------------------------------------------------------|
-| Ops per 1 kHz cycle         | 2 MACs (1 multiply + wrap + clamp)                                                        |
-| Steady-state position error | Non-zero under constant velocity reference for the P design; removed by the integral term |
-| Steady-state error at rest  | Zero (no steady velocity → no position error)                                             |
-| Requires J, Bf              | No                                                                                        |
-| Tuning knobs                | 1 ($K_p = \omega_{bw}^p$); the integral zero and reference weight are design constants    |
+| Property                    | Value                                                                                  |
+|-----------------------------|----------------------------------------------------------------------------------------|
+| Ops per 1 kHz cycle         | 2 MACs (1 multiply + wrap + clamp)                                                     |
+| Steady-state position error | $(1 - b)\,\dot{\theta}^* / (0.2\,\omega_{bw}^p)$ under a constant velocity reference   |
+| Steady-state error at rest  | Zero (no steady velocity → no position error)                                          |
+| Requires J, Bf              | No                                                                                     |
+| Tuning knobs                | 1 ($K_p = \omega_{bw}^p$); the integral zero and reference weight are design constants |
 
 ---
 
 ## Limitations & Assumptions
 
 - Treats the speed loop as ideal. Valid when $\omega_{bw}^s \geq 5\, \omega_{bw}^p$.
-- Under a constant velocity reference $\dot{\theta}_m^* \neq 0$, a pure P controller has
-  non-zero steady-state tracking error. The implementation carries an integral term for this, and
-  velocity feedforward (as in P2 / Cascade P) addresses it without the integral's phase cost.
+- Under a constant velocity reference $\dot{\theta}_m^* \neq 0$ the law keeps a standing tracking
+  error (*Integral zero and reference weighting*). Velocity feedforward (as in P2 / Cascade P)
+  addresses it without the integral's phase cost.
+- A setpoint between two cogging detents sits where the cogging torque pushes the rotor away from it.
+  The loop holds there only while its stiffness, $2 J\,\omega_{bw}^s\,\omega_{bw}^p$, exceeds the
+  cogging's, the detent count times its depth. On the bench at the default bandwidths the two are
+  about equal, 0.10 against 0.096 N·m/rad, and the rotor steps between the neighbouring detents
+  instead; 3.0 rad is such a setpoint there. Cascade P does the same.
 - No disturbance rejection beyond what the speed loop provides.
 - Encoder noise enters the position estimate. A state observer upstream improves robustness.
 
