@@ -57,6 +57,32 @@ Feature: Disconnected And Faulty Motor Wiring
     And a speed setpoint of 20 rad/s is applied
     Then the state machine shall report a sensor fault
 
+  @sil @REQ-SM-028
+  Scenario Outline: A position held against a shaft load after a full calibration is not reported under the <position> law
+    Given a bench motor plant
+    And the plant response is recorded at 100 Hz for up to 2000 samples
+    And a torque step of 0.01 Nm applied 6000 ms after enable
+    And the motor boots in position mode
+    And the position loop runs the <position> algorithm
+    When the target boots
+    And the full calibration is run from the terminal
+    And a position setpoint of 0.0 rad is applied
+    And the motor is enabled
+    And the response is captured for 2500 ms after enable
+    And a position setpoint of 0.0 rad is applied
+    And the response is captured for 5000 ms after enable
+    And a position setpoint of 0.0 rad is applied
+    And the response is captured for 7500 ms after enable
+    And a position setpoint of 0.0 rad is applied
+    And the response is captured for 9000 ms after enable
+    Then the position loop shall be running the <position> algorithm
+    And the state machine shall be in the running state
+
+    Examples:
+      | position |
+      | lqr      |
+      | lqi      |
+
   @sil @REQ-SM-006 @REQ-INT-014
   Scenario: A healthy motor turns when commanded and reports its speed
     Given a nominal motor plant

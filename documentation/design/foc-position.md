@@ -2,7 +2,7 @@
 title: "FOC Position Control"
 type: design
 status: draft
-version: 0.1.2
+version: 0.1.3
 component: foc-position
 date: 2026-10-22
 ---
@@ -12,7 +12,7 @@ date: 2026-10-22
 | Title     | FOC Position Control |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.1.1                |
+| Version   | 0.1.3                |
 | Component | foc-position         |
 | Date      | 2026-10-22           |
 
@@ -141,6 +141,7 @@ This ordering guarantees that the Iq setpoint used by the inner loop is always t
 | SelectPositionAlgorithm | Selects the position algorithm.                          | Refused with `busy` while enabled, and with `invalidParameters` when the design does not converge; the previously active algorithm stays live.                                              |
 | SetPoint                | Sets the target position in mechanical radians.          | Written atomically; used on the next outer-loop cycle.                                                                                                                                      |
 | Calculate               | Executes the inner 20 kHz FOC torque loop for one cycle. | Called from the FOC ISR; returns `PhasePwmDutyCycles`. Must not block.                                                                                                                      |
+| ObserveMotion           | Reports the motion the drive asks for and gets.          | Window speed, mean q-axis current, demanded speed and position error, for REQ-SM-028. LQR and LQI demand no speed: they command the current, so the stale speed reference is not one.       |
 
 ### Required
 
