@@ -294,6 +294,17 @@ THEN(R"(the identified {word} shall be within {float} % of the plant)", (std::st
     CompareWithPlant(setup, setup.identified, "identified", quantity, limitPercent, kReferenceCelsius);
 }
 
+THEN(R"(the calibration shall store no cogging map)")
+{
+    const auto& setup = context.Get<ScenarioSetup>();
+    ASSERT_TRUE(setup.identified.coggingPeakNm.has_value()) << "No calibration record was captured";
+
+    std::fprintf(stderr, "[METRIC] ident identified cogging %s plant=%.6g value=%.6g\n",
+        setup.plantName.c_str(), setup.plant.coggingTorqueNm, *setup.identified.coggingPeakNm);
+
+    EXPECT_EQ(*setup.identified.coggingPeakNm, 0.0f) << "A cogging map with a peak of " << *setup.identified.coggingPeakNm << " N·m was stored";
+}
+
 THEN(R"(the identified current offsets shall be within {float} mA of the plant)", (float limitMilliAmpere))
 {
     const auto& setup = context.Get<ScenarioSetup>();
