@@ -46,9 +46,10 @@ namespace application
                     *platformFaultNotifier,
                     configData,
                     ControlMode::OuterLoopArgs{
-                        this->hardware.MaxCurrentSupported(),
-                        this->hardware.BaseFrequency(),
-                        this->hardware.LowPriorityInterrupt() });
+                        .maxCurrent = this->hardware.MaxCurrentSupported(),
+                        .baseFrequency = this->hardware.BaseFrequency(),
+                        .lowPriorityInterrupt = this->hardware.LowPriorityInterrupt(),
+                        .dutyUpdateDelayPeriods = this->hardware.DutyUpdateDelayPeriods() });
                 canBridge.emplace(*motorCanServer, *controlMode, this->hardware, this->hardware, *electricalIdent, nullptr, nvm, configData, this->hardware.Tracer());
                 canLivenessWatchdog.emplace(*canServer, *controlMode, this->hardware.Tracer());
                 encoderPlausibility.Attach([this]() -> const state_machine::FocStateMachineBase&

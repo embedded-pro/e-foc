@@ -134,6 +134,7 @@ namespace application
         ApplyCurrentSense(SampleAndHold::shortest);
         if (plantConfig->maxReadableDutyPercent != 0)
             maxReadableDuty = hal::DutyCycle::FromPercent(plantConfig->maxReadableDutyPercent);
+        dutyDelayed = plantConfig->dutyDelayPeriods != 0;
         model.SetCoulombFriction(foc::NewtonMeter{ plantConfig->coulombFrictionNm });
         model.SetEncoderResolution(plantConfig->encoderCountsPerRevolution);
         model.ResetTemperature();
@@ -392,7 +393,8 @@ namespace application
             responseRecorder.Note(foc::PlantResponseKind::encoderFreeze, PlantSampleAt(tick));
         }
 
-        model.StepForTest(lastDutyPhases);
+        model.StepForTest(dutyDelayed ? appliedDutyPhases : lastDutyPhases);
+        appliedDutyPhases = lastDutyPhases;
         responseRecorder.Capture(PlantSampleAt(tick));
 
         lastCurrents = model.LastMeasuredCurrents();
@@ -522,6 +524,11 @@ namespace application
             return {};
 
         return { std::chrono::nanoseconds{ static_cast<int64_t>(plantConfig->deadTimeCompensationNanoseconds + 0.5f) }, foc::Ampere{ plantConfig->deadTimeCompensationKneeAmpere } };
+    }
+
+    uint32_t PlatformFactoryImpl::DutyUpdateDelayPeriods() const
+    {
+        return dutyDelayed ? 1 : 0;
     }
 
     foc::Radians PlatformFactoryImpl::Read()
