@@ -2,7 +2,7 @@
 title: "Service: Electrical Parameters Identification"
 type: design
 status: draft
-version: 0.3.1
+version: 0.4.0
 component: service-electrical-ident
 date: 2026-10-22
 ---
@@ -398,6 +398,15 @@ with the number of steps its memory holds. Through the bench's current-sense cha
 phase, readings at 10 Hz scattered by 3.6 % (one standard deviation) from one run to the next and reached 8 % low,
 at 20 Hz by 1.9 %, and at 50 Hz by 1.1 %. With the noise removed, the same chain read within 0.2 % from run to run.
 The 10 ms half-period is still six or more times the L/R of the reference motors and the bench motor, 0.6 to 1.6 ms.
+
+The square wave is audible. On the bench it is a ±71 mA d-axis current with harmonics at 150, 250, 350 Hz and
+up, as large as the torque current at light load. The cascades therefore run it in bursts: the first 4 s after
+each enable, then the first 4 s of every 60 s, with the reference at zero in between. The 50 mA threshold above
+makes the estimator skip every window of a pause, so it neither updates nor forgets, and its estimates hold
+until the next burst. A burst holds two memories of the estimator, which converges within it from the wrong
+seeds of REQ-CAL-014; a winding that warms over minutes is still followed, a minute at a time. In simulation
+the bench motor's d-axis current is 75 mA RMS during the first burst and 2.8 mA RMS in the pause after it,
+while the speed reference steps between 30 and 50 rad/s (REQ-CAL-019).
 
 ### Publication
 

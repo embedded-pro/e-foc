@@ -177,3 +177,13 @@
     A calibration whose map cannot be measured shall complete without one. On the bench plant with
     the bench's cogging (24 detents a revolution, 4 mN·m deep) and dry friction (3.7 mN·m), the
     stored map's peak shall be within 10 % of the plant's cogging.
+
+- id: REQ-CAL-019
+  title: The online electrical estimator's d-axis test current runs in bursts
+  shall: >
+    While an online electrical estimator is attached, the speed and position cascades shall add
+    their d-axis square wave for the first 4 s after each enable and for the first 4 s of every
+    60 s after that, and shall hold the d-axis reference at zero in between, where the estimator
+    shall take no update and keep its estimates. On the bench motor driven between 30 and 50 rad/s,
+    the plant's d-axis current shall be above 60 mA RMS from 0.2 to 3.8 s after enable and below
+    10 mA RMS from 4.2 to 9 s after enable.

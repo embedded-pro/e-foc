@@ -10,7 +10,7 @@ Feature: Parameter Identification Against a Known Plant
   motors. The online estimators regress window averages the control interrupt
   accumulates over each outer-loop period, and the resistance is observable
   because the speed and position cascades carry a small d-axis square wave while
-  the electrical estimator runs. With a constant shaft torque the excitation
+  the electrical estimator runs, in bursts of 4 s every 60 s from each enable. With a constant shaft torque the excitation
   waits on the plant's clock until the torque is on: the step that enables the
   motor waits in host time, so a slow host would otherwise start the rotor
   before the load arrives. See Part J of
@@ -214,6 +214,20 @@ Feature: Parameter Identification Against a Known Plant
       | decoupled |
       | deadbeat  |
       | sliding   |
+
+  @sil @REQ-CAL-019
+  Scenario: The d-axis test current runs in a burst after enable and then pauses
+    Given a bench motor plant
+    And the plant response is recorded at 100 Hz for up to 1000 samples
+    And the motor is already calibrated
+    And the motor boots in speed mode
+    When the target boots
+    And the rotor is aligned
+    And the motor is enabled
+    And the speed setpoint alternates between 30 and 50 rad/s every 1000 ms for 9000 ms
+    And the response is captured for 9000 ms after enable
+    Then the d-axis current shall be above 60 mA RMS from 200 to 3800 ms after enable
+    And the d-axis current shall be below 10 mA RMS from 4200 to 9000 ms after enable
 
   @sil @REQ-CAL-018
   Scenario: The full calibration maps the bench's cogging torque

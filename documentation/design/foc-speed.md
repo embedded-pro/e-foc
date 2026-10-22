@@ -2,7 +2,7 @@
 title: "FOC Speed Control"
 type: design
 status: draft
-version: 0.1.1
+version: 0.1.2
 component: foc-speed
 date: 2026-10-22
 ---
@@ -93,7 +93,8 @@ by −2π; if it is less than −π, it is shifted by +2π. This produces a sign
 The speed PID receives the speed error (setpoint minus estimate) and produces the Iq setpoint. Its output is clamped to ± maxCurrent (in Ampere), which directly limits the peak torque the motor can apply while tracking the speed command. This clamp is the primary over-current protection for the speed-control mode.
 
 The d-axis setpoint is 0 A, except while an online electrical estimator is attached: the cascade then
-adds a ±2.5 % of maxCurrent, 50 Hz square wave so the winding resistance stays observable (see
+adds a ±2.5 % of maxCurrent, 50 Hz square wave so the winding resistance stays observable. It runs in
+bursts, the first 4 s of every 60 s from each enable, and the setpoint is 0 A in between (see
 `service-electrical-ident.md`, Excitation).
 
 ### LowPriorityInterrupt — Outer Loop Scheduling
