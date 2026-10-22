@@ -24,6 +24,7 @@ namespace application
         void RunAlignmentOnly(state_machine::Calibrating& calibrating);
         void OnAlignmentSucceeded(state_machine::Calibrating& calibrating, foc::Radians angle);
         void OnMechanicalParametersIdentified(state_machine::Calibrating& calibrating, const state_machine::MechanicalParametersIdentified& event);
+        void OnCoggingMapped(state_machine::Calibrating& calibrating, const state_machine::CoggingMapped& event);
         void Save(state_machine::Calibrating& calibrating);
 
         state_machine::Ready Complete(const state_machine::Calibrating& calibrating);

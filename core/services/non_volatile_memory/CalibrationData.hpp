@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 
 namespace services
@@ -9,6 +11,8 @@ namespace services
         none = 0,
         complete = 1
     };
+
+    inline constexpr std::size_t coggingMapBins = 48;
 
     // All 4-byte fields precede the byte-sized fields to avoid implicit compiler padding.
     // 'reserved1' keeps sizeof(CalibrationData) a multiple of 4 and
@@ -28,11 +32,13 @@ namespace services
         int32_t encoderZeroOffset = 0;
         float currentLoopBandwidth = 0.0f;
         float speedLoopBandwidth = 0.0f;
+        float coggingTorqueScale = 0.0f;
         uint8_t encoderDirection = 0;
         uint8_t polePairs = 0;
         CalibrationStage stage = CalibrationStage::none;
         uint8_t reserved1 = 0;
+        std::array<int8_t, coggingMapBins> coggingTorque{};
     };
 
-    static_assert(sizeof(CalibrationData) == 56, "CalibrationData layout must be free of implicit padding");
+    static_assert(sizeof(CalibrationData) == 108, "CalibrationData layout must be free of implicit padding");
 }

@@ -17,6 +17,7 @@ namespace application
         virtual foc::Controllable& GetFocControl() = 0;
         virtual foc::CurrentLoopTunable& CurrentTunable() = 0;
         virtual void RunPostAlignmentStep(state_machine::Calibrating& calibrating) = 0;
+        virtual bool RunPostMechanicalStep(state_machine::Calibrating& calibrating) = 0;
 
         // Mechanical identification runs the drive under a provisional plant. Whatever ends the run has to
         // say what becomes of it: a committed calibration supersedes it, anything else must put back the

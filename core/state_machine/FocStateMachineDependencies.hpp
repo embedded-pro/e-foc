@@ -3,6 +3,7 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/alignment/MotorAlignment.hpp"
+#include "core/services/cogging_compensation/CoggingMapping.hpp"
 #include "core/services/current_offsets/PhaseCurrentOffsets.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
@@ -34,5 +35,7 @@ namespace application
         foc::Weber fluxLinkage{ foc::Weber{ 0.0f } };
         uint8_t agreeingMechanicalRuns{ 1 };
         std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets{ std::nullopt };
+        bool mapCogging{ false };
+        std::optional<std::reference_wrapper<services::CoggingMapping>> coggingMappingOverride{ std::nullopt };
     };
 }

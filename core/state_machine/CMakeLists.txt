@@ -12,6 +12,7 @@ target_link_libraries(e_foc.state_machine PUBLIC
     e_foc.platform_abstraction
     e_foc.services.alignment
     e_foc.services.cli
+    e_foc.services.cogging_compensation
     e_foc.services.current_offsets
     e_foc.services.electrical_system_ident
     e_foc.services.mechanical_system_ident

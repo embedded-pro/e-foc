@@ -37,6 +37,8 @@ namespace application
         static constexpr uint32_t calibrationRegionSize = 128;
         static constexpr uint32_t configRegionOffset = calibrationRegionOffset + calibrationRegionSize;
         static constexpr uint32_t configRegionSize = 128;
+        static_assert(services::NonVolatileMemoryImpl::calibrationRecordSize <= calibrationRegionSize);
+        static_assert(services::NonVolatileMemoryImpl::configRecordSize <= configRegionSize);
         static constexpr uint32_t controlLoopFrequencyHz = 20000;
         static constexpr uint32_t pwmDeadTimeNs = 500;
         static constexpr float motorFluxLinkageWb = 0.007f;

@@ -18,7 +18,8 @@ namespace state_machine
         polePairs,
         resistanceAndInductance,
         alignment,
-        frictionAndInertia
+        frictionAndInertia,
+        coggingMap
     };
 
     struct Idle

@@ -114,7 +114,8 @@ namespace
             bool resistanceOk = true,
             bool alignmentOk = true,
             bool mechOk = true,
-            bool nvmSaveOk = true)
+            bool nvmSaveOk = true,
+            bool reachesSave = true)
         {
             if (polePairsOk)
                 EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
@@ -200,6 +201,9 @@ namespace
                         }));
                 return;
             }
+
+            if (!reachesSave)
+                return;
 
             if (nvmSaveOk)
             {
@@ -2804,4 +2808,118 @@ TEST_F(FocStateMachineSpeedIdentificationTest, a_refused_electrical_model_still_
     // restore, since the refused electrical model stops the step before the provisional plant is applied.
     EXPECT_GE(cascade.mechanicalConfigurations, 2u);
     EXPECT_NEAR(cascade.lastMechanical.inertia.Value(), 0.01f, 1e-6f);
+}
+
+namespace
+{
+    class FocStateMachineSpeedCoggingTest
+        : public FocStateMachineSpeedCliTest
+    {
+    public:
+        StrictMock<services::CoggingMappingMock> coggingMock;
+        infra::Execute setupCoggingExpectations{ [this]()
+            {
+                EXPECT_CALL(coggingMock, Abort()).Times(AnyNumber());
+            } };
+        bool mappingInFlight{ false };
+
+        SpeedStateMachine CreateStateMachineMappingCogging()
+        {
+            EXPECT_CALL(coggingMock, IsRunning()).WillRepeatedly(Invoke([this]()
+                {
+                    return mappingInFlight;
+                }));
+
+            auto services = application::CalibrationServices{ electricalIdentMock, alignmentMock, std::ref(mechIdentMock), foc::Weber{ 0.007f } };
+            services.coggingMappingOverride = std::ref(coggingMock);
+
+            return SpeedStateMachine{
+                application::TerminalAndTracer{ terminal, tracer },
+                application::MotorHardware{ inverterMock, encoderMock, vdc },
+                nvmMock,
+                services,
+                faultNotifierMock,
+                state_machine::TransitionPolicy::Cli,
+                application::OuterLoopArgs{ foc::Ampere{ 10.0f }, hal::Hertz{ 1000 }, lowPriorityInterruptMock },
+                nvmActivity
+            };
+        }
+
+        static services::CoggingMap AMap()
+        {
+            services::CoggingMap map{};
+            map.torque[3] = 127;
+            map.torque[9] = -127;
+            map.torqueScale = 3.0e-5f;
+            map.peak = foc::NewtonMeter{ 3.8e-3f };
+            return map;
+        }
+    };
+}
+
+TEST_F(FocStateMachineSpeedCoggingTest, calibration_maps_the_cogging_with_the_agreed_mechanics_and_stores_the_map)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    ExpectSpeedCalibrationSequence();
+    auto sm = CreateStateMachineMappingCogging();
+
+    EXPECT_CALL(coggingMock, Measure(_, _, 4, _, _))
+        .WillOnce(Invoke([](foc::NewtonMeter torqueConstant, foc::NewtonMeterSecondSquared inertia, std::size_t, const services::CoggingMapping::Config&, const infra::Function<void(std::optional<services::CoggingMap>)>& onDone)
+            {
+                EXPECT_GT(torqueConstant.Value(), 0.0f);
+                EXPECT_NEAR(inertia.Value(), 0.005f, 1e-6f);
+                onDone(AMap());
+            }));
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    const auto& data = std::get<state_machine::Ready>(sm.CurrentState()).loadedData;
+    EXPECT_EQ(data.coggingTorque, AMap().torque);
+    EXPECT_FLOAT_EQ(data.coggingTorqueScale, AMap().torqueScale);
+}
+
+TEST_F(FocStateMachineSpeedCoggingTest, a_cogging_map_that_cannot_be_measured_leaves_the_calibration_complete_without_one)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    ExpectSpeedCalibrationSequence();
+    auto sm = CreateStateMachineMappingCogging();
+
+    EXPECT_CALL(coggingMock, Measure(_, _, _, _, _))
+        .WillOnce(Invoke([](foc::NewtonMeter, foc::NewtonMeterSecondSquared, std::size_t, const services::CoggingMapping::Config&, const infra::Function<void(std::optional<services::CoggingMap>)>& onDone)
+            {
+                onDone(std::nullopt);
+            }));
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_EQ(std::get<state_machine::Ready>(sm.CurrentState()).loadedData.coggingTorqueScale, 0.0f);
+}
+
+TEST_F(FocStateMachineSpeedCoggingTest, an_emergency_stop_while_mapping_aborts_the_mapping)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    ExpectSpeedCalibrationSequence(true, true, true, true, true, false);
+    auto sm = CreateStateMachineMappingCogging();
+
+    EXPECT_CALL(coggingMock, Measure(_, _, _, _, _))
+        .WillOnce(Invoke([this](foc::NewtonMeter, foc::NewtonMeterSecondSquared, std::size_t, const services::CoggingMapping::Config&, const infra::Function<void(std::optional<services::CoggingMap>)>&)
+            {
+                mappingInFlight = true;
+            }));
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+    ASSERT_TRUE(mappingInFlight);
+
+    EXPECT_CALL(coggingMock, Abort()).Times(AtLeast(1)).WillRepeatedly(Invoke([this]()
+        {
+            mappingInFlight = false;
+        }));
+    EXPECT_EQ(sm.CmdEmergencyStop(), state_machine::CommandResult::ok);
+
+    EXPECT_FALSE(std::holds_alternative<state_machine::Calibrating>(sm.CurrentState()));
 }

@@ -2,9 +2,9 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.3.0
+version: 0.3.1
 component: service-nvm
-date: 2026-04-07
+date: 2026-10-22
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-04-07
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.3.0                        |
+| Version   | 0.3.1                        |
 | Component | service-nvm                  |
-| Date      | 2026-04-07                   |
+| Date      | 2026-10-22                   |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -51,8 +51,10 @@ The service manages two independent EEPROM regions. Each region holds exactly on
 
 | Region        | Magic        | Data structure    | Data size |
 |---------------|--------------|-------------------|-----------|
-| Calibration   | `0xCAFEF00D` | `CalibrationData` | 56 bytes  |
+| Calibration   | `0xCAFEF00D` | `CalibrationData` | 108 bytes |
 | Configuration | `0xDEADBEEF` | `ConfigData`      | 20 bytes  |
+
+The calibration record's layout is at version 4. The cogging map (`service-cogging-compensation.md`) took its data from 56 to 108 bytes, so a record written by an earlier firmware reads as a version mismatch and the motor has to be calibrated again.
 
 The two regions use different `NvmRegion` instances (injected at construction) and can be read, written, and erased independently. An operation on the calibration region has no effect on the configuration region and vice versa.
 

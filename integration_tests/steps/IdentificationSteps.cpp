@@ -86,6 +86,8 @@ namespace
             out.currentOffsetAmpereB = *b / kMilliPerUnit;
         if (const auto c = ValueAfter(line, " Ic_mA="))
             out.currentOffsetAmpereC = *c / kMilliPerUnit;
+        if (const auto cogging = ValueAfter(line, " cog_mNm="))
+            out.coggingPeakNm = *cogging / kMilliPerUnit;
     }
 
     void CompareOffsetWithPlant(const ScenarioSetup& setup, const char* phase, std::optional<float> identified, float bias, float limitMilliAmpere)
@@ -110,6 +112,8 @@ namespace
             return plant.rotorInertiaKgM2;
         if (quantity == "friction")
             return plant.viscousDampingNmSPerRad;
+        if (quantity == "cogging")
+            return plant.coggingTorqueNm;
         return std::nullopt;
     }
 
@@ -123,6 +127,8 @@ namespace
             return parameters.inertiaKgM2;
         if (quantity == "friction")
             return parameters.frictionNmSPerRad;
+        if (quantity == "cogging")
+            return parameters.coggingPeakNm;
         return std::nullopt;
     }
 

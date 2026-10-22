@@ -57,6 +57,17 @@ namespace application
 
         GetOnlineMechEstimator().SetInitialEstimate(foc::NewtonMeterSecondSquared{ data.inertia }, foc::NewtonMeterSecondPerRadian{ data.frictionViscous });
         GetOnlineElecEstimator().SetInitialEstimate(foc::Ohm{ data.rPhase }, foc::MilliHenry{ data.lD });
+        ApplyCoggingMap(data);
+    }
+
+    void OuterLoopStateMachine::ApplyCoggingMap(const services::CalibrationData& data)
+    {
+        const auto torqueConstant = TorqueConstantFor(data);
+
+        if (foc::IsFinitePositive(data.coggingTorqueScale) && foc::IsFinitePositive(torqueConstant.Value()))
+            LoadCoggingCompensation(infra::MakeRange(data.coggingTorque), data.coggingTorqueScale, torqueConstant);
+        else
+            ClearCoggingCompensation();
     }
 
     bool OuterLoopStateMachine::HasValidModeSpecificCalibration(const services::CalibrationData& data) const
@@ -118,14 +129,44 @@ namespace application
         RunMechanicalIdentStep(calibrating);
     }
 
+    bool OuterLoopStateMachine::RunPostMechanicalStep(state_machine::Calibrating& calibrating)
+    {
+        auto* mapping = CoggingMappingImpl();
+        if (mapping == nullptr)
+            return false;
+
+        const auto& pending = calibrating.pendingData;
+        const auto torqueConstant = TorqueConstantFor(pending);
+
+        if (!ApplyMechanics(foc::NewtonMeterSecondSquared{ pending.inertia }, foc::NewtonMeterSecondPerRadian{ pending.frictionViscous }, velocityBandwidthRadPerSec, torqueConstant))
+        {
+            GetTracer().Trace() << "[SM] Cogging map skipped: the measured mechanics do not configure the speed loop";
+            return false;
+        }
+
+        calibrating.step = state_machine::CalibrationStep::coggingMap;
+        GetTracer().Trace() << "[SM] Mapping cogging torque";
+
+        mapping->Measure(torqueConstant, foc::NewtonMeterSecondSquared{ pending.inertia }, static_cast<std::size_t>(pending.polePairs), CoggingConfig(), [this](std::optional<services::CoggingMap> map)
+            {
+                Dispatch(state_machine::CoggingMapped{ map });
+            });
+
+        return true;
+    }
+
     bool OuterLoopStateMachine::HasModeSpecificWorkPending() const
     {
-        return MechIdentImpl().IsRunning();
+        const auto* mapping = CoggingMappingImpl();
+        return MechIdentImpl().IsRunning() || (mapping != nullptr && mapping->IsRunning());
     }
 
     void OuterLoopStateMachine::AbortModeSpecificServices()
     {
         MechIdentImpl().Abort();
+
+        if (auto* mapping = CoggingMappingImpl())
+            mapping->Abort();
     }
 
     services::MechanicalParametersIdentification& OuterLoopStateMachine::ResolveMechIdent(
@@ -142,6 +183,25 @@ namespace application
 
         ownMechIdent.emplace(speedCommandable, drive, observable, inverter, encoder);
         return **ownMechIdent;
+    }
+
+    services::CoggingMapping* OuterLoopStateMachine::ResolveCoggingMapping(
+        const CalibrationServices& calibServices,
+        std::optional<infra::WithSharedAccess<services::CoggingMappingImpl>>& ownCoggingMapping,
+        foc::SpeedCommandable& speedCommandable,
+        foc::Controllable& drive,
+        foc::PhaseCurrentsObservable& observable,
+        drivers::ThreePhaseInverter& inverter,
+        drivers::Encoder& encoder)
+    {
+        if (calibServices.coggingMappingOverride.has_value())
+            return &calibServices.coggingMappingOverride->get();
+
+        if (!calibServices.mapCogging)
+            return nullptr;
+
+        ownCoggingMapping.emplace(speedCommandable, drive, observable, inverter, encoder);
+        return &**ownCoggingMapping;
     }
 
     // Identification needs the loops it is about to excite to be live. Until the electrical model measured
@@ -173,10 +233,18 @@ namespace application
         return config;
     }
 
+    services::CoggingMapping::Config OuterLoopStateMachine::CoggingConfig() const
+    {
+        auto config = services::CoggingMapping::Config{};
+        config.maxCurrent = foc::Ampere{ driveCurrentLimit.Value() * services::identificationCurrentMargin };
+        return config;
+    }
+
     void OuterLoopStateMachine::RunMechanicalIdentStep(state_machine::Calibrating& calibrating)
     {
         calibrating.step = state_machine::CalibrationStep::frictionAndInertia;
         const auto pending = calibrating.pendingData;
+        ClearCoggingCompensation();
 
         if (!ApplyIdentificationControl(pending))
         {

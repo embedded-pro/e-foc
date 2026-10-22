@@ -224,6 +224,7 @@ cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
 | [CLI Service](documentation/design/service-cli.md)                                       | Command-line interface service               |
 | [Current Offsets Service](documentation/design/service-current-offsets.md)               | Current sensor offset calibration service    |
 | [Dead-Time Compensation Service](documentation/design/service-dead-time-compensation.md) | Duty correction for the bridge's dead time   |
+| [Cogging Compensation Service](documentation/design/service-cogging-compensation.md)     | Cogging torque map and current feed-forward  |
 | [Electrical Identification Service](documentation/design/service-electrical-ident.md)    | Resistance and inductance estimation service |
 | [Mechanical Identification Service](documentation/design/service-mechanical-ident.md)    | Friction and inertia estimation service      |
 | [NVM Service](documentation/design/service-nvm.md)                                       | Non-volatile memory persistence service      |

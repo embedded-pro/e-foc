@@ -2,9 +2,9 @@
 title: "Service: Mechanical Parameters Identification"
 type: design
 status: draft
-version: 0.2.0
+version: 0.2.1
 component: service-mechanical-ident
-date: 2026-09-21
+date: 2026-10-22
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-09-21
 | Title     | Service: Mechanical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.2.0                                         |
+| Version   | 0.2.1                                         |
 | Component | service-mechanical-ident                      |
-| Date      | 2026-09-21                                    |
+| Date      | 2026-10-22                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -363,6 +363,16 @@ The mechanical equation of motion for the motor shaft is:
 $$T_e = J \cdot \dot{\omega} + B \cdot \omega + c_\pm, \qquad c_\pm = \tau_L \pm \tau_c$$
 
 The electromagnetic torque is approximated as $T_e = I_q \cdot k_t$, where $k_t = \tfrac{3}{2} p \psi_f$ is derived from the calibration record's pole pairs and flux linkage. Angular acceleration $\dot{\omega}$ and speed $\omega$ come from the window-mean positions of three consecutive observation windows (see Window Kinematics below).
+
+When the calibration holds a cogging map, the cascade adds the map's current to what the speed loop asks for
+(`service-cogging-compensation.md`), and $I_q$ here is the current without that addition. The compensation and
+the plant's cogging then cancel in the torque balance, so the regression is left with only what the map
+missed, rather than the whole cogging as an unmodelled disturbance.
+
+The cogging can mislead this estimator. From a seed off by twice the inertia and half the friction, the plant
+with the bench's cogging and dry friction read the viscous friction 12 times too high after a sweep that
+dwells at 30 and 60 rad/s and then stops through zero; without the cogging, 40 % high. Seeded from a full
+calibration, both read it within 2 %, with or without the map.
 
 The intercept is whatever torque does not scale with the motion: a shaft load $\tau_L$ that keeps its sign,
 plus a dry friction $\tau_c$ that turns with the rotor. Their sum differs by $2\tau_c$ between the two

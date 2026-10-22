@@ -74,6 +74,7 @@ namespace
         NonCommandEvent{ Event<state_machine::AlignmentSucceeded>(), onlyCalibrating },
         NonCommandEvent{ Event<state_machine::CalibrationStepFailed>(), onlyCalibrating },
         NonCommandEvent{ Event<state_machine::MechanicalParametersIdentified>(), onlyCalibrating },
+        NonCommandEvent{ Event<state_machine::CoggingMapped>(), onlyCalibrating },
         NonCommandEvent{ Event<state_machine::CalibrationSaved>(), onlyCalibrating },
         NonCommandEvent{ Event<state_machine::RunCalibrationSequence>(), onlyCalibrating },
         NonCommandEvent{ Event<state_machine::RunAlignmentOnly>(), onlyCalibrating },

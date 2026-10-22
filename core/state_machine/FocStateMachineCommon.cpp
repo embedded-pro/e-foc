@@ -193,6 +193,11 @@ namespace application
             tracer.Trace() << "[SM] Provisional identification model discarded, no calibration held";
     }
 
+    bool FocStateMachineCommon::RunPostMechanicalStep(state_machine::Calibrating& /*calibrating*/)
+    {
+        return false;
+    }
+
     void FocStateMachineCommon::ApplyModeSpecificCalibration(const services::CalibrationData& /*data*/)
     {}
 

@@ -6,6 +6,7 @@
 #include "core/state_machine/OuterLoopStateMachine.hpp"
 #include <functional>
 #include <optional>
+#include <type_traits>
 
 namespace application
 {
@@ -27,6 +28,7 @@ namespace application
             , onlineMechEstimator(services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
             , onlineElecEstimator(services::RealTimeResistanceAndInductanceEstimator::defaultForgettingFactor, outerLoopArgs.outerLoopFrequency)
             , resolvedMechIdent(ResolveMechIdent(calibServices, ownMechIdent, focController, focController, focController, hardware.inverter, hardware.encoder))
+            , resolvedCoggingMapping(ResolveCoggingMapping(calibServices, ownCoggingMapping, focController, focController, focController, hardware.inverter, hardware.encoder))
         {
             focController.SetOnlineMechanicalEstimator(onlineMechEstimator);
             focController.SetOnlineElectricalEstimator(onlineElecEstimator);
@@ -96,11 +98,35 @@ namespace application
             return resolvedMechIdent.get();
         }
 
+        services::CoggingMapping* CoggingMappingImpl() override
+        {
+            return resolvedCoggingMapping;
+        }
+
+        const services::CoggingMapping* CoggingMappingImpl() const override
+        {
+            return resolvedCoggingMapping;
+        }
+
+        void LoadCoggingCompensation(infra::MemoryRange<const int8_t> torque, float torqueScale, foc::NewtonMeter torqueConstant) override
+        {
+            if constexpr (std::is_base_of_v<foc::CoggingCompensable, Cascade>)
+                focController.LoadCoggingMap(torque, torqueScale, torqueConstant);
+        }
+
+        void ClearCoggingCompensation() override
+        {
+            if constexpr (std::is_base_of_v<foc::CoggingCompensable, Cascade>)
+                focController.ClearCoggingMap();
+        }
+
     private:
         Cascade focController;
         services::RealTimeFrictionAndInertiaEstimator onlineMechEstimator;
         services::RealTimeResistanceAndInductanceEstimator onlineElecEstimator;
         std::optional<infra::WithSharedAccess<services::MechanicalParametersIdentificationImpl>> ownMechIdent;
         std::reference_wrapper<services::MechanicalParametersIdentification> resolvedMechIdent;
+        std::optional<infra::WithSharedAccess<services::CoggingMappingImpl>> ownCoggingMapping;
+        services::CoggingMapping* resolvedCoggingMapping;
     };
 }

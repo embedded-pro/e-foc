@@ -2,9 +2,9 @@
 title: "Position Loop — P (Baseline)"
 type: theory
 status: draft
-version: 1.1.0
+version: 1.2.0
 component: "position-loop-pid"
-date: 2026-10-21
+date: 2026-10-22
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-10-21
 | Title     | Position Loop — P (Baseline) |
 | Type      | theory                       |
 | Status    | draft                        |
-| Version   | 1.1.0                        |
+| Version   | 1.2.0                        |
 | Component | position-loop-pid            |
-| Date      | 2026-10-21                   |
+| Date      | 2026-10-22                   |
 
 > **Theory document**: Explains the mathematical and engineering principles behind a component or algorithm.
 > This document is descriptive — it records the *why* and *how* at a scientific level, independent of any
@@ -202,7 +202,9 @@ $$
   The loop holds there only while its stiffness, $2 J\,\omega_{bw}^s\,\omega_{bw}^p$, exceeds the
   cogging's, the detent count times its depth. On the bench at the default bandwidths the two are
   about equal, 0.10 against 0.096 N·m/rad, and the rotor steps between the neighbouring detents
-  instead; 3.0 rad is such a setpoint there. Cascade P does the same.
+  instead; 3.0 rad is such a setpoint there. Cascade P does the same. The calibration's cogging
+  map removes the cogging from what the loop has to hold (`service-cogging-compensation.md`), and
+  with it every position law holds 3.0 rad (REQ-POS-012).
 - No disturbance rejection beyond what the speed loop provides.
 - Encoder noise enters the position estimate. A state observer upstream improves robustness.
 

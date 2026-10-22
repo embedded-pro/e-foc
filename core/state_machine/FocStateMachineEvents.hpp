@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/foc/interfaces/Units.hpp"
+#include "core/services/cogging_compensation/CoggingMap.hpp"
 #include "core/services/non_volatile_memory/CalibrationData.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
@@ -97,6 +98,12 @@ namespace state_machine
         float speedLoopBandwidth;
     };
 
+    struct CoggingMapped
+    {
+        static constexpr const char* name{ "CoggingMapped" };
+        std::optional<services::CoggingMap> map;
+    };
+
     struct CalibrationSaved
     {
         static constexpr const char* name{ "CalibrationSaved" };
@@ -177,6 +184,7 @@ namespace state_machine
         AlignmentSucceeded,
         CalibrationStepFailed,
         MechanicalParametersIdentified,
+        CoggingMapped,
         CalibrationSaved,
         Enable,
         Disable,

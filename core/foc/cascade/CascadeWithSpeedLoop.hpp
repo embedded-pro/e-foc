@@ -7,6 +7,7 @@
 #include "core/foc/interfaces/OnlineEstimators.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/foc/math/AngleWrap.hpp"
+#include "core/foc/math/CoggingFeedForward.hpp"
 #include "core/foc/math/MechanicalWindowAccumulator.hpp"
 #include "core/foc/speed_loop/SpeedControllerSelector.hpp"
 #include "core/foc/transforms/SpaceVectorModulation.hpp"
@@ -33,14 +34,14 @@ namespace foc
 
         void Restart();
 
-        ALWAYS_INLINE_HOT void Accumulate(RotatingFrame measured, RotatingFrame normalizedVoltage, float mechanicalAngle, float polePairs)
+        ALWAYS_INLINE_HOT void Accumulate(RotatingFrame measured, RotatingFrame normalizedVoltage, float mechanicalAngle, float polePairs, float coggingCurrent)
         {
             const auto mechanicalRotation = rotationPrimed ? detail::PositionWithWrapAround(mechanicalAngle - previousMechanicalAngle) : 0.0f;
             const auto electricalRotation = mechanicalRotation * polePairs;
             previousMechanicalAngle = mechanicalAngle;
             rotationPrimed = true;
 
-            mechanical.Accumulate(measured.q, mechanicalRotation);
+            mechanical.Accumulate(measured.q - coggingCurrent, mechanicalRotation);
 
             const auto meanIq = 0.5f * (measured.q + previousIq);
 
@@ -191,6 +192,8 @@ namespace foc
         void UpdateOnlineMechanicalEstimator();
         void UpdateOnlineElectricalEstimator();
         void SetDirectAxisExcitation(Ampere amplitude, hal::Hertz frequency);
+        void LoadCoggingMapImpl(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant);
+        void ClearCoggingMapImpl();
 
     private:
         [[no_unique_address]] Park park;
@@ -217,5 +220,6 @@ namespace foc
         EstimatorChannel estimators;
         EstimatorWindowAccumulator estimatorWindow;
         DirectAxisExcitation directAxisExcitation;
+        CoggingFeedForward coggingFeedForward;
     };
 }

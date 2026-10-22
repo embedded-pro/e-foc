@@ -2,9 +2,9 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.3.0
+version: 0.3.1
 component: state-machine
-date: 2026-09-21
+date: 2026-10-22
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-09-21
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.3.0                      |
+| Version   | 0.3.1                      |
 | Component | state-machine              |
-| Date      | 2026-09-21                 |
+| Date      | 2026-10-22                 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -230,6 +230,7 @@ sequenceDiagram
     participant EI as Electrical Ident
     participant MA as Motor Alignment
     participant MI as Mech Ident (speed modes)
+    participant CM as Cogging Mapping (speed modes)
     participant FOC as FOC Controller
     participant NVM as Non-Volatile Memory
 
@@ -248,6 +249,9 @@ sequenceDiagram
     note over SM,FOC: Failure here fails the step, identification never starts
     SM->>MI: EstimateFrictionAndInertia(bounded excitation)
     MI-->>SM: result (B, J or failure)
+    SM->>FOC: ConfigureMechanics(identified J, B)
+    SM->>CM: Measure(two turns each way)
+    CM-->>SM: cogging map, or none
     SM->>NVM: SaveCalibration(data)
     NVM-->>SM: status
     note over SM: On success: apply data, enter Ready
@@ -264,15 +268,19 @@ sequenceDiagram
 | 3. Alignment                                   | Motor Alignment     | `encoderZeroOffset`                                       |
 | 4. Apply measured model + provisional plant    | FOC controller      | Nothing persisted; makes the loops able to move the rotor |
 | 5. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth`        |
-| 6. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                        |
+| 6. Cogging map (speed/position only)           | Cogging Mapping     | `coggingTorque`, `coggingTorqueScale`; none if unmeasured |
+| 7. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                        |
 
 The offsets apply as soon as they are measured, so the identification and alignment steps after
 them read corrected currents (`service-current-offsets.md`). An electrical identification that
-arrives over CAN does not measure them and keeps the ones in force.
+arrives over CAN does not measure them and keeps the ones in force, and keeps the cogging map too.
+
+The cogging map is measured with the speed loop configured from the identified mechanics, and a
+run that measures no map does not fail the calibration (`service-cogging-compensation.md`).
 
 After saving, calibration data is applied to the FOC controller (current PID gains computed from R/L/bandwidth, velocity PID gains applied for speed modes), and the state machine transitions to `Ready`. The encoder zero offset is not written back to the encoder at this point; it is established only by the alignment step itself during the calibration sequence.
 
-Every record handed to the NVM is traced first as `[SM] Calibration record: R=… L_mH=… p=… J_uNms2=… B_uNms=… Ia_mA=… Ib_mA=… Ic_mA=…`. Inertia and viscous friction are traced in micro-units because the tracer prints three decimals, which cannot show values around 1e-6 and 1e-5; the same convention applies to the `[EST]` lines and the `[SM] Applying mechanical estimates` line below.
+Every record handed to the NVM is traced first as `[SM] Calibration record: R=… L_mH=… p=… J_uNms2=… B_uNms=… Ia_mA=… Ib_mA=… Ic_mA=… cog_mNm=…`, where `cog_mNm` is the peak of the cogging map, 0 when there is none. Inertia and viscous friction are traced in micro-units because the tracer prints three decimals, which cannot show values around 1e-6 and 1e-5; the same convention applies to the `[EST]` lines and the `[SM] Applying mechanical estimates` line below.
 
 The calibration record line is what an external observer, the software-in-the-loop suite included, compares against the plant it configured.
 

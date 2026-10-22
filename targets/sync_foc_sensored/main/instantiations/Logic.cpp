@@ -42,7 +42,7 @@ namespace application
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
                     MotorHardware{ deadTimeCompensation, this->hardware, vdc },
                     nvm,
-                    CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = *currentOffsets },
+                    CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = *currentOffsets, .mapCogging = true },
                     *platformFaultNotifier,
                     configData,
                     ControlMode::OuterLoopArgs{

@@ -123,4 +123,14 @@ namespace foc
     {
         return CalculateInnerLoop(currentPhases, position);
     }
+
+    void SpeedCascade::LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant)
+    {
+        LoadCoggingMapImpl(torque, torqueScale, torqueConstant);
+    }
+
+    void SpeedCascade::ClearCoggingMap()
+    {
+        ClearCoggingMapImpl();
+    }
 }

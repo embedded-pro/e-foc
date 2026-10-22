@@ -215,6 +215,16 @@ Feature: Parameter Identification Against a Known Plant
       | deadbeat  |
       | sliding   |
 
+  @sil @REQ-CAL-018
+  Scenario: The full calibration maps the bench's cogging torque
+    Given a bench motor plant
+    And the plant's shaft has the bench's dry friction and cogging
+    And the motor boots in speed mode
+    When the target boots
+    And the full calibration is run from the terminal
+    Then the identified cogging shall be within 10 % of the plant
+    And the identified inertia shall be within 5 % of the plant
+
   @sil @REQ-CAL-014
   Scenario Outline: The online resistance estimate follows the plant (<motor>)
     Given a <motor> motor plant
