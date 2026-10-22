@@ -38,7 +38,7 @@ namespace foc
     namespace
     {
         constexpr float excitationCurrentFraction{ 0.025f };
-        const hal::Hertz excitationFrequency{ 10 };
+        const hal::Hertz excitationFrequency{ 50 };
     }
 
     EstimatorWindowAccumulator::EstimatorWindowAccumulator(hal::Hertz tickFrequency, uint32_t ticksPerWindow, uint32_t dutyUpdateDelayPeriods)

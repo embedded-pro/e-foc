@@ -2,9 +2,9 @@
 title: "FOC Position Control"
 type: design
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: foc-position
-date: 2026-04-07
+date: 2026-10-22
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-04-07
 | Title     | FOC Position Control |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.1.0                |
+| Version   | 0.1.1                |
 | Component | foc-position         |
-| Date      | 2026-04-07           |
+| Date      | 2026-10-22           |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -97,7 +97,7 @@ When a speed-reference position law is active, the speed setpoint consumed by th
 The inner loop is functionally identical to the FOC Torque Control design document: Clarke, Park, d-axis PID, q-axis PID, inverse Park, and SVM. It runs independently at 20 kHz and reads its Iq setpoint from the value most recently written by the middle loop.
 
 The d-axis setpoint is 0 A, except while an online electrical estimator is attached: the cascade then
-adds a ±2.5 % of maxCurrent, 10 Hz square wave so the winding resistance stays observable (see
+adds a ±2.5 % of maxCurrent, 50 Hz square wave so the winding resistance stays observable (see
 `service-electrical-ident.md`, Excitation).
 
 ### Enable and Disable
@@ -158,7 +158,7 @@ This ordering guarantees that the Iq setpoint used by the inner loop is always t
 | Position PID output | ω_sp                | RadiansPerSecond (float) | [−bw·π, +bw·π] rad/s                     | Clamped speed setpoint; saturation = one speed-loop bandwidth per π rad of error |
 | Estimated speed     | ω                   | RadiansPerSecond (float) | computed from Δθ/Δt                      | Finite difference with ±π wrap correction                                        |
 | Speed PID output    | Iq_sp               | Ampere (float)           | ± maxCurrent                             | Written to inner loop                                                            |
-| d-axis setpoint     | Id_sp               | Ampere (float)           | 0 A; ±2.5 % Imax at 10 Hz with estimator | SPMSM maximum torque per ampere                                                  |
+| d-axis setpoint     | Id_sp               | Ampere (float)           | 0 A; ±2.5 % Imax at 50 Hz with estimator | SPMSM maximum torque per ampere                                                  |
 | Previous angle      | θm_prev             | Radians (float)          | [0, 2π)                                  | Saved each outer cycle for speed estimator                                       |
 | Outer loop period   | Δt                  | Seconds (float)          | 1 / outer_frequency                      | Constant after construction                                                      |
 | Pole pairs          | P                   | Integer (unsigned)       | ≥ 1                                      | Motor property                                                                   |

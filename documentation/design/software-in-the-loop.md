@@ -2,9 +2,9 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.4.0
+version: 1.4.1
 component: "software-in-the-loop"
-date: 2026-09-23
+date: 2026-10-22
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-09-23
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.4.0                       |
+| Version   | 1.4.1                       |
 | Component | software-in-the-loop        |
-| Date      | 2026-09-23                  |
+| Date      | 2026-10-22                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -625,7 +625,7 @@ What the first characterisation found, in the order it was found:
   also paired each current with the voltage commanded on the same tick, which contains the PI's
   own −Kp·id and pulled the resistance negative by about Kp, and it differentiated two
   instantaneous currents a millisecond apart. The cascades now carry a d-axis square wave while
-  the estimator is attached (±2.5 % of the current limit at 10 Hz, no torque on a non-salient
+  the estimator is attached (±2.5 % of the current limit, now at 50 Hz, no torque on a non-salient
   machine), and the estimator regresses the integrated d-axis equation over window averages that
   pair each current with the voltage applied while it formed (`service-electrical-ident.md`).
   The resistance then reads 0.360 Ω and 0.405 Ω.

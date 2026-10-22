@@ -13,7 +13,7 @@ namespace services
         : public foc::OnlineElectricalEstimator
     {
     public:
-        static constexpr float defaultForgettingFactor = 0.999f;
+        static constexpr float defaultForgettingFactor = 0.9995f;
         static constexpr float minimumDirectCurrent = 0.05f;
         static constexpr uint16_t minimumUpdates = 200;
 
