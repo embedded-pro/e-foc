@@ -137,7 +137,7 @@ jobs:
           version="${{ needs.release_please.outputs.version }}"
           staging="staging/simulator"
           mkdir -p "$staging"
-          find build/tools/simulator -name "e_foc.tool.simulator.exe" -type f -exec cp {} "$staging/" \;
+          find build/tools -name "e_foc.tool.simulator.exe" -type f -exec cp {} "$staging/" \;
           test -f "$staging/e_foc.tool.simulator.exe"
           windeployqt --release --no-translations "$staging/e_foc.tool.simulator.exe"
           cp tools/simulator/config/*.json "$staging/"
@@ -148,7 +148,7 @@ jobs:
           version="${{ needs.release_please.outputs.version }}"
           staging="staging/can_commander"
           mkdir -p "$staging"
-          find build/tools/can_commander -name "e_foc.tool.can_commander.exe" -type f -exec cp {} "$staging/" \;
+          find build/tools -name "e_foc.tool.can_commander.exe" -type f -exec cp {} "$staging/" \;
           test -f "$staging/e_foc.tool.can_commander.exe"
           windeployqt --release --no-translations "$staging/e_foc.tool.can_commander.exe"
           7z a "e_foc-can_commander-${version}-windows-x86_64.zip" "./staging/can_commander/*"
