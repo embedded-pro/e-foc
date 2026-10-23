@@ -211,6 +211,32 @@ Feature: Parameter Identification Against a Known Plant
     Then the online friction estimate shall be within 10 % of the plant
     And the online inertia estimate shall be within 2 % of the plant
 
+  @sil @REQ-CAL-016
+  Scenario Outline: A stop through zero leaves the online friction where the speed levels put it (<speed> speed loop)
+    Given a bench motor plant
+    And the plant's shaft has the bench's dry friction and cogging
+    And a motor plant with:
+      | viscous_damping_nm_s_per_rad | 0.00001 |
+    And the plant response is recorded at 100 Hz for up to 2000 samples
+    And the motor is already calibrated
+    And the motor boots in speed mode
+    And the speed loop runs the <speed> algorithm
+    When the target boots
+    And the rotor is aligned
+    And the motor is enabled
+    And the speed setpoint is held at 30 rad/s for 2500 ms
+    And the speed setpoint is held at 60 rad/s for 2500 ms
+    And the speed setpoint is held at -30 rad/s for 2500 ms
+    And the speed setpoint is held at 0 rad/s for 2500 ms
+    And the online estimates are read
+    Then the online friction estimate shall be within 10 % of the plant
+
+    Examples:
+      | speed |
+      | pid   |
+      | lqi   |
+      | adrc  |
+
   @sil @REQ-CAL-017
   Scenario Outline: The online electrical estimates hold under the <current> current law when each duty acts a period late
     Given a bench motor plant

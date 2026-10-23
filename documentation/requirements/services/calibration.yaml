@@ -163,7 +163,13 @@
     dry friction, seeded with an inertia twice and a viscous friction half the plant's, and excited
     by a speed reference alternating between 30 and 60 rad/s every second for four seconds and then
     between -30 and -60 rad/s for four more, it shall report a viscous friction within 10 % and an
-    inertia within 2 % of the plant's.
+    inertia within 2 % of the plant's. The estimator shall publish the viscous friction from the mean torques
+    of the runs at a constant speed, as one slope pooled over both directions about each direction's own
+    means, rather than from the regressions, so that neither a stop through zero after the
+    speed levels nor the speed loop's answer to the torque ripple at a level can move it: on the bench motor
+    with its cogging and dry friction and a viscous friction of 10 µN·m·s, held 2.5 s each at 30, 60, -30 and
+    0 rad/s, the online viscous friction shall be within 10 % of the plant's under the PID, LQI and ADRC speed
+    loops.
 
 - id: REQ-CAL-017
   title: Online electrical estimates hold on a board that applies each duty a period late

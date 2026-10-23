@@ -2,7 +2,7 @@
 title: "Service: Mechanical Parameters Identification"
 type: design
 status: draft
-version: 0.4.0
+version: 0.4.1
 component: service-mechanical-ident
 date: 2026-10-23
 ---
@@ -12,7 +12,7 @@ date: 2026-10-23
 | Title     | Service: Mechanical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.4.0                                         |
+| Version   | 0.4.1                                         |
 | Component | service-mechanical-ident                      |
 | Date      | 2026-10-23                                    |
 
@@ -446,7 +446,8 @@ directions of rotation, and nothing in one direction's data says how it splits. 
 **one fit per direction**. Each carries the regressor $\phi = [1,\ \dot{\omega},\ \omega]^T$ and the
 parameters $\theta = [c_\pm,\ J,\ B]^T$, with the scalar output $T_e$, and an RLS with a forgetting factor of
 0.9995 updates the fit of the direction an observation moves in, once per observation window. Each fit has its
-own covariance, excitation count, residual and settled state, and whichever fit settles publishes $J$ and $B$.
+own covariance, excitation count, residual and settled state, and whichever fit settles publishes its $J$ and
+the viscous friction of its constant-speed runs (below).
 
 One fit for both directions used to read a reversal wrongly. Its intercept could not follow the step of
 $2\tau_c$, so the fit put it on the viscous column, whose speed reverses too: the speed sweep on the rig, 30,
@@ -456,6 +457,34 @@ $\tau_c\,\mathrm{sgn}(\omega)$ instead fixed that but read a constant shaft torq
 backwards wrongly instead, 3 to 5 times the plant's friction. Two fits read both.
 
 An observation whose speed is smaller than its acceleration times one observation window may cross zero inside the window, where it belongs to neither direction. It is refused.
+
+The viscous friction a fit publishes does not come from its regression. Each fit also averages every run of
+observations whose speed stays within 3 % of the run's mean, at least 16 and at most 256 observations long, into
+one mean speed and one mean torque less the fit's inertia times the run's mean acceleration. A line through those
+means, weighted by their lengths and forgotten at the regression's rate, gives the viscous friction as its slope.
+The viscous friction is the same both ways while the intercepts are not, so the slope is pooled over both
+directions, each direction's runs taken about their own means. It is published once either direction's means
+span distinct speeds, a weighted spread of at least an eighth of their mean speed, and held at its last value
+when neither does.
+
+The regression's own viscous term also takes the torque of every transient between the speeds and of every
+ripple at one speed, both much larger than the torque difference friction makes between two constant speeds.
+On the rig, the speed sweep that holds 30 and 60 rad/s and then stops through zero read the online viscous
+friction at 1.0 to 1.6 times the calibration's under the PID and two-degree-of-freedom speed loops and at 0.1 to
+0.7 times it under LQI and ADRC, while the mean torques of constant-speed holds from 10 to 60 rad/s gave a slope
+of 8 to 11 µN·m·s for every law. In simulation, on the bench plant with its cogging and dry friction and
+10 µN·m·s, the regression read 9.0 after the two holds and 19.8 after the stop under the PID loop; the means read
+9.6 to 9.8 at both points under PID, LQI and ADRC. Within a run the speed loop answers each dip with torque, so
+the scatter there has the loop's stiffness for a slope, hundreds of times the friction; the means carry none of it.
+
+The rig's friction is not linear in speed: its constant-speed torque stays at about 3.75 mN·m from 10 to 30 rad/s
+and rises at about 13 µN·m·s above that. The slope published is the line through the speeds the motor has run at.
+A slope per direction, published by whichever direction ran last, read the rig's sweep correctly under PID and the
+two-degree-of-freedom loop and at 0 to 0.3 times the calibration's under LQI and ADRC: the negative direction only
+held -10 rad/s, in the calibration's cogging pass, and -30 rad/s, both where the friction is flat, so its slope was
+about 0, and only the PID loops overshot into the positive direction when they stopped, which published that
+direction's 10 to 12 µN·m·s instead. Pooled, a direction held only at flat speeds weighs in by its small spread,
+and the sweep reads 0.85 to 1.08 times the calibration's friction under every current and speed law.
 
 A fit that only ever sees one speed cannot tell its intercept from its viscous friction, since $\omega$ is
 then constant. The span of speeds a publication waits for (Persistence of Excitation below) is therefore taken

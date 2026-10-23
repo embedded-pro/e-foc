@@ -7,6 +7,7 @@
 #include "core/services/mechanical_system_ident/FrictionAndInertiaEstimator.hpp"
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
 #include "core/services/mechanical_system_ident/MechanicalWindowKinematics.hpp"
+#include "core/services/mechanical_system_ident/SteadySpeedFrictionFit.hpp"
 #include "numerical/estimators/online/RecursiveLeastSquares.hpp"
 #include <array>
 #include <optional>
@@ -42,6 +43,7 @@ namespace services
         struct DirectionalFit
         {
             std::optional<MotorRLS> rls;
+            SteadySpeedFrictionFit steady;
             MotorRLS::EstimationMetrics metrics{};
             uint16_t periods{ 0 };
             MechanicalExcitation excitation;
@@ -50,9 +52,11 @@ namespace services
         };
 
         void ReseedOnline();
-        bool IsOnlineObservationInformative(float acceleration, float speed, const DirectionalFit& fit) const;
+        bool IsOnlineObservationInDirection(float acceleration, float speed) const;
+        bool IsOnlineObservationInformative(float acceleration, const DirectionalFit& fit) const;
         bool HasOnlineEstimateSettled(const DirectionalFit& fit) const;
         void PublishOnlineEstimate(const DirectionalFit& fit);
+        std::optional<float> SteadyFriction() const;
 
         float samplingFrequency;
         float forgettingFactor;
