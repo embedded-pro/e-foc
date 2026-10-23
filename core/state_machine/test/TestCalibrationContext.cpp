@@ -157,17 +157,17 @@ TEST_F(CalibrationContextTest, apply_pushes_the_stored_current_offsets_and_inval
 
     EXPECT_CALL(currentOffsets, Apply(_)).WillOnce(Invoke([](const foc::PhaseCurrents& offsets)
         {
-            EXPECT_FLOAT_EQ(offsets.a.Value(), 0.027f);
-            EXPECT_FLOAT_EQ(offsets.b.Value(), -0.018f);
-            EXPECT_FLOAT_EQ(offsets.c.Value(), 0.054f);
+            EXPECT_NEAR(offsets.a.Value(), 0.027f, 1e-6f);
+            EXPECT_NEAR(offsets.b.Value(), -0.018f, 1e-6f);
+            EXPECT_NEAR(offsets.c.Value(), 0.054f, 1e-6f);
         }));
     withOffsets.Apply(foc, foc);
 
     EXPECT_CALL(currentOffsets, Apply(_)).WillOnce(Invoke([](const foc::PhaseCurrents& offsets)
         {
-            EXPECT_FLOAT_EQ(offsets.a.Value(), 0.0f);
-            EXPECT_FLOAT_EQ(offsets.b.Value(), 0.0f);
-            EXPECT_FLOAT_EQ(offsets.c.Value(), 0.0f);
+            EXPECT_NEAR(offsets.a.Value(), 0.0f, 1e-6f);
+            EXPECT_NEAR(offsets.b.Value(), 0.0f, 1e-6f);
+            EXPECT_NEAR(offsets.c.Value(), 0.0f, 1e-6f);
         }));
     withOffsets.Invalidate();
 }

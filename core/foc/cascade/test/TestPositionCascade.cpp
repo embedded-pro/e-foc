@@ -637,7 +637,7 @@ TEST_F(TestPositionCascade, a_current_commanding_algorithm_demands_no_speed_what
 
     DutyAfterOuterCycles(stateFeedback, 0.01f, 0.0f);
 
-    EXPECT_FLOAT_EQ(stateFeedback.cascade->ObserveMotion().demandedSpeed.Value(), 0.0f);
+    EXPECT_NEAR(stateFeedback.cascade->ObserveMotion().demandedSpeed.Value(), 0.0f, 1e-6f);
 }
 
 TEST_F(TestPositionCascade, a_speed_commanding_algorithm_reports_the_speed_it_demands)

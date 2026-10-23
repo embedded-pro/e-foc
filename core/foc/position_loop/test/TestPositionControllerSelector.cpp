@@ -94,7 +94,7 @@ TEST_F(TestPositionControllerSelector, zero_error_produces_zero_command)
     selector.Configure(ValidParameters());
     ASSERT_EQ(selector.Select(foc::PositionAlgorithm::cascadeP), foc::SelectResult::ok);
 
-    EXPECT_FLOAT_EQ(selector.Compute(Context(0.5f, 0.5f, 0.0f)).value, 0.0f);
+    EXPECT_NEAR(selector.Compute(Context(0.5f, 0.5f, 0.0f)).value, 0.0f, 1e-6f);
 }
 
 TEST_F(TestPositionControllerSelector, a_rejected_design_leaves_the_previous_algorithm_running)

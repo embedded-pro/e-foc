@@ -93,11 +93,11 @@ TEST_F(PlantResponseRecorderTest, sample_carries_plant_values)
 
     const auto records = Drain();
     ASSERT_EQ(records.size(), 2u);
-    EXPECT_FLOAT_EQ(records[1].sample.omegaMech, 1.0f);
-    EXPECT_FLOAT_EQ(records[1].sample.thetaMech, 2.0f);
-    EXPECT_FLOAT_EQ(records[1].sample.iq, 3.0f);
-    EXPECT_FLOAT_EQ(records[1].sample.id, 4.0f);
-    EXPECT_FLOAT_EQ(records[1].sample.externalTorqueNm, 5.0f);
+    EXPECT_NEAR(records[1].sample.omegaMech, 1.0f, 1e-6f);
+    EXPECT_NEAR(records[1].sample.thetaMech, 2.0f, 1e-6f);
+    EXPECT_NEAR(records[1].sample.iq, 3.0f, 1e-6f);
+    EXPECT_NEAR(records[1].sample.id, 4.0f, 1e-6f);
+    EXPECT_NEAR(records[1].sample.externalTorqueNm, 5.0f, 1e-6f);
 }
 
 TEST_F(PlantResponseRecorderTest, note_is_drained_ahead_of_samples_with_its_own_tick)

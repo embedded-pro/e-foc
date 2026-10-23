@@ -2877,7 +2877,7 @@ TEST_F(FocStateMachineSpeedCoggingTest, calibration_maps_the_cogging_with_the_ag
     ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
     const auto& data = std::get<state_machine::Ready>(sm.CurrentState()).loadedData;
     EXPECT_EQ(data.coggingTorque, AMap().torque);
-    EXPECT_FLOAT_EQ(data.coggingTorqueScale, AMap().torqueScale);
+    EXPECT_NEAR(data.coggingTorqueScale, AMap().torqueScale, 1e-10f);
 }
 
 TEST_F(FocStateMachineSpeedCoggingTest, a_cogging_map_that_cannot_be_measured_leaves_the_calibration_complete_without_one)

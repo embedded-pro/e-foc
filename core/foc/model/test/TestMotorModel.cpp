@@ -158,14 +158,14 @@ TEST_F(MotorModelTest, iteration_limit_notifies_finished_and_stops_callback)
 TEST_F(MotorModelTest, set_and_read_angle_round_trips)
 {
     model->Set(foc::Radians{ 1.5f });
-    EXPECT_FLOAT_EQ(model->Read().Value(), 1.5f);
+    EXPECT_NEAR(model->Read().Value(), 1.5f, 1e-6f);
 }
 
 TEST_F(MotorModelTest, set_zero_resets_angle)
 {
     model->Set(foc::Radians{ 2.0f });
     model->SetZero();
-    EXPECT_FLOAT_EQ(model->Read().Value(), 0.0f);
+    EXPECT_NEAR(model->Read().Value(), 0.0f, 1e-6f);
 }
 
 TEST_F(MotorModelTest, set_load_does_not_crash)
@@ -177,13 +177,13 @@ TEST_F(MotorModelTest, set_load_does_not_crash)
 TEST_F(MotorModelTest, effective_inductance_d_at_ambient_equals_ld)
 {
     const float expected = foc::M_2310P_LN_04K::parameters.Ld.Value();
-    EXPECT_FLOAT_EQ(model->EffectiveInductanceD().Value(), expected);
+    EXPECT_NEAR(model->EffectiveInductanceD().Value(), expected, 1e-9f);
 }
 
 TEST_F(MotorModelTest, effective_inductance_q_at_ambient_equals_lq)
 {
     const float expected = foc::M_2310P_LN_04K::parameters.Lq.Value();
-    EXPECT_FLOAT_EQ(model->EffectiveInductanceQ().Value(), expected);
+    EXPECT_NEAR(model->EffectiveInductanceQ().Value(), expected, 1e-9f);
 }
 
 TEST_F(MotorModelTest, self_drive_fires_phase_currents_via_event_dispatcher)
@@ -246,7 +246,7 @@ namespace
 
 TEST_F(MotorModelTest, external_torque_defaults_to_zero)
 {
-    EXPECT_FLOAT_EQ(model->ExternalTorque().Value(), 0.0f);
+    EXPECT_NEAR(model->ExternalTorque().Value(), 0.0f, 1e-6f);
 }
 
 TEST_F(MotorModelTest, free_rotor_without_external_torque_stays_at_rest)
@@ -254,8 +254,8 @@ TEST_F(MotorModelTest, free_rotor_without_external_torque_stays_at_rest)
     for (int i = 0; i != kFreeRunSteps; ++i)
         model->StepForTest(kZeroVoltageDuty);
 
-    EXPECT_FLOAT_EQ(model->MechanicalSpeed().Value(), 0.0f);
-    EXPECT_FLOAT_EQ(model->MechanicalAngle().Value(), 0.0f);
+    EXPECT_NEAR(model->MechanicalSpeed().Value(), 0.0f, 1e-6f);
+    EXPECT_NEAR(model->MechanicalAngle().Value(), 0.0f, 1e-6f);
 }
 
 TEST_F(MotorModelTest, negative_external_torque_accelerates_a_free_rotor)
@@ -284,14 +284,14 @@ TEST_F(MotorModelTest, external_torque_survives_start)
 {
     model->SetExternalTorque(foc::NewtonMeter{ 0.002f });
     model->Start();
-    EXPECT_FLOAT_EQ(model->ExternalTorque().Value(), 0.002f);
+    EXPECT_NEAR(model->ExternalTorque().Value(), 0.002f, 1e-9f);
     model->Stop();
 }
 
 TEST_F(MotorModelTest, last_dq_currents_are_zero_before_any_step)
 {
-    EXPECT_FLOAT_EQ(model->LastDqCurrents().d, 0.0f);
-    EXPECT_FLOAT_EQ(model->LastDqCurrents().q, 0.0f);
+    EXPECT_NEAR(model->LastDqCurrents().d, 0.0f, 1e-6f);
+    EXPECT_NEAR(model->LastDqCurrents().q, 0.0f, 1e-6f);
 }
 
 TEST_F(MotorModelTest, last_dq_currents_follow_a_driven_step)

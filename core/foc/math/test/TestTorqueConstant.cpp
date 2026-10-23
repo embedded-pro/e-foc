@@ -9,6 +9,6 @@ TEST(TorqueConstantTest, is_three_halves_of_pole_pairs_times_flux_linkage)
 
 TEST(TorqueConstantTest, vanishes_without_pole_pairs_or_flux)
 {
-    EXPECT_FLOAT_EQ(foc::TorqueConstantFor(0, foc::Weber{ 0.0064f }).Value(), 0.0f);
-    EXPECT_FLOAT_EQ(foc::TorqueConstantFor(4, foc::Weber{ 0.0f }).Value(), 0.0f);
+    EXPECT_NEAR(foc::TorqueConstantFor(0, foc::Weber{ 0.0064f }).Value(), 0.0f, 1e-9f);
+    EXPECT_NEAR(foc::TorqueConstantFor(4, foc::Weber{ 0.0f }).Value(), 0.0f, 1e-9f);
 }

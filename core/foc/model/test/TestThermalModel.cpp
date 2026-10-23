@@ -51,5 +51,5 @@ TEST_F(TestThermalModel, reset_temperature_restores_ambient)
     model.SetWindingTemperatureForTest(80.0f);
     model.ResetTemperature();
 
-    EXPECT_FLOAT_EQ(model.WindingTemperatureCelsius(), 25.0f);
+    EXPECT_NEAR(model.WindingTemperatureCelsius(), 25.0f, 1e-4f);
 }

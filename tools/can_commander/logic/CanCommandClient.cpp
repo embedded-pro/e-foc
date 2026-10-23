@@ -2,29 +2,10 @@
 #include "can-lite/core/CanFrameCodec.hpp"
 #include "can-lite/core/CanPayload.hpp"
 #include "core/can/FocMotorWireContract.hpp"
-#include <algorithm>
-#include <cmath>
-#include <limits>
 
 namespace tool
 {
     using namespace services;
-
-    namespace
-    {
-        // Clamp before converting: an out-of-range float cast to int32_t is undefined behaviour
-        int32_t ScaleAndClampToInt16(float value, float scale)
-        {
-            const float scaled = value * scale;
-            if (std::isnan(scaled))
-                return 0;
-
-            constexpr float minInt16 = static_cast<float>(std::numeric_limits<int16_t>::min());
-            constexpr float maxInt16 = static_cast<float>(std::numeric_limits<int16_t>::max());
-
-            return static_cast<int32_t>(std::clamp(scaled, minInt16, maxInt16));
-        }
-    }
 
     CanCommandClient::CanCommandClient(CanBusAdapter& adapter)
         : focClient{ adapter, nodeId }
@@ -44,6 +25,7 @@ namespace tool
     void CanCommandClient::SetNodeId(uint16_t id)
     {
         nodeId = id;
+        focClient.SetNodeId(id);
     }
 
     uint16_t CanCommandClient::NodeId() const
@@ -71,73 +53,70 @@ namespace tool
     void CanCommandClient::SendStartMotor()
     {
         SetBusy(true);
-        if (focClient.Start())
+        if (!focClient.Start())
             SetBusy(false);
     }
 
     void CanCommandClient::SendStopMotor()
     {
         SetBusy(true);
-        if (focClient.Stop())
+        if (!focClient.Stop())
             SetBusy(false);
     }
 
     void CanCommandClient::SendEmergencyStop()
     {
         SetBusy(true);
-        if (focClient.EmergencyStop())
+        if (!focClient.EmergencyStop())
             SetBusy(false);
     }
 
     void CanCommandClient::SendSetControlMode(can::FocMotorMode mode)
     {
         SetBusy(true);
-        if (focClient.SelectControlMode(mode))
+        if (!focClient.SelectControlMode(mode))
             SetBusy(false);
     }
 
     void CanCommandClient::SendSetTorqueSetpoint(float iqCurrent)
     {
         SetBusy(true);
-        const auto scaled = ScaleAndClampToInt16(iqCurrent, can::focCurrentScale);
-        if (focClient.SetTorque(foc::Ampere{ static_cast<float>(scaled) / can::focCurrentScale }))
+        if (!focClient.SetTorque(foc::Ampere{ iqCurrent }))
             SetBusy(false);
     }
 
     void CanCommandClient::SendSetSpeedSetpoint(float speedRadPerSec)
     {
         SetBusy(true);
-        const auto scaled = ScaleAndClampToInt16(speedRadPerSec, can::focSpeedScale);
-        if (focClient.SetSpeed(foc::RadiansPerSecond{ static_cast<float>(scaled) / can::focSpeedScale }))
+        if (!focClient.SetSpeed(foc::RadiansPerSecond{ speedRadPerSec }))
             SetBusy(false);
     }
 
     void CanCommandClient::SendSetPositionSetpoint(float positionRad)
     {
         SetBusy(true);
-        const auto scaled = ScaleAndClampToInt16(positionRad, can::focPositionScale);
-        if (focClient.SetPosition(foc::Radians{ static_cast<float>(scaled) / can::focPositionScale }))
+        if (!focClient.SetPosition(foc::Radians{ positionRad }))
             SetBusy(false);
     }
 
     void CanCommandClient::SendSetCurrentBandwidth(float bandwidth)
     {
         SetBusy(true);
-        if (focClient.SetCurrentBandwidth(bandwidth))
+        if (!focClient.SetCurrentBandwidth(bandwidth))
             SetBusy(false);
     }
 
     void CanCommandClient::SendSetSpeedBandwidth(float bandwidth)
     {
         SetBusy(true);
-        if (focClient.SetSpeedBandwidth(bandwidth))
+        if (!focClient.SetSpeedBandwidth(bandwidth))
             SetBusy(false);
     }
 
     void CanCommandClient::SendSetPositionBandwidth(float bandwidth)
     {
         SetBusy(true);
-        if (focClient.SetPositionBandwidth(bandwidth))
+        if (!focClient.SetPositionBandwidth(bandwidth))
             SetBusy(false);
     }
 
@@ -155,8 +134,11 @@ namespace tool
             });
     }
 
-    void CanCommandClient::OnServerOnline(uint16_t /*nodeId*/)
+    void CanCommandClient::OnServerOnline(uint16_t serverNodeId)
     {
+        if (serverNodeId != nodeId)
+            return;
+
         RequestData();
 
         NotifyObservers([](auto& observer)
@@ -165,8 +147,11 @@ namespace tool
             });
     }
 
-    void CanCommandClient::OnServerOffline(uint16_t /*nodeId*/)
+    void CanCommandClient::OnServerOffline(uint16_t serverNodeId)
     {
+        if (serverNodeId != nodeId)
+            return;
+
         NotifyObservers([](auto& observer)
             {
                 observer.OnConnectionChanged(false);
@@ -256,16 +241,8 @@ namespace tool
             hal::Can::Message msg;
             for (auto b : data)
                 msg.push_back(b);
-            if (msgType == can::focTelemetryStatusResponseId)
-            {
-                DecodeTelemetryStatus(msg);
+            if (msgType == can::focTelemetryStatusResponseId || msgType == can::focTelemetryElectricalResponseId)
                 consumed = true;
-            }
-            else if (msgType == can::focTelemetryElectricalResponseId)
-            {
-                DecodeTelemetryElectrical(msg);
-                consumed = true;
-            }
             else if (msgType == canCommandAckMessageTypeId && category == canSystemCategoryId && msg.size() >= canCommandAckSize)
             {
                 const uint8_t ackCategory = msg[0];

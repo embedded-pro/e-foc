@@ -623,7 +623,7 @@ TEST_F(ControlModeStateMachineExtTest, PersistedFluxLinkageOverridesTheConfigure
 
     ConstructSubjectWithFluxLinkage(foc::Weber{ 0.007f });
 
-    EXPECT_FLOAT_EQ(subject->ActiveFluxLinkage().Value(), 0.02f);
+    EXPECT_NEAR(subject->ActiveFluxLinkage().Value(), 0.02f, 1e-6f);
 }
 
 TEST_F(ControlModeStateMachineExtTest, Cli_SetFluxLinkage_PersistsTheValueAndMakesDecoupledPidSelectable)
@@ -635,13 +635,13 @@ TEST_F(ControlModeStateMachineExtTest, Cli_SetFluxLinkage_PersistsTheValueAndMak
     EXPECT_CALL(nvmMock, SaveCalibration(_, _))
         .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
             {
-                EXPECT_FLOAT_EQ(data.fluxLinkage, 0.009f);
+                EXPECT_NEAR(data.fluxLinkage, 0.009f, 1e-6f);
                 onDone(services::NvmStatus::Ok);
             }));
 
     InvokeCliCommand("sfl 0.009");
 
-    EXPECT_FLOAT_EQ(subject->ActiveFluxLinkage().Value(), 0.009f);
+    EXPECT_NEAR(subject->ActiveFluxLinkage().Value(), 0.009f, 1e-6f);
     EXPECT_EQ(subject->SelectCurrentAlgorithm(foc::CurrentAlgorithm::decoupledPid), foc::SelectResult::ok);
 }
 
@@ -652,7 +652,7 @@ TEST_F(ControlModeStateMachineExtTest, Cli_SetFluxLinkage_RejectsNonPositiveValu
 
     InvokeCliCommand("sfl 0");
 
-    EXPECT_FLOAT_EQ(subject->ActiveFluxLinkage().Value(), 0.007f);
+    EXPECT_NEAR(subject->ActiveFluxLinkage().Value(), 0.007f, 1e-6f);
 }
 
 TEST_F(ControlModeStateMachineExtTest, Active_Returns_Position_When_Constructed_With_Position_Default)

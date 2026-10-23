@@ -14,6 +14,8 @@ namespace can
     public:
         FocMotorCanClient(hal::Can& can, uint16_t nodeId);
 
+        void SetNodeId(uint16_t nodeId);
+
         bool Start();
         bool Stop();
         bool ClearFault();
