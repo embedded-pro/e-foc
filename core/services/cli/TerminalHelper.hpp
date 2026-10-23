@@ -2,6 +2,7 @@
 
 #include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/foc/interfaces/Foc.hpp"
+#include "core/services/cli/DecimalToken.hpp"
 #include "infra/stream/StringInputStream.hpp"
 #include "infra/util/Tokenizer.hpp"
 #include "numerical/controllers/interfaces/PidController.hpp"
@@ -12,6 +13,9 @@ namespace services
 {
     inline std::optional<float> ParseInput(const infra::BoundedConstString& data, float minValue = -std::numeric_limits<float>::infinity(), float maxValue = std::numeric_limits<float>::infinity())
     {
+        if (!IsDecimalToken(data))
+            return {};
+
         float value = 0.0f;
         infra::StringInputStream stream(data, infra::softFail);
 

@@ -227,6 +227,24 @@ TEST_F(TestHardwareTerminal, duty_invalid_argument_count)
     ExecuteAllActions();
 }
 
+TEST_F(TestHardwareTerminal, duty_value_that_wraps_a_byte_is_rejected)
+{
+    InvokeCommand("duty 300 20 30", [this]()
+        {
+            ::testing::InSequence _;
+
+            std::string newline{ "\r\n" };
+            std::string header{ "ERROR: " };
+            std::string payload{ "invalid value for phase A. It should be a float between 1 and 99." };
+
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(newline.begin(), newline.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(header.begin(), header.end())), testing::_));
+            EXPECT_CALL(streamWriterMock, Insert(infra::CheckByteRangeContents(std::vector<uint8_t>(payload.begin(), payload.end())), testing::_));
+        });
+
+    ExecuteAllActions();
+}
+
 TEST_F(TestHardwareTerminal, pwm_command)
 {
     InvokeCommand("pwm 500 10000", [this]()
