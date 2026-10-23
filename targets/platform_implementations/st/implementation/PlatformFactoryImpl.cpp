@@ -1,4 +1,5 @@
 #include "targets/platform_implementations/st/implementation/PlatformFactoryImpl.hpp"
+#include "services/tracer/GlobalTracer.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/CutPowerStage.hpp"
 #include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 #include DEVICE_HEADER
@@ -52,6 +53,9 @@ namespace application
         // The driver starts the window watchdog at the highest priority; an early warning that can preempt a hung
         // handler would keep refreshing it, so it is lowered to the lowest level the NVIC implements
         NVIC_SetPriority(WWDG_IRQn, (1u << __NVIC_PRIO_BITS) - 1u);
+
+        services::SetGlobalTracerInstance(terminalAndTracer.tracer);
+        this->onInitialized();
     }
 
     PlatformFactoryImpl::HalInitialization::HalInitialization()
@@ -129,7 +133,7 @@ namespace application
 
     foc::Ampere PlatformFactoryImpl::MaxCurrentSupported() const
     {
-        return foc::Ampere(15.0f);
+        return foc::Ampere(BoardCharacteristics::maxCurrentSupportedAmps);
     }
 
     foc::LowPriorityInterrupt& PlatformFactoryImpl::LowPriorityInterrupt()
@@ -267,7 +271,7 @@ namespace application
 
     void PlatformFactoryImpl::AdcMultiChannelStub::Measure(const infra::Function<void(Samples)>& onDone)
     {
-        onDone(Samples());
+        onDone(Samples(neutralSamples));
     }
 
     void PlatformFactoryImpl::AdcMultiChannelStub::Stop()

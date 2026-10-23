@@ -12,9 +12,11 @@ namespace application
         static constexpr float overvoltageThresholdVolts{ 58.0f };
 
         static constexpr float voltageToCurrent{ 5.0f };
+        static constexpr float ratedCurrentAmps{ 3.0f };
         // 80 % of the +8.25 A that the mid-rail biased sense spans on a 3.3 V ADC
         static constexpr float overcurrentThresholdAmps{ 6.6f };
-        static constexpr float maxCurrentSupportedAmps{ 15.0f };
+        static constexpr float maxCurrentSupportedAmps{ ratedCurrentAmps };
+        static_assert(maxCurrentSupportedAmps < overcurrentThresholdAmps);
         static constexpr uint32_t measuredDeadBandNanoseconds{ 0 };
         static constexpr uint32_t effectiveDeadTimeNanoseconds{ 0 };
         static constexpr float deadTimeKneeAmps{ 0.0f };
