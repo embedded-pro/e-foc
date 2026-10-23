@@ -50,7 +50,7 @@ namespace application
         };
     }
 
-    constexpr std::array<FocLifecycleTable::Transition, 13> FocLifecycleTable::CalibrationRows()
+    constexpr std::array<FocLifecycleTable::Transition, 15> FocLifecycleTable::CalibrationRows()
     {
         return services::JoinRows(CalibrationEntryRows<state_machine::Idle>(), CalibrationEntryRows<state_machine::Ready>(),
             std::array{
@@ -62,6 +62,24 @@ namespace application
                     [](const LifecycleContext& context, const state_machine::Calibrating&, const state_machine::CompleteExternalCalibration& command)
                     {
                         return !context.pending.Pending() && !context.calibration.HasRunInFlight() && context.calibration.IsPlausibleExternal(command);
+                    }),
+                Machine::Row<state_machine::Calibrating, state_machine::ReleaseExternalCalibration, state_machine::Ready>(
+                    [](const LifecycleContext& context, const state_machine::Calibrating& calibrating, const state_machine::ReleaseExternalCalibration&)
+                    {
+                        return context.calibration.IsReleasable(calibrating) && context.calibration.HasValidCalibration();
+                    },
+                    [](LifecycleContext& context, state_machine::Calibrating&, const state_machine::ReleaseExternalCalibration&)
+                    {
+                        return context.calibration.ReadyState();
+                    }),
+                Machine::Row<state_machine::Calibrating, state_machine::ReleaseExternalCalibration, state_machine::Idle>(
+                    [](const LifecycleContext& context, const state_machine::Calibrating& calibrating, const state_machine::ReleaseExternalCalibration&)
+                    {
+                        return context.calibration.IsReleasable(calibrating);
+                    },
+                    [](LifecycleContext&, state_machine::Calibrating&, const state_machine::ReleaseExternalCalibration&)
+                    {
+                        return state_machine::Idle{};
                     }),
                 Machine::InternalRow<state_machine::Calibrating, state_machine::RunCalibrationSequence>(
                     [](LifecycleContext& context, state_machine::Calibrating& calibrating, const state_machine::RunCalibrationSequence&)
@@ -326,7 +344,7 @@ namespace application
         };
     }
 
-    constexpr std::array<LifecycleMachine::Transition, 46> FocLifecycleTable::Rows()
+    constexpr std::array<LifecycleMachine::Transition, 48> FocLifecycleTable::Rows()
     {
         return services::JoinRows(CalibrationRows(), CalibrationCompletionRows(), OperationRows(), SafetyRows(), MaintenanceRows(), BootRows());
     }

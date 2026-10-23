@@ -42,6 +42,7 @@ namespace
         Edge{ State<state_machine::Ready>(), Event<state_machine::SetFluxLinkage>() },
         Edge{ State<state_machine::Ready>(), Event<state_machine::Enable>() },
         Edge{ State<state_machine::Calibrating>(), Event<state_machine::CompleteExternalCalibration>() },
+        Edge{ State<state_machine::Calibrating>(), Event<state_machine::ReleaseExternalCalibration>() },
         Edge{ State<state_machine::Enabled>(), Event<state_machine::Disable>() },
         Edge{ State<state_machine::Fault>(), Event<state_machine::ClearFault>() },
     };
@@ -50,6 +51,7 @@ namespace
         Event<state_machine::Calibrate>(),
         Event<state_machine::ReAlign>(),
         Event<state_machine::ReserveExternalCalibration>(),
+        Event<state_machine::ReleaseExternalCalibration>(),
         Event<state_machine::CompleteExternalCalibration>(),
         Event<state_machine::ClearCalibration>(),
         Event<state_machine::SetFluxLinkage>(),
