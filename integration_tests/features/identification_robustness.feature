@@ -50,6 +50,25 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
       | 50   | 5          |
       | 270  | 15         |
 
+  @sil @REQ-CAL-012
+  Scenario: Uncompensated, the bench's dead time reads the calibration resistance high
+    Given a bench motor plant
+    And the plant drives its windings through the bench's power stage
+    And the motor boots in torque mode
+    When the target boots
+    And electrical identification is run
+    Then the identified resistance shall read at least 3.5 % above the plant
+
+  @sil @REQ-CAL-012
+  Scenario: Compensating the bench's dead time keeps the calibration resistance on the winding
+    Given a bench motor plant
+    And the plant drives its windings through the bench's power stage
+    And the drive compensates the bench's dead time
+    And the motor boots in torque mode
+    When the target boots
+    And electrical identification is run
+    Then the identified resistance shall be within 3 % of the plant
+
   @sil @REQ-TRQ-008
   Scenario: Uncompensated, the bench's dead time reads the online resistance high
     Given a bench motor plant

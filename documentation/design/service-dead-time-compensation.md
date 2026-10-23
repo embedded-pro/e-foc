@@ -2,7 +2,7 @@
 title: "Service: Dead-Time Compensation"
 type: design
 status: draft
-version: 0.1.1
+version: 0.2.0
 component: service-dead-time-compensation
 date: 2026-10-22
 ---
@@ -12,9 +12,9 @@ date: 2026-10-22
 | Title     | Service: Dead-Time Compensation |
 | Type      | design                          |
 | Status    | draft                           |
-| Version   | 0.1.0                           |
+| Version   | 0.2.0                           |
 | Component | service-dead-time-compensation  |
-| Date      | 2026-10-21                      |
+| Date      | 2026-10-22                      |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -104,17 +104,17 @@ shorter than the band, so the band should not be narrowed without measuring that
 
 ### Part D — Where it does not reach
 
-- **A held duty.** The resistance identification and the alignment write their duties once, when
-  the current is still zero, and hold them, so their duties go uncompensated.
-- **A pulse as short as the band.** The resistance identification holds two legs at 1 %, a pulse
-  no longer than the dead band. A leg that barely switches is outside the model, and the bias it
-  puts on the calibration resistance stays.
+- **A held duty.** The alignment writes its duties once, when the current is still zero, and holds
+  them, so its duties go uncompensated. The resistance identification no longer does: it holds its
+  legs near mid-rail and writes them again on every sample (`service-electrical-ident.md`).
 - **A leg at either rail.** A leg that does not switch has no dead time, but the correction still
   moves it by up to the full loss. Space-vector modulation keeps the legs off the rails except at
   full modulation, where the effect is a fraction of a percent.
 
-Making the resistance identification use legs near 50 % and correct its duty on every sample would
-remove the first two. That is the next step.
+A consumer that samples below the PWM rate has to know the platform: the target re-clocks its PWM
+to the rate asked for, which keeps the scale right, but the emulator keeps its PWM rate and drops
+samples, so the correction there would be scaled for a period twice as long as the one switching.
+The resistance identification therefore samples at the PWM's own rate.
 
 ---
 
@@ -166,3 +166,9 @@ the commanded voltage to within 1 mV.
 Through the bench's power stage, uncompensated, the online resistance reads 18.1 to 18.3 % above
 the winding, and compensated with the board's figure it reads 3.2 to 3.3 % above
 (REQ-TRQ-008, `identification_robustness.feature`).
+
+Through the same stage the calibration resistance reads 4.4 % above the winding uncompensated and
+2.4 % above compensated (REQ-CAL-012). Held at 1 % legs and written once, it read 4.2 % and 4.5 %:
+the correction did not reach it. What stays is the switches' on-resistance, 1.1 % of the bench
+winding, which the current also crosses in closed loop, and the difference between the plant's
+100 ns and the board's 70 ns.

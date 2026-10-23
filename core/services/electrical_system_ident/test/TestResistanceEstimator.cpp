@@ -22,11 +22,22 @@ namespace
                WithinOneStep(arg.c, expected.c);
     }
 
+    foc::PhasePwmDutyCycles AroundMidRail(uint64_t aNumerator, uint64_t bcNumerator, uint64_t denominator)
+    {
+        return foc::PhasePwmDutyCycles{ hal::DutyCycle::FromRatio(aNumerator, denominator), hal::DutyCycle::FromRatio(bcNumerator, denominator), hal::DutyCycle::FromRatio(bcNumerator, denominator) };
+    }
+
     class ResistanceEstimatorTest
         : public ::testing::Test
         , public infra::ClockFixture
     {
     public:
+        ResistanceEstimatorTest()
+        {
+            ON_CALL(driverMock, BaseFrequency()).WillByDefault(Return(baseFrequency));
+            EXPECT_CALL(driverMock, BaseFrequency()).Times(AnyNumber());
+        }
+
         void TearDown() override
         {
             ExecuteAllActions();
@@ -49,13 +60,15 @@ namespace
                     {
                         driverMock.StorePhaseCurrentsCallback(cb);
                     });
-            EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+            EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(writesToComplete);
         }
 
         const services::ResistanceEstimator::Config measurementConfig{
             hal::DutyCycle::FromPercent(15), std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
         };
         const std::size_t samplesToComplete = 127;
+        const std::size_t writesToComplete = samplesToComplete;
+        const hal::Hertz baseFrequency{ 20000 };
 
         StrictMock<drivers::ThreePhaseInverterMock> driverMock;
         foc::Volts vdc{ 24.0f };
@@ -63,15 +76,14 @@ namespace
     };
 }
 
-TEST_F(ResistanceEstimatorTest, start_applies_test_voltage_and_registers_blank_callback)
+TEST_F(ResistanceEstimatorTest, start_holds_the_test_voltage_around_mid_rail_sampled_at_the_pwm_rate)
 {
     services::ResistanceEstimator::Config config{
         hal::DutyCycle::FromPercent(15), std::chrono::seconds{ 1 }, services::WindingConfiguration::Wye
     };
 
-    EXPECT_CALL(driverMock, PhaseCurrentsReady(hal::Hertz{ 10000 }, _));
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(foc::PhasePwmDutyCycles{
-                                hal::DutyCycle::FromPercent(15), hal::DutyCycle::FromPercent(1), hal::DutyCycle::FromPercent(1) })));
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(baseFrequency, _));
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(AroundMidRail(60, 45, 100))));
     EXPECT_CALL(driverMock, Stop());
 
     estimator->Start(config, [](auto) {});
@@ -90,8 +102,7 @@ TEST_F(ResistanceEstimatorTest, registers_sampling_callback_after_settle_time)
             {
                 driverMock.StorePhaseCurrentsCallback(cb);
             });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(foc::PhasePwmDutyCycles{
-                                hal::DutyCycle::FromPercent(20), hal::DutyCycle::FromPercent(1), hal::DutyCycle::FromPercent(1) })));
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(AroundMidRail(19, 13, 30))));
     EXPECT_CALL(driverMock, Stop());
 
     estimator->Start(config, [](auto) {});
@@ -104,7 +115,7 @@ TEST_F(ResistanceEstimatorTest, recovers_resistance_from_settled_current)
         hal::DutyCycle::FromPercent(15), std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
     };
 
-    const float testVoltage = 0.14f * vdc.Value();
+    const float testVoltage = 0.15f * vdc.Value();
     const float terminalR = 1.5f;
     const float steadyStateCurrent = testVoltage / terminalR;
 
@@ -116,7 +127,7 @@ TEST_F(ResistanceEstimatorTest, recovers_resistance_from_settled_current)
             {
                 driverMock.StorePhaseCurrentsCallback(cb);
             });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(writesToComplete);
 
     estimator->Start(config, [&result](auto r)
         {
@@ -149,7 +160,7 @@ TEST_F(ResistanceEstimatorTest, returns_no_resistance_for_zero_current)
             {
                 driverMock.StorePhaseCurrentsCallback(cb);
             });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(writesToComplete);
 
     estimator->Start(config, [&result](auto r)
         {
@@ -180,7 +191,7 @@ TEST_F(ResistanceEstimatorTest, an_overcurrent_sample_while_settling_aborts_with
             {
                 driverMock.StorePhaseCurrentsCallback(cb);
             });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(2);
     EXPECT_CALL(driverMock, Stop());
 
     estimator->Start(config, [&result](auto r)
@@ -244,7 +255,7 @@ TEST_F(ResistanceEstimatorTest, recovers_resistance_for_low_resistance_motor)
         hal::DutyCycle::FromPercent(15), std::chrono::milliseconds{ 50 }, services::WindingConfiguration::Wye
     };
 
-    const float testVoltage = 0.14f * vdc.Value();
+    const float testVoltage = 0.15f * vdc.Value();
     const float terminalR = 0.5f;
     const float steadyStateCurrent = testVoltage / terminalR;
 
@@ -256,7 +267,7 @@ TEST_F(ResistanceEstimatorTest, recovers_resistance_for_low_resistance_motor)
             {
                 driverMock.StorePhaseCurrentsCallback(cb);
             });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(1);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(writesToComplete);
 
     estimator->Start(config, [&result](auto r)
         {
@@ -320,7 +331,7 @@ TEST_F(ResistanceEstimatorTest, sample_watchdog_fires_once_samples_stop_arriving
             {
                 driverMock.StorePhaseCurrentsCallback(cb);
             });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(6);
     EXPECT_CALL(driverMock, Stop());
 
     estimator->Start(config, [&result](auto r)
@@ -450,7 +461,7 @@ TEST_F(ResistanceEstimatorTest, a_measurement_queued_by_an_aborted_run_does_not_
             {
                 driverMock.StorePhaseCurrentsCallback(cb);
             });
-    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(2);
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_)).Times(writesToComplete + 1);
     EXPECT_CALL(driverMock, Stop()).Times(3);
 
     estimator->Start(measurementConfig, [](auto) {});
@@ -537,6 +548,77 @@ TEST_F(ResistanceEstimatorTest, an_overcurrent_before_the_test_voltage_is_applie
             result = r;
         });
     ExecuteAllActions();
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->resistance.has_value());
+}
+
+TEST_F(ResistanceEstimatorTest, every_sample_rewrites_the_held_duties_so_the_dead_time_correction_follows_the_current)
+{
+    constexpr std::size_t settlingSamples = 3;
+    const auto held = AroundMidRail(60, 45, 100);
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(PhasePwmDutyCyclesEq(held))).Times(settlingSamples + 1);
+    EXPECT_CALL(driverMock, Stop());
+
+    estimator->Start(measurementConfig, [](auto) {});
+
+    for (std::size_t i = 0; i < settlingSamples; ++i)
+        driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+            foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
+}
+
+TEST_F(ResistanceEstimatorTest, a_sample_between_an_abort_and_the_bridge_stopping_does_not_rewrite_the_duties)
+{
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, Stop())
+        .WillOnce([this]()
+            {
+                driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+                    foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
+            });
+
+    estimator->Start(measurementConfig, [](auto) {});
+    estimator->Abort();
+}
+
+TEST_F(ResistanceEstimatorTest, a_sample_between_a_no_sample_failure_and_the_bridge_stopping_does_not_rewrite_the_duties)
+{
+    services::ResistanceEstimator::Config config{
+        hal::DutyCycle::FromPercent(15), std::chrono::seconds{ 2 }, services::WindingConfiguration::Wye,
+        std::chrono::milliseconds{ 100 }
+    };
+
+    std::optional<services::ResistanceEstimator::Result> result;
+
+    EXPECT_CALL(driverMock, PhaseCurrentsReady(_, _))
+        .WillOnce([this](auto, const auto& cb)
+            {
+                driverMock.StorePhaseCurrentsCallback(cb);
+            });
+    EXPECT_CALL(driverMock, ThreePhasePwmOutput(_));
+    EXPECT_CALL(driverMock, Stop())
+        .WillOnce([this]()
+            {
+                driverMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{
+                    foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
+            });
+
+    estimator->Start(config, [&result](auto r)
+        {
+            result = r;
+        });
+    ForwardTime(2 * config.noSampleTimeout + std::chrono::milliseconds{ 1 });
 
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->resistance.has_value());

@@ -107,7 +107,10 @@
     plant's, and the plant's pole-pair count exactly, for each reference motor, and shall hold
     a 10 % and 25 % envelope with current measurement noise of 0.05 A standard deviation and
     0.02 A bias and encoder noise of 0.2 mrad. The comparison is made on the values the command
-    itself broadcasts, not on a test-only readout.
+    itself broadcasts, not on a test-only readout. Through the bench's power stage, with the drive
+    correcting the board's dead-time loss, the resistance shall be within 3 % of the plant's: the
+    resistance step holds its legs near mid-rail at the PWM's own rate and writes its duties on every
+    sample, so the correction reaches it.
 
 - id: REQ-CAL-013
   title: The full calibration identifies the mechanical parameters of the plant
