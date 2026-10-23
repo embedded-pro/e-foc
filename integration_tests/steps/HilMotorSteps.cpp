@@ -243,29 +243,6 @@ THEN(R"(the measured position shall settle at {float} rad within {float} rad in 
     FAIL() << "The position did not settle at " << expected << " rad within " << tolerance << " rad; last " << last;
 }
 
-THEN(R"(the measured position shall hold at {float} rad within {float} rad for {int} ms)", (float expected, float tolerance, int durationMs))
-{
-    auto& fixture = context.Get<Fixture>();
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds{ durationMs };
-    float worst = 0.0f;
-    float worstAt = expected;
-
-    while (std::chrono::steady_clock::now() < deadline)
-    {
-        const auto position = fixture.ReadMeasuredPosition();
-        ASSERT_TRUE(position.has_value()) << "No position telemetry";
-        const float error = std::fabs(WrappedDifference(*position, expected));
-        if (error > worst)
-        {
-            worst = error;
-            worstAt = *position;
-        }
-        std::this_thread::sleep_for(kPollInterval);
-    }
-
-    EXPECT_LE(worst, tolerance) << "The position left " << expected << " rad by " << worst << " rad, reaching " << worstAt;
-}
-
 THEN(R"(the measured speed shall exceed {float} rad\/s within {int} ms)", (float threshold, int timeoutMs))
 {
     auto& fixture = context.Get<Fixture>();
