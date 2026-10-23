@@ -179,6 +179,16 @@ plus one addition, and evaluating both for the same angle does the range reducti
 
 **Interpolation:** Linear interpolation between adjacent LUT entries provides accuracy sufficient for FOC applications; the quantisation error is below the noise floor of 12-bit ADC current sensing.
 
+**Accurate sine and cosine:** some configuration-time computations need more than the interpolated
+table's ≈1.9 × 10⁻⁵ — the Goertzel bin phasor of the inductance estimator turns an error ε in cos ω into
+a phase error of about Nε / (2 sin ω) over its N-sample block, which biases the identified inductance.
+These take the table entry just below the angle and rotate it by the remaining offset δ < 2π/512 with
+the series sin δ ≈ δ − δ³/6 and cos δ ≈ 1 − δ²/2 + δ⁴/24, whose truncation error is below 10⁻¹¹.
+The result is as accurate as the table entries themselves (within 1.3 × 10⁻⁶), uses the same ROM, and keeps
+the software `sinf`/`cosf` and their argument reduction — about 4 KB on a Cortex-M4 — out of the
+firmware. It costs a handful of multiplies more than `Sine`, so the control loop keeps the interpolated
+form.
+
 ---
 
 ## Interfaces
@@ -196,6 +206,7 @@ plus one addition, and evaluating both for the same angle does the range reducti
 | SpaceVectorModulation — Generate | Converts (Vα, Vβ) to three duty cycles        | Inputs must be per-unit relative to `V_dc/√3`. Outputs are always in [0.0, 1.0]. Common-mode injection is internal; there is no sector branch. |
 | FastTrigonometry — Sine          | Returns an approximation of sin(θ)            | θ is normalised to [0, 2π) internally. ROM LUT; no floating-point transcendental at runtime.                                                   |
 | FastTrigonometry — Cosine        | Returns an approximation of cos(θ)            | Derived from the sine LUT via a quarter-period offset. Same ROM, no additional storage.                                                        |
+| FastTrigonometry — AccurateSineAndCosine | Returns sin(θ) and cos(θ) within 1.3 × 10⁻⁶ | Same ROM; table entry plus a short series. For configuration-time use, not the control loop.                                            |
 
 ### Required
 

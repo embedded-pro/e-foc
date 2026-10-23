@@ -188,6 +188,13 @@ Two phases run consecutively:
    complex result is delay-corrected (rotation by $e^{+j\omega d T_s}$ to cancel the $d$-sample
    ADC pipeline lag), then converted to $\text{Im}(Z)$ and finally to per-phase inductance.
 
+The injected sine uses the interpolated sine table. The Goertzel bin phasor $e^{j\omega}$ and the
+delay rotation use the table's accurate form (within $1.3 \times 10^{-6}$, see
+[FOC transforms](foc-transforms.md)): an error $\varepsilon$ in $\cos\omega$ detunes the resonator and
+rotates the result by about $N\varepsilon / (2\sin\omega)$, which at the default 700 Hz and
+$N = 580$ is $1.8 \times 10^{-3}$ rad, against $2.6 \times 10^{-2}$ rad for the interpolated table.
+None of these calls the software `sinf`/`cosf`, so their argument reduction is not linked.
+
 The coherence metric `fitQuality = 2|I_{Goertzel}|² / (N · \Sigma i²)` is computed simultaneously
 from the accumulated current power. It equals 1.0 for a pure sinusoid at $f_{inj}$ and falls toward
 zero with increasing noise or rotor motion.

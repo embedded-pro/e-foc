@@ -8,6 +8,7 @@ namespace
     constexpr float pi = std::numbers::pi_v<float>;
     constexpr float lutTolerance = 0.015f;
     constexpr float exactTolerance = 1e-5f;
+    constexpr float accurateTolerance = 2e-6f;
 
     class TestFastTrigonometry
         : public ::testing::Test
@@ -76,6 +77,16 @@ TEST_F(TestFastTrigonometry, cosine_matches_std_cos_across_range)
     {
         EXPECT_NEAR(foc::FastTrigonometry::Cosine(angle), std::cos(angle), lutTolerance)
             << "at angle " << angle;
+    }
+}
+
+TEST_F(TestFastTrigonometry, accurate_sine_and_cosine_match_std_to_float_precision)
+{
+    for (float angle = -2.0f * pi; angle < 2.0f * pi; angle += 0.0137f)
+    {
+        const auto result = foc::FastTrigonometry::AccurateSineAndCosine(angle);
+        EXPECT_NEAR(result.sine, std::sin(angle), accurateTolerance) << "at angle " << angle;
+        EXPECT_NEAR(result.cosine, std::cos(angle), accurateTolerance) << "at angle " << angle;
     }
 }
 

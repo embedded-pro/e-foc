@@ -1,6 +1,7 @@
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/DutyConversion.hpp"
+#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/InjectionCurrentLimit.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
@@ -168,7 +169,7 @@ namespace services
         const float voltage = foc::DutyFraction(polePairsConfig.testVoltage);
 
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
-            transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, std::cos(electricalAngle), std::sin(electricalAngle))));
+            transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle))));
 
         // The interrupt can trip between this step's check and the write above, which would re-arm the bridge it stopped.
         if (polePairsFinishing)

@@ -1,5 +1,6 @@
 #include "core/services/alignment/MotorAlignmentImpl.hpp"
 #include "core/foc/math/AngleWrap.hpp"
+#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/InjectionCurrentLimit.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
@@ -45,7 +46,7 @@ namespace services
 
         driver.Stop();
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
-            transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, std::cos(electricalAngle), std::sin(electricalAngle))));
+            transforms.Inverse(foc::RotatingFrame{ voltage, 0.0f }, foc::FastTrigonometry::Cosine(electricalAngle), foc::FastTrigonometry::Sine(electricalAngle))));
 
         driver.PhaseCurrentsReady(alignmentConfig.samplingFrequency, [this](auto currents)
             {
