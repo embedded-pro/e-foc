@@ -17,7 +17,13 @@ target_sources(e_foc.tool.hardware_bridge.common PRIVATE
     BridgeException.hpp
     ParseIPv4.hpp
     ParseIPv4.cpp
+    ResolveIPv4.hpp
+    ResolveIPv4.cpp
 )
+
+if(WIN32)
+    target_link_libraries(e_foc.tool.hardware_bridge.common PUBLIC ws2_32)
+endif()
 
 if(MSVC)
     target_compile_options(e_foc.tool.hardware_bridge.common PRIVATE /W4 /WX- /wd4996)

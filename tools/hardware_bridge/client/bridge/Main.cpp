@@ -2,7 +2,7 @@
 #include "services/network_instantiations/NetworkAdapter.hpp"
 #include "tools/hardware_bridge/client/can/TcpClientCanbus.hpp"
 #include "tools/hardware_bridge/client/common/BridgeException.hpp"
-#include "tools/hardware_bridge/client/common/ParseIPv4.hpp"
+#include "tools/hardware_bridge/client/common/ResolveIPv4.hpp"
 #include "tools/hardware_bridge/client/common/TcpClientBase.hpp"
 #include "tools/hardware_bridge/client/serial/TcpClientSerial.hpp"
 #include <cstdint>
@@ -28,12 +28,13 @@ namespace
 
         void Disconnected() override
         {
+            failed = !connectedOnce;
             alive = false;
         }
 
         bool Failed() const
         {
-            return !alive && !connectedOnce;
+            return failed;
         }
 
         bool Dropped() const
@@ -49,6 +50,7 @@ namespace
     private:
         bool connectedOnce{ false };
         bool alive{ false };
+        bool failed{ false };
     };
 }
 
@@ -95,7 +97,7 @@ int main(int argc, char* argv[])
     try
     {
         const std::string host = args::get(hostArg);
-        const auto ipv4 = tool::ParseIPv4(host);
+        const auto ipv4 = tool::ResolveIPv4(host);
         const auto canPort = static_cast<uint16_t>(canPortInt);
         const auto serialPort = static_cast<uint16_t>(serialPortInt);
 
