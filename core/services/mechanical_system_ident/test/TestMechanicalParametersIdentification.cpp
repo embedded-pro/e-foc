@@ -1182,24 +1182,26 @@ TEST_F(MechanicalParametersIdentificationTest, windows_the_event_loop_does_not_f
     auto config = DefaultConfig();
     config.timeout = std::chrono::seconds{ 60 };
 
-    std::optional<bool> estimated;
+    bool fired = false;
+    bool estimated = false;
 
     GivenEncoderFollowsTheProfile();
     ExpectRunStarted();
     EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
     ExpectDriveReleased();
 
-    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config, [&estimated](auto b, auto j)
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config, [&fired, &estimated](auto b, auto j)
         {
+            fired = true;
             estimated = b.has_value() && j.has_value();
         });
 
     for (std::size_t i = 0; i != 200000; ++i)
         PublishConsistentSample();
 
-    EXPECT_FALSE(estimated.has_value());
+    EXPECT_FALSE(fired);
     ExecuteAllActions();
 
-    ASSERT_TRUE(estimated.has_value());
-    EXPECT_FALSE(*estimated);
+    EXPECT_TRUE(fired);
+    EXPECT_FALSE(estimated);
 }

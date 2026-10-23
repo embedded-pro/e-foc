@@ -376,9 +376,9 @@ namespace services
     // The fit costs more than the rest of the control interrupt, so the interrupt only hands each window over
     void MechanicalParametersIdentificationImpl::Post(const Observation& observation)
     {
-        const auto posted = observationsPosted.load(std::memory_order_relaxed);
+        const auto posted = observationsPosted.load();
 
-        if (posted - observationsFitted.load(std::memory_order_acquire) == observationCapacity)
+        if (posted - observationsFitted.load() == observationCapacity)
         {
             outcome = Outcome::observationsDropped;
             ScheduleFinish();
@@ -386,7 +386,7 @@ namespace services
         }
 
         observations[posted % observationCapacity] = observation;
-        observationsPosted.store(posted + 1, std::memory_order_release);
+        observationsPosted = posted + 1;
 
         if (!fitScheduled.exchange(true))
             ScheduleFit();
@@ -409,11 +409,12 @@ namespace services
     {
         fitScheduled = false;
 
-        auto fitted = observationsFitted.load(std::memory_order_relaxed);
-        while (rls.has_value() && fitted != observationsPosted.load(std::memory_order_acquire))
+        auto fitted = observationsFitted.load();
+        while (rls.has_value() && fitted != observationsPosted.load())
         {
             Fit(observations[fitted % observationCapacity]);
-            observationsFitted.store(++fitted, std::memory_order_release);
+            ++fitted;
+            observationsFitted = fitted;
         }
     }
 

@@ -39,11 +39,11 @@ namespace services
 
         struct Observation
         {
-            float acceleration;
-            float speed;
-            float torque;
-            uint32_t sample;
-            uint32_t windowSamples;
+            float acceleration{ 0.0f };
+            float speed{ 0.0f };
+            float torque{ 0.0f };
+            uint32_t sample{ 0 };
+            uint32_t windowSamples{ 1 };
         };
 
         static constexpr uint32_t observationCapacity{ 16 };
