@@ -50,13 +50,11 @@
       "patterns": [
         "MechanicalParametersIdentificationImpl::OnSamplingUpdate",
         "MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia.*lambda\\(auto:1",
-        "MechanicalParametersIdentificationImpl::ScheduleFinish",
         "ClarkePark::Forward",
         "ExceedsInjectionLimit",
         "PositionWithWrapAround",
         "IsFiniteValue",
         "MechanicalParametersIdentificationImpl::Post",
-        "MechanicalParametersIdentificationImpl::ScheduleFit",
         "IsMechanicallyObservable"
       ]
     },

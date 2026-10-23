@@ -55,7 +55,7 @@ namespace services
         void Fit(const Observation& observation);
         void StopExcitation();
         void ReleaseDrive();
-        void ScheduleFinish();
+        void Tick();
         void FailEnvelope();
         void FinishRun();
         void CommandNextExcitationLevel();
@@ -114,7 +114,7 @@ namespace services
         bool atDwellLevel{ false };
         float commandedSpeed{ 0.0f };
         float levelSpeed{ 0.0f };
-        infra::TimerRepeating slewTimer;
+        infra::TimerRepeating tickTimer;
         [[no_unique_address]] foc::ClarkePark transform;
         infra::TimerSingleShot timeoutTimer;
         infra::TimerRepeating excitationTimer;
@@ -123,8 +123,6 @@ namespace services
         std::array<Observation, observationCapacity> observations{};
         std::atomic<uint32_t> observationsPosted{ 0 };
         std::atomic<uint32_t> observationsFitted{ 0 };
-        std::atomic<bool> fitScheduled{ false };
         volatile Outcome outcome{ Outcome::pending };
-        uint32_t run{ 0 };
     };
 }

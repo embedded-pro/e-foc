@@ -141,11 +141,14 @@ namespace
             EXPECT_CALL(driverMock, Stop());
         }
 
-        // Nothing else is scheduled during a run driven sample by sample, so a non-idle dispatcher means
-        // the terminal outcome has queued its finish.
-        bool AFinishIsQueued() const
+        void ElapseSample()
         {
-            return !IsIdle();
+            ForwardTime(std::chrono::microseconds{ 1000000 / baseFrequency });
+        }
+
+        void ElapseTick()
+        {
+            ForwardTime(std::chrono::milliseconds{ 1 });
         }
 
         void PublishCurrents(float a = 1.0f, float b = -0.5f, float c = -0.5f)
@@ -527,7 +530,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_run_that_has_not_converged_keep
     for (std::size_t i = 0; i != 2000 && !outcome.fired; ++i)
     {
         PublishCurrents();
-        ExecuteAllActions();
+        ElapseSample();
     }
 
     EXPECT_EQ(outcome.fired, !observableMock.HasObserver());
@@ -567,7 +570,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_consistent_excited_run_reports_
     for (std::size_t i = 0; i != 400000 && !outcome.fired; ++i)
     {
         PublishConsistentSample();
-        ExecuteAllActions();
+        ElapseSample();
     }
 
     ASSERT_TRUE(outcome.fired);
@@ -613,12 +616,48 @@ TEST_F(MechanicalParametersIdentificationTest, a_coarse_encoder_run_converges_in
     for (std::size_t i = 0; i != 100000 && !outcome.fired; ++i)
     {
         PublishConsistentSample();
-        ExecuteAllActions();
+        ElapseSample();
     }
 
     ASSERT_TRUE(outcome.fired);
     ASSERT_TRUE(outcome.inertia.has_value());
     EXPECT_NEAR(outcome.inertia->Value(), trueInertia, trueInertia * 0.3f);
+}
+
+TEST_F(MechanicalParametersIdentificationTest, a_coarse_encoder_run_schedules_nothing_from_the_control_interrupt)
+{
+    constexpr float countsPerRevolution = 4000.0f;
+    constexpr float countAngle = 2.0f * std::numbers::pi_v<float> / countsPerRevolution;
+
+    bool fired = false;
+    bool estimated = false;
+    bool scheduledFromTheInterrupt = false;
+
+    EXPECT_CALL(encoderMock, Read())
+        .WillRepeatedly(Invoke([this]()
+            {
+                return foc::Radians{ std::floor(position / countAngle) * countAngle };
+            }));
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
+    ExpectDriveReleased();
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, DefaultConfig(), [&fired, &estimated](auto b, auto j)
+        {
+            fired = true;
+            estimated = b.has_value() && j.has_value();
+        });
+
+    for (std::size_t i = 0; i != 100000 && !fired; ++i)
+    {
+        PublishConsistentSample();
+        scheduledFromTheInterrupt = scheduledFromTheInterrupt || !IsIdle();
+        ElapseSample();
+    }
+
+    EXPECT_FALSE(scheduledFromTheInterrupt);
+    EXPECT_TRUE(fired);
+    EXPECT_TRUE(estimated);
 }
 
 void MechanicalParametersIdentificationTest::ExpectUnbiasedInertiaOnCoarseEncoder(float countsPerRevolution, float tolerance)
@@ -665,7 +704,7 @@ void MechanicalParametersIdentificationTest::ExpectUnbiasedInertiaOnCoarseEncode
         position += speed * samplingPeriod;
 
         observableMock.Publish(CurrentsProducing(trueCoulomb + trueInertia * acceleration + trueFriction * speed, position));
-        ExecuteAllActions();
+        ElapseSample();
     }
 
     ASSERT_TRUE(fired);
@@ -731,7 +770,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_slewed_two_level_run_on_a_noisy
         position += speed * samplingPeriod;
 
         observableMock.Publish(CurrentsProducing(trueCoulomb + trueInertia * acceleration + trueFriction * speed, position));
-        ExecuteAllActions();
+        ElapseSample();
     }
 
     ASSERT_TRUE(fired);
@@ -762,7 +801,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_run_lasts_at_least_two_dwell_pe
     for (std::size_t i = 0; i != 400000 && !fired; ++i)
     {
         PublishConsistentSample();
-        ExecuteAllActions();
+        ElapseSample();
         samplesAtCompletion = i + 1;
     }
 
@@ -794,7 +833,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_converged_run_ends_on_a_dwell_b
     for (std::size_t i = 0; i != 400000 && !fired; ++i)
     {
         PublishConsistentSample();
-        ExecuteAllActions();
+        ElapseSample();
         samplesAtCompletion = i + 1;
     }
 
@@ -828,7 +867,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_sample_above_the_current_envelo
 
     AdvanceProfile();
     PublishCurrents(5.0f, -2.5f, -2.5f);
-    ExecuteAllActions();
+    ElapseTick();
 
     EXPECT_TRUE(fired);
     EXPECT_FALSE(friction.has_value());
@@ -855,7 +894,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_current_between_the_supported_l
 
     AdvanceProfile();
     PublishCurrents(supported * 1.8f, -supported * 0.9f, -supported * 0.9f);
-    ExecuteAllActions();
+    ElapseTick();
 
     EXPECT_FALSE(fired);
     EXPECT_TRUE(identification->IsRunning());
@@ -886,7 +925,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_current_beyond_the_margin_ends_
 
     AdvanceProfile();
     PublishCurrents(supported * 2.2f, -supported * 1.1f, -supported * 1.1f);
-    ExecuteAllActions();
+    ElapseTick();
 
     EXPECT_TRUE(fired);
 }
@@ -922,7 +961,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_rotor_faster_than_the_speed_lim
         position += 100.0f * samplingPeriod;
         PublishCurrents(0.1f, -0.05f, -0.05f);
     }
-    ExecuteAllActions();
+    ElapseTick();
 
     EXPECT_TRUE(fired);
     EXPECT_FALSE(inertia.has_value());
@@ -954,7 +993,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_rotor_held_at_a_constant_speed_
     {
         position += 10.0f * samplingPeriod;
         PublishCurrents(0.5f, -0.25f, -0.25f);
-        ExecuteAllActions();
+        ElapseSample();
     }
 
     EXPECT_FALSE(fired);
@@ -995,7 +1034,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_coarse_encoder_at_a_steady_spee
     {
         position += steadySpeed * samplingPeriod;
         PublishCurrents(0.5f, -0.25f, -0.25f);
-        ExecuteAllActions();
+        ElapseSample();
     }
 
     EXPECT_FALSE(fired);
@@ -1079,7 +1118,7 @@ TEST_F(MechanicalParametersIdentificationTest, an_envelope_violation_stops_the_p
     EXPECT_TRUE(observableMock.HasObserver());
 
     ExpectDriveReleased();
-    ExecuteAllActions();
+    ElapseTick();
 
     EXPECT_FALSE(observableMock.HasObserver());
 }
@@ -1114,7 +1153,7 @@ TEST_F(MechanicalParametersIdentificationTest, a_sample_outside_the_envelope_inv
     for (std::size_t i = 0; i != 400000 && !identification->HasConverged(); ++i)
     {
         PublishConsistentSample();
-        ExecuteAllActions();
+        ElapseSample();
     }
 
     ASSERT_TRUE(identification->HasConverged());
@@ -1122,14 +1161,14 @@ TEST_F(MechanicalParametersIdentificationTest, a_sample_outside_the_envelope_inv
 
     AdvanceProfile();
     PublishCurrents(9.0f, -4.5f, -4.5f);
-    ExecuteAllActions();
+    ElapseTick();
 
     ASSERT_TRUE(outcome.fired);
     EXPECT_FALSE(outcome.inertia.has_value());
     EXPECT_FALSE(outcome.friction.has_value());
 }
 
-TEST_F(MechanicalParametersIdentificationTest, work_queued_before_an_abort_does_not_touch_the_run_started_after_it)
+TEST_F(MechanicalParametersIdentificationTest, an_outcome_and_windows_left_by_an_aborted_run_do_not_reach_the_run_started_after_it)
 {
     auto config = DefaultConfig();
     config.timeout = std::chrono::seconds{ 60 };
@@ -1147,10 +1186,8 @@ TEST_F(MechanicalParametersIdentificationTest, work_queued_before_an_abort_does_
             firstFired = true;
         });
 
-    for (std::size_t i = 0; i != 400000 && !AFinishIsQueued(); ++i)
+    for (std::size_t i = 0; i != 4000; ++i)
         PublishConsistentSample();
-
-    ASSERT_TRUE(AFinishIsQueued());
 
     EXPECT_CALL(driverMock, Stop());
     AdvanceProfile();
@@ -1166,7 +1203,7 @@ TEST_F(MechanicalParametersIdentificationTest, work_queued_before_an_abort_does_
             secondFired = true;
         });
 
-    ExecuteAllActions();
+    ElapseTick();
 
     EXPECT_FALSE(firstFired);
     EXPECT_FALSE(secondFired);
@@ -1200,7 +1237,7 @@ TEST_F(MechanicalParametersIdentificationTest, windows_the_event_loop_does_not_f
         PublishConsistentSample();
 
     EXPECT_FALSE(fired);
-    ExecuteAllActions();
+    ElapseTick();
 
     EXPECT_TRUE(fired);
     EXPECT_FALSE(estimated);

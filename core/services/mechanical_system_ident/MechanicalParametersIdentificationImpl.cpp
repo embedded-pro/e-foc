@@ -11,8 +11,8 @@
 
 namespace
 {
-    constexpr infra::Duration slewPeriod{ std::chrono::milliseconds{ 1 } };
-    constexpr float slewPeriodSeconds{ 0.001f };
+    constexpr infra::Duration tickPeriod{ std::chrono::milliseconds{ 1 } };
+    constexpr float tickPeriodSeconds{ 0.001f };
 
     constexpr float accelerationQuantumTarget{ 100.0f };
     constexpr std::size_t maximumObservationWindow{ 256 };
@@ -87,12 +87,10 @@ namespace services
         this->excitation.Restart();
         this->atDwellLevel = true;
         this->outcome = Outcome::pending;
-        ++run;
 
         RestartEstimator(config.forgettingFactor);
         observationsPosted = 0;
         observationsFitted = 0;
-        fitScheduled = false;
         this->samplesSinceStart = 0;
         this->dwellSamples = std::max<std::size_t>(1, static_cast<std::size_t>(std::chrono::duration<float>(config.dwellTime).count() / samplingPeriod + 0.5f));
         this->minimumRunSamples = static_cast<std::size_t>(minimumRunDwells * static_cast<float>(dwellSamples));
@@ -110,9 +108,9 @@ namespace services
         controller.EnableSpeedCommand();
         controller.CommandSpeed(foc::RadiansPerSecond{ commandedSpeed });
 
-        slewTimer.Start(slewPeriod, [this]()
+        tickTimer.Start(tickPeriod, [this]()
             {
-                StepSpeedCommand();
+                Tick();
             });
 
         excitationTimer.Start(config.dwellTime, [this]()
@@ -163,7 +161,7 @@ namespace services
 
     void MechanicalParametersIdentificationImpl::StepSpeedCommand()
     {
-        const auto step = currentConfig.speedSlewRate * slewPeriodSeconds;
+        const auto step = currentConfig.speedSlewRate * tickPeriodSeconds;
         const auto remaining = levelSpeed - commandedSpeed;
 
         commandedSpeed = std::abs(remaining) <= step ? levelSpeed : commandedSpeed + std::copysign(step, remaining);
@@ -195,7 +193,7 @@ namespace services
     {
         timeoutTimer.Cancel();
         excitationTimer.Cancel();
-        slewTimer.Cancel();
+        tickTimer.Cancel();
     }
 
     void MechanicalParametersIdentificationImpl::ReleaseDrive()
@@ -211,19 +209,15 @@ namespace services
             onDone(friction, inertia);
     }
 
-    // The finish is deferred, so an abort and a new run can both happen before it is dispatched. Tagging it
-    // with the run that queued it keeps a terminal outcome from completing the run that followed it.
-    void MechanicalParametersIdentificationImpl::ScheduleFinish()
+    // Scheduling from the control interrupt costs more than it has left on the sample that closes a window, so
+    // the interrupt only records the outcome and posts the window, and this tick fits and finishes from the event loop
+    void MechanicalParametersIdentificationImpl::Tick()
     {
-        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
-            [finishingRun = run](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
-            {
-                if (self->run != finishingRun)
-                    return;
+        StepSpeedCommand();
+        FitPostedObservations();
 
-                self->FinishRun();
-            },
-            WeakFromThis());
+        if (outcome != Outcome::pending)
+            FinishRun();
     }
 
     void MechanicalParametersIdentificationImpl::FinishRun()
@@ -254,7 +248,6 @@ namespace services
 
         outcome = Outcome::outsideEnvelope;
         inverter.Stop();
-        ScheduleFinish();
     }
 
     void MechanicalParametersIdentificationImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant)
@@ -363,7 +356,6 @@ namespace services
         if (finishAtSample != 0 && samplesSinceStart >= finishAtSample)
         {
             outcome = Outcome::converged;
-            ScheduleFinish();
             return;
         }
 
@@ -373,33 +365,29 @@ namespace services
         Post(Observation{ acceleration, centredSpeed, centredTorque, static_cast<uint32_t>(samplesSinceStart), static_cast<uint32_t>(windowSamples) });
     }
 
-    // The fit costs more than the rest of the control interrupt, so the interrupt only hands each window over
     void MechanicalParametersIdentificationImpl::Post(const Observation& observation)
     {
         const auto posted = observationsPosted.load();
+        const auto pending = posted - observationsFitted.load();
 
-        if (posted - observationsFitted.load() == observationCapacity)
+        if (pending == observationCapacity)
         {
             outcome = Outcome::observationsDropped;
-            ScheduleFinish();
             return;
         }
 
         observations[posted % observationCapacity] = observation;
         observationsPosted = posted + 1;
 
-        if (!fitScheduled.exchange(true))
+        // Windows shorter than the tick arrive faster than it fits them, so half a ring asks the event loop at once
+        if (pending + 1 == observationCapacity / 2)
             ScheduleFit();
     }
 
     void MechanicalParametersIdentificationImpl::ScheduleFit()
     {
-        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
-            [fittingRun = run](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
+        infra::EventDispatcherWithWeakPtr::Instance().Schedule([](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
             {
-                if (self->run != fittingRun)
-                    return;
-
                 self->FitPostedObservations();
             },
             WeakFromThis());
@@ -407,8 +395,6 @@ namespace services
 
     void MechanicalParametersIdentificationImpl::FitPostedObservations()
     {
-        fitScheduled = false;
-
         auto fitted = observationsFitted.load();
         while (rls.has_value() && fitted != observationsPosted.load())
         {

@@ -243,14 +243,14 @@ On the first sample whose phase current exceeds the current envelope in any phas
 direction, or whose measured speed exceeds the speed limit, the run ends and reports absent values.
 
 The power stage is stopped **in the interrupt that observed the sample**, not with the rest of the
-teardown. Deferring it would leave the inverter driving an out-of-envelope current for as long as the
-dispatcher takes to run, which is the one thing the envelope exists to prevent; stopping the inverter
+teardown. Deferring it would leave the inverter driving an out-of-envelope current until the event loop
+next ran, which is the one thing the envelope exists to prevent; stopping the inverter
 touches no callback slot, so it is safe from the interrupt, whereas releasing the observer there would
 destroy the closure being executed. Releasing the observer, stopping the drive through the controller and
 delivering the completion therefore stay deferred, as they are for every other way a run ends.
 
 The envelope is evaluated on **every** sample for as long as the drive is live — including samples that
-arrive after a converged one has queued its completion but before the dispatcher has run. A run is only
+arrive after a converged one has recorded the outcome but before the event loop has ended the run. A run is only
 over once the drive has been released, so a sample that leaves the envelope in that window still
 invalidates the estimate rather than letting a converged value through.
 
@@ -310,7 +310,7 @@ flowchart TD
     CB --> VEL["Accumulate ω, dω/dt\nfrom encoder"]
     TAU --> POST["Close the window,\npost it to the ring"]
     VEL --> POST
-    POST --> RLS["RLS update step\n(event loop)\n(φ=[dω/dt, ω, 1], y=τ)"]
+    POST --> RLS["RLS update step\n(event loop, 1 ms tick)\n(φ=[dω/dt, ω, 1], y=τ)"]
     RLS --> TIMEOUT{"TimerSingleShot\nexpired?"}
     TIMEOUT -->|No| CB
     TIMEOUT -->|Yes| REL["Stop drive,\nrelease observer"]
@@ -320,24 +320,31 @@ flowchart TD
 
 ### Where the Fit Runs
 
-The control interrupt observes every sample, but it does not fit. It accumulates the window, checks
-the current and speed envelopes, decides whether the window is observable, and posts the closed window
-(acceleration, speed, torque, the sample it closed on and the window's length) to a ring of 16 entries.
-The event loop takes the windows from the ring in order and runs the update, the inertia-settling check
-and the convergence decision on each. The update and the decision cost more than the rest of the
-interrupt together: on the rig, with the fit in the interrupt, every calibration took 472 interrupts past
-the 4500-cycle budget, at up to 5000 cycles, one for each fitted window of the two runs.
+The control interrupt observes every sample, but it neither fits nor schedules. It accumulates the
+window, checks the current and speed envelopes, decides whether the window is observable, and posts the
+closed window (acceleration, speed, torque, the sample it closed on and the window's length) to a ring of
+16 entries. When the run reaches its outcome, converged on a dwell boundary, outside the envelope or with
+a full ring, the interrupt only records it.
+
+The run's 1 ms tick in the event loop, the one that also slews the speed command, takes the windows from
+the ring in order, runs the update, the inertia-settling check and the convergence decision on each, and
+ends the run once the interrupt has recorded an outcome. On the rig, with the fit in the interrupt, every
+calibration took 472 interrupts past the 4500-cycle budget, at up to 5000 cycles, one for each fitted
+window of the two runs. With the fit in the event loop but scheduled from the interrupt, each sample that
+posted a window still took about 4550 cycles: scheduling a call cost about 600 cycles of it.
 
 The fit produces the same estimate as before, because it sees the same windows in the same order and
 takes the window length and the sample index each was closed on from the window itself, not from the
 interrupt's state when it is fitted. The decision to finish on a dwell boundary is taken from the
 window's sample index too. The interrupt finishes on the first window it sees at or past that boundary,
-which can come a little after it because the fit runs late. The fit therefore drops any window closed at
+which can come a little after it because the fit runs on the next tick. The fit therefore drops any window closed at
 or past the boundary, so the run fits exactly the windows it fitted when the fit ran in the interrupt.
 On the timeout, and when the run finishes, the windows still in the ring are fitted first.
 
-A run whose windows fill the ring before the event loop fits them ends without an estimate rather than
-skipping a window. At the rig's window of about 4 ms the ring holds 64 ms of windows.
+Windows shorter than the tick arrive faster than it fits them, so once half the ring is waiting the
+interrupt schedules a fit at once. At the rig's window of about 4 ms the tick leaves at most one window
+waiting, so this never happens there. A run whose windows still fill the ring before they are fitted ends
+without an estimate rather than skipping a window.
 
 ### Timeout and Result Delivery
 
