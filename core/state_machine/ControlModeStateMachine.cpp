@@ -408,6 +408,11 @@ namespace state_machine
         return ActiveCommon().CmdReserveExternalCalibration();
     }
 
+    CommandResult ControlModeStateMachine::CmdReleaseExternalCalibration()
+    {
+        return ActiveCommon().CmdReleaseExternalCalibration();
+    }
+
     void ControlModeStateMachine::CmdCompleteExternalCalibration(const services::CalibrationData& data,
         const infra::Function<void(CommandResult)>& onDone)
     {

@@ -21,27 +21,30 @@ namespace application
         }
 
         conditionPollTimer.reset();
+        cleanRunTimer.reset();
     }
 
     void FaultController::LatchFromInterrupt(state_machine::FaultCode code)
     {
-        pendingCode = code;
-        faultPending = true;
+        really_assert(code != state_machine::FaultCode::none);
+
+        auto noneYet = state_machine::FaultCode::none;
+        pendingCode.compare_exchange_strong(noneYet, code);
         faultLatched = true;
     }
 
     std::optional<state_machine::FaultCode> FaultController::TakePendingFault()
     {
-        if (!faultPending)
+        const auto code = pendingCode.exchange(state_machine::FaultCode::none);
+        if (code == state_machine::FaultCode::none)
             return std::nullopt;
 
-        const auto code = pendingCode;
-        faultPending = false;
         return code;
     }
 
     void FaultController::EnterFault()
     {
+        cleanRunTimer.reset();
         faultLatched = true;
         faultRecorded = true;
         lastCondition = state_machine::FaultConditionState::unknown;
@@ -115,6 +118,19 @@ namespace application
         consecutiveFaultClears = 0;
     }
 
+    void FaultController::StartCleanRun()
+    {
+        cleanRunTimer.emplace(cleanRunDuration, [this]()
+            {
+                ResetClearCount();
+            });
+    }
+
+    void FaultController::StopCleanRun()
+    {
+        cleanRunTimer.reset();
+    }
+
     bool FaultController::IsLatched() const
     {
         return faultLatched;
@@ -127,6 +143,6 @@ namespace application
 
     bool FaultController::IsPending() const
     {
-        return faultPending;
+        return pendingCode.load() != state_machine::FaultCode::none;
     }
 }

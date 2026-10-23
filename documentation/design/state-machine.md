@@ -50,13 +50,13 @@ date: 2026-10-22
 
 The state machine has five named states:
 
-| State         | Motor condition                                                                                                                       | Allowed transitions                                                                                                                                                                                                                                                  |
-|---------------|---------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled                 | → `Calibrating` (CmdCalibrate, CmdReAlign with loaded parameters, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                                                                                      |
-| `Calibrating` | Calibration sequence in progress; motor is driven by identification services, under a provisional plant model for the mechanical step | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop with previously valid calibration), → `Idle` (record saved but incomplete for this mode, or CmdEmergencyStop without valid calibration), → `Fault` (any step or the NVM save fails, or hardware fault) |
-| `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true), → `Calibrating` (CmdCalibrate re-runs, CmdReAlign, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault, or the NVM invalidation failing)                  |
-| `Enabled`     | FOC controller active; motor under closed-loop control                                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                                                                                |
-| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times. A further fault re-enters `Fault` but keeps the code that first tripped the drive                                                           |
+| State         | Motor condition                                                                                                                       | Allowed transitions                                                                                                                                                                                                                                                                                                                  |
+|---------------|---------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Idle`        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled                 | → `Calibrating` (CmdCalibrate, CmdReAlign with loaded parameters, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault)                                                                                                                                                                      |
+| `Calibrating` | Calibration sequence in progress; motor is driven by identification services, under a provisional plant model for the mechanical step | → `Ready` (sequence complete + NVM saved, or CmdEmergencyStop / CmdReleaseExternalCalibration with previously valid calibration), → `Idle` (record saved but incomplete for this mode, or CmdEmergencyStop / CmdReleaseExternalCalibration without valid calibration), → `Fault` (any step or the NVM save fails, or hardware fault) |
+| `Ready`       | Calibration data valid, rotor reference established; motor can be enabled                                                             | → `Enabled` (CmdEnable, only when `rotorReferenceValid` is true), → `Calibrating` (CmdCalibrate re-runs, CmdReAlign, or CmdReserveExternalCalibration), → `Idle` (CmdClearCalibration), → `Fault` (hardware fault, or the NVM invalidation failing)                                                                                  |
+| `Enabled`     | FOC controller active; motor under closed-loop control                                                                                | → `Ready` (CmdDisable, or CmdEmergencyStop with valid calibration), → `Idle` (CmdEmergencyStop without valid calibration), → `Fault` (hardware fault)                                                                                                                                                                                |
+| `Fault`       | Safe state; inverter stopped; fault code recorded and latched                                                                         | → `Ready` (CmdClearFault with valid calibration held), → `Idle` (CmdClearFault without it); at most 3 consecutive times. A further fault re-enters `Fault` but keeps the code that first tripped the drive                                                                                                                           |
 
 ### State Diagram
 
@@ -73,6 +73,8 @@ stateDiagram-v2
     Calibrating --> Ready : CmdEmergencyStop\n(calibration still valid)
     Calibrating --> Idle : CmdEmergencyStop\n(no valid calibration)
     Calibrating --> Fault : any step or the NVM save fails\nor hardware fault
+    Calibrating --> Ready : CmdReleaseExternalCalibration\n(calibration still valid)
+    Calibrating --> Idle : CmdReleaseExternalCalibration\n(no valid calibration)
 
     Ready --> Enabled : CmdEnable
     Ready --> Calibrating : CmdCalibrate (re-calibrate),\nCmdReAlign\nor CmdReserveExternalCalibration
@@ -379,6 +381,10 @@ An external client (e.g. the CAN bridge) can supply pre-measured calibration dat
 
 The two-command split ensures the FSM enters `Calibrating` before any open-loop PWM is applied, and that the state guard lives entirely inside the state machine rather than in the calling layer.
 
+3. **`CmdReleaseExternalCalibration()`** — synchronous. Gives up a reservation whose estimation failed, or whose completion was rejected, so the node does not stay in `Calibrating` until an emergency stop. It returns to `Ready` when a valid calibration is held and to `Idle` otherwise, and is accepted only while the reservation came from `CmdReserveExternalCalibration` (`Calibrating::externalReservation`), no command is pending and no run is in flight — a CLI calibration cannot be released from CAN, and a completion that is already aligning finishes first.
+
+The CAN bridge also takes this reservation for `OnIdentifyMechanical`, which spins the motor: holding `Calibrating` for the run refuses `CmdEnable`, mode selection and setpoints meanwhile, and the bridge releases it when the estimation reports. The CAN liveness watchdog emergency-stops a reservation like an `Enabled` drive when the client is lost.
+
 The external path stops after alignment; it does not chain into mechanical identification. `OnIdentifyElectrical` and `OnIdentifyMechanical` are separate CAN commands (REQ-INT-011), so the electrical command must not drive the mechanical estimator. The NVM save therefore stamps `stage = complete` only when the record satisfies the active mode's own validity requirements. Torque mode is satisfied by electrical parameters plus alignment and transitions to `Ready`. Speed and position still lack inertia and friction, so their record is persisted with `stage = none` and the machine returns to `Idle` holding a partial record, reported over CAN as `FocMotorState::partialCalibration`. Completing those modes requires the internal `CmdCalibrate` chain, which runs mechanical identification.
 
 ### Fault Safety
@@ -473,9 +479,14 @@ reading taken while faulted distinguishes a cleared condition from an unevaluate
 tested, and becomes load-bearing as soon as a platform can answer — see REQ-EH-013.
 
 **The budget.** Each accepted `CmdClearFault` increments a counter; once `maxConsecutiveFaultClears` (3) clears
-have happened without an intervening clean run, further clears are refused and a reset is required. The
-counter is reset by `CmdDisable` from `Enabled`, which is the only evidence the state machine has that the
-drive ran and was stopped deliberately rather than by the same condition re-tripping. The budget supplements
+have happened without an intervening clean run, further clears are refused and a reset is required. Two
+things count as a clean run and reset the counter: `CmdDisable` from `Enabled`, the drive running and being
+stopped deliberately rather than by the same condition re-tripping; and `cleanRunDuration` (10 s) spent in
+`Enabled` without a fault. The second is what keeps three faults spread over a long life of a drive that is
+only ever stopped by faults or emergency stops from needing a power cycle. `OperationFlow` starts the clean-run
+timer once `Enabled` has started without a pending fault and cancels it on entering any other state;
+`FaultController::EnterFault` cancels it too. A condition that re-faults within 10 s of every enable therefore
+still exhausts the budget. The budget supplements
 the condition gate rather than replacing it: it bounds the platforms that cannot verify, and it bounds a
 condition that happens to read clear between attempts on those that can. A clear the condition refused does not
 spend from it.
@@ -499,17 +510,19 @@ without consulting the state, because hardware saying "fault" outranks the state
 it was doing — and then hands the `FaultDetected` event to `infra::EventDispatcher`. The secondary handler,
 which broadcasts the fault over CAN, already worked this way.
 
-Latching is three single-word writes (`pendingCode`, `faultPending`, `faultLatched`), which is all an interrupt
-may do here: the tracing, the multi-word `std::variant` write and the pending-command completion stay on the
-dispatcher. `faultLatched` says a fault is in force and is what commands consult; `faultPending` says the
-`FaultDetected` transition it owes has not been taken yet, and is consumed by whichever context takes it.
+Latching is an atomic compare-and-set of `pendingCode` from `none` and a write of `faultLatched`, which is all
+an interrupt may do here: the tracing, the multi-word `std::variant` write and the pending-command completion
+stay on the dispatcher. `faultLatched` says a fault is in force and is what commands consult; a `pendingCode`
+other than `none` says the `FaultDetected` transition it owes has not been taken yet, and is consumed by
+whichever context takes it. The compare-and-set keeps the first code when a second source (the PWM trip and
+CAN bus-off both latch) fires before the transition is taken, so the root cause is the code reported.
 `FaultController` keeps a third, dispatcher-only flag, `faultRecorded`, for "the transition has been taken" —
 the distinction `faultLatched` carried before latching moved into the interrupt, and what decides whether an
 arriving fault is the one that tripped the drive or a further one whose code is kept out of `LastFaultCode()`.
 
-`TakePendingFault()` claims the flag and the code together and hands back the code, so a second interrupt
-landing mid-claim cannot leave the taker dispatching one fault's transition under another's code. Claiming is
-the *only* thing that clears `faultPending`: taking the transition does not, or a fault latched while that
+`TakePendingFault()` claims the code with one atomic exchange to `none` and hands it back, so an interrupt
+landing mid-claim either is claimed with it or stays pending for its own transition — it cannot be wiped.
+Claiming is the *only* thing that clears `pendingCode`: taking the transition does not, or a fault latched while that
 transition ran would be wiped before its own dispatcher turn reached it and would never be recorded at all.
 For the same reason `CmdClearFault` is refused while a fault is pending — clearing there would drop the latch
 of a fault that has already tripped the drive, and spend one of the three permitted clears on a state the
@@ -782,7 +795,9 @@ any NVM operation is outstanding. The cascades' own refusal while enabled remain
 `CalibrationFlow` retries a `SaveCalibration` answered with `Busy` every 10 ms from a copy of the
 record, keeping `NvmActivity` raised and reusing the completion captured at the epoch of the run, so
 `CalibrationSaved` is only dispatched with the status of a write that actually ran. An abort while a
-retry is waiting cancels it and releases `NvmActivity`: an aborted run is not persisted.
+retry is waiting cancels it and releases `NvmActivity`. An abort while a write is in flight drops the
+completion; when that write answers, `OnSaved` releases `NvmActivity` and stops — a `Busy` answer is not
+retried — so an aborted run is not persisted (REQ-SM-030).
 
 #### C3 — Deferred Apply and Re-check Before Activate
 

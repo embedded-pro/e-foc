@@ -121,8 +121,8 @@ The observer interface provides callbacks for:
 - `OnSelectControlMode` — takes a `FocMotorMode` and a result callback.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` — take a typed unit quantity and a completion callback.
 - `OnSetPidCurrent`, `OnSetPidSpeed`, `OnSetPidPosition` — receive a bandwidth parameter parsed from the CAN frame and forward to the corresponding `TrySet*Bandwidth` on `ControlModeStateMachine`.
-- `OnIdentifyElectrical` — calls `CmdReserveExternalCalibration()` before starting estimation; `invalidState` if rejected; on estimation success calls `CmdCompleteExternalCalibration()` and broadcasts `focElectricalParamsResponseId`.
-- `OnIdentifyMechanical` — calls `ActiveCalibrationData()` to obtain pole pairs and guard the state in one step; `invalidState` if not in `Ready`; on success broadcasts `focMechanicalParamsResponseId`.
+- `OnIdentifyElectrical` — calls `CmdReserveExternalCalibration()` before starting estimation; `invalidState` if rejected; on estimation success calls `CmdCompleteExternalCalibration()` and broadcasts `focElectricalParamsResponseId`; on estimation failure or a rejected completion calls `CmdReleaseExternalCalibration()`.
+- `OnIdentifyMechanical` — calls `ActiveCalibrationData()` to obtain pole pairs and guard the state in one step, then `CmdReserveExternalCalibration()` for the duration of the run; `invalidState` if not in `Ready`; releases the reservation when the estimation reports and on success broadcasts `focMechanicalParamsResponseId`.
 - `OnRequestTelemetry` — broadcasts current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`. Position is read from the encoder; speed is the active mode's `ObserveMotion().measuredSpeed` — the outer loop's window speed in speed and position mode, the interrupt's filtered speed in torque mode (REQ-INT-014).
 - `OnSetEncoderResolution`, `OnConfigureTelemetryRate` — validate payload, update and persist `ConfigData` via `NonVolatileMemory`.
 
@@ -139,15 +139,15 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
 - `OnStart` → `CmdEnable()`; success calls the ack callback, rejection sends `invalidState`.
 - `OnStop` → `CmdDisable()`.
 - `OnClearFault` → `CmdClearFault()`.
-- `OnEmergencyStop` → `CmdEmergencyStop()`.
+- `OnEmergencyStop` → aborts the bridge's mechanical identification if one runs, then `CmdEmergencyStop()`.
 - `OnSelectControlMode` → `Select(mode, onDone)`; the result callback sends the mode response or a category error.
 - `OnSetTorqueSetpoint`, `OnSetSpeedSetpoint`, `OnSetPositionSetpoint` → validate mode and range, then delegate to `TrySet*` on the state machine.
 - PID bandwidth commands → `TrySet*Bandwidth(bandwidth)` on the state machine. The state machine applies the
   same `foc::CommandLimits` ranges and the same enabled-state policy the CLI gets: a value outside the range
   for that loop, or one that does not apply to the active mode, is acknowledged `invalidPayload`; a redesign
   refused because the drive is running is acknowledged `invalidState`.
-- `OnIdentifyElectrical` → `CmdReserveExternalCalibration()` (state guard + `Calibrating` entry); run estimation; `CmdCompleteExternalCalibration(data, cb)` on success, which aligns the rotor and persists; `invalidState` / `calibrationFailed` / `busy` on failure. The command covers the electrical steps only — it never drives the mechanical estimator — so speed and position end in `Idle` reporting `partialCalibration`, while torque reaches `Ready`.
-- `OnIdentifyMechanical` → `ActiveCalibrationData()` (state guard + pole-pairs extraction in one call); run estimation; broadcast on success; `invalidState` / `calibrationFailed` / `busy` on failure.
+- `OnIdentifyElectrical` → `CmdReserveExternalCalibration()` (state guard + `Calibrating` entry); run estimation; `CmdCompleteExternalCalibration(data, cb)` on success, which aligns the rotor and persists; `invalidState` / `calibrationFailed` / `busy` on failure. Every failure that leaves the reservation in place — a poor R/L fit, no pole-pair estimate (or one that does not fit the wire's byte), a rejected completion — calls `CmdReleaseExternalCalibration()`, so the node returns to `Ready` or `Idle`. A request that finds its previous run abandoned by an emergency stop or a fault (the reservation gone, the estimation never answered) starts afresh instead of answering `busy`. The command covers the electrical steps only — it never drives the mechanical estimator — so speed and position end in `Idle` reporting `partialCalibration`, while torque reaches `Ready`.
+- `OnIdentifyMechanical` → `ActiveCalibrationData()` (state guard + pole-pairs extraction in one call); `CmdReserveExternalCalibration()`; run estimation; `CmdReleaseExternalCalibration()` when it reports; broadcast on success; `invalidState` / `calibrationFailed` / `busy` on failure. The reservation keeps `Start`, mode selection and setpoints refused while the motor spins.
 - `OnRequestTelemetry` → broadcast current state, fault code, measured speed and measured position via `focTelemetryStatusResponseId`; always succeeds. `ToCanMotorState` maps `Idle` to `FocMotorState::partialCalibration` instead of `idle` when `HasPartialCalibration()` reports a non-empty but incomplete NVM record (old-schema or interrupted external calibration).
 - `OnSetEncoderResolution` / `OnConfigureTelemetryRate` → persist to `NonVolatileMemory`; `persistenceFailed` on write error; `busy` if a prior NVM save is in flight.
 
@@ -164,9 +164,13 @@ Provides the same `Send*` API as `FocMotorCategoryClient` but hides the transpor
 `CanProtocolServer` already tracks client liveness: it restarts a timer on every frame from the client and calls `Offline()` on its observers when `clientTimeout` elapses with no traffic. Nothing acted on that notification, so unplugging the bus mid-spin left the drive holding its last setpoint indefinitely.
 
 `CanLivenessWatchdog` is a `CanProtocolServerObserver` that closes the loop. On `Offline()` it checks whether
-the active state machine is in `Enabled`; if so it traces and issues `CmdEmergencyStop`, which stops the
-inverter. When the drive is not enabled the notification is ignored — a bus that goes quiet while the motor is
-stopped is not a hazard, and faulting there would obstruct commissioning.
+the active state machine is in `Enabled`, or in `Calibrating` under a CAN client's reservation (an
+identification the client started, which may be spinning the motor); if so it traces and issues
+`CmdEmergencyStop`, which stops the inverter. A calibration started from the CLI is left alone. When the drive
+is otherwise not running the notification is ignored — a bus that goes quiet while the motor is
+stopped is not a hazard, and faulting there would obstruct commissioning. An identification acknowledges only
+when it ends, so a client waiting on one keeps sending frames; `CanProtocolClient` heartbeats every
+`heartbeatInterval` for this.
 
 It is composed in the instantiation layer alongside the CAN bridge, so the bridge and category server stay free of lifecycle policy.
 

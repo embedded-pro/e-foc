@@ -45,6 +45,7 @@ namespace state_machine
         uint8_t mechanicalAttempts{ 0 };
         std::array<MechanicalRun, maxMechanicalRuns> mechanicalRuns{};
         uint8_t mechanicalRunCount{ 0 };
+        bool externalReservation{ false };
     };
 
     struct Ready

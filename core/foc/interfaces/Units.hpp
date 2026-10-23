@@ -14,9 +14,9 @@ namespace foc
         using Weber = infra::BaseUnit<13>;
         using KilogramMeterSquared = infra::BaseUnit<14>;
 
-        using Radians = Angle::Scale<infra::StaticRational<10, 0>>;
-        using RevPerSecond = Revolution::Div<infra::Second>::Inverse;
-        using RevPerMinute = RevPerSecond::Scale<infra::StaticRational<60, 1>>;
+        using Radians = Angle;
+        using RevPerSecond = Revolution::Div<infra::Second>;
+        using RevPerMinute = Revolution::Div<infra::Minute>;
     }
 
     using Ampere = infra::Quantity<infra::Ampere, float>;

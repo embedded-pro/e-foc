@@ -82,9 +82,11 @@
     method on ControlModeStateMachine, responding with success or invalidPayload.
     OnIdentifyElectrical shall delegate to ElectricalParametersIdentification,
     broadcast the result via focElectricalParamsResponseId, and acknowledge success,
-    or send calibrationFailed on estimation failure.
-    OnIdentifyMechanical shall require the state machine to be in Ready state, delegate
-    to MechanicalParametersIdentification, broadcast via focMechanicalParamsResponseId,
+    or send calibrationFailed on estimation failure; every failure shall release the
+    external calibration reservation so the node returns to Ready or Idle.
+    OnIdentifyMechanical shall require the state machine to be in Ready state, hold the
+    external calibration reservation while it runs, delegate to
+    MechanicalParametersIdentification, broadcast via focMechanicalParamsResponseId,
     and acknowledge success; it shall respond invalidState if not in Ready, and
     notImplemented if no MechanicalParametersIdentification service is available.
     OnRequestTelemetry shall broadcast the current motor state and fault code via

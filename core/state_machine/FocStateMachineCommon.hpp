@@ -52,6 +52,7 @@ namespace application
 
         void CmdReAlign(const infra::Function<void(state_machine::CommandResult)>& onDone);
         state_machine::CommandResult CmdReserveExternalCalibration();
+        state_machine::CommandResult CmdReleaseExternalCalibration();
         void CmdCompleteExternalCalibration(const services::CalibrationData& data, const infra::Function<void(state_machine::CommandResult)>& onDone);
         void CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone);
         foc::Weber ActiveFluxLinkage() const;

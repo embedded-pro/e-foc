@@ -56,6 +56,11 @@ namespace state_machine
         static constexpr const char* name{ "ReserveExternalCalibration" };
     };
 
+    struct ReleaseExternalCalibration
+    {
+        static constexpr const char* name{ "ReleaseExternalCalibration" };
+    };
+
     struct CompleteExternalCalibration
     {
         static constexpr const char* name{ "CompleteExternalCalibration" };
@@ -177,6 +182,7 @@ namespace state_machine
         Calibrate,
         ReAlign,
         ReserveExternalCalibration,
+        ReleaseExternalCalibration,
         CompleteExternalCalibration,
         RunCalibrationSequence,
         RunAlignmentOnly,

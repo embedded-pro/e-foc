@@ -674,6 +674,44 @@ TEST_F(FocStateMachineTorqueCliTest, async_work_stays_pending_while_a_save_is_ou
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
+TEST_F(FocStateMachineTorqueCliTest, a_busy_answer_to_the_save_of_an_aborted_run_is_not_retried)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(std::optional<std::size_t>)>& cb)
+            {
+                cb(std::size_t{ 7 });
+            }));
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const auto&, const infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)>& cb)
+            {
+                cb(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
+            }));
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&, const infra::Function<void(std::optional<foc::Radians>)>& cb)
+            {
+                cb(foc::Radians{ 0.0f });
+            }));
+    infra::Function<void(services::NvmStatus)> capturedSave;
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([&capturedSave](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                capturedSave = onDone;
+            }));
+
+    sm.CmdCalibrate([](state_machine::CommandResult) {});
+    sm.CmdEmergencyStop();
+
+    capturedSave(services::NvmStatus::Busy);
+    ForwardTime(std::chrono::seconds{ 1 });
+
+    EXPECT_FALSE(sm.HasPendingAsyncWork());
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
 TEST_F(FocStateMachineTorqueCliTest, calibrate_is_rejected_while_the_save_of_an_aborted_run_is_still_outstanding)
 {
     GivenFaultNotifierRegistered();
@@ -1232,6 +1270,53 @@ TEST_F(FocStateMachineTorqueCliTest, a_clean_enable_and_disable_cycle_resets_the
     faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
 
     EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::ok);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, a_clean_run_while_enabled_resets_the_fault_retry_budget)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    EXPECT_CALL(inverterMock, Stop()).Times(AnyNumber());
+
+    for (int attempt = 0; attempt != 3; ++attempt)
+    {
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+        EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::ok);
+    }
+
+    sm.CmdEnable();
+    ForwardTime(application::FaultController::cleanRunDuration);
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+
+    EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::ok);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, a_run_shorter_than_the_clean_run_keeps_the_fault_retry_budget_spent)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    EXPECT_CALL(inverterMock, Stop()).Times(AnyNumber());
+
+    for (int attempt = 0; attempt != 3; ++attempt)
+    {
+        faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+        EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::ok);
+    }
+
+    sm.CmdEnable();
+    ForwardTime(application::FaultController::cleanRunDuration - std::chrono::seconds(1));
+    faultNotifierMock.TriggerFault(state_machine::FaultCode::overcurrent);
+    ForwardTime(std::chrono::seconds(2));
+
+    EXPECT_EQ(sm.CmdClearFault(), state_machine::CommandResult::rejected);
 }
 
 TEST_F(FocStateMachineTorqueCliTest, clear_fault_from_enabled_is_rejected)

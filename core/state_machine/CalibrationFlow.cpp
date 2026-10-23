@@ -45,7 +45,14 @@ namespace application
 
     state_machine::Calibrating CalibrationFlow::Reserve()
     {
-        return state_machine::Calibrating{ state_machine::CalibrationStep::polePairs, {}, true };
+        state_machine::Calibrating calibrating{ state_machine::CalibrationStep::polePairs, {}, true };
+        calibrating.externalReservation = true;
+        return calibrating;
+    }
+
+    bool CalibrationFlow::IsReleasable(const state_machine::Calibrating& calibrating) const
+    {
+        return calibrating.externalReservation && !env.pending.Pending() && !HasRunInFlight();
     }
 
     bool CalibrationFlow::IsPlausibleExternal(const state_machine::CompleteExternalCalibration& command) const
@@ -230,6 +237,12 @@ namespace application
     // Busy is contention with another writer of the shared NVM, not a failure of this record
     void CalibrationFlow::OnSaved(services::NvmStatus status)
     {
+        if (saveCompletion == nullptr)
+        {
+            env.nvmActivity.End();
+            return;
+        }
+
         if (status == services::NvmStatus::Busy)
         {
             RetrySave();
@@ -299,9 +312,11 @@ namespace application
         if (saveRetryTimer.Armed())
         {
             saveRetryTimer.Cancel();
-            saveCompletion = nullptr;
             env.nvmActivity.End();
         }
+
+        // A save still in flight answers into OnSaved, which then neither retries nor completes the aborted run
+        saveCompletion = nullptr;
 
         orchestrator.Abort();
         env.mode.AbortModeSpecificServices();

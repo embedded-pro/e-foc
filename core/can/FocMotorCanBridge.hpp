@@ -66,6 +66,10 @@ namespace can
         void ReportSelectFailure(state_machine::SelectResult result);
         bool SetpointRejected(uint8_t commandId, state_machine::ControlMode requiredMode, bool withinRange);
         bool SetpointAllowedInCurrentState() const;
+        bool ReserveCalibration(uint8_t commandId);
+        bool ElectricalIdentificationInProgress() const;
+        bool MechanicalIdentificationInProgress() const;
+        void FailElectricalIdentification(FocMotorCategoryError error);
 
         FocMotorCategoryServer& server;
         state_machine::ControlModeStateMachine& controlMode;

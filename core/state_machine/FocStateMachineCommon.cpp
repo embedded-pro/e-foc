@@ -141,6 +141,11 @@ namespace application
         return ToCommandResult(Dispatch(state_machine::ReserveExternalCalibration{}));
     }
 
+    state_machine::CommandResult FocStateMachineCommon::CmdReleaseExternalCalibration()
+    {
+        return ToCommandResult(Dispatch(state_machine::ReleaseExternalCalibration{}));
+    }
+
     void FocStateMachineCommon::CmdCompleteExternalCalibration(const services::CalibrationData& data, const infra::Function<void(state_machine::CommandResult)>& onDone)
     {
         Dispatch(state_machine::CompleteExternalCalibration{ data, state_machine::CommandCallback{ onDone } });

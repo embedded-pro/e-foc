@@ -30,7 +30,11 @@ namespace foc
     bool PidSpeedController::ApplyGains()
     {
         if (!AreMechanicalParametersValid(parameters))
+        {
+            speedPid.SetTunings({ 0.0f, 0.0f, 0.0f });
+            speedPid.Reset();
             return false;
+        }
 
         const auto inertia = parameters.inertia.Value();
         const auto scale = 1.0f / parameters.maxCurrent.Value();

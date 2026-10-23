@@ -16,6 +16,10 @@ namespace integration
     struct Fixture
     {
         static constexpr uint16_t kServerNodeId = 1;
+        // The target drops a client silent for 3 s of its own time, and a command such as an identification
+        // acknowledges only when it ends: a waiting client heartbeats, as CanProtocolClient does. The simulated
+        // target can run faster than the wall clock, so the interval leaves margin on the 3 s.
+        static constexpr std::chrono::milliseconds kClientHeartbeatInterval{ 250 };
 
         Fixture();
 
@@ -78,6 +82,7 @@ namespace integration
 
     private:
         void SyncLines();
+        void SendClientHeartbeat();
         std::size_t LineIndexOf(std::size_t mark) const;
 
         TargetInteractor& interactor;

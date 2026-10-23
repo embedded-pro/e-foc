@@ -149,6 +149,10 @@ directory holding the target's files, the socket carrying frames, and the captur
 | Simulation        | Describe the plant and the stored calibration and configuration             |
 | Response          | Capture the plant trajectory and measure step and disturbance metrics on it |
 
+The command transport heartbeats while it awaits an acknowledgement, as a CAN client does. An
+identification acknowledges only when it ends, and the target emergency-stops an identification or an
+enabled drive whose client falls silent (see the CAN service design).
+
 ### Required from the system under test
 
 - A CAN command set covering mode selection, calibration, alignment, enable, disable, setpoints,
