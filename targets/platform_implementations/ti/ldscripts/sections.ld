@@ -53,8 +53,8 @@ SECTIONS
         _etext = .;
     } > REGION_TEXT
 
-    /* .bss first and sorted by alignment: the 1 KiB-aligned uDMA control table then sits at the start of RAM
-       instead of forcing up to 1 KiB of padding after .data */
+    /* .bss first and sorted by alignment: the 1 KiB-aligned uDMA control table then sits at the start of RAM, so
+       there is no padding after .data and growth elsewhere moves the end of RAM byte for byte, not by a whole KiB */
     .bss (NOLOAD):
     {
         . = ALIGN(4);
