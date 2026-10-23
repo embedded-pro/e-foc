@@ -82,12 +82,13 @@ TEST_F(FaultControllerTest, a_pending_fault_is_taken_once)
     EXPECT_FALSE(controller.TakePendingFault().has_value());
 }
 
-TEST_F(FaultControllerTest, a_second_interrupt_replaces_the_code_the_pending_fault_carries)
+TEST_F(FaultControllerTest, a_second_interrupt_keeps_the_code_of_the_first)
 {
     controller.LatchFromInterrupt(state_machine::FaultCode::overcurrent);
     controller.LatchFromInterrupt(state_machine::FaultCode::overvoltage);
 
-    EXPECT_EQ(controller.TakePendingFault(), state_machine::FaultCode::overvoltage);
+    EXPECT_EQ(controller.TakePendingFault(), state_machine::FaultCode::overcurrent);
+    EXPECT_FALSE(controller.TakePendingFault().has_value());
 }
 
 TEST_F(FaultControllerTest, no_fault_is_pending_before_an_interrupt_latches_one)
@@ -176,6 +177,53 @@ TEST_F(FaultControllerTest, reset_clear_count_allows_clearing_again)
     controller.ResetClearCount();
     controller.EnterFault();
     EXPECT_TRUE(controller.TryClear());
+}
+
+TEST_F(FaultControllerTest, a_clean_run_refills_the_clear_budget)
+{
+    for (int i = 0; i < 3; ++i)
+    {
+        controller.EnterFault();
+        controller.TryClear();
+    }
+
+    controller.StartCleanRun();
+    ForwardTime(application::FaultController::cleanRunDuration);
+
+    controller.EnterFault();
+    EXPECT_TRUE(controller.TryClear());
+}
+
+TEST_F(FaultControllerTest, a_fault_before_the_clean_run_completes_keeps_the_budget_spent)
+{
+    for (int i = 0; i < 3; ++i)
+    {
+        controller.EnterFault();
+        controller.TryClear();
+    }
+
+    controller.StartCleanRun();
+    ForwardTime(application::FaultController::cleanRunDuration - std::chrono::seconds(1));
+    controller.EnterFault();
+    ForwardTime(std::chrono::seconds(2));
+
+    EXPECT_FALSE(controller.TryClear());
+}
+
+TEST_F(FaultControllerTest, stopping_the_clean_run_keeps_the_budget_spent)
+{
+    for (int i = 0; i < 3; ++i)
+    {
+        controller.EnterFault();
+        controller.TryClear();
+    }
+
+    controller.StartCleanRun();
+    controller.StopCleanRun();
+    ForwardTime(application::FaultController::cleanRunDuration);
+
+    controller.EnterFault();
+    EXPECT_FALSE(controller.TryClear());
 }
 
 TEST_F(FaultControllerTest, registered_callbacks_are_forwarded_to_notifier)

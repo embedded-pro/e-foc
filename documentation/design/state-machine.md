@@ -473,9 +473,14 @@ reading taken while faulted distinguishes a cleared condition from an unevaluate
 tested, and becomes load-bearing as soon as a platform can answer — see REQ-EH-013.
 
 **The budget.** Each accepted `CmdClearFault` increments a counter; once `maxConsecutiveFaultClears` (3) clears
-have happened without an intervening clean run, further clears are refused and a reset is required. The
-counter is reset by `CmdDisable` from `Enabled`, which is the only evidence the state machine has that the
-drive ran and was stopped deliberately rather than by the same condition re-tripping. The budget supplements
+have happened without an intervening clean run, further clears are refused and a reset is required. Two
+things count as a clean run and reset the counter: `CmdDisable` from `Enabled`, the drive running and being
+stopped deliberately rather than by the same condition re-tripping; and `cleanRunDuration` (10 s) spent in
+`Enabled` without a fault. The second is what keeps three faults spread over a long life of a drive that is
+only ever stopped by faults or emergency stops from needing a power cycle. `OperationFlow` starts the clean-run
+timer once `Enabled` has started without a pending fault and cancels it on entering any other state;
+`FaultController::EnterFault` cancels it too. A condition that re-faults within 10 s of every enable therefore
+still exhausts the budget. The budget supplements
 the condition gate rather than replacing it: it bounds the platforms that cannot verify, and it bounds a
 condition that happens to read clear between attempts on those that can. A clear the condition refused does not
 spend from it.
@@ -499,17 +504,19 @@ without consulting the state, because hardware saying "fault" outranks the state
 it was doing — and then hands the `FaultDetected` event to `infra::EventDispatcher`. The secondary handler,
 which broadcasts the fault over CAN, already worked this way.
 
-Latching is three single-word writes (`pendingCode`, `faultPending`, `faultLatched`), which is all an interrupt
-may do here: the tracing, the multi-word `std::variant` write and the pending-command completion stay on the
-dispatcher. `faultLatched` says a fault is in force and is what commands consult; `faultPending` says the
-`FaultDetected` transition it owes has not been taken yet, and is consumed by whichever context takes it.
+Latching is an atomic compare-and-set of `pendingCode` from `none` and a write of `faultLatched`, which is all
+an interrupt may do here: the tracing, the multi-word `std::variant` write and the pending-command completion
+stay on the dispatcher. `faultLatched` says a fault is in force and is what commands consult; a `pendingCode`
+other than `none` says the `FaultDetected` transition it owes has not been taken yet, and is consumed by
+whichever context takes it. The compare-and-set keeps the first code when a second source (the PWM trip and
+CAN bus-off both latch) fires before the transition is taken, so the root cause is the code reported.
 `FaultController` keeps a third, dispatcher-only flag, `faultRecorded`, for "the transition has been taken" —
 the distinction `faultLatched` carried before latching moved into the interrupt, and what decides whether an
 arriving fault is the one that tripped the drive or a further one whose code is kept out of `LastFaultCode()`.
 
-`TakePendingFault()` claims the flag and the code together and hands back the code, so a second interrupt
-landing mid-claim cannot leave the taker dispatching one fault's transition under another's code. Claiming is
-the *only* thing that clears `faultPending`: taking the transition does not, or a fault latched while that
+`TakePendingFault()` claims the code with one atomic exchange to `none` and hands it back, so an interrupt
+landing mid-claim either is claimed with it or stays pending for its own transition — it cannot be wiped.
+Claiming is the *only* thing that clears `pendingCode`: taking the transition does not, or a fault latched while that
 transition ran would be wiped before its own dispatcher turn reached it and would never be recorded at all.
 For the same reason `CmdClearFault` is refused while a fault is pending — clearing there would drop the latch
 of a fault that has already tripped the drive, and spend one of the three permitted clears on a state the

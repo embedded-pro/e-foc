@@ -175,7 +175,8 @@ namespace application
 
         env.mode.GetFocControl().Start();
 
-        DispatchPendingFault();
+        if (!DispatchPendingFault())
+            faultController.StartCleanRun();
     }
 
     bool OperationFlow::DispatchPendingFault()
@@ -193,6 +194,8 @@ namespace application
     {
         if (state.Is<state_machine::Enabled>())
             StartUnlessFaulted();
+        else
+            faultController.StopCleanRun();
 
         env.pending.FlushDeferred();
 
