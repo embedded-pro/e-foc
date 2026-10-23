@@ -62,7 +62,7 @@ jobs:
           submodules: recursive
       - uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
       - name: Install Qt6
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qt6-base-dev libgl1-mesa-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qt6-base-dev libgl1-mesa-dev ccache
       - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
         with:
           configurePreset: "host"
@@ -130,7 +130,7 @@ jobs:
           -DE_FOC_BUILD_SIMULATOR=On
           -DNUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS=Off
       - name: Build
-        run: cmake --build build
+        run: cmake --build build --target e_foc.tool.simulator e_foc.tool.can_commander
       - name: Package simulator
         shell: bash
         run: |
@@ -185,7 +185,7 @@ jobs:
         uses: carlosperate/arm-none-eabi-gcc-action@0edbb000a5a98e2292b051b463bff6f512547118 # v1.14.0
         with:
           release: ${{ matrix.gcc }}
-      - run: sudo apt-get update && sudo apt-get install ninja-build xsltproc
+      - run: sudo apt-get update && sudo apt-get install ninja-build xsltproc ccache
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: host-install-package
