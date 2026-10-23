@@ -13,45 +13,45 @@ namespace application
 {
     namespace Pins
     {
-        inline hal::tiva::GpioPin currentPhaseA{ hal::tiva::Port::E, 3 };
-        inline hal::tiva::GpioPin currentPhaseB{ hal::tiva::Port::E, 2 };
-        inline hal::tiva::GpioPin currentPhaseC{ hal::tiva::Port::E, 1 };
-        inline hal::tiva::GpioPin powerSupplyVoltage{ hal::tiva::Port::B, 5 };
-        inline SharedGpioPin powerSupplyVoltageForUndervoltage{ hal::tiva::Port::B, 5 };
-        inline hal::tiva::GpioPin currentTotal{ hal::tiva::Port::B, 4 };
+        extern hal::tiva::GpioPin currentPhaseA;
+        extern hal::tiva::GpioPin currentPhaseB;
+        extern hal::tiva::GpioPin currentPhaseC;
+        extern hal::tiva::GpioPin powerSupplyVoltage;
+        extern SharedGpioPin powerSupplyVoltageForUndervoltage;
+        extern hal::tiva::GpioPin currentTotal;
 
-        inline hal::tiva::GpioPin hallSensorA{ hal::tiva::Port::E, 4 };
-        inline hal::tiva::GpioPin hallSensorB{ hal::tiva::Port::E, 5 };
-        inline hal::tiva::GpioPin hallSensorC{ hal::tiva::Port::E, 6 };
+        extern hal::tiva::GpioPin hallSensorA;
+        extern hal::tiva::GpioPin hallSensorB;
+        extern hal::tiva::GpioPin hallSensorC;
 
-        inline hal::tiva::GpioPin encoderA{ hal::tiva::Port::L, 1 };
-        inline hal::tiva::GpioPin encoderB{ hal::tiva::Port::L, 2 };
-        inline hal::tiva::GpioPin encoderZ{ hal::tiva::Port::L, 3 };
+        extern hal::tiva::GpioPin encoderA;
+        extern hal::tiva::GpioPin encoderB;
+        extern hal::tiva::GpioPin encoderZ;
 
-        inline hal::tiva::GpioPin pwmPhase1a{ hal::tiva::Port::F, 2 };
-        inline hal::tiva::GpioPin pwmPhase1b{ hal::tiva::Port::F, 3 };
-        inline hal::tiva::GpioPin pwmPhase2a{ hal::tiva::Port::G, 0 };
-        inline hal::tiva::GpioPin pwmPhase2b{ hal::tiva::Port::G, 1 };
-        inline hal::tiva::GpioPin pwmPhase3a{ hal::tiva::Port::K, 4 };
-        inline hal::tiva::GpioPin pwmPhase3b{ hal::tiva::Port::K, 5 };
+        extern hal::tiva::GpioPin pwmPhase1a;
+        extern hal::tiva::GpioPin pwmPhase1b;
+        extern hal::tiva::GpioPin pwmPhase2a;
+        extern hal::tiva::GpioPin pwmPhase2b;
+        extern hal::tiva::GpioPin pwmPhase3a;
+        extern hal::tiva::GpioPin pwmPhase3b;
 
-        inline hal::tiva::GpioPin operationalLed{ hal::tiva::Port::N, 3 };
-        inline hal::tiva::GpioPin warningLed{ hal::tiva::Port::N, 2 };
-        inline hal::tiva::GpioPin failureLed{ hal::tiva::Port::P, 2 };
+        extern hal::tiva::GpioPin operationalLed;
+        extern hal::tiva::GpioPin warningLed;
+        extern hal::tiva::GpioPin failureLed;
 
-        inline hal::tiva::GpioPin boardId0{ hal::tiva::Port::K, 0, hal::tiva::Drive::Up };
-        inline hal::tiva::GpioPin boardId1{ hal::tiva::Port::K, 1, hal::tiva::Drive::Up };
-        inline hal::tiva::GpioPin boardId2{ hal::tiva::Port::K, 2, hal::tiva::Drive::Up };
+        extern hal::tiva::GpioPin boardId0;
+        extern hal::tiva::GpioPin boardId1;
+        extern hal::tiva::GpioPin boardId2;
 
-        inline hal::tiva::GpioPin powerStatus{ hal::tiva::Port::C, 6, hal::tiva::Drive::Up };
+        extern hal::tiva::GpioPin powerStatus;
 
-        inline hal::tiva::GpioPin uartRx{ hal::tiva::Port::D, 4 };
-        inline hal::tiva::GpioPin uartTx{ hal::tiva::Port::D, 5 };
+        extern hal::tiva::GpioPin uartRx;
+        extern hal::tiva::GpioPin uartTx;
 
-        inline hal::tiva::GpioPin canRx{ hal::tiva::Port::A, 0 };
-        inline hal::tiva::GpioPin canTx{ hal::tiva::Port::A, 1 };
+        extern hal::tiva::GpioPin canRx;
+        extern hal::tiva::GpioPin canTx;
 
-        inline hal::tiva::GpioPin performance{ hal::tiva::Port::N, 4 };
+        extern hal::tiva::GpioPin performance;
     }
 
     namespace Peripheral
@@ -90,11 +90,7 @@ namespace application
         constexpr static hal::DutyCycle maxReadableDuty{ hal::DutyCycle::FromPercent(application::BoardCharacteristics::maxReadableDutyPercent) };
         constexpr static hal::DutyCycle maxDuty{ hal::DutyCycle::FromPercent(application::BoardCharacteristics::maxDutyPercent) };
 
-        inline std::array<hal_pwm::PinChannel, 3> pwmPhases{ {
-            { hal_pwm::GeneratorIndex::generator1, Pins::pwmPhase1a, Pins::pwmPhase1b, true, true, std::make_optional(hal_pwm::PinChannel::Trigger::countZero) },
-            { hal_pwm::GeneratorIndex::generator2, Pins::pwmPhase2a, Pins::pwmPhase2b, true, true, std::nullopt },
-            { hal_pwm::GeneratorIndex::generator3, Pins::pwmPhase3a, Pins::pwmPhase3b, true, true, std::nullopt },
-        } };
+        extern std::array<hal_pwm::PinChannel, 3> pwmPhases;
     }
 
     // Buffer capacities read by the shared platform implementation.
