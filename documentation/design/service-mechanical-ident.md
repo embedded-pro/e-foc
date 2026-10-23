@@ -483,7 +483,8 @@ A slope per direction, published by whichever direction ran last, read the rig's
 two-degree-of-freedom loop and at 0 to 0.3 times the calibration's under LQI and ADRC: the negative direction only
 held -10 rad/s, in the calibration's cogging pass, and -30 rad/s, both where the friction is flat, so its slope was
 about 0, and only the PID loops overshot into the positive direction when they stopped, which published that
-direction's 10 to 12 µN·m·s instead. Pooled, a direction held only at flat speeds weighs in by its small spread.
+direction's 10 to 12 µN·m·s instead. Pooled, a direction held only at flat speeds weighs in by its small spread,
+and the sweep reads 0.85 to 1.08 times the calibration's friction under every current and speed law.
 
 A fit that only ever sees one speed cannot tell its intercept from its viscous friction, since $\omega$ is
 then constant. The span of speeds a publication waits for (Persistence of Excitation below) is therefore taken
