@@ -249,36 +249,47 @@ WHEN(R"(the full calibration is run from the terminal)")
     ParseTraceValues(*record, setup.identified);
 }
 
+namespace
+{
+    void AlternateSpeedSetpoint(Fixture& fixture, ScenarioSetup& setup, float low, float high, int dwellMs, int totalMs)
+    {
+        ASSERT_NE(setup.plant.responseSampleRateHz, 0u) << "Excitation is paced on the plant's clock: record the plant response first";
+
+        const auto ticksPerMs = setup.plant.baseFrequencyHz / 1000u;
+        const auto dwellTicks = static_cast<uint32_t>(dwellMs) * ticksPerMs;
+        const auto totalTicks = static_cast<uint32_t>(totalMs) * ticksPerMs;
+
+        FeedTrace(setup);
+        const auto start = setup.trace.LastSampleTick();
+        ASSERT_TRUE(start.has_value()) << "No plant samples yet: is the motor enabled and the response recorded?";
+
+        bool atHigh = false;
+        while (true)
+        {
+            FeedTrace(setup);
+            const auto now = setup.trace.LastSampleTick().value_or(*start);
+            if (now >= *start + totalTicks)
+                break;
+
+            atHigh = !atHigh;
+            const float target = atHigh ? high : low;
+            ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetSpeedSetpointId, EncodeFixed16BE(target, can::focSpeedScale)))
+                << "Speed setpoint command rejected";
+            setup.lastSetpoint = Setpoint{ can::focSetSpeedSetpointId, target };
+
+            ASSERT_TRUE(WaitForGuestTicks(fixture, setup, dwellTicks)) << "The plant clock stopped advancing during the excitation";
+        }
+    }
+}
+
 WHEN(R"(the speed setpoint alternates between {float} and {float} rad\/s every {int} ms for {int} ms)", (float low, float high, int dwellMs, int totalMs))
 {
-    auto& fixture = context.Get<Fixture>();
-    auto& setup = context.Get<ScenarioSetup>();
-    ASSERT_NE(setup.plant.responseSampleRateHz, 0u) << "Excitation is paced on the plant's clock: record the plant response first";
+    AlternateSpeedSetpoint(context.Get<Fixture>(), context.Get<ScenarioSetup>(), low, high, dwellMs, totalMs);
+}
 
-    const auto ticksPerMs = setup.plant.baseFrequencyHz / 1000u;
-    const auto dwellTicks = static_cast<uint32_t>(dwellMs) * ticksPerMs;
-    const auto totalTicks = static_cast<uint32_t>(totalMs) * ticksPerMs;
-
-    FeedTrace(setup);
-    const auto start = setup.trace.LastSampleTick();
-    ASSERT_TRUE(start.has_value()) << "No plant samples yet: is the motor enabled and the response recorded?";
-
-    bool atHigh = false;
-    while (true)
-    {
-        FeedTrace(setup);
-        const auto now = setup.trace.LastSampleTick().value_or(*start);
-        if (now >= *start + totalTicks)
-            break;
-
-        atHigh = !atHigh;
-        const float target = atHigh ? high : low;
-        ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focSetSpeedSetpointId, EncodeFixed16BE(target, can::focSpeedScale)))
-            << "Speed setpoint command rejected";
-        setup.lastSetpoint = Setpoint{ can::focSetSpeedSetpointId, target };
-
-        ASSERT_TRUE(WaitForGuestTicks(fixture, setup, dwellTicks)) << "The plant clock stopped advancing during the excitation";
-    }
+WHEN(R"(the speed setpoint is held at {float} rad\/s for {int} ms)", (float speed, int durationMs))
+{
+    AlternateSpeedSetpoint(context.Get<Fixture>(), context.Get<ScenarioSetup>(), speed, speed, durationMs, durationMs);
 }
 
 WHEN(R"(the online estimates are read)")

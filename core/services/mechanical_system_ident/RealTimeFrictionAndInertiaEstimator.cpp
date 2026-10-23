@@ -136,6 +136,10 @@ namespace services
             return false;
         if (std::abs(speed) <= std::abs(acceleration) * static_cast<float>(kinematics.WindowsPerObservation()) / samplingFrequency)
             return false;
+        // Far under the speeds the fit has held, the speed is coarsely quantised, a cogging torque outlasts the window and
+        // dry friction is not yet constant; the few observations a stop through zero leaves there would set the slope
+        if (std::abs(speed) < mechanical_estimate::minimumSpeedSpan * fit.excitation.FastestSpeed())
+            return false;
 
         return std::abs(acceleration) >= mechanical_estimate::minimumAcceleration || fit.metrics.uncertainty <= onlineCovarianceCeiling;
     }

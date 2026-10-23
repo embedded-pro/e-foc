@@ -2,7 +2,7 @@
 title: "Service: Mechanical Parameters Identification"
 type: design
 status: draft
-version: 0.3.0
+version: 0.3.1
 component: service-mechanical-ident
 date: 2026-10-23
 ---
@@ -12,7 +12,7 @@ date: 2026-10-23
 | Title     | Service: Mechanical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.3.0                                         |
+| Version   | 0.3.1                                         |
 | Component | service-mechanical-ident                      |
 | Date      | 2026-10-23                                    |
 
@@ -427,6 +427,16 @@ $\tau_c\,\mathrm{sgn}(\omega)$ instead fixed that but read a constant shaft torq
 backwards wrongly instead, 3 to 5 times the plant's friction. Two fits read both.
 
 An observation whose speed is smaller than its acceleration times one observation window may cross zero inside the window, where it belongs to neither direction. It is refused.
+
+An observation slower than a quarter of the fastest constant speed its fit has held is refused too. There the
+speed is coarsely quantised, a cogging torque outlasts the window instead of averaging out within it, and a real
+dry friction is not yet constant, while the few such observations a stop through zero leaves lie far from the
+speeds the fit holds and so set its slope. On the rig, the speed sweep that holds 30 and 60 rad/s and then stops
+through zero read the viscous friction at 11 to 14 µN·m·s under the PID speed loop and 0 under the LQI and ADRC
+loops, against the calibration's 9 to 11. In simulation, on the bench plant with its cogging and dry friction and
+a viscous friction of 10 µN·m·s, the PID loop read 9.0 after the two holds and 19.8 after the stop; with the floor
+it reads 9.5, and the LQI and ADRC loops 8.8 and 9.6. The floor follows the fit's own speeds, so it costs nothing
+at the speed levels themselves: alternating between 26 and 52 rad/s it sits at 13.
 
 A fit that only ever sees one speed cannot tell its intercept from its viscous friction, since $\omega$ is
 then constant. The span of speeds a publication waits for (Persistence of Excitation below) is therefore taken
