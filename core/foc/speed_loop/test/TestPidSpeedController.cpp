@@ -131,6 +131,20 @@ TEST_F(TestPidSpeedController, invalid_parameters_leave_gains_untouched)
     EXPECT_NEAR(output.Value(), 0.0f, tolerance);
 }
 
+TEST_F(TestPidSpeedController, invalid_mechanics_after_valid_ones_stop_driving_current)
+{
+    ASSERT_TRUE(controller.Configure(ValidParameters()));
+    EXPECT_GT(controller.Compute({ foc::RadiansPerSecond{ 0.0f }, foc::RadiansPerSecond{ 10.0f } }).Value(), 0.0f);
+
+    auto invalid = ValidParameters();
+    invalid.torqueConstant = foc::NewtonMeter{ 0.0f };
+    EXPECT_FALSE(controller.Configure(invalid));
+
+    auto output = controller.Compute({ foc::RadiansPerSecond{ 0.0f }, foc::RadiansPerSecond{ 10.0f } });
+
+    EXPECT_NEAR(output.Value(), 0.0f, tolerance);
+}
+
 TEST_F(TestPidSpeedController, gains_follow_the_inertia_based_design)
 {
     const auto parameters = ValidParameters();

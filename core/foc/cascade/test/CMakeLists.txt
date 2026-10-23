@@ -16,6 +16,7 @@ target_sources(e_foc.foc.cascade_test PRIVATE
     TestEstimatorChannel.cpp
     TestPositionCascade.cpp
     TestSpeedCascade.cpp
+    TestSpeedDifferentiator.cpp
     TestTorqueCascade.cpp
     TestTripleBuffer.cpp
 )
