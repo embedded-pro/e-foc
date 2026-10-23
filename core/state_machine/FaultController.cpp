@@ -29,13 +29,13 @@ namespace application
         really_assert(code != state_machine::FaultCode::none);
 
         auto noneYet = state_machine::FaultCode::none;
-        pendingCode.compare_exchange_strong(noneYet, code, std::memory_order_acq_rel);
+        pendingCode.compare_exchange_strong(noneYet, code);
         faultLatched = true;
     }
 
     std::optional<state_machine::FaultCode> FaultController::TakePendingFault()
     {
-        const auto code = pendingCode.exchange(state_machine::FaultCode::none, std::memory_order_acq_rel);
+        const auto code = pendingCode.exchange(state_machine::FaultCode::none);
         if (code == state_machine::FaultCode::none)
             return std::nullopt;
 
@@ -143,6 +143,6 @@ namespace application
 
     bool FaultController::IsPending() const
     {
-        return pendingCode.load(std::memory_order_acquire) != state_machine::FaultCode::none;
+        return pendingCode.load() != state_machine::FaultCode::none;
     }
 }

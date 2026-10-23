@@ -68,7 +68,7 @@ namespace application
                     {
                         return context.calibration.IsReleasable(calibrating) && context.calibration.HasValidCalibration();
                     },
-                    [](LifecycleContext& context, state_machine::Calibrating&, const state_machine::ReleaseExternalCalibration&)
+                    [](const LifecycleContext& context, const state_machine::Calibrating&, const state_machine::ReleaseExternalCalibration&)
                     {
                         return context.calibration.ReadyState();
                     }),
