@@ -77,11 +77,17 @@ The outer loop is triggered by the `LowPriorityInterrupt` at a prescale ratio de
 
 **Speed estimation by finite difference:**
 
-The angular velocity is estimated from the difference between the current mechanical angle sample and the previous angle sample, divided by the outer-loop period Δt:
+The angular velocity is estimated from the difference between the current mechanical angle sample and the previous angle sample, divided by the time between them Δt:
 
 ```text
-ω = Δθ / Δt
+ω = Δθ / Δt,   Δt = n · T_outer
 ```
+
+The inner-loop interrupt closes a window every prescaler ticks whether or not the outer loop has read the
+previous one, and counts each window it closes. `n` is the number of windows closed since the last read: 1
+normally, more when the outer-loop handler ran late. Dividing by one period after a late read would report a
+multiple of the true speed followed by zero. A read that finds no new window keeps the previous estimate. The
+angle and the count are read together and the read is retried if a window closes in between.
 
 Because the encoder angle wraps around at 2π, the raw angle difference may be discontinuous at the wrap
 boundary. Wrap-around compensation applies a correction: if the computed Δθ is greater than +π, it is shifted
