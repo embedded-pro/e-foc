@@ -195,18 +195,18 @@ form.
 
 ### Provided
 
-| Interface                        | Purpose                                       | Contract                                                                                                                                       |
-|----------------------------------|-----------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
-| Clarke — Forward                 | Converts (Ia, Ib, Ic) to (Iα, Iβ)             | All three phase currents are measured; no phase is reconstructed. The amplitude-invariant form remains valid for unbalanced phases.            |
-| Clarke — Inverse                 | Converts (Vα, Vβ) to (Va, Vb, Vc)             | Produces all three phase voltages. The sum of outputs is zero.                                                                                 |
-| Park — Forward                   | Converts (Iα, Iβ, θe) to (Id, Iq)             | Caller supplies pre-computed or LUT-evaluated cos(θe) and sin(θe). Stateless.                                                                  |
-| Park — Inverse                   | Converts (Vd, Vq, θe) to (Vα, Vβ)             | Uses the same θe as the forward Park in the same control cycle.                                                                                |
-| ClarkePark — Forward             | Converts (Ia, Ib, θe) to (Id, Iq) in one call | Computes cos/sin once; result is identical to chaining Clarke then Park separately.                                                            |
-| ClarkePark — Inverse             | Converts (Vd, Vq, θe) to (Va, Vb, Vc) in one call | Chains inverse Park → inverse Clarke; computes cos/sin once. Output is three phase voltages, not (Vα, Vβ).                               |
-| SpaceVectorModulation — Generate | Converts (Vα, Vβ) to three duty cycles        | Inputs must be per-unit relative to `V_dc/√3`. Outputs are always in [0.0, 1.0]. Common-mode injection is internal; there is no sector branch. |
-| FastTrigonometry — Sine          | Returns an approximation of sin(θ)            | θ is normalised to [0, 2π) internally. ROM LUT; no floating-point transcendental at runtime.                                                   |
-| FastTrigonometry — Cosine        | Returns an approximation of cos(θ)            | Derived from the sine LUT via a quarter-period offset. Same ROM, no additional storage.                                                        |
-| FastTrigonometry — AccurateSineAndCosine | Returns sin(θ) and cos(θ) within 1.3 × 10⁻⁶ | Same ROM; table entry plus a short series. For configuration-time use, not the control loop.                                            |
+| Interface                                | Purpose                                           | Contract                                                                                                                                       |
+|------------------------------------------|---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| Clarke — Forward                         | Converts (Ia, Ib, Ic) to (Iα, Iβ)                 | All three phase currents are measured; no phase is reconstructed. The amplitude-invariant form remains valid for unbalanced phases.            |
+| Clarke — Inverse                         | Converts (Vα, Vβ) to (Va, Vb, Vc)                 | Produces all three phase voltages. The sum of outputs is zero.                                                                                 |
+| Park — Forward                           | Converts (Iα, Iβ, θe) to (Id, Iq)                 | Caller supplies pre-computed or LUT-evaluated cos(θe) and sin(θe). Stateless.                                                                  |
+| Park — Inverse                           | Converts (Vd, Vq, θe) to (Vα, Vβ)                 | Uses the same θe as the forward Park in the same control cycle.                                                                                |
+| ClarkePark — Forward                     | Converts (Ia, Ib, θe) to (Id, Iq) in one call     | Computes cos/sin once; result is identical to chaining Clarke then Park separately.                                                            |
+| ClarkePark — Inverse                     | Converts (Vd, Vq, θe) to (Va, Vb, Vc) in one call | Chains inverse Park → inverse Clarke; computes cos/sin once. Output is three phase voltages, not (Vα, Vβ).                                     |
+| SpaceVectorModulation — Generate         | Converts (Vα, Vβ) to three duty cycles            | Inputs must be per-unit relative to `V_dc/√3`. Outputs are always in [0.0, 1.0]. Common-mode injection is internal; there is no sector branch. |
+| FastTrigonometry — Sine                  | Returns an approximation of sin(θ)                | θ is normalised to [0, 2π) internally. ROM LUT; no floating-point transcendental at runtime.                                                   |
+| FastTrigonometry — Cosine                | Returns an approximation of cos(θ)                | Derived from the sine LUT via a quarter-period offset. Same ROM, no additional storage.                                                        |
+| FastTrigonometry — AccurateSineAndCosine | Returns sin(θ) and cos(θ) within 1.3 × 10⁻⁶       | Same ROM; table entry plus a short series. For configuration-time use, not the control loop.                                                   |
 
 ### Required
 
