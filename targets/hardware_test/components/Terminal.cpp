@@ -1,6 +1,7 @@
 #include "targets/hardware_test/components/Terminal.hpp"
 #include "core/foc/interfaces/Signals.hpp"
 #include "core/services/alignment/MotorAlignment.hpp"
+#include "core/services/cli/DecimalToken.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "hal/interfaces/Pwm.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
@@ -14,6 +15,7 @@
 #include <chrono>
 #include <numbers>
 #include <optional>
+#include <type_traits>
 
 namespace
 {
@@ -42,15 +44,17 @@ namespace
     template<typename T>
     std::optional<T> ParseInput(const infra::BoundedConstString& data, T min, T max)
     {
-        if (data.empty())
+        constexpr bool isFloat = std::is_floating_point_v<T>;
+        if (!services::IsDecimalToken(data, isFloat || std::is_signed_v<T>, isFloat))
             return {};
 
+        using Parsed = std::conditional_t<isFloat, float, int64_t>;
         infra::StringInputStream stream(data, infra::softFail);
-        T value = 0.0f;
+        Parsed value{};
         stream >> value;
 
-        if (!stream.ErrorPolicy().Failed() && value >= min && value <= max)
-            return std::make_optional(value);
+        if (!stream.ErrorPolicy().Failed() && value >= static_cast<Parsed>(min) && value <= static_cast<Parsed>(max))
+            return std::make_optional(static_cast<T>(value));
         else
             return {};
     }

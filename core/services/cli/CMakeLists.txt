@@ -20,6 +20,7 @@ target_sources(e_foc.services.cli PRIVATE
     TerminalBase.hpp
     TerminalDiagnostics.cpp
     TerminalDiagnostics.hpp
+    DecimalToken.hpp
     TerminalHelper.hpp
     TerminalPosition.cpp
     TerminalPosition.hpp
