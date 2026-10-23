@@ -84,7 +84,7 @@ namespace application
         constexpr static hal::DutyCycle maxDuty{ hal::DutyCycle::FromPercent(100) };
 
         inline std::array<hal_pwm::PinChannel, 3> pwmPhases{ {
-            { hal_pwm::GeneratorIndex::generator0, Pins::pwmPhase1a, Pins::pwmPhase1b, true, true, std::make_optional(hal_pwm::PinChannel::Trigger::countLoad) },
+            { hal_pwm::GeneratorIndex::generator0, Pins::pwmPhase1a, Pins::pwmPhase1b, true, true, std::make_optional(hal_pwm::PinChannel::Trigger::countZero) },
             { hal_pwm::GeneratorIndex::generator1, Pins::pwmPhase2a, Pins::pwmPhase2b, true, true, std::nullopt },
             { hal_pwm::GeneratorIndex::generator2, Pins::pwmPhase3a, Pins::pwmPhase3b, true, true, std::nullopt },
         } };

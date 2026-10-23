@@ -3,10 +3,12 @@
 #include <algorithm>
 #include <array>
 #include HARDWARE_PINS_AND_PERIPHERALS_HEADER
+#include MOTOR_BOARD_CHARACTERISTICS_HEADER
 #include "core/platform_abstraction/AdcPhaseCurrentMeasurement.hpp"
 #include "core/platform_abstraction/CanBusAdapter.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "core/platform_abstraction/QuadratureEncoderDecorator.hpp"
+#include "hal/cortex_m/SystemTickTimerService.hpp"
 #include "hal/interfaces/Gpio.hpp"
 #include "hal/interfaces/Pwm.hpp"
 #include "hal/interfaces/SerialCommunication.hpp"
@@ -117,6 +119,11 @@ namespace application
             // Implementation of hal::AdcMultiChannel
             void Measure(const infra::Function<void(Samples)>& onDone) override;
             void Stop() override;
+
+        private:
+            // 12-bit ADC mid-scale: the zero-current reading a bipolar current-sense amplifier reports.
+            static constexpr uint16_t neutralCode = 2048;
+            static constexpr std::array<uint16_t, 3> neutralSamples{ neutralCode, neutralCode, neutralCode };
         };
 
         class ThreeChannelsPwmStub
@@ -231,6 +238,7 @@ namespace application
 
         // Initialised first, so the watchdog the dispatcher starts runs on an initialised HAL
         HalInitialization halInitialization;
+        hal::cortex::SystemTickTimerService systemTick{ SystemCoreClock, std::chrono::milliseconds(1) };
         hal::WatchDogStm watchdog{ WatchdogConfig() };
         services::EventDispatcherWithWeakPtrAndWatchdog::WithSize<50> eventDispatcher{ watchdog, watchdogExpirationTimeout, []()
             {
