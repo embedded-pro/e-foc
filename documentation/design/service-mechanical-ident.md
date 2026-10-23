@@ -203,10 +203,9 @@ the leftover as viscous friction. The default levels, 250 and 500 rpm, are there
 exactly one and two turns, so a dwell covers whole turns at either level, and with the run ending on a dwell
 boundary every harmonic of the turn cancels to first order.
 
-On the rig the two runs of one calibration read the viscous friction 15 % apart (per run, over 261
-calibrations), against 2.5 % in simulation, while the inertia agreed within 0.3 %. The simulated bench motor
-with a once-per-turn torque of 1 mN·m reproduced it with 250 ms dwells: every first run read the friction
-28 % high, and one second run 16 % low, because it started where the first had stopped. With whole turns:
+In simulation, the bench motor with a once-per-turn torque of 1 mN·m and 250 ms dwells read the friction 28 %
+high on every first run, and 16 % low on one second run, because it started where the first had stopped. With
+whole turns:
 
 | Plant, viscous friction 12 µN·m·s | 250 ms dwells        | Whole turns |
 |-----------------------------------|----------------------|-------------|
@@ -217,8 +216,14 @@ with a once-per-turn torque of 1 mN·m reproduced it with 250 ms dwells: every f
 | Bench dry friction and cogging    | −7 %                 | −8 %        |
 
 What remains is second order: the speed ripple the torque itself causes correlates with it, which grows with
-the square of the torque. The rig's run-to-run spread, at most about 6 µN·m·s between the two runs of a
-calibration, is that of the 1 mN·m plant.
+the square of the torque.
+
+On the rig, in six calibrations of each interleaved, the first run read the friction 2.9 µN·m·s (about 25 %)
+above the second with 250 ms dwells, in all six, and 0.7 µN·m·s below it with whole turns, in four of six. In a
+full sweep, where each calibration starts at a different angle, the leftover would show as scatter rather than
+bias; the rms difference between runs was 1.8 µN·m·s, against 1.7 to 3.1 in seven earlier sweeps, so a sweep
+does not resolve it. What does not change is a scatter of 1.5 to 2 µN·m·s (15 %) in a single run, with either
+dwell: it is not from the turn.
 
 The friction also changes with the motor's temperature, which no trajectory removes: on the rig it fell by 10
 to 30 % through each 12-minute sweep and read high again after an idle hour, while the winding resistance
