@@ -2,6 +2,7 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/math/FiniteGuard.hpp"
+#include "core/services/mechanical_system_ident/DiagPlateauLog.hpp"
 #include <algorithm>
 #include <cmath>
 #include <optional>
@@ -109,6 +110,12 @@ namespace services
         const auto observation = kinematics.Add(window);
         if (!observation.has_value())
             return;
+
+        const auto inDirection = IsMechanicallyObservable(observation->speed) && std::abs(observation->speed) > std::abs(observation->acceleration) * static_cast<float>(kinematics.WindowsPerObservation()) / samplingFrequency;
+        if (inDirection && std::abs(observation->acceleration) < mechanical_estimate::minimumAcceleration)
+            diag::plateauLog.Add(observation->speed, torqueConstant.Value() * observation->iq, observation->acceleration);
+        else
+            diag::plateauLog.End();
 
         auto& fit = onlineFits[observation->speed >= 0.0f ? 0 : 1];
         if (!IsOnlineObservationInformative(observation->acceleration, observation->speed, fit))

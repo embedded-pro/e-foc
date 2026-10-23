@@ -2,6 +2,7 @@
 #include "core/foc/math/FiniteGuard.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
 #include "core/foc/math/TorqueConstant.hpp"
+#include "core/services/mechanical_system_ident/DiagPlateauLog.hpp"
 #include <cmath>
 
 namespace
@@ -93,6 +94,12 @@ namespace application
     {
         GetTracer().Trace() << "[EST] Mech: J_uNms2=" << Micro(GetOnlineMechEstimator().CurrentInertia().Value()) << " B_uNms=" << Micro(GetOnlineMechEstimator().CurrentFriction().Value());
         GetTracer().Trace() << "[EST] Elec: R=" << GetOnlineElecEstimator().CurrentResistance().Value() << " L_mH=" << GetOnlineElecEstimator().CurrentInductance().Value();
+
+        for (std::size_t i = 0; i != diag::plateauLog.Count(); ++i)
+        {
+            const auto& plateau = diag::plateauLog.Entry(i);
+            GetTracer().Trace() << "[EST] Plateau " << static_cast<uint32_t>(i) << ": w=" << plateau.speed << " tau_uNm=" << Micro(plateau.torque) << " a=" << plateau.acceleration << " n=" << plateau.observations;
+        }
     }
 
     void OuterLoopStateMachine::ApplyOnlineEstimates()
