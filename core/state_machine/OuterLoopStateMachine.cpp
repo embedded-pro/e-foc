@@ -2,6 +2,7 @@
 #include "core/foc/math/FiniteGuard.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
 #include "core/foc/math/TorqueConstant.hpp"
+#include "core/services/mechanical_system_ident/DiagRunLog.hpp"
 #include <cmath>
 
 namespace
@@ -93,6 +94,13 @@ namespace application
     {
         GetTracer().Trace() << "[EST] Mech: J_uNms2=" << Micro(GetOnlineMechEstimator().CurrentInertia().Value()) << " B_uNms=" << Micro(GetOnlineMechEstimator().CurrentFriction().Value());
         GetTracer().Trace() << "[EST] Elec: R=" << GetOnlineElecEstimator().CurrentResistance().Value() << " L_mH=" << GetOnlineElecEstimator().CurrentInductance().Value();
+        GetTracer().Trace() << "[EST] Fit: Bpos_uNms=" << diag::runLog.friction[0] << " Bneg_uNms=" << diag::runLog.friction[1];
+
+        for (std::size_t i = 0; i != diag::runLog.Count(); ++i)
+        {
+            const auto& run = diag::runLog.Entry(i);
+            GetTracer().Trace() << "[EST] Run " << static_cast<uint32_t>(i) << ": t0=" << run.start << " n=" << run.observations << " w=" << run.speed << " tau_uNm=" << Micro(run.torque) << " a=" << run.acceleration << " J_uNms2=" << run.inertia;
+        }
     }
 
     void OuterLoopStateMachine::ApplyOnlineEstimates()

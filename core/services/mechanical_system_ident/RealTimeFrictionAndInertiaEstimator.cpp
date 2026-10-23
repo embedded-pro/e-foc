@@ -2,6 +2,7 @@
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
 #include "core/foc/math/FiniteGuard.hpp"
+#include "core/services/mechanical_system_ident/DiagRunLog.hpp"
 #include <algorithm>
 #include <cmath>
 #include <optional>
@@ -112,6 +113,7 @@ namespace services
 
         if (!IsOnlineObservationInDirection(observation->acceleration, observation->speed))
         {
+            diag::runLog.Skip();
             for (auto& directional : onlineFits)
                 directional.steady.EndRun();
             return;
@@ -121,6 +123,8 @@ namespace services
         math::Matrix<float, 1, 1> output;
         output.at(0, 0) = torqueConstant.Value() * observation->iq * outputScale;
         fit.steady.Add(observation->speed * columnScale, output.at(0, 0) - fit.rls->Coefficients().at(1, 0) * observation->acceleration * columnScale, forgettingFactor);
+        diag::runLog.Add(observation->speed, torqueConstant.Value() * observation->iq, observation->acceleration, fit.rls->Coefficients().at(1, 0));
+        diag::runLog.friction[observation->speed >= 0.0f ? 0 : 1] = fit.steady.Friction().value_or(-1.0f);
 
         if (!IsOnlineObservationInformative(observation->acceleration, fit))
             return;
