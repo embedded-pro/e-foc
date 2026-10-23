@@ -2,9 +2,9 @@
 title: "Service: FOC State Machine"
 type: design
 status: draft
-version: 0.3.1
+version: 0.3.2
 component: state-machine
-date: 2026-10-22
+date: 2026-10-23
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-10-22
 | Title     | Service: FOC State Machine |
 | Type      | design                     |
 | Status    | draft                      |
-| Version   | 0.3.1                      |
+| Version   | 0.3.2                      |
 | Component | state-machine              |
-| Date      | 2026-10-22                 |
+| Date      | 2026-10-23                 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -31,7 +31,7 @@ date: 2026-10-22
 **Is responsible for:**
 - Owning the complete motor lifecycle: `Idle → Calibrating → Ready ⇄ Enabled`, and `Fault` as an escape state reachable from any active state
 - Enforcing all transition guards so that the FOC controller can only be enabled after a successful calibration, and calibration can only be started from `Idle` or `Ready`
-- Orchestrating the sequential calibration chain: pole-pair identification → resistance and inductance estimation → alignment → (mechanical parameter identification for speed/position modes) → NVM persistence
+- Orchestrating the sequential calibration chain: waiting for the rotor to come to rest → current sensor offsets → pole-pair identification → resistance and inductance estimation → alignment → (mechanical parameter identification for speed/position modes) → NVM persistence
 - On successful boot with valid NVM data, loading electrical parameters (R, L, pole pairs) and remaining in `Idle` until a live alignment re-establishes the rotor reference; the motor cannot be enabled until `CmdReAlign()` or `CmdCalibrate()` succeeds
 - Registering lifecycle commands on the terminal in CLI-driven mode (`calibrate`, `align`, `enable`, `disable`, `clear_fault`, `clear_cal`)
 - Intercepting hardware fault notifications from the fault notifier: stopping the inverter in the delivering context, then transitioning to `Fault` on the event dispatcher (see Fault Safety)
@@ -228,6 +228,7 @@ When `CmdCalibrate` is issued from `Idle` or `Ready`, the state machine enters `
 ```mermaid
 sequenceDiagram
     participant SM as FOC State Machine
+    participant RS as Rotor Standstill
     participant CO as Current Offsets
     participant EI as Electrical Ident
     participant MA as Motor Alignment
@@ -236,6 +237,8 @@ sequenceDiagram
     participant FOC as FOC Controller
     participant NVM as Non-Volatile Memory
 
+    SM->>RS: Await (encoder within 2 mrad for 100 ms)
+    RS-->>SM: at rest, or still turning after 10 s
     SM->>CO: Measure (all legs at 50 % duty)
     CO-->>SM: result (three offsets or failure)
     SM->>CO: Apply(offsets)
@@ -264,6 +267,7 @@ sequenceDiagram
 
 | Step                                           | Service             | Data stored                                               |
 |------------------------------------------------|---------------------|-----------------------------------------------------------|
+| Rotor at rest                                  | Rotor Standstill    | Nothing; fails the calibration after 10 s                 |
 | 0. Current sensor offsets                      | Current Offsets     | `currentOffsetA`, `currentOffsetB`, `currentOffsetC`      |
 | 1. Pole pairs                                  | Electrical Ident    | `polePairs`                                               |
 | 2. Resistance and inductance                   | Electrical Ident    | `rPhase`, `lD`, `lQ`                                      |
@@ -272,6 +276,16 @@ sequenceDiagram
 | 5. Mechanical parameters (speed/position only) | Mechanical Ident    | `inertia`, `frictionViscous`, `speedLoopBandwidth`        |
 | 6. Cogging map (speed/position only)           | Cogging Mapping     | `coggingTorque`, `coggingTorqueScale`; none if unmeasured |
 | 7. NVM persist                                 | Non-Volatile Memory | All of the above written to EEPROM                        |
+
+The sequence starts only once the rotor is at rest: the encoder must stay within 2 mrad of where a
+100 ms window began, which bounds the speed to 0.02 rad/s, and a rotor still turning after 10 s fails
+the calibration with `[SM] The rotor did not come to rest`. The offset step holds all three legs at
+50 % duty, which shorts the windings, so a turning rotor drives current through the sensors. A rotor
+that slows to a stop inside the averaging window leaves part of that current in the stored offsets. In
+simulation, a calibration started 25 ms after disabling the bench motor at 500 rpm stored offsets 5 to
+15 mA off in five runs out of five, against the 5 mA REQ-CAL-015 allows, and 4 to 9 mA off from 100 rpm
+(REQ-CAL-020). The wait is measured from the window's start rather than from poll to poll, so a slow
+creep cannot pass one encoder count at a time. A rotor already at rest costs the 100 ms window.
 
 The offsets apply as soon as they are measured, so the identification and alignment steps after
 them read corrected currents (`service-current-offsets.md`). An electrical identification that
@@ -670,6 +684,10 @@ On construction, the state machine asynchronously checks whether valid calibrati
 2. Calls the Motor Alignment service using the stored pole pairs.
 3. On success: marks `rotorReferenceValid`, saves the updated offset to NVM through the same completion path as a full calibration, applies mode-specific calibration from the stored parameters, and transitions to `Ready`.
 4. On failure: enters `Fault` with code `calibrationFailed`.
+
+A re-alignment does not wait for the rotor to come to rest. The alignment holds the rotor until its
+position settles, and in simulation a re-alignment issued 30 ms after disabling at 500 rpm aligned and
+ran every reference motor and the bench motor.
 
 The CLI command is `align` (short form `aln`). Because the same completion path is used, the speed and position loop parameters are also re-applied from the stored calibration, so mechanical identification does not need to be re-run after an alignment-only recovery.
 

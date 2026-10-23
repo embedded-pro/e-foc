@@ -2,9 +2,9 @@
 title: "Service: Current Sensor Offsets"
 type: design
 status: draft
-version: 0.1.0
+version: 0.1.1
 component: service-current-offsets
-date: 2026-10-21
+date: 2026-10-23
 ---
 
 | Field     | Value                           |
@@ -12,9 +12,9 @@ date: 2026-10-21
 | Title     | Service: Current Sensor Offsets |
 | Type      | design                          |
 | Status    | draft                           |
-| Version   | 0.1.0                           |
+| Version   | 0.1.1                           |
 | Component | service-current-offsets         |
-| Date      | 2026-10-21                      |
+| Date      | 2026-10-23                      |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -61,6 +61,10 @@ platform's board protection does too, as the real comparators would.
 ### Part B — Measuring
 
 With all three legs at 50 % duty the windings see no voltage, so each sensor reads only its offset.
+That holds only for a rotor at rest: the legs short the windings, so a turning rotor's back-EMF drives
+current through the sensors, and a rotor that slows to a stop during the average leaves part of it in
+the result. The calibration sequence therefore starts the measurement only once the rotor is at rest
+(`state-machine.md`, Calibration Sequence).
 The measurement runs at the control frequency, the one the loop runs at. It discards the first 200
 samples while the bridge and the sensing settle, then averages the next 2000 for each phase: 110 ms at
 20 kHz, which brings 35 mA of sample noise below 1 mA. It reads the raw samples, whatever offsets are

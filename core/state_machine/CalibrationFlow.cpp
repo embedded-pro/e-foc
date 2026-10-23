@@ -16,7 +16,7 @@ namespace application
     CalibrationFlow::CalibrationFlow(const LifecycleEnvironment& environment, const CalibrationServices& services)
         : env(environment)
         , agreeingRuns(services.agreeingMechanicalRuns)
-        , orchestrator(services.electricalIdent, services.motorAlignment, environment.tracer, services.currentOffsets)
+        , orchestrator(services.electricalIdent, services.motorAlignment, environment.tracer, services.currentOffsets, services.standstill)
     {}
 
     state_machine::Calibrating CalibrationFlow::Begin(const state_machine::Calibrate& command)

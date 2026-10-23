@@ -7,6 +7,7 @@
 #include "core/services/current_offsets/PhaseCurrentOffsets.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
+#include "core/services/standstill/RotorStandstill.hpp"
 #include "services/tracer/Tracer.hpp"
 #include "services/util/TerminalWithStorage.hpp"
 #include <functional>
@@ -37,5 +38,6 @@ namespace application
         std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets{ std::nullopt };
         bool mapCogging{ false };
         std::optional<std::reference_wrapper<services::CoggingMapping>> coggingMappingOverride{ std::nullopt };
+        std::optional<std::reference_wrapper<services::RotorStandstill>> standstill{ std::nullopt };
     };
 }
