@@ -372,19 +372,24 @@ namespace application
         return pwmBaseFrequency;
     }
 
+    // The encoder exists only once the NVM load has supplied its resolution
     foc::Radians PlatformFactoryImpl::Read()
     {
+        if (!peripherals->encoder)
+            return foc::Radians{ 0.0f };
         return peripherals->encoder->Read() - encoderOffset;
     }
 
     void PlatformFactoryImpl::Set(foc::Radians value)
     {
-        encoderOffset = peripherals->encoder->Read() - value;
+        if (peripherals->encoder)
+            encoderOffset = peripherals->encoder->Read() - value;
     }
 
     void PlatformFactoryImpl::SetZero()
     {
-        encoderOffset = peripherals->encoder->Read();
+        if (peripherals->encoder)
+            encoderOffset = peripherals->encoder->Read();
     }
 
     hal::Eeprom& PlatformFactoryImpl::Eeprom()
