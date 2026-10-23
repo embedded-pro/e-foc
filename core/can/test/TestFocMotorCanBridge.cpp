@@ -739,6 +739,131 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_FailedResistance_SendsCalibra
     EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
 }
 
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_FailedResistance_ReleasesTheReservation)
+{
+    ConstructFixture();
+
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
+                             infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+            {
+                done(services::ElectricalParametersIdentification::ResistanceInductanceResult{});
+            }));
+
+    DispatchCommand(can::focIdentifyElectricalId);
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(coordinator->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_PoorFitWithAValidCalibration_ReturnsToReady)
+{
+    ConstructFixtureInReady();
+
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
+                             infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+            {
+                done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 0.3f });
+            }));
+
+    ResetCaptures();
+    DispatchCommand(can::focIdentifyElectricalId);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::calibrationFailed);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(coordinator->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_NoPolePairs_ReleasesTheReservation)
+{
+    ConstructFixture();
+
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::ResistanceAndInductanceConfig&,
+                             infra::Function<void(services::ElectricalParametersIdentification::ResistanceInductanceResult)> done)
+            {
+                done(services::ElectricalParametersIdentification::ResistanceInductanceResult{ foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.0f }, 1.0f });
+            }));
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _))
+        .WillOnce(Invoke([](const services::ElectricalParametersIdentification::PolePairsConfig&,
+                             infra::Function<void(std::optional<std::size_t>)> done)
+            {
+                done(std::nullopt);
+            }));
+
+    ResetCaptures();
+    DispatchCommand(can::focIdentifyElectricalId);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(coordinator->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_AfterAnEmergencyStopAbandonedTheRun_IsAcceptedAgain)
+{
+    ConstructFixture();
+
+    EXPECT_CALL(electricalIdentMock, EstimateResistanceAndInductance(_, _)).Times(2);
+
+    DispatchCommand(can::focIdentifyElectricalId);
+    DispatchCommand(can::focEmergencyStopId);
+
+    ResetCaptures();
+    DispatchCommand(can::focIdentifyElectricalId);
+
+    EXPECT_FALSE(categoryErrorSent);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(coordinator->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_HoldsTheDriveUntilTheIdentificationEnds)
+{
+    ConstructFixtureInReady();
+
+    infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>, std::optional<foc::NewtonMeterSecondSquared>)> capturedDone;
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+        .WillOnce(Invoke([&capturedDone](const foc::NewtonMeter&, std::size_t,
+                             const services::MechanicalParametersIdentification::Config&,
+                             infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
+                                 std::optional<foc::NewtonMeterSecondSquared>)>
+                                 done)
+            {
+                capturedDone = done;
+            }));
+
+    DispatchCommand(can::focIdentifyMechanicalId);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Calibrating>(coordinator->ActiveStateMachine().CurrentState()));
+
+    ResetCaptures();
+    DispatchCommand(can::focStartId);
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+
+    capturedDone(foc::NewtonMeterSecondPerRadian{ 0.001f }, foc::NewtonMeterSecondSquared{ 0.002f });
+    ExecuteAllActions();
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(coordinator->ActiveStateMachine().CurrentState()));
+}
+
+TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_Failure_ReturnsToReady)
+{
+    ConstructFixtureInReady();
+
+    EXPECT_CALL(mechIdentMock, EstimateFrictionAndInertia(_, _, _, _))
+        .WillOnce(Invoke([](const foc::NewtonMeter&, std::size_t,
+                             const services::MechanicalParametersIdentification::Config&,
+                             infra::Function<void(std::optional<foc::NewtonMeterSecondPerRadian>,
+                                 std::optional<foc::NewtonMeterSecondSquared>)>
+                                 done)
+            {
+                done(std::nullopt, std::nullopt);
+            }));
+
+    ResetCaptures();
+    DispatchCommand(can::focIdentifyMechanicalId);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(coordinator->ActiveStateMachine().CurrentState()));
+}
+
 TEST_F(FocMotorCanBridgeTest, OnIdentifyMechanical_InReady_BroadcastsParamsAndAcksSuccess)
 {
     ConstructFixtureInReady();

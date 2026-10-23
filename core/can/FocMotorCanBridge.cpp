@@ -2,6 +2,8 @@
 #include "core/foc/math/TorqueConstant.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include <cmath>
+#include <limits>
+#include <variant>
 
 namespace can
 {
@@ -82,6 +84,9 @@ namespace can
 
     void FocMotorCanBridge::OnEmergencyStop(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
+        if (mechIdent != nullptr)
+            mechIdent->Abort();
+
         ReportCommandOutcome(can::focEmergencyStopId, controlMode.ActiveStateMachine().CmdEmergencyStop(), onDone);
     }
 
@@ -198,26 +203,54 @@ namespace can
             });
     }
 
+    bool FocMotorCanBridge::ReserveCalibration(uint8_t commandId)
+    {
+        const auto reservation = controlMode.CmdReserveExternalCalibration();
+
+        if (reservation == state_machine::CommandResult::ok)
+            return true;
+
+        if (reservation == state_machine::CommandResult::queued)
+            server.SendCategoryError(commandId, FocMotorCategoryError::busy);
+        else
+            server.SendCommandAck(commandId, services::CanAckStatus::invalidState);
+
+        return false;
+    }
+
+    // An emergency stop or a fault ends the reservation and aborts the estimation without answering it
+    bool FocMotorCanBridge::ElectricalIdentificationInProgress() const
+    {
+        return pendingElectricalIdentDoneCallback != nullptr && std::holds_alternative<state_machine::Calibrating>(controlMode.ActiveStateMachine().CurrentState());
+    }
+
+    bool FocMotorCanBridge::MechanicalIdentificationInProgress() const
+    {
+        return mechIdent->IsRunning() || (pendingMechIdentDoneCallback != nullptr && std::holds_alternative<state_machine::Calibrating>(controlMode.ActiveStateMachine().CurrentState()));
+    }
+
+    void FocMotorCanBridge::FailElectricalIdentification(FocMotorCategoryError error)
+    {
+        pendingElectricalR.reset();
+        pendingElectricalL.reset();
+        pendingElectricalIdentDoneCallback = nullptr;
+        controlMode.CmdReleaseExternalCalibration();
+        server.SendCategoryError(can::focIdentifyElectricalId, error);
+    }
+
     void FocMotorCanBridge::OnIdentifyElectrical(const infra::Function<void()>& onDone)
     {
-        if (pendingElectricalIdentDoneCallback != nullptr)
+        if (ElectricalIdentificationInProgress())
         {
             server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::busy);
             return;
         }
 
-        const auto reservation = controlMode.CmdReserveExternalCalibration();
-
-        if (reservation != state_machine::CommandResult::ok)
-        {
-            if (reservation == state_machine::CommandResult::queued)
-                server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::busy);
-            else
-                server.SendCommandAck(can::focIdentifyElectricalId, services::CanAckStatus::invalidState);
-
+        if (!ReserveCalibration(can::focIdentifyElectricalId))
             return;
-        }
 
+        pendingElectricalR.reset();
+        pendingElectricalL.reset();
         pendingElectricalIdentDoneCallback = onDone;
 
         electricalIdent.EstimateResistanceAndInductance({},
@@ -225,8 +258,7 @@ namespace can
             {
                 if (!result.resistance.has_value() || !result.inductance.has_value() || result.fitQuality < 0.5f)
                 {
-                    pendingElectricalIdentDoneCallback = nullptr;
-                    server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::calibrationFailed);
+                    FailElectricalIdentification(FocMotorCategoryError::calibrationFailed);
                     return;
                 }
 
@@ -236,12 +268,9 @@ namespace can
                 electricalIdent.EstimateNumberOfPolePairs({},
                     [this](std::optional<std::size_t> polePairs)
                     {
-                        if (!polePairs.has_value())
+                        if (!polePairs.has_value() || *polePairs > std::numeric_limits<uint8_t>::max())
                         {
-                            pendingElectricalR.reset();
-                            pendingElectricalL.reset();
-                            pendingElectricalIdentDoneCallback = nullptr;
-                            server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::calibrationFailed);
+                            FailElectricalIdentification(FocMotorCategoryError::calibrationFailed);
                             return;
                         }
 
@@ -268,8 +297,13 @@ namespace can
                                 if (result == state_machine::CommandResult::ok)
                                     callback();
                                 else
+                                {
+                                    if (result == state_machine::CommandResult::rejected)
+                                        controlMode.CmdReleaseExternalCalibration();
+
                                     server.SendCategoryError(can::focIdentifyElectricalId,
                                         state_machine::ToCategoryError(result));
+                                }
                             });
                     });
             });
@@ -283,7 +317,7 @@ namespace can
             return;
         }
 
-        if (pendingMechIdentDoneCallback != nullptr)
+        if (MechanicalIdentificationInProgress())
         {
             server.SendCategoryError(can::focIdentifyMechanicalId, FocMotorCategoryError::busy);
             return;
@@ -296,6 +330,9 @@ namespace can
             return;
         }
 
+        if (!ReserveCalibration(can::focIdentifyMechanicalId))
+            return;
+
         pendingMechIdentDoneCallback = onDone;
 
         mechIdent->EstimateFrictionAndInertia(
@@ -307,6 +344,7 @@ namespace can
             {
                 auto callback = pendingMechIdentDoneCallback;
                 pendingMechIdentDoneCallback = nullptr;
+                controlMode.CmdReleaseExternalCalibration();
 
                 if (!friction.has_value() || !inertia.has_value())
                 {

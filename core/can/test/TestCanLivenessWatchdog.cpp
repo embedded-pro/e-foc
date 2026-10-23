@@ -181,3 +181,15 @@ TEST_F(CanLivenessWatchdogTest, RegainingTheClientDoesNotDisturbTheStateMachine)
 
     EXPECT_TRUE(IsEnabled());
 }
+
+TEST_F(CanLivenessWatchdogTest, LosingTheClientDuringItsIdentificationStopsTheDrive)
+{
+    Construct();
+    AlignAfterConstruct();
+
+    ASSERT_EQ(controlMode->CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+
+    watchdog->Offline();
+
+    EXPECT_FALSE(std::holds_alternative<state_machine::Calibrating>(controlMode->ActiveStateMachine().CurrentState()));
+}
