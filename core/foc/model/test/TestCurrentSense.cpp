@@ -89,6 +89,30 @@ TEST_F(TestCurrentSense, the_amplifier_settles_into_the_window_and_decays_after_
     EXPECT_NEAR(foc::ShuntAmplifierOutput(sense, window, 2.0f, -1e-9f), 0.0f, 1e-9f);
 }
 
+TEST_F(TestCurrentSense, a_settled_amplifier_reads_what_its_exponential_rounds_to)
+{
+    sense.amplifierTimeConstantSeconds = timeConstant;
+    const foc::ConductionWindow window{ 0.0f, 1e-3f };
+
+    for (const auto constants : { 17.0f, 17.9f, 18.0f, 30.0f })
+    {
+        const auto elapsed = constants * timeConstant;
+        EXPECT_EQ(foc::ShuntAmplifierOutput(sense, window, 2.0f, elapsed), 2.0f * (1.0f - std::exp(-elapsed / timeConstant)));
+    }
+}
+
+TEST_F(TestCurrentSense, a_decayed_amplifier_reads_what_its_exponential_rounds_to)
+{
+    sense.amplifierTimeConstantSeconds = timeConstant;
+    const foc::ConductionWindow window{ -30.0f * timeConstant, 0.0f };
+
+    for (const auto constants : { 90.0f, 103.0f, 104.0f, 200.0f })
+    {
+        const auto elapsed = constants * timeConstant;
+        EXPECT_EQ(foc::ShuntAmplifierOutput(sense, window, 2.0f, elapsed), 2.0f * std::exp(-elapsed / timeConstant));
+    }
+}
+
 TEST_F(TestCurrentSense, the_converter_rounds_each_conversion_to_a_code_and_truncates_their_mean)
 {
     sense.fullScaleAmpere = 8.0f;

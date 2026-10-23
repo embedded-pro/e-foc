@@ -72,7 +72,8 @@
     held within the period. A board with no loss measured at that dead band shall receive its
     duties unchanged. Through the bench's power stage, whose loss reads the online resistance
     about 18 % high when uncompensated, the online resistance estimate shall be within 5 % of
-    the plant's once the drive compensates with the bench's measured loss.
+    the plant's once the drive compensates with the bench's measured loss, also when the
+    currents are read through the bench's current-sense chain.
 
 - id: REQ-TRQ-009
   title: Two readable phases give the third phase's current

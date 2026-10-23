@@ -123,7 +123,10 @@
     is made on what the motor will run with. On the bench motor with a dry friction of 3.7 mN·m
     and a torque of 1 mN·m that repeats once per turn, the viscous friction shall be within 10 %
     and the inertia within 5 %: each excitation dwell spans whole turns, and a converged run ends
-    on a dwell boundary, so the angle-dependent torque cancels from the fit.
+    on a dwell boundary, so the angle-dependent torque cancels from the fit. Driving its windings
+    through the bench's power stage and reading its currents through the bench's current-sense
+    chain together, the bench motor shall complete the full calibration without a fault and with
+    its resistance and inertia within 5 % of the plant's.
 
 - id: REQ-CAL-014
   title: Online estimates converge on the plant from a wrong seed

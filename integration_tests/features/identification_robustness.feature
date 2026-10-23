@@ -120,6 +120,44 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
     And the online estimates are read
     Then the online resistance estimate shall be within 5 % of the plant
 
+  @sil @REQ-TRQ-008
+  Scenario: Compensating the bench's dead time keeps the online resistance on the winding read through the current-sense chain
+    Given a bench motor plant
+    And the plant drives its windings through the bench's power stage
+    And the plant reads its currents through the bench's current-sense chain
+    And the drive compensates the bench's dead time
+    And the plant response is recorded at 100 Hz for up to 2000 samples
+    And the motor is already calibrated
+    And the stored calibration is off by:
+      | resistance | 1.3 |
+    And the motor boots in speed mode
+    When the target boots
+    And the rotor is aligned
+    And the motor is enabled
+    And the speed setpoint alternates between 26 and 52 rad/s every 250 ms for 6000 ms
+    And the online estimates are read
+    Then the online resistance estimate shall be within 5 % of the plant
+
+  @sil @REQ-CAL-013 @REQ-PERF-004
+  Scenario: The full calibration of the bench motor runs through its power stage and current-sense chain together
+    Given a bench motor plant
+    And the plant drives its windings through the bench's power stage
+    And the plant reads its currents through the bench's current-sense chain
+    And the drive compensates the bench's dead time
+    And the motor is already calibrated
+    And the stored calibration is off by:
+      | inertia  | 2.0 |
+      | friction | 0.5 |
+    And the motor boots in speed mode
+    When the target boots
+    And the control loop statistics are cleared
+    And the full calibration is run from the terminal
+    Then the motor shall not report a fault
+    And the identified resistance shall be within 5 % of the plant
+    And the identified pole pairs shall match the plant
+    And the identified inertia shall be within 5 % of the plant
+    And the control loop shall have stayed within its budget
+
   @sil @REQ-CAL-012
   Scenario: The electrical identification reads through the bench's current-sense chain
     Given a bench motor plant
