@@ -4,13 +4,13 @@ Canonical rules: **[AGENTS.md](../AGENTS.md)** (shared with Claude; VS Code auto
 Sub-agent definitions: `.github/agents/`. Build presets: `CMakePresets.json`.
 
 Essentials (full detail in AGENTS.md):
-- **No heap** — bounded containers / `std::array` / `std::optional`; no recursion; no `virtual ~D() = 0`; tests too. Scope: `core/foc/`, `core/platform_abstraction/`, `core/state_machine/`, `targets/`, ISR paths.
+- **No heap** — bounded containers / `std::array` / `std::optional`; no recursion; no `virtual ~D() = 0`. Scope: `core/foc/`, `core/platform_abstraction/`, `core/state_machine/`, `targets/`, ISR paths; host tools, simulators and tests may use heap.
 - **Real-time** — `Calculate()` at 20 kHz; ≤4500 cycles at 120 MHz. No virtual dispatch, no heap, no blocking, no raw `sin`/`cos` in hot path.
   No `#pragma GCC optimize`/`optimize` attribute — per-function options block inlining; embedded builds get `-ffast-math -fno-finite-math-only` for all of e-foc from `cmake/CompilerOptimizations.cmake`.
   `OPTIMIZE_FOR_SPEED` only on header-defined hot functions — it is `always_inline`, so never on a `.cpp` definition.
 - **FOC theory** — Clarke/Park/SVM from `core/foc/transforms/`; reuse, don't reimplement. Anti-windup on all PIDs. Unit types: `Ampere`, `Radians`, `Volts`, `RevPerMinute`.
 - **Style** — Allman braces, 4-space, `{}` init, PascalCase types/methods, camelCase members. No comments except non-obvious *why*.
-- **Tests** — `TEST_F`, `StrictMock` only, `EXPECT_NEAR`, no heap. `NiceMock`/`NaggyMock` forbidden.
+- **Tests** — `TEST_F`, `StrictMock` only, `EXPECT_NEAR`. `NiceMock`/`NaggyMock` forbidden.
 - **No exceptions** — `std::optional`/status enums; interfaces `virtual ~I() = default`.
 - **Docs-first** — update `documentation/` before/alongside behavioral changes. Mermaid/ASCII only.
 - **CI** — see AGENTS.md §Build for the two-tier workflow and embedded cmake rules.
