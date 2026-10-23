@@ -1,14 +1,7 @@
 #include "integration_tests/support/interactor/hardware/BridgeSession.hpp"
 #include "integration_tests/support/interactor/hardware/SerialLogger.hpp"
 #include "integration_tests/support/interactor/hardware/Timeouts.hpp"
-#include "tools/hardware_bridge/client/common/ParseIPv4.hpp"
-#ifdef _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#else
-#include <arpa/inet.h>
-#include <netdb.h>
-#endif
+#include "tools/hardware_bridge/client/common/ResolveIPv4.hpp"
 #include <chrono>
 #include <cstring>
 #include <sstream>
@@ -23,42 +16,11 @@ namespace hil
             return std::chrono::duration_cast<std::chrono::milliseconds>(d);
         }
 
-        services::IPv4Address ResolveHost(const std::string& host)
+        struct SendResult
         {
-            try
-            {
-                return tool::ParseIPv4(host);
-            }
-            catch (...)
-            {
-            }
-
-            addrinfo hints{};
-            hints.ai_family = AF_INET;
-            hints.ai_socktype = SOCK_STREAM;
-
-            addrinfo* result = nullptr;
-            const int rc = ::getaddrinfo(host.c_str(), nullptr, &hints, &result);
-            if (rc != 0)
-            {
-                if (result != nullptr)
-                    ::freeaddrinfo(result);
-                throw std::runtime_error{ "BridgeSession: cannot resolve host '" + host + "': " + ::gai_strerror(rc) };
-            }
-            if (result == nullptr)
-                throw std::runtime_error{ "BridgeSession: cannot resolve host '" + host + "': no address returned" };
-
-            const auto* in = reinterpret_cast<const sockaddr_in*>(result->ai_addr);
-            const uint32_t addr = ntohl(in->sin_addr.s_addr);
-            ::freeaddrinfo(result);
-
-            return services::IPv4Address{
-                static_cast<uint8_t>((addr >> 24) & 0xff),
-                static_cast<uint8_t>((addr >> 16) & 0xff),
-                static_cast<uint8_t>((addr >> 8) & 0xff),
-                static_cast<uint8_t>(addr & 0xff)
-            };
-        }
+            bool completed{ false };
+            bool success{ false };
+        };
     }
 
     BridgeSession& BridgeSession::Instance()
@@ -75,7 +37,7 @@ namespace hil
 
     void BridgeSession::Connect()
     {
-        const auto ipv4 = ResolveHost(config.host);
+        const auto ipv4 = tool::ResolveIPv4(config.host);
 
         serial = std::make_unique<tool::TcpClientSerial>(
             network.ConnectionFactory(), ipv4, config.serialPort);
@@ -406,20 +368,20 @@ namespace hil
         if (!canTracker || !canTracker->Alive())
             throw std::runtime_error{ "BridgeSession: CAN bridge disconnected" };
 
-        bool completed = false;
-        bool success = false;
-        can->SendData(id, message, [&completed, &success](bool ok)
+        // The callback can still fire after a timeout, so it shares ownership of the result
+        auto result = std::make_shared<SendResult>();
+        can->SendData(id, message, [result](bool ok)
             {
-                completed = true;
-                success = ok;
+                result->completed = true;
+                result->success = ok;
             });
 
-        RunUntil([&]
+        RunUntil([&result]
             {
-                return completed;
+                return result->completed;
             },
             timeout);
-        return completed && success;
+        return result->completed && result->success;
     }
 
     bool BridgeSession::WaitForCanFrame(hal::Can::Id expectedId,

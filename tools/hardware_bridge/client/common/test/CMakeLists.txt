@@ -11,5 +11,6 @@ target_link_libraries(e_foc.tool.hardware_bridge.common_test PUBLIC
 
 target_sources(e_foc.tool.hardware_bridge.common_test PRIVATE
     TestParseIPv4.cpp
+    TestResolveIPv4.cpp
     TestTcpClientBase.cpp
 )

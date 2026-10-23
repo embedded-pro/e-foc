@@ -1,5 +1,6 @@
 #include "integration_tests/support/interactor/hardware/TypingTransmitter.hpp"
 #include "infra/util/ByteRange.hpp"
+#include <memory>
 
 namespace hil
 {
@@ -24,15 +25,22 @@ namespace hil
 
     void TypingTransmitter::SendOne(uint8_t byte)
     {
-        bool completed = false;
-        communication.SendData(infra::MakeRangeFromSingleObject(byte), [&completed]
+        struct PendingByte
+        {
+            uint8_t byte;
+            bool completed{ false };
+        };
+
+        // The send can still be in flight after the retries give up, so it shares ownership of the byte and the flag
+        auto pending = std::make_shared<PendingByte>(PendingByte{ byte });
+        communication.SendData(infra::MakeRangeFromSingleObject(pending->byte), [pending]
             {
-                completed = true;
+                pending->completed = true;
             });
 
         runFor(interCharDelay);
 
-        for (int attempts = 0; attempts < 20 && !completed; ++attempts)
+        for (int attempts = 0; attempts < 20 && !pending->completed; ++attempts)
             runFor(interCharDelay);
     }
 }
