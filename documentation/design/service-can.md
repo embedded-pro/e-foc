@@ -168,7 +168,9 @@ the active state machine is in `Enabled`, or in `Calibrating` under a CAN client
 identification the client started, which may be spinning the motor); if so it traces and issues
 `CmdEmergencyStop`, which stops the inverter. A calibration started from the CLI is left alone. When the drive
 is otherwise not running the notification is ignored — a bus that goes quiet while the motor is
-stopped is not a hazard, and faulting there would obstruct commissioning.
+stopped is not a hazard, and faulting there would obstruct commissioning. An identification acknowledges only
+when it ends, so a client waiting on one keeps sending frames; `CanProtocolClient` heartbeats every
+`heartbeatInterval` for this.
 
 It is composed in the instantiation layer alongside the CAN bridge, so the bridge and category server stay free of lifecycle policy.
 

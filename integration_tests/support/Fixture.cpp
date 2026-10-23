@@ -1,4 +1,5 @@
 #include "integration_tests/support/Fixture.hpp"
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -143,8 +144,17 @@ namespace integration
 
             hal::Can::Message ackPayload;
             std::chrono::milliseconds elapsed{ 0 };
-            if (!WaitForCanFrame(ackId, ackPayload, remaining, elapsed))
-                return false;
+            const auto slice = std::min(remaining, kClientHeartbeatInterval);
+            const auto sliceStart = std::chrono::steady_clock::now();
+            if (!WaitForCanFrame(ackId, ackPayload, slice, elapsed))
+            {
+                // A wait that ends well inside its slice did not time out: the target stopped answering at all
+                if (std::chrono::steady_clock::now() - sliceStart < slice / 2)
+                    return false;
+
+                SendClientHeartbeat();
+                continue;
+            }
 
             if (ackPayload.size() < 3 || ackPayload[1] != messageType)
                 continue;
@@ -152,6 +162,15 @@ namespace integration
             ++nextSequence;
             return ackPayload[2] == static_cast<uint8_t>(services::CanAckStatus::success);
         }
+    }
+
+    void Fixture::SendClientHeartbeat()
+    {
+        const hal::Can::Id heartbeatId = MakeId(services::CanPriority::heartbeat,
+            services::canSystemCategoryId, services::canHeartbeatMessageTypeId, services::canBroadcastNodeId);
+        hal::Can::Message payload;
+        payload.push_back(services::canProtocolVersion);
+        interactor.SendCanFrame(heartbeatId, payload, std::chrono::milliseconds{ 100 });
     }
 
     bool Fixture::WaitForMotorState(can::FocMotorState expectedState, std::chrono::milliseconds timeout)
