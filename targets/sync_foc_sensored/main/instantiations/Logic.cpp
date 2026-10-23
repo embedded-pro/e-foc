@@ -1,4 +1,5 @@
 #include "targets/sync_foc_sensored/main/instantiations/Logic.hpp"
+#include "core/foc/interfaces/IsrProfile.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 
 namespace application
@@ -22,6 +23,22 @@ namespace application
                 platformFaultNotifier->Raise(state_machine::FaultCode::encoderLoss);
             } }
     {
+        terminalWithStorage.AddCommand({ { "isr_profile", "ip", "Print the control interrupt's per-stage cycles" },
+            [this](const infra::BoundedConstString&)
+            {
+                for (std::size_t stage = 0; stage < diag::IsrProfile::stages; ++stage)
+                    this->hardware.Tracer().Trace() << "[ISRP] " << diag::isrStageNames[stage]
+                                                    << " hits=" << diag::isrProfile.Hits(stage)
+                                                    << " avg=" << diag::isrProfile.Average(stage)
+                                                    << " max=" << diag::isrProfile.Maximum(stage);
+            } });
+
+        terminalWithStorage.AddCommand({ { "isr_profile_clear", "ipc", "Reset the control interrupt's per-stage cycles" },
+            [](const infra::BoundedConstString&)
+            {
+                diag::isrProfile.Clear();
+            } });
+
         hardware.ConfigureAdcAndPwm(hal::Hertz{ controlLoopFrequencyHz }, std::chrono::nanoseconds{ pwmDeadTimeNs }, PlatformFactory::SampleAndHold::shortest);
 
         nvm.LoadConfig(configData, [this](services::NvmStatus status)

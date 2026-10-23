@@ -1,4 +1,5 @@
 #include "core/foc/cascade/TorqueCascade.hpp"
+#include "core/foc/interfaces/IsrProfile.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/DutyConversion.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
@@ -111,12 +112,15 @@ namespace foc
         auto sinTheta = FastTrigonometry::Sine(electricalAngle);
 
         auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
+        diag::isrProfile.Mark(diag::IsrStage::transform);
         const auto electricalSpeed = MeasureElectricalSpeed(mechanicalAngle);
         lastElectricalSpeed = electricalSpeed;
         lastIq = idAndIq.q;
         const auto& setPoint = setPointBuffer.Acquire();
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ setPoint.first.Value(), setPoint.second.Value() }, electricalSpeed });
+        diag::isrProfile.Mark(diag::IsrStage::currentLoop);
         auto output = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
+        diag::isrProfile.Mark(diag::IsrStage::modulation);
 
         return ToDutyCycles(output);
     }
