@@ -23,4 +23,5 @@ target_sources(e_foc.foc.interfaces PRIVATE
     Units.hpp
 )
 
+add_subdirectory(test)
 add_subdirectory(test_doubles)
