@@ -30,6 +30,24 @@ Feature: Identification Against a Plant That Behaves Like Real Hardware
       | 0.0005  |
       | 0.002   |
 
+  @sil @REQ-CAL-013
+  Scenario: The full calibration reads the viscous friction through a once-per-turn torque
+    Given a bench motor plant
+    And a motor plant with:
+      | viscous_damping_nm_s_per_rad  | 0.000012 |
+      | coulomb_friction_nm           | 0.0037   |
+      | cogging_torque_nm             | 0.001    |
+      | cogging_cycles_per_revolution | 1        |
+    And the motor is already calibrated
+    And the stored calibration is off by:
+      | inertia  | 2.0 |
+      | friction | 0.5 |
+    And the motor boots in speed mode
+    When the target boots
+    And the full calibration is run from the terminal
+    Then the identified friction shall be within 10 % of the plant
+    And the identified inertia shall be within 5 % of the plant
+
   @sil @REQ-CAL-012
   Scenario Outline: The electrical identification reads through a non-ideal power stage (<dead> ns dead time)
     Given a bench motor plant

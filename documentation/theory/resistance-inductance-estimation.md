@@ -2,9 +2,9 @@
 title: "Electrical Parameters Identification — Resistance and Inductance"
 type: theory
 status: approved
-version: 2.2.0
+version: 2.2.1
 component: "service-electrical-ident"
-date: 2026-10-22
+date: 2026-10-23
 ---
 
 | Field     | Value                                          |
@@ -12,9 +12,9 @@ date: 2026-10-22
 | Title     | Electrical Parameters Identification — R and L |
 | Type      | theory                                         |
 | Status    | approved                                       |
-| Version   | 2.2.0                                          |
+| Version   | 2.2.1                                          |
 | Component | service-electrical-ident                       |
-| Date      | 2026-10-22                                     |
+| Date      | 2026-10-23                                     |
 
 ## Overview
 
@@ -95,8 +95,10 @@ A single step measures whatever voltage the bridge loses along with the winding,
 built for the dead-time correction (`documentation/design/service-dead-time-compensation.md`) to
 remove that loss. Every leg switches near the middle of the period, never a pulse as short as the
 dead band, and the duties are written again on every sample at the PWM's own rate, so the
-correction follows the current as it rises. On the rig a step from 1 % legs read the winding about 4 % high, against the 1.02 to
-1.06 Ω the dead-time sweep measured at mid-rail.
+correction follows the current as it rises. At the step's 2 A the board's loss is worth at most
+about 0.03 Ω, and on the rig the step read 1.083 Ω this way against 1.082 Ω from 1 % legs written
+once, within the 0.005 Ω between runs. The dead-time sweep's 1.02 to 1.06 Ω is a slope through a
+bus reading that fell with the current, not a measure of the step's bias.
 
 **Why this fails for L:** the DC step reveals only the time constant $\tau = L_s/R_s$. For the
 Anaheim BLY172S ($L_s = 0.64\,\text{mH}$, $R_s = 0.405\,\Omega$) $\tau = 1.58\,\text{ms}$, which

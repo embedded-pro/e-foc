@@ -34,7 +34,7 @@ namespace services
             float forgettingFactor{ 0.9995f };
             infra::Duration timeout{ std::chrono::seconds{ 5 } };
             foc::RadiansPerSecond dwellSpeed{ 26.18f };
-            infra::Duration dwellTime{ std::chrono::milliseconds{ 250 } };
+            infra::Duration dwellTime{ std::chrono::milliseconds{ 240 } };
             foc::Ampere maxCurrent{ 10.0f };
             foc::RadiansPerSecond maxSpeed{ 104.72f };
             float speedSlewRate{ 5000.0f };

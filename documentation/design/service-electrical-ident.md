@@ -2,9 +2,9 @@
 title: "Service: Electrical Parameters Identification"
 type: design
 status: draft
-version: 0.5.0
+version: 0.5.1
 component: service-electrical-ident
-date: 2026-10-22
+date: 2026-10-23
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-10-22
 | Title     | Service: Electrical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.5.0                                         |
+| Version   | 0.5.1                                         |
 | Component | service-electrical-ident                      |
-| Date      | 2026-10-22                                    |
+| Date      | 2026-10-23                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -126,8 +126,9 @@ Applies a DC differential voltage across phase A versus phases B and C, held aro
 above the middle by two thirds of the test duty, B and C below it by one third. Every leg switches
 near the middle of the period, and the duties are written again on every sample, settling and
 measuring alike, sampled at the PWM's own rate, so the dead-time correction below the estimator follows the current as it rises
-and the winding receives the test voltage (`service-dead-time-compensation.md`). Held once from
-legs at 1 %, a pulse as short as the dead band, the step read the rig's winding about 4 % high. A
+and the winding receives the test voltage (`service-dead-time-compensation.md`). On the rig the
+loss is small at the step's current: held this way the step read 1.083 Ω, and held once from legs
+at 1 % it read 1.082 Ω. A
 `TimerSingleShot` fires after the configured settle time to allow the current to reach steady state.
 A 5-sample moving-average filter (using a bounded deque of capacity 5) is applied in-flight to each
 ADC sample before it is pushed to the measurement buffer (bounded vector, capacity 123).
