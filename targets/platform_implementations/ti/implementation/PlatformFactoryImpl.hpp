@@ -32,6 +32,7 @@
 #include "services/util/EventDispatcherWatchdog.hpp"
 #include "targets/platform_implementations/cortex_m_common/CycleCounter.hpp"
 #include "targets/platform_implementations/cortex_m_common/FocLowPriorityInterruptAdapter.hpp"
+#include "targets/platform_implementations/error_handling_cortex_m/PersistentFaultData.hpp"
 
 extern "C" uint32_t SystemCoreClock;
 
@@ -105,8 +106,8 @@ namespace application
         // QueueForOneReaderOneIrqWriter copies the range without checking that it fits.
         static_assert(Resources::terminalQueueSize >= Resources::uartReceiveBufferSize / 2,
             "terminal queue must absorb a whole DMA half-buffer");
-        static_assert(Resources::faultStatusSize >= 251,
-            "fault status must hold the full register and FSR/FAR dump");
+        static_assert(Resources::faultStatusSize >= PersistentFaultData::kMaxFormattedSize,
+            "fault status must hold the full register, FSR/FAR and backtrace dump");
 
         struct Cortex
         {
@@ -141,7 +142,7 @@ namespace application
             services::StreamWriterOnSerialCommunication::WithStorage<Resources::tracerBufferSize> streamWriterOnSerialCommunication{ console };
             infra::TextOutputStream::WithErrorPolicy tracerStream{ streamWriterOnSerialCommunication };
             services::TracerWithDateTime tracer{ tracerStream };
-            services::TerminalWithCommandsImpl::WithMaxQueueAndMaxHistory<Resources::terminalQueueSize, Resources::terminalHistorySize> terminal{ console, tracer };
+            services::TerminalWithCommandsImplBase<Resources::terminalCommandLength>::WithMaxQueueAndMaxHistory<Resources::terminalQueueSize, Resources::terminalHistorySize> terminal{ console, tracer };
         };
 
         struct AdcForPowerSupplyMeasurementImpl

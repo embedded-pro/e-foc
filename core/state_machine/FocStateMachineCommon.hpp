@@ -36,8 +36,6 @@ namespace application
         // sizeof(Event), so this is budgeted against the 32 KB targets rather than rounded up.
         static constexpr std::size_t eventQueueDepth{ 6 };
 
-        ~FocStateMachineCommon() override = default;
-
         const state_machine::State& CurrentState() const override;
         state_machine::FaultCode LastFaultCode() const override;
         bool HasPendingAsyncWork() const override;
@@ -66,6 +64,7 @@ namespace application
             services::NonVolatileMemory& nvm,
             const CalibrationServices& calibServices,
             NvmActivity& nvmActivity);
+        ~FocStateMachineCommon() = default;
 
         void RegisterFaultHandler(state_machine::FaultNotifier& faultNotifier);
         void ReleaseExternalResources();

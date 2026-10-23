@@ -85,6 +85,12 @@ namespace foc
         constexpr float lutScale = static_cast<float>(sineLUT.size()) / two_pi;
     }
 
+    struct SineAndCosine
+    {
+        float sine;
+        float cosine;
+    };
+
     struct FastTrigonometry
     {
         ALWAYS_INLINE static float Sine(float angle) noexcept
@@ -102,6 +108,23 @@ namespace foc
         ALWAYS_INLINE static float Cosine(float angle) noexcept
         {
             return Sine(angle + detail::pi_over_2);
+        }
+
+        // Table entry rotated by the remainder through a short series: as accurate as the table, for configuration-time use
+        static SineAndCosine AccurateSineAndCosine(float angle) noexcept
+        {
+            const auto scaledAngle = angle * detail::lutScale;
+            const auto i = static_cast<int32_t>(scaledAngle);
+            const auto floored = i - (scaledAngle < static_cast<float>(i) ? 1 : 0);
+            const auto index = static_cast<std::size_t>(static_cast<uint32_t>(floored)) & detail::lutMask;
+            const auto offset = (scaledAngle - static_cast<float>(floored)) / detail::lutScale;
+            const auto offsetSquared = offset * offset;
+            const auto offsetSine = offset * (1.0f - offsetSquared / 6.0f);
+            const auto offsetCosine = 1.0f - offsetSquared * (0.5f - offsetSquared / 24.0f);
+            const auto tableSine = detail::sineLUT[index];
+            const auto tableCosine = detail::sineLUT[(index + detail::sineLUT.size() / 4) & detail::lutMask];
+
+            return { tableSine * offsetCosine + tableCosine * offsetSine, tableCosine * offsetCosine - tableSine * offsetSine };
         }
 
         ALWAYS_INLINE static float Arctangent(float value) noexcept

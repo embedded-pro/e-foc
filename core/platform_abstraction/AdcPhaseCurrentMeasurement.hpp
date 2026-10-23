@@ -11,9 +11,10 @@ namespace application
 {
     class AdcPhaseCurrentMeasurement
     {
-    public:
-        virtual ~AdcPhaseCurrentMeasurement() = default;
+    protected:
+        ~AdcPhaseCurrentMeasurement() = default;
 
+    public:
         virtual void Measure(const infra::Function<void(foc::Ampere phaseA, foc::Ampere phaseB, foc::Ampere phaseC)>& onDone) = 0;
         virtual void Stop() = 0;
     };

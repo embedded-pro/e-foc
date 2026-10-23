@@ -17,9 +17,10 @@ namespace hal
 {
     class PerformanceTracker
     {
-    public:
-        virtual ~PerformanceTracker() = default;
+    protected:
+        ~PerformanceTracker() = default;
 
+    public:
         virtual void Start() = 0;
         virtual uint32_t ElapsedCycles() = 0;
     };
@@ -42,8 +43,10 @@ namespace application
         : public drivers::ThreePhaseInverter
         , public drivers::Encoder
     {
+    protected:
+        ~PlatformFactory() = default;
+
     public:
-        virtual ~PlatformFactory() = default;
         enum class SampleAndHold
         {
             shortest,

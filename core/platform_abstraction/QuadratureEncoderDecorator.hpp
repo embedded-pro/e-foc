@@ -10,9 +10,10 @@ namespace application
 {
     class QuadratureEncoderDecorator
     {
-    public:
-        virtual ~QuadratureEncoderDecorator() = default;
+    protected:
+        ~QuadratureEncoderDecorator() = default;
 
+    public:
         virtual foc::Radians Read() = 0;
     };
 

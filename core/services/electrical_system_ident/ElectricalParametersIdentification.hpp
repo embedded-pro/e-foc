@@ -17,9 +17,10 @@ namespace services
 
     class ElectricalParametersIdentification
     {
-    public:
-        virtual ~ElectricalParametersIdentification() = default;
+    protected:
+        ~ElectricalParametersIdentification() = default;
 
+    public:
         struct ResistanceAndInductanceConfig
         {
             hal::DutyCycle testVoltage{ hal::DutyCycle::FromPercent(14) };

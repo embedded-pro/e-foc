@@ -152,7 +152,8 @@ namespace application
 
             hal::cortex::InterruptTable::WithStorage<64> interruptTable;
             hal::WatchdogQemu watchdog{ hal::WatchdogQemu::Config{ .timeout = watchdogEarlyWarningPeriod } };
-            EventDispatcherCortexWithWeakPtrAndWatchdog::WithSize<50> eventDispatcher{ watchdog, watchdogExpirationTimeout, []()
+            // The TI boards' depth, so the SIL suite runs the application within it
+            EventDispatcherCortexWithWeakPtrAndWatchdog::WithSize<24> eventDispatcher{ watchdog, watchdogExpirationTimeout, []()
                 {
                     OnWatchdogExpired();
                 } };

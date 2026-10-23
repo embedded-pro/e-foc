@@ -29,8 +29,6 @@ namespace
     struct AcknowledgerSpy
         : services::CanCommandAcknowledger
     {
-        virtual ~AcknowledgerSpy() = default;
-
         struct Entry
         {
             uint8_t category{};

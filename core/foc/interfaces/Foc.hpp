@@ -23,9 +23,10 @@ namespace foc
 
     class FocBase
     {
-    public:
-        virtual ~FocBase() = default;
+    protected:
+        ~FocBase() = default;
 
+    public:
         virtual MotionObservation ObserveMotion() const = 0;
 
         virtual bool Configure(const MotorModelParameters& parameters) = 0;
@@ -36,52 +37,58 @@ namespace foc
 
     class CurrentLoopTunable
     {
-    public:
-        virtual ~CurrentLoopTunable() = default;
+    protected:
+        ~CurrentLoopTunable() = default;
 
+    public:
         virtual void SetCurrentTunings(const CurrentLoopTunings& tunings) = 0;
     };
 
     class CurrentLoopSelectable
     {
-    public:
-        virtual ~CurrentLoopSelectable() = default;
+    protected:
+        ~CurrentLoopSelectable() = default;
 
+    public:
         virtual SelectResult SelectCurrentAlgorithm(CurrentAlgorithm algorithm) = 0;
         virtual CurrentAlgorithm ActiveCurrentAlgorithm() const = 0;
     };
 
     class SpeedLoopSelectable
     {
-    public:
-        virtual ~SpeedLoopSelectable() = default;
+    protected:
+        ~SpeedLoopSelectable() = default;
 
+    public:
         virtual SelectResult SelectSpeedAlgorithm(SpeedAlgorithm algorithm) = 0;
         virtual SpeedAlgorithm ActiveSpeedAlgorithm() const = 0;
     };
 
     class SpeedLoopTunable
     {
-    public:
-        virtual ~SpeedLoopTunable() = default;
+    protected:
+        ~SpeedLoopTunable() = default;
 
+    public:
         virtual bool ConfigureMechanics(const MechanicalModelParameters& parameters) = 0;
         virtual void SetSpeedTunings(const SpeedLoopTunings& tunings) = 0;
     };
 
     class PositionLoopTunable
     {
-    public:
-        virtual ~PositionLoopTunable() = default;
+    protected:
+        ~PositionLoopTunable() = default;
 
+    public:
         virtual SelectResult SetPositionTunings(const PositionLoopTunings& tunings) = 0;
     };
 
     class PositionLoopSelectable
     {
-    public:
-        virtual ~PositionLoopSelectable() = default;
+    protected:
+        ~PositionLoopSelectable() = default;
 
+    public:
         virtual SelectResult SelectPositionAlgorithm(PositionAlgorithm algorithm) = 0;
         virtual PositionAlgorithm ActivePositionAlgorithm() const = 0;
     };
@@ -91,35 +98,39 @@ namespace foc
         , public CurrentLoopTunable
         , public CurrentLoopSelectable
     {
-    public:
-        virtual ~FocTorque() = default;
+    protected:
+        ~FocTorque() = default;
 
+    public:
         virtual void SetPoint(IdAndIqPoint setPoint) = 0;
     };
 
     class FocOnlineEstimableBase
     {
-    public:
-        virtual ~FocOnlineEstimableBase() = default;
+    protected:
+        ~FocOnlineEstimableBase() = default;
 
+    public:
         virtual void SetOnlineMechanicalEstimator(OnlineMechanicalEstimator& estimator) = 0;
         virtual void SetOnlineElectricalEstimator(OnlineElectricalEstimator& estimator) = 0;
     };
 
     class CoggingCompensable
     {
-    public:
-        virtual ~CoggingCompensable() = default;
+    protected:
+        ~CoggingCompensable() = default;
 
+    public:
         virtual void LoadCoggingMap(infra::MemoryRange<const int8_t> torque, float torqueScale, NewtonMeter torqueConstant) = 0;
         virtual void ClearCoggingMap() = 0;
     };
 
     class SpeedCommandable
     {
-    public:
-        virtual ~SpeedCommandable() = default;
+    protected:
+        ~SpeedCommandable() = default;
 
+    public:
         virtual void EnableSpeedCommand() = 0;
         virtual void DisableSpeedCommand() = 0;
         virtual void CommandSpeed(RadiansPerSecond speed) = 0;
@@ -134,9 +145,10 @@ namespace foc
         , public SpeedLoopSelectable
         , public FocOnlineEstimableBase
     {
-    public:
-        ~FocSpeed() override = default;
+    protected:
+        ~FocSpeed() = default;
 
+    public:
         virtual void SetPoint(RadiansPerSecond setPoint) = 0;
         virtual hal::Hertz OuterLoopFrequency() const = 0;
     };
@@ -151,9 +163,10 @@ namespace foc
         , public PositionLoopSelectable
         , public FocOnlineEstimableBase
     {
-    public:
-        ~FocPosition() override = default;
+    protected:
+        ~FocPosition() = default;
 
+    public:
         virtual void SetPoint(Radians setPoint) = 0;
     };
 }

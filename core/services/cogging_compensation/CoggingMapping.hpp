@@ -12,9 +12,10 @@ namespace services
 {
     class CoggingMapping
     {
-    public:
-        virtual ~CoggingMapping() = default;
+    protected:
+        ~CoggingMapping() = default;
 
+    public:
         struct Config
         {
             foc::RadiansPerSecond speed{ 10.0f };

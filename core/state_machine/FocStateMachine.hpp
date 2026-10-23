@@ -88,8 +88,10 @@ namespace state_machine
 
     class FocStateMachineBase
     {
+    protected:
+        ~FocStateMachineBase() = default;
+
     public:
-        virtual ~FocStateMachineBase() = default;
         virtual const State& CurrentState() const = 0;
         virtual FaultCode LastFaultCode() const = 0;
 

@@ -1,5 +1,6 @@
 #include "core/services/electrical_system_ident/SinusoidalInductanceEstimator.hpp"
 #include "core/foc/math/DutyConversion.hpp"
+#include "core/foc/math/FastTrigonometry.hpp"
 #include "core/services/InjectionCurrentLimit.hpp"
 #include "core/services/electrical_system_ident/NormalizedDutyCycles.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
@@ -70,7 +71,8 @@ namespace services
         measurementSamples = activeConfig.measurementPeriods * samplesPerPeriod;
         sampleCount = 0;
         sumSquared = 0.0f;
-        goertzel.emplace(activeConfig.measurementPeriods, measurementSamples);
+        const auto binPhasor = foc::FastTrigonometry::AccurateSineAndCosine(phaseIncrement);
+        goertzel.emplace(math::Complex<float>{ binPhasor.cosine, binPhasor.sine }, measurementSamples);
 
         return true;
     }
@@ -161,7 +163,7 @@ namespace services
     {
         sampleSeen = true;
 
-        const float vNorm = injectionAmplitude * math::Sin(injectionPhase);
+        const float vNorm = injectionAmplitude * foc::FastTrigonometry::Sine(injectionPhase);
         driver.ThreePhasePwmOutput(detail::NormalizedDutyCycles(
             transforms.Inverse(foc::RotatingFrame{ vNorm, 0.0f }, 1.0f, 0.0f)));
 
@@ -201,10 +203,9 @@ namespace services
         auto I = goertzel->Result();
 
         const float delayAngle = omega * static_cast<float>(activeConfig.voltageToCurrentDelaySamples) / static_cast<float>(samplingFrequency.Value());
-        const float cosD = math::Cos(delayAngle);
-        const float sinD = math::Sin(delayAngle);
-        const float iRe = I.Real() * cosD - I.Imaginary() * sinD;
-        const float iIm = I.Real() * sinD + I.Imaginary() * cosD;
+        const auto delay = foc::FastTrigonometry::AccurateSineAndCosine(delayAngle);
+        const float iRe = I.Real() * delay.cosine - I.Imaginary() * delay.sine;
+        const float iIm = I.Real() * delay.sine + I.Imaginary() * delay.cosine;
 
         const float magSquared = iRe * iRe + iIm * iIm;
         if (magSquared < 1e-20f)

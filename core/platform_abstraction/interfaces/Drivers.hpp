@@ -16,9 +16,10 @@ namespace drivers
 
     class Encoder
     {
-    public:
-        virtual ~Encoder() = default;
+    protected:
+        ~Encoder() = default;
 
+    public:
         virtual foc::Radians Read() = 0;
         virtual void Set(foc::Radians value) = 0;
         virtual void SetZero() = 0;
@@ -26,17 +27,19 @@ namespace drivers
 
     class HallSensor
     {
-    public:
-        virtual ~HallSensor() = default;
+    protected:
+        ~HallSensor() = default;
 
+    public:
         virtual std::pair<foc::HallState, foc::Direction> Read() const = 0;
     };
 
     class ThreePhaseInverter
     {
-    public:
-        virtual ~ThreePhaseInverter() = default;
+    protected:
+        ~ThreePhaseInverter() = default;
 
+    public:
         virtual void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) = 0;
         virtual void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) = 0;
         virtual void Start() = 0;

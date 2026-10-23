@@ -13,9 +13,10 @@ namespace services
 
     class MechanicalParametersIdentification
     {
-    public:
-        virtual ~MechanicalParametersIdentification() = default;
+    protected:
+        ~MechanicalParametersIdentification() = default;
 
+    public:
         struct IdentificationResult
         {
             foc::NewtonMeterSecondPerRadian friction;

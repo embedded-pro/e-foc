@@ -16,7 +16,7 @@ namespace application
             state_machine::FaultNotifier& faultNotifier,
             state_machine::TransitionPolicy transitionPolicy,
             NvmActivity& nvmActivity);
-        ~TorqueStateMachine() override;
+        ~TorqueStateMachine();
 
         foc::FocTorque& GetController();
         const foc::FocTorque& GetController() const;

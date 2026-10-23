@@ -20,8 +20,10 @@ namespace foc
     class ThreePhaseMotorModelObserver
         : public infra::Observer<ThreePhaseMotorModelObserver, ThreePhaseMotorModel>
     {
+    protected:
+        ~ThreePhaseMotorModelObserver() = default;
+
     public:
-        virtual ~ThreePhaseMotorModelObserver() = default;
         using infra::Observer<ThreePhaseMotorModelObserver, ThreePhaseMotorModel>::Observer;
 
         virtual void Started() = 0;

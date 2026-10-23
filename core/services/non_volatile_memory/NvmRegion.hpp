@@ -8,9 +8,10 @@ namespace services
 {
     class NvmRegion
     {
-    public:
-        virtual ~NvmRegion() = default;
+    protected:
+        ~NvmRegion() = default;
 
+    public:
         virtual void Write(infra::ConstByteRange data, infra::Function<void()> onDone) = 0;
         virtual void Read(infra::ByteRange data, infra::Function<void()> onDone) = 0;
         virtual void Erase(infra::Function<void()> onDone) = 0;

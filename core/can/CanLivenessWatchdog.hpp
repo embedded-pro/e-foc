@@ -11,7 +11,6 @@ namespace can
     {
     public:
         CanLivenessWatchdog(services::CanProtocolServer& server, state_machine::ControlModeStateMachine& controlMode, services::Tracer& tracer);
-        virtual ~CanLivenessWatchdog() = default;
 
         void Online() override;
         void Offline() override;
