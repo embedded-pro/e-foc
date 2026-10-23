@@ -23,6 +23,7 @@ namespace
                     .WillRepeatedly(Invoke([this](hal::Can::Id id, const hal::Can::Message&, const infra::Function<void(bool)>& cb)
                         {
                             lastSentMsgType = services::ExtractCanMessageType(id.Get29BitId());
+                            lastSentNodeId = services::ExtractCanNodeId(id.Get29BitId());
                             cb(true);
                         }));
                 EXPECT_CALL(canMock, ReceiveData(_)).Times(AnyNumber());
@@ -31,7 +32,18 @@ namespace
         can::FocMotorCanClient client{ canMock, 1 };
 
         uint8_t lastSentMsgType{};
+        uint16_t lastSentNodeId{};
     };
+}
+
+TEST_F(FocMotorCanClientTest, SetNodeId_AddressesLaterCommandsToTheNewNode)
+{
+    client.Start();
+    EXPECT_EQ(lastSentNodeId, 1u);
+
+    client.SetNodeId(5);
+    client.Start();
+    EXPECT_EQ(lastSentNodeId, 5u);
 }
 
 TEST_F(FocMotorCanClientTest, Start_TransmitsStartFrame)

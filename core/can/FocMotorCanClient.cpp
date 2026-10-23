@@ -10,6 +10,11 @@ namespace can
         protocolClient.RegisterCategory(categoryClient);
     }
 
+    void FocMotorCanClient::SetNodeId(uint16_t targetNodeId)
+    {
+        nodeId = targetNodeId;
+    }
+
     bool FocMotorCanClient::Start()
     {
         return categoryClient.SendStart(nodeId);
