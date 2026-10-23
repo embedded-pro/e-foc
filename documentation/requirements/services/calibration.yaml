@@ -199,3 +199,11 @@
     shall take no update and keep its estimates. On the bench motor driven between 30 and 50 rad/s,
     the plant's d-axis current shall be above 60 mA RMS from 0.2 to 3.8 s after enable and below
     10 mA RMS from 4.2 to 9 s after enable.
+
+- id: REQ-CAL-020
+  title: The full calibration measures the current sensors' offsets on a rotor at rest
+  shall: >
+    The full calibration sequence shall begin only once the encoder has stayed within 2 mrad of where
+    a 100 ms window began, and shall fail if the rotor has not come to rest within 10 s. Started 25 ms
+    after the bench motor, with the current sensor biases of REQ-CAL-015, is disabled at 52 rad/s, the
+    full calibration shall store offsets within 5 mA of the plant's biases.

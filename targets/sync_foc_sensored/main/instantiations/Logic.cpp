@@ -16,6 +16,7 @@ namespace application
         , deadTimeCompensation{ *currentOffsets, hardware.InverterDeadTimeLoss(std::chrono::nanoseconds{ pwmDeadTimeNs }) }
         , electricalIdent{ deadTimeCompensation, hardware, vdc }
         , motorAlignment{ deadTimeCompensation, hardware }
+        , rotorStandstill{ hardware }
         , platformFaultNotifier{ hardware }
         , encoderPlausibility{ hardware, hardware.MaxCurrentSupported(), [this]()
             {
@@ -42,7 +43,7 @@ namespace application
                     TerminalAndTracer{ terminalWithStorage, this->hardware.Tracer() },
                     MotorHardware{ deadTimeCompensation, this->hardware, vdc },
                     nvm,
-                    CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = *currentOffsets, .mapCogging = true },
+                    CalibrationServices{ .electricalIdent = *electricalIdent, .motorAlignment = *motorAlignment, .fluxLinkage = foc::Weber{ motorFluxLinkageWb }, .agreeingMechanicalRuns = 2, .currentOffsets = *currentOffsets, .mapCogging = true, .standstill = rotorStandstill },
                     *platformFaultNotifier,
                     configData,
                     ControlMode::OuterLoopArgs{

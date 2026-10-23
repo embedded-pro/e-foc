@@ -81,6 +81,27 @@ Feature: Parameter Identification Against a Known Plant
     Then the identified current offsets shall be within 5 mA of the plant
     And the identified resistance shall be within 5 % of the plant
 
+  @sil @REQ-CAL-020
+  Scenario: A calibration started while the rotor coasts measures the offsets once it is at rest
+    Given a bench motor plant
+    And a motor plant with:
+      | adc_noise_sigma_ampere | 0.035  |
+      | adc_bias_ampere_a      | 0.027  |
+      | adc_bias_ampere_b      | -0.018 |
+      | adc_bias_ampere_c      | 0.054  |
+    And the motor is already calibrated
+    And the motor boots in speed mode
+    When the target boots
+    And the rotor is aligned
+    And the motor is enabled
+    And a speed setpoint of 52 rad/s is applied
+    Then the measured speed shall exceed 45 rad/s within 4000 ms
+    When the motor is disabled
+    And the full calibration is run from the terminal
+    Then the identified current offsets shall be within 5 mA of the plant
+    And the identified resistance shall be within 5 % of the plant
+    And the identified pole pairs shall match the plant
+
   @sil @REQ-CAL-013
   Scenario Outline: The full calibration identifies the mechanical parameters (<motor>)
     Given a <motor> motor plant

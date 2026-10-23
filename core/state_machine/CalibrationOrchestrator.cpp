@@ -7,11 +7,13 @@ namespace application
         services::ElectricalParametersIdentification& electricalIdent,
         services::MotorAlignment& motorAlignment,
         services::Tracer& tracer,
-        std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets)
+        std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets,
+        std::optional<std::reference_wrapper<services::RotorStandstill>> standstill)
         : electricalIdent(electricalIdent)
         , motorAlignment(motorAlignment)
         , tracer(tracer)
         , currentOffsets(currentOffsets)
+        , standstill(standstill)
     {}
 
     void CalibrationOrchestrator::Start(
@@ -28,10 +30,10 @@ namespace application
         running = true;
         ++runToken;
 
-        if (currentOffsets)
-            RunCurrentOffsetsStep();
+        if (standstill)
+            RunStandstillStep();
         else
-            RunPolePairsStep();
+            RunFirstMeasurementStep();
     }
 
     void CalibrationOrchestrator::StartAlignmentOnly(
@@ -59,6 +61,9 @@ namespace application
 
         if (currentOffsets)
             currentOffsets->get().Abort();
+
+        if (standstill)
+            standstill->get().Abort();
     }
 
     bool CalibrationOrchestrator::IsRunning() const
@@ -69,6 +74,35 @@ namespace application
     bool CalibrationOrchestrator::HasRunInFlight() const
     {
         return running;
+    }
+
+    // A turning rotor drives current through windings the offset step shorts, and that current would be stored as sensor bias
+    void CalibrationOrchestrator::RunStandstillStep()
+    {
+        tracer.Trace() << "[SM] Waiting for the rotor to come to rest";
+
+        const auto token = runToken;
+        standstill->get().Await([this, token](bool atRest)
+            {
+                if (aborted || token != runToken)
+                    return;
+
+                if (!atRest)
+                {
+                    tracer.Trace() << "[SM] The rotor did not come to rest";
+                    Fail();
+                }
+                else
+                    RunFirstMeasurementStep();
+            });
+    }
+
+    void CalibrationOrchestrator::RunFirstMeasurementStep()
+    {
+        if (currentOffsets)
+            RunCurrentOffsetsStep();
+        else
+            RunPolePairsStep();
     }
 
     // The steps after this one read the phase currents, so the offsets apply as soon as they are known.

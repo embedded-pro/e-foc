@@ -18,6 +18,7 @@
 #include "core/services/electrical_system_ident/ElectricalParametersIdentificationImpl.hpp"
 #include "core/services/non_volatile_memory/NonVolatileMemoryImpl.hpp"
 #include "core/services/non_volatile_memory/NvmEepromRegion.hpp"
+#include "core/services/standstill/RotorStandstillImpl.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/PlatformFaultNotifier.hpp"
 #include "core/supervision/EncoderPlausibilityMonitor.hpp"
@@ -57,6 +58,7 @@ namespace application
         services::DeadTimeCompensation deadTimeCompensation;
         infra::WithSharedAccess<services::ElectricalParametersIdentificationImpl> electricalIdent;
         infra::WithSharedAccess<services::MotorAlignmentImpl> motorAlignment;
+        services::RotorStandstillImpl rotorStandstill;
         infra::WithSharedAccess<state_machine::PlatformFaultNotifier> platformFaultNotifier;
         supervision::EncoderPlausibilityMonitor encoderPlausibility;
         services::ConfigData configData;

@@ -1,4 +1,5 @@
 #include "TestFocStateMachineHelper.hpp"
+#include "core/services/standstill/test_doubles/RotorStandstillMock.hpp"
 #include "core/state_machine/CalibrationOrchestrator.hpp"
 
 namespace
@@ -356,4 +357,83 @@ TEST_F(CalibrationOrchestratorWithCurrentOffsetsTest, is_running_while_the_offse
     EXPECT_CALL(electricalIdent, IsRunning()).WillOnce(Return(false));
     EXPECT_CALL(currentOffsets, IsRunning()).WillOnce(Return(true));
     EXPECT_TRUE(withOffsets.IsRunning());
+}
+
+namespace
+{
+    class CalibrationOrchestratorWithStandstillTest
+        : public CalibrationOrchestratorTest
+    {
+    public:
+        void StartWithStandstill()
+        {
+            EXPECT_CALL(standstill, Await(_)).WillOnce(Invoke([this](const infra::Function<void(bool)>& cb)
+                {
+                    storedStandstillCb = cb;
+                }));
+
+            withStandstill.Start(
+                pendingData,
+                [](state_machine::CalibrationStep) {},
+                [this](foc::Radians)
+                {
+                    alignedCalled = true;
+                },
+                [this]
+                {
+                    failedCalled = true;
+                });
+        }
+
+        StrictMock<services::PhaseCurrentOffsetsMock> currentOffsets;
+        StrictMock<services::RotorStandstillMock> standstill;
+        application::CalibrationOrchestrator withStandstill{ electricalIdent, motorAlignment, tracer, std::ref(currentOffsets), std::ref(standstill) };
+        infra::Function<void(bool)> storedStandstillCb;
+    };
+}
+
+TEST_F(CalibrationOrchestratorWithStandstillTest, the_offsets_are_measured_only_once_the_rotor_is_at_rest)
+{
+    StartWithStandstill();
+
+    EXPECT_CALL(currentOffsets, Measure(_));
+    storedStandstillCb(true);
+
+    EXPECT_FALSE(failedCalled);
+}
+
+TEST_F(CalibrationOrchestratorWithStandstillTest, a_rotor_that_does_not_come_to_rest_fails_the_calibration)
+{
+    StartWithStandstill();
+
+    storedStandstillCb(false);
+
+    EXPECT_TRUE(failedCalled);
+    EXPECT_FALSE(alignedCalled);
+}
+
+TEST_F(CalibrationOrchestratorWithStandstillTest, abort_while_waiting_for_rest_drops_its_result)
+{
+    StartWithStandstill();
+
+    EXPECT_CALL(electricalIdent, Abort());
+    EXPECT_CALL(motorAlignment, Abort());
+    EXPECT_CALL(currentOffsets, Abort());
+    EXPECT_CALL(standstill, Abort());
+    withStandstill.Abort();
+    storedStandstillCb(true);
+
+    EXPECT_FALSE(failedCalled);
+}
+
+TEST_F(CalibrationOrchestratorWithStandstillTest, a_re_alignment_does_not_wait_for_rest)
+{
+    pendingData.polePairs = 4;
+    EXPECT_CALL(motorAlignment, ForceAlignment(4, _, _));
+
+    withStandstill.StartAlignmentOnly(
+        pendingData,
+        [](state_machine::CalibrationStep) {},
+        [](foc::Radians) {},
+        [] {});
 }
