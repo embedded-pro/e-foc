@@ -2,9 +2,9 @@
 title: "Service: Dead-Time Compensation"
 type: design
 status: draft
-version: 0.2.0
+version: 0.2.1
 component: service-dead-time-compensation
-date: 2026-10-22
+date: 2026-10-23
 ---
 
 | Field     | Value                           |
@@ -12,9 +12,9 @@ date: 2026-10-22
 | Title     | Service: Dead-Time Compensation |
 | Type      | design                          |
 | Status    | draft                           |
-| Version   | 0.2.0                           |
+| Version   | 0.2.1                           |
 | Component | service-dead-time-compensation  |
-| Date      | 2026-10-22                      |
+| Date      | 2026-10-23                      |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -172,3 +172,8 @@ Through the same stage the calibration resistance reads 4.4 % above the winding 
 the correction did not reach it. What stays is the switches' on-resistance, 1.1 % of the bench
 winding, which the current also crosses in closed loop, and the difference between the plant's
 100 ns and the board's 70 ns.
+
+On the rig the correction moves the calibration resistance by less than the runs scatter: three
+interleaved pairs read 1.082 Ω held at 1 % legs and 1.083 Ω held near mid-rail and corrected, each
+within 0.005 Ω, against an online resistance of 1.077 to 1.079 Ω. At 2 A the board's 70 ns is
+worth at most about 0.03 Ω on this step.
