@@ -18,6 +18,7 @@ target_link_libraries(e_foc.sync_foc_sensored.main.inst PUBLIC
     e_foc.services.electrical_system_ident
     e_foc.services.alignment
     e_foc.services.non_volatile_memory
+    e_foc.services.standstill
     numerical.controllers.implementations
     services.peripheral
 )
