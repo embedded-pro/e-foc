@@ -72,54 +72,44 @@ namespace tool
         connect(commandPanel, &CommandPanel::StartMotorRequested, [this]()
             {
                 client.SendStartMotor();
-                timeoutTimer.start(2000);
             });
         connect(commandPanel, &CommandPanel::StopMotorRequested, [this]()
             {
                 client.SendStopMotor();
-                timeoutTimer.start(2000);
             });
         connect(commandPanel, &CommandPanel::EmergencyStopRequested, [this]()
             {
                 client.SendEmergencyStop();
-                timeoutTimer.start(2000);
             });
         connect(commandPanel, &CommandPanel::SetControlModeRequested, [this](can::FocMotorMode mode)
             {
                 client.SendSetControlMode(mode);
                 commandPanel->SetActiveControlMode(mode);
-                timeoutTimer.start(2000);
             });
         connect(commandPanel, &CommandPanel::SetTorqueSetpointRequested, [this](float iq)
             {
                 client.SendSetTorqueSetpoint(iq);
-                timeoutTimer.start(2000);
             });
         connect(commandPanel, &CommandPanel::SetSpeedSetpointRequested, [this](float speed)
             {
                 client.SendSetSpeedSetpoint(speed);
-                timeoutTimer.start(2000);
             });
         connect(commandPanel, &CommandPanel::SetPositionSetpointRequested, [this](float pos)
             {
                 client.SendSetPositionSetpoint(pos);
-                timeoutTimer.start(2000);
             });
 
         connect(commandPanel, &CommandPanel::SetCurrentBandwidthRequested, [this](float bandwidth)
             {
                 client.SendSetCurrentBandwidth(bandwidth);
-                timeoutTimer.start(2000);
             });
         connect(commandPanel, &CommandPanel::SetSpeedBandwidthRequested, [this](float bandwidth)
             {
                 client.SendSetSpeedBandwidth(bandwidth);
-                timeoutTimer.start(2000);
             });
         connect(commandPanel, &CommandPanel::SetPositionBandwidthRequested, [this](float bandwidth)
             {
                 client.SendSetPositionBandwidth(bandwidth);
-                timeoutTimer.start(2000);
             });
 
         connect(commandPanel, &CommandPanel::RequestDataRequested, [this]()
@@ -130,6 +120,10 @@ namespace tool
         connect(nodeIdSpin, &QSpinBox::valueChanged, [this](int value)
             {
                 client.SetNodeId(static_cast<uint16_t>(value));
+                contractCompatible = false;
+                UpdateCommandsEnabled();
+                if (adapterConnected)
+                    client.RequestData();
             });
     }
 
@@ -166,13 +160,15 @@ namespace tool
 
     void MainWindow::UpdateCommandsEnabled()
     {
-        commandPanel->SetCommandsEnabled(adapterConnected && contractCompatible);
+        commandPanel->SetCommandsEnabled(adapterConnected && contractCompatible && !client.IsBusy());
     }
 
     void MainWindow::OnBusyChanged(bool busy)
     {
-        commandPanel->SetCommandsEnabled(!busy && adapter.IsConnected());
-        if (!busy)
+        UpdateCommandsEnabled();
+        if (busy)
+            timeoutTimer.start(2000);
+        else
             timeoutTimer.stop();
     }
 

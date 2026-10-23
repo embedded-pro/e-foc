@@ -1,5 +1,6 @@
 #include "can-lite/core/CanProtocolDefinitions.hpp"
 #include "core/can/FocMotorMessages.hpp"
+#include "core/can/FocMotorWireContract.hpp"
 #include "hal/interfaces/Can.hpp"
 #include "infra/timer/test_helper/ClockFixture.hpp"
 #include "tools/can_commander/logic/test/CanBusAdapterMock.hpp"
@@ -49,6 +50,36 @@ namespace
         FixtureInit fixtureInit{ adapter, receiveCallback };
         CanCommandClient client{ adapter };
         StrictMock<CanCommandClientObserverMock> observer{ client };
+
+        void DeliverAck(uint8_t commandType)
+        {
+            CanFrame ackData;
+            ackData.push_back(can::focMotorCategoryId);
+            ackData.push_back(commandType);
+            ackData.push_back(static_cast<uint8_t>(services::CanAckStatus::success));
+            ackData.push_back(0);
+
+            const uint32_t rawId = services::MakeCanId(services::CanPriority::response,
+                services::canSystemCategoryId, services::canCommandAckMessageTypeId, 1);
+
+            adapter.NotifyObservers([rawId, &ackData](auto& obs)
+                {
+                    obs.OnFrameLog(false, rawId, ackData);
+                });
+        }
+
+        hal::Can::Id SendStartAndCaptureId()
+        {
+            hal::Can::Id sentId{ hal::Can::Id::Create11BitId(0) };
+            EXPECT_CALL(adapter, SendData(_, _, _))
+                .WillOnce(Invoke([&sentId](hal::Can::Id id, const hal::Can::Message&, const infra::Function<void(bool)>& cb)
+                    {
+                        sentId = id;
+                        cb(true);
+                    }));
+            client.SendStartMotor();
+            return sentId;
+        }
     };
 
     // ---------- Initial state ----------
@@ -69,6 +100,27 @@ namespace
     {
         client.SetNodeId(42);
         EXPECT_EQ(client.NodeId(), 42u);
+    }
+
+    TEST_F(TestCanCommandClient, commands_are_addressed_to_the_selected_node)
+    {
+        EXPECT_EQ(services::ExtractCanNodeId(SendStartAndCaptureId().Get29BitId()), 1u);
+
+        client.SetNodeId(5);
+        EXPECT_EQ(services::ExtractCanNodeId(SendStartAndCaptureId().Get29BitId()), 5u);
+    }
+
+    TEST_F(TestCanCommandClient, heartbeat_from_another_node_does_not_change_connection)
+    {
+        client.SetNodeId(5);
+
+        auto canId = hal::Can::Id::Create29BitId(
+            services::MakeCanId(services::CanPriority::heartbeat,
+                services::canSystemCategoryId,
+                services::canHeartbeatMessageTypeId,
+                1));
+        receiveCallback(canId, hal::Can::Message{});
+        // StrictMock: no OnConnectionChanged for node 1 while node 5 is selected
     }
 
     // ---------- Timeout ----------
@@ -137,94 +189,94 @@ namespace
 
     // ---------- Command busy management ----------
 
-    TEST_F(TestCanCommandClient, send_start_motor_clears_busy)
+    TEST_F(TestCanCommandClient, send_start_motor_stays_busy_until_acknowledged)
     {
         client.SendStartMotor();
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClient, send_speed_setpoint_clears_busy)
+    TEST_F(TestCanCommandClient, send_speed_setpoint_stays_busy_until_acknowledged)
     {
         client.SendSetSpeedSetpoint(100.0f);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClient, send_position_setpoint_clears_busy)
+    TEST_F(TestCanCommandClient, send_position_setpoint_stays_busy_until_acknowledged)
     {
         client.SendSetPositionSetpoint(1.0f);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClient, send_torque_setpoint_clears_busy)
+    TEST_F(TestCanCommandClient, send_torque_setpoint_stays_busy_until_acknowledged)
     {
         client.SendSetTorqueSetpoint(5.0f);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
     // ---------- Setpoint clamping ----------
 
-    TEST_F(TestCanCommandClient, send_speed_setpoint_overrange_positive_clears_busy)
+    TEST_F(TestCanCommandClient, send_speed_setpoint_overrange_positive_stays_busy_until_acknowledged)
     {
         client.SendSetSpeedSetpoint(100000.0f);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClient, send_speed_setpoint_overrange_negative_clears_busy)
+    TEST_F(TestCanCommandClient, send_speed_setpoint_overrange_negative_stays_busy_until_acknowledged)
     {
         client.SendSetSpeedSetpoint(-100000.0f);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClient, send_position_setpoint_overrange_positive_clears_busy)
+    TEST_F(TestCanCommandClient, send_position_setpoint_overrange_positive_stays_busy_until_acknowledged)
     {
         client.SendSetPositionSetpoint(1000.0f);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClient, send_position_setpoint_overrange_negative_clears_busy)
+    TEST_F(TestCanCommandClient, send_position_setpoint_overrange_negative_stays_busy_until_acknowledged)
     {
         client.SendSetPositionSetpoint(-1000.0f);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
     // ---------- Send commands ----------
 
-    TEST_F(TestCanCommandClient, send_stop_motor_clears_busy)
+    TEST_F(TestCanCommandClient, send_stop_motor_stays_busy_until_acknowledged)
     {
         client.SendStopMotor();
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClient, send_emergency_stop_clears_busy)
+    TEST_F(TestCanCommandClient, send_emergency_stop_stays_busy_until_acknowledged)
     {
         client.SendEmergencyStop();
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClient, send_set_control_mode_clears_busy)
+    TEST_F(TestCanCommandClient, send_set_control_mode_stays_busy_until_acknowledged)
     {
         client.SendSetControlMode(can::FocMotorMode::speed);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
     // ---------- Bandwidth setters ----------
 
-    TEST_F(TestCanCommandClient, send_set_current_bandwidth_clears_busy)
+    TEST_F(TestCanCommandClient, send_set_current_bandwidth_stays_busy_until_acknowledged)
     {
         client.SendSetCurrentBandwidth(500.0f);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClient, send_set_speed_bandwidth_clears_busy)
+    TEST_F(TestCanCommandClient, send_set_speed_bandwidth_stays_busy_until_acknowledged)
     {
         client.SendSetSpeedBandwidth(188.5f);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClient, send_set_position_bandwidth_clears_busy)
+    TEST_F(TestCanCommandClient, send_set_position_bandwidth_stays_busy_until_acknowledged)
     {
         client.SendSetPositionBandwidth(18.8f);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
     // ---------- Request data ----------
@@ -237,13 +289,34 @@ namespace
 
     // ---------- Busy notifications ----------
 
-    TEST_F(TestCanCommandClient, send_command_notifies_busy_true_then_false)
+    TEST_F(TestCanCommandClient, send_command_notifies_busy_true_and_ack_notifies_busy_false)
     {
         testing::InSequence seq;
         EXPECT_CALL(observer, OnBusyChanged(true));
         EXPECT_CALL(observer, OnBusyChanged(false));
+        EXPECT_CALL(observer, OnCommandAck(can::focMotorCategoryId, can::focStartId, services::CanAckStatus::success));
 
         client.SendStartMotor();
+        EXPECT_TRUE(client.IsBusy());
+
+        DeliverAck(can::focStartId);
+        EXPECT_FALSE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClient, send_refused_by_incompatible_contract_clears_busy)
+    {
+        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnContractVersion(static_cast<uint8_t>(can::focContractVersionMajor + 1), 0, false));
+
+        hal::Can::Message data;
+        data.push_back(static_cast<uint8_t>(can::focContractVersionMajor + 1));
+        data.push_back(0);
+        receiveCallback(hal::Can::Id::Create29BitId(services::MakeCanId(services::CanPriority::response,
+                            can::focMotorCategoryId, can::focContractVersionResponseId, 1)),
+            data);
+
+        client.SendStartMotor();
+        EXPECT_FALSE(client.IsBusy());
     }
 
     // ---------- Server online / offline ----------
@@ -305,10 +378,11 @@ namespace
 
     TEST_F(TestCanCommandClient, telemetry_status_notifies_motor_status_and_speed_position)
     {
+        EXPECT_CALL(observer, OnConnectionChanged(true));
         EXPECT_CALL(observer, OnMotorStatusReceived(FocMotorState::running, FocFaultCode::none));
         EXPECT_CALL(observer, OnSpeedPositionReceived(testing::FloatNear(10.0f, 0.01f), testing::FloatNear(1.0f, 0.001f)));
 
-        CanFrame data;
+        hal::Can::Message data;
         data.resize(6, 0);
         data[0] = static_cast<uint8_t>(FocMotorState::running);
         data[1] = static_cast<uint8_t>(FocFaultCode::none);
@@ -322,10 +396,15 @@ namespace
             can::focTelemetryStatusResponseId,
             1);
 
-        adapter.NotifyObservers([rawId, &data](auto& obs)
+        CanFrame logged;
+        for (auto b : data)
+            logged.push_back(b);
+
+        adapter.NotifyObservers([rawId, &logged](auto& obs)
             {
-                obs.OnFrameLog(false, rawId, data);
+                obs.OnFrameLog(false, rawId, logged);
             });
+        receiveCallback(hal::Can::Id::Create29BitId(rawId), data);
     }
 
     TEST_F(TestCanCommandClient, telemetry_status_with_fault_notifies_fault_event)
@@ -566,7 +645,24 @@ namespace
         EXPECT_EQ(capturedData[2], 0x0Au); // low  byte of 10
     }
 
-    // ---------- Adapter send failure: busy stays true ----------
+    TEST_F(TestCanCommandClient, send_position_setpoint_rounds_to_nearest_wire_value)
+    {
+        hal::Can::Message capturedData;
+        EXPECT_CALL(adapter, SendData(_, _, _))
+            .WillOnce(Invoke([&capturedData](hal::Can::Id, const hal::Can::Message& msg, const infra::Function<void(bool)>& cb)
+                {
+                    capturedData = msg;
+                    cb(true);
+                }));
+
+        client.SendSetPositionSetpoint(0.157f); // 15.7 → 16, truncation would give 15
+
+        ASSERT_EQ(capturedData.size(), 3u);
+        EXPECT_EQ(capturedData[1], 0x00u);
+        EXPECT_EQ(capturedData[2], 0x10u);
+    }
+
+    // ---------- Adapter send failure: busy stays true until the timeout ----------
 
     class TestCanCommandClientAdapterFails
         : public testing::Test
@@ -604,63 +700,73 @@ namespace
         StrictMock<CanCommandClientObserverMock> observer{ client };
     };
 
-    TEST_F(TestCanCommandClientAdapterFails, send_start_clears_busy_even_when_adapter_reports_failure)
+    TEST_F(TestCanCommandClientAdapterFails, send_start_stays_busy_until_timeout_when_adapter_reports_failure)
     {
         client.SendStartMotor();
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClientAdapterFails, send_stop_clears_busy_even_when_adapter_reports_failure)
+    TEST_F(TestCanCommandClientAdapterFails, send_stop_stays_busy_until_timeout_when_adapter_reports_failure)
     {
         client.SendStopMotor();
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClientAdapterFails, send_emergency_stop_clears_busy_even_when_adapter_reports_failure)
+    TEST_F(TestCanCommandClientAdapterFails, send_emergency_stop_stays_busy_until_timeout_when_adapter_reports_failure)
     {
         client.SendEmergencyStop();
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClientAdapterFails, send_set_control_mode_clears_busy_even_when_adapter_reports_failure)
+    TEST_F(TestCanCommandClientAdapterFails, send_set_control_mode_stays_busy_until_timeout_when_adapter_reports_failure)
     {
         client.SendSetControlMode(can::FocMotorMode::speed);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClientAdapterFails, send_set_torque_setpoint_clears_busy_even_when_adapter_reports_failure)
+    TEST_F(TestCanCommandClientAdapterFails, send_set_torque_setpoint_stays_busy_until_timeout_when_adapter_reports_failure)
     {
         client.SendSetTorqueSetpoint(5.0f);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClientAdapterFails, send_set_speed_setpoint_clears_busy_even_when_adapter_reports_failure)
+    TEST_F(TestCanCommandClientAdapterFails, send_set_speed_setpoint_stays_busy_until_timeout_when_adapter_reports_failure)
     {
         client.SendSetSpeedSetpoint(10.0f);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClientAdapterFails, send_set_position_setpoint_clears_busy_even_when_adapter_reports_failure)
+    TEST_F(TestCanCommandClientAdapterFails, send_set_position_setpoint_stays_busy_until_timeout_when_adapter_reports_failure)
     {
         client.SendSetPositionSetpoint(1.0f);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClientAdapterFails, send_set_current_bandwidth_clears_busy_even_when_adapter_reports_failure)
+    TEST_F(TestCanCommandClientAdapterFails, send_set_current_bandwidth_stays_busy_until_timeout_when_adapter_reports_failure)
     {
         client.SendSetCurrentBandwidth(500.0f);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClientAdapterFails, send_set_speed_bandwidth_clears_busy_even_when_adapter_reports_failure)
+    TEST_F(TestCanCommandClientAdapterFails, send_set_speed_bandwidth_stays_busy_until_timeout_when_adapter_reports_failure)
     {
         client.SendSetSpeedBandwidth(188.5f);
-        EXPECT_FALSE(client.IsBusy());
+        EXPECT_TRUE(client.IsBusy());
     }
 
-    TEST_F(TestCanCommandClientAdapterFails, send_set_position_bandwidth_clears_busy_even_when_adapter_reports_failure)
+    TEST_F(TestCanCommandClientAdapterFails, send_set_position_bandwidth_stays_busy_until_timeout_when_adapter_reports_failure)
     {
         client.SendSetPositionBandwidth(18.8f);
+        EXPECT_TRUE(client.IsBusy());
+    }
+
+    TEST_F(TestCanCommandClientAdapterFails, timeout_after_failed_send_clears_busy)
+    {
+        EXPECT_CALL(observer, OnCommandTimeout());
+
+        client.SendStartMotor();
+        client.HandleTimeout();
+
         EXPECT_FALSE(client.IsBusy());
     }
 }
