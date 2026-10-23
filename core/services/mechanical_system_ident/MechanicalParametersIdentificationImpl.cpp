@@ -90,6 +90,9 @@ namespace services
         ++run;
 
         RestartEstimator(config.forgettingFactor);
+        observationsPosted = 0;
+        observationsFitted = 0;
+        fitScheduled = false;
         this->samplesSinceStart = 0;
         this->dwellSamples = std::max<std::size_t>(1, static_cast<std::size_t>(std::chrono::duration<float>(config.dwellTime).count() / samplingPeriod + 0.5f));
         this->minimumRunSamples = static_cast<std::size_t>(minimumRunDwells * static_cast<float>(dwellSamples));
@@ -119,6 +122,8 @@ namespace services
 
         timeoutTimer.Start(config.timeout, [this]()
             {
+                FitPostedObservations();
+
                 if (finishAtSample != 0 && outcome == Outcome::pending)
                     outcome = Outcome::converged;
 
@@ -135,10 +140,10 @@ namespace services
         updatesSinceReference = 0;
     }
 
-    void MechanicalParametersIdentificationImpl::TrackInertiaSettling()
+    void MechanicalParametersIdentificationImpl::TrackInertiaSettling(uint32_t observedWindowSamples)
     {
         const auto memoryInSamples = updateForgetting < 1.0f ? std::ceil(1.0f / (1.0f - updateForgetting)) : static_cast<float>(maximumSettlingInterval);
-        const auto memoryInUpdates = std::max<std::size_t>(minimumSettlingUpdates, static_cast<std::size_t>(std::ceil(memoryInSamples / static_cast<float>(windowSamples))));
+        const auto memoryInUpdates = std::max<std::size_t>(minimumSettlingUpdates, static_cast<std::size_t>(std::ceil(memoryInSamples / static_cast<float>(observedWindowSamples))));
 
         if (++updatesSinceReference < memoryInUpdates)
             return;
@@ -179,6 +184,11 @@ namespace services
     bool MechanicalParametersIdentificationImpl::IsRunning() const
     {
         return rls.has_value();
+    }
+
+    bool MechanicalParametersIdentificationImpl::HasConverged() const
+    {
+        return finishAtSample != 0;
     }
 
     void MechanicalParametersIdentificationImpl::StopExcitation()
@@ -223,6 +233,7 @@ namespace services
 
         StopExcitation();
         ReleaseDrive();
+        FitPostedObservations();
 
         const auto& theta = rls->Coefficients();
         const auto inertia = theta.at(1, 0);
@@ -359,17 +370,70 @@ namespace services
         if (!countKnown || !hadSpeed || !IsMechanicallyObservable(centredSpeed))
             return;
 
-        MechanicalRls::MakeRegressor(regressor, acceleration, centredSpeed);
-        torque.at(0, 0) = centredTorque;
+        Post(Observation{ acceleration, centredSpeed, centredTorque, static_cast<uint32_t>(samplesSinceStart), static_cast<uint32_t>(windowSamples) });
+    }
+
+    // The fit costs more than the rest of the control interrupt, so the interrupt only hands each window over
+    void MechanicalParametersIdentificationImpl::Post(const Observation& observation)
+    {
+        const auto posted = observationsPosted.load(std::memory_order_relaxed);
+
+        if (posted - observationsFitted.load(std::memory_order_acquire) == observationCapacity)
+        {
+            outcome = Outcome::observationsDropped;
+            ScheduleFinish();
+            return;
+        }
+
+        observations[posted % observationCapacity] = observation;
+        observationsPosted.store(posted + 1, std::memory_order_release);
+
+        if (!fitScheduled.exchange(true))
+            ScheduleFit();
+    }
+
+    void MechanicalParametersIdentificationImpl::ScheduleFit()
+    {
+        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
+            [fittingRun = run](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
+            {
+                if (self->run != fittingRun)
+                    return;
+
+                self->FitPostedObservations();
+            },
+            WeakFromThis());
+    }
+
+    void MechanicalParametersIdentificationImpl::FitPostedObservations()
+    {
+        fitScheduled = false;
+
+        auto fitted = observationsFitted.load(std::memory_order_relaxed);
+        while (rls.has_value() && fitted != observationsPosted.load(std::memory_order_acquire))
+        {
+            Fit(observations[fitted % observationCapacity]);
+            observationsFitted.store(++fitted, std::memory_order_release);
+        }
+    }
+
+    void MechanicalParametersIdentificationImpl::Fit(const Observation& observation)
+    {
+        // The interrupt finishes on the first window it sees past the boundary, which can be later than this fit set it
+        if (finishAtSample != 0 && observation.sample >= finishAtSample)
+            return;
+
+        MechanicalRls::MakeRegressor(regressor, observation.acceleration, observation.speed);
+        torque.at(0, 0) = observation.torque;
 
         auto metrics = rls->Update(regressor, torque);
-        excitation.Count(acceleration, centredSpeed);
-        TrackInertiaSettling();
+        excitation.Count(observation.acceleration, observation.speed);
+        TrackInertiaSettling(observation.windowSamples);
 
-        if (finishAtSample != 0 || samplesSinceStart < minimumRunSamples || !inertiaSettled || !HasConvergedMechanics(metrics, excitation, updateForgetting, std::max(1.0f, static_cast<float>(windowSamples) / coveredWindowSamples)))
+        if (finishAtSample != 0 || observation.sample < minimumRunSamples || !inertiaSettled || !HasConvergedMechanics(metrics, excitation, updateForgetting, std::max(1.0f, static_cast<float>(observation.windowSamples) / coveredWindowSamples)))
             return;
 
         // An angle-dependent torque cancels only over whole turns, so a converged fit keeps every dwell it started whole
-        finishAtSample = (samplesSinceStart / dwellSamples + 1) * dwellSamples;
+        finishAtSample = (observation.sample / dwellSamples + 1) * dwellSamples;
     }
 }

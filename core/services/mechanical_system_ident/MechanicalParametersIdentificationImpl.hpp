@@ -9,6 +9,9 @@
 #include "infra/timer/Timer.hpp"
 #include "infra/util/AutoResetFunction.hpp"
 #include "infra/util/SharedPtr.hpp"
+#include <array>
+#include <atomic>
+#include <cstdint>
 
 namespace services
 {
@@ -23,15 +26,33 @@ namespace services
         bool IsRunning() const override;
         void Abort() override;
 
+        bool HasConverged() const;
+
     private:
         enum class Outcome : uint8_t
         {
             pending,
             converged,
-            outsideEnvelope
+            outsideEnvelope,
+            observationsDropped
         };
 
+        struct Observation
+        {
+            float acceleration;
+            float speed;
+            float torque;
+            uint32_t sample;
+            uint32_t windowSamples;
+        };
+
+        static constexpr uint32_t observationCapacity{ 16 };
+
         void OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant);
+        void Post(const Observation& observation);
+        void ScheduleFit();
+        void FitPostedObservations();
+        void Fit(const Observation& observation);
         void StopExcitation();
         void ReleaseDrive();
         void ScheduleFinish();
@@ -40,7 +61,7 @@ namespace services
         void CommandNextExcitationLevel();
         void StepSpeedCommand();
         void RestartEstimator(float forgettingFactor);
-        void TrackInertiaSettling();
+        void TrackInertiaSettling(uint32_t observedWindowSamples);
         void Complete(std::optional<foc::NewtonMeterSecondPerRadian> friction, std::optional<foc::NewtonMeterSecondSquared> inertia);
 
         foc::SpeedCommandable& controller;
@@ -99,6 +120,10 @@ namespace services
         infra::TimerRepeating excitationTimer;
         MechanicalRls::InputMatrix regressor;
         math::Matrix<float, 1, 1> torque;
+        std::array<Observation, observationCapacity> observations{};
+        std::atomic<uint32_t> observationsPosted{ 0 };
+        std::atomic<uint32_t> observationsFitted{ 0 };
+        std::atomic<bool> fitScheduled{ false };
         volatile Outcome outcome{ Outcome::pending };
         uint32_t run{ 0 };
     };

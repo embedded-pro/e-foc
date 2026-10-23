@@ -68,4 +68,6 @@
     runs closed loop in any control mode, no control-interrupt execution shall exceed the budget
     or the control period, and none shall re-enter. Rotor alignment and every identification
     procedure shall deliver its outcome from the event loop, not from the interrupt that
-    decides it.
+    decides it. Mechanical identification shall fit its observations from the event loop: the
+    control interrupt shall only accumulate each observation window, check the envelope and hand
+    the closed window over.

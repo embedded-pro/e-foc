@@ -2,7 +2,7 @@
 title: "Service: Mechanical Parameters Identification"
 type: design
 status: draft
-version: 0.3.0
+version: 0.4.0
 component: service-mechanical-ident
 date: 2026-10-23
 ---
@@ -12,7 +12,7 @@ date: 2026-10-23
 | Title     | Service: Mechanical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.3.0                                         |
+| Version   | 0.4.0                                         |
 | Component | service-mechanical-ident                      |
 | Date      | 2026-10-23                                    |
 
@@ -306,16 +306,38 @@ flowchart TD
     OBS --> DRIVE["Start drive"]
     DRIVE --> CMD_SPEED["Command target speed"]
     CMD_SPEED --> CB["Observer call\n(ADC interrupt)"]
-    CB --> TAU["Estimate τ = Kt × Iq"]
-    CB --> VEL["Estimate ω, dω/dt\nfrom encoder"]
-    TAU --> RLS["RLS update step\n(φ=[dω/dt, ω, 1], y=τ)"]
-    VEL --> RLS
+    CB --> TAU["Accumulate τ = Kt × Iq"]
+    CB --> VEL["Accumulate ω, dω/dt\nfrom encoder"]
+    TAU --> POST["Close the window,\npost it to the ring"]
+    VEL --> POST
+    POST --> RLS["RLS update step\n(event loop)\n(φ=[dω/dt, ω, 1], y=τ)"]
     RLS --> TIMEOUT{"TimerSingleShot\nexpired?"}
     TIMEOUT -->|No| CB
     TIMEOUT -->|Yes| REL["Stop drive,\nrelease observer"]
     REL --> REPORT["Read θ = [J, B, τ_fric]"]
     REPORT --> CB2["onDone(B, J)\n(dispatcher context)"]
 ```
+
+### Where the Fit Runs
+
+The control interrupt observes every sample, but it does not fit. It accumulates the window, checks
+the current and speed envelopes, decides whether the window is observable, and posts the closed window
+(acceleration, speed, torque, the sample it closed on and the window's length) to a ring of 16 entries.
+The event loop takes the windows from the ring in order and runs the update, the inertia-settling check
+and the convergence decision on each. The update and the decision cost more than the rest of the
+interrupt together: on the rig, with the fit in the interrupt, every calibration took 472 interrupts past
+the 4500-cycle budget, at up to 5000 cycles, one for each fitted window of the two runs.
+
+The fit produces the same estimate as before, because it sees the same windows in the same order and
+takes the window length and the sample index each was closed on from the window itself, not from the
+interrupt's state when it is fitted. The decision to finish on a dwell boundary is taken from the
+window's sample index too. The interrupt finishes on the first window it sees at or past that boundary,
+which can come a little after it because the fit runs late. The fit therefore drops any window closed at
+or past the boundary, so the run fits exactly the windows it fitted when the fit ran in the interrupt.
+On the timeout, and when the run finishes, the windows still in the ring are fitted first.
+
+A run whose windows fill the ring before the event loop fits them ends without an estimate rather than
+skipping a window. At the rig's window of about 4 ms the ring holds 64 ms of windows.
 
 ### Timeout and Result Delivery
 

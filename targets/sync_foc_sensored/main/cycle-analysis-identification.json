@@ -1,5 +1,5 @@
 {
-  "path_name": "ADC ISR -> FOC inner loop -> mechanical identification observer (RLS)",
+  "path_name": "ADC ISR -> FOC inner loop -> mechanical identification observer (window)",
   "loop_rates_khz": [20],
   "path_stages": [
     {
@@ -45,22 +45,19 @@
       ]
     },
     {
-      "label": "Mechanical Identification Observer (RLS)",
+      "label": "Mechanical Identification Observer (window)",
       "required": false,
       "patterns": [
         "MechanicalParametersIdentificationImpl::OnSamplingUpdate",
         "MechanicalParametersIdentificationImpl::EstimateFrictionAndInertia.*lambda\\(auto:1",
         "MechanicalParametersIdentificationImpl::ScheduleFinish",
         "ClarkePark::Forward",
-        "RecursiveLeastSquares<float, 3u>::MakeRegressor",
-        "RecursiveLeastSquares<float, 3u>::Update",
-        "RecursiveLeastSquares<float, 3u>::EvaluateConvergence",
         "ExceedsInjectionLimit",
-        "IsMechanicallyExciting",
-        "HasConvergedMechanics",
-        "UncertaintyThresholdFor",
         "PositionWithWrapAround",
-        "IsFiniteValue"
+        "IsFiniteValue",
+        "MechanicalParametersIdentificationImpl::Post",
+        "MechanicalParametersIdentificationImpl::ScheduleFit",
+        "IsMechanicallyObservable"
       ]
     },
     {

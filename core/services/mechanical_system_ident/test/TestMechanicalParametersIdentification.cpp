@@ -1111,10 +1111,13 @@ TEST_F(MechanicalParametersIdentificationTest, a_sample_outside_the_envelope_inv
             outcome.inertia = j;
         });
 
-    for (std::size_t i = 0; i != 400000 && !AFinishIsQueued(); ++i)
+    for (std::size_t i = 0; i != 400000 && !identification->HasConverged(); ++i)
+    {
         PublishConsistentSample();
+        ExecuteAllActions();
+    }
 
-    ASSERT_TRUE(AFinishIsQueued());
+    ASSERT_TRUE(identification->HasConverged());
     EXPECT_FALSE(outcome.fired);
 
     AdvanceProfile();
@@ -1126,10 +1129,11 @@ TEST_F(MechanicalParametersIdentificationTest, a_sample_outside_the_envelope_inv
     EXPECT_FALSE(outcome.friction.has_value());
 }
 
-TEST_F(MechanicalParametersIdentificationTest, a_convergence_scheduled_before_an_abort_does_not_complete_the_run_started_after_it)
+TEST_F(MechanicalParametersIdentificationTest, work_queued_before_an_abort_does_not_touch_the_run_started_after_it)
 {
     auto config = DefaultConfig();
     config.timeout = std::chrono::seconds{ 60 };
+    config.maxCurrent = foc::Ampere{ 4.0f };
 
     bool firstFired = false;
     bool secondFired = false;
@@ -1148,6 +1152,10 @@ TEST_F(MechanicalParametersIdentificationTest, a_convergence_scheduled_before_an
 
     ASSERT_TRUE(AFinishIsQueued());
 
+    EXPECT_CALL(driverMock, Stop());
+    AdvanceProfile();
+    PublishCurrents(9.0f, -4.5f, -4.5f);
+
     ExpectDriveReleased();
     identification->Abort();
 
@@ -1163,7 +1171,35 @@ TEST_F(MechanicalParametersIdentificationTest, a_convergence_scheduled_before_an
     EXPECT_FALSE(firstFired);
     EXPECT_FALSE(secondFired);
     EXPECT_TRUE(identification->IsRunning());
+    EXPECT_FALSE(identification->HasConverged());
 
     ExpectDriveReleased();
     identification->Abort();
+}
+
+TEST_F(MechanicalParametersIdentificationTest, windows_the_event_loop_does_not_fit_in_time_end_the_run_without_an_estimate)
+{
+    auto config = DefaultConfig();
+    config.timeout = std::chrono::seconds{ 60 };
+
+    std::optional<bool> estimated;
+
+    GivenEncoderFollowsTheProfile();
+    ExpectRunStarted();
+    EXPECT_CALL(controllerMock, CommandSpeed(_)).Times(AnyNumber());
+    ExpectDriveReleased();
+
+    identification->EstimateFrictionAndInertia(foc::NewtonMeter{ torqueConstant }, 7, config, [&estimated](auto b, auto j)
+        {
+            estimated = b.has_value() && j.has_value();
+        });
+
+    for (std::size_t i = 0; i != 200000; ++i)
+        PublishConsistentSample();
+
+    EXPECT_FALSE(estimated.has_value());
+    ExecuteAllActions();
+
+    ASSERT_TRUE(estimated.has_value());
+    EXPECT_FALSE(*estimated);
 }
