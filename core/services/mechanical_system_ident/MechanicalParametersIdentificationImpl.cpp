@@ -11,8 +11,8 @@
 
 namespace
 {
-    constexpr infra::Duration slewPeriod{ std::chrono::milliseconds{ 1 } };
-    constexpr float slewPeriodSeconds{ 0.001f };
+    constexpr infra::Duration tickPeriod{ std::chrono::milliseconds{ 1 } };
+    constexpr float tickPeriodSeconds{ 0.001f };
 
     constexpr float accelerationQuantumTarget{ 100.0f };
     constexpr std::size_t maximumObservationWindow{ 256 };
@@ -87,9 +87,10 @@ namespace services
         this->excitation.Restart();
         this->atDwellLevel = true;
         this->outcome = Outcome::pending;
-        ++run;
 
         RestartEstimator(config.forgettingFactor);
+        observationsPosted = 0;
+        observationsFitted = 0;
         this->samplesSinceStart = 0;
         this->dwellSamples = std::max<std::size_t>(1, static_cast<std::size_t>(std::chrono::duration<float>(config.dwellTime).count() / samplingPeriod + 0.5f));
         this->minimumRunSamples = static_cast<std::size_t>(minimumRunDwells * static_cast<float>(dwellSamples));
@@ -107,9 +108,9 @@ namespace services
         controller.EnableSpeedCommand();
         controller.CommandSpeed(foc::RadiansPerSecond{ commandedSpeed });
 
-        slewTimer.Start(slewPeriod, [this]()
+        tickTimer.Start(tickPeriod, [this]()
             {
-                StepSpeedCommand();
+                Tick();
             });
 
         excitationTimer.Start(config.dwellTime, [this]()
@@ -119,6 +120,8 @@ namespace services
 
         timeoutTimer.Start(config.timeout, [this]()
             {
+                FitPostedObservations();
+
                 if (finishAtSample != 0 && outcome == Outcome::pending)
                     outcome = Outcome::converged;
 
@@ -135,10 +138,10 @@ namespace services
         updatesSinceReference = 0;
     }
 
-    void MechanicalParametersIdentificationImpl::TrackInertiaSettling()
+    void MechanicalParametersIdentificationImpl::TrackInertiaSettling(uint32_t observedWindowSamples)
     {
         const auto memoryInSamples = updateForgetting < 1.0f ? std::ceil(1.0f / (1.0f - updateForgetting)) : static_cast<float>(maximumSettlingInterval);
-        const auto memoryInUpdates = std::max<std::size_t>(minimumSettlingUpdates, static_cast<std::size_t>(std::ceil(memoryInSamples / static_cast<float>(windowSamples))));
+        const auto memoryInUpdates = std::max<std::size_t>(minimumSettlingUpdates, static_cast<std::size_t>(std::ceil(memoryInSamples / static_cast<float>(observedWindowSamples))));
 
         if (++updatesSinceReference < memoryInUpdates)
             return;
@@ -158,7 +161,7 @@ namespace services
 
     void MechanicalParametersIdentificationImpl::StepSpeedCommand()
     {
-        const auto step = currentConfig.speedSlewRate * slewPeriodSeconds;
+        const auto step = currentConfig.speedSlewRate * tickPeriodSeconds;
         const auto remaining = levelSpeed - commandedSpeed;
 
         commandedSpeed = std::abs(remaining) <= step ? levelSpeed : commandedSpeed + std::copysign(step, remaining);
@@ -181,11 +184,16 @@ namespace services
         return rls.has_value();
     }
 
+    bool MechanicalParametersIdentificationImpl::HasConverged() const
+    {
+        return finishAtSample != 0;
+    }
+
     void MechanicalParametersIdentificationImpl::StopExcitation()
     {
         timeoutTimer.Cancel();
         excitationTimer.Cancel();
-        slewTimer.Cancel();
+        tickTimer.Cancel();
     }
 
     void MechanicalParametersIdentificationImpl::ReleaseDrive()
@@ -201,19 +209,15 @@ namespace services
             onDone(friction, inertia);
     }
 
-    // The finish is deferred, so an abort and a new run can both happen before it is dispatched. Tagging it
-    // with the run that queued it keeps a terminal outcome from completing the run that followed it.
-    void MechanicalParametersIdentificationImpl::ScheduleFinish()
+    // Scheduling from the control interrupt costs more than it has left on the sample that closes a window, so
+    // the interrupt only records the outcome and posts the window, and this tick fits and finishes from the event loop
+    void MechanicalParametersIdentificationImpl::Tick()
     {
-        infra::EventDispatcherWithWeakPtr::Instance().Schedule(
-            [finishingRun = run](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
-            {
-                if (self->run != finishingRun)
-                    return;
+        StepSpeedCommand();
+        FitPostedObservations();
 
-                self->FinishRun();
-            },
-            WeakFromThis());
+        if (outcome != Outcome::pending)
+            FinishRun();
     }
 
     void MechanicalParametersIdentificationImpl::FinishRun()
@@ -223,6 +227,7 @@ namespace services
 
         StopExcitation();
         ReleaseDrive();
+        FitPostedObservations();
 
         const auto& theta = rls->Coefficients();
         const auto inertia = theta.at(1, 0);
@@ -243,7 +248,6 @@ namespace services
 
         outcome = Outcome::outsideEnvelope;
         inverter.Stop();
-        ScheduleFinish();
     }
 
     void MechanicalParametersIdentificationImpl::OnSamplingUpdate(const foc::PhaseCurrents& currentPhases, const foc::NewtonMeter& torqueConstant)
@@ -352,24 +356,71 @@ namespace services
         if (finishAtSample != 0 && samplesSinceStart >= finishAtSample)
         {
             outcome = Outcome::converged;
-            ScheduleFinish();
             return;
         }
 
         if (!countKnown || !hadSpeed || !IsMechanicallyObservable(centredSpeed))
             return;
 
-        MechanicalRls::MakeRegressor(regressor, acceleration, centredSpeed);
-        torque.at(0, 0) = centredTorque;
+        Post(Observation{ acceleration, centredSpeed, centredTorque, static_cast<uint32_t>(samplesSinceStart), static_cast<uint32_t>(windowSamples) });
+    }
+
+    void MechanicalParametersIdentificationImpl::Post(const Observation& observation)
+    {
+        const auto posted = observationsPosted.load();
+        const auto pending = posted - observationsFitted.load();
+
+        if (pending == observationCapacity)
+        {
+            outcome = Outcome::observationsDropped;
+            return;
+        }
+
+        observations[posted % observationCapacity] = observation;
+        observationsPosted = posted + 1;
+
+        // Windows shorter than the tick arrive faster than it fits them, so half a ring asks the event loop at once
+        if (pending + 1 == observationCapacity / 2)
+            ScheduleFit();
+    }
+
+    void MechanicalParametersIdentificationImpl::ScheduleFit()
+    {
+        infra::EventDispatcherWithWeakPtr::Instance().Schedule([](const infra::SharedPtr<MechanicalParametersIdentificationImpl>& self)
+            {
+                self->FitPostedObservations();
+            },
+            WeakFromThis());
+    }
+
+    void MechanicalParametersIdentificationImpl::FitPostedObservations()
+    {
+        auto fitted = observationsFitted.load();
+        while (rls.has_value() && fitted != observationsPosted.load())
+        {
+            Fit(observations[fitted % observationCapacity]);
+            ++fitted;
+            observationsFitted = fitted;
+        }
+    }
+
+    void MechanicalParametersIdentificationImpl::Fit(const Observation& observation)
+    {
+        // The interrupt finishes on the first window it sees past the boundary, which can be later than this fit set it
+        if (finishAtSample != 0 && observation.sample >= finishAtSample)
+            return;
+
+        MechanicalRls::MakeRegressor(regressor, observation.acceleration, observation.speed);
+        torque.at(0, 0) = observation.torque;
 
         auto metrics = rls->Update(regressor, torque);
-        excitation.Count(acceleration, centredSpeed);
-        TrackInertiaSettling();
+        excitation.Count(observation.acceleration, observation.speed);
+        TrackInertiaSettling(observation.windowSamples);
 
-        if (finishAtSample != 0 || samplesSinceStart < minimumRunSamples || !inertiaSettled || !HasConvergedMechanics(metrics, excitation, updateForgetting, std::max(1.0f, static_cast<float>(windowSamples) / coveredWindowSamples)))
+        if (finishAtSample != 0 || observation.sample < minimumRunSamples || !inertiaSettled || !HasConvergedMechanics(metrics, excitation, updateForgetting, std::max(1.0f, static_cast<float>(observation.windowSamples) / coveredWindowSamples)))
             return;
 
         // An angle-dependent torque cancels only over whole turns, so a converged fit keeps every dwell it started whole
-        finishAtSample = (samplesSinceStart / dwellSamples + 1) * dwellSamples;
+        finishAtSample = (observation.sample / dwellSamples + 1) * dwellSamples;
     }
 }

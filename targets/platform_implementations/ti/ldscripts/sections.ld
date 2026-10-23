@@ -66,7 +66,8 @@ SECTIONS
     {
         . = ALIGN(4);
         _bss = .;
-        *(.bss .bss*)
+        /* The uDMA control table is 1 KiB aligned: placed first, it no longer moves a whole KiB when an object before it grows */
+        *(SORT_BY_ALIGNMENT(.bss*))
         *(COMMON)
         . = ALIGN(4);
         _ebss = .;
