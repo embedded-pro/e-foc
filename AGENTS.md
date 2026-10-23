@@ -25,7 +25,7 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 
 **Scope**: `core/foc/`, `core/platform_abstraction/`, `core/state_machine/`, `targets/`, ISR-reachable paths. Host tools, simulators, and tests may use heap.
 
-Forbidden: `new`/`delete`/`malloc`/`free`, `make_unique`/`make_shared`, `std::vector`/`string`/`deque`/`list`/`map`/`set`. No recursion. No `virtual ~D() = 0`.
+Forbidden: `new`/`delete`/`malloc`/`free`, `make_unique`/`make_shared`, `std::vector`/`string`/`deque`/`list`/`map`/`set`. No recursion. No virtual destructors (see Interfaces & errors).
 
 Use: `infra::BoundedVector<T>::WithMaxSize<N>`, `infra::BoundedString::WithStorage<N>`, `infra::BoundedDeque<T>::WithMaxSize<N>`, `std::array<T,N>`, `std::optional<T>`.
 
@@ -87,7 +87,10 @@ Any service that schedules event-dispatcher closures and whose lifetime is manag
 
 ## Interfaces & errors
 
-- Interfaces = pure virtual; `virtual ~I() = default` — **never** `= 0` destructors
+- Interfaces = pure virtual methods and a **protected, non-virtual** destructor (`protected: ~I() = default;`), as EMIL does.
+  Never `virtual ~I()`: nothing is deleted through an interface, and each virtual destructor adds a deleting destructor plus,
+  under multiple inheritance, a thunk per base — about 18 KB of flash on the TM4C123 build. Concrete classes declare no
+  destructor or a plain public one. Only host code that owns objects through a base pointer (`std::unique_ptr<Base>`) keeps one.
 - No exceptions. `std::optional<T>` or status enums. `assert()`/`really_assert()` for preconditions
 - SOLID + DIP: constructor injection via `PlatformFactory`; depend on abstractions. No global state.
 
@@ -202,7 +205,7 @@ Before finalizing any plan or implementation, verify:
 **Memory (embedded/runtime scope)**
 - [ ] No `new`/`delete`/`malloc`/`free`/`make_unique`/`make_shared`
 - [ ] No `std::vector`/`string`/`deque`/`list`/`map`/`set` — use bounded alternatives
-- [ ] No recursion; no `virtual ~D() = 0`
+- [ ] No recursion; no virtual destructors — interfaces use a protected non-virtual destructor
 
 **Real-time**
 - [ ] No virtual dispatch in `Calculate()` hot path

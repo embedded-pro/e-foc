@@ -25,8 +25,10 @@ namespace application
     class OuterLoopStateMachine
         : public FocStateMachineCommon
     {
+    protected:
+        ~OuterLoopStateMachine() = default;
+
     public:
-        ~OuterLoopStateMachine() override = default;
         void ApplyOnlineEstimates() override;
         void TraceOnlineEstimates();
 

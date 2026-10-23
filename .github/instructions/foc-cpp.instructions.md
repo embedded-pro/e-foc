@@ -13,7 +13,7 @@ This project is a Field-Oriented Control (FOC) implementation for BLDC/PMSM moto
 
 Never use `new`, `delete`, `malloc`, `free`, `std::make_unique`, or `std::make_shared`.
 
-Avoid `virtual ~ClassName() = 0` (pure virtual destructors) — they pull in `__cxa_pure_virtual` and vtable overhead, increasing flash/RAM usage significantly. The default is **no pure virtual destructor**. Only add one when there is a proven, documented need.
+Never declare a virtual destructor (`virtual ~ClassName()`, `= default` or `= 0`). Nothing is deleted through a base pointer, and each virtual destructor emits a deleting destructor plus, under multiple inheritance, a thunk per base — about 18 KB of flash on the TM4C123 build. Interfaces declare `protected: ~ClassName() = default;` (the EMIL convention); concrete classes declare no destructor or a plain public one.
 
 Replace standard containers:
 - `std::vector<T>` → `infra::BoundedVector<T>::WithMaxSize<N>`

@@ -16,8 +16,6 @@ namespace
     struct SequenceSourceStub
         : services::CanSequenceSource
     {
-        virtual ~SequenceSourceStub() = default;
-
         uint8_t PeekSequence(uint16_t) override
         {
             return seq;

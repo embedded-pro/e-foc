@@ -37,7 +37,7 @@ End with: total C/W/S counts + **APPROVE** or **REQUEST CHANGES**.
 **Memory** (embedded/runtime scope only — not host tools/tests):
 - No `new`/`delete`/`malloc`/`free`/`make_unique`/`make_shared`
 - No `std::vector`/`string`/`deque`/`list`/`map`/`set` — use bounded alternatives
-- No recursion; no `virtual ~D() = 0`
+- No recursion; no virtual destructors — interfaces use `protected: ~I() = default;`
 
 **Real-time**:
 - No virtual dispatch in `Calculate()` hot path

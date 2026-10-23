@@ -10,9 +10,10 @@ namespace application
 {
     class ModeHooks
     {
-    public:
-        virtual ~ModeHooks() = default;
+    protected:
+        ~ModeHooks() = default;
 
+    public:
         virtual foc::FocBase& GetFoc() = 0;
         virtual foc::Controllable& GetFocControl() = 0;
         virtual foc::CurrentLoopTunable& CurrentTunable() = 0;

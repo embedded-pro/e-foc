@@ -30,9 +30,10 @@ namespace foc
 
     class OnlineMechanicalEstimator
     {
-    public:
-        virtual ~OnlineMechanicalEstimator() = default;
+    protected:
+        ~OnlineMechanicalEstimator() = default;
 
+    public:
         virtual void SetTorqueConstant(NewtonMeter kt) = 0;
         virtual void SetInitialEstimate(NewtonMeterSecondSquared inertia, NewtonMeterSecondPerRadian friction) = 0;
 
@@ -44,9 +45,10 @@ namespace foc
 
     class OnlineElectricalEstimator
     {
-    public:
-        virtual ~OnlineElectricalEstimator() = default;
+    protected:
+        ~OnlineElectricalEstimator() = default;
 
+    public:
         virtual void SetInitialEstimate(Ohm resistance, MilliHenry inductance) = 0;
 
         virtual void Update(const ElectricalWindow& window) = 0;

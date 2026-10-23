@@ -14,7 +14,7 @@ namespace foc
     {
     public:
         Runner(drivers::ThreePhaseInverter& inverter, drivers::Encoder& encoder, FocImpl& foc);
-        ~Runner() override;
+        ~Runner();
 
         Runner(const Runner&) = delete;
         Runner& operator=(const Runner&) = delete;

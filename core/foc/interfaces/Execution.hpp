@@ -7,9 +7,10 @@ namespace foc
 {
     class LowPriorityInterrupt
     {
-    public:
-        virtual ~LowPriorityInterrupt() = default;
+    protected:
+        ~LowPriorityInterrupt() = default;
 
+    public:
         virtual void Trigger() = 0;
         virtual void Register(const infra::Function<void()>& handler) = 0;
         virtual void Unregister() = 0;
@@ -17,18 +18,20 @@ namespace foc
 
     class Controllable
     {
-    public:
-        virtual ~Controllable() = default;
+    protected:
+        ~Controllable() = default;
 
+    public:
         virtual void Start() = 0;
         virtual void Stop() = 0;
     };
 
     class PhaseCurrentsObservable
     {
-    public:
-        virtual ~PhaseCurrentsObservable() = default;
+    protected:
+        ~PhaseCurrentsObservable() = default;
 
+    public:
         virtual void RegisterPhaseCurrentsObserver(const infra::Function<void(const PhaseCurrents& currentPhases)>& observer) = 0;
         virtual void UnregisterPhaseCurrentsObserver() = 0;
     };

@@ -37,7 +37,7 @@ namespace application
             Boot();
         }
 
-        ~OuterLoopStateMachineFor() override
+        ~OuterLoopStateMachineFor()
         {
             ReleaseExternalResources();
         }

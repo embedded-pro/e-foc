@@ -17,8 +17,10 @@ namespace can
     class FocMotorCategoryServerObserver
         : public infra::SingleObserver<FocMotorCategoryServerObserver, FocMotorCategoryServer>
     {
+    protected:
+        ~FocMotorCategoryServerObserver() = default;
+
     public:
-        virtual ~FocMotorCategoryServerObserver() = default;
         using infra::SingleObserver<FocMotorCategoryServerObserver, FocMotorCategoryServer>::SingleObserver;
 
         virtual void OnStart(const infra::Function<void(services::CanAckStatus)>& onDone) = 0;
@@ -47,7 +49,6 @@ namespace can
     {
     public:
         explicit FocMotorCategoryServer(services::CanFrameTransport& transport);
-        virtual ~FocMotorCategoryServer() = default;
 
         uint8_t Id() const override;
 

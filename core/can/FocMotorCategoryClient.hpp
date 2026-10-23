@@ -18,8 +18,10 @@ namespace can
     class FocMotorCategoryClientObserver
         : public infra::SingleObserver<FocMotorCategoryClientObserver, FocMotorCategoryClient>
     {
+    protected:
+        ~FocMotorCategoryClientObserver() = default;
+
     public:
-        virtual ~FocMotorCategoryClientObserver() = default;
         using infra::SingleObserver<FocMotorCategoryClientObserver, FocMotorCategoryClient>::SingleObserver;
 
         virtual void OnSelectControlModeResponse(FocMotorMode activeMode) = 0;
@@ -44,7 +46,6 @@ namespace can
     {
     public:
         FocMotorCategoryClient(services::CanFrameTransport& transport, services::CanSequenceSource& sequenceSource);
-        virtual ~FocMotorCategoryClient() = default;
 
         uint8_t Id() const override;
 

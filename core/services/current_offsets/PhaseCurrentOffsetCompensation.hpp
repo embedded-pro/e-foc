@@ -30,7 +30,7 @@ namespace services
 
         explicit PhaseCurrentOffsetCompensation(drivers::ThreePhaseInverter& inverter);
         PhaseCurrentOffsetCompensation(drivers::ThreePhaseInverter& inverter, const Config& config);
-        ~PhaseCurrentOffsetCompensation() override;
+        ~PhaseCurrentOffsetCompensation();
 
         void PhaseCurrentsReady(hal::Hertz baseFrequency, const infra::Function<void(foc::PhaseCurrents currentPhases)>& onDone) override;
         void ThreePhasePwmOutput(const foc::PhasePwmDutyCycles& dutyPhases) override;

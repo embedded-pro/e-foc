@@ -11,9 +11,10 @@ namespace services
 {
     class MotorAlignment
     {
-    public:
-        virtual ~MotorAlignment() = default;
+    protected:
+        ~MotorAlignment() = default;
 
+    public:
         struct AlignmentConfig
         {
             hal::DutyCycle testVoltage{ hal::DutyCycle::FromPercent(20) };

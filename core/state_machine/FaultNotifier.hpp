@@ -54,8 +54,10 @@ namespace state_machine
 
     class FaultNotifier
     {
+    protected:
+        ~FaultNotifier() = default;
+
     public:
-        virtual ~FaultNotifier() = default;
         virtual void Register(const infra::Function<void(FaultCode)>& onImmediate, const infra::Function<void(FaultCode)>& onDeferred) = 0;
 
         virtual void Unregister() = 0;
@@ -67,8 +69,6 @@ namespace state_machine
         : public FaultNotifier
     {
     public:
-        ~NoOpFaultNotifier() override = default;
-
         void Register(const infra::Function<void(FaultCode)>&, const infra::Function<void(FaultCode)>&) override
         {}
 

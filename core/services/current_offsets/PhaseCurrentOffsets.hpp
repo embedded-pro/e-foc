@@ -8,9 +8,10 @@ namespace services
 {
     class PhaseCurrentOffsets
     {
-    public:
-        virtual ~PhaseCurrentOffsets() = default;
+    protected:
+        ~PhaseCurrentOffsets() = default;
 
+    public:
         virtual void Measure(const infra::Function<void(std::optional<foc::PhaseCurrents>)>& onDone) = 0;
         virtual void Apply(const foc::PhaseCurrents& offsets) = 0;
         virtual bool IsRunning() const = 0;
