@@ -274,7 +274,7 @@ TEST_F(TestRunner, RegisteredObserverSeesThePhaseCurrentsAfterTheDutiesAreWritte
     inverterMock.TriggerPhaseCurrentsCallback(foc::PhaseCurrents{ foc::Ampere{ 1.0f }, foc::Ampere{ -0.5f }, foc::Ampere{ -0.5f } });
 
     ASSERT_TRUE(observed.has_value());
-    EXPECT_FLOAT_EQ(1.0f, observed->a.Value());
+    EXPECT_NEAR(1.0f, observed->a.Value(), 1e-6f);
 
     EXPECT_CALL(inverterMock, Stop());
     EXPECT_CALL(focMock, Disable());

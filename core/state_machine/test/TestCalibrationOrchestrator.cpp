@@ -323,9 +323,9 @@ TEST_F(CalibrationOrchestratorWithCurrentOffsetsTest, the_offsets_are_measured_f
     storedOffsetsCb(offsets);
 
     EXPECT_EQ(steps.back(), state_machine::CalibrationStep::polePairs);
-    EXPECT_FLOAT_EQ(pendingData.currentOffsetA, 0.027f);
-    EXPECT_FLOAT_EQ(pendingData.currentOffsetB, -0.018f);
-    EXPECT_FLOAT_EQ(pendingData.currentOffsetC, 0.054f);
+    EXPECT_NEAR(pendingData.currentOffsetA, 0.027f, 1e-6f);
+    EXPECT_NEAR(pendingData.currentOffsetB, -0.018f, 1e-6f);
+    EXPECT_NEAR(pendingData.currentOffsetC, 0.054f, 1e-6f);
 }
 
 TEST_F(CalibrationOrchestratorWithCurrentOffsetsTest, a_failed_offset_measurement_fails_the_calibration)

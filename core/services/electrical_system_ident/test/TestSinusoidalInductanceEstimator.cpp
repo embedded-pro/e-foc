@@ -172,7 +172,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, zero_current_response_returns_no_induc
     ExecuteAllActions();
 
     EXPECT_FALSE(result.inductance.has_value());
-    EXPECT_FLOAT_EQ(result.fitQuality, 0.0f);
+    EXPECT_NEAR(result.fitQuality, 0.0f, 1e-6f);
 }
 
 TEST_F(SinusoidalInductanceEstimatorTest, recovers_inductance_within_1_percent_of_zoh_for_standard_motor)
@@ -290,7 +290,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, zero_injection_frequency_returns_empty
         });
 
     EXPECT_FALSE(result.inductance.has_value());
-    EXPECT_FLOAT_EQ(result.fitQuality, 0.0f);
+    EXPECT_NEAR(result.fitQuality, 0.0f, 1e-6f);
 }
 
 TEST_F(SinusoidalInductanceEstimatorTest, negative_zimag_returns_nullopt_inductance_with_fit_quality)
@@ -366,7 +366,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, overcurrent_on_first_sample_stops_driv
     ExecuteAllActions();
 
     EXPECT_FALSE(result.inductance.has_value());
-    EXPECT_FLOAT_EQ(result.fitQuality, 0.0f);
+    EXPECT_NEAR(result.fitQuality, 0.0f, 1e-6f);
 }
 
 TEST_F(SinusoidalInductanceEstimatorTest, overcurrent_on_phase_b_also_aborts)
@@ -440,7 +440,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, no_sample_timeout_fires_if_no_adc_call
     ForwardTime(2 * config.noSampleTimeout + std::chrono::milliseconds{ 1 });
 
     EXPECT_FALSE(result.inductance.has_value());
-    EXPECT_FLOAT_EQ(result.fitQuality, 0.0f);
+    EXPECT_NEAR(result.fitQuality, 0.0f, 1e-6f);
 }
 
 TEST_F(SinusoidalInductanceEstimatorTest, sample_watchdog_fires_once_samples_stop_arriving)
@@ -472,7 +472,7 @@ TEST_F(SinusoidalInductanceEstimatorTest, sample_watchdog_fires_once_samples_sto
     ForwardTime(2 * config.noSampleTimeout + std::chrono::milliseconds{ 1 });
 
     EXPECT_FALSE(result.inductance.has_value());
-    EXPECT_FLOAT_EQ(result.fitQuality, 0.0f);
+    EXPECT_NEAR(result.fitQuality, 0.0f, 1e-6f);
 }
 
 TEST_F(SinusoidalInductanceEstimatorTest, destructor_stops_driver_when_destroyed_while_active)

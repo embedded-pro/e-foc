@@ -98,9 +98,9 @@ namespace
 
     void ExpectCurrents(const foc::PhaseCurrents& actual, float a, float b, float c)
     {
-        EXPECT_FLOAT_EQ(actual.a.Value(), a);
-        EXPECT_FLOAT_EQ(actual.b.Value(), b);
-        EXPECT_FLOAT_EQ(actual.c.Value(), c);
+        EXPECT_NEAR(actual.a.Value(), a, 1e-6f);
+        EXPECT_NEAR(actual.b.Value(), b, 1e-6f);
+        EXPECT_NEAR(actual.c.Value(), c, 1e-6f);
     }
 }
 

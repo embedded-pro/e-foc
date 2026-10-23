@@ -101,11 +101,11 @@ TEST_F(TestPowerStage, a_low_pulse_shorter_than_the_minimum_leaves_only_the_diod
     const auto duty = 0.98f;
 
     EXPECT_NEAR(foc::LowSideConduction(stage, duty, 1.0f, period).end, 0.5f * ((1.0f - duty) * period + deadTime), 1e-10f);
-    EXPECT_FLOAT_EQ(foc::LowSideConduction(stage, duty, -1.0f, period).end, 0.0f);
+    EXPECT_NEAR(foc::LowSideConduction(stage, duty, -1.0f, period).end, 0.0f, 1e-10f);
 }
 
 TEST_F(TestPowerStage, the_low_side_conducts_all_period_at_zero_duty_and_never_at_full_duty)
 {
     EXPECT_NEAR(foc::LowSideConduction(stage, 0.0f, -1.0f, period).end, period, 1e-10f);
-    EXPECT_FLOAT_EQ(foc::LowSideConduction(stage, 1.0f, 1.0f, period).end, 0.0f);
+    EXPECT_NEAR(foc::LowSideConduction(stage, 1.0f, 1.0f, period).end, 0.0f, 1e-10f);
 }

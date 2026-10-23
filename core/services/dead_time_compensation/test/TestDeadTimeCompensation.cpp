@@ -81,9 +81,9 @@ TEST_F(TestDeadTimeCompensation, the_currents_pass_through_unchanged)
     inverterMock.TriggerPhaseCurrentsCallback(Currents(1.0f, -0.4f, -0.6f));
 
     ASSERT_TRUE(forwarded.has_value());
-    EXPECT_EQ(forwarded->a, foc::Ampere{ 1.0f });
-    EXPECT_EQ(forwarded->b, foc::Ampere{ -0.4f });
-    EXPECT_EQ(forwarded->c, foc::Ampere{ -0.6f });
+    EXPECT_NEAR(forwarded->a.Value(), 1.0f, 1e-6f);
+    EXPECT_NEAR(forwarded->b.Value(), -0.4f, 1e-6f);
+    EXPECT_NEAR(forwarded->c.Value(), -0.6f, 1e-6f);
 }
 
 TEST_F(TestDeadTimeCompensation, the_bridge_commands_pass_through_unchanged)

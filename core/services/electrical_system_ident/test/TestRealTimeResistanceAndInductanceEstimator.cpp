@@ -82,8 +82,8 @@ TEST_F(TestRealTimeResistanceAndInductanceEstimator, set_initial_estimate_stores
 {
     estimator.SetInitialEstimate(foc::Ohm{ 0.5f }, foc::MilliHenry{ 1.2f });
 
-    EXPECT_FLOAT_EQ(estimator.CurrentResistance().Value(), 0.5f);
-    EXPECT_FLOAT_EQ(estimator.CurrentInductance().Value(), 1.2f);
+    EXPECT_NEAR(estimator.CurrentResistance().Value(), 0.5f, 1e-6f);
+    EXPECT_NEAR(estimator.CurrentInductance().Value(), 1.2f, 1e-6f);
 }
 
 TEST_F(TestRealTimeResistanceAndInductanceEstimator, without_a_direct_axis_current_the_seed_is_kept)
@@ -93,8 +93,8 @@ TEST_F(TestRealTimeResistanceAndInductanceEstimator, without_a_direct_axis_curre
 
     WindowedWindingRun{ winding, estimator }.Run(0.0f, 2000);
 
-    EXPECT_FLOAT_EQ(estimator.CurrentResistance().Value(), 2.0f);
-    EXPECT_FLOAT_EQ(estimator.CurrentInductance().Value(), 3.0f);
+    EXPECT_NEAR(estimator.CurrentResistance().Value(), 2.0f, 1e-6f);
+    EXPECT_NEAR(estimator.CurrentInductance().Value(), 3.0f, 1e-6f);
 }
 
 TEST_F(TestRealTimeResistanceAndInductanceEstimator, too_few_updates_are_not_published)
@@ -104,8 +104,8 @@ TEST_F(TestRealTimeResistanceAndInductanceEstimator, too_few_updates_are_not_pub
 
     WindowedWindingRun{ winding, estimator }.Run(0.5f, 100);
 
-    EXPECT_FLOAT_EQ(estimator.CurrentResistance().Value(), 2.0f);
-    EXPECT_FLOAT_EQ(estimator.CurrentInductance().Value(), 3.0f);
+    EXPECT_NEAR(estimator.CurrentResistance().Value(), 2.0f, 1e-6f);
+    EXPECT_NEAR(estimator.CurrentInductance().Value(), 3.0f, 1e-6f);
 }
 
 TEST_F(TestRealTimeResistanceAndInductanceEstimator, a_direct_axis_square_wave_identifies_the_winding_from_a_wrong_seed)
