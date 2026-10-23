@@ -208,13 +208,13 @@ calibrations), against 2.5 % in simulation, while the inertia agreed within 0.3 
 with a once-per-turn torque of 1 mN·m reproduced it with 250 ms dwells: every first run read the friction
 28 % high, and one second run 16 % low, because it started where the first had stopped. With whole turns:
 
-| Plant, viscous friction 12 µN·m·s | 250 ms dwells               | Whole turns   |
-|-----------------------------------|-----------------------------|---------------|
-| Once per turn, 0.5 mN·m           | +15 %                       | 0, ±1 %       |
-| Once per turn, 1 mN·m             | +28 %, one run −16 %        | −5 %, ±2 %    |
-| Twice per turn, 1 mN·m            | −18 % to +2 %               | 0, ±1.5 %     |
-| Once per turn, 2 mN·m             | +41 %, one run −47 %        | −22 %, ±6 %   |
-| Bench dry friction and cogging    | −7 %                        | −8 %          |
+| Plant, viscous friction 12 µN·m·s | 250 ms dwells        | Whole turns |
+|-----------------------------------|----------------------|-------------|
+| Once per turn, 0.5 mN·m           | +15 %                | 0, ±1 %     |
+| Once per turn, 1 mN·m             | +28 %, one run −16 % | −5 %, ±2 %  |
+| Twice per turn, 1 mN·m            | −18 % to +2 %        | 0, ±1.5 %   |
+| Once per turn, 2 mN·m             | +41 %, one run −47 % | −22 %, ±6 % |
+| Bench dry friction and cogging    | −7 %                 | −8 %        |
 
 What remains is second order: the speed ripple the torque itself causes correlates with it, which grows with
 the square of the torque. The rig's run-to-run spread, at most about 6 µN·m·s between the two runs of a
