@@ -95,7 +95,7 @@ Any service that schedules event-dispatcher closures and whose lifetime is manag
 
 - GoogleTest. `TEST_F` for fixture tests; `TYPED_TEST` for typed; plain `TEST()` for simple stateless matching existing patterns
 - **`StrictMock` only** (`NiceMock`/`NaggyMock` forbidden). Fixture in anonymous namespace; macros outside
-- `EXPECT_NEAR` with explicit tolerance for float assertions. No heap in tests.
+- `EXPECT_NEAR` with explicit tolerance for float assertions. Heap is allowed in tests (see Memory scope).
 - Test files: `test/Test{ComponentName}.cpp` inside the library under test
 - Host stubs: `targets/platform_implementations/host/`
 
