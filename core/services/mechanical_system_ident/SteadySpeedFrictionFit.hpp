@@ -3,16 +3,14 @@
 #include "core/services/mechanical_system_ident/MechanicalEstimatePolicy.hpp"
 #include <cmath>
 #include <cstdint>
-#include <optional>
 
 namespace services
 {
-    // The viscous friction as the slope of the mean torque against the mean speed of each run of observations
-    // whose speed stays within a band. Within a run a speed loop answers every dip with torque, and a loop that
-    // ripples there swings the torque against the acceleration, so either would decide a slope fitted to the
-    // observations themselves; their means carry neither. Means and covariances decay together with the
-    // estimator's forgetting, so a long run at one speed narrows the spread rather than inflating a covariance,
-    // and no slope is given once the speeds no longer differ.
+    // The mean torque against the mean speed of each run of observations whose speed stays within a band, as the
+    // moments a viscous-friction slope is fitted from. Within a run a speed loop answers every dip with torque, and
+    // a loop that ripples there swings the torque against the acceleration, so either would decide a slope fitted
+    // to the observations themselves; their means carry neither. Means and covariances decay together with the
+    // estimator's forgetting, so a long run at one speed narrows the spread rather than inflating a covariance.
     class SteadySpeedFrictionFit
     {
     public:
@@ -44,14 +42,21 @@ namespace services
             runDecay = 1.0f;
         }
 
-        std::optional<float> Friction() const
+        bool SpansDistinctSpeeds() const
         {
             const auto spread = 0.5f * mechanical_estimate::minimumSpeedSpan * std::abs(meanSpeed);
 
-            if (weight == 0.0f || speedVariance < spread * spread * weight)
-                return std::nullopt;
+            return weight != 0.0f && speedVariance >= spread * spread * weight;
+        }
 
-            return speedTorqueCovariance / speedVariance;
+        float SpeedVariance() const
+        {
+            return speedVariance;
+        }
+
+        float SpeedTorqueCovariance() const
+        {
+            return speedTorqueCovariance;
         }
 
     private:

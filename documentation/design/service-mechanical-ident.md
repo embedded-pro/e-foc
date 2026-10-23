@@ -462,8 +462,10 @@ The viscous friction a fit publishes does not come from its regression. Each fit
 observations whose speed stays within 3 % of the run's mean, at least 16 and at most 256 observations long, into
 one mean speed and one mean torque less the fit's inertia times the run's mean acceleration. A line through those
 means, weighted by their lengths and forgotten at the regression's rate, gives the viscous friction as its slope.
-It is published once the means span distinct speeds, a weighted spread of at least an eighth of their mean speed,
-and held at its last value when they no longer do.
+The viscous friction is the same both ways while the intercepts are not, so the slope is pooled over both
+directions, each direction's runs taken about their own means. It is published once either direction's means
+span distinct speeds, a weighted spread of at least an eighth of their mean speed, and held at its last value
+when neither does.
 
 The regression's own viscous term also takes the torque of every transient between the speeds and of every
 ripple at one speed, both much larger than the torque difference friction makes between two constant speeds.
@@ -477,6 +479,11 @@ the scatter there has the loop's stiffness for a slope, hundreds of times the fr
 
 The rig's friction is not linear in speed: its constant-speed torque stays at about 3.75 mN·m from 10 to 30 rad/s
 and rises at about 13 µN·m·s above that. The slope published is the line through the speeds the motor has run at.
+A slope per direction, published by whichever direction ran last, read the rig's sweep correctly under PID and the
+two-degree-of-freedom loop and at 0 to 0.3 times the calibration's under LQI and ADRC: the negative direction only
+held -10 rad/s, in the calibration's cogging pass, and -30 rad/s, both where the friction is flat, so its slope was
+about 0, and only the PID loops overshot into the positive direction when they stopped, which published that
+direction's 10 to 12 µN·m·s instead. Pooled, a direction held only at flat speeds weighs in by its small spread.
 
 A fit that only ever sees one speed cannot tell its intercept from its viscous friction, since $\omega$ is
 then constant. The span of speeds a publication waits for (Persistence of Excitation below) is therefore taken

@@ -56,6 +56,7 @@ namespace services
         bool IsOnlineObservationInformative(float acceleration, const DirectionalFit& fit) const;
         bool HasOnlineEstimateSettled(const DirectionalFit& fit) const;
         void PublishOnlineEstimate(const DirectionalFit& fit);
+        std::optional<float> SteadyFriction() const;
 
         float samplingFrequency;
         float forgettingFactor;

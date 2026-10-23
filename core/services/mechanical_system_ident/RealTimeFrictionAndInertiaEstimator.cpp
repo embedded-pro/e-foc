@@ -165,7 +165,7 @@ namespace services
         // The full fit's viscous term also takes the torque of every transient and every ripple, which on the rig
         // outweighed the small difference between constant speeds; the runs at constant speed give the friction
         const auto inertia = fit.rls->Coefficients().at(1, 0) / parameterScale;
-        const auto steadyFriction = fit.steady.Friction();
+        const auto steadyFriction = SteadyFriction();
         const auto friction = steadyFriction.has_value() ? SettledFriction(*steadyFriction / parameterScale) : currentFriction.Value();
 
         if (!IsPlausibleMechanics(inertia, friction))
@@ -173,6 +173,28 @@ namespace services
 
         currentInertia = foc::NewtonMeterSecondSquared{ inertia };
         currentFriction = foc::NewtonMeterSecondPerRadian{ friction };
+    }
+
+    // The viscous friction is the same both ways while the intercepts are not, so the slope is pooled over both
+    // directions' runs, each about its own means: a direction that has only held speeds where the friction is still
+    // flat, as the rig's is from 10 to 30 rad/s, cannot set it alone, and the last direction run does not choose it
+    std::optional<float> RealTimeFrictionAndInertiaEstimator::SteadyFriction() const
+    {
+        auto variance = 0.0f;
+        auto covariance = 0.0f;
+        auto spansDistinctSpeeds = false;
+
+        for (const auto& fit : onlineFits)
+        {
+            variance += fit.steady.SpeedVariance();
+            covariance += fit.steady.SpeedTorqueCovariance();
+            spansDistinctSpeeds = spansDistinctSpeeds || fit.steady.SpansDistinctSpeeds();
+        }
+
+        if (!spansDistinctSpeeds)
+            return std::nullopt;
+
+        return covariance / variance;
     }
 
     foc::NewtonMeterSecondSquared RealTimeFrictionAndInertiaEstimator::CurrentInertia() const

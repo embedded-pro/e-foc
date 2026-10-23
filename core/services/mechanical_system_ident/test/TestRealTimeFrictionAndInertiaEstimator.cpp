@@ -50,6 +50,7 @@ namespace
         float currentNoise{ 0.0f };
         float torqueDisturbance{ 0.0f };
         float cogging{ 0.0f };
+        float viscousKnee{ 0.0f };
         float integralBandwidth{ 0.0f };
         bool frictionFeedForward{ true };
     };
@@ -64,7 +65,8 @@ namespace
     // counts (zero for a continuous one), the way the control interrupt accumulates its windows. The current follows
     // its reference through a current loop, as a winding's does, and the position and the current are sampled at the
     // same instant, the start of each step. The sampled current can carry white noise, and the shaft a torque
-    // disturbance the model does not know of, drawn anew for each window, and a cogging torque that follows the angle.
+    // disturbance the model does not know of, drawn anew for each window, and a cogging torque that follows the angle. The
+    // viscous friction can start only above a knee speed, as the rig's does.
     class WindowedRotorRun
     {
     public:
@@ -101,7 +103,8 @@ namespace
                     window.Accumulate(current + noise(engine) * rotor.currentNoise, measured - measuredAngle);
                     measuredAngle = measured;
 
-                    const auto acceleration = (rotor.torqueConstant * current - rotor.friction * speed - std::copysign(rotor.dryFriction, speed) - rotor.shaftTorque - disturbance - rotor.cogging * std::sin(coggingCyclesPerRevolution * angle)) / rotor.inertia;
+                    const auto viscous = rotor.friction * std::copysign(std::max(std::abs(speed) - rotor.viscousKnee, 0.0f), speed);
+                    const auto acceleration = (rotor.torqueConstant * current - viscous - std::copysign(rotor.dryFriction, speed) - rotor.shaftTorque - disturbance - rotor.cogging * std::sin(coggingCyclesPerRevolution * angle)) / rotor.inertia;
                     angle += speed * dt + 0.5f * acceleration * dt * dt;
                     speed += acceleration * dt;
                     current += (currentReference - current) * currentResponse;
@@ -413,4 +416,26 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_stop_through_zero_after_the_sp
 
     EXPECT_NEAR(afterTheLevels, rotor.friction, 0.15f * rotor.friction);
     EXPECT_NEAR(production.CurrentFriction().Value(), afterTheLevels, 0.02f * afterTheLevels);
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_direction_held_only_where_the_friction_is_still_flat_does_not_publish_its_slope_alone)
+{
+    services::RealTimeFrictionAndInertiaEstimator production{ services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, hal::Hertz{ 1000 } };
+    ReferenceRotor rotor;
+    rotor.inertia = 13.9e-6f;
+    rotor.friction = 12e-6f;
+    rotor.torqueConstant = 0.042f;
+    rotor.dryFriction = 3.7e-3f;
+    rotor.viscousKnee = 30.0f;
+    rotor.integralBandwidth = 40.0f;
+    rotor.frictionFeedForward = false;
+    production.SetTorqueConstant(foc::NewtonMeter{ rotor.torqueConstant });
+    production.SetInitialEstimate(foc::NewtonMeterSecondSquared{ rotor.inertia }, foc::NewtonMeterSecondPerRadian{ rotor.friction });
+
+    WindowedRotorRun run{ rotor, production, 4000 };
+    run.Run(std::array<float, 2>{ 30.0f, 60.0f }, 2500, 5000);
+    run.Run(std::array<float, 2>{ -10.0f, -30.0f }, 2500, 5000);
+
+    EXPECT_GT(production.CurrentFriction().Value(), 0.5f * rotor.friction);
+    EXPECT_LT(production.CurrentFriction().Value(), 1.05f * rotor.friction);
 }
