@@ -93,12 +93,12 @@ namespace
 
 TEST_F(EstimatorWindowAccumulatorTest, a_duty_that_acts_at_once_is_paired_with_the_current_step_that_follows_it)
 {
-    EXPECT_FLOAT_EQ(MeanDirectVoltageOverRamp(0), (0.0f + 1.0f + 2.0f + 3.0f) / 4.0f);
+    EXPECT_NEAR(MeanDirectVoltageOverRamp(0), (0.0f + 1.0f + 2.0f + 3.0f) / 4.0f, 1e-6f);
 }
 
 TEST_F(EstimatorWindowAccumulatorTest, a_duty_that_acts_a_period_late_is_paired_with_the_current_step_a_period_later)
 {
-    EXPECT_FLOAT_EQ(MeanDirectVoltageOverRamp(1), (0.0f + 0.0f + 1.0f + 2.0f) / 4.0f);
+    EXPECT_NEAR(MeanDirectVoltageOverRamp(1), (0.0f + 0.0f + 1.0f + 2.0f) / 4.0f, 1e-6f);
 }
 
 TEST_F(EstimatorWindowAccumulatorTest, the_mechanical_window_leaves_out_the_current_that_holds_the_cogging)

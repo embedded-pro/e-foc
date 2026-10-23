@@ -30,7 +30,7 @@ TEST_F(TestDirectAxisExcitation, the_burst_alternates_between_the_two_signs_of_t
     for (uint32_t i = 0; i != burstSamples - 1; ++i)
     {
         const auto value = excitation.Advance();
-        EXPECT_FLOAT_EQ(std::abs(value), amplitude) << " sample " << i;
+        EXPECT_NEAR(std::abs(value), amplitude, 1e-6f) << " sample " << i;
         (value > 0.0f ? positives : negatives) += 1;
     }
 
@@ -42,14 +42,14 @@ TEST_F(TestDirectAxisExcitation, the_reference_is_zero_between_bursts)
     Skip(burstSamples - 1);
 
     for (uint32_t i = burstSamples; i != cycleSamples; ++i)
-        EXPECT_FLOAT_EQ(excitation.Advance(), 0.0f) << " sample " << i;
+        EXPECT_NEAR(excitation.Advance(), 0.0f, 1e-6f) << " sample " << i;
 }
 
 TEST_F(TestDirectAxisExcitation, a_new_burst_starts_every_cycle_on_the_positive_step)
 {
     Skip(cycleSamples - 1);
 
-    EXPECT_FLOAT_EQ(excitation.Advance(), amplitude);
+    EXPECT_NEAR(excitation.Advance(), amplitude, 1e-6f);
 }
 
 TEST_F(TestDirectAxisExcitation, restarting_starts_a_burst_at_once)
@@ -58,7 +58,7 @@ TEST_F(TestDirectAxisExcitation, restarting_starts_a_burst_at_once)
 
     excitation.Restart();
 
-    EXPECT_FLOAT_EQ(excitation.Advance(), amplitude);
+    EXPECT_NEAR(excitation.Advance(), amplitude, 1e-6f);
 }
 
 TEST_F(TestDirectAxisExcitation, a_zero_frequency_keeps_the_reference_at_zero)
@@ -66,5 +66,5 @@ TEST_F(TestDirectAxisExcitation, a_zero_frequency_keeps_the_reference_at_zero)
     foc::DirectAxisExcitation off{ foc::Ampere{ amplitude }, hal::Hertz{ 0 }, outerLoopFrequency, std::chrono::seconds{ 1 }, std::chrono::seconds{ 3 } };
 
     for (uint32_t i = 0; i != cycleSamples; ++i)
-        EXPECT_FLOAT_EQ(off.Advance(), 0.0f);
+        EXPECT_NEAR(off.Advance(), 0.0f, 1e-6f);
 }

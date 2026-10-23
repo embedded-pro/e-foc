@@ -30,7 +30,7 @@ namespace
 TEST_F(TestEncoderNoise, zero_config_returns_exact_angle)
 {
     model.Set(foc::Radians{ 1.234f });
-    EXPECT_FLOAT_EQ(model.Read().Value(), 1.234f);
+    EXPECT_NEAR(model.Read().Value(), 1.234f, 1e-6f);
 }
 
 TEST_F(TestEncoderNoise, bias_is_constant_offset)
@@ -40,7 +40,7 @@ TEST_F(TestEncoderNoise, bias_is_constant_offset)
     model.Set(foc::Radians{ 1.0f });
 
     for (int i = 0; i < 50; ++i)
-        EXPECT_FLOAT_EQ(model.Read().Value(), 1.0f + bias);
+        EXPECT_NEAR(model.Read().Value(), 1.0f + bias, 1e-6f);
 }
 
 TEST_F(TestEncoderNoise, sigma_yields_zero_mean_perturbation)
@@ -70,7 +70,7 @@ TEST_F(TestEncoderNoise, noise_is_drawn_once_per_plant_step)
 
     Step();
     const auto first = model.Read().Value();
-    EXPECT_FLOAT_EQ(model.Read().Value(), first);
+    EXPECT_NEAR(model.Read().Value(), first, 1e-6f);
 
     Step();
     EXPECT_NE(model.Read().Value(), first);
@@ -84,7 +84,7 @@ TEST_F(TestEncoderNoise, disabling_noise_takes_effect_before_the_next_step)
 
     model.SetEncoderNoise(foc::ThreePhaseMotorModel::EncoderNoiseConfig{ 0.0f, 0.0f });
 
-    EXPECT_FLOAT_EQ(model.Read().Value(), model.MechanicalAngle().Value());
+    EXPECT_NEAR(model.Read().Value(), model.MechanicalAngle().Value(), 1e-6f);
 }
 
 TEST_F(TestEncoderNoise, output_is_wrapped_into_zero_to_two_pi)

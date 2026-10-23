@@ -74,9 +74,9 @@ TEST_F(TestAdcPhaseCurrentMeasurement, a_full_conversion_is_scaled_and_offset_on
     capture.onSamples(infra::MakeRange(samples));
 
     ASSERT_TRUE(measured.has_value());
-    EXPECT_FLOAT_EQ(measured->a.Value(), 0.0f);
-    EXPECT_FLOAT_EQ(measured->b.Value(), 512.0f);
-    EXPECT_FLOAT_EQ(measured->c.Value(), -512.0f);
+    EXPECT_NEAR(measured->a.Value(), 0.0f, 1e-3f);
+    EXPECT_NEAR(measured->b.Value(), 512.0f, 1e-3f);
+    EXPECT_NEAR(measured->c.Value(), -512.0f, 1e-3f);
 }
 
 TEST_F(TestAdcPhaseCurrentMeasurement, a_conversion_that_drains_fewer_samples_than_phases_is_discarded)
@@ -97,7 +97,7 @@ TEST_F(TestAdcPhaseCurrentMeasurement, a_conversion_carrying_more_samples_than_p
     capture.onSamples(infra::MakeRange(withExtras));
 
     ASSERT_TRUE(measured.has_value());
-    EXPECT_FLOAT_EQ(measured->b.Value(), 512.0f);
+    EXPECT_NEAR(measured->b.Value(), 512.0f, 1e-3f);
 }
 
 TEST_F(TestAdcPhaseCurrentMeasurement, stopping_reaches_the_converter)

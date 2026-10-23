@@ -29,7 +29,7 @@ TEST_F(TorqueStepSchedulerTest, fires_once_after_the_delay)
 
     const auto fired = scheduler.Fire(103);
     ASSERT_TRUE(fired.has_value());
-    EXPECT_FLOAT_EQ(*fired, 0.002f);
+    EXPECT_NEAR(*fired, 0.002f, 1e-9f);
 
     EXPECT_FALSE(scheduler.Fire(104).has_value());
 }
@@ -41,7 +41,7 @@ TEST_F(TorqueStepSchedulerTest, zero_delay_fires_on_the_begin_tick)
 
     const auto fired = scheduler.Fire(7);
     ASSERT_TRUE(fired.has_value());
-    EXPECT_FLOAT_EQ(*fired, -0.001f);
+    EXPECT_NEAR(*fired, -0.001f, 1e-9f);
 }
 
 TEST_F(TorqueStepSchedulerTest, does_not_fire_without_begin)

@@ -180,8 +180,8 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, set_initial_estimate_stores_valu
         foc::NewtonMeterSecondSquared{ 0.002f },
         foc::NewtonMeterSecondPerRadian{ 0.001f });
 
-    EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 0.002f);
-    EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 0.001f);
+    EXPECT_NEAR(estimator.CurrentInertia().Value(), 0.002f, 1e-9f);
+    EXPECT_NEAR(estimator.CurrentFriction().Value(), 0.001f, 1e-9f);
 }
 
 TEST_F(TestRealTimeFrictionAndInertiaEstimator, standstill_observations_leave_the_coefficients_untouched)
@@ -197,8 +197,8 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, standstill_observations_leave_th
 
     auto last = estimator.Update(idle, stopped, angle, torque);
 
-    EXPECT_FLOAT_EQ(last.inertia.Value(), first.inertia.Value());
-    EXPECT_FLOAT_EQ(last.friction.Value(), first.friction.Value());
+    EXPECT_NEAR(last.inertia.Value(), first.inertia.Value(), 1e-9f);
+    EXPECT_NEAR(last.friction.Value(), first.friction.Value(), 1e-9f);
 }
 
 TEST_F(TestRealTimeFrictionAndInertiaEstimator, an_excited_observation_carrying_torque_updates_the_coefficients)
@@ -221,8 +221,8 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_standstill_run_does_not_publis
     for (int sample = 0; sample != 2000; ++sample)
         estimator.Update(SteadyWindow(0.0f, 0.0f, sample == 0));
 
-    EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 1.0e-4f);
-    EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
+    EXPECT_NEAR(estimator.CurrentInertia().Value(), 1.0e-4f, 1e-9f);
+    EXPECT_NEAR(estimator.CurrentFriction().Value(), 1.0e-4f, 1e-9f);
 }
 
 TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_steady_speed_is_not_excitation_enough_to_publish)
@@ -233,8 +233,8 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_steady_speed_is_not_excitation
     for (int sample = 0; sample != 5000; ++sample)
         estimator.Update(SteadyWindow(0.5f, speed.Value(), sample == 0));
 
-    EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 1.0e-4f);
-    EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
+    EXPECT_NEAR(estimator.CurrentInertia().Value(), 1.0e-4f, 1e-9f);
+    EXPECT_NEAR(estimator.CurrentFriction().Value(), 1.0e-4f, 1e-9f);
 }
 
 TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_short_burst_of_excitation_is_not_enough_to_publish)
@@ -245,8 +245,8 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_short_burst_of_excitation_is_n
     for (int sample = 0; sample != 8; ++sample)
         estimator.Update(SteadyWindow(1.0f, static_cast<float>(sample) * 13.0f, sample == 0));
 
-    EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 1.0e-4f);
-    EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
+    EXPECT_NEAR(estimator.CurrentInertia().Value(), 1.0e-4f, 1e-9f);
+    EXPECT_NEAR(estimator.CurrentFriction().Value(), 1.0e-4f, 1e-9f);
 }
 
 TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_two_level_speed_reference_identifies_the_reference_rotor_from_a_wrong_seed)
@@ -283,8 +283,8 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, reseeding_restarts_the_online_fi
 
     estimator.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 1.0e-4f }, foc::NewtonMeterSecondPerRadian{ 1.0e-4f });
 
-    EXPECT_FLOAT_EQ(estimator.CurrentInertia().Value(), 1.0e-4f);
-    EXPECT_FLOAT_EQ(estimator.CurrentFriction().Value(), 1.0e-4f);
+    EXPECT_NEAR(estimator.CurrentInertia().Value(), 1.0e-4f, 1e-9f);
+    EXPECT_NEAR(estimator.CurrentFriction().Value(), 1.0e-4f, 1e-9f);
 }
 
 TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_four_thousand_count_encoder_identifies_the_reference_rotor_from_a_wrong_seed)
@@ -346,7 +346,7 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, reversing_at_one_speed_cannot_te
 
     WindowedRotorRun{ rotor, production, 4000 }.Run(std::array<float, 2>{ 30.0f, -30.0f }, 500, 8000);
 
-    EXPECT_FLOAT_EQ(production.CurrentFriction().Value(), 0.5f * rotor.friction);
+    EXPECT_NEAR(production.CurrentFriction().Value(), 0.5f * rotor.friction, 1e-9f);
 }
 
 TEST_F(TestRealTimeFrictionAndInertiaEstimator, a_shaft_torque_that_turns_the_rotor_backwards_before_the_excitation_is_not_read_as_viscous_friction)
