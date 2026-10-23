@@ -446,7 +446,8 @@ directions of rotation, and nothing in one direction's data says how it splits. 
 **one fit per direction**. Each carries the regressor $\phi = [1,\ \dot{\omega},\ \omega]^T$ and the
 parameters $\theta = [c_\pm,\ J,\ B]^T$, with the scalar output $T_e$, and an RLS with a forgetting factor of
 0.9995 updates the fit of the direction an observation moves in, once per observation window. Each fit has its
-own covariance, excitation count, residual and settled state, and whichever fit settles publishes $J$ and $B$.
+own covariance, excitation count, residual and settled state, and whichever fit settles publishes its $J$ and
+the viscous friction of its constant-speed runs (below).
 
 One fit for both directions used to read a reversal wrongly. Its intercept could not follow the step of
 $2\tau_c$, so the fit put it on the viscous column, whose speed reverses too: the speed sweep on the rig, 30,
@@ -457,15 +458,25 @@ backwards wrongly instead, 3 to 5 times the plant's friction. Two fits read both
 
 An observation whose speed is smaller than its acceleration times one observation window may cross zero inside the window, where it belongs to neither direction. It is refused.
 
-An observation slower than a quarter of the fastest constant speed its fit has held is refused too. There the
-speed is coarsely quantised, a cogging torque outlasts the window instead of averaging out within it, and a real
-dry friction is not yet constant, while the few such observations a stop through zero leaves lie far from the
-speeds the fit holds and so set its slope. On the rig, the speed sweep that holds 30 and 60 rad/s and then stops
-through zero read the viscous friction at 11 to 14 µN·m·s under the PID speed loop and 0 under the LQI and ADRC
-loops, against the calibration's 9 to 11. In simulation, on the bench plant with its cogging and dry friction and
-a viscous friction of 10 µN·m·s, the PID loop read 9.0 after the two holds and 19.8 after the stop; with the floor
-it reads 9.5, and the LQI and ADRC loops 8.8 and 9.6. The floor follows the fit's own speeds, so it costs nothing
-at the speed levels themselves: alternating between 26 and 52 rad/s it sits at 13.
+The viscous friction a fit publishes does not come from its regression. Each fit also averages every run of
+observations whose speed stays within 3 % of the run's mean, at least 16 and at most 256 observations long, into
+one mean speed and one mean torque less the fit's inertia times the run's mean acceleration. A line through those
+means, weighted by their lengths and forgotten at the regression's rate, gives the viscous friction as its slope.
+It is published once the means span distinct speeds, a weighted spread of at least an eighth of their mean speed,
+and held at its last value when they no longer do.
+
+The regression's own viscous term also takes the torque of every transient between the speeds and of every
+ripple at one speed, both much larger than the torque difference friction makes between two constant speeds.
+On the rig, the speed sweep that holds 30 and 60 rad/s and then stops through zero read the online viscous
+friction at 1.0 to 1.6 times the calibration's under the PID and two-degree-of-freedom speed loops and at 0.1 to
+0.7 times it under LQI and ADRC, while the mean torques of constant-speed holds from 10 to 60 rad/s gave a slope
+of 8 to 11 µN·m·s for every law. In simulation, on the bench plant with its cogging and dry friction and
+10 µN·m·s, the regression read 9.0 after the two holds and 19.8 after the stop under the PID loop; the means read
+9.6 to 9.8 at both points under PID, LQI and ADRC. Within a run the speed loop answers each dip with torque, so
+the scatter there has the loop's stiffness for a slope, hundreds of times the friction; the means carry none of it.
+
+The rig's friction is not linear in speed: its constant-speed torque stays at about 3.75 mN·m from 10 to 30 rad/s
+and rises at about 13 µN·m·s above that. The slope published is the line through the speeds the motor has run at.
 
 A fit that only ever sees one speed cannot tell its intercept from its viscous friction, since $\omega$ is
 then constant. The span of speeds a publication waits for (Persistence of Excitation below) is therefore taken

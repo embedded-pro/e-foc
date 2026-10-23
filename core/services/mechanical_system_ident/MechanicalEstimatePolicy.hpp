@@ -93,11 +93,6 @@ namespace services
             return seen && fastest - slowest >= mechanical_estimate::minimumSpeedSpan * fastest;
         }
 
-        float FastestSpeed() const
-        {
-            return fastest;
-        }
-
     private:
         uint16_t accelerating{ 0 };
         float slowest{ 0.0f };

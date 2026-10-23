@@ -110,13 +110,22 @@ namespace services
         if (!observation.has_value())
             return;
 
+        if (!IsOnlineObservationInDirection(observation->acceleration, observation->speed))
+        {
+            for (auto& directional : onlineFits)
+                directional.steady.EndRun();
+            return;
+        }
+
         auto& fit = onlineFits[observation->speed >= 0.0f ? 0 : 1];
-        if (!IsOnlineObservationInformative(observation->acceleration, observation->speed, fit))
+        math::Matrix<float, 1, 1> output;
+        output.at(0, 0) = torqueConstant.Value() * observation->iq * outputScale;
+        fit.steady.Add(observation->speed * columnScale, output.at(0, 0) - fit.rls->Coefficients().at(1, 0) * observation->acceleration * columnScale, forgettingFactor);
+
+        if (!IsOnlineObservationInformative(observation->acceleration, fit))
             return;
 
         MotorRLS::MakeRegressor(onlineRegressor, observation->acceleration * columnScale, observation->speed * columnScale);
-        math::Matrix<float, 1, 1> output;
-        output.at(0, 0) = torqueConstant.Value() * observation->iq * outputScale;
 
         fit.metrics = fit.rls->Update(onlineRegressor, output);
         fit.residualPower += residualAveragingWeight * (fit.metrics.residual * fit.metrics.residual - fit.residualPower);
@@ -130,17 +139,13 @@ namespace services
         PublishOnlineEstimate(fit);
     }
 
-    bool RealTimeFrictionAndInertiaEstimator::IsOnlineObservationInformative(float acceleration, float speed, const DirectionalFit& fit) const
+    bool RealTimeFrictionAndInertiaEstimator::IsOnlineObservationInDirection(float acceleration, float speed) const
     {
-        if (!IsMechanicallyObservable(speed))
-            return false;
-        if (std::abs(speed) <= std::abs(acceleration) * static_cast<float>(kinematics.WindowsPerObservation()) / samplingFrequency)
-            return false;
-        // Far under the speeds the fit has held, the speed is coarsely quantised, a cogging torque outlasts the window and
-        // dry friction is not yet constant; the few observations a stop through zero leaves there would set the slope
-        if (std::abs(speed) < mechanical_estimate::minimumSpeedSpan * fit.excitation.FastestSpeed())
-            return false;
+        return IsMechanicallyObservable(speed) && std::abs(speed) > std::abs(acceleration) * static_cast<float>(kinematics.WindowsPerObservation()) / samplingFrequency;
+    }
 
+    bool RealTimeFrictionAndInertiaEstimator::IsOnlineObservationInformative(float acceleration, const DirectionalFit& fit) const
+    {
         return std::abs(acceleration) >= mechanical_estimate::minimumAcceleration || fit.metrics.uncertainty <= onlineCovarianceCeiling;
     }
 
@@ -157,8 +162,11 @@ namespace services
         if (!HasOnlineEstimateSettled(fit))
             return;
 
+        // The full fit's viscous term also takes the torque of every transient and every ripple, which on the rig
+        // outweighed the small difference between constant speeds; the runs at constant speed give the friction
         const auto inertia = fit.rls->Coefficients().at(1, 0) / parameterScale;
-        const auto friction = SettledFriction(fit.rls->Coefficients().at(2, 0) / parameterScale);
+        const auto steadyFriction = fit.steady.Friction();
+        const auto friction = steadyFriction.has_value() ? SettledFriction(*steadyFriction / parameterScale) : currentFriction.Value();
 
         if (!IsPlausibleMechanics(inertia, friction))
             return;

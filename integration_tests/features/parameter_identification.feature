@@ -229,7 +229,7 @@ Feature: Parameter Identification Against a Known Plant
     And the speed setpoint is held at -30 rad/s for 2500 ms
     And the speed setpoint is held at 0 rad/s for 2500 ms
     And the online estimates are read
-    Then the online friction estimate shall be within 20 % of the plant
+    Then the online friction estimate shall be within 10 % of the plant
 
     Examples:
       | speed |

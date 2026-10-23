@@ -325,6 +325,24 @@ TEST_F(TestRealTimeFrictionAndInertiaEstimator, the_bench_rotor_is_identified_th
     WindowedRotorRun{ rotor, production, 4000 }.Run(26.0f, 52.0f, 100, 3200);
 
     EXPECT_NEAR(production.CurrentInertia().Value(), rotor.inertia, 0.02f * rotor.inertia);
+}
+
+TEST_F(TestRealTimeFrictionAndInertiaEstimator, the_bench_rotor_friction_is_identified_through_the_torque_scatter_of_the_rig)
+{
+    services::RealTimeFrictionAndInertiaEstimator production{ services::RealTimeFrictionAndInertiaEstimator::defaultForgettingFactor, hal::Hertz{ 1000 } };
+    ReferenceRotor rotor;
+    rotor.inertia = 13.9e-6f;
+    rotor.friction = 7e-6f;
+    rotor.torqueConstant = 0.042f;
+    rotor.shaftTorque = 3.7e-3f;
+    rotor.currentNoise = 0.012f;
+    rotor.torqueDisturbance = 1e-3f;
+    production.SetTorqueConstant(foc::NewtonMeter{ rotor.torqueConstant });
+    production.SetInitialEstimate(foc::NewtonMeterSecondSquared{ 2.0f * rotor.inertia }, foc::NewtonMeterSecondPerRadian{ 0.5f * rotor.friction });
+
+    WindowedRotorRun{ rotor, production, 4000 }.Run(26.0f, 52.0f, 250, 6000);
+
+    EXPECT_NEAR(production.CurrentInertia().Value(), rotor.inertia, 0.02f * rotor.inertia);
     EXPECT_NEAR(production.CurrentFriction().Value(), rotor.friction, 0.3f * rotor.friction);
 }
 
