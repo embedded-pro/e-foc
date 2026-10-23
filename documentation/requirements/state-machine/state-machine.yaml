@@ -133,9 +133,10 @@
   title: Repeated fault clearance is refused
   shall: >
     The state machine shall refuse a clear-fault command once three consecutive
-    clear-fault commands have been accepted without an intervening successful enable
-    and disable cycle, so that a condition which re-faults immediately cannot be
-    cleared indefinitely. A completed disable command shall reset that count. This
+    clear-fault commands have been accepted without an intervening clean run, so that a
+    condition which re-faults immediately cannot be cleared indefinitely. A completed
+    disable command, or ten seconds of uninterrupted Enabled operation without a fault,
+    shall reset that count; a fault or a stop before the ten seconds elapse shall not. This
     budget supplements the hardware verification of REQ-SM-025 and does not replace it;
     it bounds the platforms that cannot verify, and bounds a condition that clears
     between attempts on those that can.
