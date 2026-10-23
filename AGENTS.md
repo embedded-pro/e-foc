@@ -122,6 +122,8 @@ Presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1
 
 **CI — single workflow**: `ci.yml` builds all targets and uploads `e_foc`, `e_foc.integration_tests`, and `e_foc.sync_foc_sensored.qemu.elf` as artifacts. The `software_in_the_loop_tests` job runs in the same workflow with `needs: [host_build_test_ubuntu, qemu_foc_sensored_build]`, downloads those artifacts, and runs behavioral tests — never recompiles. Do not add cmake build steps to that job.
 
+**Release**: `release-please.yml` builds and attaches the Linux/Windows tools, the firmware and the documentation PDFs when release-please creates a release. Dispatch it with `dry_run: true` to build and check every asset without creating a release — do this after changing the workflow.
+
 **Before pushing**: always verify locally before pushing — CI minutes and tokens are finite.
 
 ```bash
