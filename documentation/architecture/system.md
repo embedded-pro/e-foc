@@ -253,6 +253,26 @@ On the Texas Instruments targets the command console and the trace output are al
 A debug probe can then read and drive the console with the USB-serial link down, which is the situation in which a hardware failure most needs diagnosing.
 RTT writes are non-blocking and drop when no probe is reading.
 
+The TI boards size their console and event buffers in `Resources` (`PinsAndPeripherals.hpp`) to what the
+application needs, because the EK-TM4C123GXL has 32 KiB of RAM. Each size has a reason, and growing a feature past
+it should change the reason, not just the number:
+
+| Buffer                                            | Size      | Why this size                                                                                                                                                                                                                                                                             |
+|---------------------------------------------------|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Trace output (`tracerBufferSize`)                 | 2048 B    | Everything traced while the application is constructed is written before the event loop runs, and the UART only drains once it does: about 1.1 KB at boot, about 1.7 KB with a previous session's fault dump. Output that does not fit is dropped, so `help` (about 4.2 KB) is cut short. |
+| RTT up buffer (`EMIL_SEGGER_RTT_BUFFER_SIZE_UP`)  | 2048 B    | The mirror hands RTT the same chunks as the UART and RTT drops what does not fit, so it matches the trace buffer.                                                                                                                                                                         |
+| Terminal line (`terminalCommandLength`)           | 64 chars  | The longest command line is 34 characters.                                                                                                                                                                                                                                                |
+| Terminal history (`terminalHistorySize`)          | 1         | Recalls the last command; every entry costs a whole line.                                                                                                                                                                                                                                 |
+| Terminal input queue (`terminalQueueSize`)        | 128 B     | Must take a whole UART DMA half-buffer (a `static_assert`) and two command lines while the event loop is busy.                                                                                                                                                                            |
+| UART receive DMA buffer (`uartReceiveBufferSize`) | 64 B      | 32-byte halves; the receive time-out delivers anything shorter.                                                                                                                                                                                                                           |
+| Event dispatcher (`eventDispatcherSize`)          | 24        | The whole `@sil` suite peaks at 3 pending actions; the drivers add at most one per CAN error class (10), CAN receive and transmit, UART receive and transmit, and the timer service. The SIL target uses the same depth, so the suite runs within it.                                     |
+| CAN receive buffer (`canReceiveBufferSize`)       | 16 frames | A client's transport queues at most 8 frames; an overflow is counted as `messageLost`, not lost silently.                                                                                                                                                                                 |
+| Fault status (`faultStatusSize`)                  | 448 B     | `PersistentFaultData::kMaxFormattedSize` (444), enforced by a `static_assert`, so the boot fault dump is never truncated.                                                                                                                                                                 |
+
+`sync_foc_sensored` sizes its CLI command table to the 24 commands it registers. The TI linker script places `.bss`
+first, sorted by alignment, so the uDMA control table — which must be 1 KiB-aligned — starts at the beginning of RAM
+instead of forcing up to 1 KiB of padding after `.data`.
+
 Each platform also states the electrical facts of its board, which the control loops cannot discover:
 
 | Board setting             | Meaning                                                                                                                                                                                                                                                                                                       |

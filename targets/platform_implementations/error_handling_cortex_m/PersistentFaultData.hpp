@@ -10,7 +10,9 @@ namespace application
     struct PersistentFaultData
     {
         static constexpr uint32_t kMagicValid = 0xDEADBEEFu;
-        static constexpr std::size_t kMaxStackTraceEntries = 243u;
+        static constexpr std::size_t kMaxStackTraceEntries = 16u;
+        static constexpr std::size_t kMaxFormattedRegistersSize = 251u;
+        static constexpr std::size_t kMaxFormattedSize = kMaxFormattedRegistersSize + 17u + 11u * kMaxStackTraceEntries;
 
         uint32_t magic{ 0 };
         uint32_t r0{ 0 };
@@ -31,8 +33,8 @@ namespace application
         void Invalidate();
     };
 
-    static_assert(sizeof(PersistentFaultData) == 1024u,
-        "PersistentFaultData must be exactly 1024 bytes");
+    static_assert(sizeof(PersistentFaultData) <= 1024u,
+        "PersistentFaultData must fit the 1 KiB .error_handling region");
 
     void FormatFaultData(const PersistentFaultData& data, infra::BoundedString& out);
 

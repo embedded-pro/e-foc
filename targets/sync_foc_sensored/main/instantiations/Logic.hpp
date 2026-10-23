@@ -49,7 +49,8 @@ namespace application
         application::PlatformFactory& hardware;
         services::DebugLed debugLed;
         foc::Volts vdc;
-        services::TerminalWithBanner::WithMaxSize<32> terminalWithStorage;
+        // help + 3 diagnostics + 20 control-mode commands; registering a 25th asserts at boot
+        services::TerminalWithBanner::WithMaxSize<24> terminalWithStorage;
         services::TerminalDiagnostics terminalDiagnostics;
         services::NvmEepromRegion calibrationRegion;
         services::NvmEepromRegion configRegion;

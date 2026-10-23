@@ -32,7 +32,7 @@ date: 2026-04-13
 - Supervising the event dispatcher with the MCU watchdog — that is the watchdog component's work
   ([Watchdog Design](watchdog.md)). This component only reports a watchdog reset once it has happened.
 - Correcting or masking the fault condition.
-- Logging to persistent storage beyond the single 1 KiB fault region.
+- Logging to persistent storage beyond the single fault region.
 - CAN-bus boot notification or any network-layer diagnostics.
 
 ---
@@ -118,7 +118,9 @@ After capture, the handler calls `abort()`, which the platform startup maps to `
 
 ### Persistent fault region
 
-The fault data structure (`PersistentFaultData`) is placed in a dedicated `.error_handling` linker section that is marked `NOLOAD`. The linker scripts for both TI and ST targets locate this section inside RAM but exclude it from the BSS zero-fill at startup, so its contents survive across a warm reset. The region is exactly 1 KiB and the linker asserts this at link time.
+The fault data structure (`PersistentFaultData`) is placed in a dedicated `.error_handling` linker section that is marked `NOLOAD`. The linker scripts for both TI and ST targets locate this section inside RAM but exclude it from the BSS zero-fill at startup, so its contents survive across a warm reset. The structure holds 16 backtrace entries (116 bytes); the linker asserts that the region stays within 1 KiB.
+
+The backtrace length and the boot-time fault string are sized together: `PersistentFaultData::kMaxFormattedSize` is the length of the formatted dump with every register at its widest and all 16 entries present, and each platform's fault string must hold at least that much, so the dump is never truncated (REQ-EH-002). A longer capture only costs RAM: the previous 243-entry backtrace could not be printed past entry 68 through its 1 KiB string.
 
 ### Reset cause detection
 
@@ -191,8 +193,8 @@ about two dozen inlined instructions, under one percent of the 20 kHz period.
 | PersistentFaultData | magic                   | 32-bit unsigned       | 0 or 0xDEADBEEF                                 | Written last to commit capture          |
 | PersistentFaultData | r0–r3, r12, lr, pc, psr | 32-bit unsigned       | Any                                             | ARM exception stack frame words         |
 | PersistentFaultData | cfsr, mmfar, bfar       | 32-bit unsigned       | Any                                             | Cortex-M fault status registers         |
-| PersistentFaultData | stackTrace[243]         | 32-bit unsigned array | Any                                             | Addresses within `.text` found on stack |
-| PersistentFaultData | stackTraceCount         | 32-bit unsigned       | 0–243                                           | Number of valid trace entries           |
+| PersistentFaultData | stackTrace[16]          | 32-bit unsigned array | Any                                             | Addresses within `.text` found on stack |
+| PersistentFaultData | stackTraceCount         | 32-bit unsigned       | 0–16                                            | Number of valid trace entries           |
 | ResetCause          | —                       | enum                  | powerUp, brownOut, software, hardware, watchdog | MCU-agnostic                            |
 
 `ResetCause::watchdog` comes from the reset source bits alone. The watchdog never resets by software: on

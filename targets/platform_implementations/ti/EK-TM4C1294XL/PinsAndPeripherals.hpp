@@ -101,12 +101,13 @@ namespace application
     namespace Resources
     {
         constexpr std::size_t tracerBufferSize{ 2048 };
-        constexpr std::size_t terminalQueueSize{ 256 };
-        constexpr std::size_t terminalHistorySize{ 4 };
-        constexpr std::size_t uartReceiveBufferSize{ 256 };
-        constexpr std::size_t eventDispatcherSize{ 50 };
-        constexpr std::size_t canReceiveBufferSize{ 32 };
-        constexpr std::size_t faultStatusSize{ 1024 };
+        constexpr std::size_t terminalQueueSize{ 128 };
+        constexpr std::size_t terminalHistorySize{ 1 };
+        constexpr std::size_t terminalCommandLength{ 64 };
+        constexpr std::size_t uartReceiveBufferSize{ 64 };
+        constexpr std::size_t eventDispatcherSize{ 24 };
+        constexpr std::size_t canReceiveBufferSize{ 16 };
+        constexpr std::size_t faultStatusSize{ 448 };
     }
 
     namespace Clocks

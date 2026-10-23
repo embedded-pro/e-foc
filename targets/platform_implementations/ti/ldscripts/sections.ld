@@ -53,6 +53,19 @@ SECTIONS
         _etext = .;
     } > REGION_TEXT
 
+    /* .bss first and sorted by alignment: the 1 KiB-aligned uDMA control table then sits at the start of RAM
+       instead of forcing up to 1 KiB of padding after .data */
+    .bss (NOLOAD):
+    {
+        . = ALIGN(4);
+        _bss = .;
+        *(SORT_BY_ALIGNMENT(.bss*))
+        *(COMMON)
+        . = ALIGN(4);
+        _ebss = .;
+        . = ALIGN(8);
+    } > REGION_RAM
+
     .data : AT(ADDR(.text) + SIZEOF(.text))
     {
         . = ALIGN(4);
@@ -60,17 +73,6 @@ SECTIONS
         *(vtable)
         *(.data .data* .gnu.linkonce.d.*)
         _edata = .;
-    } > REGION_RAM
-
-    .bss (NOLOAD):
-    {
-        . = ALIGN(4);
-        _bss = .;
-        *(.bss .bss*)
-        *(COMMON)
-        . = ALIGN(4);
-        _ebss = .;
-        . = ALIGN(8);
     } > REGION_RAM
 
     /* Persistent 1 KiB region for fault data — not zeroed on reset */

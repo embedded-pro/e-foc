@@ -32,9 +32,9 @@ TEST_F(TestPersistentFaultData, invalidate_clears_magic)
     EXPECT_FALSE(faultData.IsValid());
 }
 
-TEST_F(TestPersistentFaultData, size_is_exactly_1024_bytes)
+TEST_F(TestPersistentFaultData, fits_the_fault_region)
 {
-    static_assert(sizeof(application::PersistentFaultData) == 1024);
+    static_assert(sizeof(application::PersistentFaultData) <= 1024);
 }
 
 TEST(TestFormatFaultData, format_fault_data_includes_register_names)
@@ -69,4 +69,19 @@ TEST(TestFormatFaultData, format_fault_data_includes_stack_trace_when_present)
 
     const std::string result(output.begin(), output.end());
     EXPECT_NE(result.find("Backtrace"), std::string::npos);
+}
+
+TEST(TestFormatFaultData, worst_case_output_fits_max_formatted_size_without_truncation)
+{
+    application::PersistentFaultData data{};
+    data.magic = application::PersistentFaultData::kMagicValid;
+    data.r0 = data.r1 = data.r2 = data.r3 = data.r12 = data.lr = data.pc = data.psr = 0xFFFFFFFFu;
+    data.cfsr = data.mmfar = data.bfar = 0xFFFFFFFFu;
+    data.stackTraceCount = application::PersistentFaultData::kMaxStackTraceEntries + 1;
+    data.stackTrace.fill(0xFFFFFFFFu);
+
+    infra::BoundedString::WithStorage<application::PersistentFaultData::kMaxFormattedSize + 1> output;
+    application::FormatFaultData(data, output);
+
+    EXPECT_EQ(output.size(), application::PersistentFaultData::kMaxFormattedSize);
 }
