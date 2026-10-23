@@ -19,13 +19,16 @@ namespace diag
         calculateRest,
         pwm,
         observer,
+        mechSample,
+        mechWindow,
+        mechPost,
         total,
         count
     };
 
     inline constexpr std::array<const char*, static_cast<std::size_t>(IsrStage::count)> isrStageNames{
         "readout", "dispatch", "encoder", "transform", "currentLoop", "modulation",
-        "estimatorWindow", "windowClose", "calculateRest", "pwm", "observer", "total"
+        "estimatorWindow", "windowClose", "calculateRest", "pwm", "observer", "mechSample", "mechWindow", "mechPost", "total"
     };
 
     class IsrProfile

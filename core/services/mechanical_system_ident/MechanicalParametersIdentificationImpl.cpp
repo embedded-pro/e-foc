@@ -1,4 +1,5 @@
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentificationImpl.hpp"
+#include "core/foc/interfaces/IsrProfile.hpp"
 #include "core/foc/interfaces/Units.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
@@ -304,6 +305,7 @@ namespace services
         if (++samplesInWindow < windowSamples)
             return;
 
+        diag::isrProfile.Mark(diag::IsrStage::mechSample);
         samplesInWindow = 0;
 
         const auto windowTorque = torqueSum / static_cast<float>(windowSamples);
@@ -370,7 +372,9 @@ namespace services
         if (!countKnown || !hadSpeed || !IsMechanicallyObservable(centredSpeed))
             return;
 
+        diag::isrProfile.Mark(diag::IsrStage::mechWindow);
         Post(Observation{ acceleration, centredSpeed, centredTorque, static_cast<uint32_t>(samplesSinceStart), static_cast<uint32_t>(windowSamples) });
+        diag::isrProfile.Mark(diag::IsrStage::mechPost);
     }
 
     // The fit costs more than the rest of the control interrupt, so the interrupt only hands each window over
