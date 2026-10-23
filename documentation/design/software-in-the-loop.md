@@ -876,13 +876,13 @@ core, inside the same 50 µs interrupt as the drive, so what it costs is taken f
 event loop. Timed with the emulated clock (five instructions to a cycle, 1250 cycles to the
 period), one plant step averages:
 
-| Plant                            | Average cycles | Share of the period |
-|----------------------------------|----------------|---------------------|
-| Nominal motor                    | 212            | 17 %                |
-| Bench motor                      | 217            | 17 %                |
-| Bench motor and power stage      | 275            | 22 %                |
-| Bench motor and sense chain      | 560            | 45 %                |
-| Bench motor, stage and chain     | 573            | 46 %                |
+| Plant                        | Average cycles | Share of the period |
+|------------------------------|----------------|---------------------|
+| Nominal motor                | 212            | 17 %                |
+| Bench motor                  | 217            | 17 %                |
+| Bench motor and power stage  | 275            | 22 %                |
+| Bench motor and sense chain  | 560            | 45 %                |
+| Bench motor, stage and chain | 573            | 46 %                |
 
 The chain had cost 1010 cycles on its own, 81 % of the period, and with the drive's interrupt on top
 the event loop starved and the watchdog reset the target. Most of it went on work whose result never
