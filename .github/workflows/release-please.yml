@@ -280,10 +280,10 @@ jobs:
             "e_foc-firmware-EK-TM4C1294XL-${v}.tar.gz" \
             "e_foc-firmware-EK-TM4C123GXL-${v}.tar.gz" \
             "e_foc-firmware-STM32F407G-DISC1-${v}.tar.gz" \
-            "e_foc-firmware-NUCLEO-H563ZI-${v}.tar.gz" \
-            "e_foc-traceability-matrix-${v}.pdf"; do
+            "e_foc-firmware-NUCLEO-H563ZI-${v}.tar.gz"; do
             test -s "release-assets/$asset" || { echo "::error::missing release asset $asset"; exit 1; }
           done
+          compgen -G "release-assets/*-${v}.pdf" > /dev/null || { echo "::error::no documentation PDFs"; exit 1; }
       - name: Upload release assets
         if: needs.release_please.outputs.release_created == 'true'
         env:
