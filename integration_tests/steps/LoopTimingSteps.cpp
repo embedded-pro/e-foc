@@ -110,3 +110,33 @@ THEN(R"(no control loop execution shall have taken more than {int} cycles)", (in
     EXPECT_LE(statistics->maximum, static_cast<unsigned long>(cycles))
         << "The slowest execution took " << statistics->maximum << " cycles";
 }
+
+WHEN(R"(the interrupt profile is cleared)")
+{
+    ASSERT_TRUE(context.Get<Fixture>().SendCommand("isr_profile_clear")) << "The isr_profile_clear command was not acknowledged";
+}
+
+THEN(R"(the interrupt profile is reported)")
+{
+    auto& fixture = context.Get<Fixture>();
+    const auto mark = fixture.CapturedLineCount();
+    ASSERT_TRUE(fixture.SendCommand("isr_profile")) << "The isr_profile command was not acknowledged";
+
+    std::optional<std::string> total;
+    DrainUntil(fixture, [&]
+        {
+            total = fixture.LastCapturedLineWith(mark, "[ISRP] total ");
+            return total.has_value();
+        },
+        kTraceTimeout);
+
+    ASSERT_TRUE(total.has_value()) << "The target did not print its interrupt profile";
+
+    for (const char* stage : { "readout", "dispatch", "encoder", "transform", "currentLoop", "modulation", "estimatorWindow", "windowClose", "calculateRest", "pwm", "observer", "total" })
+    {
+        const auto line = fixture.LastCapturedLineWith(mark, std::string{ "[ISRP] " } + stage + " ");
+        if (line.has_value())
+            std::fprintf(stderr, "[METRIC] isr stage=%s hits=%lu avg=%lu max=%lu\n", stage,
+                ValueAfter(*line, "hits=").value_or(0), ValueAfter(*line, "avg=").value_or(0), ValueAfter(*line, "max=").value_or(0));
+    }
+}
