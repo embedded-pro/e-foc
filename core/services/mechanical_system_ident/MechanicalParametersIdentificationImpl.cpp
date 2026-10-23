@@ -91,7 +91,9 @@ namespace services
 
         RestartEstimator(config.forgettingFactor);
         this->samplesSinceStart = 0;
-        this->minimumRunSamples = static_cast<std::size_t>(minimumRunDwells * std::chrono::duration<float>(config.dwellTime).count() / samplingPeriod);
+        this->dwellSamples = std::max<std::size_t>(1, static_cast<std::size_t>(std::chrono::duration<float>(config.dwellTime).count() / samplingPeriod + 0.5f));
+        this->minimumRunSamples = static_cast<std::size_t>(minimumRunDwells * static_cast<float>(dwellSamples));
+        this->finishAtSample = 0;
 
         observable.RegisterPhaseCurrentsObserver([this, torqueConstant](const auto& currents)
             {
@@ -117,6 +119,9 @@ namespace services
 
         timeoutTimer.Start(config.timeout, [this]()
             {
+                if (finishAtSample != 0 && outcome == Outcome::pending)
+                    outcome = Outcome::converged;
+
                 FinishRun();
             });
     }
@@ -344,6 +349,13 @@ namespace services
         if (outcome != Outcome::pending)
             return;
 
+        if (finishAtSample != 0 && samplesSinceStart >= finishAtSample)
+        {
+            outcome = Outcome::converged;
+            ScheduleFinish();
+            return;
+        }
+
         if (!countKnown || !hadSpeed || !IsMechanicallyObservable(centredSpeed))
             return;
 
@@ -354,10 +366,10 @@ namespace services
         excitation.Count(acceleration, centredSpeed);
         TrackInertiaSettling();
 
-        if (samplesSinceStart < minimumRunSamples || !inertiaSettled || !HasConvergedMechanics(metrics, excitation, updateForgetting, std::max(1.0f, static_cast<float>(windowSamples) / coveredWindowSamples)))
+        if (finishAtSample != 0 || samplesSinceStart < minimumRunSamples || !inertiaSettled || !HasConvergedMechanics(metrics, excitation, updateForgetting, std::max(1.0f, static_cast<float>(windowSamples) / coveredWindowSamples)))
             return;
 
-        outcome = Outcome::converged;
-        ScheduleFinish();
+        // An angle-dependent torque cancels only over whole turns, so a converged fit keeps every dwell it started whole
+        finishAtSample = (samplesSinceStart / dwellSamples + 1) * dwellSamples;
     }
 }

@@ -2,9 +2,9 @@
 title: "Service: Mechanical Parameters Identification"
 type: design
 status: draft
-version: 0.2.1
+version: 0.3.0
 component: service-mechanical-ident
-date: 2026-10-22
+date: 2026-10-23
 ---
 
 | Field     | Value                                         |
@@ -12,9 +12,9 @@ date: 2026-10-22
 | Title     | Service: Mechanical Parameters Identification |
 | Type      | design                                        |
 | Status    | draft                                         |
-| Version   | 0.2.1                                         |
+| Version   | 0.3.0                                         |
 | Component | service-mechanical-ident                      |
-| Date      | 2026-10-22                                    |
+| Date      | 2026-10-23                                    |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -154,7 +154,9 @@ windows after a step count, so an unscaled count kept a 1000-count run going for
 shortened the memory so far that the viscous friction, which is resolved only from the difference between the two speed
 levels, was estimated from one level and came out 20 to 30 % high in simulation.
 
-A run may not converge before it has crossed both speed levels, so it lasts at least two dwell periods.
+A run may not converge before it has crossed both speed levels, so it lasts at least two dwell periods. A run that
+has converged does not end there: it keeps fitting until the dwell it is in has ended, counted in samples from the
+start of the run, so every dwell the fit has seen is a whole one (Whole Turns, below).
 
 Convergence additionally requires the inertia to have **settled**: it is compared with itself one estimator memory earlier
 (the memory being $1/(1-\lambda)$ samples, that is that many divided by the window in updates) and must have moved by less than 10 %. A single innovation under its bound
@@ -191,6 +193,26 @@ speed
   ω_dwell   ──────┘     └─────┘     └───  …
             |<-T->|<-T->|<-T->|<-T->|
 ```
+
+### Whole Turns
+
+A torque that depends on the rotor's angle — a disc out of balance, a bearing's runout, the cogging — is
+not part of the model, and over part of a turn it does not average away. What is left of it depends on the
+angle the dwell started at, and since the speed column is what differs between the two levels, the fit reads
+the leftover as viscous friction. The default levels, 250 and 500 rpm, are therefore held for 240 ms each:
+exactly one and two turns, so a dwell covers whole turns at either level, and with the run ending on a dwell
+boundary every harmonic of the turn cancels to first order.
+
+On the rig the two runs of one calibration read the viscous friction 15 % apart (per run, over 261
+calibrations), against 2.5 % in simulation, while the inertia agreed within 0.3 %. The simulated bench motor
+with a once-per-turn torque of 1 mN·m reproduced it with 250 ms dwells: every first run read the friction
+28 % high, and one second run 16 % low, because it started where the first had stopped. With whole turns
+the same plant read 5 % low, every run within 3 % of the others. What remains is second order: the speed
+ripple the torque itself causes correlates with it, and at 2 mN·m the friction reads 27 % low.
+
+The friction also changes with the motor's temperature, which no trajectory removes: on the rig it fell by 10
+to 30 % through each 12-minute sweep and read high again after an idle hour, while the winding resistance
+barely moved. That is the bearing's grease, and the online estimator follows it.
 
 ### Bounded Envelope
 

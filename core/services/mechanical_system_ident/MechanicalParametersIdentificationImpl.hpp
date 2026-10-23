@@ -67,6 +67,8 @@ namespace services
         bool inertiaSettled{ false };
         std::size_t samplesSinceStart{ 0 };
         std::size_t minimumRunSamples{ 0 };
+        std::size_t dwellSamples{ 1 };
+        volatile std::size_t finishAtSample{ 0 };
         float previousPosition{ 0.0f };
         float previousSpeed{ 0.0f };
         bool hasPreviousMean{ false };
