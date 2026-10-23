@@ -2,6 +2,7 @@
 
 #include "core/foc/interfaces/Execution.hpp"
 #include "core/foc/interfaces/Foc.hpp"
+#include "core/foc/interfaces/IsrProfile.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "infra/util/HotSwapFunction.hpp"
 #include "numerical/math/CompilerOptimizations.hpp"
@@ -133,9 +134,15 @@ namespace foc
         if (!enabled)
             return;
 
+        diag::isrProfile.Mark(diag::IsrStage::dispatch);
         auto position = encoder.Read();
-        inverter.ThreePhasePwmOutput(foc.Calculate(currentPhases, position));
+        diag::isrProfile.Mark(diag::IsrStage::encoder);
+        const auto duties = foc.Calculate(currentPhases, position);
+        diag::isrProfile.Mark(diag::IsrStage::calculateRest);
+        inverter.ThreePhasePwmOutput(duties);
+        diag::isrProfile.Mark(diag::IsrStage::pwm);
 
         phaseCurrentsObserver(currentPhases);
+        diag::isrProfile.Mark(diag::IsrStage::observer);
     }
 }

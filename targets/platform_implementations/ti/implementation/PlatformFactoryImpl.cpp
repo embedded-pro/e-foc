@@ -1,4 +1,5 @@
 #include "targets/platform_implementations/ti/implementation/PlatformFactoryImpl.hpp"
+#include "core/foc/interfaces/IsrProfile.hpp"
 #include "core/platform_abstraction/PlatformFactory.hpp"
 #include "infra/event/EventDispatcher.hpp"
 #include "services/tracer/GlobalTracer.hpp"
@@ -60,6 +61,7 @@ namespace application
         }
 
         application::Clocks::Initialize();
+        diag::isrProfile.Attach(reinterpret_cast<volatile const uint32_t*>(0xE0001004u));
         peripherals.emplace();
         services::SetGlobalTracerInstance(peripherals->terminalAndTracer.tracer);
         this->onInitialized();
@@ -299,14 +301,19 @@ namespace application
 
                 controlLoopEntered = true;
                 const auto entryCycles = CycleCounter::Now();
+                diag::isrProfile.Begin();
 
                 const auto currents = shuntReadout.Read(foc::PhaseCurrents{ a, b, c });
 
                 if (overCurrentTripped || ExceedsOverCurrent(currents.a, currents.b, currents.c))
                     TripOverCurrent();
                 else
+                {
+                    diag::isrProfile.Mark(diag::IsrStage::readout);
                     onPhaseCurrentsReady(currents);
+                }
 
+                diag::isrProfile.End();
                 controlLoopMetrics.Record(CycleCounter::Now() - entryCycles);
                 controlLoopEntered = false;
             });

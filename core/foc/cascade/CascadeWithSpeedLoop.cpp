@@ -1,4 +1,5 @@
 #include "core/foc/cascade/CascadeWithSpeedLoop.hpp"
+#include "core/foc/interfaces/IsrProfile.hpp"
 #include "core/foc/math/AngleWrap.hpp"
 #include "core/foc/math/DutyConversion.hpp"
 #include "core/foc/math/FastTrigonometry.hpp"
@@ -246,13 +247,17 @@ namespace foc
         auto sinTheta = FastTrigonometry::Sine(electricalAngle);
 
         auto idAndIq = park.Forward(clarke.Forward(ThreePhase{ ia, ib, ic }), cosTheta, sinTheta);
+        diag::isrProfile.Mark(diag::IsrStage::transform);
         const auto coggingCurrent = coggingFeedForward.CurrentAt(electricalAngle);
         const auto quadratureReference = std::clamp(lastSpeedLoopOutput + coggingCurrent, -maxCurrent.Value(), maxCurrent.Value());
         auto voltage = currentLoop.Compute(CurrentControlContext{ idAndIq, RotatingFrame{ directCurrentReference, quadratureReference }, lastElectricalSpeed });
+        diag::isrProfile.Mark(diag::IsrStage::currentLoop);
 
         auto output = spaceVectorModulator.Generate(park.Inverse(voltage, cosTheta, sinTheta));
+        diag::isrProfile.Mark(diag::IsrStage::modulation);
 
         estimatorWindow.Accumulate(idAndIq, voltage, mechanicalAngle, polePairs, coggingCurrent);
+        diag::isrProfile.Mark(diag::IsrStage::estimatorWindow);
 
         ++triggerCounter;
         if (triggerCounter >= prescaler)
@@ -263,6 +268,7 @@ namespace foc
             lastMeanIq = window.meanIq;
             estimators.Publish(window);
             lowPriorityInterrupt.Trigger();
+            diag::isrProfile.Mark(diag::IsrStage::windowClose);
         }
 
         return ToDutyCycles(output);
