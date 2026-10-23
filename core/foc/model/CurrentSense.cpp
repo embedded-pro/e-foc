@@ -1,6 +1,7 @@
 #include "core/foc/model/CurrentSense.hpp"
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 namespace foc
 {
@@ -11,14 +12,24 @@ namespace foc
             return std::max(config.averagedConversions, uint32_t{ 1 });
         }
 
+        // Past these the result is what the exponential rounds to in float, so it is not computed
+        constexpr float settledTimeConstants{ 18.0f };
+        constexpr float decayedTimeConstants{ 104.0f };
+
         float Settled(float elapsed, float timeConstant)
         {
-            return timeConstant > 0.0f ? 1.0f - std::exp(-elapsed / timeConstant) : 1.0f;
+            if (timeConstant <= 0.0f || elapsed >= settledTimeConstants * timeConstant)
+                return 1.0f;
+
+            return 1.0f - std::exp(-elapsed / timeConstant);
         }
 
         float Decayed(float elapsed, float timeConstant)
         {
-            return timeConstant > 0.0f ? std::exp(-elapsed / timeConstant) : 0.0f;
+            if (timeConstant <= 0.0f || elapsed >= decayedTimeConstants * timeConstant)
+                return 0.0f;
+
+            return std::exp(-elapsed / timeConstant);
         }
 
         bool Quantised(const CurrentSenseConfig& config)
@@ -26,16 +37,25 @@ namespace foc
             return config.fullScaleAmpere > 0.0f && config.resolutionBits > 0;
         }
 
-        float CodeWidth(const CurrentSenseConfig& config)
+        struct Converter
         {
-            return 2.0f * config.fullScaleAmpere / std::ldexp(1.0f, static_cast<int>(config.resolutionBits));
-        }
+            explicit Converter(const CurrentSenseConfig& config)
+                : fullScale(config.fullScaleAmpere)
+                , levels(std::ldexp(1.0f, static_cast<int>(config.resolutionBits)))
+                , codeWidth(2.0f * config.fullScaleAmpere / levels)
+                , highest(static_cast<int32_t>(levels) - 1)
+            {}
 
-        int64_t Code(const CurrentSenseConfig& config, float ampere)
-        {
-            const auto highest = static_cast<int64_t>(std::ldexp(1.0f, static_cast<int>(config.resolutionBits))) - 1;
-            return std::clamp(static_cast<int64_t>(std::lround((ampere + config.fullScaleAmpere) / CodeWidth(config))), int64_t{ 0 }, highest);
-        }
+            int32_t Code(float ampere) const
+            {
+                return std::clamp(static_cast<int32_t>(std::lround((ampere + fullScale) / codeWidth)), int32_t{ 0 }, highest);
+            }
+
+            float fullScale;
+            float levels;
+            float codeWidth;
+            int32_t highest;
+        };
 
         float Clipped(const CurrentSenseConfig& config, float ampere)
         {
@@ -70,7 +90,9 @@ namespace foc
     float ShuntReading(const CurrentSenseConfig& config, const ShuntSample& sample, uint32_t step, const infra::Function<float()>& conversionNoise)
     {
         const auto count = AveragedConversions(config);
-        int64_t codes{ 0 };
+        const auto quantised = Quantised(config);
+        const std::optional<Converter> converter = quantised ? std::optional<Converter>{ std::in_place, config } : std::nullopt;
+        int32_t codes{ 0 };
         float sum{ 0.0f };
 
         for (uint32_t conversion = 0; conversion != count; ++conversion)
@@ -78,15 +100,15 @@ namespace foc
             const auto time = ConversionHoldInstant(config, step * count + conversion);
             const auto analog = ShuntAmplifierOutput(config, sample.window, sample.current, time) + sample.offset + conversionNoise();
 
-            if (Quantised(config))
-                codes += Code(config, analog);
+            if (quantised)
+                codes += converter->Code(analog);
             else
                 sum += Clipped(config, analog);
         }
 
         // Integer division, as the converter's hardware averager drops the remainder.
-        if (Quantised(config))
-            return static_cast<float>(codes / count) * CodeWidth(config) - config.fullScaleAmpere;
+        if (quantised)
+            return static_cast<float>(codes / static_cast<int32_t>(count)) * converter->codeWidth - converter->fullScale;
 
         return sum / static_cast<float>(count);
     }

@@ -2,9 +2,9 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.5.1
+version: 1.6.0
 component: "software-in-the-loop"
-date: 2026-10-22
+date: 2026-10-23
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-10-22
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.4.1                       |
+| Version   | 1.6.0                       |
 | Component | software-in-the-loop        |
-| Date      | 2026-10-22                  |
+| Date      | 2026-10-23                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -871,10 +871,32 @@ resistance reads 18 % high through it. The drive compensates the loss
 (`service-dead-time-compensation.md`), and a scenario can give the emulated drive the bench's
 compensation figures while the plant's stage stays as it is.
 
-The stage and the current-sense chain (Part M) are not used together while the loop runs closed.
-With both, the plant alone takes about 85 % of the emulated core's control period, and the drive's
-interrupt fills the rest, so the event loop starves and the watchdog resets the target. With the
-stage alone the interrupt takes about 40 % of the period.
+The stage and the current-sense chain (Part M) run together. The plant executes on the emulated
+core, inside the same 50 µs interrupt as the drive, so what it costs is taken from the firmware's
+event loop. Timed with the emulated clock (five instructions to a cycle, 1250 cycles to the
+period), one plant step averages:
+
+| Plant                            | Average cycles | Share of the period |
+|----------------------------------|----------------|---------------------|
+| Nominal motor                    | 212            | 17 %                |
+| Bench motor                      | 217            | 17 %                |
+| Bench motor and power stage      | 275            | 22 %                |
+| Bench motor and sense chain      | 560            | 45 %                |
+| Bench motor, stage and chain     | 573            | 46 %                |
+
+The chain had cost 1010 cycles on its own, 81 % of the period, and with the drive's interrupt on top
+the event loop starved and the watchdog reset the target. Most of it went on work whose result never
+changed: an exponential for an amplifier that had settled long before the sample, which in float
+rounds to exactly one past eighteen time constants and is no longer computed there, the converter's
+code width and range rebuilt for every conversion, and 64-bit sums for codes that fit in 32 bits.
+Compiled for the host, the old and the new reading agree bit for bit over three million random
+windows, currents, offsets and noise draws; the emulated build allows the compiler to reassociate
+floating point, in both. What remains is mostly the normal noise drawn for each conversion.
+
+About one step in 120 takes some 1800 cycles, more than a period: each of the two noise generators
+refills its state of 624 words once every 624 draws, and the nominal plant draws four a step. The
+interrupt that carries it ends after the next period has begun. It happens in every plant, the
+nominal one included, and the chain only makes it more frequent.
 
 ### Part M — The current-sense chain between the winding and the controller
 
