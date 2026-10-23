@@ -95,7 +95,7 @@ Any service that schedules event-dispatcher closures and whose lifetime is manag
 
 - GoogleTest. `TEST_F` for fixture tests; `TYPED_TEST` for typed; plain `TEST()` for simple stateless matching existing patterns
 - **`StrictMock` only** (`NiceMock`/`NaggyMock` forbidden). Fixture in anonymous namespace; macros outside
-- `EXPECT_NEAR` with explicit tolerance for float assertions. No heap in tests.
+- `EXPECT_NEAR` with explicit tolerance for float assertions. Heap is allowed in tests (see Memory scope).
 - Test files: `test/Test{ComponentName}.cpp` inside the library under test
 - Host stubs: `targets/platform_implementations/host/`
 
@@ -121,6 +121,8 @@ Presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1
 `qemu-foc-sensored` builds `e_foc.sync_foc_sensored.main` for emulated Cortex-M4 via semihosting. The resulting ELF is uploaded as a CI artifact for the Software-in-the-Loop Tests job.
 
 **CI — single workflow**: `ci.yml` builds all targets and uploads `e_foc`, `e_foc.integration_tests`, and `e_foc.sync_foc_sensored.qemu.elf` as artifacts. The `software_in_the_loop_tests` job runs in the same workflow with `needs: [host_build_test_ubuntu, qemu_foc_sensored_build]`, downloads those artifacts, and runs behavioral tests — never recompiles. Do not add cmake build steps to that job.
+
+**Release**: `release-please.yml` builds and attaches the Linux/Windows tools, the firmware and the documentation PDFs when release-please creates a release. Dispatch it with `dry_run: true` to build and check every asset without creating a release — do this after changing the workflow.
 
 **Before pushing**: always verify locally before pushing — CI minutes and tokens are finite.
 

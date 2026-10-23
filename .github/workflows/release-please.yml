@@ -3,6 +3,11 @@ name: Create Release
 
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build and check every release asset without creating a release"
+        type: boolean
+        default: false
   push:
     branches: [main]
 
@@ -11,7 +16,7 @@ permissions:
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   CMAKE_BUILD_PARALLEL_LEVEL: 2
@@ -25,14 +30,17 @@ jobs:
       pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
+      build: ${{ steps.release.outputs.release_created == 'true' || inputs.dry_run == true }}
+      version: ${{ steps.release.outputs.tag_name || format('dry-run-{0}', github.run_number) }}
     steps:
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        if: ${{ !inputs.dry_run }}
         id: token
         with:
           app-id: ${{ vars.FOREST_RELEASER_APP_ID }}
           private-key: ${{ secrets.FOREST_RELEASER_APP_PRIVATE_KEY }}
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        if: ${{ !inputs.dry_run }}
         id: release
         with:
           token: ${{ steps.token.outputs.token }}
@@ -40,7 +48,7 @@ jobs:
   build_linux_tools:
     name: Build Linux Tools
     needs: release_please
-    if: needs.release_please.outputs.release_created == 'true'
+    if: needs.release_please.outputs.build == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Configure Git
@@ -54,29 +62,27 @@ jobs:
           submodules: recursive
       - uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
       - name: Install Qt6
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qt6-base-dev libgl1-mesa-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qt6-base-dev libgl1-mesa-dev ccache
       - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
         with:
           configurePreset: "host"
           buildPreset: "host-Release-WithPackage"
       - name: Package simulator
         run: |
-          version="${{ needs.release_please.outputs.tag_name }}"
+          version="${{ needs.release_please.outputs.version }}"
           staging="staging/simulator"
           mkdir -p "$staging"
-          find build/host/tools/simulator -name "e_foc.tool.simulator.*" -type f -executable | while read -r f; do
-            cp "$f" "$staging/"
-          done
-          cp tools/simulator/config/*.json "$staging/" 2>/dev/null || true
+          find build/host/tools/simulator -name "e_foc.tool.simulator" -type f -executable -exec cp {} "$staging/" \;
+          test -x "$staging/e_foc.tool.simulator"
+          cp tools/simulator/config/*.json "$staging/"
           tar -czf "e_foc-simulator-${version}-linux-x86_64.tar.gz" -C staging simulator
       - name: Package CAN Commander
         run: |
-          version="${{ needs.release_please.outputs.tag_name }}"
+          version="${{ needs.release_please.outputs.version }}"
           staging="staging/can_commander"
           mkdir -p "$staging"
-          find build/host/tools/can_commander -name "e_foc.tool.can_commander" -type f -executable | while read -r f; do
-            cp "$f" "$staging/"
-          done
+          find build/host/tools/can_commander -name "e_foc.tool.can_commander" -type f -executable -exec cp {} "$staging/" \;
+          test -x "$staging/e_foc.tool.can_commander"
           tar -czf "e_foc-can_commander-${version}-linux-x86_64.tar.gz" -C staging can_commander
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -97,7 +103,7 @@ jobs:
   build_windows_tools:
     name: Build Windows Tools
     needs: release_please
-    if: needs.release_please.outputs.release_created == 'true'
+    if: needs.release_please.outputs.build == 'true'
     runs-on: windows-latest
     steps:
       - name: Configure Git
@@ -108,8 +114,9 @@ jobs:
           persist-credentials: false
           submodules: recursive
       - uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
       - name: Install Qt6
-        uses: jurplel/install-qt-action@v4.4.1  # TODO: pin to commit SHA (mutable tag)
+        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
           version: "6.7.*"
           cache: true
@@ -118,31 +125,32 @@ jobs:
           cmake -B build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_COMPILE_WARNING_AS_ERROR=On
-          -DE_FOC_TARGET_PLATFORM=Host
+          -DE_FOC_TARGET_PLATFORM=host
           -DE_FOC_BUILD_TESTS=Off
+          -DE_FOC_BUILD_SIMULATOR=On
           -DNUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS=Off
       - name: Build
-        run: cmake --build build
+        run: cmake --build build --target e_foc.tool.simulator e_foc.tool.can_commander
       - name: Package simulator
         shell: bash
         run: |
-          version="${{ needs.release_please.outputs.tag_name }}"
+          version="${{ needs.release_please.outputs.version }}"
           staging="staging/simulator"
           mkdir -p "$staging"
-          find build/source/tools/simulator -name "e_foc.tool.simulator.*.exe" -type f | while read -r f; do
-            cp "$f" "$staging/"
-          done
-          cp tools/simulator/config/*.json "$staging/" 2>/dev/null || true
+          find build/tools -name "e_foc.tool.simulator.exe" -type f -exec cp {} "$staging/" \;
+          test -f "$staging/e_foc.tool.simulator.exe"
+          windeployqt --release --no-translations "$staging/e_foc.tool.simulator.exe"
+          cp tools/simulator/config/*.json "$staging/"
           7z a "e_foc-simulator-${version}-windows-x86_64.zip" "./staging/simulator/*"
       - name: Package CAN Commander
         shell: bash
         run: |
-          version="${{ needs.release_please.outputs.tag_name }}"
+          version="${{ needs.release_please.outputs.version }}"
           staging="staging/can_commander"
           mkdir -p "$staging"
-          find build/source/tools/can_commander -name "e_foc.tool.can_commander.exe" -type f | while read -r f; do
-            cp "$f" "$staging/"
-          done
+          find build/tools -name "e_foc.tool.can_commander.exe" -type f -exec cp {} "$staging/" \;
+          test -f "$staging/e_foc.tool.can_commander.exe"
+          windeployqt --release --no-translations "$staging/e_foc.tool.can_commander.exe"
           7z a "e_foc-can_commander-${version}-windows-x86_64.zip" "./staging/can_commander/*"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -158,7 +166,7 @@ jobs:
   build_embedded:
     name: Build Embedded (${{ matrix.target }})
     needs: [release_please, build_linux_tools]
-    if: needs.release_please.outputs.release_created == 'true'
+    if: needs.release_please.outputs.build == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -177,7 +185,7 @@ jobs:
         uses: carlosperate/arm-none-eabi-gcc-action@0edbb000a5a98e2292b051b463bff6f512547118 # v1.14.0
         with:
           release: ${{ matrix.gcc }}
-      - run: sudo apt-get update && sudo apt-get install ninja-build xsltproc
+      - run: sudo apt-get update && sudo apt-get install ninja-build xsltproc ccache
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: host-install-package
@@ -195,7 +203,7 @@ jobs:
           done
       - name: Package firmware
         run: |
-          version="${{ needs.release_please.outputs.tag_name }}"
+          version="${{ needs.release_please.outputs.version }}"
           staging="staging/${{ matrix.target }}"
           mkdir -p "$staging"
           find "build/${{ matrix.target }}" \( -name "*.elf" -o -name "*.hex" \) -path "*/${{ matrix.configuration }}/*" -type f | while read -r f; do
@@ -211,7 +219,7 @@ jobs:
   build_documentation:
     name: Build Documentation
     needs: release_please
-    if: needs.release_please.outputs.release_created == 'true'
+    if: needs.release_please.outputs.build == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Configure Git
@@ -231,13 +239,13 @@ jobs:
         with:
           run-build-documentation-pdfs: 'true'
           run-traceability-matrix: 'true'
-          version: ${{ needs.release_please.outputs.tag_name }}
+          version: ${{ needs.release_please.outputs.version }}
           output-dir: docs-pdf
           artifact-name: documentation-pdfs
           requirements-dir: documentation/requirements
           features-dir: integration_tests/features
           matrix-output: docs-pdf/traceability-matrix.md
-          matrix-pdf-output: docs-pdf/e_foc-traceability-matrix-${{ needs.release_please.outputs.tag_name }}.pdf
+          matrix-pdf-output: docs-pdf/e_foc-traceability-matrix-${{ needs.release_please.outputs.version }}.pdf
 
   publish_release_assets:
     name: Publish Release Assets
@@ -249,7 +257,7 @@ jobs:
         build_embedded,
         build_documentation
       ]
-    if: needs.release_please.outputs.release_created == 'true'
+    if: needs.release_please.outputs.build == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -260,12 +268,29 @@ jobs:
           merge-multiple: true
       - name: Remove host install package
         run: rm -f release-assets/e_foc-0*.* release-assets/e_foc-*-Linux.*
+      - name: Check release assets
+        run: |
+          v="${{ needs.release_please.outputs.version }}"
+          ls -l release-assets
+          for asset in \
+            "e_foc-simulator-${v}-linux-x86_64.tar.gz" \
+            "e_foc-can_commander-${v}-linux-x86_64.tar.gz" \
+            "e_foc-simulator-${v}-windows-x86_64.zip" \
+            "e_foc-can_commander-${v}-windows-x86_64.zip" \
+            "e_foc-firmware-EK-TM4C1294XL-${v}.tar.gz" \
+            "e_foc-firmware-EK-TM4C123GXL-${v}.tar.gz" \
+            "e_foc-firmware-STM32F407G-DISC1-${v}.tar.gz" \
+            "e_foc-firmware-NUCLEO-H563ZI-${v}.tar.gz"; do
+            test -s "release-assets/$asset" || { echo "::error::missing release asset $asset"; exit 1; }
+          done
+          compgen -G "release-assets/*-${v}.pdf" > /dev/null || { echo "::error::no documentation PDFs"; exit 1; }
       - name: Upload release assets
+        if: needs.release_please.outputs.release_created == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          tag="${{ needs.release_please.outputs.tag_name }}"
+          tag="${{ needs.release_please.outputs.version }}"
           for asset in release-assets/*; do
             [ -f "$asset" ] || continue
             echo "Uploading: $asset"
