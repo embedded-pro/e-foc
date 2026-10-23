@@ -206,13 +206,23 @@ boundary every harmonic of the turn cancels to first order.
 On the rig the two runs of one calibration read the viscous friction 15 % apart (per run, over 261
 calibrations), against 2.5 % in simulation, while the inertia agreed within 0.3 %. The simulated bench motor
 with a once-per-turn torque of 1 mN·m reproduced it with 250 ms dwells: every first run read the friction
-28 % high, and one second run 16 % low, because it started where the first had stopped. With whole turns
-the same plant read 5 % low, every run within 3 % of the others. What remains is second order: the speed
-ripple the torque itself causes correlates with it, and at 2 mN·m the friction reads 27 % low.
+28 % high, and one second run 16 % low, because it started where the first had stopped. With whole turns:
+
+| Plant, viscous friction 12 µN·m·s | 250 ms dwells               | Whole turns   |
+|-----------------------------------|-----------------------------|---------------|
+| Once per turn, 0.5 mN·m           | +15 %                       | 0, ±1 %       |
+| Once per turn, 1 mN·m             | +28 %, one run −16 %        | −5 %, ±2 %    |
+| Twice per turn, 1 mN·m            | −18 % to +2 %               | 0, ±1.5 %     |
+| Once per turn, 2 mN·m             | +41 %, one run −47 %        | −22 %, ±6 %   |
+| Bench dry friction and cogging    | −7 %                        | −8 %          |
+
+What remains is second order: the speed ripple the torque itself causes correlates with it, which grows with
+the square of the torque. The rig's run-to-run spread, at most about 6 µN·m·s between the two runs of a
+calibration, is that of the 1 mN·m plant.
 
 The friction also changes with the motor's temperature, which no trajectory removes: on the rig it fell by 10
 to 30 % through each 12-minute sweep and read high again after an idle hour, while the winding resistance
-barely moved. That is the bearing's grease, and the online estimator follows it.
+barely moved, as a bearing's grease would. The online estimator follows it.
 
 ### Bounded Envelope
 

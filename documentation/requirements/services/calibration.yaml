@@ -120,7 +120,10 @@
     shall store a record whose resistance is within 5 %, inductance within 20 %, inertia within
     5 % and viscous friction within 10 % of the plant's, with the plant's pole-pair count, for
     each reference motor. The record shall be traced when it is stored so that the comparison
-    is made on what the motor will run with.
+    is made on what the motor will run with. On the bench motor with a dry friction of 3.7 mN·m
+    and a torque of 1 mN·m that repeats once per turn, the viscous friction shall be within 10 %
+    and the inertia within 5 %: each excitation dwell spans whole turns, and a converged run ends
+    on a dwell boundary, so the angle-dependent torque cancels from the fit.
 
 - id: REQ-CAL-014
   title: Online estimates converge on the plant from a wrong seed
