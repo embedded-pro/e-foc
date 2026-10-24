@@ -12,7 +12,7 @@ namespace tool
 
         MOCK_METHOD(void, OnConnectionChanged, (bool connected), (override));
         MOCK_METHOD(void, OnAdapterError, (infra::BoundedConstString message), (override));
-        MOCK_METHOD(void, OnFrameLog, (bool transmitted, uint32_t id, const CanFrame& data), (override));
+        MOCK_METHOD(void, OnFrameLog, (bool transmitted, uint32_t id, const services::CanFrame& data), (override));
         MOCK_METHOD(void, OnNodeOnlineChanged, (uint16_t nodeId, bool online), (override));
         MOCK_METHOD(void, OnBusyChanged, (uint16_t nodeId, bool busy), (override));
         MOCK_METHOD(void, OnCommandTimeout, (uint16_t nodeId), (override));

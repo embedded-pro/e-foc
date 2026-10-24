@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tools/can_commander/adapter/CanBusAdapter.hpp"
+#include "can-lite/drivers/interface/CanBusAdapter.hpp"
 #include "tools/can_commander/gui/ConnectionPanel.hpp"
 #include "tools/can_commander/gui/EventLogView.hpp"
 #include "tools/can_commander/gui/MotorOverview.hpp"
@@ -32,7 +32,7 @@ namespace tool
     public:
         static constexpr std::size_t maxMotors{ 8 };
 
-        MainWindow(CanBusAdapter& adapter, IssueLog& issueLog, QWidget* parent = nullptr);
+        MainWindow(services::CanBusAdapter& adapter, IssueLog& issueLog, QWidget* parent = nullptr);
         ~MainWindow() override;
 
         void StartAutomaticUpdateChecks();
@@ -45,7 +45,7 @@ namespace tool
     private:
         void OnConnectionChanged(bool connected) override;
         void OnAdapterError(infra::BoundedConstString message) override;
-        void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& frame) override;
+        void OnFrameLog(bool transmitted, uint32_t id, const services::CanFrame& frame) override;
         void OnNodeOnlineChanged(uint16_t nodeId, bool online) override;
         void OnBusyChanged(uint16_t nodeId, bool busy) override;
         void OnCommandTimeout(uint16_t nodeId) override;
@@ -100,7 +100,7 @@ namespace tool
         void SetupSocketNotifier();
         void TeardownSocketNotifier();
 
-        CanBusAdapter& adapter;
+        services::CanBusAdapter& adapter;
         IssueLog& issueLog;
         CanCommandClient client;
         UpdateChecker updateChecker;

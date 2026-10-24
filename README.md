@@ -246,6 +246,18 @@ Each controller needs its own node ID. On the EK-TM4C1294XL, fit the board-ID ju
 ground; PK0 is bit 0): with the default configuration a board answers as node 1 + its board ID, so
 boards jumpered 0–7 become nodes 1–8. Jumpers are read at reset only.
 
+### Supported CAN adapters
+
+| Adapter                          | Linux             | Windows                            | Interface name                     |
+|----------------------------------|-------------------|------------------------------------|------------------------------------|
+| SocketCAN devices                | Yes               | —                                  | `can0`                             |
+| CANable and other slcan adapters | Yes               | Yes                                | `slcan:/dev/ttyACM0`, `slcan:COM3` |
+| candleLight (gs_usb firmware)    | Through SocketCAN | Yes, no driver to install          | `candleLight:1`                    |
+| PEAK PCAN-USB                    | Through SocketCAN | Yes, with the PEAK driver package  | `PCAN:1`                           |
+| Kvaser                           | Through SocketCAN | Yes, with the Kvaser CANlib driver | `Kvaser:0`                         |
+
+On Linux, slcan needs the user in the `dialout` group (`sudo usermod -aG dialout $USER`, then log in again).
+
 ### Install
 
 Download the installer for your platform from the [latest release](https://github.com/embedded-pro/e-foc/releases/latest):
@@ -256,7 +268,7 @@ Download the installer for your platform from the [latest release](https://githu
 | Debian/Ubuntu x86-64 | `e_foc-can_commander-<tag>-linux-x86_64.deb`         | `sudo apt install ./e_foc-can_commander-<tag>-linux-x86_64.deb` |
 
 The `.deb` is built on Ubuntu 24.04 and needs a distribution of that generation or newer. Portable archives
-(`.zip`, `.tar.gz`) remain available. On Linux, bring the interface up first, e.g.
+(`.zip`, `.tar.gz`) remain available. On Linux, bring a SocketCAN interface up first, e.g.
 `sudo ip link set can0 up type can bitrate 1000000`. `e-foc-can-commander --version` prints the installed
 version without opening a window (on Windows, run it from a console).
 

@@ -2,10 +2,20 @@
 #include "ui/backend/qt/QtTheme.hpp"
 #include "ui/theme/Theme.hpp"
 #include <QHBoxLayout>
+#include <QLineEdit>
 
 namespace tool
 {
-    ConnectionPanel::ConnectionPanel(CanBusAdapter& adapter, QWidget* parent)
+    namespace
+    {
+#if defined(_WIN32)
+        constexpr const char* interfaceHint{ "CAN adapter to open: PCAN:<channel>, Kvaser:<channel>, slcan:<COM port> for a CANable or other slcan adapter, or candleLight:<number>" };
+#else
+        constexpr const char* interfaceHint{ "CAN adapter to open: a SocketCAN interface such as can0, or slcan:<serial port> for a CANable or other slcan adapter, e.g. slcan:/dev/ttyACM0" };
+#endif
+    }
+
+    ConnectionPanel::ConnectionPanel(services::CanBusAdapter& adapter, QWidget* parent)
         : QGroupBox("Connection", parent)
         , adapter(adapter)
     {
@@ -34,8 +44,9 @@ namespace tool
         interfaceCombo = new QComboBox();
         interfaceCombo->setEditable(true);
         interfaceCombo->setInsertPolicy(QComboBox::NoInsert);
-        interfaceCombo->setMinimumWidth(120);
-        interfaceCombo->setToolTip("CAN interface to open, e.g. can0 or a PCAN/Kvaser/CANable channel");
+        interfaceCombo->setMinimumWidth(160);
+        interfaceCombo->setToolTip(interfaceHint);
+        interfaceCombo->lineEdit()->setPlaceholderText("No adapter found");
         AddLabelled(layout, "&Interface:", interfaceCombo);
 
         refreshButton = new QPushButton("↻");
@@ -74,11 +85,10 @@ namespace tool
         const auto current = interfaceCombo->currentText();
         interfaceCombo->clear();
 
-        for (const auto& name : adapter.AvailableInterfaces())
-            interfaceCombo->addItem(QString::fromStdString(name));
-
-        if (interfaceCombo->count() == 0)
-            interfaceCombo->addItem("can0");
+        adapter.EnumerateInterfaces([this](infra::BoundedConstString name)
+            {
+                interfaceCombo->addItem(QString::fromUtf8(name.data(), static_cast<qsizetype>(name.size())));
+            });
 
         if (!current.isEmpty())
             interfaceCombo->setCurrentText(current);

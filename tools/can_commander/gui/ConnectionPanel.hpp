@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tools/can_commander/adapter/CanBusAdapter.hpp"
+#include "can-lite/drivers/interface/CanBusAdapter.hpp"
 #include <QComboBox>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -16,7 +16,7 @@ namespace tool
         Q_OBJECT
 
     public:
-        explicit ConnectionPanel(CanBusAdapter& adapter, QWidget* parent = nullptr);
+        explicit ConnectionPanel(services::CanBusAdapter& adapter, QWidget* parent = nullptr);
 
         QString InterfaceName() const;
         uint32_t Bitrate() const;
@@ -42,7 +42,7 @@ namespace tool
         void ConnectSignals();
         void UpdateConnectEnabled();
 
-        CanBusAdapter& adapter;
+        services::CanBusAdapter& adapter;
         QComboBox* interfaceCombo;
         QPushButton* refreshButton;
         QComboBox* bitrateCombo;
