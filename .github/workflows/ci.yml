@@ -91,6 +91,16 @@ jobs:
           name: e_foc-windows
           path: build/windows/**/*.exe
           if-no-files-found: warn
+  release_tools_build:
+    name: Release Tools Build
+    permissions:
+      contents: read
+      actions: write
+    uses: ./.github/workflows/build-tools.yml
+    with:
+      version: ci-${{ github.run_number }}
+      retention_days: 7
+    secrets: inherit
   embedded_build:
     name: Embedded Build
     runs-on: ubuntu-latest
