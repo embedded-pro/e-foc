@@ -68,13 +68,24 @@ namespace
     public:
         using can::FocMotorCategoryClientObserver::FocMotorCategoryClientObserver;
 
-        MOCK_METHOD(void, OnSelectControlModeResponse, (can::FocMotorMode), (override));
-        MOCK_METHOD(void, OnCategoryError, (uint8_t, can::FocMotorCategoryError), (override));
-        MOCK_METHOD(void, OnTelemetryStatus, (const hal::Can::Message&), (override));
-        MOCK_METHOD(void, OnTelemetryElectrical, (const hal::Can::Message&), (override));
-        MOCK_METHOD(void, OnContractVersionResponse, (uint8_t, uint8_t), (override));
-        MOCK_METHOD(void, OnElectricalParamsResponse, (foc::Ohm, foc::MilliHenry, uint8_t), (override));
-        MOCK_METHOD(void, OnMechanicalParamsResponse, (foc::NewtonMeterSecondPerRadian, foc::NewtonMeterSecondSquared), (override));
+        MOCK_METHOD(void, OnSelectControlModeResponse, (uint16_t, can::FocMotorMode), (override));
+        MOCK_METHOD(void, OnCategoryError, (uint16_t, uint8_t, can::FocMotorCategoryError), (override));
+        MOCK_METHOD(void, OnTelemetryStatus, (uint16_t, const hal::Can::Message&), (override));
+        MOCK_METHOD(void, OnTelemetryElectrical, (uint16_t, const hal::Can::Message&), (override));
+        MOCK_METHOD(void, OnContractVersionResponse, (uint16_t, uint8_t, uint8_t), (override));
+        MOCK_METHOD(void, OnElectricalParamsResponse, (uint16_t, foc::Ohm, foc::MilliHenry, uint8_t), (override));
+        MOCK_METHOD(void, OnMechanicalParamsResponse, (uint16_t, foc::NewtonMeterSecondPerRadian, foc::NewtonMeterSecondSquared), (override));
+    };
+
+    struct FrameOriginStub
+        : can::CanFrameOrigin
+    {
+        uint16_t SourceNodeId() const override
+        {
+            return node;
+        }
+
+        uint16_t node{ 1 };
     };
 
     struct SequenceSourceStub
@@ -142,7 +153,8 @@ namespace
         services::CanFrameTransport serverTransport{ serverCanMock, 0 };
         SequenceSourceStub sequenceSource;
 
-        can::FocMotorCategoryClient client{ clientTransport, sequenceSource };
+        FrameOriginStub origin;
+        can::FocMotorCategoryClient client{ clientTransport, sequenceSource, origin };
         can::FocMotorCategoryServer server{ serverTransport };
         AcknowledgerSpy ackSpy;
         StrictMock<ContractServerObserver> serverObserver{ server };
@@ -266,7 +278,7 @@ TEST_F(FocMotorWireContractTest, every_command_the_client_sends_reaches_the_serv
 
 TEST_F(FocMotorWireContractTest, a_select_control_mode_response_reaches_the_client)
 {
-    EXPECT_CALL(clientObserver, OnSelectControlModeResponse(can::FocMotorMode::position));
+    EXPECT_CALL(clientObserver, OnSelectControlModeResponse(1, can::FocMotorMode::position));
 
     server.SendSelectControlModeResponse(can::FocMotorMode::position);
     DeliverToClient();
@@ -280,7 +292,7 @@ TEST_F(FocMotorWireContractTest, the_contract_version_round_trips_and_both_ends_
     EXPECT_EQ(can::focContractVersionResponseId, respondedMessageType);
     EXPECT_EQ(Bytes({ can::focContractVersionMajor, can::focContractVersionMinor }), respondedMessage);
 
-    EXPECT_CALL(clientObserver, OnContractVersionResponse(can::focContractVersionMajor, can::focContractVersionMinor));
+    EXPECT_CALL(clientObserver, OnContractVersionResponse(1, can::focContractVersionMajor, can::focContractVersionMinor));
     DeliverToClient();
 }
 
@@ -313,27 +325,27 @@ TEST_F(FocMotorWireContractTest, every_command_is_rejected_one_byte_short_and_on
 
 TEST_F(FocMotorWireContractTest, sends_are_allowed_before_the_version_is_known)
 {
-    EXPECT_EQ(can::ContractCompatibility::unknown, client.Compatibility());
+    EXPECT_EQ(can::ContractCompatibility::unknown, client.Compatibility(1));
     EXPECT_TRUE(client.SendStart(1));
 }
 
 TEST_F(FocMotorWireContractTest, a_matching_major_marks_the_contract_compatible)
 {
-    EXPECT_CALL(clientObserver, OnContractVersionResponse(_, _));
+    EXPECT_CALL(clientObserver, OnContractVersionResponse(1, _, _));
     client.HandleMessage(can::focContractVersionResponseId,
         Bytes({ can::focContractVersionMajor, can::focContractVersionMinor }));
 
-    EXPECT_EQ(can::ContractCompatibility::compatible, client.Compatibility());
+    EXPECT_EQ(can::ContractCompatibility::compatible, client.Compatibility(1));
     EXPECT_TRUE(client.SendStart(1));
 }
 
 TEST_F(FocMotorWireContractTest, an_incompatible_major_refuses_every_further_category_command)
 {
-    EXPECT_CALL(clientObserver, OnContractVersionResponse(_, _));
+    EXPECT_CALL(clientObserver, OnContractVersionResponse(1, _, _));
     client.HandleMessage(can::focContractVersionResponseId,
         Bytes({ static_cast<uint8_t>(can::focContractVersionMajor + 1), 0 }));
 
-    EXPECT_EQ(can::ContractCompatibility::incompatible, client.Compatibility());
+    EXPECT_EQ(can::ContractCompatibility::incompatible, client.Compatibility(1));
 
     EXPECT_FALSE(client.SendStart(1));
     EXPECT_FALSE(client.SendStop(1));
@@ -348,9 +360,55 @@ TEST_F(FocMotorWireContractTest, an_incompatible_major_refuses_every_further_cat
     EXPECT_FALSE(client.SendSetPositionBandwidth(1, 100.0f));
 }
 
+TEST_F(FocMotorWireContractTest, an_incompatible_node_does_not_refuse_commands_to_other_nodes)
+{
+    EXPECT_CALL(clientObserver, OnContractVersionResponse(1, _, _));
+    client.HandleMessage(can::focContractVersionResponseId,
+        Bytes({ static_cast<uint8_t>(can::focContractVersionMajor + 1), 0 }));
+
+    origin.node = 2;
+    EXPECT_CALL(clientObserver, OnContractVersionResponse(2, _, _));
+    client.HandleMessage(can::focContractVersionResponseId,
+        Bytes({ can::focContractVersionMajor, can::focContractVersionMinor }));
+
+    EXPECT_EQ(can::ContractCompatibility::incompatible, client.Compatibility(1));
+    EXPECT_EQ(can::ContractCompatibility::compatible, client.Compatibility(2));
+    EXPECT_EQ(can::ContractCompatibility::unknown, client.Compatibility(3));
+    EXPECT_FALSE(client.SendEmergencyStop(1));
+    EXPECT_TRUE(client.SendEmergencyStop(2));
+    EXPECT_TRUE(client.SendEmergencyStop(3));
+}
+
+TEST_F(FocMotorWireContractTest, a_node_that_is_upgraded_reports_its_new_compatibility)
+{
+    EXPECT_CALL(clientObserver, OnContractVersionResponse(1, _, _)).Times(2);
+    client.HandleMessage(can::focContractVersionResponseId,
+        Bytes({ static_cast<uint8_t>(can::focContractVersionMajor + 1), 0 }));
+    client.HandleMessage(can::focContractVersionResponseId,
+        Bytes({ can::focContractVersionMajor, can::focContractVersionMinor }));
+
+    EXPECT_EQ(can::ContractCompatibility::compatible, client.Compatibility(1));
+    EXPECT_TRUE(client.SendStart(1));
+}
+
+TEST_F(FocMotorWireContractTest, compatibility_of_the_oldest_node_is_forgotten_beyond_the_tracked_limit)
+{
+    for (uint16_t node = 1; node <= can::FocMotorCategoryClient::maxTrackedNodes + 1; ++node)
+    {
+        origin.node = node;
+        EXPECT_CALL(clientObserver, OnContractVersionResponse(node, _, _));
+        client.HandleMessage(can::focContractVersionResponseId,
+            Bytes({ static_cast<uint8_t>(can::focContractVersionMajor + 1), 0 }));
+    }
+
+    EXPECT_EQ(can::ContractCompatibility::unknown, client.Compatibility(1));
+    EXPECT_EQ(can::ContractCompatibility::incompatible, client.Compatibility(2));
+    EXPECT_EQ(can::ContractCompatibility::incompatible, client.Compatibility(can::FocMotorCategoryClient::maxTrackedNodes + 1));
+}
+
 TEST_F(FocMotorWireContractTest, the_version_query_itself_survives_an_incompatible_major)
 {
-    EXPECT_CALL(clientObserver, OnContractVersionResponse(_, _));
+    EXPECT_CALL(clientObserver, OnContractVersionResponse(1, _, _));
     client.HandleMessage(can::focContractVersionResponseId,
         Bytes({ static_cast<uint8_t>(can::focContractVersionMajor + 1), 0 }));
 
@@ -481,7 +539,7 @@ TEST_F(FocMotorWireContractTest, an_overlong_category_error_frame_is_dropped_rat
 {
     const auto valid = Bytes({ can::focStartId, static_cast<uint8_t>(can::FocMotorCategoryError::busy) });
 
-    EXPECT_CALL(clientObserver, OnCategoryError(can::focStartId, can::FocMotorCategoryError::busy));
+    EXPECT_CALL(clientObserver, OnCategoryError(1, can::focStartId, can::FocMotorCategoryError::busy));
     client.HandleMessage(services::canCategoryErrorResponseMessageTypeId, valid);
 
     const auto overlong = Bytes({ can::focStartId, static_cast<uint8_t>(can::FocMotorCategoryError::busy), 0x00 });

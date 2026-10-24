@@ -204,6 +204,63 @@ cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
 | Black window or no rendering    | Set `LIBGL_ALWAYS_INDIRECT=1` (already configured in the Dev Container)            |
 | Windows firewall blocks display | Allow VcXsrv (`vcxsrv.exe`) through the Windows firewall for private networks      |
 
+## Releases
+
+Each [release](https://github.com/embedded-pro/e-foc/releases) carries:
+
+| Asset                                                  | Content                                                                            |
+|--------------------------------------------------------|------------------------------------------------------------------------------------|
+| `e_foc-firmware-<board>-<tag>.tar.gz`                  | `.elf` and `.hex` of every application built for the board                         |
+| `e_foc-firmware-EK-TM4C1294XL-<application>-<tag>.hex` | ready-to-flash images for the EK-TM4C1294XL (`sync_foc_sensored`, `hardware_test`) |
+| `e_foc-source-<tag>.tar.gz`                            | the complete source with every submodule (GitHub's own source archives omit them)  |
+| `e_foc-can_commander-*`, `e_foc-simulator-*`           | desktop tools for Linux and Windows (see below)                                    |
+| `*.pdf`                                                | design booklet, requirements and traceability matrix                               |
+
+Configuring a build from the source archive still downloads the dependencies CMake declares with
+`FetchContent` (such as `ui-cpp` and GoogleTest).
+
+## CAN Commander
+
+**e-foc CAN Commander** commands and monitors the e-foc motor controllers on one CAN bus — up to eight,
+each addressed by its node ID. Every controller whose heartbeat is seen gets its own tab (you can also add
+one by node ID) with start/stop, control mode, setpoints, loop bandwidths, telemetry and identified
+parameters; an overview row keeps every motor's state and faults in view, and one always-visible
+**EMERGENCY STOP ALL** (`Esc`) reaches every motor.
+
+### Install
+
+Download the installer for your platform from the [latest release](https://github.com/embedded-pro/e-foc/releases/latest):
+
+| Platform             | Asset                                                | Install                                                         |
+|----------------------|------------------------------------------------------|-----------------------------------------------------------------|
+| Windows x86-64       | `e_foc-can_commander-<tag>-windows-x86_64-setup.exe` | Run it; start from *Start → e-foc CAN Commander*                |
+| Debian/Ubuntu x86-64 | `e_foc-can_commander-<tag>-linux-x86_64.deb`         | `sudo apt install ./e_foc-can_commander-<tag>-linux-x86_64.deb` |
+
+The `.deb` is built on Ubuntu 24.04 and needs a distribution of that generation or newer. Portable archives
+(`.zip`, `.tar.gz`) remain available. On Linux, bring the interface up first, e.g.
+`sudo ip link set can0 up type can bitrate 1000000`. `e-foc-can-commander --version` prints the installed
+version without opening a window (on Windows, run it from a console).
+
+### Issue log, bug reports and updates
+
+- Every session writes an issue log (UTC timestamps, rotated at 1 MiB, three files) to
+  `~/.local/share/e-foc/CAN Commander/logs` on Linux or `%LOCALAPPDATA%\e-foc\CAN Commander\logs` on Windows.
+  *Help → Open Log Folder* opens it.
+- *Help → Report Issue* opens a pre-filled GitHub issue with the version, OS and recent log lines for you
+  to review and submit.
+- At startup the tool checks the latest GitHub release and shows a banner when a newer version exists.
+  Turn it off with *Help → Check for Updates at Startup* or `--no-update-check`.
+
+### Build the installers locally
+
+```bash
+cmake --preset host && cmake --build build/host --config Release --target e_foc.tool.can_commander
+cpack --config build/host/tools/can_commander/installer/CPackConfig.cmake -C Release -G DEB   # Linux
+cpack --config build/tools/can_commander/installer/CPackConfig.cmake -C Release -G NSIS        # Windows, NSIS on PATH
+```
+
+Design: [documentation/design/tool-can-commander.md](documentation/design/tool-can-commander.md).
+
 ## Documentation
 
 ### Architecture Documents
@@ -229,6 +286,7 @@ cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
 | [Mechanical Identification Service](documentation/design/service-mechanical-ident.md)    | Friction and inertia estimation service      |
 | [NVM Service](documentation/design/service-nvm.md)                                       | Non-volatile memory persistence service      |
 | [Integration Testing Design](documentation/design/integration-testing.md)                | Fixture design, calibration flow, CAN bridge |
+| [CAN Commander](documentation/design/tool-can-commander.md)                              | Desktop commander, issue log, installers     |
 
 ### Requirements
 

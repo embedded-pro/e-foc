@@ -1,0 +1,26 @@
+IDI_ICON1 ICON "@CAN_COMMANDER_ICON@"
+
+1 VERSIONINFO
+FILEVERSION @e_foc_VERSION_MAJOR@,@e_foc_VERSION_MINOR@,@e_foc_VERSION_PATCH@,0
+PRODUCTVERSION @e_foc_VERSION_MAJOR@,@e_foc_VERSION_MINOR@,@e_foc_VERSION_PATCH@,0
+FILEOS 0x40004
+FILETYPE 0x1
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "embedded-pro"
+            VALUE "FileDescription", "e-foc CAN Commander"
+            VALUE "FileVersion", "@e_foc_VERSION@"
+            VALUE "InternalName", "e-foc-can-commander"
+            VALUE "OriginalFilename", "e-foc-can-commander.exe"
+            VALUE "ProductName", "e-foc CAN Commander"
+            VALUE "ProductVersion", "@e_foc_VERSION@"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

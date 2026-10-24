@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file>e-foc-can-commander.png</file>
+    </qresource>
+</RCC>

@@ -16,6 +16,8 @@ target_link_libraries(e_foc.can PUBLIC
 )
 
 target_sources(e_foc.can PRIVATE
+    CanFrameOrigin.hpp
+    CanFrameOrigin.cpp
     FocMotorMessages.hpp
     FocMotorWireContract.hpp
     FocMotorCategoryServer.hpp

@@ -62,7 +62,7 @@ jobs:
           submodules: recursive
       - uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
       - name: Install Qt6
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qt6-base-dev libgl1-mesa-dev ccache
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qt6-base-dev libgl1-mesa-dev ccache dpkg-dev desktop-file-utils
       - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
         with:
           configurePreset: "host"
@@ -81,9 +81,33 @@ jobs:
           version="${{ needs.release_please.outputs.version }}"
           staging="staging/can_commander"
           mkdir -p "$staging"
-          find build/host/tools/can_commander -name "e_foc.tool.can_commander" -type f -executable -exec cp {} "$staging/" \;
-          test -x "$staging/e_foc.tool.can_commander"
+          find build/host/tools/can_commander -name "e-foc-can-commander" -type f -executable -path "*/Release/*" -exec cp {} "$staging/" \;
+          test -x "$staging/e-foc-can-commander"
           tar -czf "e_foc-can_commander-${version}-linux-x86_64.tar.gz" -C staging can_commander
+      - name: Package CAN Commander installer
+        run: |
+          version="${{ needs.release_please.outputs.version }}"
+          cpack --config build/host/tools/can_commander/installer/CPackConfig.cmake -C Release -G DEB \
+            -B "$PWD/installer" -D CPACK_PACKAGE_FILE_NAME="e_foc-can_commander-${version}-linux-x86_64"
+          mv "installer/e_foc-can_commander-${version}-linux-x86_64.deb" .
+          dpkg-deb --info "e_foc-can_commander-${version}-linux-x86_64.deb"
+          dpkg-deb --contents "e_foc-can_commander-${version}-linux-x86_64.deb"
+      - name: Verify CAN Commander installer
+        run: |
+          version="${{ needs.release_please.outputs.version }}"
+          expected="$(sed -nE 's/^project\(e_foc .*VERSION ([0-9.]+)\).*/\1/p' CMakeLists.txt)"
+          sudo apt-get install -y "./e_foc-can_commander-${version}-linux-x86_64.deb"
+          desktop-file-validate /usr/share/applications/e-foc-can-commander.desktop
+          test -f /usr/share/icons/hicolor/scalable/apps/e-foc-can-commander.svg
+          reported="$(e-foc-can-commander --version)"
+          echo "$reported"
+          test "$reported" = "e-foc CAN Commander ${expected}"
+          e-foc-can-commander --help
+          status=0
+          QT_QPA_PLATFORM=offscreen timeout 10 e-foc-can-commander --no-update-check || status=$?
+          test "$status" -eq 124 || { echo "::error::CAN Commander exited with $status instead of running"; exit 1; }
+          sudo apt-get remove -y e-foc-can-commander
+          test ! -e /usr/bin/e-foc-can-commander
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-simulator
@@ -93,6 +117,11 @@ jobs:
         with:
           name: linux-can-commander
           path: e_foc-can_commander-*-linux-x86_64.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-can-commander-installer
+          path: e_foc-can_commander-*-linux-x86_64.deb
           if-no-files-found: error
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -148,10 +177,41 @@ jobs:
           version="${{ needs.release_please.outputs.version }}"
           staging="staging/can_commander"
           mkdir -p "$staging"
-          find build/tools -name "e_foc.tool.can_commander.exe" -type f -exec cp {} "$staging/" \;
-          test -f "$staging/e_foc.tool.can_commander.exe"
-          windeployqt --release --no-translations "$staging/e_foc.tool.can_commander.exe"
+          find build/tools -name "e-foc-can-commander.exe" -type f -exec cp {} "$staging/" \;
+          test -f "$staging/e-foc-can-commander.exe"
+          windeployqt --release --no-translations "$staging/e-foc-can-commander.exe"
           7z a "e_foc-can_commander-${version}-windows-x86_64.zip" "./staging/can_commander/*"
+      - name: Package CAN Commander installer
+        shell: bash
+        run: |
+          version="${{ needs.release_please.outputs.version }}"
+          if ! command -v makensis >/dev/null && [ ! -x "/c/Program Files (x86)/NSIS/makensis.exe" ]; then
+            choco install nsis -y --no-progress
+          fi
+          export PATH="$PATH:/c/Program Files (x86)/NSIS"
+          cpack --config build/tools/can_commander/installer/CPackConfig.cmake -C Release -G NSIS \
+            -B "$PWD/installer" -D CPACK_PACKAGE_FILE_NAME="e_foc-can_commander-${version}-windows-x86_64-setup"
+          mv "installer/e_foc-can_commander-${version}-windows-x86_64-setup.exe" .
+      - name: Verify CAN Commander installer
+        shell: pwsh
+        run: |
+          $version = "${{ needs.release_please.outputs.version }}"
+          $expected = (Select-String -Path CMakeLists.txt -Pattern '^project\(e_foc .*VERSION ([0-9.]+)\)').Matches[0].Groups[1].Value
+          $target = "C:\efoc-can-commander-test"
+          Start-Process -FilePath ".\e_foc-can_commander-$version-windows-x86_64-setup.exe" -ArgumentList "/S", "/D=$target" -Wait
+          $exe = Join-Path $target "bin\e-foc-can-commander.exe"
+          if (-not (Test-Path $exe)) { throw "installer did not install $exe" }
+          if (-not (Test-Path (Join-Path $target "bin\Qt6Widgets.dll"))) { throw "installer did not deploy the Qt runtime" }
+          $info = (Get-Item $exe).VersionInfo
+          Write-Output "$($info.ProductName) $($info.ProductVersion)"
+          if ($info.ProductName -ne "e-foc CAN Commander" -or $info.ProductVersion -ne $expected) { throw "unexpected version resource" }
+          $app = Start-Process -FilePath $exe -ArgumentList "--no-update-check" -PassThru
+          Start-Sleep -Seconds 8
+          if ($app.HasExited) { throw "CAN Commander exited with $($app.ExitCode) instead of running" }
+          Stop-Process -Id $app.Id -Force
+          Start-Sleep -Seconds 2
+          Start-Process -FilePath (Join-Path $target "Uninstall.exe") -ArgumentList "/S", "_?=$target" -Wait
+          if (Test-Path $exe) { throw "uninstaller left $exe behind" }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-simulator
@@ -161,6 +221,11 @@ jobs:
         with:
           name: windows-can-commander
           path: e_foc-can_commander-*-windows-x86_64.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-can-commander-installer
+          path: e_foc-can_commander-*-windows-x86_64-setup.exe
           if-no-files-found: error
 
   build_embedded:
@@ -215,6 +280,50 @@ jobs:
           name: firmware-${{ matrix.target }}
           path: e_foc-firmware-${{ matrix.target }}-*.tar.gz
           if-no-files-found: error
+      - name: Stage EK-TM4C1294XL hex images
+        if: matrix.target == 'EK-TM4C1294XL'
+        run: |
+          version="${{ needs.release_please.outputs.version }}"
+          for app in sync_foc_sensored hardware_test; do
+            hex="$(find "build/${{ matrix.target }}" -name "e_foc.${app}.main.hex" -path "*/${{ matrix.configuration }}/*" -type f | head -n 1)"
+            test -s "$hex" || { echo "::error::no ${app} hex image for ${{ matrix.target }}"; exit 1; }
+            cp "$hex" "e_foc-firmware-${{ matrix.target }}-${app}-${version}.hex"
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.target == 'EK-TM4C1294XL'
+        with:
+          name: firmware-hex-${{ matrix.target }}
+          path: e_foc-firmware-${{ matrix.target }}-*.hex
+          if-no-files-found: error
+
+  package_source:
+    name: Package Source
+    needs: release_please
+    if: needs.release_please.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure Git
+        run: |
+          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git config --global --add safe.directory '*'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: Archive source with submodules
+        run: |
+          version="${{ needs.release_please.outputs.version }}"
+          archive="e_foc-source-${version}.tar.gz"
+          git ls-files --recurse-submodules -z | tar --null -T - --transform "s,^,e_foc-${version}/," -czf "$archive"
+          tar -tzf "$archive" | grep -q "^e_foc-${version}/infra/embedded-infra-lib/CMakeLists.txt$"
+          tar -tzf "$archive" | grep -q "^e_foc-${version}/CMakeLists.txt$"
+          ls -l "$archive"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: source
+          path: e_foc-source-*.tar.gz
+          if-no-files-found: error
 
   build_documentation:
     name: Build Documentation
@@ -255,7 +364,8 @@ jobs:
         build_linux_tools,
         build_windows_tools,
         build_embedded,
-        build_documentation
+        build_documentation,
+        package_source
       ]
     if: needs.release_please.outputs.build == 'true'
     runs-on: ubuntu-latest
@@ -275,12 +385,17 @@ jobs:
           for asset in \
             "e_foc-simulator-${v}-linux-x86_64.tar.gz" \
             "e_foc-can_commander-${v}-linux-x86_64.tar.gz" \
+            "e_foc-can_commander-${v}-linux-x86_64.deb" \
             "e_foc-simulator-${v}-windows-x86_64.zip" \
             "e_foc-can_commander-${v}-windows-x86_64.zip" \
+            "e_foc-can_commander-${v}-windows-x86_64-setup.exe" \
             "e_foc-firmware-EK-TM4C1294XL-${v}.tar.gz" \
             "e_foc-firmware-EK-TM4C123GXL-${v}.tar.gz" \
             "e_foc-firmware-STM32F407G-DISC1-${v}.tar.gz" \
-            "e_foc-firmware-NUCLEO-H563ZI-${v}.tar.gz"; do
+            "e_foc-firmware-NUCLEO-H563ZI-${v}.tar.gz" \
+            "e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-${v}.hex" \
+            "e_foc-firmware-EK-TM4C1294XL-hardware_test-${v}.hex" \
+            "e_foc-source-${v}.tar.gz"; do
             test -s "release-assets/$asset" || { echo "::error::missing release asset $asset"; exit 1; }
           done
           compgen -G "release-assets/*-${v}.pdf" > /dev/null || { echo "::error::no documentation PDFs"; exit 1; }

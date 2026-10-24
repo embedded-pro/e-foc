@@ -1,214 +1,224 @@
 #include "tools/can_commander/gui/CommandPanel.hpp"
 #include "core/foc/interfaces/CommandLimits.hpp"
+#include "tools/can_commander/gui/DisplayFormat.hpp"
 #include "ui/backend/qt/QtTheme.hpp"
 #include "ui/theme/Theme.hpp"
 #include <QFormLayout>
 #include <QHBoxLayout>
-#include <QLabel>
-#include <QVBoxLayout>
 
 namespace tool
 {
+    QString CommandPanel::ControlModeName(can::FocMotorMode mode)
+    {
+        switch (mode)
+        {
+            case can::FocMotorMode::torque:
+                return "Torque";
+            case can::FocMotorMode::speed:
+                return "Speed";
+            case can::FocMotorMode::position:
+                return "Position";
+            default:
+                return "Unknown";
+        }
+    }
+
     CommandPanel::CommandPanel(QWidget* parent)
         : QWidget(parent)
     {
         auto* layout = new QVBoxLayout(this);
+        layout->setContentsMargins(0, 0, 0, 0);
+
+        hintLabel = new QLabel();
+        hintLabel->setWordWrap(true);
+        ui::backend::qt::StyleStatusLabel(*hintLabel, ui::theme::StatusLevel::Warning);
+        layout->addWidget(hintLabel);
 
         tabs = new QTabWidget();
-        tabs->addTab(CreateMotorControlTab(), "Motor Control");
-        tabs->addTab(CreatePidTuningTab(), "PID Tuning");
-        tabs->addTab(CreateParametersTab(), "Parameters");
-        layout->addWidget(tabs);
+        tabs->addTab(CreateMotorControlTab(), "&Motor Control");
+        tabs->addTab(CreatePidTuningTab(), "&PID Tuning");
+        layout->addWidget(tabs, 1);
     }
 
     QWidget* CommandPanel::CreateMotorControlTab()
     {
         auto* page = new QWidget();
         auto* layout = new QVBoxLayout(page);
+        layout->addWidget(CreateControlGroup());
+        layout->addWidget(CreateModeGroup());
+        layout->addWidget(CreateSetpointStack());
 
-        auto* controlGroup = new QGroupBox("Control");
-        auto* controlLayout = new QHBoxLayout(controlGroup);
-
-        auto* startButton = new QPushButton("Start Motor");
-        auto* stopButton = new QPushButton("Stop Motor");
-        auto* estopButton = new QPushButton("EMERGENCY STOP");
-        ui::backend::qt::StyleButton(*estopButton, ui::theme::ButtonRole::EmergencyStop);
-
-        controlLayout->addWidget(startButton);
-        controlLayout->addWidget(stopButton);
-        controlLayout->addWidget(estopButton);
-        layout->addWidget(controlGroup);
-
-        commandButtons.push_back(startButton);
-        commandButtons.push_back(stopButton);
-        commandButtons.push_back(estopButton);
-
-        connect(startButton, &QPushButton::clicked, this, &CommandPanel::StartMotorRequested);
-        connect(stopButton, &QPushButton::clicked, this, &CommandPanel::StopMotorRequested);
-        connect(estopButton, &QPushButton::clicked, this, &CommandPanel::EmergencyStopRequested);
-
-        auto* modeGroup = new QGroupBox("Control Mode");
-        auto* modeLayout = new QHBoxLayout(modeGroup);
-        auto* modeCombo = new QComboBox();
-        modeCombo->addItem("Torque", static_cast<int>(can::FocMotorMode::torque));
-        modeCombo->addItem("Speed", static_cast<int>(can::FocMotorMode::speed));
-        modeCombo->addItem("Position", static_cast<int>(can::FocMotorMode::position));
-        auto* modeButton = new QPushButton("Set Mode");
-        modeLabel = new QLabel("Active: Unknown");
-        ui::backend::qt::StyleStatusLabel(*modeLabel, ui::theme::StatusLevel::Neutral);
-        modeLayout->addWidget(modeCombo);
-        modeLayout->addWidget(modeButton);
-        modeLayout->addWidget(modeLabel);
-        layout->addWidget(modeGroup);
-
-        commandButtons.push_back(modeButton);
-        connect(modeButton, &QPushButton::clicked, [this, modeCombo]()
-            {
-                emit SetControlModeRequested(static_cast<can::FocMotorMode>(modeCombo->currentData().toInt()));
-            });
-
-        setpointStack = new QStackedWidget();
-
-        auto* torqueGroup = new QGroupBox("Torque Setpoint");
-        auto* torqueLayout = new QFormLayout(torqueGroup);
-        auto* iqSpin = new QDoubleSpinBox();
-        iqSpin->setRange(-32.0, 32.0);
-        iqSpin->setDecimals(3);
-        iqSpin->setSuffix(" A");
-        torqueLayout->addRow("Iq:", iqSpin);
-        auto* torqueButton = new QPushButton("Set Torque");
-        torqueLayout->addRow(torqueButton);
-        setpointStack->addWidget(torqueGroup);
-
-        commandButtons.push_back(torqueButton);
-        connect(torqueButton, &QPushButton::clicked, [this, iqSpin]()
-            {
-                emit SetTorqueSetpointRequested(static_cast<float>(iqSpin->value()));
-            });
-
-        auto* speedGroup = new QGroupBox("Speed Setpoint");
-        auto* speedLayout = new QFormLayout(speedGroup);
-        auto* speedSpin = new QDoubleSpinBox();
-        speedSpin->setRange(-32767.0, 32767.0);
-        speedSpin->setDecimals(3);
-        speedSpin->setSuffix(" rad/s");
-        speedLayout->addRow("Speed:", speedSpin);
-        auto* speedButton = new QPushButton("Set Speed");
-        speedLayout->addRow(speedButton);
-        setpointStack->addWidget(speedGroup);
-
-        commandButtons.push_back(speedButton);
-        connect(speedButton, &QPushButton::clicked, [this, speedSpin]()
-            {
-                emit SetSpeedSetpointRequested(static_cast<float>(speedSpin->value()));
-            });
-
-        auto* posGroup = new QGroupBox("Position Setpoint");
-        auto* posLayout = new QFormLayout(posGroup);
-        auto* posSpin = new QDoubleSpinBox();
-        posSpin->setRange(-327.67, 327.67);
-        posSpin->setDecimals(4);
-        posSpin->setSuffix(" rad");
-        posLayout->addRow("Position:", posSpin);
-        auto* posButton = new QPushButton("Set Position");
-        posLayout->addRow(posButton);
-        setpointStack->addWidget(posGroup);
-
-        commandButtons.push_back(posButton);
-        connect(posButton, &QPushButton::clicked, [this, posSpin]()
-            {
-                emit SetPositionSetpointRequested(static_cast<float>(posSpin->value()));
-            });
-
-        layout->addWidget(setpointStack);
-
-        auto* queryButton = new QPushButton("Query Controller Status");
+        auto* queryButton = new QPushButton("Chec&k Firmware Compatibility");
+        queryButton->setToolTip("Ask the controller for its CAN contract version");
         layout->addWidget(queryButton);
-        commandButtons.push_back(queryButton);
+        commandWidgets.push_back(queryButton);
         connect(queryButton, &QPushButton::clicked, this, &CommandPanel::RequestDataRequested);
 
         layout->addStretch();
         return page;
     }
 
+    QGroupBox* CommandPanel::CreateControlGroup()
+    {
+        auto* group = new QGroupBox("Motor");
+        auto* layout = new QHBoxLayout(group);
+
+        auto* startButton = new QPushButton("&Start Motor");
+        auto* stopButton = new QPushButton("S&top Motor");
+        layout->addWidget(startButton);
+        layout->addWidget(stopButton);
+
+        commandWidgets.push_back(startButton);
+        commandWidgets.push_back(stopButton);
+        connect(startButton, &QPushButton::clicked, this, &CommandPanel::StartMotorRequested);
+        connect(stopButton, &QPushButton::clicked, this, &CommandPanel::StopMotorRequested);
+        return group;
+    }
+
+    QGroupBox* CommandPanel::CreateModeGroup()
+    {
+        auto* group = new QGroupBox("Control Mode");
+        auto* layout = new QHBoxLayout(group);
+
+        auto* modeCombo = new QComboBox();
+        modeCombo->setAccessibleName("Control mode");
+        for (const auto mode : { can::FocMotorMode::torque, can::FocMotorMode::speed, can::FocMotorMode::position })
+            modeCombo->addItem(ControlModeName(mode), static_cast<int>(mode));
+        auto* modeButton = new QPushButton("Apply");
+        modeLabel = new QLabel();
+        layout->addWidget(modeCombo);
+        layout->addWidget(modeButton);
+        layout->addWidget(modeLabel, 1);
+        ClearActiveControlMode();
+
+        commandWidgets.push_back(modeButton);
+        connect(modeButton, &QPushButton::clicked, this, [this, modeCombo]()
+            {
+                emit SetControlModeRequested(static_cast<can::FocMotorMode>(modeCombo->currentData().toInt()));
+            });
+        return group;
+    }
+
+    QStackedWidget* CommandPanel::CreateSetpointStack()
+    {
+        using foc::CommandLimits;
+
+        setpointStack = new QStackedWidget();
+        setpointStack->addWidget(CreateSetpointGroup("Torque Setpoint", "Iq:", SetpointLimit(CommandLimits::maxTorqueSetpoint, can::focCurrentScale),
+            DecimalsFor(can::focCurrentScale), " A", &CommandPanel::SetTorqueSetpointRequested));
+        setpointStack->addWidget(CreateSetpointGroup("Speed Setpoint", "Speed:", SetpointLimit(CommandLimits::maxSpeedSetpoint, can::focSpeedScale),
+            DecimalsFor(can::focSpeedScale), " rad/s", &CommandPanel::SetSpeedSetpointRequested));
+        setpointStack->addWidget(CreateSetpointGroup("Position Setpoint", "Position:", SetpointLimit(CommandLimits::maxPositionSetpoint, can::focPositionScale),
+            DecimalsFor(can::focPositionScale), " rad", &CommandPanel::SetPositionSetpointRequested));
+        return setpointStack;
+    }
+
+    QGroupBox* CommandPanel::CreateSetpointGroup(const char* title, const char* label, double limit, int decimals, const char* suffix, void (CommandPanel::*signal)(float))
+    {
+        auto* group = new QGroupBox(title);
+        auto* layout = new QFormLayout(group);
+
+        auto* spin = new QDoubleSpinBox();
+        spin->setRange(-limit, limit);
+        spin->setDecimals(decimals);
+        spin->setSuffix(suffix);
+        spin->setKeyboardTracking(false);
+        spin->setToolTip(QString("Accepted by the firmware: ±%1%2").arg(limit, 0, 'f', decimals).arg(suffix));
+        layout->addRow(label, spin);
+
+        auto* applyButton = new QPushButton("Apply");
+        layout->addRow(applyButton);
+
+        commandWidgets.push_back(applyButton);
+        connect(applyButton, &QPushButton::clicked, this, [this, spin, signal]()
+            {
+                emit(this->*signal)(static_cast<float>(spin->value()));
+            });
+        return group;
+    }
+
     QWidget* CommandPanel::CreatePidTuningTab()
     {
+        using foc::CommandLimits;
+
         auto* page = new QWidget();
         auto* layout = new QVBoxLayout(page);
-
         pidStack = new QStackedWidget();
 
-        auto addBandwidthGroup = [this](QVBoxLayout* parentLayout, const char* name, float maxBw, void (CommandPanel::*signal)(float))
+        for (int loops = 1; loops <= 3; ++loops)
         {
-            auto* group = new QGroupBox(name);
-            auto* formLayout = new QFormLayout(group);
-
-            auto* bwSpin = new QDoubleSpinBox();
-            bwSpin->setRange(foc::CommandLimits::minBandwidth, static_cast<double>(maxBw));
-            bwSpin->setDecimals(1);
-            bwSpin->setSuffix(" rad/s");
-
-            formLayout->addRow("Bandwidth:", bwSpin);
-
-            auto* sendButton = new QPushButton("Apply");
-            formLayout->addRow(sendButton);
-            parentLayout->addWidget(group);
-
-            commandButtons.push_back(sendButton);
-
-            connect(sendButton, &QPushButton::clicked, [this, bwSpin, signal]()
-                {
-                    (this->*signal)(static_cast<float>(bwSpin->value()));
-                });
-        };
-
-        auto* torquePidPage = new QWidget();
-        auto* torquePidLayout = new QVBoxLayout(torquePidPage);
-        addBandwidthGroup(torquePidLayout, "Current Loop Bandwidth", foc::CommandLimits::maxCurrentBandwidth, &CommandPanel::SetCurrentBandwidthRequested);
-        torquePidLayout->addStretch();
-        pidStack->addWidget(torquePidPage);
-
-        auto* speedPidPage = new QWidget();
-        auto* speedPidLayout = new QVBoxLayout(speedPidPage);
-        addBandwidthGroup(speedPidLayout, "Current Loop Bandwidth", foc::CommandLimits::maxCurrentBandwidth, &CommandPanel::SetCurrentBandwidthRequested);
-        addBandwidthGroup(speedPidLayout, "Speed Loop Bandwidth", foc::CommandLimits::maxSpeedBandwidth, &CommandPanel::SetSpeedBandwidthRequested);
-        speedPidLayout->addStretch();
-        pidStack->addWidget(speedPidPage);
-
-        auto* positionPidPage = new QWidget();
-        auto* positionPidLayout = new QVBoxLayout(positionPidPage);
-        addBandwidthGroup(positionPidLayout, "Current Loop Bandwidth", foc::CommandLimits::maxCurrentBandwidth, &CommandPanel::SetCurrentBandwidthRequested);
-        addBandwidthGroup(positionPidLayout, "Speed Loop Bandwidth", foc::CommandLimits::maxSpeedBandwidth, &CommandPanel::SetSpeedBandwidthRequested);
-        addBandwidthGroup(positionPidLayout, "Position Loop Bandwidth", foc::CommandLimits::maxPositionBandwidth, &CommandPanel::SetPositionBandwidthRequested);
-        positionPidLayout->addStretch();
-        pidStack->addWidget(positionPidPage);
+            auto* loopPage = new QWidget();
+            auto* loopLayout = new QVBoxLayout(loopPage);
+            AddBandwidthGroup(*loopLayout, "Current Loop Bandwidth", CommandLimits::maxCurrentBandwidth, &CommandPanel::SetCurrentBandwidthRequested);
+            if (loops >= 2)
+                AddBandwidthGroup(*loopLayout, "Speed Loop Bandwidth", CommandLimits::maxSpeedBandwidth, &CommandPanel::SetSpeedBandwidthRequested);
+            if (loops >= 3)
+                AddBandwidthGroup(*loopLayout, "Position Loop Bandwidth", CommandLimits::maxPositionBandwidth, &CommandPanel::SetPositionBandwidthRequested);
+            loopLayout->addStretch();
+            pidStack->addWidget(loopPage);
+        }
 
         layout->addWidget(pidStack);
         return page;
     }
 
-    QWidget* CommandPanel::CreateParametersTab()
+    void CommandPanel::AddBandwidthGroup(QVBoxLayout& layout, const char* title, float maxBandwidth, void (CommandPanel::*signal)(float))
     {
-        auto* page = new QWidget();
-        auto* layout = new QVBoxLayout(page);
-        layout->addStretch();
-        return page;
+        auto* group = new QGroupBox(title);
+        auto* formLayout = new QFormLayout(group);
+
+        auto* spin = new QDoubleSpinBox();
+        spin->setRange(foc::CommandLimits::minBandwidth, static_cast<double>(maxBandwidth));
+        spin->setDecimals(DecimalsFor(can::focPidScale));
+        spin->setSuffix(" rad/s");
+        spin->setKeyboardTracking(false);
+        formLayout->addRow("Bandwidth:", spin);
+
+        auto* applyButton = new QPushButton("Apply");
+        formLayout->addRow(applyButton);
+        layout.addWidget(group);
+
+        commandWidgets.push_back(applyButton);
+        connect(applyButton, &QPushButton::clicked, this, [this, spin, signal]()
+            {
+                emit(this->*signal)(static_cast<float>(spin->value()));
+            });
     }
 
-    void CommandPanel::SetCommandsEnabled(bool enabled)
+    void CommandPanel::SetCommandsAvailable(const QString& unavailableReason, bool explained)
     {
-        for (auto* button : commandButtons)
-            button->setEnabled(enabled);
+        const bool available = unavailableReason.isEmpty();
+        for (auto* widget : commandWidgets)
+        {
+            widget->setEnabled(available);
+            widget->setToolTip(available ? QString{} : unavailableReason);
+        }
+
+        hintLabel->setText(unavailableReason);
+        hintLabel->setVisible(!available && explained);
+    }
+
+    void CommandPanel::ShowRequestedControlMode(can::FocMotorMode mode)
+    {
+        modeLabel->setText(QString("Requested: %1…").arg(ControlModeName(mode)));
+        ui::backend::qt::StyleStatusLabel(*modeLabel, ui::theme::StatusLevel::Warning);
     }
 
     void CommandPanel::SetActiveControlMode(can::FocMotorMode mode)
     {
-        int index = static_cast<int>(mode);
+        const int index = static_cast<int>(mode);
+        if (index < 0 || index >= setpointStack->count())
+            return;
+
         setpointStack->setCurrentIndex(index);
         pidStack->setCurrentIndex(index);
+        modeLabel->setText(QString("Active: %1").arg(ControlModeName(mode)));
+        ui::backend::qt::StyleStatusLabel(*modeLabel, ui::theme::StatusLevel::Ok);
+    }
 
-        static const char* modeNames[] = { "Torque", "Speed", "Position" };
-        if (index >= 0 && index <= 2)
-            modeLabel->setText(QString("Active: %1").arg(modeNames[index]));
+    void CommandPanel::ClearActiveControlMode()
+    {
+        modeLabel->setText("Active: unknown");
+        ui::backend::qt::StyleStatusLabel(*modeLabel, ui::theme::StatusLevel::Neutral);
     }
 }

@@ -2,7 +2,6 @@
 #include "ui/backend/qt/QtTheme.hpp"
 #include "ui/theme/Theme.hpp"
 #include <QHBoxLayout>
-#include <QVBoxLayout>
 
 namespace tool
 {
@@ -10,70 +9,84 @@ namespace tool
         : QGroupBox("Connection", parent)
         , adapter(adapter)
     {
-        auto* layout = new QVBoxLayout(this);
+        auto* layout = new QHBoxLayout(this);
+        CreateFields(*layout);
+        CreateButtons(*layout);
 
-        auto* interfaceRow = new QHBoxLayout();
-        interfaceRow->addWidget(new QLabel("Interface:"));
+        statusLabel = new QLabel();
+        layout->addWidget(statusLabel, 1);
+
+        ConnectSignals();
+        RefreshInterfaces();
+        OnConnectionChanged(false);
+    }
+
+    void ConnectionPanel::AddLabelled(QHBoxLayout& layout, const char* text, QWidget* field)
+    {
+        auto* label = new QLabel(text);
+        label->setBuddy(field);
+        layout.addWidget(label);
+        layout.addWidget(field);
+    }
+
+    void ConnectionPanel::CreateFields(QHBoxLayout& layout)
+    {
         interfaceCombo = new QComboBox();
         interfaceCombo->setEditable(true);
         interfaceCombo->setInsertPolicy(QComboBox::NoInsert);
-        interfaceCombo->setMinimumWidth(100);
-        interfaceRow->addWidget(interfaceCombo, 1);
+        interfaceCombo->setMinimumWidth(120);
+        interfaceCombo->setToolTip("CAN interface to open, e.g. can0 or a PCAN/Kvaser/CANable channel");
+        AddLabelled(layout, "&Interface:", interfaceCombo);
+
         refreshButton = new QPushButton("↻");
         refreshButton->setFixedWidth(28);
         refreshButton->setToolTip("Refresh interface list");
-        interfaceRow->addWidget(refreshButton);
-        layout->addLayout(interfaceRow);
+        refreshButton->setAccessibleName("Refresh interface list");
+        layout.addWidget(refreshButton);
 
-        auto* bitrateRow = new QHBoxLayout();
-        bitrateRow->addWidget(new QLabel("Bitrate:"));
         bitrateCombo = new QComboBox();
-        bitrateCombo->addItem("125 kbit/s", 125000);
-        bitrateCombo->addItem("250 kbit/s", 250000);
-        bitrateCombo->addItem("500 kbit/s", 500000);
+        for (const auto bitrate : { 125000, 250000, 500000 })
+            bitrateCombo->addItem(QString("%1 kbit/s").arg(bitrate / 1000), bitrate);
         bitrateCombo->addItem("1 Mbit/s", 1000000);
         bitrateCombo->setCurrentIndex(3);
-        bitrateRow->addWidget(bitrateCombo);
-        layout->addLayout(bitrateRow);
+        AddLabelled(layout, "&Bitrate:", bitrateCombo);
+    }
 
-        auto* buttonRow = new QHBoxLayout();
-        connectButton = new QPushButton("Connect");
-        disconnectButton = new QPushButton("Disconnect");
-        disconnectButton->setEnabled(false);
-        buttonRow->addWidget(connectButton);
-        buttonRow->addWidget(disconnectButton);
-        layout->addLayout(buttonRow);
+    void ConnectionPanel::CreateButtons(QHBoxLayout& layout)
+    {
+        connectButton = new QPushButton("&Connect");
+        ui::backend::qt::StyleButton(*connectButton, ui::theme::ButtonRole::Primary);
+        disconnectButton = new QPushButton("&Disconnect");
+        layout.addWidget(connectButton);
+        layout.addWidget(disconnectButton);
+    }
 
-        statusLabel = new QLabel("Disconnected");
-        ui::backend::qt::StyleStatusLabel(*statusLabel, ui::theme::StatusLevel::Fault);
-        layout->addWidget(statusLabel);
-
+    void ConnectionPanel::ConnectSignals()
+    {
         connect(refreshButton, &QPushButton::clicked, this, &ConnectionPanel::RefreshInterfaces);
+        connect(interfaceCombo, &QComboBox::currentTextChanged, this, &ConnectionPanel::UpdateConnectEnabled);
         connect(connectButton, &QPushButton::clicked, this, &ConnectionPanel::ConnectRequested);
         connect(disconnectButton, &QPushButton::clicked, this, &ConnectionPanel::DisconnectRequested);
-
-        RefreshInterfaces();
     }
 
     void ConnectionPanel::RefreshInterfaces()
     {
-        QString current = interfaceCombo->currentText();
+        const auto current = interfaceCombo->currentText();
         interfaceCombo->clear();
 
-        for (const auto& iface : adapter.AvailableInterfaces())
-            interfaceCombo->addItem(QString::fromStdString(iface));
+        for (const auto& name : adapter.AvailableInterfaces())
+            interfaceCombo->addItem(QString::fromStdString(name));
 
         if (interfaceCombo->count() == 0)
             interfaceCombo->addItem("can0");
 
-        int idx = interfaceCombo->findText(current);
-        if (idx >= 0)
-            interfaceCombo->setCurrentIndex(idx);
+        if (!current.isEmpty())
+            interfaceCombo->setCurrentText(current);
     }
 
     QString ConnectionPanel::InterfaceName() const
     {
-        return interfaceCombo->currentText();
+        return interfaceCombo->currentText().trimmed();
     }
 
     uint32_t ConnectionPanel::Bitrate() const
@@ -81,23 +94,43 @@ namespace tool
         return bitrateCombo->currentData().toUInt();
     }
 
-    void ConnectionPanel::OnConnectionChanged(bool connected)
+    QString ConnectionPanel::BitrateText() const
     {
-        connectButton->setEnabled(!connected);
+        return bitrateCombo->currentText();
+    }
+
+    void ConnectionPanel::RestoreSettings(const QSettings& settings)
+    {
+        const auto interfaceName = settings.value("connection/interface").toString();
+        if (!interfaceName.isEmpty())
+            interfaceCombo->setCurrentText(interfaceName);
+
+        const auto bitrateIndex = bitrateCombo->findData(settings.value("connection/bitrate", Bitrate()).toUInt());
+        if (bitrateIndex >= 0)
+            bitrateCombo->setCurrentIndex(bitrateIndex);
+    }
+
+    void ConnectionPanel::SaveSettings(QSettings& settings) const
+    {
+        settings.setValue("connection/interface", InterfaceName());
+        settings.setValue("connection/bitrate", Bitrate());
+    }
+
+    void ConnectionPanel::OnConnectionChanged(bool isConnected)
+    {
+        connected = isConnected;
         disconnectButton->setEnabled(connected);
         interfaceCombo->setEnabled(!connected);
         refreshButton->setEnabled(!connected);
         bitrateCombo->setEnabled(!connected);
+        UpdateConnectEnabled();
 
-        if (connected)
-        {
-            statusLabel->setText("Connected");
-            ui::backend::qt::StyleStatusLabel(*statusLabel, ui::theme::StatusLevel::Ok);
-        }
-        else
-        {
-            statusLabel->setText("Disconnected");
-            ui::backend::qt::StyleStatusLabel(*statusLabel, ui::theme::StatusLevel::Fault);
-        }
+        statusLabel->setText(connected ? QString("Connected to %1 at %2").arg(InterfaceName(), BitrateText()) : QString("Not connected"));
+        ui::backend::qt::StyleStatusLabel(*statusLabel, connected ? ui::theme::StatusLevel::Ok : ui::theme::StatusLevel::Neutral);
+    }
+
+    void ConnectionPanel::UpdateConnectEnabled()
+    {
+        connectButton->setEnabled(!connected && !InterfaceName().isEmpty());
     }
 }

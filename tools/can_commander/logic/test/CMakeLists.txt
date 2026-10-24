@@ -12,4 +12,5 @@ target_sources(e_foc.tool.can_commander.logic_test PRIVATE
     CanBusAdapterMock.hpp
     CanCommandClientObserverMock.hpp
     TestCanCommandClient.cpp
+    TestCommandDescriptions.cpp
 )

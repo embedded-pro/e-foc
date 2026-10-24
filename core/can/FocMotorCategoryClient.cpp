@@ -5,8 +5,9 @@
 namespace can
 {
     FocMotorCategoryClient::FocMotorCategoryClient(services::CanFrameTransport& transport,
-        services::CanSequenceSource& sequenceSource)
+        services::CanSequenceSource& sequenceSource, const CanFrameOrigin& origin)
         : CanCategoryClient(transport, sequenceSource)
+        , origin(origin)
     {
         AddMessageTypes(selectControlModeResponse, categoryError, telemetryStatus, telemetryElectrical, contractVersionResponse,
             electricalParamsResponse, mechanicalParamsResponse);
@@ -19,7 +20,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendStart(uint16_t targetNodeId)
     {
-        if (SendsRefused())
+        if (SendsRefused(targetNodeId))
             return false;
 
         return SendCommand(targetNodeId, focStartId);
@@ -27,7 +28,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendStop(uint16_t targetNodeId)
     {
-        if (SendsRefused())
+        if (SendsRefused(targetNodeId))
             return false;
 
         return SendCommand(targetNodeId, focStopId);
@@ -35,7 +36,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendClearFault(uint16_t targetNodeId)
     {
-        if (SendsRefused())
+        if (SendsRefused(targetNodeId))
             return false;
 
         return SendCommand(targetNodeId, focClearFaultId);
@@ -43,7 +44,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendEmergencyStop(uint16_t targetNodeId)
     {
-        if (SendsRefused())
+        if (SendsRefused(targetNodeId))
             return false;
 
         return SendCommand(targetNodeId, focEmergencyStopId, services::CanPriority::emergency);
@@ -51,7 +52,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSelectControlMode(uint16_t targetNodeId, FocMotorMode mode)
     {
-        if (SendsRefused())
+        if (SendsRefused(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -61,7 +62,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSetTorqueSetpoint(uint16_t targetNodeId, foc::Ampere value)
     {
-        if (SendsRefused())
+        if (SendsRefused(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -71,7 +72,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSetSpeedSetpoint(uint16_t targetNodeId, foc::RadiansPerSecond value)
     {
-        if (SendsRefused())
+        if (SendsRefused(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -81,7 +82,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSetPositionSetpoint(uint16_t targetNodeId, foc::Radians value)
     {
-        if (SendsRefused())
+        if (SendsRefused(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -91,7 +92,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSetCurrentBandwidth(uint16_t targetNodeId, float bandwidth)
     {
-        if (SendsRefused())
+        if (SendsRefused(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -101,7 +102,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSetSpeedBandwidth(uint16_t targetNodeId, float bandwidth)
     {
-        if (SendsRefused())
+        if (SendsRefused(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -111,7 +112,7 @@ namespace can
 
     bool FocMotorCategoryClient::SendSetPositionBandwidth(uint16_t targetNodeId, float bandwidth)
     {
-        if (SendsRefused())
+        if (SendsRefused(targetNodeId))
             return false;
 
         services::CanPayloadWriter payload;
@@ -125,14 +126,38 @@ namespace can
         return SendCommand(targetNodeId, focQueryContractVersionId, payload);
     }
 
-    ContractCompatibility FocMotorCategoryClient::Compatibility() const
+    ContractCompatibility FocMotorCategoryClient::Compatibility(uint16_t nodeId) const
     {
-        return contractCompatibility;
+        for (const auto& contract : contracts)
+            if (contract.nodeId == nodeId && nodeId != 0)
+                return contract.compatibility;
+
+        return ContractCompatibility::unknown;
     }
 
-    bool FocMotorCategoryClient::SendsRefused() const
+    bool FocMotorCategoryClient::SendsRefused(uint16_t targetNodeId) const
     {
-        return contractCompatibility == ContractCompatibility::incompatible;
+        return Compatibility(targetNodeId) == ContractCompatibility::incompatible;
+    }
+
+    void FocMotorCategoryClient::RecordCompatibility(uint16_t nodeId, ContractCompatibility compatibility)
+    {
+        for (auto& contract : contracts)
+            if (contract.nodeId == nodeId)
+            {
+                contract.compatibility = compatibility;
+                return;
+            }
+
+        for (auto& contract : contracts)
+            if (contract.nodeId == 0)
+            {
+                contract = NodeContract{ nodeId, compatibility };
+                return;
+            }
+
+        contracts[nextEvicted] = NodeContract{ nodeId, compatibility };
+        nextEvicted = (nextEvicted + 1) % contracts.size();
     }
 
     bool FocMotorCategoryClient::HandleContractVersionResponse(const hal::Can::Message& data)
@@ -144,11 +169,13 @@ namespace can
         const auto major = reader.ReadUInt8();
         const auto minor = reader.ReadUInt8();
 
-        contractCompatibility = major == focContractVersionMajor ? ContractCompatibility::compatible : ContractCompatibility::incompatible;
+        const auto source = origin.SourceNodeId();
+        if (source != 0)
+            RecordCompatibility(source, major == focContractVersionMajor ? ContractCompatibility::compatible : ContractCompatibility::incompatible);
 
-        NotifyObservers([major, minor](auto& observer)
+        NotifyObservers([source, major, minor](auto& observer)
             {
-                observer.OnContractVersionResponse(major, minor);
+                observer.OnContractVersionResponse(source, major, minor);
             });
 
         return true;
@@ -161,9 +188,9 @@ namespace can
 
         services::CanPayloadReader reader{ data };
         const auto activeMode = static_cast<FocMotorMode>(reader.ReadUInt8());
-        NotifyObservers([activeMode](auto& observer)
+        NotifyObservers([source = origin.SourceNodeId(), activeMode](auto& observer)
             {
-                observer.OnSelectControlModeResponse(activeMode);
+                observer.OnSelectControlModeResponse(source, activeMode);
             });
 
         return true;
@@ -177,9 +204,9 @@ namespace can
         services::CanPayloadReader reader{ data };
         const auto originCommandId = reader.ReadUInt8();
         const auto errorCode = static_cast<FocMotorCategoryError>(reader.ReadUInt8());
-        NotifyObservers([originCommandId, errorCode](auto& observer)
+        NotifyObservers([source = origin.SourceNodeId(), originCommandId, errorCode](auto& observer)
             {
-                observer.OnCategoryError(originCommandId, errorCode);
+                observer.OnCategoryError(source, originCommandId, errorCode);
             });
 
         return true;
@@ -190,9 +217,9 @@ namespace can
         if (!PayloadExact(data, focTelemetryStatusResponseId))
             return false;
 
-        NotifyObservers([&data](auto& observer)
+        NotifyObservers([source = origin.SourceNodeId(), &data](auto& observer)
             {
-                observer.OnTelemetryStatus(data);
+                observer.OnTelemetryStatus(source, data);
             });
 
         return true;
@@ -203,9 +230,9 @@ namespace can
         if (!PayloadExact(data, focTelemetryElectricalResponseId))
             return false;
 
-        NotifyObservers([&data](auto& observer)
+        NotifyObservers([source = origin.SourceNodeId(), &data](auto& observer)
             {
-                observer.OnTelemetryElectrical(data);
+                observer.OnTelemetryElectrical(source, data);
             });
 
         return true;
@@ -221,9 +248,9 @@ namespace can
         const auto inductance = foc::MilliHenry{ reader.ReadFixed16(focInductanceScale) };
         const auto polePairs = reader.ReadUInt8();
 
-        NotifyObservers([resistance, inductance, polePairs](auto& observer)
+        NotifyObservers([source = origin.SourceNodeId(), resistance, inductance, polePairs](auto& observer)
             {
-                observer.OnElectricalParamsResponse(resistance, inductance, polePairs);
+                observer.OnElectricalParamsResponse(source, resistance, inductance, polePairs);
             });
 
         return true;
@@ -238,9 +265,9 @@ namespace can
         const auto friction = foc::NewtonMeterSecondPerRadian{ static_cast<float>(reader.ReadUInt32()) / static_cast<float>(focFrictionScale) };
         const auto inertia = foc::NewtonMeterSecondSquared{ static_cast<float>(reader.ReadUInt32()) / static_cast<float>(focInertiaScale) };
 
-        NotifyObservers([friction, inertia](auto& observer)
+        NotifyObservers([source = origin.SourceNodeId(), friction, inertia](auto& observer)
             {
-                observer.OnMechanicalParamsResponse(friction, inertia);
+                observer.OnMechanicalParamsResponse(source, friction, inertia);
             });
 
         return true;

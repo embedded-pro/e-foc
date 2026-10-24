@@ -2,9 +2,9 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.1.0
+version: 0.2.0
 component: can-service
-date: 2026-08-21
+date: 2026-10-24
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-08-21
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.1.0                    |
+| Version   | 0.2.0                    |
 | Component | can-service              |
-| Date      | 2026-08-21               |
+| Date      | 2026-10-24               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -75,7 +75,10 @@ which is what surfaces the encode or decode change that has to accompany it.
 `QueryContractVersion` (`0x12`) answers it in `ContractVersionResponse` (`0x92`). A client whose major differs
 from the server's shall report the mismatch and send no further category-`0x02` commands; equal majors are
 compatible. Adding a message is a minor bump; changing any field layout, or the meaning of any enumerator, is
-a major bump.
+a major bump. The client keeps the verdict per server node, because one client commands several drives on a
+bus: an incompatible node silences commands to itself only, and a node that answers again (after a firmware
+update) is judged afresh. The client remembers the eight most recent nodes, the number of servers `can-lite`
+tracks per bus.
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`). Friction and inertia of the reference motors are around
@@ -130,7 +133,9 @@ The observer interface provides callbacks for:
 
 Inherits `CanCategoryClient` from `can-lite`. Provides typed `Send*` methods that encode physical units into wire format via `CanPayloadWriter` and call `SendCommand(nodeId, messageType, payload)`.
 
-Registers response handlers for the server-to-client response message types. Response handlers decode the payload and invoke the corresponding observer callbacks.
+Registers response handlers for the server-to-client response message types. Response handlers decode the payload and invoke the corresponding observer callbacks, each naming the node that sent the response.
+
+`can-lite` hands a category the payload of a frame but not its sender. The client therefore takes a frame-origin source: a thin decorator between the bus and the protocol client records the node of each received frame just before the frame is dispatched, and the category reads it while handling that frame. Per-node contract compatibility (see the wire contract above) and per-node response attribution both rest on it.
 
 ### Part D — FocMotorCanBridge
 
@@ -155,7 +160,7 @@ The bridge validates that the correct control mode is active before accepting a 
 
 ### Part E — FocMotorCanClient
 
-A self-contained client object for use in host tools and SIL tests. Internally composes `CanFrameTransport`, `CanProtocolClient`, and `FocMotorCategoryClient` as value members (no heap). Constructed with a `hal::Can&` reference and a target node ID.
+A self-contained client object for use in host tools and SIL tests. Internally composes the frame-origin tracker, `CanFrameTransport`, `CanProtocolClient`, and `FocMotorCategoryClient` as value members (no heap). Constructed with a `hal::Can&` reference and a target node ID; tools that command several nodes address the category client directly with each node ID.
 
 Provides the same `Send*` API as `FocMotorCategoryClient` but hides the transport and protocol client, so callers only need a CAN bus reference and a node ID.
 
@@ -309,9 +314,11 @@ graph LR
     end
 
     subgraph "Client Path (host tools)"
-        HAL_CAN_C["hal::Can"] --> CPC["CanProtocolClient"]
+        HAL_CAN_C["hal::Can"] --> FOT["CanFrameOriginTracker"]
+        FOT --> CPC["CanProtocolClient"]
         CPC --> CPCO["TracingCanProtocolClientObserver"]
         CPC --> MCC["FocMotorCategoryClient"]
+        FOT -. "sender of the frame being dispatched" .-> MCC
         MCC --> FMC["FocMotorCanClient (user API)"]
     end
 ```

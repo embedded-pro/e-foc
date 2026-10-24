@@ -19,7 +19,7 @@ FOC implementation for BLDC/PMSM motors. Strict real-time and memory constraints
 - `targets/` — App entry points (`hardware_test`, `sync_foc_sensored`) + platform implementations (`host`, `qemu`, `ti`, `st`, shared `cortex_m_common`, `error_handling_cortex_m`, `motor_boards`)
 - `infra/numerical-toolbox/` — PID, filters, fixed-point math (see its own `AGENTS.md`)
 - `infra/embedded-infra-lib/` — Bounded containers, build helpers, toolchain cmake
-- `tools/simulator/` — Host simulation; `tools/can_commander/` — CAN interface; `tools/hardware_bridge/` — terminal/CAN/serial bridge client used by the HIL runner
+- `tools/simulator/` — Host simulation; `tools/can_commander/` — CAN commander GUI, its issue log/update check (`support/`) and installers (`installer/`); `tools/hardware_bridge/` — terminal/CAN/serial bridge client used by the HIL runner
 
 ## Memory — no heap (embedded/runtime code)
 
@@ -125,7 +125,7 @@ Presets: `host`, `coverage`, `EK-TM4C1294XL`, `EK-TM4C123GXL`, `STM32F407G-DISC1
 
 **CI — single workflow**: `ci.yml` builds all targets and uploads `e_foc`, `e_foc.integration_tests`, and `e_foc.sync_foc_sensored.qemu.elf` as artifacts. The `software_in_the_loop_tests` job runs in the same workflow with `needs: [host_build_test_ubuntu, qemu_foc_sensored_build]`, downloads those artifacts, and runs behavioral tests — never recompiles. Do not add cmake build steps to that job.
 
-**Release**: `release-please.yml` builds and attaches the Linux/Windows tools, the firmware and the documentation PDFs when release-please creates a release. Dispatch it with `dry_run: true` to build and check every asset without creating a release — do this after changing the workflow.
+**Release**: `release-please.yml` builds and attaches the Linux/Windows tools (including the CAN Commander `.deb` and NSIS `setup.exe`, each installed, launched and uninstalled on the runner first), the firmware archives, the EK-TM4C1294XL `.hex` images as standalone assets, a full source archive with every submodule (`e_foc-source-<tag>.tar.gz`) and the documentation PDFs when release-please creates a release. The CAN Commander's update check finds its installer by those asset-name suffixes (`-linux-x86_64.deb`, `-windows-x86_64-setup.exe`); keep them stable. Dispatch it with `dry_run: true` to build and check every asset without creating a release — do this after changing the workflow.
 
 **Before pushing**: always verify locally before pushing — CI minutes and tokens are finite.
 
@@ -197,6 +197,7 @@ Every metric assertion prints a `[METRIC]` line; limits are pinned from those li
 - **executor** — bug fixes, small changes, tasks with a clear existing plan; follows TDD
 - **reviewer** — reviewing code or recent changes against project standards
 - **analyst** — investigation, audit, root-cause analysis, design exploration; read-only, no code changes
+- **ux-ui-expert** skill (`.claude/skills/ux-ui-expert/SKILL.md`) — load before designing, reviewing or changing anything a person sees or operates under `tools/`: layouts, safety controls, feedback, installers, update and issue-reporting flows
 
 ## Constraints checklist
 

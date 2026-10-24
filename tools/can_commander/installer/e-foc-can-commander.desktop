@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=e-foc CAN Commander
+GenericName=Motor Controller CAN Commander
+Comment=Command and monitor e-foc motor controllers over CAN
+Exec=e-foc-can-commander
+Icon=e-foc-can-commander
+Terminal=false
+Categories=Development;Electronics;
+Keywords=CAN;FOC;motor;e-foc;SocketCAN;

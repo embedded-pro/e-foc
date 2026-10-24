@@ -14,5 +14,5 @@ Essentials (full detail in AGENTS.md):
 - **No exceptions** — `std::optional`/status enums; interfaces get a protected non-virtual destructor (`protected: ~I() = default;`), never `virtual ~I()`.
 - **Docs-first** — update `documentation/` before/alongside behavioral changes. Mermaid/ASCII only.
 - **CI** — see AGENTS.md §Build for the two-tier workflow and embedded cmake rules.
-- **Agents** — see AGENTS.md §Agent routing. Use `analyst` for investigations; `planner` for design; `executor` for implementation; `reviewer` for review.
+- **Agents** — see AGENTS.md §Agent routing. Use `analyst` for investigations; `planner` for design; `executor` for implementation; `reviewer` for review. Load the `ux-ui-expert` skill for any user-facing change under `tools/`.
 - **Be terse** — minimal prose; report file paths + pass/fail.
