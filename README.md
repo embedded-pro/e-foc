@@ -230,7 +230,7 @@ the [GitHub CLI](https://cli.github.com/):
 gh attestation verify e_foc-can_commander-<tag>-windows-x86_64-setup.exe --repo embedded-pro/e-foc
 ```
 
-Once code signing is enabled for the project (see [`.signpath/README.md`](.signpath/README.md)), the Windows
+Once code signing is enabled for the project (see [`.github/signpath/README.md`](.github/signpath/README.md)), the Windows
 CAN Commander executable and installer are also Authenticode-signed, so Windows shows the publisher instead of
 *Unknown publisher*.
 
