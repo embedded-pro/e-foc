@@ -18,7 +18,6 @@ target_sources(e_foc.tool.can_commander PRIVATE
     ../resources/can_commander.qrc
 )
 
-# Installed, packaged and launched as e-foc-can-commander; the target name stays in the e_foc.tool namespace.
 set_target_properties(e_foc.tool.can_commander PROPERTIES
     OUTPUT_NAME e-foc-can-commander
     AUTORCC ON

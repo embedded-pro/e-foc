@@ -151,8 +151,6 @@ namespace
     };
 }
 
-// ---------- Initial state and addressing ----------
-
 TEST_F(TestCanCommandClient, initially_no_node_is_busy_or_online)
 {
     EXPECT_FALSE(client.IsBusy(1));
@@ -173,8 +171,6 @@ TEST_F(TestCanCommandClient, each_node_tracks_its_own_pending_command)
     EXPECT_TRUE(client.IsBusy(1));
     EXPECT_FALSE(client.IsBusy(2));
 }
-
-// ---------- Node liveness ----------
 
 TEST_F(TestCanCommandClient, a_heartbeat_reports_its_node_online_once)
 {
@@ -259,8 +255,6 @@ TEST_F(TestCanCommandClient, a_node_heard_again_after_reconnecting_is_reported_o
     EXPECT_TRUE(client.IsOnline(1));
 }
 
-// ---------- Adapter event relay ----------
-
 TEST_F(TestCanCommandClient, transmitted_frames_are_relayed_to_the_log)
 {
     CanFrame data;
@@ -290,8 +284,6 @@ TEST_F(TestCanCommandClient, adapter_error_relayed)
             obs.OnError("test error");
         });
 }
-
-// ---------- Pending commands ----------
 
 TEST_F(TestCanCommandClient, every_command_stays_pending_until_answered)
 {
@@ -405,8 +397,6 @@ TEST_F(TestCanCommandClient, a_newer_command_restarts_the_timeout)
     ForwardTime(std::chrono::milliseconds(500));
 }
 
-// ---------- Firmware contract ----------
-
 TEST_F(TestCanCommandClient, an_incompatible_node_refuses_commands_without_touching_its_pending_command)
 {
     BringOnline(1);
@@ -435,15 +425,12 @@ TEST_F(TestCanCommandClient, an_incompatible_node_does_not_block_the_others)
     EXPECT_EQ(can::ContractCompatibility::compatible, client.Compatibility(2));
 }
 
-// ---------- Responses and telemetry ----------
-
 TEST_F(TestCanCommandClient, telemetry_status_notifies_motor_status_and_speed_position)
 {
     EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
     EXPECT_CALL(observer, OnMotorStatusReceived(1, FocMotorState::running, FocFaultCode::none));
     EXPECT_CALL(observer, OnSpeedPositionReceived(1, testing::FloatNear(10.0f, 0.01f), testing::FloatNear(1.0f, 0.001f)));
 
-    // speed wire 10 / focSpeedScale(1) = 10 rad/s; position wire 100 / focPositionScale(100) = 1 rad
     const auto data = Message({ static_cast<uint8_t>(FocMotorState::running), static_cast<uint8_t>(FocFaultCode::none), 0, 10, 0, 100 });
     const auto rawId = FocId(services::CanPriority::telemetry, can::focTelemetryStatusResponseId, 1);
     LogReceived(rawId, data);
@@ -482,7 +469,6 @@ TEST_F(TestCanCommandClient, telemetry_electrical_notifies_current_and_voltage)
     EXPECT_CALL(observer, OnCurrentMeasurementReceived(1, testing::FloatNear(3.0f, 0.01f), testing::FloatNear(5.0f, 0.01f)));
     EXPECT_CALL(observer, OnBusVoltageReceived(1, testing::FloatNear(24.0f, 0.01f)));
 
-    // voltage wire 240 / focVoltageScale(10) = 24 V; iq 50 and id 30 / focCurrentScale(10) = 5 A and 3 A
     Receive(FocId(services::CanPriority::telemetry, can::focTelemetryElectricalResponseId, 1), Message({ 0, 240, 0, 0, 0, 50, 0, 30 }));
 }
 
@@ -498,7 +484,6 @@ TEST_F(TestCanCommandClient, electrical_params_response_notifies_observer)
     EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
     EXPECT_CALL(observer, OnElectricalParametersReceived(1, testing::FloatNear(0.5f, 0.001f), testing::FloatNear(1.0f, 0.001f), 7));
 
-    // resistance 500 / focResistanceScale(1000) = 0.5 ohm; inductance 1000 / focInductanceScale(1000) = 1 mH
     Receive(FocId(services::CanPriority::response, can::focElectricalParamsResponseId, 1), Message({ 0x01, 0xF4, 0x03, 0xE8, 7 }));
 }
 
@@ -507,7 +492,6 @@ TEST_F(TestCanCommandClient, mechanical_params_response_notifies_observer)
     EXPECT_CALL(observer, OnNodeOnlineChanged(1, true));
     EXPECT_CALL(observer, OnMechanicalParametersReceived(1, testing::FloatNear(1.5e-5f, 1e-7f), testing::FloatNear(7.06e-6f, 1e-8f)));
 
-    // friction 15000 and inertia 7060 nano-units
     Receive(FocId(services::CanPriority::response, can::focMechanicalParamsResponseId, 1), Message({ 0x00, 0x00, 0x3A, 0x98, 0x00, 0x00, 0x1B, 0x94 }));
 }
 
@@ -521,8 +505,6 @@ TEST_F(TestCanCommandClient, select_control_mode_response_acknowledges_the_mode_
 
     EXPECT_FALSE(client.IsBusy(1));
 }
-
-// ---------- Encoding ----------
 
 TEST_F(TestCanCommandClient, send_torque_setpoint_encodes_with_correct_scale)
 {
@@ -557,7 +539,7 @@ TEST_F(TestCanCommandClient, send_speed_setpoint_overrange_negative_wire_value_c
 TEST_F(TestCanCommandClient, send_speed_setpoint_extreme_value_clamps_without_ub)
 {
     CaptureNextPayload();
-    client.SendSetSpeedSetpoint(1, 1e10f); // must clamp in float, not overflow the integer cast
+    client.SendSetSpeedSetpoint(1, 1e10f);
 
     ASSERT_EQ(capturedPayload.size(), 3u);
     EXPECT_EQ(capturedPayload[1], 0x7Fu);
@@ -593,8 +575,6 @@ TEST_F(TestCanCommandClient, send_position_setpoint_rounds_to_nearest_wire_value
     EXPECT_EQ(capturedPayload[1], 0x00u);
     EXPECT_EQ(capturedPayload[2], 0x10u);
 }
-
-// ---------- Adapter send failure: the command stays pending until the timeout ----------
 
 TEST_F(TestCanCommandClientAdapterFails, every_command_stays_pending_when_the_adapter_reports_failure)
 {

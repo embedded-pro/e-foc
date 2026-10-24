@@ -3,8 +3,6 @@ include(GNUInstallDirs)
 set(component can_commander)
 set(resources "${CMAKE_CURRENT_LIST_DIR}/../resources")
 
-# EXCLUDE_FROM_ALL keeps the tool out of the e_foc host install package; only this
-# component's own package installs it.
 install(TARGETS e_foc.tool.can_commander
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     COMPONENT ${component}
@@ -29,8 +27,6 @@ else()
     install(FILES "${PROJECT_SOURCE_DIR}/LICENSE" DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/e-foc-can-commander RENAME copyright COMPONENT ${component} EXCLUDE_FROM_ALL)
 endif()
 
-# A package of its own, next to the project-wide CPackConfig.cmake:
-#   cpack --config <build>/tools/can_commander/installer/CPackConfig.cmake -C Release -G DEB|NSIS
 function(e_foc_can_commander_package)
     set(CPACK_OUTPUT_CONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/CPackConfig.cmake")
     set(CPACK_SOURCE_OUTPUT_CONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/CPackSourceConfig.cmake")
@@ -53,7 +49,6 @@ function(e_foc_can_commander_package)
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "embedded-pro")
     set(CPACK_DEBIAN_PACKAGE_SECTION "electronics")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
-    # dpkg-shlibdeps finds the Qt libraries but not the platform plugins they load at run time.
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "qt6-qpa-plugins")
     set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "Desktop tool to command and monitor e-foc motor controllers over CAN.\n Connects through SocketCAN, keeps an issue log and checks for new releases.")
 
@@ -71,8 +66,6 @@ function(e_foc_can_commander_package)
     set(CPACK_NSIS_MANIFEST_DPI_AWARE ON)
     set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/embedded-pro/e-foc")
     set(CPACK_NSIS_HELP_LINK "https://github.com/embedded-pro/e-foc/issues")
-    # windeployqt leaves the MSVC redistributable beside the executable; run it so the tool starts
-    # on machines that lack the runtime.
     set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS [=[
   CreateShortCut "$DESKTOP\e-foc CAN Commander.lnk" "$INSTDIR\bin\e-foc-can-commander.exe"
   IfFileExists "$INSTDIR\bin\vc_redist.x64.exe" 0 +3

@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""Renders the CAN Commander icon to the PNG and ICO files the build embeds.
-
-The geometry matches e-foc-can-commander.svg; rerun after changing either:
-    python3 tools/can_commander/resources/generate_icons.py
-Requires Pillow.
-"""
 
 import math
 import pathlib

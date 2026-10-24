@@ -256,7 +256,7 @@ namespace tool
         Refresh();
     }
 
-    void MotorPanel::OnBusyChanged(bool /*busy*/)
+    void MotorPanel::OnBusyChanged(bool)
     {
         Refresh();
     }
@@ -315,7 +315,6 @@ namespace tool
         if (lastState != state)
             Report(IssueSeverity::info, QString("state %1").arg(TelemetryPanel::MotorStateName(state)));
 
-        // Telemetry repeats the fault in every status frame; only a change is worth a log entry.
         if (lastFault != fault)
         {
             if (fault != FocFaultCode::none)

@@ -12,8 +12,6 @@ namespace tool
 {
     QIcon StatusIcon(ui::theme::StatusLevel level);
 
-    // Every motor at a glance, whichever tab is open: a fault on one motor stays visible while
-    // another is being commanded.
     class MotorOverview
         : public QWidget
     {

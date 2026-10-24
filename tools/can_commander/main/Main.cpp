@@ -50,8 +50,6 @@ namespace
         parser.addOption(noUpdateCheck);
     }
 
-    // A GUI-subsystem executable starts without a console; borrow the one it was started from,
-    // unless its output is already redirected to a file or pipe.
     void AttachToParentConsole()
     {
 #if defined(_WIN32)
@@ -65,7 +63,6 @@ namespace
 #endif
     }
 
-    // Version and help are answered without a GUI so they work over SSH or in a package check.
     bool AnswersWithoutGui(int argc, char* argv[], const QCommandLineOption& noUpdateCheck)
     {
         if (HasArgument(argc, argv, { "-v", "--version", "-h", "--help", "--help-all", "-?" }))
@@ -147,7 +144,6 @@ int main(int argc, char* argv[])
                                                   .arg(ToQt(tool::application::displayName), ToQt(tool::application::version), QSysInfo::prettyProductName(),
                                                       QSysInfo::currentCpuArchitecture(), QString::fromUtf8(qVersion())));
 
-    // The CAN protocol client keeps heartbeat and acknowledgement timers; they run on the GUI thread.
     tool::QtEventDispatcher::WithSize<256> eventDispatcher;
     hal::TimerServiceGeneric timerService;
 

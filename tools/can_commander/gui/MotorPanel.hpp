@@ -12,8 +12,6 @@
 
 namespace tool
 {
-    // One motor controller on the shared bus: its commands, its telemetry and the state they are
-    // gated on. Everything it shows comes from its own node.
     class MotorPanel
         : public QWidget
     {

@@ -67,8 +67,6 @@ namespace can
         bool SendSetPositionBandwidth(uint16_t targetNodeId, float bandwidth);
         bool SendQueryContractVersion(uint16_t targetNodeId);
 
-        // Per node, as REQ-CAN-003 compares a client with each server it talks to; one incompatible
-        // node does not silence the others. The most recent maxTrackedNodes nodes are remembered.
         ContractCompatibility Compatibility(uint16_t nodeId) const;
 
     private:

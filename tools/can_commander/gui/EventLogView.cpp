@@ -15,7 +15,6 @@ namespace tool
 {
     namespace
     {
-        // Raw telemetry arrives at hundreds of frames per second; the view keeps the newest lines only.
         constexpr int maximumLines{ 5000 };
     }
 
@@ -45,8 +44,6 @@ namespace tool
         text->setAccessibleName("Event log");
         layout->addWidget(text, 1);
 
-        // The document lays its scroll range out after an append returns, so the tail is followed
-        // from the range change; scrolling up to read stops following until the end is reached again.
         auto* scrollBar = text->verticalScrollBar();
         connect(scrollBar, &QScrollBar::rangeChanged, this, [this, scrollBar](int, int maximum)
             {

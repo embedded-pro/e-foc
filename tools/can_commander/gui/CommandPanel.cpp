@@ -63,7 +63,6 @@ namespace tool
         auto* group = new QGroupBox("Motor");
         auto* layout = new QHBoxLayout(group);
 
-        // Default style on purpose: the theme's Start/Stop fills stay vivid when disabled and read as clickable.
         auto* startButton = new QPushButton("&Start Motor");
         auto* stopButton = new QPushButton("S&top Motor");
         layout->addWidget(startButton);

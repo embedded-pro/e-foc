@@ -8,12 +8,9 @@ namespace tool
 {
     namespace
     {
-        // Qt's message handler is process-wide; this is the one log it forwards to.
         std::atomic<IssueLog*> capturedLog{ nullptr };
         QtMessageHandler previousHandler{ nullptr };
 
-        // A warning raised while a write is in progress (QFile on a vanished folder) must not
-        // re-enter the write and take its lock a second time.
         thread_local bool writing{ false };
 
         void ForwardQtMessage(QtMsgType type, const QMessageLogContext& context, const QString& message)

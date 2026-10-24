@@ -67,8 +67,6 @@ namespace tool
 
     MainWindow::~MainWindow()
     {
-        // The client is a member and is destroyed before this observer base, and an EmIL subject
-        // asserts that no observer is still attached when it goes.
         CanCommandClientObserver::Detach();
     }
 
@@ -636,7 +634,7 @@ namespace tool
             motor->OnBusVoltage(voltage);
     }
 
-    void MainWindow::OnFaultEventReceived(uint16_t /*nodeId*/, FocFaultCode /*fault*/)
+    void MainWindow::OnFaultEventReceived(uint16_t, FocFaultCode)
     {}
 
     void MainWindow::OnElectricalParametersReceived(uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs)

@@ -35,7 +35,6 @@ namespace tool
         IssueLog(const IssueLog&) = delete;
         IssueLog& operator=(const IssueLog&) = delete;
 
-        // Callable from any thread: Qt delivers its own warnings from wherever they arise.
         void Write(IssueSeverity severity, const QString& message);
 
         bool IsWritable() const;
@@ -43,8 +42,6 @@ namespace tool
         QString Directory() const;
         QStringList RecentLines(std::size_t count) const;
 
-        // Routes qWarning/qCritical/qFatal into this log for its lifetime, so problems Qt itself
-        // reports (missing TLS backend, platform plugin warnings) reach the issue log too.
         void CaptureQtMessages();
 
     private:

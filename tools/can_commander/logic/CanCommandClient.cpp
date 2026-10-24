@@ -340,8 +340,6 @@ namespace tool
         return true;
     }
 
-    // Adapters report a received frame here before handing it to the protocol client, so a node
-    // is online before any of its responses are decoded.
     void CanCommandClient::OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data)
     {
         bool consumed{ false };

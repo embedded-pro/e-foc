@@ -29,16 +29,13 @@ namespace tool
         Q_OBJECT
 
     public:
-        // can-lite tracks liveness and sequence numbers for this many servers per bus.
         static constexpr std::size_t maxMotors{ 8 };
 
         MainWindow(CanBusAdapter& adapter, IssueLog& issueLog, QWidget* parent = nullptr);
         ~MainWindow() override;
 
-        // Honours the user's "Check for Updates at Startup" choice; never blocks.
         void CheckForUpdatesOnStartup();
 
-        // Logs a problem found while starting and tells the user, without closing the window.
         void ReportStartupProblem(const QString& title, const QString& message);
 
     protected:

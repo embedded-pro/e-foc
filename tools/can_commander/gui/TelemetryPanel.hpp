@@ -30,7 +30,6 @@ namespace tool
         void OnElectricalParameters(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs);
         void OnMechanicalParameters(float frictionNmSPerRad, float inertiaKgM2);
 
-        // Values from a node that went away must not read as live.
         void Clear();
 
     private:
@@ -48,7 +47,8 @@ namespace tool
         void ShowFault(FocFaultCode fault);
 
         // The state and fault rows stay native: they read as words rather than numbers, and
-        // ui::model has no text read-out by design. StyleStatusLabel colours them, which needs the widget itself.
+        // ui::model has no text read-out by design. The fault row is also what StyleStatusLabel
+        // turns red, which needs the widget itself.
         QLabel* motorStateLabel;
         QLabel* faultLabel;
 

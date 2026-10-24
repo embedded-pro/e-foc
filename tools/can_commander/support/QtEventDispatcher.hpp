@@ -6,9 +6,6 @@
 
 namespace tool
 {
-    // Runs EmIL's scheduled actions on the Qt GUI thread. Schedule may be called from any thread
-    // (the generic timer service schedules from its own); each burst costs one queued Qt event
-    // instead of a polling timer.
     class QtEventDispatcherWorker
         : public infra::EventDispatcherWorkerImpl
     {

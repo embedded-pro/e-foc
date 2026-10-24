@@ -6,8 +6,6 @@
 
 namespace can
 {
-    // can-lite gives a category the payload of a frame but not the node that sent it; a client
-    // that talks to several nodes learns the sender here while the frame is being dispatched.
     class CanFrameOrigin
     {
     public:

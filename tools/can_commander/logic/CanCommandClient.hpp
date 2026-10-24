@@ -25,12 +25,10 @@ namespace tool
     public:
         using infra::SingleObserver<CanCommandClientObserver, CanCommandClient>::SingleObserver;
 
-        // The bus adapter opened or closed.
         virtual void OnConnectionChanged(bool connected) = 0;
         virtual void OnAdapterError(infra::BoundedConstString message) = 0;
         virtual void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) = 0;
 
-        // A node's heartbeat appeared or timed out; the bus stays open either way.
         virtual void OnNodeOnlineChanged(uint16_t nodeId, bool online) = 0;
         virtual void OnBusyChanged(uint16_t nodeId, bool busy) = 0;
         virtual void OnCommandTimeout(uint16_t nodeId) = 0;
@@ -48,9 +46,6 @@ namespace tool
         virtual void OnMechanicalParametersReceived(uint16_t nodeId, float frictionNmSPerRad, float inertiaKgM2) = 0;
     };
 
-    // One bus, many motor controllers: every command names its node, and every report says which
-    // node it came from. Each node tracks the last command it was sent until that command is
-    // acknowledged, rejected or times out; a newer command, such as an emergency stop, takes over.
     class CanCommandClient
         : public infra::Subject<CanCommandClientObserver>
         , private services::CanProtocolClientObserver
@@ -68,8 +63,6 @@ namespace tool
         std::set<uint16_t> OnlineNodes() const;
         can::ContractCompatibility Compatibility(uint16_t nodeId) const;
 
-        // Each Send returns false when the frame was refused locally (incompatible contract or a
-        // full transmit queue); nothing reached the bus and no acknowledgement will follow.
         bool SendStartMotor(uint16_t nodeId);
         bool SendStopMotor(uint16_t nodeId);
         bool SendEmergencyStop(uint16_t nodeId);

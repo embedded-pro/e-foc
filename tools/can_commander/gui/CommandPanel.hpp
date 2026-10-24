@@ -39,8 +39,6 @@ namespace tool
         void RequestDataRequested();
 
     public slots:
-        // An empty reason enables the commands. Otherwise the reason becomes their tooltip and, when
-        // explained, an inline hint; transient reasons skip the hint so the layout does not jump.
         void SetCommandsAvailable(const QString& unavailableReason, bool explained);
         void ShowRequestedControlMode(can::FocMotorMode mode);
         void SetActiveControlMode(can::FocMotorMode mode);

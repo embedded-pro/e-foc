@@ -29,8 +29,6 @@ namespace tool
             return body;
         }
 
-        // QUrlQuery reads '%' as the start of an escape and leaves '+' alone, which GitHub decodes as a
-        // space; encoding every reserved character up front keeps log text such as "50%" or "a+b" intact.
         QString Encoded(const QString& text)
         {
             return QString::fromLatin1(QUrl::toPercentEncoding(text));

@@ -43,8 +43,6 @@ namespace tool
             ReadOut(busVoltage, "Bus voltage:", " V", DecimalsFor(can::focVoltageScale))
         };
 
-        // Identified parameters span many decades (an inertia of 2e-5 beside a resistance of 1.2), so
-        // they read in significant digits rather than fixed places.
         constexpr std::array<FieldSpec, 5> parameterFields{
             ReadOut(resistance, "Resistance:", " Ω", 4, ReadOutStyle::Significant),
             ReadOut(inductance, "Inductance:", " mH", 4, ReadOutStyle::Significant),
