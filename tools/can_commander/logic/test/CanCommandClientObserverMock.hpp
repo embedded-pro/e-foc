@@ -19,6 +19,7 @@ namespace tool
         MOCK_METHOD(void, OnFaultEventReceived, (FocFaultCode fault), (override));
         MOCK_METHOD(void, OnFrameLog, (bool transmitted, uint32_t id, const CanFrame& data), (override));
         MOCK_METHOD(void, OnConnectionChanged, (bool connected), (override));
+        MOCK_METHOD(void, OnNodeOnlineChanged, (bool online), (override));
         MOCK_METHOD(void, OnAdapterError, (infra::BoundedConstString message), (override));
         MOCK_METHOD(void, OnControlModeAcknowledged, (can::FocMotorMode activeMode), (override));
         MOCK_METHOD(void, OnCommandAck, (uint8_t categoryId, uint8_t commandType, services::CanAckStatus status), (override));

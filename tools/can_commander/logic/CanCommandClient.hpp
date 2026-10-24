@@ -33,7 +33,10 @@ namespace tool
 
         virtual void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) = 0;
 
+        // The bus adapter opened or closed.
         virtual void OnConnectionChanged(bool connected) = 0;
+        // The selected node's heartbeat appeared or timed out; the bus stays open either way.
+        virtual void OnNodeOnlineChanged(bool online) = 0;
         virtual void OnAdapterError(infra::BoundedConstString message) = 0;
 
         virtual void OnControlModeAcknowledged(can::FocMotorMode activeMode) = 0;
@@ -57,23 +60,28 @@ namespace tool
         uint16_t NodeId() const;
         bool IsBusy() const;
 
-        void SendStartMotor();
-        void SendStopMotor();
-        void SendEmergencyStop();
-        void SendSetControlMode(can::FocMotorMode mode);
-        void SendSetTorqueSetpoint(float iqCurrent);
-        void SendSetSpeedSetpoint(float speedRadPerSec);
-        void SendSetPositionSetpoint(float positionRad);
+        // Each Send returns false when the frame was refused locally (incompatible contract or a
+        // full transmit queue); nothing reached the bus and no acknowledgement will follow.
+        bool SendStartMotor();
+        bool SendStopMotor();
+        bool SendEmergencyStop();
+        bool SendSetControlMode(can::FocMotorMode mode);
+        bool SendSetTorqueSetpoint(float iqCurrent);
+        bool SendSetSpeedSetpoint(float speedRadPerSec);
+        bool SendSetPositionSetpoint(float positionRad);
 
-        void SendSetCurrentBandwidth(float bandwidth);
-        void SendSetSpeedBandwidth(float bandwidth);
-        void SendSetPositionBandwidth(float bandwidth);
+        bool SendSetCurrentBandwidth(float bandwidth);
+        bool SendSetSpeedBandwidth(float bandwidth);
+        bool SendSetPositionBandwidth(float bandwidth);
 
         void RequestData();
         void HandleTimeout();
 
     private:
         void SetBusy(bool newBusy);
+
+        template<class Send>
+        bool Tracked(Send send);
 
         // CanProtocolClientObserver
         void OnServerOnline(uint16_t nodeId) override;

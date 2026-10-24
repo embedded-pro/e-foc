@@ -204,6 +204,45 @@ cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
 | Black window or no rendering    | Set `LIBGL_ALWAYS_INDIRECT=1` (already configured in the Dev Container)            |
 | Windows firewall blocks display | Allow VcXsrv (`vcxsrv.exe`) through the Windows firewall for private networks      |
 
+## CAN Commander
+
+**e-foc CAN Commander** commands and monitors an e-foc motor controller over CAN: connection, node
+selection, start/stop, control mode, setpoints, loop bandwidths, telemetry and identified parameters, with
+an always-visible emergency stop (`Esc`).
+
+### Install
+
+Download the installer for your platform from the [latest release](https://github.com/embedded-pro/e-foc/releases/latest):
+
+| Platform             | Asset                                                | Install                                                         |
+|----------------------|------------------------------------------------------|-----------------------------------------------------------------|
+| Windows x86-64       | `e_foc-can_commander-<tag>-windows-x86_64-setup.exe` | Run it; start from *Start → e-foc CAN Commander*                |
+| Debian/Ubuntu x86-64 | `e_foc-can_commander-<tag>-linux-x86_64.deb`         | `sudo apt install ./e_foc-can_commander-<tag>-linux-x86_64.deb` |
+
+Portable archives (`.zip`, `.tar.gz`) remain available. On Linux, bring the interface up first, e.g.
+`sudo ip link set can0 up type can bitrate 1000000`. `e-foc-can-commander --version` prints the installed
+version without opening a window.
+
+### Issue log, bug reports and updates
+
+- Every session writes an issue log (UTC timestamps, rotated at 1 MiB, three files) to
+  `~/.local/share/e-foc/CAN Commander/logs` on Linux or `%LOCALAPPDATA%\e-foc\CAN Commander\logs` on Windows.
+  *Help → Open Log Folder* opens it.
+- *Help → Report Issue* opens a pre-filled GitHub issue with the version, OS and recent log lines for you
+  to review and submit.
+- At startup the tool checks the latest GitHub release and shows a banner when a newer version exists.
+  Turn it off with *Help → Check for Updates at Startup* or `--no-update-check`.
+
+### Build the installers locally
+
+```bash
+cmake --preset host && cmake --build build/host --config Release --target e_foc.tool.can_commander
+cpack --config build/host/tools/can_commander/installer/CPackConfig.cmake -C Release -G DEB   # Linux
+cpack --config build/tools/can_commander/installer/CPackConfig.cmake -C Release -G NSIS        # Windows, NSIS on PATH
+```
+
+Design: [documentation/design/tool-can-commander.md](documentation/design/tool-can-commander.md).
+
 ## Documentation
 
 ### Architecture Documents
@@ -229,6 +268,7 @@ cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
 | [Mechanical Identification Service](documentation/design/service-mechanical-ident.md)    | Friction and inertia estimation service      |
 | [NVM Service](documentation/design/service-nvm.md)                                       | Non-volatile memory persistence service      |
 | [Integration Testing Design](documentation/design/integration-testing.md)                | Fixture design, calibration flow, CAN bridge |
+| [CAN Commander](documentation/design/tool-can-commander.md)                              | Desktop commander, issue log, installers     |
 
 ### Requirements
 

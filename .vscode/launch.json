@@ -83,8 +83,8 @@
             "name": "CAN Commander (Docker)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/host/tools/can_commander/main/Debug/e_foc.tool.can_commander",
-            "args": [],
+            "program": "${workspaceFolder}/build/host/tools/can_commander/main/Debug/e-foc-can-commander",
+            "args": ["--no-update-check"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

@@ -14,17 +14,23 @@ target_link_libraries(e_foc.tool.can_commander.gui PUBLIC
     ui.backend.qt
     e_foc.tool.can_commander.adapter
     e_foc.tool.can_commander.logic
+    e_foc.tool.can_commander.support
 )
 
 target_sources(e_foc.tool.can_commander.gui PRIVATE
-    MainWindow.hpp
-    MainWindow.cpp
-    ConnectionPanel.hpp
-    ConnectionPanel.cpp
     CommandPanel.hpp
     CommandPanel.cpp
+    ConnectionPanel.hpp
+    ConnectionPanel.cpp
+    DisplayFormat.hpp
+    EventLogView.hpp
+    EventLogView.cpp
+    MainWindow.hpp
+    MainWindow.cpp
     TelemetryPanel.hpp
     TelemetryPanel.cpp
+    UpdateBanner.hpp
+    UpdateBanner.cpp
 )
 
 set_target_properties(e_foc.tool.can_commander.gui PROPERTIES

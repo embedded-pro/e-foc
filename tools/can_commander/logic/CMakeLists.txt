@@ -13,6 +13,8 @@ target_link_libraries(e_foc.tool.can_commander.logic PUBLIC
 target_sources(e_foc.tool.can_commander.logic PRIVATE
     CanCommandClient.hpp
     CanCommandClient.cpp
+    CommandDescriptions.hpp
+    CommandDescriptions.cpp
 )
 
 if(MSVC)

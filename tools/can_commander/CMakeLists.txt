@@ -1,4 +1,6 @@
 add_subdirectory(adapter)
 add_subdirectory(logic)
+add_subdirectory(support)
 add_subdirectory(gui)
 add_subdirectory(main)
+add_subdirectory(installer)

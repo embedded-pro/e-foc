@@ -120,7 +120,7 @@ namespace
                 services::canHeartbeatMessageTypeId,
                 1));
         receiveCallback(canId, hal::Can::Message{});
-        // StrictMock: no OnConnectionChanged for node 1 while node 5 is selected
+        // StrictMock: no OnNodeOnlineChanged for node 1 while node 5 is selected
     }
 
     // ---------- Timeout ----------
@@ -172,7 +172,7 @@ namespace
 
     TEST_F(TestCanCommandClient, category_error_received_does_not_call_any_observer)
     {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnNodeOnlineChanged(true));
 
         hal::Can::Message data;
         data.push_back(can::focStartId);
@@ -191,7 +191,7 @@ namespace
 
     TEST_F(TestCanCommandClient, send_start_motor_stays_busy_until_acknowledged)
     {
-        client.SendStartMotor();
+        EXPECT_TRUE(client.SendStartMotor());
         EXPECT_TRUE(client.IsBusy());
     }
 
@@ -305,7 +305,7 @@ namespace
 
     TEST_F(TestCanCommandClient, send_refused_by_incompatible_contract_clears_busy)
     {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnNodeOnlineChanged(true));
         EXPECT_CALL(observer, OnContractVersion(static_cast<uint8_t>(can::focContractVersionMajor + 1), 0, false));
 
         hal::Can::Message data;
@@ -315,7 +315,9 @@ namespace
                             can::focMotorCategoryId, can::focContractVersionResponseId, 1)),
             data);
 
-        client.SendStartMotor();
+        EXPECT_FALSE(client.SendStartMotor());
+        EXPECT_FALSE(client.IsBusy());
+        EXPECT_FALSE(client.SendEmergencyStop());
         EXPECT_FALSE(client.IsBusy());
     }
 
@@ -323,7 +325,7 @@ namespace
 
     TEST_F(TestCanCommandClient, server_online_event_forwarded_when_frame_received_from_node)
     {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnNodeOnlineChanged(true));
 
         hal::Can::Message emptyPayload;
         auto canId = hal::Can::Id::Create29BitId(
@@ -336,7 +338,7 @@ namespace
 
     TEST_F(TestCanCommandClient, server_offline_event_forwarded_after_timeout)
     {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnNodeOnlineChanged(true));
 
         hal::Can::Message emptyPayload;
         auto canId = hal::Can::Id::Create29BitId(
@@ -346,7 +348,7 @@ namespace
                 1));
         receiveCallback(canId, emptyPayload);
 
-        EXPECT_CALL(observer, OnConnectionChanged(false));
+        EXPECT_CALL(observer, OnNodeOnlineChanged(false));
 
         ForwardTime(std::chrono::seconds(4));
     }
@@ -378,7 +380,7 @@ namespace
 
     TEST_F(TestCanCommandClient, telemetry_status_notifies_motor_status_and_speed_position)
     {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnNodeOnlineChanged(true));
         EXPECT_CALL(observer, OnMotorStatusReceived(FocMotorState::running, FocFaultCode::none));
         EXPECT_CALL(observer, OnSpeedPositionReceived(testing::FloatNear(10.0f, 0.01f), testing::FloatNear(1.0f, 0.001f)));
 
@@ -409,7 +411,7 @@ namespace
 
     TEST_F(TestCanCommandClient, telemetry_status_with_fault_notifies_fault_event)
     {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnNodeOnlineChanged(true));
         EXPECT_CALL(observer, OnMotorStatusReceived(FocMotorState::fault, FocFaultCode::overCurrent));
         EXPECT_CALL(observer, OnSpeedPositionReceived(_, _));
         EXPECT_CALL(observer, OnFaultEventReceived(FocFaultCode::overCurrent));
@@ -433,7 +435,7 @@ namespace
 
     TEST_F(TestCanCommandClient, telemetry_electrical_notifies_current_and_voltage)
     {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnNodeOnlineChanged(true));
         EXPECT_CALL(observer, OnCurrentMeasurementReceived(testing::FloatNear(3.0f, 0.01f),
                                   testing::FloatNear(5.0f, 0.01f)));
         EXPECT_CALL(observer, OnBusVoltageReceived(testing::FloatNear(24.0f, 0.01f)));
@@ -459,7 +461,7 @@ namespace
 
     TEST_F(TestCanCommandClient, motor_type_response_received_does_not_call_any_observer)
     {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnNodeOnlineChanged(true));
 
         hal::Can::Message data;
         data.push_back(static_cast<uint8_t>(can::FocMotorMode::speed));
@@ -475,7 +477,7 @@ namespace
 
     TEST_F(TestCanCommandClient, electrical_params_response_notifies_observer)
     {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnNodeOnlineChanged(true));
         EXPECT_CALL(observer, OnElectricalParametersReceived(testing::FloatNear(0.5f, 0.001f),
                                   testing::FloatNear(1.0f, 0.001f), 7));
 
@@ -497,7 +499,7 @@ namespace
 
     TEST_F(TestCanCommandClient, mechanical_params_response_notifies_observer)
     {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnNodeOnlineChanged(true));
         EXPECT_CALL(observer, OnMechanicalParametersReceived(testing::FloatNear(1.5e-5f, 1e-7f),
                                   testing::FloatNear(7.06e-6f, 1e-8f)));
 
@@ -524,7 +526,7 @@ namespace
 
     TEST_F(TestCanCommandClient, select_control_mode_response_notifies_control_mode_acknowledged)
     {
-        EXPECT_CALL(observer, OnConnectionChanged(true));
+        EXPECT_CALL(observer, OnNodeOnlineChanged(true));
         EXPECT_CALL(observer, OnControlModeAcknowledged(can::FocMotorMode::speed));
 
         hal::Can::Message data;

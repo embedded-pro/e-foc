@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>e-foc CAN Commander</title>
+  <rect x="16" y="16" width="224" height="224" rx="48" fill="#0F172A"/>
+  <circle cx="128" cy="128" r="75" fill="none" stroke="#38BDF8" stroke-width="18"/>
+  <g stroke-width="18" stroke-linecap="round">
+    <line x1="128" y1="128" x2="128" y2="68" stroke="#F87171"/>
+    <line x1="128" y1="128" x2="179.96" y2="158" stroke="#FBBF24"/>
+    <line x1="128" y1="128" x2="76.04" y2="158" stroke="#34D399"/>
+  </g>
+  <circle cx="128" cy="128" r="16" fill="#E2E8F0"/>
+</svg>

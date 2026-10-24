@@ -50,74 +50,94 @@ namespace tool
         }
     }
 
-    void CanCommandClient::SendStartMotor()
+    template<class Send>
+    bool CanCommandClient::Tracked(Send send)
     {
         SetBusy(true);
-        if (!focClient.Start())
+        const bool sent = send();
+        if (!sent)
             SetBusy(false);
+        return sent;
     }
 
-    void CanCommandClient::SendStopMotor()
+    bool CanCommandClient::SendStartMotor()
     {
-        SetBusy(true);
-        if (!focClient.Stop())
-            SetBusy(false);
+        return Tracked([&]()
+            {
+                return focClient.Start();
+            });
     }
 
-    void CanCommandClient::SendEmergencyStop()
+    bool CanCommandClient::SendStopMotor()
     {
-        SetBusy(true);
-        if (!focClient.EmergencyStop())
-            SetBusy(false);
+        return Tracked([&]()
+            {
+                return focClient.Stop();
+            });
     }
 
-    void CanCommandClient::SendSetControlMode(can::FocMotorMode mode)
+    bool CanCommandClient::SendEmergencyStop()
     {
-        SetBusy(true);
-        if (!focClient.SelectControlMode(mode))
-            SetBusy(false);
+        return Tracked([&]()
+            {
+                return focClient.EmergencyStop();
+            });
     }
 
-    void CanCommandClient::SendSetTorqueSetpoint(float iqCurrent)
+    bool CanCommandClient::SendSetControlMode(can::FocMotorMode mode)
     {
-        SetBusy(true);
-        if (!focClient.SetTorque(foc::Ampere{ iqCurrent }))
-            SetBusy(false);
+        return Tracked([&]()
+            {
+                return focClient.SelectControlMode(mode);
+            });
     }
 
-    void CanCommandClient::SendSetSpeedSetpoint(float speedRadPerSec)
+    bool CanCommandClient::SendSetTorqueSetpoint(float iqCurrent)
     {
-        SetBusy(true);
-        if (!focClient.SetSpeed(foc::RadiansPerSecond{ speedRadPerSec }))
-            SetBusy(false);
+        return Tracked([&]()
+            {
+                return focClient.SetTorque(foc::Ampere{ iqCurrent });
+            });
     }
 
-    void CanCommandClient::SendSetPositionSetpoint(float positionRad)
+    bool CanCommandClient::SendSetSpeedSetpoint(float speedRadPerSec)
     {
-        SetBusy(true);
-        if (!focClient.SetPosition(foc::Radians{ positionRad }))
-            SetBusy(false);
+        return Tracked([&]()
+            {
+                return focClient.SetSpeed(foc::RadiansPerSecond{ speedRadPerSec });
+            });
     }
 
-    void CanCommandClient::SendSetCurrentBandwidth(float bandwidth)
+    bool CanCommandClient::SendSetPositionSetpoint(float positionRad)
     {
-        SetBusy(true);
-        if (!focClient.SetCurrentBandwidth(bandwidth))
-            SetBusy(false);
+        return Tracked([&]()
+            {
+                return focClient.SetPosition(foc::Radians{ positionRad });
+            });
     }
 
-    void CanCommandClient::SendSetSpeedBandwidth(float bandwidth)
+    bool CanCommandClient::SendSetCurrentBandwidth(float bandwidth)
     {
-        SetBusy(true);
-        if (!focClient.SetSpeedBandwidth(bandwidth))
-            SetBusy(false);
+        return Tracked([&]()
+            {
+                return focClient.SetCurrentBandwidth(bandwidth);
+            });
     }
 
-    void CanCommandClient::SendSetPositionBandwidth(float bandwidth)
+    bool CanCommandClient::SendSetSpeedBandwidth(float bandwidth)
     {
-        SetBusy(true);
-        if (!focClient.SetPositionBandwidth(bandwidth))
-            SetBusy(false);
+        return Tracked([&]()
+            {
+                return focClient.SetSpeedBandwidth(bandwidth);
+            });
+    }
+
+    bool CanCommandClient::SendSetPositionBandwidth(float bandwidth)
+    {
+        return Tracked([&]()
+            {
+                return focClient.SetPositionBandwidth(bandwidth);
+            });
     }
 
     void CanCommandClient::RequestData()
@@ -143,7 +163,7 @@ namespace tool
 
         NotifyObservers([](auto& observer)
             {
-                observer.OnConnectionChanged(true);
+                observer.OnNodeOnlineChanged(true);
             });
     }
 
@@ -154,7 +174,7 @@ namespace tool
 
         NotifyObservers([](auto& observer)
             {
-                observer.OnConnectionChanged(false);
+                observer.OnNodeOnlineChanged(false);
             });
     }
 

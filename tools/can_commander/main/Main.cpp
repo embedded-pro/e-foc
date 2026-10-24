@@ -1,10 +1,23 @@
+#include "hal/generic/TimerServiceGeneric.hpp"
 #include "tools/can_commander/gui/MainWindow.hpp"
+#include "tools/can_commander/support/ApplicationInfo.hpp"
+#include "tools/can_commander/support/IssueLog.hpp"
+#include "tools/can_commander/support/QtEventDispatcher.hpp"
+#include "ui/backend/qt/QtConversions.hpp"
 #include "ui/backend/qt/QtTheme.hpp"
 #include "ui/theme/Theme.hpp"
 #include <QApplication>
-#include <QMessageBox>
-#include <cstdlib>
+#include <QCommandLineParser>
+#include <QDir>
+#include <QFile>
+#include <QIcon>
+#include <QNetworkProxyFactory>
+#include <QStandardPaths>
+#include <QSysInfo>
+#include <cstring>
+#include <initializer_list>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 
 #ifdef __linux__
@@ -13,14 +26,110 @@
 #include "tools/can_commander/adapter/WindowsCanAdapter.hpp"
 #endif
 
+namespace
+{
+    using ui::backend::qt::ToQt;
+
+    bool HasArgument(int argc, char* argv[], std::initializer_list<const char*> names)
+    {
+        for (int index = 1; index < argc; ++index)
+            for (const auto* name : names)
+                if (std::strcmp(argv[index], name) == 0)
+                    return true;
+
+        return false;
+    }
+
+    void DescribeOptions(QCommandLineParser& parser, const QCommandLineOption& noUpdateCheck)
+    {
+        parser.setApplicationDescription("Commands and monitors e-foc motor controllers over CAN.");
+        parser.addHelpOption();
+        parser.addVersionOption();
+        parser.addOption(noUpdateCheck);
+    }
+
+    // Version and help are answered without a GUI so they work over SSH or in a package check.
+    bool AnswersWithoutGui(int argc, char* argv[], const QCommandLineOption& noUpdateCheck)
+    {
+        if (HasArgument(argc, argv, { "-v", "--version" }))
+        {
+            std::cout << tool::application::displayName << " " << tool::application::version << "\n";
+            return true;
+        }
+
+        if (!HasArgument(argc, argv, { "-h", "--help", "--help-all", "-?" }))
+            return false;
+
+        QCoreApplication core{ argc, argv };
+        QCommandLineParser parser;
+        DescribeOptions(parser, noUpdateCheck);
+        parser.process(core);
+        return true;
+    }
+
+    void ConfigureApplication()
+    {
+        QApplication::setOrganizationName(ToQt(tool::application::organization));
+        QApplication::setApplicationName(ToQt(tool::application::name));
+        QApplication::setApplicationDisplayName(ToQt(tool::application::displayName));
+        QApplication::setApplicationVersion(ToQt(tool::application::version));
+        QApplication::setWindowIcon(QIcon{ ":/icons/e-foc-can-commander.png" });
+#if defined(__linux__)
+        QGuiApplication::setDesktopFileName("e-foc-can-commander");
+#endif
+        QNetworkProxyFactory::setUseSystemConfiguration(true);
+        ui::backend::qt::ApplyTheme(ui::theme::Instrument());
+    }
+
+    tool::IssueLog::Config IssueLogConfig()
+    {
+        tool::IssueLog::Config config;
+        config.directory = QDir{ QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) }.filePath("logs");
+        return config;
+    }
+
+    template<class Adapter>
+    std::optional<QString> MissingDriver(const Adapter& adapter)
+    {
+        try
+        {
+            adapter.ValidateDriverAvailability();
+            return std::nullopt;
+        }
+        catch (const std::runtime_error& e)
+        {
+            return QString::fromUtf8(e.what());
+        }
+    }
+}
+
 int main(int argc, char* argv[])
 {
-    if (qEnvironmentVariableIsEmpty("DISPLAY") && qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY"))
+    const QCommandLineOption noUpdateCheck{ "no-update-check", "Do not look for a newer release at startup." };
+    if (AnswersWithoutGui(argc, argv, noUpdateCheck))
+        return 0;
+
+#if defined(__linux__)
+    if (QFile::exists("/.dockerenv") && qEnvironmentVariableIsEmpty("DISPLAY") && qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY"))
         qputenv("DISPLAY", "host.docker.internal:0.0");
+#endif
 
     QApplication app(argc, argv);
-    QApplication::setApplicationName("e-foc CAN Commander");
-    ui::backend::qt::ApplyTheme(ui::theme::Instrument());
+    ConfigureApplication();
+
+    QCommandLineParser parser;
+    DescribeOptions(parser, noUpdateCheck);
+    parser.process(app);
+
+    tool::IssueLog issueLog{ IssueLogConfig() };
+    issueLog.CaptureQtMessages();
+    issueLog.Write(tool::IssueSeverity::info, QString("Session started: %1 %2 on %3 (%4), Qt %5")
+                                                  .arg(ToQt(tool::application::displayName), ToQt(tool::application::version), QSysInfo::prettyProductName(),
+                                                      QSysInfo::currentCpuArchitecture(), QString::fromUtf8(qVersion())));
+
+    // The CAN protocol client keeps heartbeat and acknowledgement timers; they run on the GUI thread.
+    tool::QtEventDispatcher::WithSize<256> eventDispatcher;
+    hal::TimerServiceGeneric timerService;
 
 #if defined(__linux__)
     tool::SocketCanAdapter adapter;
@@ -33,18 +142,14 @@ int main(int argc, char* argv[])
 #endif
 
 #if defined(__linux__) || defined(_WIN32)
-    try
-    {
-        adapter.ValidateDriverAvailability();
-    }
-    catch (const std::runtime_error& e)
-    {
-        QMessageBox::critical(nullptr, "CAN Driver Not Found", QString::fromUtf8(e.what()));
-        return 1;
-    }
-
-    tool::MainWindow window(adapter);
+    tool::MainWindow window(adapter, issueLog);
     window.show();
+
+    if (!parser.isSet(noUpdateCheck))
+        window.CheckForUpdatesOnStartup();
+
+    if (const auto problem = MissingDriver(adapter))
+        window.ReportStartupProblem("CAN Driver Not Found", *problem);
 
     return QApplication::exec();
 #endif
