@@ -204,6 +204,21 @@ cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
 | Black window or no rendering    | Set `LIBGL_ALWAYS_INDIRECT=1` (already configured in the Dev Container)            |
 | Windows firewall blocks display | Allow VcXsrv (`vcxsrv.exe`) through the Windows firewall for private networks      |
 
+## Releases
+
+Each [release](https://github.com/embedded-pro/e-foc/releases) carries:
+
+| Asset                                                  | Content                                                                            |
+|--------------------------------------------------------|------------------------------------------------------------------------------------|
+| `e_foc-firmware-<board>-<tag>.tar.gz`                  | `.elf` and `.hex` of every application built for the board                         |
+| `e_foc-firmware-EK-TM4C1294XL-<application>-<tag>.hex` | ready-to-flash images for the EK-TM4C1294XL (`sync_foc_sensored`, `hardware_test`) |
+| `e_foc-source-<tag>.tar.gz`                            | the complete source with every submodule (GitHub's own source archives omit them)  |
+| `e_foc-can_commander-*`, `e_foc-simulator-*`           | desktop tools for Linux and Windows (see below)                                    |
+| `*.pdf`                                                | design booklet, requirements and traceability matrix                               |
+
+Configuring a build from the source archive still downloads the dependencies CMake declares with
+`FetchContent` (such as `ui-cpp` and GoogleTest).
+
 ## CAN Commander
 
 **e-foc CAN Commander** commands and monitors the e-foc motor controllers on one CAN bus — up to eight,

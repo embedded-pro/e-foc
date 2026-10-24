@@ -280,6 +280,50 @@ jobs:
           name: firmware-${{ matrix.target }}
           path: e_foc-firmware-${{ matrix.target }}-*.tar.gz
           if-no-files-found: error
+      - name: Stage EK-TM4C1294XL hex images
+        if: matrix.target == 'EK-TM4C1294XL'
+        run: |
+          version="${{ needs.release_please.outputs.version }}"
+          for app in sync_foc_sensored hardware_test; do
+            hex="$(find "build/${{ matrix.target }}" -name "e_foc.${app}.main.hex" -path "*/${{ matrix.configuration }}/*" -type f | head -n 1)"
+            test -s "$hex" || { echo "::error::no ${app} hex image for ${{ matrix.target }}"; exit 1; }
+            cp "$hex" "e_foc-firmware-${{ matrix.target }}-${app}-${version}.hex"
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.target == 'EK-TM4C1294XL'
+        with:
+          name: firmware-hex-${{ matrix.target }}
+          path: e_foc-firmware-${{ matrix.target }}-*.hex
+          if-no-files-found: error
+
+  package_source:
+    name: Package Source
+    needs: release_please
+    if: needs.release_please.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure Git
+        run: |
+          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git config --global --add safe.directory '*'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: Archive source with submodules
+        run: |
+          version="${{ needs.release_please.outputs.version }}"
+          archive="e_foc-source-${version}.tar.gz"
+          git ls-files --recurse-submodules -z | tar --null -T - --transform "s,^,e_foc-${version}/," -czf "$archive"
+          tar -tzf "$archive" | grep -q "^e_foc-${version}/infra/embedded-infra-lib/CMakeLists.txt$"
+          tar -tzf "$archive" | grep -q "^e_foc-${version}/CMakeLists.txt$"
+          ls -l "$archive"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: source
+          path: e_foc-source-*.tar.gz
+          if-no-files-found: error
 
   build_documentation:
     name: Build Documentation
@@ -320,7 +364,8 @@ jobs:
         build_linux_tools,
         build_windows_tools,
         build_embedded,
-        build_documentation
+        build_documentation,
+        package_source
       ]
     if: needs.release_please.outputs.build == 'true'
     runs-on: ubuntu-latest
@@ -347,7 +392,10 @@ jobs:
             "e_foc-firmware-EK-TM4C1294XL-${v}.tar.gz" \
             "e_foc-firmware-EK-TM4C123GXL-${v}.tar.gz" \
             "e_foc-firmware-STM32F407G-DISC1-${v}.tar.gz" \
-            "e_foc-firmware-NUCLEO-H563ZI-${v}.tar.gz"; do
+            "e_foc-firmware-NUCLEO-H563ZI-${v}.tar.gz" \
+            "e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-${v}.hex" \
+            "e_foc-firmware-EK-TM4C1294XL-hardware_test-${v}.hex" \
+            "e_foc-source-${v}.tar.gz"; do
             test -s "release-assets/$asset" || { echo "::error::missing release asset $asset"; exit 1; }
           done
           compgen -G "release-assets/*-${v}.pdf" > /dev/null || { echo "::error::no documentation PDFs"; exit 1; }
