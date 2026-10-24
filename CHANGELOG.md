@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.1](https://github.com/embedded-pro/e-foc/compare/v1.2.0...v1.2.1) (2026-10-24)
+
+
+### Bug Fixes
+
+* **can_commander:** Build the Windows tools with MSVC again ([adcf477](https://github.com/embedded-pro/e-foc/commit/adcf477e101908ba2e7a9f41b5d2039a9d951467))
+
+
+### Continuous Integration
+
+* Build the Linux and Windows tools the same way in CI and in the release ([adcf477](https://github.com/embedded-pro/e-foc/commit/adcf477e101908ba2e7a9f41b5d2039a9d951467))
+
 ## [1.2.0](https://github.com/embedded-pro/e-foc/compare/v1.1.0...v1.2.0) (2026-10-24)
 
 
