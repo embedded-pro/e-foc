@@ -228,6 +228,10 @@ one by node ID) with start/stop, control mode, setpoints, loop bandwidths, telem
 parameters; an overview row keeps every motor's state and faults in view, and one always-visible
 **EMERGENCY STOP ALL** (`Esc`) reaches every motor.
 
+Each controller needs its own node ID. On the EK-TM4C1294XL, fit the board-ID jumpers on PK0–PK2 (to
+ground; PK0 is bit 0): with the default configuration a board answers as node 1 + its board ID, so
+boards jumpered 0–7 become nodes 1–8. Jumpers are read at reset only.
+
 ### Install
 
 Download the installer for your platform from the [latest release](https://github.com/embedded-pro/e-foc/releases/latest):

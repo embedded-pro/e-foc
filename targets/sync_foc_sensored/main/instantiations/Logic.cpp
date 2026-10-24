@@ -1,10 +1,12 @@
 #include "targets/sync_foc_sensored/main/instantiations/Logic.hpp"
+#include "core/can/CanNodeAddress.hpp"
 #include "infra/event/EventDispatcherWithWeakPtr.hpp"
 
 namespace application
 {
     Logic::Logic(application::PlatformFactory& hardware)
         : hardware{ hardware }
+        , boardId{ hardware.BoardId() }
         , debugLed{ hardware.OperationalLed(), std::chrono::milliseconds(50), std::chrono::milliseconds(1950) }
         , vdc{ hardware.PowerSupplyVoltage() }
         , terminalWithStorage{ hardware.Terminal(), hardware.Tracer(), services::TerminalWithBanner::Banner{ "sync_foc_sensored", vdc, hardware.SystemClock(), hardware.GetResetCause(), hardware.FaultStatus() } }
@@ -32,9 +34,11 @@ namespace application
                 this->hardware.SetEncoderResolution(this->configData.encoderResolution);
                 this->hardware.ConfigureCanBus(this->configData.canBaudrate, false);
 
+                const auto nodeId = can::CanNodeId(this->configData.canNodeId, boardId);
+                this->hardware.Tracer().Trace() << "[CAN] node " << nodeId << " = base " << this->configData.canNodeId << " + board ID " << boardId;
+
                 tracingCan.emplace(this->hardware.CanBus(), this->hardware.Tracer());
-                canServer.emplace(*tracingCan, services::CanProtocolServer::Config{
-                                                   .nodeId = static_cast<uint16_t>(this->configData.canNodeId) });
+                canServer.emplace(*tracingCan, services::CanProtocolServer::Config{ .nodeId = nodeId });
                 tracingServerObserver.emplace(*canServer, this->hardware.Tracer());
                 motorCanServer.emplace(canServer->Transport());
                 canServer->RegisterCategory(*motorCanServer);

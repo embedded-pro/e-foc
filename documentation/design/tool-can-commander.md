@@ -22,7 +22,7 @@ date: 2026-10-24
 
 **Is responsible for:**
 - Letting a bench engineer open one CAN interface and command every e-foc motor controller on it, each
-  addressed by its CAN node ID (its board ID): start, stop, control mode, torque/speed/position setpoints
+  addressed by its CAN node ID (configured base plus the board's ID jumpers): start, stop, control mode, torque/speed/position setpoints
   and loop bandwidths, plus one emergency stop that reaches all of them.
 - Showing each controller's state as that controller reports it: heartbeat, firmware contract
   compatibility, motor state and fault, measurements and identified motor parameters.

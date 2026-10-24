@@ -47,6 +47,7 @@ namespace application
         using ControlMode = state_machine::ControlModeStateMachine;
 
         application::PlatformFactory& hardware;
+        uint8_t boardId;
         services::DebugLed debugLed;
         foc::Volts vdc;
         // help + 3 diagnostics + 20 control-mode commands; registering a 25th asserts at boot

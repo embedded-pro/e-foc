@@ -45,3 +45,13 @@
     Where this contract differs from the can-lite reference example that claims the same category
     identifier, the difference and its reason shall be recorded in the protocol design document,
     and the rejection behaviour a frame built to the example receives shall be stated.
+
+- id: REQ-CAN-006
+  title: A controller's node ID is its configured base plus its board ID, fixed at start-up
+  shall: >
+    A controller shall answer on the CAN node ID equal to its configured base node ID plus the
+    board ID read from its ID jumpers, so that boards running the same firmware and configuration
+    can share a bus. The board ID shall be read once, at start-up; a jumper changed while running
+    shall take effect only after a reset. A board without ID jumpers shall use board ID 0. A
+    configured base of 0, the broadcast address, or one whose sum with the board ID exceeds the
+    12-bit node field shall be replaced by the default base of 1.
