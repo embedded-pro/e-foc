@@ -214,7 +214,8 @@ Each [release](https://github.com/embedded-pro/e-foc/releases) carries:
 | `e_foc-firmware-EK-TM4C1294XL-<application>-<tag>.hex` | ready-to-flash images for the EK-TM4C1294XL (`sync_foc_sensored`, `hardware_test`) |
 | `e_foc-source-<tag>.tar.gz`                            | the complete source with every submodule (GitHub's own source archives omit them)  |
 | `e_foc-can_commander-*`, `e_foc-simulator-*`           | desktop tools for Linux and Windows (see below)                                    |
-| `*.pdf`                                                | design booklet, requirements and traceability matrix                               |
+| `eFocDesign.pdf`                                       | the complete design booklet                                                        |
+| `e_foc-documentation-<tag>.zip`                        | the individual design, theory and requirements documents as PDFs                   |
 
 Configuring a build from the source archive still downloads the dependencies CMake declares with
 `FetchContent` (such as `ui-cpp` and GoogleTest).
