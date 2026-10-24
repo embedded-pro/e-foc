@@ -25,6 +25,7 @@ code is out of scope — the rules in `AGENTS.md` still apply to everything you 
 ## Heuristics
 
 ### Safety controls (SAFETY)
+
 - Emergency stop is reachable whenever a bus is connected — never gated by "busy" or the current tab. It
   has a keyboard shortcut, the `ButtonRole::EmergencyStop` style and stays in view. With several motors on
   the bus it reaches all of them, and the result names every motor it could not reach.
@@ -35,6 +36,7 @@ code is out of scope — the rules in `AGENTS.md` still apply to everything you 
   suffix. No hard-coded magic ranges that disagree with the firmware.
 
 ### Visibility of system state (STATE)
+
 - Connection, node, contract compatibility, pending command and motor fault are visible at all times
   (status bar, motor header), not only in a scrolling log. Every log line about a motor names the motor.
 - A displayed state comes from the device (ack/telemetry), not from what the user last clicked. Show a
@@ -44,6 +46,7 @@ code is out of scope — the rules in `AGENTS.md` still apply to everything you 
 - Stale values are marked or cleared on disconnect; placeholders read "—", not "0.000".
 
 ### Errors and recovery (ERROR)
+
 - Disabled controls explain why (tooltip or inline hint): not connected / firmware incompatible / waiting
   for response.
 - Failures are reported once, in plain language, with the next step ("Check the interface is up:
@@ -54,6 +57,7 @@ code is out of scope — the rules in `AGENTS.md` still apply to everything you 
   attached to a bug report.
 
 ### Flow efficiency (FLOW)
+
 - The last interface, bitrate, node and window layout are restored on launch (`QSettings`).
 - Enter applies the focused setpoint; Tab order follows the visual order; menus carry mnemonics and
   standard shortcuts (`QKeySequence::Quit`, F1 help).
@@ -62,6 +66,7 @@ code is out of scope — the rules in `AGENTS.md` still apply to everything you 
   a level, a filter and Clear/Save.
 
 ### Consistency (CONSISTENCY)
+
 - Use the `ui-cpp` theme (`ui::backend::qt::ApplyTheme`, `StyleButton`, `StyleStatusLabel`) and
   `ui::model` forms for numeric read-outs; no ad-hoc stylesheets or colours.
 - Title Case for buttons/menus, sentence case for messages. One verb per action ("Apply", not
@@ -69,6 +74,7 @@ code is out of scope — the rules in `AGENTS.md` still apply to everything you 
 - Units: SI with the symbol in the suffix (`A`, `V`, `rad/s`, `rad`, `Ω`, `mH`).
 
 ### Polish and accessibility (POLISH)
+
 - Every interactive widget has an accessible name (`setAccessibleName`) or a buddy label.
 - Minimum window size keeps every control usable; splitters, not fixed sizes; no clipped text at 125 %
   and 150 % scaling.
@@ -97,7 +103,7 @@ code is out of scope — the rules in `AGENTS.md` still apply to everything you 
 
 ## Output format (review)
 
-```
+```text
 ### tools/<tool>/gui/<File>.cpp
 SAFETY      — [S1] E-stop disabled while a command is pending (CommandPanel::SetCommandsEnabled). Fix: …
 STATE       — [T1] …

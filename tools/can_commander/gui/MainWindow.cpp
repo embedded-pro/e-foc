@@ -478,10 +478,8 @@ namespace tool
             online += client.IsOnline(nodeId) ? 1 : 0;
         }
 
-        motorsStatus->setText(QString("%1 of %2 motor(s) online%3")
-                                  .arg(online)
-                                  .arg(motors.size())
-                                  .arg(faulted > 0 ? QString(" · %1 in fault").arg(faulted) : QString{}));
+        const auto faultSummary = faulted > 0 ? QString(" · %1 in fault").arg(faulted) : QString{};
+        motorsStatus->setText(QString("%1 of %2 motor(s) online%3").arg(online).arg(motors.size()).arg(faultSummary));
         ui::backend::qt::StyleStatusLabel(*motorsStatus, faulted > 0 ? StatusLevel::Fault : StatusLevel::Neutral);
     }
 

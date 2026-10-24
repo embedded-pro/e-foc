@@ -87,15 +87,15 @@ graph TD
 
 ### Part C — state the user can see at all times
 
-| Element | Shows | Source |
-|---------|-------|--------|
-| Connection panel | interface, bitrate, connected or not | bus adapter |
-| Overview row | every motor's summary (running, idle, fault, offline, incompatible) with a status dot | each node |
-| Tab | status dot and tooltip of that motor | each node |
-| Motor header | node state, firmware contract, the command waiting for an answer | that node |
-| Control mode | *requested…* until acknowledged, then *active* | that node's mode response |
-| Motor status, measurements, identified parameters | values, or "—" when nothing live is known | that node's telemetry and responses |
-| Status bar | motors online out of motors shown, and how many are in fault | all nodes |
+| Element                                           | Shows                                                                                 | Source                              |
+|---------------------------------------------------|---------------------------------------------------------------------------------------|-------------------------------------|
+| Connection panel                                  | interface, bitrate, connected or not                                                  | bus adapter                         |
+| Overview row                                      | every motor's summary (running, idle, fault, offline, incompatible) with a status dot | each node                           |
+| Tab                                               | status dot and tooltip of that motor                                                  | each node                           |
+| Motor header                                      | node state, firmware contract, the command waiting for an answer                      | that node                           |
+| Control mode                                      | *requested…* until acknowledged, then *active*                                        | that node's mode response           |
+| Motor status, measurements, identified parameters | values, or "—" when nothing live is known                                             | that node's telemetry and responses |
+| Status bar                                        | motors online out of motors shown, and how many are in fault                          | all nodes                           |
 
 A displayed state always comes from the controller. A motor's values are cleared when the bus closes or
 that node goes offline, so stale numbers never read as live. A fault on one motor stays visible in the
@@ -156,10 +156,10 @@ release tag is compared with the tool's own version as three numbers.
 
 ### Part H — installers
 
-| Platform | Package | Installs | Notes |
-|----------|---------|----------|-------|
-| Windows x86-64 | `e_foc-can_commander-<tag>-windows-x86_64-setup.exe` | `Program Files\e-foc CAN Commander`, Start-menu and desktop shortcuts, uninstaller, Add/Remove Programs entry | Qt runtime included, MSVC runtime installed when bundled; an existing installation is removed first |
-| Debian/Ubuntu x86-64 | `e_foc-can_commander-<tag>-linux-x86_64.deb` | the `e-foc-can-commander` command, a desktop entry and icons | Qt libraries and platform plugins declared as package dependencies; built on Ubuntu 24.04, so it needs a distribution of that generation or newer |
+| Platform             | Package                                              | Installs                                                                                                      | Notes                                                                                                                                             |
+|----------------------|------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
+| Windows x86-64       | `e_foc-can_commander-<tag>-windows-x86_64-setup.exe` | `Program Files\e-foc CAN Commander`, Start-menu and desktop shortcuts, uninstaller, Add/Remove Programs entry | Qt runtime included, MSVC runtime installed when bundled; an existing installation is removed first                                               |
+| Debian/Ubuntu x86-64 | `e_foc-can_commander-<tag>-linux-x86_64.deb`         | the `e-foc-can-commander` command, a desktop entry and icons                                                  | Qt libraries and platform plugins declared as package dependencies; built on Ubuntu 24.04, so it needs a distribution of that generation or newer |
 
 The portable archives (Windows zip, Linux tar.gz) stay alongside the installers. The release workflow
 installs each package on a clean runner, checks the reported version against the project version, launches
@@ -171,21 +171,21 @@ the tool, and uninstalls it before the release is published.
 
 ### Provided
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
-| Desktop application | Command and monitor up to eight motor controllers on one bus | Usable without a bus: logs, report and update functions work when the CAN driver is missing |
-| Command line | Scripted checks of an installation | Version and help are answered without a display (on Windows, in the console it was started from); the no-update-check option skips the startup check |
-| Issue log files | Evidence for bug reports | Plain UTF-8 text, one entry per line, rotated, per user |
+| Interface           | Purpose                                                      | Contract                                                                                                                                             |
+|---------------------|--------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Desktop application | Command and monitor up to eight motor controllers on one bus | Usable without a bus: logs, report and update functions work when the CAN driver is missing                                                          |
+| Command line        | Scripted checks of an installation                           | Version and help are answered without a display (on Windows, in the console it was started from); the no-update-check option skips the startup check |
+| Issue log files     | Evidence for bug reports                                     | Plain UTF-8 text, one entry per line, rotated, per user                                                                                              |
 
 ### Required
 
-| Interface | Purpose | Contract |
-|-----------|---------|----------|
-| CAN adapter driver | Bus access | SocketCAN kernel modules on Linux; PCAN, Kvaser or CANable driver on Windows |
-| Firmware wire contract | Command and telemetry encoding | A node's commands are enabled only when its major contract version matches (REQ-CAN-003, per server) |
-| CAN service client | Per-node attribution of responses and per-node compatibility | See the frame-origin tracker in the CAN service design |
-| Release feed | Update check | The project's latest-release document; release asset names follow the installer suffixes in Part H |
-| Web browser | Issue reporting, downloads | Opened through the desktop's default handler |
+| Interface              | Purpose                                                      | Contract                                                                                             |
+|------------------------|--------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
+| CAN adapter driver     | Bus access                                                   | SocketCAN kernel modules on Linux; PCAN, Kvaser or CANable driver on Windows                         |
+| Firmware wire contract | Command and telemetry encoding                               | A node's commands are enabled only when its major contract version matches (REQ-CAN-003, per server) |
+| CAN service client     | Per-node attribution of responses and per-node compatibility | See the frame-origin tracker in the CAN service design                                               |
+| Release feed           | Update check                                                 | The project's latest-release document; release asset names follow the installer suffixes in Part H   |
+| Web browser            | Issue reporting, downloads                                   | Opened through the desktop's default handler                                                         |
 
 ---
 
@@ -288,24 +288,24 @@ sequenceDiagram
 
 ## Constraints & Limitations
 
-| Constraint | Value / Description |
-|------------|---------------------|
-| Motors per bus | 8 (the servers `can-lite` tracks) |
-| Command answer timeout | 2 s per node, restarted by every newer command |
-| Node offline after | 3 s without a frame (`can-lite` server timeout) |
-| On-screen event log | newest 5000 lines |
-| Issue log | 1 MiB per file, 3 files, UTC timestamps |
-| Bug report size | address kept within 7000 characters by dropping the oldest log entries |
-| Release check | one request at a time, 10 s transfer timeout, unauthenticated (shared hourly rate limit per address) |
-| Version format | releases tagged *v*major.minor.patch; pre-release tags are never offered |
-| Linux package | Debian-based x86-64, Ubuntu 24.04 generation or newer, Qt 6 from the distribution |
+| Constraint             | Value / Description                                                                                  |
+|------------------------|------------------------------------------------------------------------------------------------------|
+| Motors per bus         | 8 (the servers `can-lite` tracks)                                                                    |
+| Command answer timeout | 2 s per node, restarted by every newer command                                                       |
+| Node offline after     | 3 s without a frame (`can-lite` server timeout)                                                      |
+| On-screen event log    | newest 5000 lines                                                                                    |
+| Issue log              | 1 MiB per file, 3 files, UTC timestamps                                                              |
+| Bug report size        | address kept within 7000 characters by dropping the oldest log entries                               |
+| Release check          | one request at a time, 10 s transfer timeout, unauthenticated (shared hourly rate limit per address) |
+| Version format         | releases tagged *v*major.minor.patch; pre-release tags are never offered                             |
+| Linux package          | Debian-based x86-64, Ubuntu 24.04 generation or newer, Qt 6 from the distribution                    |
 
 ---
 
 ## Open Questions
 
-| # | Question | Options | Status |
-|---|----------|---------|--------|
-| 1 | Should the theme dim role-coloured buttons when disabled, so Start/Stop can carry their colours again? | Change the shared theme / keep default buttons | open |
-| 2 | Should the torque setpoint limit follow each board's maximum current from telemetry instead of the firmware command limit? | Decode the maximum current field / keep the static limit | open |
-| 3 | Should the emergency stop also go out as one broadcast frame, so motors without a tab are reached in a single transmission? | Broadcast plus per-node commands / per-node only | open |
+| # | Question                                                                                                                    | Options                                                  | Status |
+|---|-----------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------|--------|
+| 1 | Should the theme dim role-coloured buttons when disabled, so Start/Stop can carry their colours again?                      | Change the shared theme / keep default buttons           | open   |
+| 2 | Should the torque setpoint limit follow each board's maximum current from telemetry instead of the firmware command limit?  | Decode the maximum current field / keep the static limit | open   |
+| 3 | Should the emergency stop also go out as one broadcast frame, so motors without a tab are reached in a single transmission? | Broadcast plus per-node commands / per-node only         | open   |

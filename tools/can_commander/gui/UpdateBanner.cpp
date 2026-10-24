@@ -48,8 +48,8 @@ namespace tool
         downloadUrl = release.installerUrl.value_or(release.pageUrl);
 
         using ui::backend::qt::ToQt;
-        message->setText(QString("%1 %2 is available — you have %3.")
-                             .arg(ToQt(application::displayName), QString::fromStdString(release.version.ToString()), ToQt(application::version)));
+        const auto latest = QString::fromStdString(release.version.ToString());
+        message->setText(QString("%1 %2 is available — you have %3.").arg(ToQt(application::displayName), latest, ToQt(application::version)));
         downloadButton->setText(release.installerUrl ? "Do&wnload Installer" : "Open Do&wnload Page");
         show();
     }
