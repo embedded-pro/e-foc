@@ -24,13 +24,15 @@ namespace tool
         using ui::backend::qt::ToQt;
         using ui::theme::StatusLevel;
 
-        QString ConnectFailureHint()
+        QString ConnectFailureHint(const QString& interfaceName)
         {
-#if defined(_WIN32)
-            return "check that the adapter is plugged in and its driver (PCAN, Kvaser or CANable) is installed";
-#else
+            if (interfaceName.startsWith("slcan:", Qt::CaseInsensitive) || interfaceName.startsWith("CANable:", Qt::CaseInsensitive))
+                return "check the serial port name, that the adapter runs slcan firmware and that no other program has the port open";
+            if (interfaceName.startsWith("candleLight:", Qt::CaseInsensitive))
+                return "check that the candleLight adapter is plugged in and not used by another program";
+            if (interfaceName.startsWith("PCAN:", Qt::CaseInsensitive) || interfaceName.startsWith("Kvaser:", Qt::CaseInsensitive))
+                return "check that the adapter is plugged in and the vendor driver is installed";
             return "check that the interface exists and is up, e.g. sudo ip link set can0 up type can bitrate 1000000";
-#endif
         }
 
         QString NodeList(const std::vector<uint16_t>& nodes)
@@ -42,7 +44,7 @@ namespace tool
         }
     }
 
-    MainWindow::MainWindow(CanBusAdapter& adapter, IssueLog& issueLog, QWidget* parent)
+    MainWindow::MainWindow(services::CanBusAdapter& adapter, IssueLog& issueLog, QWidget* parent)
         : QMainWindow(parent)
         , adapter(adapter)
         , issueLog(issueLog)
@@ -78,7 +80,7 @@ namespace tool
 
     void MainWindow::ReportStartupProblem(const QString& title, const QString& message)
     {
-        Report(IssueSeverity::error, QString("%1: %2").arg(title, message));
+        Report(IssueSeverity::error, QString("%1: %2").arg(title, message.simplified()));
         QMessageBox::warning(this, title, message + "\n\nThe application stays open so you can read the log or report the issue.");
     }
 
@@ -307,7 +309,7 @@ namespace tool
         Report(IssueSeverity::info, QString("Connecting to %1 at %2").arg(connectionPanel->InterfaceName(), connectionPanel->BitrateText()));
 
         if (!adapter.Connect(infra::BoundedConstString(name.data(), name.size()), connectionPanel->Bitrate()))
-            Report(IssueSeverity::error, QString("Could not connect to %1: %2").arg(connectionPanel->InterfaceName(), ConnectFailureHint()));
+            Report(IssueSeverity::error, QString("Could not connect to %1: %2").arg(connectionPanel->InterfaceName(), ConnectFailureHint(connectionPanel->InterfaceName())));
     }
 
     void MainWindow::Disconnect()
@@ -652,7 +654,7 @@ namespace tool
         Report(IssueSeverity::error, QString("CAN adapter: %1").arg(QString::fromUtf8(message.data(), static_cast<qsizetype>(message.size()))));
     }
 
-    void MainWindow::OnFrameLog(bool transmitted, uint32_t id, const CanFrame& frame)
+    void MainWindow::OnFrameLog(bool transmitted, uint32_t id, const services::CanFrame& frame)
     {
         eventLog->AppendFrame(transmitted, id, frame);
     }
@@ -661,17 +663,19 @@ namespace tool
     {
         TeardownSocketNotifier();
 
-        const int fd = adapter.FileDescriptor();
-        if (fd >= 0)
+#if defined(__linux__)
+        if (const auto fd = adapter.FileDescriptor(); fd >= 0)
         {
-            socketNotifier = new QSocketNotifier(fd, QSocketNotifier::Read, this);
+            socketNotifier = new QSocketNotifier(static_cast<qintptr>(fd), QSocketNotifier::Read, this);
             connect(socketNotifier, &QSocketNotifier::activated, this, [this]()
                 {
                     adapter.ProcessReadEvent();
                 });
+            return;
         }
-        else
-            rxPollTimer.start(1);
+#endif
+
+        rxPollTimer.start(1);
     }
 
     void MainWindow::TeardownSocketNotifier()

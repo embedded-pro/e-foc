@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.2.1
+version: 0.4.0
 component: "tool-can-commander"
 date: 2026-10-24
 ---
@@ -12,7 +12,7 @@ date: 2026-10-24
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.2.1                |
+| Version   | 0.4.0                |
 | Component | tool-can-commander   |
 | Date      | 2026-10-24           |
 
@@ -47,8 +47,8 @@ date: 2026-10-24
 
 The tool is split so that everything but widget layout can be tested without a display:
 
-- **Adapter** — the CAN bus per platform: SocketCAN on Linux; PCAN, Kvaser or CANable on Windows. It shows
-  every received frame to its observers before handing it to the protocol client.
+- **Adapter** — the CAN bus, provided by can-lite's host drivers (Part I). It shows every received frame to its
+  observers before handing it to the protocol client.
 - **Logic** — the command client, one for the whole bus. Every command names its node and every report says
   which node sent it. Per node it tracks: online (a frame was seen; offline after the protocol's 3 s server
   timeout or when the bus closes), firmware compatibility, and the last command sent until that command is
@@ -174,6 +174,33 @@ are published unsigned.
 
 ---
 
+### Part I — CAN adapters
+
+The tool does not implement bus access itself. It uses the platform composition from can-lite's host drivers
+(can-lite design booklet, chapter 3), which puts every adapter the platform supports behind one name space:
+
+| Platform | Adapter                        | Name in the Interface box |
+|----------|--------------------------------|---------------------------|
+| Linux    | SocketCAN                      | `can0`, `vcan0`, …        |
+| Linux    | slcan: CANable and compatibles | `slcan:/dev/ttyACM0`      |
+| Windows  | PEAK PCAN-USB                  | `PCAN:1` to `PCAN:16`     |
+| Windows  | Kvaser                         | `Kvaser:0`, `Kvaser:1`, … |
+| Windows  | slcan: CANable and compatibles | `slcan:COM3`              |
+| Windows  | candleLight (gs_usb firmware)  | `candleLight:1`, …        |
+
+`CANable:` is accepted as an alias of `slcan:`. The Interface box lists every name the adapters enumerate
+and stays editable; with nothing to list it explains how to get an entry. The PCAN and Kvaser libraries are
+loaded when needed, so the tool installs and starts on a machine without them.
+
+- **Connect failure** — the adapter's own reason (port not found, in use, access denied, unsupported
+  bitrate, missing vendor library) goes to the log, followed by a next step chosen from the name's prefix.
+- **No usable adapter at startup** — when no adapter has both its driver and at least one interface, a
+  dialog lists every missing driver with what to install; while any adapter works, nothing is shown.
+- **Polling** — on Linux the tool waits on the adapter's descriptor; on Windows it polls the adapter every
+  millisecond while connected.
+- **Frames** — only 29-bit frames reach the tool and its frame log; standard-identifier frames stop at the
+  driver.
+
 ## Interfaces
 
 ### Provided
@@ -188,7 +215,7 @@ are published unsigned.
 
 | Interface              | Purpose                                                      | Contract                                                                                             |
 |------------------------|--------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
-| CAN adapter driver     | Bus access                                                   | SocketCAN kernel modules on Linux; PCAN, Kvaser or CANable driver on Windows                         |
+| CAN adapter driver     | Bus access                                                   | can-lite host drivers; the operating-system or vendor driver each adapter needs (Part I)             |
 | Firmware wire contract | Command and telemetry encoding                               | A node's commands are enabled only when its major contract version matches (REQ-CAN-003, per server) |
 | CAN service client     | Per-node attribution of responses and per-node compatibility | See the frame-origin tracker in the CAN service design                                               |
 | Release feed           | Update check                                                 | The project's latest-release document; release asset names follow the installer suffixes in Part H   |

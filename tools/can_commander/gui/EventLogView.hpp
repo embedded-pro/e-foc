@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tools/can_commander/adapter/CanBusAdapter.hpp"
+#include "can-lite/drivers/interface/CanBusAdapter.hpp"
 #include "tools/can_commander/support/IssueLog.hpp"
 #include <QCheckBox>
 #include <QPlainTextEdit>
@@ -17,7 +17,7 @@ namespace tool
         explicit EventLogView(QWidget* parent = nullptr);
 
         void Append(IssueSeverity severity, const QString& message);
-        void AppendFrame(bool transmitted, uint32_t id, const CanFrame& frame);
+        void AppendFrame(bool transmitted, uint32_t id, const services::CanFrame& frame);
 
         bool ShowsFrames() const;
 

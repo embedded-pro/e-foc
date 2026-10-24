@@ -70,7 +70,7 @@ namespace
 
         void LogReceived(uint32_t rawId, const hal::Can::Message& data)
         {
-            CanFrame frame;
+            services::CanFrame frame;
             for (auto byte : data)
                 frame.push_back(byte);
 
@@ -257,7 +257,7 @@ TEST_F(TestCanCommandClient, a_node_heard_again_after_reconnecting_is_reported_o
 
 TEST_F(TestCanCommandClient, transmitted_frames_are_relayed_to_the_log)
 {
-    CanFrame data;
+    services::CanFrame data;
     data.push_back(0x42);
 
     EXPECT_CALL(observer, OnFrameLog(true, 0x12345u, _));

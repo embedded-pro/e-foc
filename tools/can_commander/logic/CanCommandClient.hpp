@@ -2,12 +2,12 @@
 
 #include "can-lite/client/CanProtocolClient.hpp"
 #include "can-lite/core/CanProtocolDefinitions.hpp"
+#include "can-lite/drivers/interface/CanBusAdapter.hpp"
 #include "core/can/FocMotorCanClient.hpp"
 #include "core/can/FocMotorCategoryClient.hpp"
 #include "core/can/FocMotorMessages.hpp"
 #include "infra/timer/Timer.hpp"
 #include "infra/util/Observer.hpp"
-#include "tools/can_commander/adapter/CanBusAdapter.hpp"
 #include <cstdint>
 #include <map>
 #include <set>
@@ -27,7 +27,7 @@ namespace tool
 
         virtual void OnConnectionChanged(bool connected) = 0;
         virtual void OnAdapterError(infra::BoundedConstString message) = 0;
-        virtual void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) = 0;
+        virtual void OnFrameLog(bool transmitted, uint32_t id, const services::CanFrame& data) = 0;
 
         virtual void OnNodeOnlineChanged(uint16_t nodeId, bool online) = 0;
         virtual void OnBusyChanged(uint16_t nodeId, bool busy) = 0;
@@ -50,12 +50,12 @@ namespace tool
         : public infra::Subject<CanCommandClientObserver>
         , private services::CanProtocolClientObserver
         , private can::FocMotorCategoryClientObserver
-        , private CanBusAdapterObserver
+        , private services::CanBusAdapterObserver
     {
     public:
         static constexpr infra::Duration commandTimeout{ std::chrono::seconds(2) };
 
-        explicit CanCommandClient(CanBusAdapter& adapter);
+        explicit CanCommandClient(services::CanBusAdapter& adapter);
         ~CanCommandClient();
 
         bool IsBusy(uint16_t nodeId) const;
@@ -108,12 +108,12 @@ namespace tool
         void OnElectricalParamsResponse(uint16_t nodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs) override;
         void OnMechanicalParamsResponse(uint16_t nodeId, foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia) override;
 
-        // CanBusAdapterObserver
-        void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) override;
+        // services::CanBusAdapterObserver
+        void OnFrameLog(bool transmitted, uint32_t id, const services::CanFrame& data) override;
         void OnError(infra::BoundedConstString message) override;
         void OnConnectionChanged(bool connected) override;
 
-        bool HandleCommandAck(uint32_t id, const CanFrame& data);
+        bool HandleCommandAck(uint32_t id, const services::CanFrame& data);
         void DecodeTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg) const;
         void DecodeTelemetryElectrical(uint16_t nodeId, const hal::Can::Message& msg) const;
 

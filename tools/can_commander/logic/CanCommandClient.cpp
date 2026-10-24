@@ -8,19 +8,19 @@ namespace tool
 {
     using namespace services;
 
-    CanCommandClient::CanCommandClient(CanBusAdapter& adapter)
+    CanCommandClient::CanCommandClient(services::CanBusAdapter& adapter)
         : focClient{ adapter, uint16_t{ 0 } }
     {
         CanProtocolClientObserver::Attach(focClient.ProtocolClient());
         can::FocMotorCategoryClientObserver::Attach(focClient.CategoryClient());
-        CanBusAdapterObserver::Attach(adapter);
+        services::CanBusAdapterObserver::Attach(adapter);
     }
 
     CanCommandClient::~CanCommandClient()
     {
         can::FocMotorCategoryClientObserver::Detach();
         CanProtocolClientObserver::Detach();
-        CanBusAdapterObserver::Detach();
+        services::CanBusAdapterObserver::Detach();
     }
 
     bool CanCommandClient::IsBusy(uint16_t nodeId) const
@@ -320,7 +320,7 @@ namespace tool
             });
     }
 
-    bool CanCommandClient::HandleCommandAck(uint32_t id, const CanFrame& data)
+    bool CanCommandClient::HandleCommandAck(uint32_t id, const services::CanFrame& data)
     {
         if (ExtractCanMessageType(id) != canCommandAckMessageTypeId || ExtractCanCategory(id) != canSystemCategoryId || data.size() < canCommandAckSize)
             return false;
@@ -340,7 +340,7 @@ namespace tool
         return true;
     }
 
-    void CanCommandClient::OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data)
+    void CanCommandClient::OnFrameLog(bool transmitted, uint32_t id, const services::CanFrame& data)
     {
         bool consumed{ false };
         if (!transmitted)

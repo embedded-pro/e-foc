@@ -12,7 +12,7 @@ target_link_libraries(e_foc.tool.can_commander.gui PUBLIC
     ui.model
     ui.shell
     ui.backend.qt
-    e_foc.tool.can_commander.adapter
+    can_lite.drivers.interface
     e_foc.tool.can_commander.logic
     e_foc.tool.can_commander.support
 )

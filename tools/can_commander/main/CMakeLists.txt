@@ -7,7 +7,7 @@ target_include_directories(e_foc.tool.can_commander PRIVATE
 
 target_link_libraries(e_foc.tool.can_commander PRIVATE
     hal.generic
-    e_foc.tool.can_commander.adapter
+    can_lite.drivers.platform
     e_foc.tool.can_commander.logic
     e_foc.tool.can_commander.support
     e_foc.tool.can_commander.gui

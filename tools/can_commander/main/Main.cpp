@@ -13,17 +13,18 @@
 #include <QIcon>
 #include <QNetworkProxyFactory>
 #include <QStandardPaths>
+#include <QStringList>
 #include <QSysInfo>
 #include <cstring>
 #include <initializer_list>
 #include <iostream>
 #include <optional>
-#include <stdexcept>
 
-#ifdef __linux__
-#include "tools/can_commander/adapter/SocketCanAdapter.hpp"
-#elif defined(_WIN32)
-#include "tools/can_commander/adapter/WindowsCanAdapter.hpp"
+#if defined(__linux__) || defined(_WIN32)
+#include "can-lite/drivers/implementation/PlatformCanAdapter.hpp"
+#endif
+
+#ifdef _WIN32
 #include <cstdio>
 #include <windows.h>
 #endif
@@ -105,18 +106,17 @@ namespace
         return config;
     }
 
-    template<class Adapter>
-    std::optional<QString> MissingDriver(const Adapter& adapter)
+    std::optional<QString> MissingDrivers(const services::CanBusAdapter& adapter)
     {
-        try
-        {
-            adapter.ValidateDriverAvailability();
+        QStringList reasons;
+        adapter.EnumerateMissingDrivers([&reasons](infra::BoundedConstString reason)
+            {
+                reasons.append(QString::fromUtf8(reason.data(), static_cast<qsizetype>(reason.size())));
+            });
+
+        if (reasons.isEmpty())
             return std::nullopt;
-        }
-        catch (const std::runtime_error& e)
-        {
-            return QString::fromUtf8(e.what());
-        }
+        return "No CAN adapter is ready. Plug one in, or install the driver it needs:\n\n" + reasons.join("\n\n");
     }
 }
 
@@ -147,13 +147,12 @@ int main(int argc, char* argv[])
     tool::QtEventDispatcher::WithSize<256> eventDispatcher;
     hal::TimerServiceGeneric timerService;
 
-#if defined(__linux__)
-    tool::SocketCanAdapter adapter;
-#elif defined(_WIN32)
-    tool::WindowsCanAdapter adapter;
+#if defined(__linux__) || defined(_WIN32)
+    services::PlatformCanAdapter platformAdapter;
+    auto& adapter = platformAdapter.Adapter();
 #else
     std::cerr << "No CAN adapter available for this platform.\n"
-              << "Supported platforms: Linux (SocketCAN), Windows (PCAN/Kvaser/CANable)\n";
+              << "Supported platforms: Linux (SocketCAN, slcan), Windows (PCAN, Kvaser, slcan, candleLight)\n";
     return 1;
 #endif
 
@@ -164,8 +163,8 @@ int main(int argc, char* argv[])
     if (!parser.isSet(noUpdateCheck))
         window.CheckForUpdatesOnStartup();
 
-    if (const auto problem = MissingDriver(adapter))
-        window.ReportStartupProblem("CAN Driver Not Found", *problem);
+    if (const auto problem = MissingDrivers(adapter))
+        window.ReportStartupProblem("No Usable CAN Adapter", *problem);
 
     return QApplication::exec();
 #endif

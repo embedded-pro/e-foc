@@ -65,7 +65,7 @@ namespace tool
         AppendLine(QString("%1  %2").arg(ToString(severity), message));
     }
 
-    void EventLogView::AppendFrame(bool transmitted, uint32_t id, const CanFrame& frame)
+    void EventLogView::AppendFrame(bool transmitted, uint32_t id, const services::CanFrame& frame)
     {
         if (!showFrames->isChecked())
             return;

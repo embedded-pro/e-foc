@@ -7,7 +7,7 @@ target_include_directories(e_foc.tool.can_commander.logic PUBLIC
 
 target_link_libraries(e_foc.tool.can_commander.logic PUBLIC
     e_foc.can
-    e_foc.tool.can_commander.adapter
+    can_lite.drivers.interface
 )
 
 target_sources(e_foc.tool.can_commander.logic PRIVATE
