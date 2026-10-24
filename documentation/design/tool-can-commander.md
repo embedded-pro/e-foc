@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.2.1
+version: 0.3.0
 component: "tool-can-commander"
 date: 2026-10-24
 ---
@@ -12,7 +12,7 @@ date: 2026-10-24
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.2.1                |
+| Version   | 0.3.0                |
 | Component | tool-can-commander   |
 | Date      | 2026-10-24           |
 
@@ -142,17 +142,58 @@ newest log entries, and where the full log file lives (with the home folder show
 are dropped until the address fits the length the issue tracker accepts. Nothing is sent until the user
 submits the page. Help → Open Log Folder shows the files.
 
-### Part G — update check
+### Part G — update check and self-upgrade
 
-At startup (unless switched off in the Help menu or by the no-update-check option) and on Help → Check for
-Updates, the tool reads the project's latest-release document over HTTPS, honouring the system proxy. The
-release tag is compared with the tool's own version as three numbers.
+At startup and every 24 hours while running (unless automatic checks are switched off in the Help menu or by
+the no-update-check option), and on Help → Check for Updates, the tool reads the project's latest-release
+document over HTTPS, honouring the system proxy. The release tag is compared with the tool's own version as
+three numbers.
 
-- Newer release: a dismissible banner names the version and offers the installer for this platform (the
-  release asset whose name ends in the platform's installer suffix) and the release notes.
-- Same or older: nothing is shown at startup; a manual check confirms the tool is current.
-- Offline, rate-limited or unreadable: nothing is shown at startup; the failure is logged; a manual check
-  explains it and links to the releases page.
+- Newer release: a dismissible banner names the version and offers to install it, plus the release notes.
+  *Skip This Version* hides that version from automatic checks (a manual check still offers it); *Later*
+  hides the banner until the next check.
+- Same or older: nothing is shown; a manual check confirms the tool is current.
+- Offline, rate-limited or unreadable: nothing is shown; the failure is logged; a manual check explains it
+  and links to the releases page.
+
+The installer is the release asset whose name ends in the platform's installer suffix (Part H). Installing
+it from inside the tool needs the tool to run from an installed package (not a portable archive), the
+release to publish the asset's SHA-256 digest and, on Linux, `pkexec` and `apt-get` to be present.
+When any of them is missing, the banner offers the installer download, or the release page, instead.
+
+Installing always starts with the user: *Install Update…* asks for confirmation and says what happens next.
+The tool then downloads the installer with visible progress, which the user can cancel, and checks the
+received file's size and SHA-256 against the values published with the release. A file that does not match
+is deleted and never run. Downloading may happen while a bus is open, but installing closes or restarts the
+tool, so it waits until the bus is disconnected: the banner says so, and installation continues on request
+once the bus is closed.
+
+- Windows: the tool hands over to a helper and closes. The helper waits until the tool has exited, then
+  starts the installer elevated, which shows the Windows permission prompt for the installer itself, silently
+  into the current installation folder. The installer starts the new version as the signed-in user when it
+  finishes. If the permission prompt is declined, the helper starts the old version again.
+- Linux: the tool asks for the administrator password through `pkexec` and installs the package with
+  `apt-get`, keeping its window open meanwhile. On success it starts the new version and closes. A dismissed
+  password prompt or a failed installation is reported in the banner, and the tool keeps running.
+
+Every step and failure is written to the issue log.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Available : newer release found
+    Available --> Idle : Later / Skip This Version
+    Available --> Downloading : Install Update… confirmed
+    Downloading --> Available : Cancel
+    Downloading --> Failed : transfer error or checksum mismatch
+    Downloading --> Installing : verified, bus disconnected
+    Downloading --> Ready : verified, bus connected
+    Ready --> Installing : Install and Restart, bus disconnected
+    Installing --> [*] : tool closes (Windows) or restarts (Linux)
+    Installing --> Failed : permission declined or installer failed
+    Failed --> Downloading : Try Again
+    Failed --> Idle : Later
+```
 
 ### Part H — installers
 
@@ -178,11 +219,11 @@ are published unsigned.
 
 ### Provided
 
-| Interface           | Purpose                                                      | Contract                                                                                                                                             |
-|---------------------|--------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Desktop application | Command and monitor up to eight motor controllers on one bus | Usable without a bus: logs, report and update functions work when the CAN driver is missing                                                          |
-| Command line        | Scripted checks of an installation                           | Version and help are answered without a display (on Windows, in the console it was started from); the no-update-check option skips the startup check |
-| Issue log files     | Evidence for bug reports                                     | Plain UTF-8 text, one entry per line, rotated, per user                                                                                              |
+| Interface           | Purpose                                                      | Contract                                                                                                                                            |
+|---------------------|--------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| Desktop application | Command and monitor up to eight motor controllers on one bus | Usable without a bus: logs, report and update functions work when the CAN driver is missing                                                         |
+| Command line        | Scripted checks of an installation                           | Version and help are answered without a display (on Windows, in the console it was started from); the no-update-check option skips automatic checks |
+| Issue log files     | Evidence for bug reports                                     | Plain UTF-8 text, one entry per line, rotated, per user                                                                                             |
 
 ### Required
 
@@ -192,6 +233,7 @@ are published unsigned.
 | Firmware wire contract | Command and telemetry encoding                               | A node's commands are enabled only when its major contract version matches (REQ-CAN-003, per server) |
 | CAN service client     | Per-node attribution of responses and per-node compatibility | See the frame-origin tracker in the CAN service design                                               |
 | Release feed           | Update check                                                 | The project's latest-release document; release asset names follow the installer suffixes in Part H   |
+| Elevation              | Self-upgrade                                                 | Windows permission prompt; on Linux `pkexec` with `apt-get`                                          |
 | Web browser            | Issue reporting, downloads                                   | Opened through the desktop's default handler                                                         |
 
 ---
@@ -256,6 +298,35 @@ sequenceDiagram
     end
 ```
 
+### Installing an update
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Tool as CAN Commander
+    participant Feed as Release feed
+    participant Helper as Update helper (Windows)
+    participant OS as Installer / package manager
+    User->>Tool: Install Update…
+    Tool-->>User: Confirm: closes, installs, restarts
+    User->>Tool: Install and Restart
+    Tool->>Feed: Download installer (progress, cancellable)
+    Tool->>Tool: Check size and SHA-256
+    alt Mismatch
+        Tool-->>User: Banner: not installed, download page offered
+    else Bus connected
+        Tool-->>User: Banner: disconnect to install
+    else Windows
+        Tool->>Helper: Start, then close
+        Helper->>OS: Installer, elevated and silent, after the tool exits
+        OS->>Tool: Start new version
+    else Linux
+        Tool->>OS: pkexec apt-get install
+        OS-->>Tool: Result
+        Tool->>Tool: Start new version, close
+    end
+```
+
 ### Discovering a motor
 
 ```mermaid
@@ -305,6 +376,8 @@ sequenceDiagram
 | Bug report size        | address kept within 7000 characters by dropping the oldest log entries                               |
 | Release check          | one request at a time, 10 s transfer timeout, unauthenticated (shared hourly rate limit per address) |
 | Version format         | releases tagged *v*major.minor.patch; pre-release tags are never offered                             |
+| Automatic checks       | at startup and every 24 h while running                                                              |
+| Self-upgrade           | installed packages only; never while a bus is open; SHA-256 and size must match the release          |
 | Linux package          | Debian-based x86-64, Ubuntu 24.04 generation or newer, Qt 6 from the distribution                    |
 
 ---

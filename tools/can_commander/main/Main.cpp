@@ -122,7 +122,7 @@ namespace
 
 int main(int argc, char* argv[])
 {
-    const QCommandLineOption noUpdateCheck{ "no-update-check", "Do not look for a newer release at startup." };
+    const QCommandLineOption noUpdateCheck{ "no-update-check", "Do not look for newer releases automatically." };
     if (AnswersWithoutGui(argc, argv, noUpdateCheck))
         return 0;
 
@@ -162,7 +162,7 @@ int main(int argc, char* argv[])
     window.show();
 
     if (!parser.isSet(noUpdateCheck))
-        window.CheckForUpdatesOnStartup();
+        window.StartAutomaticUpdateChecks();
 
     if (const auto problem = MissingDriver(adapter))
         window.ReportStartupProblem("CAN Driver Not Found", *problem);

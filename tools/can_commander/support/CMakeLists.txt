@@ -29,6 +29,14 @@ target_sources(e_foc.tool.can_commander.support PRIVATE
     ReleaseVersion.cpp
     UpdateChecker.hpp
     UpdateChecker.cpp
+    UpdateDownloader.hpp
+    UpdateDownloader.cpp
+    UpdateInstallation.hpp
+    UpdateInstallation.cpp
+    UpdateInstaller.hpp
+    UpdateInstaller.cpp
+    UpdateSession.hpp
+    UpdateSession.cpp
 )
 
 set_target_properties(e_foc.tool.can_commander.support PROPERTIES
