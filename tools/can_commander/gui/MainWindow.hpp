@@ -9,6 +9,7 @@
 #include "tools/can_commander/logic/CanCommandClient.hpp"
 #include "tools/can_commander/support/IssueLog.hpp"
 #include "tools/can_commander/support/UpdateChecker.hpp"
+#include "tools/can_commander/support/UpdateSession.hpp"
 #include <QAction>
 #include <QLabel>
 #include <QMainWindow>
@@ -34,7 +35,7 @@ namespace tool
         MainWindow(services::CanBusAdapter& adapter, IssueLog& issueLog, QWidget* parent = nullptr);
         ~MainWindow() override;
 
-        void CheckForUpdatesOnStartup();
+        void StartAutomaticUpdateChecks();
 
         void ReportStartupProblem(const QString& title, const QString& message);
 
@@ -70,6 +71,11 @@ namespace tool
         QWidget* BuildEmptyState();
         void ConnectSignals();
         void ConnectUpdateChecker();
+        void ConnectUpdateSession();
+        void OnUpdateStateChanged(const UpdateState& state);
+        void RequestUpdateInstall();
+        void RestartForUpdate();
+        void RelaunchUpdatedVersion();
         void RestoreSettings();
         void SaveSettings() const;
 
@@ -98,6 +104,7 @@ namespace tool
         IssueLog& issueLog;
         CanCommandClient client;
         UpdateChecker updateChecker;
+        UpdateSession updateSession;
 
         UpdateBanner* updateBanner{ nullptr };
         ConnectionPanel* connectionPanel{ nullptr };
@@ -113,13 +120,15 @@ namespace tool
         QAction* addMotorAction{ nullptr };
         QAction* emergencyStopAction{ nullptr };
         QAction* showFramesAction{ nullptr };
-        QAction* checkAtStartupAction{ nullptr };
+        QAction* automaticUpdatesAction{ nullptr };
 
         QTimer rxPollTimer;
+        QTimer automaticUpdateTimer;
         QSocketNotifier* socketNotifier{ nullptr };
 
         std::map<uint16_t, MotorPanel*> motors;
         bool busConnected{ false };
         bool userRequestedUpdateCheck{ false };
+        UpdatePhase updatePhase{ UpdatePhase::idle };
     };
 }

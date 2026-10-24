@@ -71,6 +71,12 @@ function(e_foc_can_commander_package)
   IfFileExists "$INSTDIR\bin\vc_redist.x64.exe" 0 +3
     ExecWait '"$INSTDIR\bin\vc_redist.x64.exe" /install /quiet /norestart'
     Delete "$INSTDIR\bin\vc_redist.x64.exe"
+  Push $CMDLINE
+  Push "/RELAUNCH"
+  Call StrStr
+  Pop $0
+  StrCmp $0 "" +2 0
+    Exec '"$WINDIR\explorer.exe" "$INSTDIR\bin\e-foc-can-commander.exe"'
 ]=])
     set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS [=[
   Delete "$DESKTOP\e-foc CAN Commander.lnk"

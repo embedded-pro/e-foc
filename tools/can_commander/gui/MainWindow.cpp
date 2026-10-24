@@ -2,17 +2,23 @@
 #include "core/can/FocMotorWireContract.hpp"
 #include "tools/can_commander/support/ApplicationInfo.hpp"
 #include "tools/can_commander/support/IssueReport.hpp"
+#include "tools/can_commander/support/UpdateInstallation.hpp"
 #include "ui/backend/qt/QtConversions.hpp"
 #include "ui/backend/qt/QtTheme.hpp"
 #include "ui/theme/Theme.hpp"
+#include <QApplication>
 #include <QCloseEvent>
+#include <QDateTime>
 #include <QDesktopServices>
 #include <QDir>
+#include <QDirIterator>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QProcess>
 #include <QSettings>
+#include <QStandardPaths>
 #include <QStatusBar>
 #include <QVBoxLayout>
 #include <utility>
@@ -35,6 +41,35 @@ namespace tool
             return "check that the interface exists and is up, e.g. sudo ip link set can0 up type can bitrate 1000000";
         }
 
+        constexpr std::chrono::hours automaticUpdateInterval{ 24 };
+
+        QString UpdateDownloadDirectory()
+        {
+            return QDir{ QStandardPaths::writableLocation(QStandardPaths::CacheLocation) }.filePath("updates");
+        }
+
+        void RemoveStaleUpdateDownloads()
+        {
+            const auto cutoff = QDateTime::currentDateTimeUtc().addDays(-1);
+            QDirIterator files{ UpdateDownloadDirectory(), QDir::Files };
+            while (files.hasNext())
+                if (const auto file = files.nextFileInfo(); file.lastModified().toUTC() < cutoff)
+                    QFile::remove(file.filePath());
+        }
+
+        std::optional<InstallCommand> UpdateCommandFor(const QString& installerPath)
+        {
+            return DefaultUpdateCommand(CurrentInstallerPlatform(), installerPath, QCoreApplication::applicationFilePath(), QCoreApplication::applicationPid());
+        }
+
+        QString InstallSteps()
+        {
+            if (CurrentInstallerPlatform() == InstallerPlatform::windowsX64)
+                return "CAN Commander downloads the installer and checks it against the release. It then closes, Windows asks for permission, and the new version starts when the installation is done.";
+
+            return "CAN Commander downloads the package and checks it against the release, then asks for your password to install it and restarts.";
+        }
+
         QString NodeList(const std::vector<uint16_t>& nodes)
         {
             QStringList names;
@@ -50,6 +85,7 @@ namespace tool
         , issueLog(issueLog)
         , client(adapter)
         , updateChecker(ReleaseVersion::Parse(application::version).value_or(ReleaseVersion{}), QUrl{ ToQt(application::latestReleaseApiUrl) })
+        , updateSession(UpdateDownloadDirectory(), UpdateCommandFor)
     {
         CanCommandClientObserver::Attach(client);
         setWindowTitle(QString("%1 %2").arg(ToQt(application::displayName), ToQt(application::version)));
@@ -62,6 +98,8 @@ namespace tool
         RestoreSettings();
         ConnectSignals();
         ConnectUpdateChecker();
+        ConnectUpdateSession();
+        RemoveStaleUpdateDownloads();
 
         UpdateSafetyControls();
         UpdateStatusBar();
@@ -72,9 +110,16 @@ namespace tool
         CanCommandClientObserver::Detach();
     }
 
-    void MainWindow::CheckForUpdatesOnStartup()
+    void MainWindow::StartAutomaticUpdateChecks()
     {
-        if (checkAtStartupAction->isChecked())
+        connect(&automaticUpdateTimer, &QTimer::timeout, this, [this]()
+            {
+                if (automaticUpdatesAction->isChecked())
+                    CheckForUpdates(false);
+            });
+        automaticUpdateTimer.start(automaticUpdateInterval);
+
+        if (automaticUpdatesAction->isChecked())
             CheckForUpdates(false);
     }
 
@@ -137,9 +182,9 @@ namespace tool
             {
                 CheckForUpdates(true);
             });
-        checkAtStartupAction = helpMenu->addAction("Check for Updates at &Startup");
-        checkAtStartupAction->setCheckable(true);
-        checkAtStartupAction->setChecked(true);
+        automaticUpdatesAction = helpMenu->addAction("Check for Updates &Automatically");
+        automaticUpdatesAction->setCheckable(true);
+        automaticUpdatesAction->setChecked(true);
         helpMenu->addSeparator();
         helpMenu->addAction("&Report Issue…", this, &MainWindow::ReportIssue);
         helpMenu->addAction("Open &Log Folder", this, &MainWindow::OpenLogFolder);
@@ -254,9 +299,15 @@ namespace tool
     {
         connect(&updateChecker, &UpdateChecker::UpdateAvailable, this, [this](const ReleaseInfo& release)
             {
-                userRequestedUpdateCheck = false;
+                const auto requested = std::exchange(userRequestedUpdateCheck, false);
+                if (!requested && QSettings{}.value("updates/skippedVersion").toString() == release.tag)
+                {
+                    Report(IssueSeverity::info, QString("Update available: %1 (skipped)").arg(release.tag));
+                    return;
+                }
+
                 Report(IssueSeverity::info, QString("Update available: %1").arg(release.tag));
-                updateBanner->ShowRelease(release);
+                updateSession.Offer(release);
             });
         connect(&updateChecker, &UpdateChecker::UpToDate, this, [this](const ReleaseInfo& latest)
             {
@@ -273,6 +324,94 @@ namespace tool
             });
     }
 
+    void MainWindow::ConnectUpdateSession()
+    {
+        connect(&updateSession, &UpdateSession::StateChanged, this, &MainWindow::OnUpdateStateChanged);
+        connect(&updateSession, &UpdateSession::RestartRequested, this, &MainWindow::RestartForUpdate);
+        connect(&updateSession, &UpdateSession::Relaunch, this, &MainWindow::RelaunchUpdatedVersion);
+        connect(updateBanner, &UpdateBanner::InstallRequested, this, &MainWindow::RequestUpdateInstall);
+        connect(updateBanner, &UpdateBanner::CancelRequested, &updateSession, &UpdateSession::Cancel);
+        connect(updateBanner, &UpdateBanner::DismissRequested, &updateSession, &UpdateSession::Dismiss);
+        connect(updateBanner, &UpdateBanner::SkipRequested, this, [this]()
+            {
+                if (const auto& release = updateSession.State().release)
+                {
+                    QSettings{}.setValue("updates/skippedVersion", release->tag);
+                    Report(IssueSeverity::info, QString("Update %1 skipped").arg(release->tag));
+                }
+                updateSession.Dismiss();
+            });
+    }
+
+    void MainWindow::OnUpdateStateChanged(const UpdateState& state)
+    {
+        updateBanner->Render(state);
+
+        if (std::exchange(updatePhase, state.phase) == state.phase || !state.release)
+            return;
+
+        const auto& tag = state.release->tag;
+        switch (state.phase)
+        {
+            case UpdatePhase::downloading:
+                Report(IssueSeverity::info, QString("Downloading update %1 from %2").arg(tag, state.release->installer->url.toString()));
+                break;
+            case UpdatePhase::ready:
+                Report(IssueSeverity::info, QString("Update %1 downloaded and verified; waiting for the bus to be disconnected").arg(tag));
+                break;
+            case UpdatePhase::installing:
+                Report(IssueSeverity::info, QString("Installing update %1").arg(tag));
+                break;
+            case UpdatePhase::failed:
+                Report(IssueSeverity::warning, QString("Update to %1 failed: %2").arg(tag, state.failure));
+                break;
+            default:
+                break;
+        }
+    }
+
+    void MainWindow::RequestUpdateInstall()
+    {
+        const auto& state = updateSession.State();
+        if (state.phase == UpdatePhase::available || state.phase == UpdatePhase::failed)
+        {
+            QMessageBox confirm{ this };
+            confirm.setIcon(QMessageBox::Question);
+            confirm.setWindowTitle("Install Update");
+            confirm.setText(QString("Install %1 %2?").arg(ToQt(application::displayName), QString::fromStdString(state.release->version.ToString())));
+            confirm.setInformativeText(InstallSteps() + (busConnected ? "\n\nInstalling waits until you disconnect from the CAN bus." : QString{}));
+            auto* install = confirm.addButton("&Install and Restart", QMessageBox::AcceptRole);
+            confirm.addButton(QMessageBox::Cancel);
+            confirm.setDefaultButton(install);
+            confirm.exec();
+            if (confirm.clickedButton() != install)
+                return;
+        }
+
+        updateSession.Install();
+    }
+
+    void MainWindow::RestartForUpdate()
+    {
+        Report(IssueSeverity::info, QString("Closing so the installer can update to %1").arg(updateSession.State().release->tag));
+        close();
+        QApplication::quit();
+    }
+
+    void MainWindow::RelaunchUpdatedVersion()
+    {
+        Report(IssueSeverity::info, QString("Update %1 installed; restarting").arg(updateSession.State().release->tag));
+        SaveSettings();
+        if (!QProcess::startDetached(QCoreApplication::applicationFilePath(), {}))
+        {
+            Report(IssueSeverity::warning, "Could not start the new version; restart CAN Commander to use it");
+            return;
+        }
+
+        close();
+        QApplication::quit();
+    }
+
     void MainWindow::RestoreSettings()
     {
         QSettings settings;
@@ -280,7 +419,7 @@ namespace tool
         logSplitter->restoreState(settings.value("window/logSplitter").toByteArray());
         eventLog->SetShowsFrames(settings.value("log/showFrames", false).toBool());
         showFramesAction->setChecked(eventLog->ShowsFrames());
-        checkAtStartupAction->setChecked(settings.value("updates/checkAtStartup", true).toBool());
+        automaticUpdatesAction->setChecked(settings.value("updates/checkAtStartup", true).toBool());
         connectionPanel->RestoreSettings(settings);
 
         for (const auto& node : settings.value("motors/nodeIds").toList())
@@ -294,7 +433,7 @@ namespace tool
         settings.setValue("window/geometry", saveGeometry());
         settings.setValue("window/logSplitter", logSplitter->saveState());
         settings.setValue("log/showFrames", eventLog->ShowsFrames());
-        settings.setValue("updates/checkAtStartup", checkAtStartupAction->isChecked());
+        settings.setValue("updates/checkAtStartup", automaticUpdatesAction->isChecked());
         connectionPanel->SaveSettings(settings);
 
         QVariantList nodes;
@@ -530,6 +669,7 @@ namespace tool
     {
         busConnected = connected;
         connectionPanel->OnConnectionChanged(connected);
+        updateSession.SetBusConnected(connected);
 
         if (connected)
         {
