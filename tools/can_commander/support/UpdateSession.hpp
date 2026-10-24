@@ -55,7 +55,7 @@ namespace tool
 
     private:
         bool Busy() const;
-        QString InstallerPath(const InstallerAsset& installer) const;
+        QString InstallerPath(const InstallerAsset& asset) const;
         void StartDownload();
         void StartInstall();
         void Fail(const QString& reason);
