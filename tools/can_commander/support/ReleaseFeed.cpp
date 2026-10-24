@@ -7,7 +7,9 @@ namespace tool
 {
     namespace
     {
-        std::optional<QUrl> FindInstaller(const QJsonArray& assets, InstallerPlatform platform)
+        constexpr qsizetype sha256Bytes{ 32 };
+
+        std::optional<InstallerAsset> FindInstaller(const QJsonArray& assets, InstallerPlatform platform)
         {
             const auto suffix = InstallerAssetSuffix(platform);
             if (suffix.isEmpty())
@@ -16,10 +18,11 @@ namespace tool
             for (const auto& asset : assets)
             {
                 const auto object = asset.toObject();
+                const auto name = object.value("name").toString();
                 const QUrl url{ object.value("browser_download_url").toString() };
 
-                if (object.value("name").toString().endsWith(suffix) && url.isValid() && url.scheme() == "https")
-                    return url;
+                if (name.endsWith(suffix) && url.isValid() && url.scheme() == "https")
+                    return InstallerAsset{ name, url, object.value("size").toInteger(), ParseSha256Digest(object.value("digest").toString()) };
             }
 
             return std::nullopt;
@@ -48,6 +51,23 @@ namespace tool
             default:
                 return {};
         }
+    }
+
+    std::optional<QByteArray> ParseSha256Digest(const QString& digest)
+    {
+        static const QString prefix{ "sha256:" };
+        if (!digest.startsWith(prefix))
+            return std::nullopt;
+
+        const auto hex = digest.mid(prefix.size());
+        if (hex.size() != sha256Bytes * 2)
+            return std::nullopt;
+
+        for (const auto character : hex)
+            if (!character.isDigit() && !QStringLiteral("abcdefABCDEF").contains(character))
+                return std::nullopt;
+
+        return QByteArray::fromHex(hex.toLatin1());
     }
 
     std::optional<ReleaseInfo> ParseLatestRelease(const QByteArray& json, InstallerPlatform platform)

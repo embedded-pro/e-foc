@@ -14,4 +14,7 @@ target_sources(e_foc.tool.can_commander.support_test PRIVATE
     TestReleaseFeed.cpp
     TestReleaseVersion.cpp
     TestUpdateChecker.cpp
+    TestUpdateDownloader.cpp
+    TestUpdateInstallation.cpp
+    TestUpdateSession.cpp
 )
