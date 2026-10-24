@@ -378,6 +378,17 @@ jobs:
           merge-multiple: true
       - name: Remove host install package
         run: rm -f release-assets/e_foc-0*.* release-assets/e_foc-*-Linux.*
+      - name: Bundle documentation PDFs
+        run: |
+          v="${{ needs.release_please.outputs.version }}"
+          docs="e_foc-documentation-${v}"
+          shopt -s nullglob
+          pdfs=(release-assets/*-"${v}".pdf)
+          [ "${#pdfs[@]}" -gt 0 ] || { echo "::error::no documentation PDFs"; exit 1; }
+          mkdir "$docs"
+          mv "${pdfs[@]}" "$docs/"
+          zip -q -r -X "release-assets/${docs}.zip" "$docs"
+          unzip -l "release-assets/${docs}.zip"
       - name: Check release assets
         run: |
           v="${{ needs.release_please.outputs.version }}"
@@ -395,10 +406,14 @@ jobs:
             "e_foc-firmware-NUCLEO-H563ZI-${v}.tar.gz" \
             "e_foc-firmware-EK-TM4C1294XL-sync_foc_sensored-${v}.hex" \
             "e_foc-firmware-EK-TM4C1294XL-hardware_test-${v}.hex" \
-            "e_foc-source-${v}.tar.gz"; do
+            "e_foc-source-${v}.tar.gz" \
+            "e_foc-documentation-${v}.zip"; do
             test -s "release-assets/$asset" || { echo "::error::missing release asset $asset"; exit 1; }
           done
-          compgen -G "release-assets/*-${v}.pdf" > /dev/null || { echo "::error::no documentation PDFs"; exit 1; }
+          if compgen -G "release-assets/*.pdf" > /dev/null; then
+            echo "::error::documentation PDFs left outside the zip"
+            exit 1
+          fi
       - name: Upload release assets
         if: needs.release_please.outputs.release_created == 'true'
         env:
