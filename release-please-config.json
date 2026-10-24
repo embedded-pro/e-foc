@@ -1,8 +1,6 @@
 {
   "include-component-in-tag": false,
-  "plugins": [
-    "sentence-case"
-  ],
+  "plugins": ["sentence-case"],
   "changelog-sections": [
     { "type": "feat", "section": "Features" },
     { "type": "fix", "section": "Bug Fixes" },
@@ -20,10 +18,7 @@
     ".": {
       "release-type": "simple",
       "package-name": "e-foc",
-      "extra-files": [
-        "CMakeLists.txt",
-        "sonar-project.properties"
-      ]
+      "extra-files": ["CMakeLists.txt", "sonar-project.properties"]
     }
   },
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json"
