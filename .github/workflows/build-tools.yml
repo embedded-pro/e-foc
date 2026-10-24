@@ -1,0 +1,296 @@
+---
+name: Build Tools
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Version used in the package file names"
+        type: string
+        required: true
+      sign:
+        description: "Authenticode-sign the CAN Commander executable and installer when SignPath is configured"
+        type: boolean
+        default: false
+      dry_run:
+        description: "Sign with the test policy and accept a test signature"
+        type: boolean
+        default: true
+      retention_days:
+        description: "Days to keep the uploaded packages (0 keeps the repository default)"
+        type: number
+        default: 0
+
+permissions:
+  contents: read
+
+env:
+  CMAKE_BUILD_PARALLEL_LEVEL: 2
+
+jobs:
+  build_linux_tools:
+    name: Build Linux Tools
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure Git
+        run: |
+          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git config --global --add safe.directory '*'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
+      - name: Install Qt6
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qt6-base-dev libgl1-mesa-dev ccache dpkg-dev desktop-file-utils
+      - uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
+        with:
+          configurePreset: "host"
+          buildPreset: "host-Release-WithPackage"
+      - name: Package simulator
+        run: |
+          version="${{ inputs.version }}"
+          staging="staging/simulator"
+          mkdir -p "$staging"
+          find build/host/tools/simulator -name "e_foc.tool.simulator" -type f -executable -exec cp {} "$staging/" \;
+          test -x "$staging/e_foc.tool.simulator"
+          cp tools/simulator/config/*.json "$staging/"
+          tar -czf "e_foc-simulator-${version}-linux-x86_64.tar.gz" -C staging simulator
+      - name: Package CAN Commander
+        run: |
+          version="${{ inputs.version }}"
+          staging="staging/can_commander"
+          mkdir -p "$staging"
+          find build/host/tools/can_commander -name "e-foc-can-commander" -type f -executable -path "*/Release/*" -exec cp {} "$staging/" \;
+          test -x "$staging/e-foc-can-commander"
+          tar -czf "e_foc-can_commander-${version}-linux-x86_64.tar.gz" -C staging can_commander
+      - name: Package CAN Commander installer
+        run: |
+          version="${{ inputs.version }}"
+          cpack --config build/host/tools/can_commander/installer/CPackConfig.cmake -C Release -G DEB \
+            -B "$PWD/installer" -D CPACK_PACKAGE_FILE_NAME="e_foc-can_commander-${version}-linux-x86_64"
+          mv "installer/e_foc-can_commander-${version}-linux-x86_64.deb" .
+          dpkg-deb --info "e_foc-can_commander-${version}-linux-x86_64.deb"
+          dpkg-deb --contents "e_foc-can_commander-${version}-linux-x86_64.deb"
+      - name: Verify CAN Commander installer
+        run: |
+          version="${{ inputs.version }}"
+          expected="$(sed -nE 's/^project\(e_foc .*VERSION ([0-9.]+)\).*/\1/p' CMakeLists.txt)"
+          sudo apt-get install -y "./e_foc-can_commander-${version}-linux-x86_64.deb"
+          desktop-file-validate /usr/share/applications/e-foc-can-commander.desktop
+          test -f /usr/share/icons/hicolor/scalable/apps/e-foc-can-commander.svg
+          reported="$(e-foc-can-commander --version)"
+          echo "$reported"
+          test "$reported" = "e-foc CAN Commander ${expected}"
+          e-foc-can-commander --help
+          status=0
+          QT_QPA_PLATFORM=offscreen timeout 10 e-foc-can-commander --no-update-check || status=$?
+          test "$status" -eq 124 || { echo "::error::CAN Commander exited with $status instead of running"; exit 1; }
+          sudo apt-get remove -y e-foc-can-commander
+          test ! -e /usr/bin/e-foc-can-commander
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-simulator
+          path: e_foc-simulator-*-linux-x86_64.tar.gz
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention_days }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-can-commander
+          path: e_foc-can_commander-*-linux-x86_64.tar.gz
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention_days }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-can-commander-installer
+          path: e_foc-can_commander-*-linux-x86_64.deb
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention_days }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: host-install-package
+          path: build/host/e_foc-*.*
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention_days }}
+
+  build_windows_tools:
+    name: Build Windows Tools
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Configure Git
+        run: |
+          git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: seanmiddleditch/gha-setup-ninja@3b1f8f94a2f8254bd26914c4ab9474d4f0015f67 # v6
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      - name: Install Qt6
+        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
+        with:
+          version: "6.7.*"
+          cache: true
+      - name: Configure
+        run: >
+          cmake -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_COMPILE_WARNING_AS_ERROR=On
+          -DE_FOC_TARGET_PLATFORM=host
+          -DE_FOC_BUILD_TESTS=Off
+          -DE_FOC_BUILD_SIMULATOR=On
+          -DNUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS=Off
+      - name: Build
+        run: cmake --build build --target e_foc.tool.simulator e_foc.tool.can_commander
+      - name: Stage CAN Commander executable for signing
+        if: inputs.sign && vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: bash
+        run: |
+          mkdir -p signing/executable
+          exe=$(find build/tools -name "e-foc-can-commander.exe" -type f | head -n 1)
+          test -n "$exe"
+          cp "$exe" signing/executable/
+          echo "CAN_COMMANDER_EXE=$exe" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: inputs.sign && vars.SIGNPATH_ORGANIZATION_ID != ''
+        id: unsigned-executable
+        with:
+          name: unsigned-can-commander-executable
+          path: signing/executable/e-foc-can-commander.exe
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention_days }}
+      - name: Sign CAN Commander executable
+        if: inputs.sign && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'e-foc' }}
+          signing-policy-slug: ${{ inputs.dry_run && (vars.SIGNPATH_TEST_POLICY_SLUG || 'test-signing') || (vars.SIGNPATH_RELEASE_POLICY_SLUG || 'release-signing') }}
+          artifact-configuration-slug: can-commander-executable
+          github-artifact-id: ${{ steps.unsigned-executable.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signing/executable-signed
+      - name: Use the signed CAN Commander executable
+        if: inputs.sign && vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: bash
+        run: cp signing/executable-signed/e-foc-can-commander.exe "$CAN_COMMANDER_EXE"
+      - name: Package simulator
+        shell: bash
+        run: |
+          version="${{ inputs.version }}"
+          staging="staging/simulator"
+          mkdir -p "$staging"
+          find build/tools -name "e_foc.tool.simulator.exe" -type f -exec cp {} "$staging/" \;
+          test -f "$staging/e_foc.tool.simulator.exe"
+          windeployqt --release --no-translations "$staging/e_foc.tool.simulator.exe"
+          cp tools/simulator/config/*.json "$staging/"
+          7z a "e_foc-simulator-${version}-windows-x86_64.zip" "./staging/simulator/*"
+      - name: Package CAN Commander
+        shell: bash
+        run: |
+          version="${{ inputs.version }}"
+          staging="staging/can_commander"
+          mkdir -p "$staging"
+          find build/tools -name "e-foc-can-commander.exe" -type f -exec cp {} "$staging/" \;
+          test -f "$staging/e-foc-can-commander.exe"
+          windeployqt --release --no-translations "$staging/e-foc-can-commander.exe"
+          7z a "e_foc-can_commander-${version}-windows-x86_64.zip" "./staging/can_commander/*"
+      - name: Package CAN Commander installer
+        shell: bash
+        run: |
+          version="${{ inputs.version }}"
+          if ! command -v makensis >/dev/null && [ ! -x "/c/Program Files (x86)/NSIS/makensis.exe" ]; then
+            choco install nsis -y --no-progress
+          fi
+          export PATH="$PATH:/c/Program Files (x86)/NSIS"
+          cpack --config build/tools/can_commander/installer/CPackConfig.cmake -C Release -G NSIS \
+            -B "$PWD/installer" -D CPACK_PACKAGE_FILE_NAME="e_foc-can_commander-${version}-windows-x86_64-setup"
+          mv "installer/e_foc-can_commander-${version}-windows-x86_64-setup.exe" .
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: inputs.sign && vars.SIGNPATH_ORGANIZATION_ID != ''
+        id: unsigned-installer
+        with:
+          name: unsigned-can-commander-installer
+          path: e_foc-can_commander-*-windows-x86_64-setup.exe
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention_days }}
+      - name: Sign CAN Commander installer
+        if: inputs.sign && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'e-foc' }}
+          signing-policy-slug: ${{ inputs.dry_run && (vars.SIGNPATH_TEST_POLICY_SLUG || 'test-signing') || (vars.SIGNPATH_RELEASE_POLICY_SLUG || 'release-signing') }}
+          artifact-configuration-slug: can-commander-installer
+          github-artifact-id: ${{ steps.unsigned-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signing/installer-signed
+      - name: Use the signed CAN Commander installer
+        if: inputs.sign && vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: bash
+        run: cp signing/installer-signed/e_foc-can_commander-*-windows-x86_64-setup.exe .
+      - name: Delete unsigned artifacts
+        if: inputs.sign && vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for id in "${{ steps.unsigned-executable.outputs.artifact-id }}" "${{ steps.unsigned-installer.outputs.artifact-id }}"; do
+            gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$id"
+          done
+      - name: Verify CAN Commander installer
+        shell: pwsh
+        env:
+          SIGNING_ENABLED: ${{ inputs.sign && vars.SIGNPATH_ORGANIZATION_ID != '' }}
+          RELEASE_SIGNING: ${{ inputs.sign && vars.SIGNPATH_ORGANIZATION_ID != '' && !inputs.dry_run }}
+        run: |
+          $version = "${{ inputs.version }}"
+          $expected = (Select-String -Path CMakeLists.txt -Pattern '^project\(e_foc .*VERSION ([0-9.]+)\)').Matches[0].Groups[1].Value
+          $target = "C:\efoc-can-commander-test"
+          $installer = ".\e_foc-can_commander-$version-windows-x86_64-setup.exe"
+          Start-Process -FilePath $installer -ArgumentList "/S", "/D=$target" -Wait
+          $exe = Join-Path $target "bin\e-foc-can-commander.exe"
+          if (-not (Test-Path $exe)) { throw "installer did not install $exe" }
+          if ($env:SIGNING_ENABLED -eq 'true') {
+            foreach ($file in @($installer, $exe)) {
+              $signature = Get-AuthenticodeSignature $file
+              Write-Output "$file signed by $($signature.SignerCertificate.Subject): $($signature.Status)"
+              if ($null -eq $signature.SignerCertificate) { throw "$file is not signed" }
+              if ($env:RELEASE_SIGNING -eq 'true' -and $signature.Status -ne 'Valid') { throw "$file signature is $($signature.Status)" }
+            }
+          }
+          if (-not (Test-Path (Join-Path $target "bin\Qt6Widgets.dll"))) { throw "installer did not deploy the Qt runtime" }
+          $info = (Get-Item $exe).VersionInfo
+          Write-Output "$($info.ProductName) $($info.ProductVersion)"
+          if ($info.ProductName -ne "e-foc CAN Commander" -or $info.ProductVersion -ne $expected) { throw "unexpected version resource" }
+          $app = Start-Process -FilePath $exe -ArgumentList "--no-update-check" -PassThru
+          Start-Sleep -Seconds 8
+          if ($app.HasExited) { throw "CAN Commander exited with $($app.ExitCode) instead of running" }
+          Stop-Process -Id $app.Id -Force
+          Start-Sleep -Seconds 2
+          Start-Process -FilePath (Join-Path $target "Uninstall.exe") -ArgumentList "/S", "_?=$target" -Wait
+          if (Test-Path $exe) { throw "uninstaller left $exe behind" }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-simulator
+          path: e_foc-simulator-*-windows-x86_64.zip
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention_days }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-can-commander
+          path: e_foc-can_commander-*-windows-x86_64.zip
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention_days }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-can-commander-installer
+          path: e_foc-can_commander-*-windows-x86_64-setup.exe
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention_days }}

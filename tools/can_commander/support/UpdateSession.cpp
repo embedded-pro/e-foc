@@ -96,9 +96,9 @@ namespace tool
         return state.phase == UpdatePhase::downloading || state.phase == UpdatePhase::ready || state.phase == UpdatePhase::installing;
     }
 
-    QString UpdateSession::InstallerPath(const InstallerAsset& installer) const
+    QString UpdateSession::InstallerPath(const InstallerAsset& asset) const
     {
-        return QDir{ downloadDirectory }.filePath(installer.fileName);
+        return QDir{ downloadDirectory }.filePath(asset.fileName);
     }
 
     void UpdateSession::StartDownload()
