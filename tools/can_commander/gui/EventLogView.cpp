@@ -65,14 +65,14 @@ namespace tool
         AppendLine(QString("%1  %2").arg(ToString(severity), message));
     }
 
-    void EventLogView::AppendFrame(bool transmitted, uint32_t id, const CanFrame& data)
+    void EventLogView::AppendFrame(bool transmitted, uint32_t id, const CanFrame& frame)
     {
         if (!showFrames->isChecked())
             return;
 
         QString hex;
-        for (std::size_t i = 0; i < data.size(); ++i)
-            hex += QString(i == 0 ? "%1" : " %1").arg(data[i], 2, 16, QChar('0')).toUpper();
+        for (std::size_t i = 0; i < frame.size(); ++i)
+            hex += QString(i == 0 ? "%1" : " %1").arg(frame[i], 2, 16, QChar('0')).toUpper();
 
         AppendLine(QString("%1  ID 0x%2  [%3]").arg(transmitted ? "TX   " : "RX   ").arg(id, 8, 16, QChar('0')).arg(hex));
     }

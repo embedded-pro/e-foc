@@ -17,7 +17,7 @@ namespace tool
         explicit EventLogView(QWidget* parent = nullptr);
 
         void Append(IssueSeverity severity, const QString& message);
-        void AppendFrame(bool transmitted, uint32_t id, const CanFrame& data);
+        void AppendFrame(bool transmitted, uint32_t id, const CanFrame& frame);
 
         bool ShowsFrames() const;
 
@@ -30,7 +30,7 @@ namespace tool
         void SaveAs();
 
     private:
-        void AppendLine(const QString& text);
+        void AppendLine(const QString& line);
 
         QPlainTextEdit* text;
         QCheckBox* showFrames;

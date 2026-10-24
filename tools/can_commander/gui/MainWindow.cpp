@@ -654,9 +654,9 @@ namespace tool
         Report(IssueSeverity::error, QString("CAN adapter: %1").arg(QString::fromUtf8(message.data(), static_cast<qsizetype>(message.size()))));
     }
 
-    void MainWindow::OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data)
+    void MainWindow::OnFrameLog(bool transmitted, uint32_t id, const CanFrame& frame)
     {
-        eventLog->AppendFrame(transmitted, id, data);
+        eventLog->AppendFrame(transmitted, id, frame);
     }
 
     void MainWindow::SetupSocketNotifier()

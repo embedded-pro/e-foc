@@ -44,7 +44,7 @@ namespace tool
     private:
         void OnConnectionChanged(bool connected) override;
         void OnAdapterError(infra::BoundedConstString message) override;
-        void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data) override;
+        void OnFrameLog(bool transmitted, uint32_t id, const CanFrame& frame) override;
         void OnNodeOnlineChanged(uint16_t nodeId, bool online) override;
         void OnBusyChanged(uint16_t nodeId, bool busy) override;
         void OnCommandTimeout(uint16_t nodeId) override;
