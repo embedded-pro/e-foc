@@ -62,16 +62,11 @@ namespace tool
         if (platform == InstallerPlatform::windowsX64)
             return WindowsUpdateCommand(installerPath, WindowsInstallDirectory(applicationFilePath), processId, applicationFilePath);
 
-        if (platform == InstallerPlatform::linuxX64)
-        {
-            const auto elevation = QStandardPaths::findExecutable("pkexec");
-            const auto packageManager = QStandardPaths::findExecutable("apt-get");
-            if (elevation.isEmpty() || packageManager.isEmpty())
-                return std::nullopt;
+        const auto elevation = QStandardPaths::findExecutable("pkexec");
+        const auto packageManager = QStandardPaths::findExecutable("apt-get");
+        if (elevation.isEmpty() || packageManager.isEmpty())
+            return std::nullopt;
 
-            return LinuxUpdateCommand(elevation, packageManager, installerPath);
-        }
-
-        return std::nullopt;
+        return LinuxUpdateCommand(elevation, packageManager, installerPath);
     }
 }

@@ -265,3 +265,129 @@ TEST_F(TestUpdateSession, dismiss_hides_the_offer)
 
     EXPECT_EQ(UpdatePhase::idle, session->State().phase);
 }
+
+TEST_F(TestUpdateSession, offers_only_the_release_page_without_an_installer)
+{
+    release.installer.reset();
+    auto session = Session(Shell("exit 0"));
+    session->Offer(release);
+    session->Install();
+
+    EXPECT_FALSE(session->State().automaticInstall);
+    EXPECT_EQ(UpdatePhase::available, session->State().phase);
+    EXPECT_TRUE(requestedPaths.isEmpty());
+}
+
+TEST_F(TestUpdateSession, install_without_an_offer_does_nothing)
+{
+    auto session = Session(Shell("exit 0"));
+    session->Install();
+    session->Cancel();
+
+    EXPECT_EQ(UpdatePhase::idle, session->State().phase);
+}
+
+TEST_F(TestUpdateSession, install_while_downloading_does_not_restart_the_download)
+{
+    auto session = Session(Shell("exit 0"));
+    session->SetBusConnected(true);
+    session->Offer(release);
+    session->Install();
+    session->Install();
+
+    EXPECT_EQ(UpdatePhase::downloading, session->State().phase);
+    ASSERT_TRUE(WaitFor([&session]()
+        {
+            return session->State().phase == UpdatePhase::ready;
+        }));
+}
+
+TEST_F(TestUpdateSession, fails_when_the_installation_can_no_longer_update_itself)
+{
+    int calls{ 0 };
+    UpdateSession session{ downloads.path(), [&calls](const QString&) -> std::optional<InstallCommand>
+        {
+            if (++calls == 1)
+                return Shell("exit 0");
+            return std::nullopt;
+        } };
+    session.Offer(release);
+    session.Install();
+
+    ASSERT_TRUE(WaitFor([&session]()
+        {
+            return session.State().phase == UpdatePhase::failed;
+        }));
+    EXPECT_EQ("this installation cannot be updated automatically", session.State().failure);
+}
+
+TEST_F(TestUpdateSession, dismiss_during_download_cancels_it)
+{
+    auto session = Session(Shell("exit 0"));
+    session->Offer(release);
+    session->Install();
+    session->Dismiss();
+
+    EXPECT_EQ(UpdatePhase::idle, session->State().phase);
+    EXPECT_FALSE(WaitFor([this]()
+        {
+            return relaunches > 0;
+        },
+        300));
+    EXPECT_EQ(UpdatePhase::idle, session->State().phase);
+    EXPECT_FALSE(QFile::exists(Downloaded()));
+}
+
+TEST_F(TestUpdateSession, dismiss_is_ignored_while_installing)
+{
+    auto session = Session(Shell("sleep 0.3; exit 0"));
+    session->Offer(release);
+    session->Install();
+    ASSERT_TRUE(WaitFor([&session]()
+        {
+            return session->State().phase == UpdatePhase::installing;
+        }));
+
+    session->Dismiss();
+    session->Cancel();
+
+    EXPECT_EQ(UpdatePhase::installing, session->State().phase);
+    EXPECT_TRUE(WaitFor([this]()
+        {
+            return relaunches > 0;
+        }));
+}
+
+TEST_F(TestUpdateSession, cancel_while_ready_returns_to_the_offer)
+{
+    auto session = Session(Shell("exit 0"));
+    session->SetBusConnected(true);
+    session->Offer(release);
+    session->Install();
+    ASSERT_TRUE(WaitFor([&session]()
+        {
+            return session->State().phase == UpdatePhase::ready;
+        }));
+
+    session->Cancel();
+
+    EXPECT_EQ(UpdatePhase::available, session->State().phase);
+}
+
+TEST_F(TestUpdateSession, reports_bus_changes_only_once)
+{
+    auto session = Session(Shell("exit 0"));
+    int changes{ 0 };
+    QObject::connect(session.get(), &UpdateSession::StateChanged, [&changes](const UpdateState&)
+        {
+            ++changes;
+        });
+
+    session->SetBusConnected(true);
+    session->SetBusConnected(true);
+    session->SetBusConnected(false);
+    session->SetBusConnected(false);
+
+    EXPECT_EQ(2, changes);
+    EXPECT_FALSE(session->State().busConnected);
+}

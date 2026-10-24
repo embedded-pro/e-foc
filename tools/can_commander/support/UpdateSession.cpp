@@ -34,7 +34,7 @@ namespace tool
             return;
 
         state.release = release;
-        state.automaticInstall = release.installer && release.installer->sha256 && commandFor(InstallerPath()).has_value();
+        state.automaticInstall = release.installer && release.installer->sha256 && commandFor(InstallerPath(*release.installer)).has_value();
         state.failure.clear();
         Enter(UpdatePhase::available);
     }
@@ -96,12 +96,9 @@ namespace tool
         return state.phase == UpdatePhase::downloading || state.phase == UpdatePhase::ready || state.phase == UpdatePhase::installing;
     }
 
-    QString UpdateSession::InstallerPath() const
+    QString UpdateSession::InstallerPath(const InstallerAsset& installer) const
     {
-        if (!state.release || !state.release->installer)
-            return {};
-
-        return QDir{ downloadDirectory }.filePath(state.release->installer->fileName);
+        return QDir{ downloadDirectory }.filePath(installer.fileName);
     }
 
     void UpdateSession::StartDownload()

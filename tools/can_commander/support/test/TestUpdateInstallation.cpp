@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QFile>
 #include <QTemporaryDir>
+#include <QtGlobal>
 
 namespace
 {
@@ -33,7 +34,30 @@ namespace
             return QDir{ installation.path() }.filePath("bin/e-foc-can-commander.exe");
         }
 
+        QString FakeExecutable(const QString& name)
+        {
+            const auto path = QDir{ tools.path() }.filePath(name);
+            QFile file{ path };
+            EXPECT_TRUE(file.open(QIODevice::WriteOnly));
+            file.write("#!/bin/sh\n");
+            file.close();
+            EXPECT_TRUE(file.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
+            return path;
+        }
+
+        void UseOnlyFakeTools()
+        {
+            qputenv("PATH", QFile::encodeName(tools.path()));
+        }
+
+        void TearDown() override
+        {
+            qputenv("PATH", originalPath);
+        }
+
         QTemporaryDir installation;
+        QTemporaryDir tools;
+        const QByteArray originalPath{ qgetenv("PATH") };
     };
 }
 
@@ -112,4 +136,34 @@ TEST_F(TestUpdateInstallation, windows_package_updates_its_own_installation_fold
 
     ASSERT_TRUE(command.has_value());
     EXPECT_TRUE(DecodedScript(*command).contains("/D=" + QDir::toNativeSeparators(QDir::cleanPath(installation.path())) + "'"));
+}
+
+TEST_F(TestUpdateInstallation, linux_package_installs_through_pkexec_and_apt_get)
+{
+    const auto pkexec = FakeExecutable("pkexec");
+    const auto aptGet = FakeExecutable("apt-get");
+    UseOnlyFakeTools();
+
+    const auto command = DefaultUpdateCommand(InstallerPlatform::linuxX64, "/tmp/e_foc-can_commander-v9.9.9-linux-x86_64.deb", "/usr/bin/e-foc-can-commander", 1);
+
+    ASSERT_TRUE(command.has_value());
+    EXPECT_EQ(pkexec, command->program);
+    EXPECT_EQ((QStringList{ aptGet, "install", "-y", "/tmp/e_foc-can_commander-v9.9.9-linux-x86_64.deb" }), command->arguments);
+    EXPECT_FALSE(command->exitsBeforeInstalling);
+}
+
+TEST_F(TestUpdateInstallation, linux_package_without_pkexec_has_no_update_command)
+{
+    FakeExecutable("apt-get");
+    UseOnlyFakeTools();
+
+    EXPECT_FALSE(DefaultUpdateCommand(InstallerPlatform::linuxX64, "/tmp/x.deb", "/usr/bin/e-foc-can-commander", 1).has_value());
+}
+
+TEST_F(TestUpdateInstallation, linux_package_without_apt_get_has_no_update_command)
+{
+    FakeExecutable("pkexec");
+    UseOnlyFakeTools();
+
+    EXPECT_FALSE(DefaultUpdateCommand(InstallerPlatform::linuxX64, "/tmp/x.deb", "/usr/bin/e-foc-can-commander", 1).has_value());
 }
