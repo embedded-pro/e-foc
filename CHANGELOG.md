@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.0](https://github.com/embedded-pro/e-foc/compare/v1.0.0...v1.1.0) (2026-10-24)
+
+
+### Features
+
+* **can_commander:** Installers, multi-motor tabs, issue log and update check ([#418](https://github.com/embedded-pro/e-foc/issues/418)) ([5e12c28](https://github.com/embedded-pro/e-foc/commit/5e12c2895d670ff0a4dca889ba176f55b2923e52))
+* **can:** Derive the CAN node ID from the board ID jumpers ([#421](https://github.com/embedded-pro/e-foc/issues/421)) ([648bf00](https://github.com/embedded-pro/e-foc/commit/648bf00a6d566b559e9f68eaf913ddbf0d65a6f7))
+
+
+### Bug Fixes
+
+* **can_commander:** Run the CAN protocol client's timers on the GUI thread; main created no timer service and the client aborted in its constructor ([5e12c28](https://github.com/embedded-pro/e-foc/commit/5e12c2895d670ff0a4dca889ba176f55b2923e52))
+
+
+### Continuous Integration
+
+* **release:** Bundle documentation PDFs into one zip ([#420](https://github.com/embedded-pro/e-foc/issues/420)) ([4cc1b7b](https://github.com/embedded-pro/e-foc/commit/4cc1b7ba2e8ccc0436f6f6c67af220db6c774c2f))
+
 ## [1.0.0](https://github.com/embedded-pro/e-foc/compare/v0.0.1...v1.0.0) (2026-10-23)
 
 
