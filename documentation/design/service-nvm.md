@@ -2,7 +2,7 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.3.1
+version: 0.3.2
 component: service-nvm
 date: 2026-10-22
 ---
@@ -12,7 +12,7 @@ date: 2026-10-22
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.3.1                        |
+| Version   | 0.3.2                        |
 | Component | service-nvm                  |
 | Date      | 2026-10-22                   |
 
@@ -221,7 +221,7 @@ stateDiagram-v2
 
 | Field              | Physical unit | Description                                  |
 |--------------------|---------------|----------------------------------------------|
-| canNodeId          | —             | CAN bus node identifier                      |
+| canNodeId          | —             | Base CAN node ID; board ID added at boot     |
 | canBaudrate        | bit/s         | CAN bus baud rate                            |
 | telemetryRateHz    | Hz            | Rate at which telemetry frames are sent      |
 | encoderResolution  | —             | Encoder counts per mechanical revolution     |

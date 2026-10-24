@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.2.0
+version: 0.3.0
 component: can-service
 date: 2026-10-24
 ---
@@ -12,7 +12,7 @@ date: 2026-10-24
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.2.0                    |
+| Version   | 0.3.0                    |
 | Component | can-service              |
 | Date      | 2026-10-24               |
 
@@ -203,6 +203,35 @@ All tracing is applied via `can-lite`'s decorator classes:
 
 These are composed in the instantiation layer (`Logic.hpp`) so the production code paths gain full observability without any tracing logic in the category or bridge classes themselves.
 
+### Part I — Node Address
+
+Each controller answers on one CAN node ID, fixed once at boot: the configured base from the
+non-volatile configuration (`canNodeId`, default 1) plus the board ID read from the board's ID
+jumpers. Boards that run the same firmware and configuration can therefore share a bus once their
+jumpers differ.
+
+The jumpers are sampled once, during platform start-up, after their pull-ups have had time to
+settle; moving a jumper takes effect at the next reset. Node 0 is the broadcast address, so a base
+of 0, or a base whose sum with the board ID exceeds the 12-bit node field (4095), is replaced by the
+default base. The resolved node and both of its parts are traced at start-up.
+
+```mermaid
+flowchart LR
+    J["ID jumpers<br/>sampled once at boot"] --> B["board ID"]
+    N["canNodeId base<br/>(NVM, default 1)"] --> V{"base ≥ 1 and<br/>base + board ID ≤ 4095?"}
+    B --> V
+    V -- yes --> R["node = base + board ID"]
+    V -- no --> D["node = 1 + board ID"]
+```
+
+| Board                                                      | ID jumpers                                                             | Board ID |
+|------------------------------------------------------------|------------------------------------------------------------------------|----------|
+| EK-TM4C1294XL                                              | PK0 (bit 0), PK1 (bit 1), PK2 (bit 2); a jumper to ground sets the bit | 0–7      |
+| EK-TM4C123GXL, STM32F407G-DISC1, NUCLEO-H563ZI, host, QEMU | none                                                                   | 0        |
+
+With the default base, eight EK-TM4C1294XL boards jumpered 0–7 answer as nodes 1–8, the most one bus
+carries (`can-lite` tracks eight servers).
+
 ---
 
 ## Interfaces
@@ -337,6 +366,7 @@ graph LR
 | NVM re-entrancy         | A second config-persist command while one is in-flight returns `busy` via `SendCategoryError`            |
 | Mechanical ident        | `mechIdent` is optional (nullable pointer); if absent, `OnIdentifyMechanical` returns `notImplemented`   |
 | Telemetry speed/pos     | Speed is the active mode's `ObserveMotion().measuredSpeed`, zero while disabled; position is the encoder |
+| Node ID                 | Configured base + board ID, fixed at boot; 1–4095                                                        |
 
 ---
 

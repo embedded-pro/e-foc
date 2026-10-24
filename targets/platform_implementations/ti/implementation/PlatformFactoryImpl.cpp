@@ -59,8 +59,10 @@ namespace application
             persistentFaultData.Invalidate();
         }
 
+        ConfigureBoardIdPins();
         application::Clocks::Initialize();
         peripherals.emplace();
+        boardId = ReadBoardIdPins();
         services::SetGlobalTracerInstance(peripherals->terminalAndTracer.tracer);
         this->onInitialized();
     }
@@ -96,6 +98,21 @@ namespace application
     }
 
     uint8_t PlatformFactoryImpl::BoardId() const
+    {
+        return boardId;
+    }
+
+    void PlatformFactoryImpl::ConfigureBoardIdPins()
+    {
+        if constexpr (Peripheral::hasBoardIdPins)
+        {
+            Pins::boardId0.Config(hal::PinConfigType::input);
+            Pins::boardId1.Config(hal::PinConfigType::input);
+            Pins::boardId2.Config(hal::PinConfigType::input);
+        }
+    }
+
+    uint8_t PlatformFactoryImpl::ReadBoardIdPins()
     {
         if constexpr (!Peripheral::hasBoardIdPins)
             return 0;

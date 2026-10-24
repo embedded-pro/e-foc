@@ -22,6 +22,7 @@ target_link_libraries(e_foc.can_test PUBLIC
 
 target_sources(e_foc.can_test PRIVATE
     TestCanFrameOrigin.cpp
+    TestCanNodeAddress.cpp
     TestCanLivenessWatchdog.cpp
     TestFocMotorCategoryServer.cpp
     TestFocMotorCategoryClient.cpp

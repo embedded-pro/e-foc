@@ -315,9 +315,13 @@ namespace application
         }
 
     private:
+        static void ConfigureBoardIdPins();
+        static uint8_t ReadBoardIdPins();
+
         infra::Function<void()> onInitialized;
         FocLowPriorityInterruptAdapter pendSvLowPriorityInterrupt;
         ResetCause resetCause{ ResetCause::powerUp };
+        uint8_t boardId{ 0 };
         [[no_unique_address]] CycleCounter cycleCounter;
         ControlLoopMetrics controlLoopMetrics;
         PlatformDiagnostics diagnostics{ controlLoopMetrics };
