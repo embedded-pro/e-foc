@@ -206,6 +206,13 @@ The portable archives (Windows zip, Linux tar.gz) stay alongside the installers.
 installs each package on a clean runner, checks the reported version against the project version, launches
 the tool, and uninstalls it before the release is published.
 
+Every release asset carries a build-provenance attestation, signed through Sigstore by the release
+workflow, so anyone can check that a file was built from this repository by its release workflow. Once the
+project's code signing is configured, the Windows executable is Authenticode-signed before packaging, so the
+portable archive and the installer carry the same signed binary, and the installer itself is signed too; the
+release check then requires both signatures to be valid. Until then the signing steps are skipped and releases
+are published unsigned.
+
 ---
 
 ## Interfaces
