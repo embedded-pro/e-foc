@@ -220,6 +220,20 @@ Each [release](https://github.com/embedded-pro/e-foc/releases) carries:
 Configuring a build from the source archive still downloads the dependencies CMake declares with
 `FetchContent` (such as `ui-cpp` and GoogleTest).
 
+### Verifying a download
+
+Every release asset carries a build-provenance attestation, signed through [Sigstore](https://www.sigstore.dev/)
+by the release workflow, which proves the file was built from this repository by GitHub Actions. Check one with
+the [GitHub CLI](https://cli.github.com/):
+
+```bash
+gh attestation verify e_foc-can_commander-<tag>-windows-x86_64-setup.exe --repo embedded-pro/e-foc
+```
+
+Once code signing is enabled for the project (see [`.github/signpath/README.md`](.github/signpath/README.md)), the Windows
+CAN Commander executable and installer are also Authenticode-signed, so Windows shows the publisher instead of
+*Unknown publisher*.
+
 ## CAN Commander
 
 **e-foc CAN Commander** commands and monitors the e-foc motor controllers on one CAN bus — up to eight,
