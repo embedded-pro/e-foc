@@ -206,9 +206,11 @@ cmake --preset host -DFETCHCONTENT_SOURCE_DIR_UI=/path/to/ui-cpp
 
 ## CAN Commander
 
-**e-foc CAN Commander** commands and monitors an e-foc motor controller over CAN: connection, node
-selection, start/stop, control mode, setpoints, loop bandwidths, telemetry and identified parameters, with
-an always-visible emergency stop (`Esc`).
+**e-foc CAN Commander** commands and monitors the e-foc motor controllers on one CAN bus — up to eight,
+each addressed by its node ID. Every controller whose heartbeat is seen gets its own tab (you can also add
+one by node ID) with start/stop, control mode, setpoints, loop bandwidths, telemetry and identified
+parameters; an overview row keeps every motor's state and faults in view, and one always-visible
+**EMERGENCY STOP ALL** (`Esc`) reaches every motor.
 
 ### Install
 
@@ -219,9 +221,10 @@ Download the installer for your platform from the [latest release](https://githu
 | Windows x86-64       | `e_foc-can_commander-<tag>-windows-x86_64-setup.exe` | Run it; start from *Start → e-foc CAN Commander*                |
 | Debian/Ubuntu x86-64 | `e_foc-can_commander-<tag>-linux-x86_64.deb`         | `sudo apt install ./e_foc-can_commander-<tag>-linux-x86_64.deb` |
 
-Portable archives (`.zip`, `.tar.gz`) remain available. On Linux, bring the interface up first, e.g.
+The `.deb` is built on Ubuntu 24.04 and needs a distribution of that generation or newer. Portable archives
+(`.zip`, `.tar.gz`) remain available. On Linux, bring the interface up first, e.g.
 `sudo ip link set can0 up type can bitrate 1000000`. `e-foc-can-commander --version` prints the installed
-version without opening a window.
+version without opening a window (on Windows, run it from a console).
 
 ### Issue log, bug reports and updates
 

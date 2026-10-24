@@ -27,6 +27,10 @@ target_sources(e_foc.tool.can_commander.gui PRIVATE
     EventLogView.cpp
     MainWindow.hpp
     MainWindow.cpp
+    MotorOverview.hpp
+    MotorOverview.cpp
+    MotorPanel.hpp
+    MotorPanel.cpp
     TelemetryPanel.hpp
     TelemetryPanel.cpp
     UpdateBanner.hpp

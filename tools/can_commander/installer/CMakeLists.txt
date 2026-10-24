@@ -53,6 +53,8 @@ function(e_foc_can_commander_package)
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "embedded-pro")
     set(CPACK_DEBIAN_PACKAGE_SECTION "electronics")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+    # dpkg-shlibdeps finds the Qt libraries but not the platform plugins they load at run time.
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "qt6-qpa-plugins")
     set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "Desktop tool to command and monitor e-foc motor controllers over CAN.\n Connects through SocketCAN, keeps an issue log and checks for new releases.")
 
     set(CPACK_NSIS_INSTALL_ROOT "$PROGRAMFILES64")

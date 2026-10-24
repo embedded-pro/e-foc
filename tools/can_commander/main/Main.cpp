@@ -24,6 +24,8 @@
 #include "tools/can_commander/adapter/SocketCanAdapter.hpp"
 #elif defined(_WIN32)
 #include "tools/can_commander/adapter/WindowsCanAdapter.hpp"
+#include <cstdio>
+#include <windows.h>
 #endif
 
 namespace
@@ -48,9 +50,27 @@ namespace
         parser.addOption(noUpdateCheck);
     }
 
+    // A GUI-subsystem executable starts without a console; borrow the one it was started from,
+    // unless its output is already redirected to a file or pipe.
+    void AttachToParentConsole()
+    {
+#if defined(_WIN32)
+        const auto output = GetStdHandle(STD_OUTPUT_HANDLE);
+        if ((output == nullptr || output == INVALID_HANDLE_VALUE) && AttachConsole(ATTACH_PARENT_PROCESS))
+        {
+            FILE* stream{ nullptr };
+            freopen_s(&stream, "CONOUT$", "w", stdout);
+            freopen_s(&stream, "CONOUT$", "w", stderr);
+        }
+#endif
+    }
+
     // Version and help are answered without a GUI so they work over SSH or in a package check.
     bool AnswersWithoutGui(int argc, char* argv[], const QCommandLineOption& noUpdateCheck)
     {
+        if (HasArgument(argc, argv, { "-v", "--version", "-h", "--help", "--help-all", "-?" }))
+            AttachToParentConsole();
+
         if (HasArgument(argc, argv, { "-v", "--version" }))
         {
             std::cout << tool::application::displayName << " " << tool::application::version << "\n";

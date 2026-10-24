@@ -26,9 +26,10 @@
   shall: >
     The server shall answer a contract-version query with the major and minor version of the
     contract it implements, in every lifecycle state. A client whose major version differs from
-    the server's shall report the mismatch to its operator and shall send no further category
-    0x02 command. Adding a message shall increment the minor version; changing any field layout,
-    or the meaning of any enumerator, shall increment the major version.
+    the server's shall report the mismatch to its operator and shall send that server no further
+    category 0x02 command; servers on the same bus whose major matches stay commandable. Adding
+    a message shall increment the minor version; changing any field layout, or the meaning of
+    any enumerator, shall increment the major version.
 
 - id: REQ-CAN-004
   title: The contract is verified byte for byte and end to end

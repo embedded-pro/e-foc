@@ -2,13 +2,14 @@
 #include "can-lite/core/CanFrameCodec.hpp"
 #include "can-lite/core/CanPayload.hpp"
 #include "core/can/FocMotorWireContract.hpp"
+#include <utility>
 
 namespace tool
 {
     using namespace services;
 
     CanCommandClient::CanCommandClient(CanBusAdapter& adapter)
-        : focClient{ adapter, nodeId }
+        : focClient{ adapter, uint16_t{ 0 } }
     {
         CanProtocolClientObserver::Attach(focClient.ProtocolClient());
         can::FocMotorCategoryClientObserver::Attach(focClient.CategoryClient());
@@ -22,187 +23,255 @@ namespace tool
         CanBusAdapterObserver::Detach();
     }
 
-    void CanCommandClient::SetNodeId(uint16_t id)
+    bool CanCommandClient::IsBusy(uint16_t nodeId) const
     {
-        nodeId = id;
-        focClient.SetNodeId(id);
+        const auto node = commands.find(nodeId);
+        return node != commands.end() && node->second.busy;
     }
 
-    uint16_t CanCommandClient::NodeId() const
+    bool CanCommandClient::IsOnline(uint16_t nodeId) const
     {
-        return nodeId;
+        return onlineNodes.contains(nodeId);
     }
 
-    bool CanCommandClient::IsBusy() const
+    std::set<uint16_t> CanCommandClient::OnlineNodes() const
     {
-        return busy;
+        return onlineNodes;
     }
 
-    void CanCommandClient::SetBusy(bool newBusy)
+    can::ContractCompatibility CanCommandClient::Compatibility(uint16_t nodeId) const
     {
-        if (busy != newBusy)
-        {
-            busy = newBusy;
-            NotifyObservers([newBusy](auto& observer)
+        return focClient.CategoryClient().Compatibility(nodeId);
+    }
+
+    void CanCommandClient::MarkBusy(uint16_t nodeId, uint8_t commandType)
+    {
+        auto& node = commands[nodeId];
+        node.pendingCommand = commandType;
+        node.timeout.Start(commandTimeout, [this, nodeId]()
+            {
+                ClearBusy(nodeId);
+                NotifyObservers([nodeId](auto& observer)
+                    {
+                        observer.OnCommandTimeout(nodeId);
+                    });
+            });
+
+        if (!std::exchange(node.busy, true))
+            NotifyObservers([nodeId](auto& observer)
                 {
-                    observer.OnBusyChanged(newBusy);
+                    observer.OnBusyChanged(nodeId, true);
                 });
-        }
+    }
+
+    void CanCommandClient::ClearBusy(uint16_t nodeId)
+    {
+        const auto node = commands.find(nodeId);
+        if (node == commands.end() || !node->second.busy)
+            return;
+
+        node->second.busy = false;
+        node->second.timeout.Cancel();
+        NotifyObservers([nodeId](auto& observer)
+            {
+                observer.OnBusyChanged(nodeId, false);
+            });
+    }
+
+    void CanCommandClient::CompleteCommand(uint16_t nodeId, uint8_t commandType)
+    {
+        const auto node = commands.find(nodeId);
+        if (node != commands.end() && node->second.pendingCommand == commandType)
+            ClearBusy(nodeId);
     }
 
     template<class Send>
-    bool CanCommandClient::Tracked(Send send)
+    bool CanCommandClient::Tracked(uint16_t nodeId, uint8_t commandType, Send send)
     {
-        SetBusy(true);
-        const bool sent = send();
-        if (!sent)
-            SetBusy(false);
-        return sent;
+        if (!send())
+            return false;
+
+        MarkBusy(nodeId, commandType);
+        return true;
     }
 
-    bool CanCommandClient::SendStartMotor()
+    bool CanCommandClient::SendStartMotor(uint16_t nodeId)
     {
-        return Tracked([&]()
+        return Tracked(nodeId, can::focStartId, [&]()
             {
-                return focClient.Start();
+                return focClient.CategoryClient().SendStart(nodeId);
             });
     }
 
-    bool CanCommandClient::SendStopMotor()
+    bool CanCommandClient::SendStopMotor(uint16_t nodeId)
     {
-        return Tracked([&]()
+        return Tracked(nodeId, can::focStopId, [&]()
             {
-                return focClient.Stop();
+                return focClient.CategoryClient().SendStop(nodeId);
             });
     }
 
-    bool CanCommandClient::SendEmergencyStop()
+    bool CanCommandClient::SendEmergencyStop(uint16_t nodeId)
     {
-        return Tracked([&]()
+        return Tracked(nodeId, can::focEmergencyStopId, [&]()
             {
-                return focClient.EmergencyStop();
+                return focClient.CategoryClient().SendEmergencyStop(nodeId);
             });
     }
 
-    bool CanCommandClient::SendSetControlMode(can::FocMotorMode mode)
+    bool CanCommandClient::SendSetControlMode(uint16_t nodeId, can::FocMotorMode mode)
     {
-        return Tracked([&]()
+        return Tracked(nodeId, can::focSelectControlModeId, [&]()
             {
-                return focClient.SelectControlMode(mode);
+                return focClient.CategoryClient().SendSelectControlMode(nodeId, mode);
             });
     }
 
-    bool CanCommandClient::SendSetTorqueSetpoint(float iqCurrent)
+    bool CanCommandClient::SendSetTorqueSetpoint(uint16_t nodeId, float iqCurrent)
     {
-        return Tracked([&]()
+        return Tracked(nodeId, can::focSetTorqueSetpointId, [&]()
             {
-                return focClient.SetTorque(foc::Ampere{ iqCurrent });
+                return focClient.CategoryClient().SendSetTorqueSetpoint(nodeId, foc::Ampere{ iqCurrent });
             });
     }
 
-    bool CanCommandClient::SendSetSpeedSetpoint(float speedRadPerSec)
+    bool CanCommandClient::SendSetSpeedSetpoint(uint16_t nodeId, float speedRadPerSec)
     {
-        return Tracked([&]()
+        return Tracked(nodeId, can::focSetSpeedSetpointId, [&]()
             {
-                return focClient.SetSpeed(foc::RadiansPerSecond{ speedRadPerSec });
+                return focClient.CategoryClient().SendSetSpeedSetpoint(nodeId, foc::RadiansPerSecond{ speedRadPerSec });
             });
     }
 
-    bool CanCommandClient::SendSetPositionSetpoint(float positionRad)
+    bool CanCommandClient::SendSetPositionSetpoint(uint16_t nodeId, float positionRad)
     {
-        return Tracked([&]()
+        return Tracked(nodeId, can::focSetPositionSetpointId, [&]()
             {
-                return focClient.SetPosition(foc::Radians{ positionRad });
+                return focClient.CategoryClient().SendSetPositionSetpoint(nodeId, foc::Radians{ positionRad });
             });
     }
 
-    bool CanCommandClient::SendSetCurrentBandwidth(float bandwidth)
+    bool CanCommandClient::SendSetCurrentBandwidth(uint16_t nodeId, float bandwidth)
     {
-        return Tracked([&]()
+        return Tracked(nodeId, can::focSetPidCurrentId, [&]()
             {
-                return focClient.SetCurrentBandwidth(bandwidth);
+                return focClient.CategoryClient().SendSetCurrentBandwidth(nodeId, bandwidth);
             });
     }
 
-    bool CanCommandClient::SendSetSpeedBandwidth(float bandwidth)
+    bool CanCommandClient::SendSetSpeedBandwidth(uint16_t nodeId, float bandwidth)
     {
-        return Tracked([&]()
+        return Tracked(nodeId, can::focSetPidSpeedId, [&]()
             {
-                return focClient.SetSpeedBandwidth(bandwidth);
+                return focClient.CategoryClient().SendSetSpeedBandwidth(nodeId, bandwidth);
             });
     }
 
-    bool CanCommandClient::SendSetPositionBandwidth(float bandwidth)
+    bool CanCommandClient::SendSetPositionBandwidth(uint16_t nodeId, float bandwidth)
     {
-        return Tracked([&]()
+        return Tracked(nodeId, can::focSetPidPositionId, [&]()
             {
-                return focClient.SetPositionBandwidth(bandwidth);
+                return focClient.CategoryClient().SendSetPositionBandwidth(nodeId, bandwidth);
             });
     }
 
-    void CanCommandClient::RequestData()
+    bool CanCommandClient::RequestData(uint16_t nodeId)
     {
-        focClient.QueryContractVersion();
+        return focClient.CategoryClient().SendQueryContractVersion(nodeId);
     }
 
-    void CanCommandClient::HandleTimeout()
+    void CanCommandClient::MarkOnline(uint16_t nodeId)
     {
-        SetBusy(false);
-        NotifyObservers([](auto& observer)
-            {
-                observer.OnCommandTimeout();
-            });
-    }
-
-    void CanCommandClient::OnServerOnline(uint16_t serverNodeId)
-    {
-        if (serverNodeId != nodeId)
+        if (nodeId == canBroadcastNodeId || !onlineNodes.insert(nodeId).second)
             return;
 
-        RequestData();
-
-        NotifyObservers([](auto& observer)
+        NotifyObservers([nodeId](auto& observer)
             {
-                observer.OnNodeOnlineChanged(true);
+                observer.OnNodeOnlineChanged(nodeId, true);
+            });
+        RequestData(nodeId);
+    }
+
+    void CanCommandClient::MarkOffline(uint16_t nodeId)
+    {
+        if (onlineNodes.erase(nodeId) == 0)
+            return;
+
+        ClearBusy(nodeId);
+        NotifyObservers([nodeId](auto& observer)
+            {
+                observer.OnNodeOnlineChanged(nodeId, false);
             });
     }
 
-    void CanCommandClient::OnServerOffline(uint16_t serverNodeId)
+    void CanCommandClient::OnServerOnline(uint16_t nodeId)
     {
-        if (serverNodeId != nodeId)
-            return;
+        MarkOnline(nodeId);
+    }
 
-        NotifyObservers([](auto& observer)
-            {
-                observer.OnNodeOnlineChanged(false);
-            });
+    void CanCommandClient::OnServerOffline(uint16_t nodeId)
+    {
+        MarkOffline(nodeId);
     }
 
     void CanCommandClient::OnCommandAckTimeout(uint16_t /*nodeId*/, uint8_t /*category*/, uint8_t /*messageType*/)
     {}
 
-    void CanCommandClient::OnSelectControlModeResponse(can::FocMotorMode activeMode)
+    void CanCommandClient::OnSelectControlModeResponse(uint16_t nodeId, can::FocMotorMode activeMode)
     {
-        SetBusy(false);
-        NotifyObservers([activeMode](auto& observer)
+        CompleteCommand(nodeId, can::focSelectControlModeId);
+        NotifyObservers([nodeId, activeMode](auto& observer)
             {
-                observer.OnControlModeAcknowledged(activeMode);
+                observer.OnControlModeAcknowledged(nodeId, activeMode);
             });
     }
 
-    void CanCommandClient::OnCategoryError(uint8_t /*originCommandId*/, can::FocMotorCategoryError /*errorCode*/)
-    {}
-
-    void CanCommandClient::HandleCommandAck(uint8_t categoryId, uint8_t commandType, CanAckStatus status)
+    void CanCommandClient::OnCategoryError(uint16_t nodeId, uint8_t originCommandId, can::FocMotorCategoryError errorCode)
     {
-        SetBusy(false);
-        NotifyObservers([categoryId, commandType, status](auto& observer)
+        CompleteCommand(nodeId, originCommandId);
+        NotifyObservers([nodeId, originCommandId, errorCode](auto& observer)
             {
-                observer.OnCommandAck(categoryId, commandType, status);
+                observer.OnCommandRejected(nodeId, originCommandId, errorCode);
             });
     }
 
-    void CanCommandClient::DecodeTelemetryStatus(const hal::Can::Message& msg) const
+    void CanCommandClient::OnTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg)
+    {
+        DecodeTelemetryStatus(nodeId, msg);
+    }
+
+    void CanCommandClient::OnTelemetryElectrical(uint16_t nodeId, const hal::Can::Message& msg)
+    {
+        DecodeTelemetryElectrical(nodeId, msg);
+    }
+
+    void CanCommandClient::OnContractVersionResponse(uint16_t nodeId, uint8_t major, uint8_t minor)
+    {
+        const bool compatible = major == can::focContractVersionMajor;
+
+        NotifyObservers([nodeId, major, minor, compatible](auto& observer)
+            {
+                observer.OnContractVersion(nodeId, major, minor, compatible);
+            });
+    }
+
+    void CanCommandClient::OnElectricalParamsResponse(uint16_t nodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs)
+    {
+        NotifyObservers([nodeId, resistance, inductance, polePairs](auto& observer)
+            {
+                observer.OnElectricalParametersReceived(nodeId, resistance.Value(), inductance.Value(), polePairs);
+            });
+    }
+
+    void CanCommandClient::OnMechanicalParamsResponse(uint16_t nodeId, foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia)
+    {
+        NotifyObservers([nodeId, friction, inertia](auto& observer)
+            {
+                observer.OnMechanicalParametersReceived(nodeId, friction.Value(), inertia.Value());
+            });
+    }
+
+    void CanCommandClient::DecodeTelemetryStatus(uint16_t nodeId, const hal::Can::Message& msg) const
     {
         if (!can::PayloadExact(msg, can::focTelemetryStatusResponseId))
             return;
@@ -213,24 +282,24 @@ namespace tool
         const auto speed = reader.ReadFixed16(can::focSpeedScale);
         const auto position = reader.ReadFixed16(can::focPositionScale);
 
-        NotifyObservers([state, fault](auto& observer)
+        NotifyObservers([nodeId, state, fault](auto& observer)
             {
-                observer.OnMotorStatusReceived(state, fault);
+                observer.OnMotorStatusReceived(nodeId, state, fault);
             });
-        NotifyObservers([speed, position](auto& observer)
+        NotifyObservers([nodeId, speed, position](auto& observer)
             {
-                observer.OnSpeedPositionReceived(speed, position);
+                observer.OnSpeedPositionReceived(nodeId, speed, position);
             });
         if (fault != FocFaultCode::none)
         {
-            NotifyObservers([fault](auto& observer)
+            NotifyObservers([nodeId, fault](auto& observer)
                 {
-                    observer.OnFaultEventReceived(fault);
+                    observer.OnFaultEventReceived(nodeId, fault);
                 });
         }
     }
 
-    void CanCommandClient::DecodeTelemetryElectrical(const hal::Can::Message& msg) const
+    void CanCommandClient::DecodeTelemetryElectrical(uint16_t nodeId, const hal::Can::Message& msg) const
     {
         if (!can::PayloadExact(msg, can::focTelemetryElectricalResponseId))
             return;
@@ -241,36 +310,47 @@ namespace tool
         const auto iq = reader.ReadFixed16(can::focCurrentScale);
         const auto id = reader.ReadFixed16(can::focCurrentScale);
 
-        NotifyObservers([id, iq](auto& observer)
+        NotifyObservers([nodeId, id, iq](auto& observer)
             {
-                observer.OnCurrentMeasurementReceived(id, iq);
+                observer.OnCurrentMeasurementReceived(nodeId, id, iq);
             });
-        NotifyObservers([voltage](auto& observer)
+        NotifyObservers([nodeId, voltage](auto& observer)
             {
-                observer.OnBusVoltageReceived(voltage);
+                observer.OnBusVoltageReceived(nodeId, voltage);
             });
     }
 
+    bool CanCommandClient::HandleCommandAck(uint32_t id, const CanFrame& data)
+    {
+        if (ExtractCanMessageType(id) != canCommandAckMessageTypeId || ExtractCanCategory(id) != canSystemCategoryId || data.size() < canCommandAckSize)
+            return false;
+
+        const auto nodeId = static_cast<uint16_t>(ExtractCanNodeId(id));
+        const uint8_t ackCategory = data[0];
+        const uint8_t ackMsgType = data[1];
+        const auto ackStatus = static_cast<CanAckStatus>(data[2]);
+
+        if (ackCategory == can::focMotorCategoryId)
+            CompleteCommand(nodeId, ackMsgType);
+
+        NotifyObservers([nodeId, ackCategory, ackMsgType, ackStatus](auto& observer)
+            {
+                observer.OnCommandAck(nodeId, ackCategory, ackMsgType, ackStatus);
+            });
+        return true;
+    }
+
+    // Adapters report a received frame here before handing it to the protocol client, so a node
+    // is online before any of its responses are decoded.
     void CanCommandClient::OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data)
     {
-        const uint8_t msgType = ExtractCanMessageType(id);
-        const uint8_t category = ExtractCanCategory(id);
-        bool consumed = false;
+        bool consumed{ false };
         if (!transmitted)
         {
-            hal::Can::Message msg;
-            for (auto b : data)
-                msg.push_back(b);
-            if (msgType == can::focTelemetryStatusResponseId || msgType == can::focTelemetryElectricalResponseId)
-                consumed = true;
-            else if (msgType == canCommandAckMessageTypeId && category == canSystemCategoryId && msg.size() >= canCommandAckSize)
-            {
-                const uint8_t ackCategory = msg[0];
-                const uint8_t ackMsgType = msg[1];
-                const auto ackStatus = static_cast<CanAckStatus>(msg[2]);
-                HandleCommandAck(ackCategory, ackMsgType, ackStatus);
-                consumed = true;
-            }
+            MarkOnline(static_cast<uint16_t>(ExtractCanNodeId(id)));
+
+            const uint8_t msgType = ExtractCanMessageType(id);
+            consumed = msgType == can::focTelemetryStatusResponseId || msgType == can::focTelemetryElectricalResponseId || HandleCommandAck(id, data);
         }
 
         if (!consumed)
@@ -280,42 +360,6 @@ namespace tool
                     observer.OnFrameLog(transmitted, id, data);
                 });
         }
-    }
-
-    void CanCommandClient::OnTelemetryStatus(const hal::Can::Message& msg)
-    {
-        DecodeTelemetryStatus(msg);
-    }
-
-    void CanCommandClient::OnTelemetryElectrical(const hal::Can::Message& msg)
-    {
-        DecodeTelemetryElectrical(msg);
-    }
-
-    void CanCommandClient::OnElectricalParamsResponse(foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs)
-    {
-        NotifyObservers([resistance, inductance, polePairs](auto& observer)
-            {
-                observer.OnElectricalParametersReceived(resistance.Value(), inductance.Value(), polePairs);
-            });
-    }
-
-    void CanCommandClient::OnMechanicalParamsResponse(foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia)
-    {
-        NotifyObservers([friction, inertia](auto& observer)
-            {
-                observer.OnMechanicalParametersReceived(friction.Value(), inertia.Value());
-            });
-    }
-
-    void CanCommandClient::OnContractVersionResponse(uint8_t major, uint8_t minor)
-    {
-        const bool compatible = major == can::focContractVersionMajor;
-
-        NotifyObservers([major, minor, compatible](auto& observer)
-            {
-                observer.OnContractVersion(major, minor, compatible);
-            });
     }
 
     void CanCommandClient::OnError(infra::BoundedConstString message)
@@ -328,6 +372,15 @@ namespace tool
 
     void CanCommandClient::OnConnectionChanged(bool connected)
     {
+        if (!connected)
+        {
+            while (!onlineNodes.empty())
+                MarkOffline(*onlineNodes.begin());
+
+            for (auto& [nodeId, command] : commands)
+                ClearBusy(nodeId);
+        }
+
         NotifyObservers([connected](auto& observer)
             {
                 observer.OnConnectionChanged(connected);

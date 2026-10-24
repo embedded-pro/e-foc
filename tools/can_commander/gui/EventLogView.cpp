@@ -45,6 +45,19 @@ namespace tool
         text->setAccessibleName("Event log");
         layout->addWidget(text, 1);
 
+        // The document lays its scroll range out after an append returns, so the tail is followed
+        // from the range change; scrolling up to read stops following until the end is reached again.
+        auto* scrollBar = text->verticalScrollBar();
+        connect(scrollBar, &QScrollBar::rangeChanged, this, [this, scrollBar](int, int maximum)
+            {
+                if (followingTail)
+                    scrollBar->setValue(maximum);
+            });
+        connect(scrollBar, &QScrollBar::valueChanged, this, [this, scrollBar](int value)
+            {
+                followingTail = value >= scrollBar->maximum();
+            });
+
         connect(showFrames, &QCheckBox::toggled, this, &EventLogView::ShowFramesChanged);
         connect(saveButton, &QPushButton::clicked, this, &EventLogView::SaveAs);
         connect(clearButton, &QPushButton::clicked, this, &EventLogView::Clear);
@@ -102,12 +115,6 @@ namespace tool
 
     void EventLogView::AppendLine(const QString& line)
     {
-        auto* scrollBar = text->verticalScrollBar();
-        const bool following = scrollBar->value() == scrollBar->maximum();
-
         text->appendPlainText(QString("%1  %2").arg(QDateTime::currentDateTime().toString("HH:mm:ss.zzz"), line));
-
-        if (following)
-            scrollBar->setValue(scrollBar->maximum());
     }
 }

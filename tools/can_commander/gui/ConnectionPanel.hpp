@@ -7,7 +7,6 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QSettings>
-#include <QSpinBox>
 
 namespace tool
 {
@@ -22,7 +21,6 @@ namespace tool
         QString InterfaceName() const;
         uint32_t Bitrate() const;
         QString BitrateText() const;
-        uint16_t NodeId() const;
 
         void RestoreSettings(const QSettings& settings);
         void SaveSettings(QSettings& settings) const;
@@ -30,7 +28,6 @@ namespace tool
     signals:
         void ConnectRequested();
         void DisconnectRequested();
-        void NodeIdChanged(uint16_t nodeId);
 
     public slots:
         void OnConnectionChanged(bool connected);
@@ -49,7 +46,6 @@ namespace tool
         QComboBox* interfaceCombo;
         QPushButton* refreshButton;
         QComboBox* bitrateCombo;
-        QSpinBox* nodeIdSpin;
         QPushButton* connectButton;
         QPushButton* disconnectButton;
         QLabel* statusLabel;

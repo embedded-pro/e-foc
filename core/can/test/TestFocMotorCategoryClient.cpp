@@ -35,13 +35,24 @@ namespace
     public:
         using can::FocMotorCategoryClientObserver::FocMotorCategoryClientObserver;
 
-        MOCK_METHOD(void, OnSelectControlModeResponse, (can::FocMotorMode activeMode), (override));
-        MOCK_METHOD(void, OnCategoryError, (uint8_t originCommandId, can::FocMotorCategoryError errorCode), (override));
-        MOCK_METHOD(void, OnTelemetryStatus, (const hal::Can::Message& msg), (override));
-        MOCK_METHOD(void, OnTelemetryElectrical, (const hal::Can::Message& msg), (override));
-        MOCK_METHOD(void, OnContractVersionResponse, (uint8_t major, uint8_t minor), (override));
-        MOCK_METHOD(void, OnElectricalParamsResponse, (foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs), (override));
-        MOCK_METHOD(void, OnMechanicalParamsResponse, (foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia), (override));
+        MOCK_METHOD(void, OnSelectControlModeResponse, (uint16_t sourceNodeId, can::FocMotorMode activeMode), (override));
+        MOCK_METHOD(void, OnCategoryError, (uint16_t sourceNodeId, uint8_t originCommandId, can::FocMotorCategoryError errorCode), (override));
+        MOCK_METHOD(void, OnTelemetryStatus, (uint16_t sourceNodeId, const hal::Can::Message& msg), (override));
+        MOCK_METHOD(void, OnTelemetryElectrical, (uint16_t sourceNodeId, const hal::Can::Message& msg), (override));
+        MOCK_METHOD(void, OnContractVersionResponse, (uint16_t sourceNodeId, uint8_t major, uint8_t minor), (override));
+        MOCK_METHOD(void, OnElectricalParamsResponse, (uint16_t sourceNodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs), (override));
+        MOCK_METHOD(void, OnMechanicalParamsResponse, (uint16_t sourceNodeId, foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia), (override));
+    };
+
+    struct FrameOriginStub
+        : can::CanFrameOrigin
+    {
+        uint16_t SourceNodeId() const override
+        {
+            return node;
+        }
+
+        uint16_t node{ 3 };
     };
 
     class FocMotorCategoryClientTest
@@ -71,7 +82,8 @@ namespace
         StrictMock<hal::CanMock> canMock;
         services::CanFrameTransport transport{ canMock, 0 };
         SequenceSourceStub seqSource;
-        can::FocMotorCategoryClient client{ transport, seqSource };
+        FrameOriginStub origin;
+        can::FocMotorCategoryClient client{ transport, seqSource, origin };
         StrictMock<MockClientObserver> observer{ client };
 
         uint8_t lastSentMsgType{};
@@ -145,7 +157,7 @@ TEST_F(FocMotorCategoryClientTest, SendSetPositionSetpoint_EncodesPosition)
 
 TEST_F(FocMotorCategoryClientTest, OnSelectControlModeResponse_NotifiesObserver)
 {
-    EXPECT_CALL(observer, OnSelectControlModeResponse(can::FocMotorMode::position));
+    EXPECT_CALL(observer, OnSelectControlModeResponse(3, can::FocMotorMode::position));
 
     hal::Can::Message msg;
     msg.push_back(static_cast<uint8_t>(can::FocMotorMode::position));
@@ -154,7 +166,7 @@ TEST_F(FocMotorCategoryClientTest, OnSelectControlModeResponse_NotifiesObserver)
 
 TEST_F(FocMotorCategoryClientTest, OnCategoryError_NotifiesObserver)
 {
-    EXPECT_CALL(observer, OnCategoryError(can::focSetPidCurrentId, can::FocMotorCategoryError::applicationError));
+    EXPECT_CALL(observer, OnCategoryError(3, can::focSetPidCurrentId, can::FocMotorCategoryError::applicationError));
 
     hal::Can::Message msg;
     msg.push_back(can::focSetPidCurrentId);
@@ -207,8 +219,8 @@ TEST_F(FocMotorCategoryClientTest, OnElectricalParamsResponse_DecodesResistanceI
     foc::Ohm resistance{ 0.0f };
     foc::MilliHenry inductance{ 0.0f };
     uint8_t polePairs{};
-    EXPECT_CALL(observer, OnElectricalParamsResponse(_, _, _))
-        .WillOnce(Invoke([&](foc::Ohm r, foc::MilliHenry l, uint8_t p)
+    EXPECT_CALL(observer, OnElectricalParamsResponse(3, _, _, _))
+        .WillOnce(Invoke([&](uint16_t, foc::Ohm r, foc::MilliHenry l, uint8_t p)
             {
                 resistance = r;
                 inductance = l;
@@ -233,8 +245,8 @@ TEST_F(FocMotorCategoryClientTest, OnMechanicalParamsResponse_DecodesFrictionAnd
 {
     foc::NewtonMeterSecondPerRadian friction{ 0.0f };
     foc::NewtonMeterSecondSquared inertia{ 0.0f };
-    EXPECT_CALL(observer, OnMechanicalParamsResponse(_, _))
-        .WillOnce(Invoke([&](foc::NewtonMeterSecondPerRadian f, foc::NewtonMeterSecondSquared j)
+    EXPECT_CALL(observer, OnMechanicalParamsResponse(3, _, _))
+        .WillOnce(Invoke([&](uint16_t, foc::NewtonMeterSecondPerRadian f, foc::NewtonMeterSecondSquared j)
             {
                 friction = f;
                 inertia = j;

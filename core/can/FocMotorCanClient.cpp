@@ -4,8 +4,9 @@ namespace can
 {
     FocMotorCanClient::FocMotorCanClient(hal::Can& can, uint16_t targetNodeId)
         : nodeId{ targetNodeId }
-        , protocolClient{ can }
-        , categoryClient{ protocolClient.Transport(), protocolClient }
+        , originTracker{ can }
+        , protocolClient{ originTracker }
+        , categoryClient{ protocolClient.Transport(), protocolClient, originTracker }
     {
         protocolClient.RegisterCategory(categoryClient);
     }
@@ -77,7 +78,7 @@ namespace can
 
     ContractCompatibility FocMotorCanClient::Compatibility() const
     {
-        return categoryClient.Compatibility();
+        return categoryClient.Compatibility(nodeId);
     }
 
     services::CanProtocolClient& FocMotorCanClient::ProtocolClient()
@@ -86,6 +87,11 @@ namespace can
     }
 
     FocMotorCategoryClient& FocMotorCanClient::CategoryClient()
+    {
+        return categoryClient;
+    }
+
+    const FocMotorCategoryClient& FocMotorCanClient::CategoryClient() const
     {
         return categoryClient;
     }

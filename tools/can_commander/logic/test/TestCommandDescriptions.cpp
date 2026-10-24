@@ -31,3 +31,9 @@ TEST_F(TestCommandDescriptions, describes_acknowledgements_in_plain_language)
     EXPECT_EQ("rejected: not allowed in the motor's current state", AckStatusDescription(services::CanAckStatus::invalidState));
     EXPECT_EQ("unknown acknowledgement", AckStatusDescription(static_cast<services::CanAckStatus>(0xff)));
 }
+
+TEST_F(TestCommandDescriptions, describes_rejections_in_plain_language)
+{
+    EXPECT_EQ("rejected: not valid in the active control mode", RejectionDescription(can::FocMotorCategoryError::modeMismatch));
+    EXPECT_EQ("rejected for an unknown reason", RejectionDescription(static_cast<can::FocMotorCategoryError>(0xff)));
+}

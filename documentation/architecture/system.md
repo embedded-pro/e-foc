@@ -308,11 +308,11 @@ In CLI mode, `ControlModeStateMachine` registers the lifecycle commands `calibra
 
 Host-only tools that do not run on the embedded target:
 
-| Tool            | Responsibility                                                                                                                                                                                                |
-|-----------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Simulator       | Closed-loop software simulation: real FOC control code drives a physics-based PMSM model (Euler integration of the dq electrical equations). Used for validating control loops without hardware.              |
-| CAN Commander   | Desktop application for sending CAN commands and showing motor telemetry; keeps an issue log, checks for new releases and ships as Windows and Debian installers ([design](../design/tool-can-commander.md)). |
-| Hardware Bridge | Desktop client that bridges the target's terminal (serial) and CAN bus to the host; the hardware-in-the-loop runner reaches the board through it.                                                             |
+| Tool            | Responsibility                                                                                                                                                                                                                           |
+|-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Simulator       | Closed-loop software simulation: real FOC control code drives a physics-based PMSM model (Euler integration of the dq electrical equations). Used for validating control loops without hardware.                                         |
+| CAN Commander   | Desktop application that commands and monitors the motor controllers on a CAN bus, one tab per node; keeps an issue log, checks for new releases and ships as Windows and Debian installers ([design](../design/tool-can-commander.md)). |
+| Hardware Bridge | Desktop client that bridges the target's terminal (serial) and CAN bus to the host; the hardware-in-the-loop runner reaches the board through it.                                                                                        |
 
 ### 6. Infrastructure (was §5)
 

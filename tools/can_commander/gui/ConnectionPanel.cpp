@@ -50,12 +50,6 @@ namespace tool
         bitrateCombo->addItem("1 Mbit/s", 1000000);
         bitrateCombo->setCurrentIndex(3);
         AddLabelled(layout, "&Bitrate:", bitrateCombo);
-
-        nodeIdSpin = new QSpinBox();
-        nodeIdSpin->setRange(1, 4095);
-        nodeIdSpin->setValue(1);
-        nodeIdSpin->setToolTip("CAN node ID of the motor controller to command");
-        AddLabelled(layout, "&Node ID:", nodeIdSpin);
     }
 
     void ConnectionPanel::CreateButtons(QHBoxLayout& layout)
@@ -73,10 +67,6 @@ namespace tool
         connect(interfaceCombo, &QComboBox::currentTextChanged, this, &ConnectionPanel::UpdateConnectEnabled);
         connect(connectButton, &QPushButton::clicked, this, &ConnectionPanel::ConnectRequested);
         connect(disconnectButton, &QPushButton::clicked, this, &ConnectionPanel::DisconnectRequested);
-        connect(nodeIdSpin, &QSpinBox::valueChanged, this, [this](int value)
-            {
-                emit NodeIdChanged(static_cast<uint16_t>(value));
-            });
     }
 
     void ConnectionPanel::RefreshInterfaces()
@@ -109,11 +99,6 @@ namespace tool
         return bitrateCombo->currentText();
     }
 
-    uint16_t ConnectionPanel::NodeId() const
-    {
-        return static_cast<uint16_t>(nodeIdSpin->value());
-    }
-
     void ConnectionPanel::RestoreSettings(const QSettings& settings)
     {
         const auto interfaceName = settings.value("connection/interface").toString();
@@ -123,15 +108,12 @@ namespace tool
         const auto bitrateIndex = bitrateCombo->findData(settings.value("connection/bitrate", Bitrate()).toUInt());
         if (bitrateIndex >= 0)
             bitrateCombo->setCurrentIndex(bitrateIndex);
-
-        nodeIdSpin->setValue(settings.value("connection/nodeId", NodeId()).toInt());
     }
 
     void ConnectionPanel::SaveSettings(QSettings& settings) const
     {
         settings.setValue("connection/interface", InterfaceName());
         settings.setValue("connection/bitrate", Bitrate());
-        settings.setValue("connection/nodeId", NodeId());
     }
 
     void ConnectionPanel::OnConnectionChanged(bool isConnected)

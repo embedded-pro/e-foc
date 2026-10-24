@@ -151,3 +151,17 @@ TEST_F(TestIssueLog, captures_qt_warnings_while_alive)
     qWarning("after the first log is gone");
     EXPECT_TRUE(later.RecentLines(10).isEmpty());
 }
+
+TEST_F(TestIssueLog, keeps_running_when_the_log_folder_disappears_while_capturing_qt_messages)
+{
+    auto config = Config();
+    config.maxFileBytes = 64;
+    IssueLog log{ config };
+    log.CaptureQtMessages();
+    log.Write(IssueSeverity::info, "first entry fills the file past its limit");
+
+    ASSERT_TRUE(QDir{ config.directory }.removeRecursively());
+    log.Write(IssueSeverity::error, "written after the folder vanished");
+
+    EXPECT_TRUE(log.RecentLines(10).back().endsWith("written after the folder vanished"));
+}

@@ -10,21 +10,22 @@ namespace tool
     public:
         using CanCommandClientObserver::CanCommandClientObserver;
 
-        MOCK_METHOD(void, OnCommandTimeout, (), (override));
-        MOCK_METHOD(void, OnBusyChanged, (bool busy), (override));
-        MOCK_METHOD(void, OnMotorStatusReceived, (FocMotorState state, FocFaultCode fault), (override));
-        MOCK_METHOD(void, OnCurrentMeasurementReceived, (float idCurrent, float iqCurrent), (override));
-        MOCK_METHOD(void, OnSpeedPositionReceived, (float speed, float position), (override));
-        MOCK_METHOD(void, OnBusVoltageReceived, (float voltage), (override));
-        MOCK_METHOD(void, OnFaultEventReceived, (FocFaultCode fault), (override));
-        MOCK_METHOD(void, OnFrameLog, (bool transmitted, uint32_t id, const CanFrame& data), (override));
         MOCK_METHOD(void, OnConnectionChanged, (bool connected), (override));
-        MOCK_METHOD(void, OnNodeOnlineChanged, (bool online), (override));
         MOCK_METHOD(void, OnAdapterError, (infra::BoundedConstString message), (override));
-        MOCK_METHOD(void, OnControlModeAcknowledged, (can::FocMotorMode activeMode), (override));
-        MOCK_METHOD(void, OnCommandAck, (uint8_t categoryId, uint8_t commandType, services::CanAckStatus status), (override));
-        MOCK_METHOD(void, OnContractVersion, (uint8_t major, uint8_t minor, bool compatible), (override));
-        MOCK_METHOD(void, OnElectricalParametersReceived, (float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs), (override));
-        MOCK_METHOD(void, OnMechanicalParametersReceived, (float frictionNmSPerRad, float inertiaKgM2), (override));
+        MOCK_METHOD(void, OnFrameLog, (bool transmitted, uint32_t id, const CanFrame& data), (override));
+        MOCK_METHOD(void, OnNodeOnlineChanged, (uint16_t nodeId, bool online), (override));
+        MOCK_METHOD(void, OnBusyChanged, (uint16_t nodeId, bool busy), (override));
+        MOCK_METHOD(void, OnCommandTimeout, (uint16_t nodeId), (override));
+        MOCK_METHOD(void, OnCommandAck, (uint16_t nodeId, uint8_t categoryId, uint8_t commandType, services::CanAckStatus status), (override));
+        MOCK_METHOD(void, OnCommandRejected, (uint16_t nodeId, uint8_t commandType, can::FocMotorCategoryError error), (override));
+        MOCK_METHOD(void, OnContractVersion, (uint16_t nodeId, uint8_t major, uint8_t minor, bool compatible), (override));
+        MOCK_METHOD(void, OnControlModeAcknowledged, (uint16_t nodeId, can::FocMotorMode activeMode), (override));
+        MOCK_METHOD(void, OnMotorStatusReceived, (uint16_t nodeId, FocMotorState state, FocFaultCode fault), (override));
+        MOCK_METHOD(void, OnCurrentMeasurementReceived, (uint16_t nodeId, float idCurrent, float iqCurrent), (override));
+        MOCK_METHOD(void, OnSpeedPositionReceived, (uint16_t nodeId, float speed, float position), (override));
+        MOCK_METHOD(void, OnBusVoltageReceived, (uint16_t nodeId, float voltage), (override));
+        MOCK_METHOD(void, OnFaultEventReceived, (uint16_t nodeId, FocFaultCode fault), (override));
+        MOCK_METHOD(void, OnElectricalParametersReceived, (uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs), (override));
+        MOCK_METHOD(void, OnMechanicalParametersReceived, (uint16_t nodeId, float frictionNmSPerRad, float inertiaKgM2), (override));
     };
 }

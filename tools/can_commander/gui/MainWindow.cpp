@@ -1,6 +1,5 @@
 #include "tools/can_commander/gui/MainWindow.hpp"
 #include "core/can/FocMotorWireContract.hpp"
-#include "tools/can_commander/logic/CommandDescriptions.hpp"
 #include "tools/can_commander/support/ApplicationInfo.hpp"
 #include "tools/can_commander/support/IssueReport.hpp"
 #include "ui/backend/qt/QtConversions.hpp"
@@ -10,10 +9,10 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QSettings>
-#include <QShortcut>
 #include <QStatusBar>
 #include <QVBoxLayout>
 #include <utility>
@@ -25,8 +24,6 @@ namespace tool
         using ui::backend::qt::ToQt;
         using ui::theme::StatusLevel;
 
-        constexpr int commandTimeoutMs{ 2000 };
-
         QString ConnectFailureHint()
         {
 #if defined(_WIN32)
@@ -34,6 +31,14 @@ namespace tool
 #else
             return "check that the interface exists and is up, e.g. sudo ip link set can0 up type can bitrate 1000000";
 #endif
+        }
+
+        QString NodeList(const std::vector<uint16_t>& nodes)
+        {
+            QStringList names;
+            for (auto node : nodes)
+                names.append(QString::number(node));
+            return names.join(", ");
         }
     }
 
@@ -47,17 +52,16 @@ namespace tool
         CanCommandClientObserver::Attach(client);
         setWindowTitle(QString("%1 %2").arg(ToQt(application::displayName), ToQt(application::version)));
         setMinimumSize(900, 600);
-        resize(1200, 800);
+        resize(1280, 860);
 
         BuildMenus();
         BuildLayout();
-        BuildStatusBar();
+        statusBar()->addPermanentWidget(motorsStatus = new QLabel());
         RestoreSettings();
-        ConnectCommands();
-        ConnectSetpoints();
+        ConnectSignals();
         ConnectUpdateChecker();
 
-        UpdateCommandsEnabled();
+        UpdateSafetyControls();
         UpdateStatusBar();
     }
 
@@ -90,6 +94,7 @@ namespace tool
     void MainWindow::BuildMenus()
     {
         BuildFileMenu();
+        BuildMotorMenu();
 
         auto* viewMenu = menuBar()->addMenu("&View");
         showFramesAction = viewMenu->addAction("Show CAN &Frames");
@@ -111,6 +116,18 @@ namespace tool
             });
         fileMenu->addSeparator();
         fileMenu->addAction("&Quit", QKeySequence::Quit, this, &QWidget::close);
+    }
+
+    void MainWindow::BuildMotorMenu()
+    {
+        auto* motorMenu = menuBar()->addMenu("&Motor");
+        addMotorAction = motorMenu->addAction("&Add Motor…", QKeySequence::New, this, &MainWindow::PromptAddMotor);
+        motorMenu->addAction("&Close Motor Tab", QKeySequence::Close, this, [this]()
+            {
+                CloseMotor(motorTabs->currentIndex());
+            });
+        motorMenu->addSeparator();
+        emergencyStopAction = motorMenu->addAction("&Emergency Stop All Motors", QKeySequence{ Qt::Key_Escape }, this, &MainWindow::EmergencyStopAll);
     }
 
     void MainWindow::BuildHelpMenu()
@@ -140,17 +157,12 @@ namespace tool
         layout->addWidget(updateBanner);
         layout->addWidget(BuildSafetyBar());
 
-        commandPanel = new CommandPanel();
-        telemetryPanel = new TelemetryPanel();
-        workSplitter = new QSplitter(Qt::Horizontal);
-        workSplitter->addWidget(commandPanel);
-        workSplitter->addWidget(telemetryPanel);
-        workSplitter->setStretchFactor(0, 3);
-        workSplitter->setStretchFactor(1, 2);
+        overview = new MotorOverview();
+        layout->addWidget(overview);
 
         eventLog = new EventLogView();
         logSplitter = new QSplitter(Qt::Vertical);
-        logSplitter->addWidget(workSplitter);
+        logSplitter->addWidget(BuildMotorArea());
         logSplitter->addWidget(eventLog);
         logSplitter->setStretchFactor(0, 3);
         logSplitter->setStretchFactor(1, 1);
@@ -166,36 +178,59 @@ namespace tool
         connectionPanel = new ConnectionPanel(adapter);
         layout->addWidget(connectionPanel, 1);
 
-        emergencyStopButton = new QPushButton("EMERGENCY STOP\n(Esc)");
-        emergencyStopButton->setMinimumSize(180, 56);
-        emergencyStopButton->setAccessibleName("Emergency stop");
+        emergencyStopButton = new QPushButton("EMERGENCY STOP\nALL MOTORS (Esc)");
+        emergencyStopButton->setMinimumSize(200, 56);
+        emergencyStopButton->setAccessibleName("Emergency stop all motors");
         ui::backend::qt::StyleButton(*emergencyStopButton, ui::theme::ButtonRole::EmergencyStop);
         layout->addWidget(emergencyStopButton);
 
-        auto* shortcut = new QShortcut(QKeySequence{ Qt::Key_Escape }, this);
-        shortcut->setContext(Qt::WindowShortcut);
-        connect(shortcut, &QShortcut::activated, this, &MainWindow::EmergencyStop);
-        connect(emergencyStopButton, &QPushButton::clicked, this, &MainWindow::EmergencyStop);
+        connect(emergencyStopButton, &QPushButton::clicked, this, &MainWindow::EmergencyStopAll);
         return bar;
     }
 
-    void MainWindow::BuildStatusBar()
+    QWidget* MainWindow::BuildMotorArea()
     {
-        activityStatus = new QLabel();
-        nodeStatus = new QLabel();
-        firmwareStatus = new QLabel();
-        statusBar()->addPermanentWidget(activityStatus);
-        statusBar()->addPermanentWidget(nodeStatus);
-        statusBar()->addPermanentWidget(firmwareStatus);
+        motorTabs = new QTabWidget();
+        motorTabs->setTabsClosable(true);
+        motorTabs->setMovable(true);
+        motorTabs->setDocumentMode(true);
+
+        addMotorButton = new QPushButton("+ Add Motor…");
+        addMotorButton->setToolTip("Add a tab for a motor controller by its CAN node ID");
+        motorTabs->setCornerWidget(addMotorButton, Qt::TopRightCorner);
+
+        motorArea = new QStackedWidget();
+        motorArea->addWidget(BuildEmptyState());
+        motorArea->addWidget(motorTabs);
+        return motorArea;
     }
 
-    void MainWindow::ConnectCommands()
+    QWidget* MainWindow::BuildEmptyState()
     {
-        timeoutTimer.setSingleShot(true);
-        connect(&timeoutTimer, &QTimer::timeout, this, [this]()
-            {
-                client.HandleTimeout();
-            });
+        auto* page = new QWidget();
+        auto* layout = new QVBoxLayout(page);
+        layout->addStretch();
+
+        auto* message = new QLabel("No motors yet.\n\nConnect to a CAN interface: every motor controller whose heartbeat is seen gets its own tab.\n"
+                                   "You can also add a motor by its node ID before it comes online.");
+        message->setAlignment(Qt::AlignCenter);
+        message->setWordWrap(true);
+        layout->addWidget(message);
+
+        auto* addButton = new QPushButton("Add Motor…");
+        ui::backend::qt::StyleButton(*addButton, ui::theme::ButtonRole::Primary);
+        connect(addButton, &QPushButton::clicked, this, &MainWindow::PromptAddMotor);
+        auto* buttonRow = new QHBoxLayout();
+        buttonRow->addStretch();
+        buttonRow->addWidget(addButton);
+        buttonRow->addStretch();
+        layout->addLayout(buttonRow);
+        layout->addStretch();
+        return page;
+    }
+
+    void MainWindow::ConnectSignals()
+    {
         connect(&rxPollTimer, &QTimer::timeout, this, [this]()
             {
                 adapter.ProcessReadEvent();
@@ -203,82 +238,16 @@ namespace tool
 
         connect(connectionPanel, &ConnectionPanel::ConnectRequested, this, &MainWindow::Connect);
         connect(connectionPanel, &ConnectionPanel::DisconnectRequested, this, &MainWindow::Disconnect);
-        connect(connectionPanel, &ConnectionPanel::NodeIdChanged, this, &MainWindow::SelectNode);
+        connect(addMotorButton, &QPushButton::clicked, this, &MainWindow::PromptAddMotor);
+        connect(motorTabs, &QTabWidget::tabCloseRequested, this, &MainWindow::CloseMotor);
+        connect(motorTabs, &QTabWidget::currentChanged, this, [this](int index)
+            {
+                if (auto* motor = qobject_cast<MotorPanel*>(motorTabs->widget(index)))
+                    overview->SetCurrent(motor->NodeId());
+            });
+        connect(overview, &MotorOverview::MotorSelected, this, &MainWindow::SelectMotor);
         connect(showFramesAction, &QAction::toggled, eventLog, &EventLogView::SetShowsFrames);
         connect(eventLog, &EventLogView::ShowFramesChanged, showFramesAction, &QAction::setChecked);
-
-        connect(commandPanel, &CommandPanel::StartMotorRequested, this, [this]()
-            {
-                Send("Start Motor", [this]()
-                    {
-                        return client.SendStartMotor();
-                    });
-            });
-        connect(commandPanel, &CommandPanel::StopMotorRequested, this, [this]()
-            {
-                Send("Stop Motor", [this]()
-                    {
-                        return client.SendStopMotor();
-                    });
-            });
-        connect(commandPanel, &CommandPanel::RequestDataRequested, this, [this]()
-            {
-                client.RequestData();
-            });
-    }
-
-    void MainWindow::ConnectSetpoints()
-    {
-        connect(commandPanel, &CommandPanel::SetControlModeRequested, this, [this](can::FocMotorMode mode)
-            {
-                commandPanel->ShowRequestedControlMode(mode);
-                Send("Control Mode", [this, mode]()
-                    {
-                        return client.SendSetControlMode(mode);
-                    });
-            });
-        connect(commandPanel, &CommandPanel::SetTorqueSetpointRequested, this, [this](float value)
-            {
-                Send(QString("Torque Setpoint %1 A").arg(value), [this, value]()
-                    {
-                        return client.SendSetTorqueSetpoint(value);
-                    });
-            });
-        connect(commandPanel, &CommandPanel::SetSpeedSetpointRequested, this, [this](float value)
-            {
-                Send(QString("Speed Setpoint %1 rad/s").arg(value), [this, value]()
-                    {
-                        return client.SendSetSpeedSetpoint(value);
-                    });
-            });
-        connect(commandPanel, &CommandPanel::SetPositionSetpointRequested, this, [this](float value)
-            {
-                Send(QString("Position Setpoint %1 rad").arg(value), [this, value]()
-                    {
-                        return client.SendSetPositionSetpoint(value);
-                    });
-            });
-        connect(commandPanel, &CommandPanel::SetCurrentBandwidthRequested, this, [this](float value)
-            {
-                Send(QString("Current Loop Bandwidth %1 rad/s").arg(value), [this, value]()
-                    {
-                        return client.SendSetCurrentBandwidth(value);
-                    });
-            });
-        connect(commandPanel, &CommandPanel::SetSpeedBandwidthRequested, this, [this](float value)
-            {
-                Send(QString("Speed Loop Bandwidth %1 rad/s").arg(value), [this, value]()
-                    {
-                        return client.SendSetSpeedBandwidth(value);
-                    });
-            });
-        connect(commandPanel, &CommandPanel::SetPositionBandwidthRequested, this, [this](float value)
-            {
-                Send(QString("Position Loop Bandwidth %1 rad/s").arg(value), [this, value]()
-                    {
-                        return client.SendSetPositionBandwidth(value);
-                    });
-            });
     }
 
     void MainWindow::ConnectUpdateChecker()
@@ -308,24 +277,30 @@ namespace tool
     {
         QSettings settings;
         restoreGeometry(settings.value("window/geometry").toByteArray());
-        workSplitter->restoreState(settings.value("window/workSplitter").toByteArray());
         logSplitter->restoreState(settings.value("window/logSplitter").toByteArray());
         eventLog->SetShowsFrames(settings.value("log/showFrames", false).toBool());
         showFramesAction->setChecked(eventLog->ShowsFrames());
         checkAtStartupAction->setChecked(settings.value("updates/checkAtStartup", true).toBool());
         connectionPanel->RestoreSettings(settings);
-        client.SetNodeId(connectionPanel->NodeId());
+
+        for (const auto& node : settings.value("motors/nodeIds").toList())
+            if (const auto nodeId = node.toUInt(); nodeId >= 1 && nodeId <= 4095)
+                AddMotor(static_cast<uint16_t>(nodeId));
     }
 
     void MainWindow::SaveSettings() const
     {
         QSettings settings;
         settings.setValue("window/geometry", saveGeometry());
-        settings.setValue("window/workSplitter", workSplitter->saveState());
         settings.setValue("window/logSplitter", logSplitter->saveState());
         settings.setValue("log/showFrames", eventLog->ShowsFrames());
         settings.setValue("updates/checkAtStartup", checkAtStartupAction->isChecked());
         connectionPanel->SaveSettings(settings);
+
+        QVariantList nodes;
+        for (const auto& [nodeId, motor] : motors)
+            nodes.append(nodeId);
+        settings.setValue("motors/nodeIds", nodes);
     }
 
     void MainWindow::Connect()
@@ -343,49 +318,118 @@ namespace tool
         adapter.Disconnect();
     }
 
-    void MainWindow::SelectNode(uint16_t nodeId)
+    void MainWindow::PromptAddMotor()
     {
-        client.SetNodeId(nodeId);
-        ForgetNodeState();
-        Report(IssueSeverity::info, QString("Commanding node %1").arg(nodeId));
+        if (motors.size() >= maxMotors)
+        {
+            QMessageBox::information(this, "Add Motor", QString("The tool follows up to %1 motors on one bus. Close a motor tab first.").arg(maxMotors));
+            return;
+        }
 
-        if (busConnected)
-            client.RequestData();
+        uint16_t suggestion{ 1 };
+        while (motors.contains(suggestion))
+            ++suggestion;
 
-        UpdateCommandsEnabled();
+        bool accepted{ false };
+        const auto nodeId = QInputDialog::getInt(this, "Add Motor", "CAN node ID of the motor controller:", suggestion, 1, 4095, 1, &accepted);
+        if (accepted)
+            SelectMotor(AddMotor(static_cast<uint16_t>(nodeId))->NodeId());
+    }
+
+    MotorPanel* MainWindow::AddMotor(uint16_t nodeId)
+    {
+        if (auto* existing = Motor(nodeId))
+            return existing;
+
+        auto* motor = new MotorPanel(client, nodeId, [this](IssueSeverity severity, const QString& message)
+            {
+                Report(severity, message);
+            });
+        motors.emplace(nodeId, motor);
+        motor->SetBusConnected(busConnected);
+        if (busConnected && client.IsOnline(nodeId))
+            motor->OnNodeOnlineChanged(true);
+
+        connect(motor, &MotorPanel::StatusChanged, this, [this, motor]()
+            {
+                RefreshMotor(*motor);
+            });
+
+        motorTabs->addTab(motor, StatusIcon(motor->Level()), motor->Title());
+        motorArea->setCurrentWidget(motorTabs);
+        RefreshMotor(*motor);
+        return motor;
+    }
+
+    void MainWindow::CloseMotor(int tabIndex)
+    {
+        auto* motor = qobject_cast<MotorPanel*>(motorTabs->widget(tabIndex));
+        if (motor == nullptr)
+            return;
+
+        const auto nodeId = motor->NodeId();
+        Report(IssueSeverity::info, QString("%1 tab closed; the motor itself is not stopped").arg(motor->Title()));
+        motors.erase(nodeId);
+        overview->RemoveMotor(nodeId);
+        motorTabs->removeTab(tabIndex);
+        motor->deleteLater();
+
+        if (motors.empty())
+            motorArea->setCurrentIndex(0);
+        UpdateSafetyControls();
         UpdateStatusBar();
     }
 
-    void MainWindow::ForgetNodeState()
+    void MainWindow::SelectMotor(uint16_t nodeId)
     {
-        nodeOnline.reset();
-        contract = Contract::unknown;
-        lastState.reset();
-        lastFault.reset();
-        telemetryPanel->Clear();
-        commandPanel->ClearActiveControlMode();
+        if (auto* motor = Motor(nodeId))
+            motorTabs->setCurrentWidget(motor);
     }
 
-    void MainWindow::EmergencyStop()
+    MotorPanel* MainWindow::Motor(uint16_t nodeId) const
+    {
+        const auto motor = motors.find(nodeId);
+        return motor != motors.end() ? motor->second : nullptr;
+    }
+
+    void MainWindow::RefreshMotor(MotorPanel& motor)
+    {
+        const auto index = motorTabs->indexOf(&motor);
+        if (index >= 0)
+        {
+            motorTabs->setTabIcon(index, StatusIcon(motor.Level()));
+            motorTabs->setTabToolTip(index, QString("%1: %2").arg(motor.Title(), motor.Summary()));
+        }
+
+        overview->SetMotor(motor.NodeId(), motor.Title(), motor.Summary(), motor.Level());
+        if (motorTabs->currentWidget() == &motor)
+            overview->SetCurrent(motor.NodeId());
+
+        UpdateSafetyControls();
+        UpdateStatusBar();
+    }
+
+    void MainWindow::EmergencyStopAll()
     {
         if (!emergencyStopButton->isEnabled())
             return;
 
-        Report(IssueSeverity::warning, "Emergency stop requested");
-        Send("Emergency Stop", [this]()
-            {
-                return client.SendEmergencyStop();
-            });
-    }
+        auto targets = client.OnlineNodes();
+        for (const auto& [nodeId, motor] : motors)
+            targets.insert(nodeId);
 
-    void MainWindow::Send(const QString& command, const std::function<bool()>& send)
-    {
-        pendingCommand = command;
-        if (send())
-            return;
+        std::vector<uint16_t> sent;
+        std::vector<uint16_t> refused;
+        for (auto nodeId : targets)
+        {
+            auto* motor = Motor(nodeId);
+            const bool accepted = motor != nullptr ? motor->SendEmergencyStop() : client.SendEmergencyStop(nodeId);
+            (accepted ? sent : refused).push_back(nodeId);
+        }
 
-        const auto reason = contract == Contract::incompatible ? "the firmware contract is incompatible" : "the CAN adapter refused the frame";
-        Report(IssueSeverity::error, QString("%1 was not sent: %2").arg(command, reason));
+        Report(IssueSeverity::warning, QString("Emergency stop sent to motor(s) %1").arg(sent.empty() ? QString("none") : NodeList(sent)));
+        if (!refused.empty())
+            Report(IssueSeverity::error, QString("Emergency stop could not be sent to motor(s) %1 (incompatible firmware or adapter refused): use the hardware stop").arg(NodeList(refused)));
     }
 
     void MainWindow::Report(IssueSeverity severity, const QString& message)
@@ -397,72 +441,50 @@ namespace tool
             statusBar()->showMessage(message.section('\n', 0, 0), 10000);
     }
 
-    QString MainWindow::CommandsUnavailableReason() const
+    void MainWindow::UpdateSafetyControls()
     {
-        if (!busConnected)
-            return "Connect to a CAN interface to send commands.";
-        if (contract == Contract::incompatible)
-            return QString("Firmware contract %1 is incompatible with this tool (%2.x): commands are disabled. Update the firmware or the tool.")
-                .arg(contractVersion)
-                .arg(can::focContractVersionMajor);
-        if (contract == Contract::unknown)
-            return QString("Waiting for node %1 to report its firmware version… Check the node ID if this does not clear.").arg(client.NodeId());
-        if (client.IsBusy())
-            return QString("Waiting for the response to %1…").arg(pendingCommand);
-        return {};
-    }
+        bool anyStoppable = !client.OnlineNodes().empty();
+        for (const auto& [nodeId, motor] : motors)
+            anyStoppable = anyStoppable || motor->AcceptsEmergencyStop();
 
-    void MainWindow::UpdateCommandsEnabled()
-    {
-        commandPanel->SetCommandsAvailable(CommandsUnavailableReason(), !client.IsBusy());
-
-        const bool canStop = busConnected && contract != Contract::incompatible;
+        const bool canStop = busConnected && anyStoppable;
         emergencyStopButton->setEnabled(canStop);
+        emergencyStopAction->setEnabled(canStop);
         if (canStop)
-            emergencyStopButton->setToolTip("Stop the motor immediately (Esc). Works while another command is pending.");
+            emergencyStopButton->setToolTip("Stop every motor on the bus immediately (Esc). Works while other commands are pending.");
         else if (busConnected)
-            emergencyStopButton->setToolTip("The firmware contract is incompatible, so the emergency stop cannot be sent. Use the hardware stop.");
+            emergencyStopButton->setToolTip("No motor can receive an emergency stop: none is known, or all have incompatible firmware. Use the hardware stop.");
         else
             emergencyStopButton->setToolTip("Connect to a CAN interface first.");
+
+        const bool canAdd = motors.size() < maxMotors;
+        addMotorAction->setEnabled(canAdd);
+        addMotorButton->setEnabled(canAdd);
+        addMotorButton->setToolTip(canAdd ? QString("Add a tab for a motor controller by its CAN node ID") : QString("Up to %1 motors per bus").arg(maxMotors));
     }
 
     void MainWindow::UpdateStatusBar()
     {
-        activityStatus->setText(client.IsBusy() ? QString("Waiting for response to %1…").arg(pendingCommand) : QString{});
-        activityStatus->setVisible(client.IsBusy());
-
-        const auto node = QString("Node %1: ").arg(client.NodeId());
         if (!busConnected)
         {
-            nodeStatus->setText(node + "—");
-            ui::backend::qt::StyleStatusLabel(*nodeStatus, StatusLevel::Neutral);
-        }
-        else if (!nodeOnline.has_value())
-        {
-            nodeStatus->setText(node + "no heartbeat yet");
-            ui::backend::qt::StyleStatusLabel(*nodeStatus, StatusLevel::Neutral);
-        }
-        else
-        {
-            nodeStatus->setText(node + (*nodeOnline ? "online" : "offline"));
-            ui::backend::qt::StyleStatusLabel(*nodeStatus, *nodeOnline ? StatusLevel::Ok : StatusLevel::Warning);
+            motorsStatus->setText(QString("%1 motor tab(s) · bus not connected").arg(motors.size()));
+            ui::backend::qt::StyleStatusLabel(*motorsStatus, StatusLevel::Neutral);
+            return;
         }
 
-        switch (contract)
+        std::size_t faulted{ 0 };
+        std::size_t online{ 0 };
+        for (const auto& [nodeId, motor] : motors)
         {
-            case Contract::compatible:
-                firmwareStatus->setText(QString("Firmware contract %1").arg(contractVersion));
-                ui::backend::qt::StyleStatusLabel(*firmwareStatus, StatusLevel::Ok);
-                break;
-            case Contract::incompatible:
-                firmwareStatus->setText(QString("Firmware contract %1: incompatible").arg(contractVersion));
-                ui::backend::qt::StyleStatusLabel(*firmwareStatus, StatusLevel::Fault);
-                break;
-            default:
-                firmwareStatus->setText("Firmware: unknown");
-                ui::backend::qt::StyleStatusLabel(*firmwareStatus, StatusLevel::Neutral);
-                break;
+            faulted += motor->Level() == StatusLevel::Fault ? 1 : 0;
+            online += client.IsOnline(nodeId) ? 1 : 0;
         }
+
+        motorsStatus->setText(QString("%1 of %2 motor(s) online%3")
+                                  .arg(online)
+                                  .arg(motors.size())
+                                  .arg(faulted > 0 ? QString(" · %1 in fault").arg(faulted) : QString{}));
+        ui::backend::qt::StyleStatusLabel(*motorsStatus, faulted > 0 ? StatusLevel::Fault : StatusLevel::Neutral);
     }
 
     void MainWindow::CheckForUpdates(bool userInitiated)
@@ -495,29 +517,26 @@ namespace tool
     {
         QMessageBox::about(this, QString("About %1").arg(ToQt(application::displayName)),
             QString("<h3>%1 %2</h3>"
-                    "<p>Commands and monitors e-foc motor controllers over CAN.</p>"
-                    "<p>CAN contract %3.%4 · Qt %5</p>"
-                    "<p><a href=\"%6\">Project page</a> · <a href=\"%7\">Releases</a> · <a href=\"%8\">Report an issue</a></p>"
-                    "<p>Log files: %9</p>"
-                    "<p>Distributed under the e-foc Non-Commercial License.</p>")
-                .arg(ToQt(application::displayName), ToQt(application::version))
-                .arg(can::focContractVersionMajor)
-                .arg(can::focContractVersionMinor)
-                .arg(QString::fromUtf8(qVersion()), ToQt(application::repositoryUrl), ToQt(application::releasesUrl), ToQt(application::newIssueUrl),
-                    QDir::toNativeSeparators(issueLog.Directory()).toHtmlEscaped()));
+                    "<p>Commands and monitors e-foc motor controllers over CAN, up to %3 per bus.</p>"
+                    "<p>CAN contract %4.%5 · Qt %6</p>"
+                    "<p><a href=\"%7\">Project page</a> · <a href=\"%8\">Releases</a> · <a href=\"%9\">Report an issue</a></p>")
+                    .arg(ToQt(application::displayName), ToQt(application::version))
+                    .arg(maxMotors)
+                    .arg(can::focContractVersionMajor)
+                    .arg(can::focContractVersionMinor)
+                    .arg(QString::fromUtf8(qVersion()), ToQt(application::repositoryUrl), ToQt(application::releasesUrl), ToQt(application::newIssueUrl)) +
+                QString("<p>Log files: %1</p><p>Distributed under the e-foc Non-Commercial License.</p>").arg(QDir::toNativeSeparators(issueLog.Directory()).toHtmlEscaped()));
     }
 
     void MainWindow::OnConnectionChanged(bool connected)
     {
         busConnected = connected;
-        ForgetNodeState();
         connectionPanel->OnConnectionChanged(connected);
 
         if (connected)
         {
             Report(IssueSeverity::info, QString("Connected to %1 at %2").arg(connectionPanel->InterfaceName(), connectionPanel->BitrateText()));
             SetupSocketNotifier();
-            client.RequestData();
         }
         else
         {
@@ -525,128 +544,116 @@ namespace tool
             TeardownSocketNotifier();
         }
 
-        UpdateCommandsEnabled();
+        for (const auto& [nodeId, motor] : motors)
+            motor->SetBusConnected(connected);
+
+        UpdateSafetyControls();
         UpdateStatusBar();
     }
 
-    void MainWindow::OnNodeOnlineChanged(bool online)
+    void MainWindow::OnNodeOnlineChanged(uint16_t nodeId, bool online)
     {
-        if (online)
-            Report(IssueSeverity::info, QString("Node %1 is online").arg(client.NodeId()));
-        else
+        auto* motor = Motor(nodeId);
+        if (motor == nullptr && online)
         {
-            Report(IssueSeverity::warning, QString("Node %1 stopped sending heartbeats").arg(client.NodeId()));
-            ForgetNodeState();
+            if (motors.size() >= maxMotors)
+            {
+                Report(IssueSeverity::warning, QString("Node %1 is on the bus but not shown: the tool follows up to %2 motors").arg(nodeId).arg(maxMotors));
+                return;
+            }
+
+            Report(IssueSeverity::info, QString("Discovered motor controller at node %1").arg(nodeId));
+            AddMotor(nodeId);
+            return;
         }
 
-        nodeOnline = online;
-        UpdateCommandsEnabled();
+        if (motor != nullptr)
+            motor->OnNodeOnlineChanged(online);
+        UpdateSafetyControls();
         UpdateStatusBar();
     }
 
-    void MainWindow::OnBusyChanged(bool busy)
+    void MainWindow::OnBusyChanged(uint16_t nodeId, bool busy)
     {
-        if (busy)
-            timeoutTimer.start(commandTimeoutMs);
+        if (auto* motor = Motor(nodeId))
+            motor->OnBusyChanged(busy);
+    }
+
+    void MainWindow::OnCommandTimeout(uint16_t nodeId)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->OnCommandTimeout();
         else
-            timeoutTimer.stop();
-
-        UpdateCommandsEnabled();
-        UpdateStatusBar();
+            Report(IssueSeverity::warning, QString("Node %1: no response to the last command").arg(nodeId));
     }
 
-    void MainWindow::OnCommandTimeout()
+    void MainWindow::OnCommandAck(uint16_t nodeId, uint8_t categoryId, uint8_t commandType, services::CanAckStatus status)
     {
-        Report(IssueSeverity::warning, QString("No response to %1 within %2 s: check the node ID and that the controller is powered")
-                                           .arg(pendingCommand.isEmpty() ? QString("the last command") : pendingCommand)
-                                           .arg(commandTimeoutMs / 1000));
+        if (auto* motor = Motor(nodeId))
+            motor->OnCommandAck(categoryId, commandType, status);
+    }
+
+    void MainWindow::OnCommandRejected(uint16_t nodeId, uint8_t commandType, can::FocMotorCategoryError error)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->OnCommandRejected(commandType, error);
+    }
+
+    void MainWindow::OnContractVersion(uint16_t nodeId, uint8_t major, uint8_t minor, bool compatible)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->OnContractVersion(major, minor, compatible);
+        UpdateSafetyControls();
+    }
+
+    void MainWindow::OnControlModeAcknowledged(uint16_t nodeId, can::FocMotorMode activeMode)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->OnControlModeAcknowledged(activeMode);
+    }
+
+    void MainWindow::OnMotorStatusReceived(uint16_t nodeId, FocMotorState state, FocFaultCode fault)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->OnMotorStatus(state, fault);
+    }
+
+    void MainWindow::OnCurrentMeasurementReceived(uint16_t nodeId, float idCurrent, float iqCurrent)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->OnCurrentMeasurement(idCurrent, iqCurrent);
+    }
+
+    void MainWindow::OnSpeedPositionReceived(uint16_t nodeId, float speed, float position)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->OnSpeedPosition(speed, position);
+    }
+
+    void MainWindow::OnBusVoltageReceived(uint16_t nodeId, float voltage)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->OnBusVoltage(voltage);
+    }
+
+    void MainWindow::OnFaultEventReceived(uint16_t /*nodeId*/, FocFaultCode /*fault*/)
+    {}
+
+    void MainWindow::OnElectricalParametersReceived(uint16_t nodeId, float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->OnElectricalParameters(resistanceOhm, inductanceMilliHenry, polePairs);
+    }
+
+    void MainWindow::OnMechanicalParametersReceived(uint16_t nodeId, float frictionNmSPerRad, float inertiaKgM2)
+    {
+        if (auto* motor = Motor(nodeId))
+            motor->OnMechanicalParameters(frictionNmSPerRad, inertiaKgM2);
     }
 
     void MainWindow::OnAdapterError(infra::BoundedConstString message)
     {
         Report(IssueSeverity::error, QString("CAN adapter: %1").arg(QString::fromUtf8(message.data(), static_cast<qsizetype>(message.size()))));
-    }
-
-    void MainWindow::OnControlModeAcknowledged(can::FocMotorMode activeMode)
-    {
-        commandPanel->SetActiveControlMode(activeMode);
-        Report(IssueSeverity::info, QString("Control mode is now %1").arg(CommandPanel::ControlModeName(activeMode)));
-    }
-
-    void MainWindow::OnCommandAck(uint8_t categoryId, uint8_t commandType, services::CanAckStatus status)
-    {
-        auto name = ToQt(CommandDisplayName(categoryId, commandType));
-        if (name.isEmpty())
-            name = QString("Command 0x%1/0x%2").arg(categoryId, 2, 16, QChar('0')).arg(commandType, 2, 16, QChar('0'));
-
-        const auto severity = status == services::CanAckStatus::success ? IssueSeverity::info : IssueSeverity::warning;
-        Report(severity, QString("%1: %2").arg(name, ToQt(AckStatusDescription(status))));
-    }
-
-    void MainWindow::OnContractVersion(uint8_t major, uint8_t minor, bool compatible)
-    {
-        contract = compatible ? Contract::compatible : Contract::incompatible;
-        contractVersion = QString("%1.%2").arg(major).arg(minor);
-
-        if (compatible)
-            Report(IssueSeverity::info, QString("Firmware contract %1 is compatible").arg(contractVersion));
-        else
-            Report(IssueSeverity::error, CommandsUnavailableReason());
-
-        UpdateCommandsEnabled();
-        UpdateStatusBar();
-    }
-
-    void MainWindow::OnElectricalParametersReceived(float resistanceOhm, float inductanceMilliHenry, uint8_t polePairs)
-    {
-        telemetryPanel->OnElectricalParameters(resistanceOhm, inductanceMilliHenry, polePairs);
-        Report(IssueSeverity::info, QString("Electrical parameters: R = %1 Ω, L = %2 mH, %3 pole pairs").arg(resistanceOhm).arg(inductanceMilliHenry).arg(polePairs));
-    }
-
-    void MainWindow::OnMechanicalParametersReceived(float frictionNmSPerRad, float inertiaKgM2)
-    {
-        telemetryPanel->OnMechanicalParameters(frictionNmSPerRad, inertiaKgM2);
-        Report(IssueSeverity::info, QString("Mechanical parameters: B = %1 N·m·s/rad, J = %2 kg·m²").arg(frictionNmSPerRad).arg(inertiaKgM2));
-    }
-
-    void MainWindow::OnMotorStatusReceived(FocMotorState state, FocFaultCode fault)
-    {
-        telemetryPanel->OnMotorStatus(state, fault);
-
-        if (lastState != state)
-            Report(IssueSeverity::info, QString("Motor state: %1").arg(TelemetryPanel::MotorStateName(state)));
-        lastState = state;
-        OnFaultEventReceived(fault);
-    }
-
-    void MainWindow::OnCurrentMeasurementReceived(float idCurrent, float iqCurrent)
-    {
-        telemetryPanel->OnCurrentMeasurement(idCurrent, iqCurrent);
-    }
-
-    void MainWindow::OnSpeedPositionReceived(float speed, float position)
-    {
-        telemetryPanel->OnSpeedPosition(speed, position);
-    }
-
-    void MainWindow::OnBusVoltageReceived(float voltage)
-    {
-        telemetryPanel->OnBusVoltage(voltage);
-    }
-
-    void MainWindow::OnFaultEventReceived(FocFaultCode fault)
-    {
-        telemetryPanel->OnFaultEvent(fault);
-
-        // Telemetry repeats the fault in every status frame; only a change is worth a log entry.
-        if (lastFault == fault)
-            return;
-
-        if (fault != FocFaultCode::none)
-            Report(IssueSeverity::error, QString("Motor fault: %1").arg(TelemetryPanel::FaultCodeName(fault)));
-        else if (lastFault.has_value())
-            Report(IssueSeverity::info, "Motor fault cleared");
-        lastFault = fault;
     }
 
     void MainWindow::OnFrameLog(bool transmitted, uint32_t id, const CanFrame& data)

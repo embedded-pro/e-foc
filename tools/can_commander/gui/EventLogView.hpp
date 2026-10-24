@@ -34,5 +34,6 @@ namespace tool
 
         QPlainTextEdit* text;
         QCheckBox* showFrames;
+        bool followingTail{ true };
     };
 }

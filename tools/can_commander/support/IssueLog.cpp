@@ -2,25 +2,25 @@
 #include <QDateTime>
 #include <QDir>
 #include <algorithm>
+#include <atomic>
 
 namespace tool
 {
     namespace
     {
         // Qt's message handler is process-wide; this is the one log it forwards to.
-        IssueLog* capturedLog{ nullptr };
+        std::atomic<IssueLog*> capturedLog{ nullptr };
         QtMessageHandler previousHandler{ nullptr };
 
-        thread_local bool forwarding{ false };
+        // A warning raised while a write is in progress (QFile on a vanished folder) must not
+        // re-enter the write and take its lock a second time.
+        thread_local bool writing{ false };
 
         void ForwardQtMessage(QtMsgType type, const QMessageLogContext& context, const QString& message)
         {
-            if (capturedLog != nullptr && !forwarding && type != QtDebugMsg && type != QtInfoMsg)
-            {
-                forwarding = true;
-                capturedLog->Write(type == QtWarningMsg ? IssueSeverity::warning : IssueSeverity::error, "Qt: " + message);
-                forwarding = false;
-            }
+            auto* log = capturedLog.load();
+            if (log != nullptr && !writing && type != QtDebugMsg && type != QtInfoMsg)
+                log->Write(type == QtWarningMsg ? IssueSeverity::warning : IssueSeverity::error, "Qt: " + message);
 
             if (previousHandler != nullptr)
                 previousHandler(type, context, message);
@@ -52,8 +52,8 @@ namespace tool
     {
         if (capturing)
         {
-            qInstallMessageHandler(previousHandler);
             capturedLog = nullptr;
+            qInstallMessageHandler(previousHandler);
             previousHandler = nullptr;
         }
     }
@@ -64,14 +64,19 @@ namespace tool
                         .arg(QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs), ToString(severity), message.simplified());
 
         std::scoped_lock lock{ mutex };
+        writing = true;
         Remember(line);
 
-        if (!file.isOpen())
-            return;
+        if (file.isOpen())
+            RotateIfNeeded();
 
-        RotateIfNeeded();
-        file.write(line.append('\n').toUtf8());
-        file.flush();
+        if (file.isOpen())
+        {
+            file.write(line.append('\n').toUtf8());
+            file.flush();
+        }
+
+        writing = false;
     }
 
     bool IssueLog::IsWritable() const
@@ -101,12 +106,12 @@ namespace tool
 
     void IssueLog::CaptureQtMessages()
     {
-        if (capturing || capturedLog != nullptr)
+        if (capturing || capturedLog.load() != nullptr)
             return;
 
         capturing = true;
-        capturedLog = this;
         previousHandler = qInstallMessageHandler(ForwardQtMessage);
+        capturedLog = this;
     }
 
     QString IssueLog::RotatedPath(int index) const

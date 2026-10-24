@@ -25,8 +25,10 @@ code is out of scope — the rules in `AGENTS.md` still apply to everything you 
 ## Heuristics
 
 ### Safety controls (SAFETY)
-- Emergency stop is reachable whenever a bus is connected — never gated by "busy", contract state or the
-  current tab. It has a keyboard shortcut, the `ButtonRole::EmergencyStop` style and stays in view.
+- Emergency stop is reachable whenever a bus is connected — never gated by "busy" or the current tab. It
+  has a keyboard shortcut, the `ButtonRole::EmergencyStop` style and stays in view. With several motors on
+  the bus it reaches all of them, and the result names every motor it could not reach.
+- One motor's fault must stay visible while another motor's tab is open (overview row, tab status dot).
 - Commands that move the motor need an explicit action (button/Enter), never fire on value change while
   typing (`keyboardTracking` off on setpoint spin boxes).
 - Setpoint ranges come from the firmware contract (`foc::CommandLimits`, wire scaling), with units in the
@@ -34,7 +36,7 @@ code is out of scope — the rules in `AGENTS.md` still apply to everything you 
 
 ### Visibility of system state (STATE)
 - Connection, node, contract compatibility, pending command and motor fault are visible at all times
-  (status bar), not only in a scrolling log.
+  (status bar, motor header), not only in a scrolling log. Every log line about a motor names the motor.
 - A displayed state comes from the device (ack/telemetry), not from what the user last clicked. Show a
   "requested…" state until the acknowledgement arrives.
 - Status colour follows `ui::theme::StatusLevel`: `Ok` healthy, `Warning` attention, `Fault` only for real

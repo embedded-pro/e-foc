@@ -1,6 +1,7 @@
 #pragma once
 
 #include "can-lite/client/CanProtocolClient.hpp"
+#include "core/can/CanFrameOrigin.hpp"
 #include "core/can/FocMotorCategoryClient.hpp"
 #include "core/can/FocMotorMessages.hpp"
 #include "core/foc/interfaces/Units.hpp"
@@ -34,9 +35,11 @@ namespace can
 
         services::CanProtocolClient& ProtocolClient();
         FocMotorCategoryClient& CategoryClient();
+        const FocMotorCategoryClient& CategoryClient() const;
 
     private:
         uint16_t nodeId;
+        CanFrameOriginTracker originTracker;
         services::CanProtocolClient protocolClient;
         FocMotorCategoryClient categoryClient;
     };

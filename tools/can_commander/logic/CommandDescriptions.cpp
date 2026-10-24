@@ -63,4 +63,25 @@ namespace tool
                 return "unknown acknowledgement";
         }
     }
+
+    std::string_view RejectionDescription(can::FocMotorCategoryError error)
+    {
+        switch (error)
+        {
+            case can::FocMotorCategoryError::busy:
+                return "rejected: the controller is busy, retry shortly";
+            case can::FocMotorCategoryError::persistenceFailed:
+                return "rejected: the value could not be stored";
+            case can::FocMotorCategoryError::modeMismatch:
+                return "rejected: not valid in the active control mode";
+            case can::FocMotorCategoryError::calibrationFailed:
+                return "rejected: calibration failed";
+            case can::FocMotorCategoryError::abortedByFault:
+                return "rejected: aborted by a motor fault";
+            case can::FocMotorCategoryError::applicationError:
+                return "rejected by the motor controller";
+            default:
+                return "rejected for an unknown reason";
+        }
+    }
 }
