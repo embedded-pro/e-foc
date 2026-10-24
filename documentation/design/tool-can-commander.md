@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.2.0
+version: 0.2.1
 component: "tool-can-commander"
 date: 2026-10-24
 ---
@@ -12,7 +12,7 @@ date: 2026-10-24
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.2.0                |
+| Version   | 0.2.1                |
 | Component | tool-can-commander   |
 | Date      | 2026-10-24           |
 
@@ -164,6 +164,13 @@ release tag is compared with the tool's own version as three numbers.
 The portable archives (Windows zip, Linux tar.gz) stay alongside the installers. The release workflow
 installs each package on a clean runner, checks the reported version against the project version, launches
 the tool, and uninstalls it before the release is published.
+
+Every release asset carries a build-provenance attestation, signed through Sigstore by the release
+workflow, so anyone can check that a file was built from this repository by its release workflow. Once the
+project's code signing is configured, the Windows executable is Authenticode-signed before packaging, so the
+portable archive and the installer carry the same signed binary, and the installer itself is signed too; the
+release check then requires both signatures to be valid. Until then the signing steps are skipped and releases
+are published unsigned.
 
 ---
 

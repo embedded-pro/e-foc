@@ -134,6 +134,9 @@ jobs:
     needs: release_please
     if: needs.release_please.outputs.build == 'true'
     runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: write
     steps:
       - name: Configure Git
         run: |
@@ -160,6 +163,38 @@ jobs:
           -DNUMERICAL_TOOLBOX_ENABLE_OPTIMIZATIONS=Off
       - name: Build
         run: cmake --build build --target e_foc.tool.simulator e_foc.tool.can_commander
+      - name: Stage CAN Commander executable for signing
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: bash
+        run: |
+          mkdir -p signing/executable
+          exe=$(find build/tools -name "e-foc-can-commander.exe" -type f | head -n 1)
+          test -n "$exe"
+          cp "$exe" signing/executable/
+          echo "CAN_COMMANDER_EXE=$exe" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        id: unsigned-executable
+        with:
+          name: unsigned-can-commander-executable
+          path: signing/executable/e-foc-can-commander.exe
+          if-no-files-found: error
+      - name: Sign CAN Commander executable
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'e-foc' }}
+          signing-policy-slug: ${{ inputs.dry_run && (vars.SIGNPATH_TEST_POLICY_SLUG || 'test-signing') || (vars.SIGNPATH_RELEASE_POLICY_SLUG || 'release-signing') }}
+          artifact-configuration-slug: can-commander-executable
+          github-artifact-id: ${{ steps.unsigned-executable.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signing/executable-signed
+      - name: Use the signed CAN Commander executable
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: bash
+        run: cp signing/executable-signed/e-foc-can-commander.exe "$CAN_COMMANDER_EXE"
       - name: Package simulator
         shell: bash
         run: |
@@ -192,15 +227,59 @@ jobs:
           cpack --config build/tools/can_commander/installer/CPackConfig.cmake -C Release -G NSIS \
             -B "$PWD/installer" -D CPACK_PACKAGE_FILE_NAME="e_foc-can_commander-${version}-windows-x86_64-setup"
           mv "installer/e_foc-can_commander-${version}-windows-x86_64-setup.exe" .
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        id: unsigned-installer
+        with:
+          name: unsigned-can-commander-installer
+          path: e_foc-can_commander-*-windows-x86_64-setup.exe
+          if-no-files-found: error
+      - name: Sign CAN Commander installer
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'e-foc' }}
+          signing-policy-slug: ${{ inputs.dry_run && (vars.SIGNPATH_TEST_POLICY_SLUG || 'test-signing') || (vars.SIGNPATH_RELEASE_POLICY_SLUG || 'release-signing') }}
+          artifact-configuration-slug: can-commander-installer
+          github-artifact-id: ${{ steps.unsigned-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signing/installer-signed
+      - name: Use the signed CAN Commander installer
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: bash
+        run: cp signing/installer-signed/e_foc-can_commander-*-windows-x86_64-setup.exe .
+      - name: Delete unsigned artifacts
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for id in "${{ steps.unsigned-executable.outputs.artifact-id }}" "${{ steps.unsigned-installer.outputs.artifact-id }}"; do
+            gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$id"
+          done
       - name: Verify CAN Commander installer
         shell: pwsh
+        env:
+          SIGNING_ENABLED: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+          RELEASE_SIGNING: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' && !inputs.dry_run }}
         run: |
           $version = "${{ needs.release_please.outputs.version }}"
           $expected = (Select-String -Path CMakeLists.txt -Pattern '^project\(e_foc .*VERSION ([0-9.]+)\)').Matches[0].Groups[1].Value
           $target = "C:\efoc-can-commander-test"
-          Start-Process -FilePath ".\e_foc-can_commander-$version-windows-x86_64-setup.exe" -ArgumentList "/S", "/D=$target" -Wait
+          $installer = ".\e_foc-can_commander-$version-windows-x86_64-setup.exe"
+          Start-Process -FilePath $installer -ArgumentList "/S", "/D=$target" -Wait
           $exe = Join-Path $target "bin\e-foc-can-commander.exe"
           if (-not (Test-Path $exe)) { throw "installer did not install $exe" }
+          if ($env:SIGNING_ENABLED -eq 'true') {
+            foreach ($file in @($installer, $exe)) {
+              $signature = Get-AuthenticodeSignature $file
+              Write-Output "$file signed by $($signature.SignerCertificate.Subject): $($signature.Status)"
+              if ($null -eq $signature.SignerCertificate) { throw "$file is not signed" }
+              if ($env:RELEASE_SIGNING -eq 'true' -and $signature.Status -ne 'Valid') { throw "$file signature is $($signature.Status)" }
+            }
+          }
           if (-not (Test-Path (Join-Path $target "bin\Qt6Widgets.dll"))) { throw "installer did not deploy the Qt runtime" }
           $info = (Get-Item $exe).VersionInfo
           Write-Output "$($info.ProductName) $($info.ProductVersion)"
@@ -371,6 +450,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -414,6 +495,18 @@ jobs:
             echo "::error::documentation PDFs left outside the zip"
             exit 1
           fi
+      - name: Attest release asset provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: release-assets/*
+      - name: Verify release asset provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${{ needs.release_please.outputs.version }}"
+          for asset in "e_foc-can_commander-${v}-windows-x86_64-setup.exe" "e_foc-can_commander-${v}-linux-x86_64.deb"; do
+            gh attestation verify "release-assets/$asset" --repo "${{ github.repository }}"
+          done
       - name: Upload release assets
         if: needs.release_please.outputs.release_created == 'true'
         env:
