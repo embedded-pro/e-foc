@@ -158,7 +158,7 @@ release tag is compared with the tool's own version as three numbers.
 
 | Platform | Package | Installs | Notes |
 |----------|---------|----------|-------|
-| Windows x86-64 | `e_foc-can_commander-<tag>-windows-x86_64-setup.exe` | Program Files\e-foc CAN Commander, Start-menu and desktop shortcuts, uninstaller, Add/Remove Programs entry | Qt runtime included, MSVC runtime installed when bundled; an existing installation is removed first |
+| Windows x86-64 | `e_foc-can_commander-<tag>-windows-x86_64-setup.exe` | `Program Files\e-foc CAN Commander`, Start-menu and desktop shortcuts, uninstaller, Add/Remove Programs entry | Qt runtime included, MSVC runtime installed when bundled; an existing installation is removed first |
 | Debian/Ubuntu x86-64 | `e_foc-can_commander-<tag>-linux-x86_64.deb` | the `e-foc-can-commander` command, a desktop entry and icons | Qt libraries and platform plugins declared as package dependencies; built on Ubuntu 24.04, so it needs a distribution of that generation or newer |
 
 The portable archives (Windows zip, Linux tar.gz) stay alongside the installers. The release workflow

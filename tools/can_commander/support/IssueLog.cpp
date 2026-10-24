@@ -120,10 +120,13 @@ namespace tool
     void IssueLog::Open()
     {
         file.setFileName(FilePath());
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
-            return;
+        if (OpenForAppend())
+            RotateIfNeeded();
+    }
 
-        RotateIfNeeded();
+    bool IssueLog::OpenForAppend()
+    {
+        return file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
     }
 
     void IssueLog::RotateIfNeeded()
@@ -136,7 +139,7 @@ namespace tool
         for (int index = config.keptFiles - 2; index >= 0; --index)
             QFile::rename(RotatedPath(index), RotatedPath(index + 1));
 
-        file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+        OpenForAppend();
     }
 
     void IssueLog::Remember(const QString& line)

@@ -47,6 +47,7 @@ namespace tool
     private:
         QString RotatedPath(int index) const;
         void Open();
+        bool OpenForAppend();
         void RotateIfNeeded();
         void Remember(const QString& line);
 
