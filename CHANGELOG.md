@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0](https://github.com/embedded-pro/e-foc/compare/v1.1.0...v1.2.0) (2026-10-24)
+
+
+### Features
+
+* **can_commander:** Install updates from inside the tool and restart ([#423](https://github.com/embedded-pro/e-foc/issues/423)) ([efe6db6](https://github.com/embedded-pro/e-foc/commit/efe6db6a45a3b4ad2111020d028924cbae945760))
+* **can_commander:** Use can-lite's host drivers for slcan, candleLight, PCAN and Kvaser ([#425](https://github.com/embedded-pro/e-foc/issues/425)) ([c8b35c4](https://github.com/embedded-pro/e-foc/commit/c8b35c476fe7864fa7056d5e04678967791a889c))
+
+
+### Continuous Integration
+
+* **release:** Attest release provenance and sign Windows installers through SignPath ([#422](https://github.com/embedded-pro/e-foc/issues/422)) ([9cef04f](https://github.com/embedded-pro/e-foc/commit/9cef04fc58e75191be66fb3f9af8f8bbf1bce3b3))
+
 ## [1.1.0](https://github.com/embedded-pro/e-foc/compare/v1.0.0...v1.1.0) (2026-10-24)
 
 
