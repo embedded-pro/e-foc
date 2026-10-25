@@ -55,7 +55,7 @@ The tool is split so that everything but widget layout can be tested without a d
 - **Logic** — the command client, one for the whole bus. Every command names its node and every report says
   which node sent it. Per node it tracks: online (a frame was seen; offline after the protocol's 3 s server
   timeout or when the bus closes), firmware compatibility, and the last command sent until that command is
-  acknowledged, rejected or times out after 2 s (two minutes for alignment and identification). A newer
+  acknowledged, rejected or times out after 2 s (two minutes for alignment, identification and calibration). A newer
   command — typically the emergency stop — takes over the slot and restarts the timeout; an acknowledgement
   of an older command no longer ends it. A command the client refuses locally leaves the slot untouched.
   Closing the bus ends every pending command and reports every node offline at once. The client also reads
@@ -482,7 +482,7 @@ sequenceDiagram
 | Constraint             | Value / Description                                                                                  |
 |------------------------|------------------------------------------------------------------------------------------------------|
 | Motors per bus         | 8 (the servers `can-lite` tracks)                                                                    |
-| Command answer timeout | 2 s per node, restarted by every newer command; 120 s for Align and identification                   |
+| Command answer timeout | 2 s per node, restarted by every newer command; 120 s for Align, identification and Calibrate        |
 | Parameter reads        | one outstanding per node, 1 s each, never marking the node busy                                      |
 | Status reads           | each compatible node every 1 s and after every accepted command                                      |
 | Node offline after     | 3 s without a frame (`can-lite` server timeout)                                                      |

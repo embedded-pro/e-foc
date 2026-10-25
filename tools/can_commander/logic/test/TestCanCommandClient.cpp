@@ -984,6 +984,21 @@ TEST_F(TestCanCommandClient, an_accepted_calibration_reads_the_settings_and_diag
     EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
 }
 
+TEST_F(TestCanCommandClient, a_cleared_calibration_reads_the_settings_and_diagnostics_again)
+{
+    RecordSends();
+    BringCompatible(1, 2);
+    AnswerAllReads();
+    client.SendClearCalibration(1);
+    sent.clear();
+
+    EXPECT_CALL(observer, OnCommandAck(1, can::focMotorCategoryId, can::focClearCalibrationId, services::CanAckStatus::success));
+    DeliverAck(can::focClearCalibrationId);
+    AnswerAllReads();
+
+    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+}
+
 TEST_F(TestCanCommandClient, cleared_statistics_are_read_again)
 {
     RecordSends();

@@ -8,7 +8,7 @@ namespace tool
 {
     namespace
     {
-        constexpr const char* calibrateHint = "Run the whole calibration: current offsets, pole pairs, resistance and inductance, alignment and, in speed and position mode, the mechanical identification";
+        constexpr const char* calibrateHint = "Run the whole calibration: current offsets, pole pairs, resistance and inductance, alignment and, in speed and position mode, the mechanical identification and the cogging map";
         constexpr const char* clearCalibrationHint = "Forget the stored calibration record; the motor has to be calibrated again before it can start";
     }
 
@@ -35,7 +35,7 @@ namespace tool
         auto* group = new QGroupBox("Commissioning");
         auto* layout = new QVBoxLayout(group);
 
-        auto* warning = new QLabel("These actions move the rotor: keep the shaft free and clear of people. "
+        auto* warning = new QLabel("Aligning, identifying and calibrating move the rotor: keep the shaft free and clear of people. "
                                    "Each one answers when it finishes, which can take up to two minutes.");
         warning->setWordWrap(true);
         ui::backend::qt::StyleStatusLabel(*warning, ui::theme::StatusLevel::Warning);

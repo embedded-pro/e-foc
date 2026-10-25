@@ -430,7 +430,7 @@ namespace tool
     QString MotorPanel::DiagnosticsUnavailableReason() const
     {
         if (client.Compatibility(nodeId) == can::ContractCompatibility::compatible && !client.SupportsDiagnostics(nodeId))
-            return QString("Needs firmware contract 2.2 or newer: this controller has %1.").arg(contractVersion);
+            return QString("Needs firmware contract 2.2 or newer: this controller has %1.").arg(contractVersion.isEmpty() ? QString("?") : contractVersion);
         return {};
     }
 

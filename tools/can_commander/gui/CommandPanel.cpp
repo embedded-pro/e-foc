@@ -44,7 +44,7 @@ namespace tool
         tabs->addTab(controllers, "C&ontrollers");
         tabs->addTab(motorParameters, "Motor &Parameters");
         tabs->addTab(configuration, "Confi&guration");
-        tabs->addTab(diagnostics, "Diagnosti&cs");
+        tabs->addTab(diagnostics, "Diagnostics");
         layout->addWidget(tabs, 1);
     }
 
