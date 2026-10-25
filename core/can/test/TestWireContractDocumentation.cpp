@@ -198,6 +198,6 @@ TEST(WireContractDocumentation, the_algorithm_and_parameter_messages_are_documen
 {
     const auto document = DesignDocument();
 
-    for (const auto* name : { "SelectAlgorithm", "QueryAlgorithms", "SetParameter", "QueryParameter", "AlgorithmsResponse", "ParameterResponse", "invalidParameters" })
+    for (const auto* name : { "SelectAlgorithm", "QueryAlgorithms", "SetParameter", "QueryParameter", "AlgorithmsResponse", "ParameterResponse", "invalidParameters", "Calibrate", "ClearCalibration", "ClearDiagnostics" })
         EXPECT_NE(std::string::npos, document.find(name)) << name;
 }

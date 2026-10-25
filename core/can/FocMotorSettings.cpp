@@ -41,6 +41,27 @@ namespace can
             case FocParameter::canNodeId:
             case FocParameter::canBitrate:
                 return ParameterGroup::startup;
+            case FocParameter::currentOffsetA:
+            case FocParameter::currentOffsetB:
+            case FocParameter::currentOffsetC:
+            case FocParameter::coggingPeak:
+                return ParameterGroup::calibrationRecord;
+            case FocParameter::estimatedResistance:
+            case FocParameter::estimatedInductance:
+            case FocParameter::estimatedInertia:
+            case FocParameter::estimatedViscousFriction:
+                return ParameterGroup::onlineEstimate;
+            case FocParameter::loopSamples:
+            case FocParameter::loopBudgetCycles:
+            case FocParameter::loopMinimumCycles:
+            case FocParameter::loopAverageCycles:
+            case FocParameter::loopMaximumCycles:
+            case FocParameter::loopOverruns:
+            case FocParameter::loopDeadlineMisses:
+            case FocParameter::loopReentries:
+                return ParameterGroup::loopStatistics;
+            case FocParameter::resetCause:
+                return ParameterGroup::platform;
             default:
                 return ParameterGroup::motor;
         }

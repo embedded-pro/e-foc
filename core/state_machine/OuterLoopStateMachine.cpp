@@ -101,6 +101,16 @@ namespace application
         GetTracer().Trace() << "[EST] Elec: R=" << GetOnlineElecEstimator().CurrentResistance().Value() << " L_mH=" << GetOnlineElecEstimator().CurrentInductance().Value();
     }
 
+    std::optional<state_machine::OnlineEstimates> OuterLoopStateMachine::CurrentOnlineEstimates()
+    {
+        return state_machine::OnlineEstimates{
+            GetOnlineElecEstimator().CurrentResistance(),
+            GetOnlineElecEstimator().CurrentInductance(),
+            GetOnlineMechEstimator().CurrentInertia(),
+            GetOnlineMechEstimator().CurrentFriction()
+        };
+    }
+
     state_machine::AppliedEstimates OuterLoopStateMachine::ApplyOnlineEstimates()
     {
         state_machine::AppliedEstimates applied;

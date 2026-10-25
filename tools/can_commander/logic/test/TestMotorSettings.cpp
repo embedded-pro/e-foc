@@ -2,6 +2,7 @@
 #include "core/can/FocMotorWireContract.hpp"
 #include "tools/can_commander/logic/MotorSettings.hpp"
 #include "gtest/gtest.h"
+#include <algorithm>
 #include <vector>
 
 namespace
@@ -63,6 +64,24 @@ TEST_F(TestMotorSettings, splits_the_parameters_into_loops_motor_and_startup)
     EXPECT_EQ(FocParameter::viscousFriction, MotorParameterSettings().back().parameter);
     EXPECT_EQ(FocParameter::encoderResolution, StartupSettings().front().parameter);
     EXPECT_EQ(FocParameter::canBitrate, StartupSettings().back().parameter);
+    EXPECT_EQ(FocParameter::currentOffsetA, Readings().front().parameter);
+    EXPECT_EQ(FocParameter::resetCause, Readings().back().parameter);
+}
+
+TEST_F(TestMotorSettings, offers_for_editing_only_what_the_controller_accepts_and_reads_out_the_rest)
+{
+    const auto readOnly = [](const SettingPresentation& setting)
+    {
+        const auto descriptor = can::FindParameter(setting.parameter);
+        return descriptor.has_value() && descriptor->readOnly;
+    };
+
+    for (const auto loop : { FocControlLoop::current, FocControlLoop::speed, FocControlLoop::position })
+        EXPECT_TRUE(std::ranges::none_of(LoopSettings(loop), readOnly));
+    EXPECT_TRUE(std::ranges::none_of(MotorParameterSettings(), readOnly));
+    EXPECT_TRUE(std::ranges::none_of(StartupSettings(), readOnly));
+    EXPECT_TRUE(std::ranges::all_of(Readings(), readOnly));
+    EXPECT_EQ(can::focParameters.size(), LoopSettings(FocControlLoop::current).size() + LoopSettings(FocControlLoop::speed).size() + LoopSettings(FocControlLoop::position).size() + MotorParameterSettings().size() + StartupSettings().size() + Readings().size());
 }
 
 TEST_F(TestMotorSettings, each_mode_runs_its_loops)

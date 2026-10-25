@@ -2,7 +2,7 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.5.0
+version: 0.5.1
 component: "tool-can-commander"
 date: 2026-10-25
 ---
@@ -12,7 +12,7 @@ date: 2026-10-25
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.5.0                |
+| Version   | 0.5.1                |
 | Component | tool-can-commander   |
 | Date      | 2026-10-25           |
 
@@ -143,7 +143,8 @@ disabled, with the reason, until its tab is closed.
 The settings tabs show what the node holds, not what was last typed. A node whose firmware contract is 2.1
 or newer is read completely when it is found compatible, and again after a mode change (accepted or
 refused), a controller change, an identification, an alignment, applied motor parameters, a refused
-setting or a Revert: the active mode and the algorithm of every loop, then every numbered parameter. Reads
+setting or a Revert: the active mode and the algorithm of every loop, then every numbered parameter the
+operator can set — the read-only values of contract 2.2 are readings, not settings, and are not read here. Reads
 go one at a time, because the CAN send queue holds six frames; they do not make the node busy and are not
 logged one by one. A read that is not answered leaves "—".
 
@@ -432,7 +433,7 @@ sequenceDiagram
     Node-->>Client: Contract version
     Client->>Window: Node 3 compatible
     Note over Window: Motor 3 commands enabled
-    loop One read at a time (2.1: algorithms and every parameter, then status)
+    loop One read at a time (2.1: algorithms and every settable parameter, then status)
         Client->>Node: Read
         Node-->>Client: Value in force
         Client->>Window: Show value

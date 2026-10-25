@@ -44,12 +44,32 @@ namespace can
         incompatible
     };
 
+    class NodeContracts
+    {
+    public:
+        static constexpr std::size_t maxTracked{ 8 };
+
+        ContractCompatibility Of(uint16_t nodeId) const;
+        bool Incompatible(uint16_t nodeId) const;
+        void Record(uint16_t nodeId, ContractCompatibility compatibility);
+
+    private:
+        struct NodeContract
+        {
+            uint16_t nodeId{ 0 };
+            ContractCompatibility compatibility{ ContractCompatibility::unknown };
+        };
+
+        std::array<NodeContract, maxTracked> contracts{};
+        std::size_t nextEvicted{ 0 };
+    };
+
     class FocMotorCategoryClient
         : public services::CanCategoryClient
         , public infra::Subject<FocMotorCategoryClientObserver>
     {
     public:
-        static constexpr std::size_t maxTrackedNodes{ 8 };
+        static constexpr std::size_t maxTrackedNodes{ NodeContracts::maxTracked };
 
         FocMotorCategoryClient(services::CanFrameTransport& transport, services::CanSequenceSource& sequenceSource, const CanFrameOrigin& origin);
 
@@ -77,19 +97,11 @@ namespace can
         bool SendQueryAlgorithms(uint16_t targetNodeId);
         bool SendSetParameter(uint16_t targetNodeId, FocParameter parameter, float value);
         bool SendQueryParameter(uint16_t targetNodeId, FocParameter parameter);
+        bool SendMaintenanceCommand(uint16_t targetNodeId, FocMaintenanceCommand command);
 
         ContractCompatibility Compatibility(uint16_t nodeId) const;
 
     private:
-        struct NodeContract
-        {
-            uint16_t nodeId{ 0 };
-            ContractCompatibility compatibility{ ContractCompatibility::unknown };
-        };
-
-        bool SendsRefused(uint16_t targetNodeId) const;
-        void RecordCompatibility(uint16_t nodeId, ContractCompatibility compatibility);
-
         bool HandleSelectControlModeResponse(const hal::Can::Message& data);
         bool HandleCategoryError(const hal::Can::Message& data);
         bool HandleTelemetryStatus(const hal::Can::Message& data);
@@ -111,7 +123,6 @@ namespace can
         services::CanMessageHandler<FocMotorCategoryClient> parameterResponse{ focParameterResponseId, *this, &FocMotorCategoryClient::HandleParameterResponse };
 
         const CanFrameOrigin& origin;
-        std::array<NodeContract, maxTrackedNodes> contracts{};
-        std::size_t nextEvicted{ 0 };
+        NodeContracts contracts;
     };
 }

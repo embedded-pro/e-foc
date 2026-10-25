@@ -14,7 +14,11 @@ namespace can
         speedLoop,
         positionLoop,
         motor,
-        startup
+        startup,
+        calibrationRecord,
+        onlineEstimate,
+        loopStatistics,
+        platform
     };
 
     ParameterGroup GroupOf(FocParameter parameter);

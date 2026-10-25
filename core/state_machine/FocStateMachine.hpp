@@ -8,6 +8,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <variant>
 
 namespace state_machine
@@ -92,6 +93,14 @@ namespace state_machine
         bool electrical{ false };
     };
 
+    struct OnlineEstimates
+    {
+        foc::Ohm resistance;
+        foc::MilliHenry inductance;
+        foc::NewtonMeterSecondSquared inertia;
+        foc::NewtonMeterSecondPerRadian viscousFriction;
+    };
+
     class FocStateMachineBase
     {
     protected:
@@ -114,6 +123,11 @@ namespace state_machine
         virtual AppliedEstimates ApplyOnlineEstimates()
         {
             return {};
+        }
+
+        virtual std::optional<OnlineEstimates> CurrentOnlineEstimates()
+        {
+            return std::nullopt;
         }
 
         virtual foc::MotionObservation ObserveMotion() const

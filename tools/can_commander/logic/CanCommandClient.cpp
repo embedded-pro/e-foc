@@ -267,7 +267,8 @@ namespace tool
 
         QueueRead(nodeId, Read{ can::focQueryAlgorithmsId });
         for (const auto& descriptor : can::focParameters)
-            QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
+            if (!descriptor.readOnly)
+                QueueRead(nodeId, Read{ can::focQueryParameterId, descriptor.id });
     }
 
     void CanCommandClient::RequestStatus(uint16_t nodeId)

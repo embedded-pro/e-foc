@@ -29,6 +29,9 @@ namespace can
     static constexpr uint8_t focQueryAlgorithmsId = 0x14;
     static constexpr uint8_t focSetParameterId = 0x15;
     static constexpr uint8_t focQueryParameterId = 0x16;
+    static constexpr uint8_t focCalibrateId = 0x17;
+    static constexpr uint8_t focClearCalibrationId = 0x18;
+    static constexpr uint8_t focClearDiagnosticsId = 0x19;
 
     static constexpr uint8_t focMotorTypeResponseId = 0x80;
     static constexpr uint8_t focElectricalParamsResponseId = 0x86;
@@ -133,7 +136,40 @@ namespace can
         viscousFriction = 0x45,
         encoderResolution = 0x60,
         canNodeId = 0x61,
-        canBitrate = 0x62
+        canBitrate = 0x62,
+        currentOffsetA = 0x80,
+        currentOffsetB = 0x81,
+        currentOffsetC = 0x82,
+        coggingPeak = 0x83,
+        estimatedResistance = 0x90,
+        estimatedInductance = 0x91,
+        estimatedInertia = 0x92,
+        estimatedViscousFriction = 0x93,
+        loopSamples = 0xA0,
+        loopBudgetCycles = 0xA1,
+        loopMinimumCycles = 0xA2,
+        loopAverageCycles = 0xA3,
+        loopMaximumCycles = 0xA4,
+        loopOverruns = 0xA5,
+        loopDeadlineMisses = 0xA6,
+        loopReentries = 0xA7,
+        resetCause = 0xB0
+    };
+
+    enum class FocResetCause : uint8_t
+    {
+        powerUp = 0,
+        brownOut = 1,
+        software = 2,
+        hardware = 3,
+        watchdog = 4
+    };
+
+    enum class FocMaintenanceCommand : uint8_t
+    {
+        calibrate = focCalibrateId,
+        clearCalibration = focClearCalibrationId,
+        clearDiagnostics = focClearDiagnosticsId
     };
 
     static constexpr uint8_t focParameterAutomaticFlag = 0x01;

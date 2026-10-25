@@ -1,8 +1,10 @@
 #pragma once
 
 #include "core/can/FocMotorCategoryServer.hpp"
+#include "core/can/FocMotorCommissioningBridge.hpp"
 #include "core/can/FocMotorSettingsBridge.hpp"
 #include "core/foc/interfaces/CommandLimits.hpp"
+#include "core/platform_abstraction/PlatformDiagnostics.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
@@ -19,11 +21,18 @@ namespace can
         : public FocMotorCategoryServerObserver
     {
     public:
+        struct Platform
+        {
+            const drivers::ThreePhaseInverter& inverter;
+            drivers::Encoder& encoder;
+            application::PlatformDiagnostics& diagnostics;
+            FocResetCause resetCause;
+        };
+
         FocMotorCanBridge(
             FocMotorCategoryServer& server,
             state_machine::ControlModeStateMachine& controlMode,
-            const drivers::ThreePhaseInverter& inverter,
-            drivers::Encoder& encoder,
+            const Platform& platform,
             services::ElectricalParametersIdentification& electricalIdent,
             services::MechanicalParametersIdentification* mechIdent,
             services::Tracer& tracer);
@@ -55,34 +64,25 @@ namespace can
         void OnQueryAlgorithms(const infra::Function<void(const FocAlgorithms&)>& onDone) override;
         void OnSetParameter(FocParameter parameter, float value, const infra::Function<void(FocParameterValue)>& onDone) override;
         void OnQueryParameter(FocParameter parameter, const infra::Function<void(FocParameterValue)>& onDone) override;
+        void OnCalibrate(const infra::Function<void(services::CanAckStatus)>& onDone) override;
+        void OnClearCalibration(const infra::Function<void(services::CanAckStatus)>& onDone) override;
+        void OnClearDiagnostics(const infra::Function<void()>& onDone) override;
 
     private:
         static FocFaultCode ToCanFaultCode(state_machine::FaultCode code);
         static FocMotorState ToCanMotorState(const state_machine::State& state, bool hasPartialCalibration);
 
-        void ReportCommandOutcome(uint8_t commandId, state_machine::CommandResult result,
-            const infra::Function<void(services::CanAckStatus)>& onDone);
         void ReportSelectFailure(state_machine::SelectResult result);
         bool SetpointRejected(uint8_t commandId, state_machine::ControlMode requiredMode, bool withinRange);
         bool SetpointAllowedInCurrentState() const;
-        bool ReserveCalibration(uint8_t commandId);
-        bool ElectricalIdentificationInProgress() const;
-        bool MechanicalIdentificationInProgress() const;
-        void FailElectricalIdentification(FocMotorCategoryError error);
 
         FocMotorCategoryServer& server;
         state_machine::ControlModeStateMachine& controlMode;
         const drivers::ThreePhaseInverter& inverter;
         drivers::Encoder& encoder;
-        services::ElectricalParametersIdentification& electricalIdent;
-        services::MechanicalParametersIdentification* mechIdent;
+        FocMotorCommissioningBridge commissioning;
         FocMotorSettingsBridge settings;
 
         infra::Function<void(FocMotorMode)> pendingSelectCallback;
-        infra::Function<void(services::CanAckStatus)> pendingAlignDoneCallback;
-        infra::Function<void()> pendingElectricalIdentDoneCallback;
-        infra::Function<void()> pendingMechIdentDoneCallback;
-        std::optional<foc::Ohm> pendingElectricalR;
-        std::optional<foc::MilliHenry> pendingElectricalL;
     };
 }

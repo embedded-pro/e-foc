@@ -7,6 +7,7 @@
 #include "tools/can_commander/logic/test/CanCommandClientObserverMock.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <algorithm>
 #include <bit>
 #include <limits>
 #include <set>
@@ -129,6 +130,26 @@ namespace
             for (const auto& frame : sent)
                 types.push_back(frame.messageType);
             return types;
+        }
+
+        static std::size_t WritableParameterCount()
+        {
+            return static_cast<std::size_t>(std::ranges::count_if(can::focParameters, [](const can::ParameterDescriptor& descriptor)
+                {
+                    return !descriptor.readOnly;
+                }));
+        }
+
+        bool QueriedAReadOnlyParameter() const
+        {
+            return std::ranges::any_of(sent, [](const SentFrame& frame)
+                {
+                    if (frame.messageType != can::focQueryParameterId || frame.payload.size() < 2)
+                        return false;
+
+                    const auto descriptor = can::FindParameter(frame.payload[1]);
+                    return descriptor.has_value() && descriptor->readOnly;
+                });
         }
 
         std::size_t Count(uint8_t messageType) const
@@ -706,7 +727,8 @@ TEST_F(TestCanCommandClient, a_2_1_node_is_read_completely_and_then_its_status)
     AnswerAllReads();
 
     EXPECT_EQ(1u, Count(can::focQueryAlgorithmsId));
-    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+    EXPECT_EQ(WritableParameterCount(), Count(can::focQueryParameterId));
+    EXPECT_FALSE(QueriedAReadOnlyParameter());
     EXPECT_EQ(can::focRequestTelemetryId, sent.back().messageType);
 }
 
@@ -811,7 +833,7 @@ TEST_F(TestCanCommandClient, an_accepted_alignment_reads_the_settings_again)
     DeliverAck(can::focAlignId);
     AnswerAllReads();
 
-    EXPECT_EQ(can::focParameters.size(), Count(can::focQueryParameterId));
+    EXPECT_EQ(WritableParameterCount(), Count(can::focQueryParameterId));
 }
 
 TEST_F(TestCanCommandClient, an_accepted_command_reads_the_status)

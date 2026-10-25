@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.4.0
+version: 0.5.0
 component: can-service
 date: 2026-10-25
 ---
@@ -12,7 +12,7 @@ date: 2026-10-25
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.4.0                    |
+| Version   | 0.5.0                    |
 | Component | can-service              |
 | Date      | 2026-10-25               |
 
@@ -200,25 +200,25 @@ The read-only parameters answer `QueryParameter` like any other and are refused 
 `invalidPayload`. Counts travel as the float of the count, exact up to 2²⁴ (about fourteen minutes of
 control periods at 20 kHz) and rounded beyond.
 
-| ID     | Parameter                  | Unit     | Value                                                                                        |
-|--------|----------------------------|----------|----------------------------------------------------------------------------------------------|
-| `0x80` | `currentOffsetA`           | A        | Phase A current-sensor offset in the calibration record                                      |
-| `0x81` | `currentOffsetB`           | A        | Phase B current-sensor offset in the calibration record                                      |
-| `0x82` | `currentOffsetC`           | A        | Phase C current-sensor offset in the calibration record                                      |
-| `0x83` | `coggingPeak`              | Nm       | Peak of the stored cogging map; `0` when the record holds none                               |
-| `0x90` | `estimatedResistance`      | ohm      | Online estimate; `0` while the active mode runs no estimator or it has none                  |
-| `0x91` | `estimatedInductance`      | mH       | Online estimate, as above                                                                    |
-| `0x92` | `estimatedInertia`         | kg.m2    | Online estimate, as above                                                                    |
-| `0x93` | `estimatedViscousFriction` | Nm.s/rad | Online estimate, as above                                                                    |
-| `0xA0` | `loopSamples`              | -        | Control periods measured since the statistics were last reset                                |
-| `0xA1` | `loopBudgetCycles`         | cycles   | Cycles one control period allows                                                             |
-| `0xA2` | `loopMinimumCycles`        | cycles   | Shortest control-interrupt execution                                                         |
-| `0xA3` | `loopAverageCycles`        | cycles   | Mean control-interrupt execution                                                             |
-| `0xA4` | `loopMaximumCycles`        | cycles   | Longest control-interrupt execution                                                          |
-| `0xA5` | `loopOverruns`             | -        | Executions longer than the budget                                                            |
-| `0xA6` | `loopDeadlineMisses`       | -        | Periods whose interrupt started late                                                         |
-| `0xA7` | `loopReentries`            | -        | Interrupts that arrived while the previous one ran                                           |
-| `0xB0` | `resetCause`               | -        | Cause of the last reset: `powerUp 0`, `brownOut 1`, `software 2`, `hardware 3`, `watchdog 4` |
+| ID     | Parameter                  | Unit     | Value                                                                                        | Automatic |
+|--------|----------------------------|----------|----------------------------------------------------------------------------------------------|-----------|
+| `0x80` | `currentOffsetA`           | A        | Phase A current-sensor offset in the calibration record                                      | no        |
+| `0x81` | `currentOffsetB`           | A        | Phase B current-sensor offset in the calibration record                                      | no        |
+| `0x82` | `currentOffsetC`           | A        | Phase C current-sensor offset in the calibration record                                      | no        |
+| `0x83` | `coggingPeak`              | Nm       | Peak of the stored cogging map; `0` when the record holds none                               | no        |
+| `0x90` | `estimatedResistance`      | ohm      | Online estimate; `0` while the active mode runs no estimator or it has none                  | no        |
+| `0x91` | `estimatedInductance`      | mH       | Online estimate, as above                                                                    | no        |
+| `0x92` | `estimatedInertia`         | kg.m2    | Online estimate, as above                                                                    | no        |
+| `0x93` | `estimatedViscousFriction` | Nm.s/rad | Online estimate, as above                                                                    | no        |
+| `0xA0` | `loopSamples`              | -        | Control periods measured since the statistics were last reset                                | no        |
+| `0xA1` | `loopBudgetCycles`         | cycles   | Cycles one control period allows                                                             | no        |
+| `0xA2` | `loopMinimumCycles`        | cycles   | Shortest control-interrupt execution                                                         | no        |
+| `0xA3` | `loopAverageCycles`        | cycles   | Mean control-interrupt execution                                                             | no        |
+| `0xA4` | `loopMaximumCycles`        | cycles   | Longest control-interrupt execution                                                          | no        |
+| `0xA5` | `loopOverruns`             | -        | Executions longer than the budget                                                            | no        |
+| `0xA6` | `loopDeadlineMisses`       | -        | Periods whose interrupt started late                                                         | no        |
+| `0xA7` | `loopReentries`            | -        | Interrupts that arrived while the previous one ran                                           | no        |
+| `0xB0` | `resetCause`               | -        | Cause of the last reset: `powerUp 0`, `brownOut 1`, `software 2`, `hardware 3`, `watchdog 4` | no        |
 
 Physical-to-wire conversions use fixed-point scale factors. `int16` fields round to nearest and
 saturate (`CanFrameCodec::FloatToFixed16`). Friction and inertia of the reference motors are around
@@ -256,6 +256,7 @@ documentation. Because every decode is length-exact, a frame built from the exam
 | `0x12` / `0x92`               | contract version query and response         | absent                 | the example has no versioning                                                                |
 | `0x13`–`0x16`, `0x93`, `0x96` | algorithm selection and numbered parameters | absent                 | the example has one fixed law per loop and no parameter access                               |
 | category error `6`            | `invalidParameters`                         | absent                 | a model-based algorithm or setting can be refused for the motor model it would run on        |
+| `0x17`–`0x19`, `0x80`–`0xB0`  | commissioning commands and read-only values | absent                 | a client commissions and diagnoses the drive without a serial connection                     |
 
 ### Part B — FocMotorCategoryServer
 
@@ -274,11 +275,22 @@ The observer interface provides callbacks for:
   contract's enumerations; the result callback sends `AlgorithmsResponse` and then the acknowledgement.
 - `OnSetParameter`, `OnQueryParameter` — receive a parameter number and, for a write, a value the server has
   already checked against the parameter table (finite, in range, whole where the parameter is an integer); the
-  result callback sends `ParameterResponse` and then the acknowledgement.
+  result callback sends `ParameterResponse` and then the acknowledgement. A write to a read-only parameter
+  never reaches the observer: the server refuses it as `invalidPayload`.
+- `OnCalibrate`, `OnClearCalibration` — commands without fields, with a `CanAckStatus` result callback that
+  is called when the sequence or the invalidation ends.
+- `OnClearDiagnostics` — a command without fields, with a completion callback.
+
+The commissioning handlers — `Align`, the two identifications, `Calibrate` and `ClearCalibration` — sit in
+one handler group of the server, so the server's own surface stays small as the contract grows.
 
 ### Part C — FocMotorCategoryClient
 
 Inherits `CanCategoryClient` from `can-lite`. Provides typed `Send*` methods that encode physical units into wire format via `CanPayloadWriter` and call `SendCommand(nodeId, messageType, payload)`.
+
+The three commands without fields that 2.2 adds — `Calibrate`, `ClearCalibration`, `ClearDiagnostics` — share
+one send method that takes the command; like every other send it is refused for a node whose major contract
+version differs.
 
 Registers response handlers for the server-to-client response message types. Response handlers decode the payload and invoke the corresponding observer callbacks, each naming the node that sent the response.
 
@@ -323,12 +335,27 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
   the bandwidth the firmware derived, flagged automatic, or `0` flagged automatic when the active mode does
   not run that loop), a motor parameter from the calibration record in RAM (`0` while unknown; an unset flux
   linkage reports the platform's default, flagged automatic), a start-up setting from the stored
-  configuration.
+  configuration. The read-only parameters report, never flagged automatic: the current offsets and the
+  cogging-map peak from the calibration record in RAM; the active mode's online estimates (`0` in torque
+  mode, which runs none); the control-loop statistics of `PlatformDiagnostics`; and the reset cause the
+  platform reported at start-up.
+- `OnCalibrate` → `CmdCalibrate` on the active mode's state machine, answered when the sequence ends: success,
+  `invalidState` when the drive is not stopped, the category error the sequence ended with otherwise.
+- `OnClearCalibration` → `CmdClearCalibration`, answered once the record is invalidated and the drive is back
+  in `Idle`; a record that cannot be invalidated faults the drive and answers `persistenceFailed`.
+  Either command arriving while the other one, another non-volatile write, a mode selection or a setting is
+  outstanding is answered `busy`.
+- `OnClearDiagnostics` → `PlatformDiagnostics::Reset()`, which restarts the control-loop and CAN statistics;
+  always succeeds.
 
 The settings callbacks — the PID bandwidth commands, `OnSetEncoderResolution`, `OnConfigureTelemetryRate`,
-`OnSelectAlgorithm`, `OnQueryAlgorithms`, `OnSetParameter` and `OnQueryParameter` — are forwarded to
-`FocMotorSettingsBridge`, which the bridge owns. It holds the one outstanding setting at a time, so a settings
-write that arrives while another is being stored is answered `busy`, whichever message carried it.
+`OnSelectAlgorithm`, `OnQueryAlgorithms`, `OnSetParameter`, `OnQueryParameter` and `OnClearDiagnostics` — are
+forwarded to `FocMotorSettingsBridge`, which the bridge owns. It holds the one outstanding setting at a time,
+so a settings write that arrives while another is being stored is answered `busy`, whichever message carried
+it. The commissioning callbacks — `OnAlign`, the identifications, `OnCalibrate` and `OnClearCalibration` — are
+forwarded to `FocMotorCommissioningBridge`, which the bridge also owns and which holds each one's outstanding
+answer. The bridge takes the platform it reads from as one argument: the inverter and encoder, the platform
+diagnostics, and the reset cause.
 
 The bridge validates that the correct control mode is active before accepting a setpoint command. An out-of-range setpoint results in `invalidPayload`. A mode mismatch results in `categoryError/modeMismatch`.
 
@@ -442,6 +469,7 @@ carries (`can-lite` tracks eight servers).
 | FocParameter          | parameter | enum uint8     | see the parameter table        | Numbers of `SetParameter`, `QueryParameter`, `ParameterResponse` |
 | Parameter value       | value     | float32 wire   | the parameter's range          | IEEE 754, most significant byte first                            |
 | ParameterResponse     | flags     | bitfield uint8 | bit 0: automatic               | Other bits are zero                                              |
+| FocResetCause         | cause     | enum uint8     | 0–4                            | Value of `resetCause`, sent as its float                         |
 
 ---
 

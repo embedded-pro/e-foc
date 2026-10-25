@@ -65,6 +65,9 @@ namespace
         MOCK_METHOD(void, OnQueryAlgorithms, ((const infra::Function<void(const can::FocAlgorithms&)>&)), (override));
         MOCK_METHOD(void, OnSetParameter, (can::FocParameter, float, (const infra::Function<void(can::FocParameterValue)>&)), (override));
         MOCK_METHOD(void, OnQueryParameter, (can::FocParameter, (const infra::Function<void(can::FocParameterValue)>&)), (override));
+        MOCK_METHOD(void, OnCalibrate, ((const infra::Function<void(services::CanAckStatus)>&)), (override));
+        MOCK_METHOD(void, OnClearCalibration, ((const infra::Function<void(services::CanAckStatus)>&)), (override));
+        MOCK_METHOD(void, OnClearDiagnostics, ((const infra::Function<void()>&)), (override));
     };
 
     class FocMotorCategoryServerTest
@@ -580,6 +583,14 @@ TEST_F(FocMotorCategoryServerTest, HandleSetParameter_ValueOutsideTheParameterDo
     EXPECT_FALSE(ackSpy.last.has_value());
 }
 
+TEST_F(FocMotorCategoryServerTest, HandleSetParameter_ReadOnlyParameter_IsRejected)
+{
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetParameterId, MakeParameterPayload(0x80, 0.0f)));
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetParameterId, MakeParameterPayload(0xA0, 1.0f)));
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetParameterId, MakeParameterPayload(0xB0, 0.0f)));
+    EXPECT_FALSE(ackSpy.last.has_value());
+}
+
 TEST_F(FocMotorCategoryServerTest, HandleSetParameter_UnknownParameter_IsRejected)
 {
     EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focSetParameterId, MakeParameterPayload(0x05, 1.0f)));
@@ -606,5 +617,74 @@ TEST_F(FocMotorCategoryServerTest, HandleQueryParameter_AnswersWithTheValueAndTh
 TEST_F(FocMotorCategoryServerTest, HandleQueryParameter_UnknownParameter_IsRejected)
 {
     EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focQueryParameterId, MakeMessage({ 0x01, 0x30 })));
+    EXPECT_FALSE(ackSpy.last.has_value());
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleQueryParameter_ReadOnlyParameter_AnswersWithTheReading)
+{
+    EXPECT_CALL(observer, OnQueryParameter(can::FocParameter::resetCause, _))
+        .WillOnce(Invoke([](can::FocParameter, const infra::Function<void(can::FocParameterValue)>& onDone)
+            {
+                onDone(can::FocParameterValue{ 4.0f, false });
+            }));
+
+    server.HandleMessage(can::focQueryParameterId, MakeMessage({ 0x01, 0xB0 }));
+
+    EXPECT_EQ(lastSentMsgType, can::focParameterResponseId);
+    EXPECT_EQ(lastSentMsg, MakeMessage({ 0xB0, 0x00, 0x40, 0x80, 0x00, 0x00 }));
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleCalibrate_AnswersWithTheStatusTheObserverReports)
+{
+    EXPECT_CALL(observer, OnCalibrate(_))
+        .WillOnce(Invoke([](const infra::Function<void(services::CanAckStatus)>& onDone)
+            {
+                onDone(services::CanAckStatus::invalidState);
+            }));
+
+    server.HandleMessage(can::focCalibrateId, MakePayload(1));
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->commandType, can::focCalibrateId);
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleClearCalibration_AnswersWithTheStatusTheObserverReports)
+{
+    EXPECT_CALL(observer, OnClearCalibration(_))
+        .WillOnce(Invoke([](const infra::Function<void(services::CanAckStatus)>& onDone)
+            {
+                onDone(services::CanAckStatus::success);
+            }));
+
+    server.HandleMessage(can::focClearCalibrationId, MakePayload(1));
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->commandType, can::focClearCalibrationId);
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCategoryServerTest, HandleClearDiagnostics_AcknowledgesOnceTheObserverIsDone)
+{
+    EXPECT_CALL(observer, OnClearDiagnostics(_))
+        .WillOnce(Invoke([](const infra::Function<void()>& onDone)
+            {
+                onDone();
+            }));
+
+    server.HandleMessage(can::focClearDiagnosticsId, MakePayload(1));
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->commandType, can::focClearDiagnosticsId);
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
+}
+
+TEST_F(FocMotorCategoryServerTest, MaintenanceCommands_WithAPayload_AreRejected)
+{
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focCalibrateId, MakeMessage({ 0x01, 0x00 })));
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focClearCalibrationId, MakeMessage({ 0x01, 0x00 })));
+    EXPECT_EQ(services::CanDispatchResult::rejected, server.HandleMessage(can::focClearDiagnosticsId, MakeMessage({ 0x01, 0x00 })));
     EXPECT_FALSE(ackSpy.last.has_value());
 }

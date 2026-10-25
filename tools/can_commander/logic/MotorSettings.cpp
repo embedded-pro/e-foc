@@ -31,8 +31,10 @@ namespace tool
         constexpr std::string_view ohm{ " \xCE\xA9" };
         constexpr std::string_view kilogramSquareMetre{ " kg\xC2\xB7m\xC2\xB2" };
         constexpr std::string_view frictionUnit{ " N\xC2\xB7m\xC2\xB7s/rad" };
+        constexpr std::string_view newtonMetre{ " N\xC2\xB7m" };
+        constexpr std::string_view cycles{ " cycles" };
 
-        constexpr std::array<SettingPresentation, 23> presentations{ {
+        constexpr std::array<SettingPresentation, 40> presentations{ {
             { FocParameter::currentBandwidth, "Current loop bandwidth", "Bandwidth:", radPerSecond,
                 "Closed-loop bandwidth of the current loop. Automatic takes it from the calibration record, or from the PWM rate without one.",
                 "Automatic", Uses({ Current::pid, Current::decoupledPid, Current::slidingMode }) },
@@ -73,10 +75,30 @@ namespace tool
             { FocParameter::encoderResolution, "Encoder resolution", "Encoder resolution:", " counts/rev", "Encoder counts per mechanical revolution.", {} },
             { FocParameter::canNodeId, "CAN node ID base", "CAN node ID base:", {}, "Base of the controller's CAN node ID; the board ID set by its jumpers is added to it.", {} },
             { FocParameter::canBitrate, "CAN bitrate", "CAN bitrate:", " bit/s", "Bitrate of the CAN bus.", {} },
+            { FocParameter::currentOffsetA, "Phase A current offset", "Phase A offset:", " A", "Current-sensor offset of phase A in the calibration record.", {} },
+            { FocParameter::currentOffsetB, "Phase B current offset", "Phase B offset:", " A", "Current-sensor offset of phase B in the calibration record.", {} },
+            { FocParameter::currentOffsetC, "Phase C current offset", "Phase C offset:", " A", "Current-sensor offset of phase C in the calibration record.", {} },
+            { FocParameter::coggingPeak, "Cogging torque peak", "Cogging peak:", newtonMetre, "Peak of the stored cogging map; 0 when the record holds none.", {} },
+            { FocParameter::estimatedResistance, "Estimated resistance", "Resistance:", ohm, "Online estimate of the phase resistance; 0 in torque mode, which runs no estimator.", {} },
+            { FocParameter::estimatedInductance, "Estimated inductance", "Inductance:", " mH", "Online estimate of the stator inductance; 0 in torque mode, which runs no estimator.", {} },
+            { FocParameter::estimatedInertia, "Estimated inertia", "Inertia:", kilogramSquareMetre, "Online estimate of the inertia of the rotor and its load; 0 in torque mode, which runs no estimator.", {} },
+            { FocParameter::estimatedViscousFriction, "Estimated viscous friction", "Viscous friction:", frictionUnit, "Online estimate of the viscous friction coefficient; 0 in torque mode, which runs no estimator.", {} },
+            { FocParameter::loopSamples, "Control loop samples", "Samples:", {}, "Control periods measured since the statistics were last cleared.", {} },
+            { FocParameter::loopBudgetCycles, "Control loop budget", "Budget:", cycles, "Cycles one control period allows.", {} },
+            { FocParameter::loopMinimumCycles, "Shortest control loop run", "Minimum:", cycles, "Shortest control-interrupt execution.", {} },
+            { FocParameter::loopAverageCycles, "Average control loop run", "Average:", cycles, "Mean control-interrupt execution.", {} },
+            { FocParameter::loopMaximumCycles, "Longest control loop run", "Maximum:", cycles, "Longest control-interrupt execution.", {} },
+            { FocParameter::loopOverruns, "Control loop overruns", "Overruns:", {}, "Executions longer than the budget.", {} },
+            { FocParameter::loopDeadlineMisses, "Control loop deadline misses", "Deadline misses:", {}, "Periods whose interrupt started late.", {} },
+            { FocParameter::loopReentries, "Control loop re-entries", "Re-entries:", {}, "Interrupts that arrived while the previous one still ran.", {} },
+            { FocParameter::resetCause, "Reset cause", "Reset cause:", {}, "Cause of the last reset of the controller.", {} },
         } };
 
         constexpr bool MatchesWireContract()
         {
+            if (presentations.size() != can::focParameters.size())
+                return false;
+
             for (std::size_t i = 0; i != presentations.size(); ++i)
                 if (presentations[i].parameter != can::focParameters[i].id)
                     return false;
@@ -236,6 +258,11 @@ namespace tool
     std::span<const SettingPresentation> StartupSettings()
     {
         return Slice(20, 3);
+    }
+
+    std::span<const SettingPresentation> Readings()
+    {
+        return Slice(23, 17);
     }
 
     const SettingPresentation& PresentationOf(can::FocParameter parameter)

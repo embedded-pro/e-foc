@@ -12,12 +12,13 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 
 namespace can
 {
     static constexpr uint8_t focContractVersionMajor = 2;
-    static constexpr uint8_t focContractVersionMinor = 1;
+    static constexpr uint8_t focContractVersionMinor = 2;
 
     enum class FieldType : uint8_t
     {
@@ -158,7 +159,7 @@ namespace can
         return MessageDescriptor{ id, name, direction, fields.data(), static_cast<uint8_t>(N) };
     }
 
-    inline constexpr std::array<MessageDescriptor, 23> focMotorMessages{ {
+    inline constexpr std::array<MessageDescriptor, 26> focMotorMessages{ {
         MakeDescriptor(focQueryMotorTypeId, "QueryMotorType", Direction::command),
         MakeDescriptor(focStartId, "Start", Direction::command),
         MakeDescriptor(focStopId, "Stop", Direction::command),
@@ -182,6 +183,9 @@ namespace can
         MakeDescriptor(focQueryAlgorithmsId, "QueryAlgorithms", Direction::command),
         MakeDescriptor(focSetParameterId, "SetParameter", Direction::command, setParameterFields),
         MakeDescriptor(focQueryParameterId, "QueryParameter", Direction::command, queryParameterFields),
+        MakeDescriptor(focCalibrateId, "Calibrate", Direction::command),
+        MakeDescriptor(focClearCalibrationId, "ClearCalibration", Direction::command),
+        MakeDescriptor(focClearDiagnosticsId, "ClearDiagnostics", Direction::command),
     } };
 
     inline constexpr std::array<MessageDescriptor, 10> focMotorResponses{ {
@@ -246,13 +250,16 @@ namespace can
         float maximum;
         bool integer;
         bool automatic;
+        bool readOnly{ false };
     };
 
     inline constexpr std::array<uint32_t, 4> focCanBitrates{ 125000, 250000, 500000, 1000000 };
     inline constexpr float focMaxEncoderResolution{ 16777216.0f };
     inline constexpr float focMaxCanNodeId{ 4095.0f };
 
-    inline constexpr std::array<ParameterDescriptor, 23> focParameters{ {
+    inline constexpr float focMaxReading{ std::numeric_limits<float>::max() };
+
+    inline constexpr std::array<ParameterDescriptor, 40> focParameters{ {
         { FocParameter::currentBandwidth, "currentBandwidth", "rad/s", foc::CommandLimits::minBandwidth, foc::CommandLimits::maxCurrentBandwidth, false, true },
         { FocParameter::currentSwitchingGain, "currentSwitchingGain", "A", 0.0f, foc::CommandLimits::maxSwitchingGain, false, false },
         { FocParameter::currentBoundaryLayer, "currentBoundaryLayer", "A", foc::CommandLimits::minBoundaryLayer, foc::CommandLimits::maxBoundaryLayer, false, false },
@@ -276,6 +283,23 @@ namespace can
         { FocParameter::encoderResolution, "encoderResolution", "counts/rev", 1.0f, focMaxEncoderResolution, true, false },
         { FocParameter::canNodeId, "canNodeId", "-", 1.0f, focMaxCanNodeId, true, false },
         { FocParameter::canBitrate, "canBitrate", "bit/s", 125000.0f, 1000000.0f, true, false },
+        { FocParameter::currentOffsetA, "currentOffsetA", "A", -focMaxReading, focMaxReading, false, false, true },
+        { FocParameter::currentOffsetB, "currentOffsetB", "A", -focMaxReading, focMaxReading, false, false, true },
+        { FocParameter::currentOffsetC, "currentOffsetC", "A", -focMaxReading, focMaxReading, false, false, true },
+        { FocParameter::coggingPeak, "coggingPeak", "Nm", 0.0f, focMaxReading, false, false, true },
+        { FocParameter::estimatedResistance, "estimatedResistance", "ohm", 0.0f, focMaxReading, false, false, true },
+        { FocParameter::estimatedInductance, "estimatedInductance", "mH", 0.0f, focMaxReading, false, false, true },
+        { FocParameter::estimatedInertia, "estimatedInertia", "kg.m2", 0.0f, focMaxReading, false, false, true },
+        { FocParameter::estimatedViscousFriction, "estimatedViscousFriction", "Nm.s/rad", 0.0f, focMaxReading, false, false, true },
+        { FocParameter::loopSamples, "loopSamples", "-", 0.0f, focMaxReading, true, false, true },
+        { FocParameter::loopBudgetCycles, "loopBudgetCycles", "cycles", 0.0f, focMaxReading, true, false, true },
+        { FocParameter::loopMinimumCycles, "loopMinimumCycles", "cycles", 0.0f, focMaxReading, true, false, true },
+        { FocParameter::loopAverageCycles, "loopAverageCycles", "cycles", 0.0f, focMaxReading, true, false, true },
+        { FocParameter::loopMaximumCycles, "loopMaximumCycles", "cycles", 0.0f, focMaxReading, true, false, true },
+        { FocParameter::loopOverruns, "loopOverruns", "-", 0.0f, focMaxReading, true, false, true },
+        { FocParameter::loopDeadlineMisses, "loopDeadlineMisses", "-", 0.0f, focMaxReading, true, false, true },
+        { FocParameter::loopReentries, "loopReentries", "-", 0.0f, focMaxReading, true, false, true },
+        { FocParameter::resetCause, "resetCause", "-", 0.0f, 4.0f, true, false, true },
     } };
 
     constexpr std::optional<ParameterDescriptor> FindParameter(uint8_t id)
@@ -294,6 +318,9 @@ namespace can
 
     inline bool IsAcceptableParameterValue(const ParameterDescriptor& descriptor, float value)
     {
+        if (descriptor.readOnly)
+            return false;
+
         if (descriptor.automatic && value == 0.0f)
             return true;
 
