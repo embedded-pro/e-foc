@@ -114,9 +114,17 @@ namespace can
         services::CanMessageHandler<FocMotorCategoryServer> queryMotorType{ focQueryMotorTypeId, *this, &FocMotorCategoryServer::HandleQueryMotorType };
         services::CanMessageHandler<FocMotorCategoryServer> configureTelemetryRate{ focConfigureTelemetryRateId, *this, &FocMotorCategoryServer::HandleConfigureTelemetryRate };
         services::CanMessageHandler<FocMotorCategoryServer> queryContractVersion{ focQueryContractVersionId, *this, &FocMotorCategoryServer::HandleQueryContractVersion };
-        services::CanMessageHandler<FocMotorCategoryServer> selectAlgorithm{ focSelectAlgorithmId, *this, &FocMotorCategoryServer::HandleSelectAlgorithm };
-        services::CanMessageHandler<FocMotorCategoryServer> queryAlgorithms{ focQueryAlgorithmsId, *this, &FocMotorCategoryServer::HandleQueryAlgorithms };
-        services::CanMessageHandler<FocMotorCategoryServer> setParameter{ focSetParameterId, *this, &FocMotorCategoryServer::HandleSetParameter };
-        services::CanMessageHandler<FocMotorCategoryServer> queryParameter{ focQueryParameterId, *this, &FocMotorCategoryServer::HandleQueryParameter };
+
+        struct SettingsMessages
+        {
+            explicit SettingsMessages(FocMotorCategoryServer& server);
+
+            services::CanMessageHandler<FocMotorCategoryServer> selectAlgorithm;
+            services::CanMessageHandler<FocMotorCategoryServer> queryAlgorithms;
+            services::CanMessageHandler<FocMotorCategoryServer> setParameter;
+            services::CanMessageHandler<FocMotorCategoryServer> queryParameter;
+        };
+
+        SettingsMessages settingsMessages{ *this };
     };
 }

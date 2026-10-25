@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <initializer_list>
+#include <limits>
 #include <utility>
 
 namespace tool
@@ -14,11 +15,11 @@ namespace tool
         using can::FocParameter;
 
         template<class Algorithm>
-        constexpr uint8_t Uses(std::initializer_list<Algorithm> algorithms)
+        constexpr uint32_t Uses(std::initializer_list<Algorithm> algorithms)
         {
-            uint8_t mask{ 0 };
+            uint32_t mask{ 0 };
             for (const auto algorithm : algorithms)
-                mask = static_cast<uint8_t>(mask | (1u << static_cast<unsigned>(algorithm)));
+                mask |= 1u << static_cast<unsigned>(algorithm);
             return mask;
         }
 
@@ -94,7 +95,7 @@ namespace tool
 
         std::vector<SettingChange>::iterator Find(std::vector<SettingChange>& changes, FocParameter parameter)
         {
-            return std::find_if(changes.begin(), changes.end(), [parameter](const SettingChange& change)
+            return std::ranges::find_if(changes, [parameter](const SettingChange& change)
                 {
                     return change.kind == SettingChange::Kind::parameter && change.parameter == parameter;
                 });
@@ -239,7 +240,7 @@ namespace tool
 
     const SettingPresentation& PresentationOf(can::FocParameter parameter)
     {
-        const auto presentation = std::find_if(presentations.begin(), presentations.end(), [parameter](const SettingPresentation& entry)
+        const auto presentation = std::ranges::find_if(presentations, [parameter](const SettingPresentation& entry)
             {
                 return entry.parameter == parameter;
             });
@@ -248,7 +249,7 @@ namespace tool
 
     bool IsUsedBy(const SettingPresentation& setting, uint8_t algorithm)
     {
-        return algorithm < 8 && (setting.usedBy & (1u << algorithm)) != 0;
+        return algorithm < std::numeric_limits<uint32_t>::digits && (setting.usedBy & (1u << algorithm)) != 0;
     }
 
     bool IsBandwidth(can::FocParameter parameter)

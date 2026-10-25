@@ -224,19 +224,20 @@ stateDiagram-v2
 
 **ConfigData** (76 bytes total):
 
-| Field                 | Physical unit | Description                                                                                                    |
-|-----------------------|---------------|----------------------------------------------------------------------------------------------------------------|
-| canNodeId             | —             | Base CAN node ID; board ID added at boot                                                                       |
-| canBaudrate           | bit/s         | CAN bus baud rate                                                                                              |
-| telemetryRateHz       | Hz            | Rate at which telemetry frames are sent                                                                        |
-| encoderResolution     | —             | Encoder counts per mechanical revolution                                                                       |
-| defaultControlMode    | —             | Control mode selected on power-up                                                                              |
-| currentAlgorithm      | —             | Current-loop algorithm selected on power-up                                                                    |
-| speedAlgorithm        | —             | Speed-loop algorithm selected on power-up                                                                      |
-| positionAlgorithm     | —             | Position-loop algorithm selected on power-up                                                                   |
-| current loop tunings  | rad/s, A, —   | Bandwidth (0 = automatic), switching gain, boundary layer, two-step deadbeat flag                              |
-| speed loop tunings    | rad/s, —, s   | Bandwidth (0 = automatic), speed error and integral weights, observer bandwidth ratio, reference time constant |
-| position loop tunings | rad/s, —, s   | Bandwidth (0 = automatic), position error, speed error and integral weights, reference time constant           |
+| Field                  | Physical unit | Description                                                                                                    |
+|------------------------|---------------|----------------------------------------------------------------------------------------------------------------|
+| canNodeId              | —             | Base CAN node ID; board ID added at boot                                                                       |
+| canBaudrate            | bit/s         | CAN bus baud rate                                                                                              |
+| telemetryRateHz        | Hz            | Rate at which telemetry frames are sent                                                                        |
+| encoderResolution      | —             | Encoder counts per mechanical revolution                                                                       |
+| currentLoop            | rad/s, A, —   | Bandwidth (0 = automatic), switching gain, boundary layer                                                      |
+| speedLoop              | rad/s, —, s   | Bandwidth (0 = automatic), speed error and integral weights, observer bandwidth ratio, reference time constant |
+| positionLoop           | rad/s, —, s   | Bandwidth (0 = automatic), position error, speed error and integral weights, reference time constant           |
+| defaultControlMode     | —             | Control mode selected on power-up                                                                              |
+| currentAlgorithm       | —             | Current-loop algorithm selected on power-up                                                                    |
+| speedAlgorithm         | —             | Speed-loop algorithm selected on power-up                                                                      |
+| positionAlgorithm      | —             | Position-loop algorithm selected on power-up                                                                   |
+| currentTwoStepDeadbeat | —             | Two-step variant of the deadbeat current law                                                                   |
 
 The tuning fields hold the operator's values as entered; a bandwidth of 0 asks the firmware to derive it.
 They are range-checked when they are written and again at boot, where a value outside its range — possible

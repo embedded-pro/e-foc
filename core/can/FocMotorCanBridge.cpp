@@ -1,7 +1,4 @@
 #include "core/can/FocMotorCanBridge.hpp"
-#include "core/can/FocMotorSettings.hpp"
-#include "core/foc/interfaces/CommandLimits.hpp"
-#include "core/foc/math/ParameterValidation.hpp"
 #include "core/foc/math/TorqueConstant.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
 #include <cmath>
@@ -25,6 +22,7 @@ namespace can
         , encoder(encoder)
         , electricalIdent(electricalIdent)
         , mechIdent{ mechIdent }
+        , settings(server, controlMode)
     {
         tracer.Trace() << "FocMotorCanBridge: initialised";
     }
@@ -155,39 +153,17 @@ namespace can
 
     void FocMotorCanBridge::OnSetPidCurrent(float bandwidth, const infra::Function<void()>& onDone)
     {
-        SetLegacyBandwidth(can::focSetPidCurrentId, FocParameter::currentBandwidth, bandwidth, onDone);
+        settings.SetLegacyBandwidth(can::focSetPidCurrentId, FocParameter::currentBandwidth, bandwidth, onDone);
     }
 
     void FocMotorCanBridge::OnSetPidSpeed(float bandwidth, const infra::Function<void()>& onDone)
     {
-        SetLegacyBandwidth(can::focSetPidSpeedId, FocParameter::speedBandwidth, bandwidth, onDone);
+        settings.SetLegacyBandwidth(can::focSetPidSpeedId, FocParameter::speedBandwidth, bandwidth, onDone);
     }
 
     void FocMotorCanBridge::OnSetPidPosition(float bandwidth, const infra::Function<void()>& onDone)
     {
-        SetLegacyBandwidth(can::focSetPidPositionId, FocParameter::positionBandwidth, bandwidth, onDone);
-    }
-
-    void FocMotorCanBridge::SetLegacyBandwidth(uint8_t messageId, FocParameter parameter, float bandwidth, const infra::Function<void()>& onDone)
-    {
-        if (SettingOutstanding())
-        {
-            server.SendCategoryError(messageId, FocMotorCategoryError::busy);
-            return;
-        }
-
-        if (!(bandwidth >= foc::CommandLimits::minBandwidth))
-        {
-            server.SendCommandAck(messageId, services::CanAckStatus::invalidPayload);
-            return;
-        }
-
-        pendingLegacyCommand = messageId;
-        pendingNvmDoneCallback = onDone;
-        SetLoopSetting(parameter, bandwidth, [this](state_machine::SettingResult result)
-            {
-                CompleteStoredCommand(pendingLegacyCommand, result);
-            });
+        settings.SetLegacyBandwidth(can::focSetPidPositionId, FocParameter::positionBandwidth, bandwidth, onDone);
     }
 
     void FocMotorCanBridge::OnAlign(const infra::Function<void(services::CanAckStatus)>& onDone)
@@ -381,253 +357,32 @@ namespace can
 
     void FocMotorCanBridge::OnSetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone)
     {
-        if (SettingOutstanding())
-        {
-            server.SendCategoryError(can::focSetEncoderResolutionId, FocMotorCategoryError::busy);
-            return;
-        }
-
-        if (resolution == 0)
-        {
-            server.SendCommandAck(can::focSetEncoderResolutionId, services::CanAckStatus::invalidPayload);
-            return;
-        }
-
-        controlMode.Config().encoderResolution = resolution;
-        pendingNvmDoneCallback = onDone;
-
-        controlMode.PersistConfig([this](services::NvmStatus status)
-            {
-                auto callback = pendingNvmDoneCallback;
-                pendingNvmDoneCallback = nullptr;
-                if (status == services::NvmStatus::Ok)
-                    callback();
-                else
-                    server.SendCategoryError(can::focSetEncoderResolutionId, FocMotorCategoryError::persistenceFailed);
-            });
+        settings.SetEncoderResolution(resolution, onDone);
     }
 
     void FocMotorCanBridge::OnConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone)
     {
-        if (SettingOutstanding())
-        {
-            server.SendCategoryError(can::focConfigureTelemetryRateId, FocMotorCategoryError::busy);
-            return;
-        }
-
-        if (rateHz == 0 || rateHz > 10000)
-        {
-            server.SendCommandAck(can::focConfigureTelemetryRateId, services::CanAckStatus::invalidPayload);
-            return;
-        }
-
-        controlMode.Config().telemetryRateHz = rateHz;
-        pendingNvmDoneCallback = onDone;
-
-        controlMode.PersistConfig([this](services::NvmStatus status)
-            {
-                auto callback = pendingNvmDoneCallback;
-                pendingNvmDoneCallback = nullptr;
-                if (status == services::NvmStatus::Ok)
-                    callback();
-                else
-                    server.SendCategoryError(can::focConfigureTelemetryRateId, FocMotorCategoryError::persistenceFailed);
-            });
-    }
-
-    bool FocMotorCanBridge::SettingOutstanding() const
-    {
-        return pendingNvmDoneCallback != nullptr || pendingAlgorithmCallback != nullptr || pendingParameterCallback != nullptr || controlMode.HasPendingConfigWrite();
+        settings.ConfigureTelemetryRate(rateHz, onDone);
     }
 
     void FocMotorCanBridge::OnSelectAlgorithm(FocControlLoop loop, uint8_t algorithm, const infra::Function<void(const FocAlgorithms&)>& onDone)
     {
-        if (SettingOutstanding())
-        {
-            server.SendCategoryError(can::focSelectAlgorithmId, FocMotorCategoryError::busy);
-            return;
-        }
-
-        pendingAlgorithmCallback = onDone;
-        const auto completed = [this](state_machine::SettingResult result)
-        {
-            CompleteAlgorithmSelection(result);
-        };
-
-        if (loop == FocControlLoop::current)
-            controlMode.SelectCurrentAlgorithm(ToCurrentAlgorithm(algorithm), completed);
-        else if (loop == FocControlLoop::speed)
-            controlMode.SelectSpeedAlgorithm(ToSpeedAlgorithm(algorithm), completed);
-        else
-            controlMode.SelectPositionAlgorithm(ToPositionAlgorithm(algorithm), completed);
+        settings.SelectAlgorithm(loop, algorithm, onDone);
     }
 
     void FocMotorCanBridge::OnQueryAlgorithms(const infra::Function<void(const FocAlgorithms&)>& onDone)
     {
-        onDone(ActiveAlgorithms());
+        onDone(settings.ActiveAlgorithms());
     }
 
     void FocMotorCanBridge::OnSetParameter(FocParameter parameter, float value, const infra::Function<void(FocParameterValue)>& onDone)
     {
-        if (SettingOutstanding())
-        {
-            server.SendCategoryError(can::focSetParameterId, FocMotorCategoryError::busy);
-            return;
-        }
-
-        pendingParameter = parameter;
-        pendingParameterCallback = onDone;
-
-        const auto completed = [this](state_machine::SettingResult result)
-        {
-            CompleteParameter(result);
-        };
-
-        if (GroupOf(parameter) == ParameterGroup::motor)
-            controlMode.SetMotorParameter(ToMotorParameter(parameter), value, completed);
-        else if (GroupOf(parameter) == ParameterGroup::startup)
-            SetStartupSetting(parameter, static_cast<uint32_t>(value));
-        else
-            SetLoopSetting(parameter, value, completed);
+        settings.SetParameter(parameter, value, onDone);
     }
 
     void FocMotorCanBridge::OnQueryParameter(FocParameter parameter, const infra::Function<void(FocParameterValue)>& onDone)
     {
-        onDone(HeldValue(parameter));
-    }
-
-    void FocMotorCanBridge::SetLoopSetting(FocParameter parameter, float value, const state_machine::ControlModeStateMachine::OnSetting& completed)
-    {
-        if (GroupOf(parameter) == ParameterGroup::currentLoop)
-            controlMode.SetCurrentTunings(WithSetting(controlMode.StoredCurrentTunings(), parameter, value), completed);
-        else if (GroupOf(parameter) == ParameterGroup::speedLoop)
-            controlMode.SetSpeedTunings(WithSetting(controlMode.StoredSpeedTunings(), parameter, value), completed);
-        else
-            controlMode.SetPositionTunings(WithSetting(controlMode.StoredPositionTunings(), parameter, value), completed);
-    }
-
-    void FocMotorCanBridge::SetStartupSetting(FocParameter parameter, uint32_t value)
-    {
-        previousStartupSetting = StartupSettingOf(controlMode.Config(), parameter);
-        WriteStartupSetting(controlMode.Config(), parameter, value);
-
-        controlMode.PersistConfig([this](services::NvmStatus status)
-            {
-                if (status != services::NvmStatus::Ok)
-                    WriteStartupSetting(controlMode.Config(), pendingParameter, previousStartupSetting);
-
-                CompleteParameter(status == services::NvmStatus::Ok ? state_machine::SettingResult::ok : state_machine::SettingResult::nvmFailed);
-            });
-    }
-
-    void FocMotorCanBridge::CompleteAlgorithmSelection(state_machine::SettingResult result)
-    {
-        auto onDone = pendingAlgorithmCallback;
-        pendingAlgorithmCallback = nullptr;
-
-        if (result == state_machine::SettingResult::ok)
-            onDone(ActiveAlgorithms());
-        else
-            ReportSettingFailure(can::focSelectAlgorithmId, result);
-    }
-
-    void FocMotorCanBridge::CompleteParameter(state_machine::SettingResult result)
-    {
-        auto onDone = pendingParameterCallback;
-        pendingParameterCallback = nullptr;
-
-        if (result == state_machine::SettingResult::ok)
-            onDone(HeldValue(pendingParameter));
-        else
-            ReportSettingFailure(can::focSetParameterId, result);
-    }
-
-    void FocMotorCanBridge::CompleteStoredCommand(uint8_t commandId, state_machine::SettingResult result)
-    {
-        auto onDone = pendingNvmDoneCallback;
-        pendingNvmDoneCallback = nullptr;
-
-        if (result == state_machine::SettingResult::ok)
-            onDone();
-        else
-            ReportSettingFailure(commandId, result);
-    }
-
-    void FocMotorCanBridge::ReportSettingFailure(uint8_t commandId, state_machine::SettingResult result)
-    {
-        switch (result)
-        {
-            case state_machine::SettingResult::invalidState:
-                server.SendCommandAck(commandId, services::CanAckStatus::invalidState);
-                break;
-            case state_machine::SettingResult::outOfRange:
-                server.SendCommandAck(commandId, services::CanAckStatus::invalidPayload);
-                break;
-            case state_machine::SettingResult::wrongMode:
-                server.SendCategoryError(commandId, FocMotorCategoryError::modeMismatch);
-                break;
-            case state_machine::SettingResult::invalidParameters:
-                server.SendCategoryError(commandId, FocMotorCategoryError::invalidParameters);
-                break;
-            case state_machine::SettingResult::nvmFailed:
-                server.SendCategoryError(commandId, FocMotorCategoryError::persistenceFailed);
-                break;
-            case state_machine::SettingResult::aborted:
-                server.SendCategoryError(commandId, FocMotorCategoryError::abortedByFault);
-                break;
-            default:
-                server.SendCategoryError(commandId, FocMotorCategoryError::busy);
-                break;
-        }
-    }
-
-    FocAlgorithms FocMotorCanBridge::ActiveAlgorithms() const
-    {
-        return FocAlgorithms{
-            state_machine::ToCanMode(controlMode.Active()),
-            ToCanAlgorithm(controlMode.ActiveCurrentAlgorithm()),
-            ToCanAlgorithm(controlMode.ActiveSpeedAlgorithm()),
-            ToCanAlgorithm(controlMode.ActivePositionAlgorithm())
-        };
-    }
-
-    FocParameterValue FocMotorCanBridge::HeldValue(FocParameter parameter) const
-    {
-        switch (GroupOf(parameter))
-        {
-            case ParameterGroup::motor:
-                return HeldMotorParameter(parameter);
-            case ParameterGroup::startup:
-                return FocParameterValue{ static_cast<float>(StartupSettingOf(controlMode.Config(), parameter)), false };
-            default:
-                return HeldLoopSetting(parameter);
-        }
-    }
-
-    FocParameterValue FocMotorCanBridge::HeldLoopSetting(FocParameter parameter) const
-    {
-        if (GroupOf(parameter) == ParameterGroup::currentLoop)
-            return FocParameterValue{ SettingOf(controlMode.EffectiveCurrentTunings(), parameter),
-                IsBandwidth(parameter) && controlMode.StoredCurrentTunings().bandwidth == 0.0f };
-
-        if (GroupOf(parameter) == ParameterGroup::speedLoop)
-        {
-            const auto stored = controlMode.StoredSpeedTunings();
-            return FocParameterValue{ SettingOf(controlMode.EffectiveSpeedTunings().value_or(stored), parameter), IsBandwidth(parameter) && stored.bandwidth == 0.0f };
-        }
-
-        const auto stored = controlMode.StoredPositionTunings();
-        return FocParameterValue{ SettingOf(controlMode.EffectivePositionTunings().value_or(stored), parameter), IsBandwidth(parameter) && stored.bandwidth == 0.0f };
-    }
-
-    FocParameterValue FocMotorCanBridge::HeldMotorParameter(FocParameter parameter) const
-    {
-        const auto& record = controlMode.CalibrationRecord();
-
-        if (parameter == FocParameter::fluxLinkage && !foc::IsFinitePositive(record.fluxLinkage))
-            return FocParameterValue{ controlMode.DefaultFluxLinkage().Value(), true };
-
-        return FocParameterValue{ services::ReadMotorParameter(record, ToMotorParameter(parameter)), false };
+        onDone(settings.HeldValue(parameter));
     }
 
     void FocMotorCanBridge::ReportCommandOutcome(uint8_t commandId, state_machine::CommandResult result,

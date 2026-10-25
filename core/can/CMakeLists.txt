@@ -30,6 +30,8 @@ target_sources(e_foc.can PRIVATE
     FocMotorCategoryClient.cpp
     FocMotorCanBridge.hpp
     FocMotorCanBridge.cpp
+    FocMotorSettingsBridge.hpp
+    FocMotorSettingsBridge.cpp
     FocMotorCanClient.hpp
     FocMotorCanClient.cpp
     CanLivenessWatchdog.hpp

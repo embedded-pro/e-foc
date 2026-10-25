@@ -6,6 +6,31 @@
 
 namespace services
 {
+    struct CurrentLoopSettings
+    {
+        float bandwidth = 0.0f;
+        float switchingGain = foc::CurrentLoopTunings{}.switchingGain;
+        float boundaryLayer = foc::CurrentLoopTunings{}.boundaryLayer;
+    };
+
+    struct SpeedLoopSettings
+    {
+        float bandwidth = 0.0f;
+        float errorWeight = foc::SpeedLoopTunings{}.speedErrorWeight;
+        float integralWeight = foc::SpeedLoopTunings{}.integralWeight;
+        float observerBandwidthRatio = foc::SpeedLoopTunings{}.observerBandwidthRatio;
+        float referenceTimeConstant = foc::SpeedLoopTunings{}.referenceTimeConstant;
+    };
+
+    struct PositionLoopSettings
+    {
+        float bandwidth = 0.0f;
+        float errorWeight = foc::PositionLoopTunings{}.positionErrorWeight;
+        float speedErrorWeight = foc::PositionLoopTunings{}.speedErrorWeight;
+        float integralWeight = foc::PositionLoopTunings{}.integralWeight;
+        float referenceTimeConstant = foc::PositionLoopTunings{}.referenceTimeConstant;
+    };
+
     // All 4-byte fields precede the byte-sized fields to avoid implicit compiler padding.
     struct ConfigData
     {
@@ -13,19 +38,9 @@ namespace services
         uint32_t canBaudrate = 1000000;
         uint32_t telemetryRateHz = 100;
         uint32_t encoderResolution = 4000;
-        float currentBandwidth = 0.0f;
-        float currentSwitchingGain = foc::CurrentLoopTunings{}.switchingGain;
-        float currentBoundaryLayer = foc::CurrentLoopTunings{}.boundaryLayer;
-        float speedBandwidth = 0.0f;
-        float speedErrorWeight = foc::SpeedLoopTunings{}.speedErrorWeight;
-        float speedIntegralWeight = foc::SpeedLoopTunings{}.integralWeight;
-        float speedObserverBandwidthRatio = foc::SpeedLoopTunings{}.observerBandwidthRatio;
-        float speedReferenceTimeConstant = foc::SpeedLoopTunings{}.referenceTimeConstant;
-        float positionBandwidth = 0.0f;
-        float positionErrorWeight = foc::PositionLoopTunings{}.positionErrorWeight;
-        float positionSpeedErrorWeight = foc::PositionLoopTunings{}.speedErrorWeight;
-        float positionIntegralWeight = foc::PositionLoopTunings{}.integralWeight;
-        float positionReferenceTimeConstant = foc::PositionLoopTunings{}.referenceTimeConstant;
+        CurrentLoopSettings currentLoop;
+        SpeedLoopSettings speedLoop;
+        PositionLoopSettings positionLoop;
         uint8_t defaultControlMode = 0;
         uint8_t currentAlgorithm = 0;
         uint8_t speedAlgorithm = 0;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/can/FocMotorCategoryServer.hpp"
+#include "core/can/FocMotorSettingsBridge.hpp"
 #include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
@@ -68,18 +69,6 @@ namespace can
         bool ElectricalIdentificationInProgress() const;
         bool MechanicalIdentificationInProgress() const;
         void FailElectricalIdentification(FocMotorCategoryError error);
-        bool SettingOutstanding() const;
-        void SetLegacyBandwidth(uint8_t messageId, FocParameter parameter, float bandwidth, const infra::Function<void()>& onDone);
-        void SetLoopSetting(FocParameter parameter, float value, const state_machine::ControlModeStateMachine::OnSetting& completed);
-        void SetStartupSetting(FocParameter parameter, uint32_t value);
-        void CompleteAlgorithmSelection(state_machine::SettingResult result);
-        void CompleteParameter(state_machine::SettingResult result);
-        void CompleteStoredCommand(uint8_t commandId, state_machine::SettingResult result);
-        void ReportSettingFailure(uint8_t commandId, state_machine::SettingResult result);
-        FocAlgorithms ActiveAlgorithms() const;
-        FocParameterValue HeldValue(FocParameter parameter) const;
-        FocParameterValue HeldLoopSetting(FocParameter parameter) const;
-        FocParameterValue HeldMotorParameter(FocParameter parameter) const;
 
         FocMotorCategoryServer& server;
         state_machine::ControlModeStateMachine& controlMode;
@@ -87,17 +76,12 @@ namespace can
         drivers::Encoder& encoder;
         services::ElectricalParametersIdentification& electricalIdent;
         services::MechanicalParametersIdentification* mechIdent;
+        FocMotorSettingsBridge settings;
 
         infra::Function<void(FocMotorMode)> pendingSelectCallback;
         infra::Function<void(services::CanAckStatus)> pendingAlignDoneCallback;
         infra::Function<void()> pendingElectricalIdentDoneCallback;
         infra::Function<void()> pendingMechIdentDoneCallback;
-        infra::Function<void()> pendingNvmDoneCallback;
-        infra::Function<void(const FocAlgorithms&)> pendingAlgorithmCallback;
-        infra::Function<void(FocParameterValue)> pendingParameterCallback;
-        FocParameter pendingParameter{ FocParameter::currentBandwidth };
-        uint32_t previousStartupSetting{ 0 };
-        uint8_t pendingLegacyCommand{ 0 };
         std::optional<foc::Ohm> pendingElectricalR;
         std::optional<foc::MilliHenry> pendingElectricalL;
     };

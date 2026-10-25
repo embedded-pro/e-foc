@@ -6,6 +6,7 @@
 #include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
 #include "hal/interfaces/Can.hpp"
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cmath>
@@ -305,11 +306,10 @@ namespace can
         if (descriptor.id != FocParameter::canBitrate)
             return true;
 
-        for (const auto bitrate : focCanBitrates)
-            if (static_cast<float>(bitrate) == value)
-                return true;
-
-        return false;
+        return std::ranges::any_of(focCanBitrates, [value](auto bitrate)
+            {
+                return static_cast<float>(bitrate) == value;
+            });
     }
 
     inline void WriteFloat32(services::CanPayloadWriter& payload, float value)

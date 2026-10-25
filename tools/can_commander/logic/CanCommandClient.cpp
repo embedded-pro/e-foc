@@ -201,7 +201,7 @@ namespace tool
 
     bool CanCommandClient::SendClearFault(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focClearFaultId, [&]()
+        return Tracked(nodeId, can::focClearFaultId, [this, nodeId]()
             {
                 return focClient.CategoryClient().SendClearFault(nodeId);
             });
@@ -209,7 +209,7 @@ namespace tool
 
     bool CanCommandClient::SendAlign(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focAlignId, [&]()
+        return Tracked(nodeId, can::focAlignId, [this, nodeId]()
             {
                 return focClient.CategoryClient().SendAlign(nodeId);
             });
@@ -217,7 +217,7 @@ namespace tool
 
     bool CanCommandClient::SendIdentifyElectrical(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focIdentifyElectricalId, [&]()
+        return Tracked(nodeId, can::focIdentifyElectricalId, [this, nodeId]()
             {
                 return focClient.CategoryClient().SendIdentifyElectrical(nodeId);
             });
@@ -225,7 +225,7 @@ namespace tool
 
     bool CanCommandClient::SendIdentifyMechanical(uint16_t nodeId)
     {
-        return Tracked(nodeId, can::focIdentifyMechanicalId, [&]()
+        return Tracked(nodeId, can::focIdentifyMechanicalId, [this, nodeId]()
             {
                 return focClient.CategoryClient().SendIdentifyMechanical(nodeId);
             });
@@ -233,7 +233,7 @@ namespace tool
 
     bool CanCommandClient::SendSetEncoderResolution(uint16_t nodeId, uint32_t countsPerRevolution)
     {
-        return Tracked(nodeId, can::focSetEncoderResolutionId, [&]()
+        return Tracked(nodeId, can::focSetEncoderResolutionId, [this, nodeId, countsPerRevolution]()
             {
                 return focClient.CategoryClient().SendSetEncoderResolution(nodeId, countsPerRevolution);
             });
@@ -241,7 +241,7 @@ namespace tool
 
     bool CanCommandClient::SendSelectAlgorithm(uint16_t nodeId, can::FocControlLoop loop, uint8_t algorithm)
     {
-        return Tracked(nodeId, can::focSelectAlgorithmId, [&]()
+        return Tracked(nodeId, can::focSelectAlgorithmId, [this, nodeId, loop, algorithm]()
             {
                 return focClient.CategoryClient().SendSelectAlgorithm(nodeId, loop, algorithm);
             });
@@ -249,7 +249,7 @@ namespace tool
 
     bool CanCommandClient::SendSetParameter(uint16_t nodeId, can::FocParameter parameter, float value)
     {
-        return Tracked(nodeId, can::focSetParameterId, [&]()
+        return Tracked(nodeId, can::focSetParameterId, [this, nodeId, parameter, value]()
             {
                 return focClient.CategoryClient().SendSetParameter(nodeId, parameter, value);
             });
@@ -279,7 +279,7 @@ namespace tool
     void CanCommandClient::QueueRead(uint16_t nodeId, Read read)
     {
         auto& node = reads[nodeId];
-        const auto queued = std::any_of(node.queued.begin(), node.queued.end(), [&read](const Read& other)
+        const auto queued = std::ranges::any_of(node.queued, [&read](const Read& other)
             {
                 return other.commandType == read.commandType && other.parameter == read.parameter;
             });

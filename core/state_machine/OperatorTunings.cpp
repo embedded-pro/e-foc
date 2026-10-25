@@ -26,45 +26,36 @@ namespace state_machine
 
     foc::CurrentLoopTunings StoredCurrentTunings(const services::ConfigData& config)
     {
-        return foc::CurrentLoopTunings{ config.currentBandwidth, config.currentSwitchingGain, config.currentBoundaryLayer, config.currentTwoStepDeadbeat != 0 };
+        const auto& stored = config.currentLoop;
+        return foc::CurrentLoopTunings{ stored.bandwidth, stored.switchingGain, stored.boundaryLayer, config.currentTwoStepDeadbeat != 0 };
     }
 
     foc::SpeedLoopTunings StoredSpeedTunings(const services::ConfigData& config)
     {
-        return foc::SpeedLoopTunings{ config.speedBandwidth, config.speedErrorWeight, config.speedIntegralWeight,
-            config.speedObserverBandwidthRatio, config.speedReferenceTimeConstant };
+        const auto& stored = config.speedLoop;
+        return foc::SpeedLoopTunings{ stored.bandwidth, stored.errorWeight, stored.integralWeight, stored.observerBandwidthRatio, stored.referenceTimeConstant };
     }
 
     foc::PositionLoopTunings StoredPositionTunings(const services::ConfigData& config)
     {
-        return foc::PositionLoopTunings{ config.positionBandwidth, config.positionErrorWeight, config.positionSpeedErrorWeight,
-            config.positionIntegralWeight, config.positionReferenceTimeConstant };
+        const auto& stored = config.positionLoop;
+        return foc::PositionLoopTunings{ stored.bandwidth, stored.errorWeight, stored.speedErrorWeight, stored.integralWeight, stored.referenceTimeConstant };
     }
 
     void StoreTunings(services::ConfigData& config, const foc::CurrentLoopTunings& tunings)
     {
-        config.currentBandwidth = tunings.bandwidth;
-        config.currentSwitchingGain = tunings.switchingGain;
-        config.currentBoundaryLayer = tunings.boundaryLayer;
+        config.currentLoop = services::CurrentLoopSettings{ tunings.bandwidth, tunings.switchingGain, tunings.boundaryLayer };
         config.currentTwoStepDeadbeat = tunings.twoStepDeadbeat ? 1 : 0;
     }
 
     void StoreTunings(services::ConfigData& config, const foc::SpeedLoopTunings& tunings)
     {
-        config.speedBandwidth = tunings.bandwidth;
-        config.speedErrorWeight = tunings.speedErrorWeight;
-        config.speedIntegralWeight = tunings.integralWeight;
-        config.speedObserverBandwidthRatio = tunings.observerBandwidthRatio;
-        config.speedReferenceTimeConstant = tunings.referenceTimeConstant;
+        config.speedLoop = services::SpeedLoopSettings{ tunings.bandwidth, tunings.speedErrorWeight, tunings.integralWeight, tunings.observerBandwidthRatio, tunings.referenceTimeConstant };
     }
 
     void StoreTunings(services::ConfigData& config, const foc::PositionLoopTunings& tunings)
     {
-        config.positionBandwidth = tunings.bandwidth;
-        config.positionErrorWeight = tunings.positionErrorWeight;
-        config.positionSpeedErrorWeight = tunings.speedErrorWeight;
-        config.positionIntegralWeight = tunings.integralWeight;
-        config.positionReferenceTimeConstant = tunings.referenceTimeConstant;
+        config.positionLoop = services::PositionLoopSettings{ tunings.bandwidth, tunings.positionErrorWeight, tunings.speedErrorWeight, tunings.integralWeight, tunings.referenceTimeConstant };
     }
 
     bool IsAcceptable(const foc::CurrentLoopTunings& tunings)

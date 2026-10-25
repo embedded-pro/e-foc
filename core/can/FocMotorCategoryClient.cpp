@@ -1,6 +1,7 @@
 #include "core/can/FocMotorCategoryClient.hpp"
 #include "can-lite/core/CanPayload.hpp"
 #include "core/can/FocMotorWireContract.hpp"
+#include <cstddef>
 
 namespace can
 {
@@ -371,13 +372,13 @@ namespace can
 
         services::CanPayloadReader reader{ data };
         const auto descriptor = FindParameter(reader.ReadUInt8());
-        const auto flags = reader.ReadUInt8();
+        const auto flags = std::byte{ reader.ReadUInt8() };
         const auto value = ReadFloat32(reader);
 
         if (!descriptor.has_value())
             return false;
 
-        const FocParameterValue held{ value, (flags & focParameterAutomaticFlag) != 0 };
+        const FocParameterValue held{ value, (flags & std::byte{ focParameterAutomaticFlag }) != std::byte{} };
 
         NotifyObservers([source = origin.SourceNodeId(), parameter = descriptor->id, held](auto& observer)
             {

@@ -1148,7 +1148,7 @@ TEST_F(ControlModeStateMachineExtTest, TrySetCurrentBandwidth_AcceptedInTorqueMo
     EXPECT_CALL(nvmMock, SaveConfig(_, _))
         .WillOnce(Invoke([](const services::ConfigData& stored, infra::Function<void(services::NvmStatus)> onDone)
             {
-                EXPECT_NEAR(stored.currentBandwidth, 8377.6f, 1e-2f);
+                EXPECT_NEAR(stored.currentLoop.bandwidth, 8377.6f, 1e-2f);
                 onDone(services::NvmStatus::Ok);
             }));
 
@@ -1510,10 +1510,10 @@ TEST_F(ControlModeStateMachineExtTest, StoredTunings_AreRestoredFromTheConfigura
     GivenNvmAlwaysInvalid();
 
     services::ConfigData config{};
-    config.currentBandwidth = 5000.0f;
-    config.currentSwitchingGain = 0.3f;
-    config.currentBoundaryLayer = 0.9f;
-    config.speedObserverBandwidthRatio = 8.0f;
+    config.currentLoop.bandwidth = 5000.0f;
+    config.currentLoop.switchingGain = 0.3f;
+    config.currentLoop.boundaryLayer = 0.9f;
+    config.speedLoop.observerBandwidthRatio = 8.0f;
     ConstructSubjectWithConfig(config);
 
     EXPECT_NEAR(subject->StoredCurrentTunings().bandwidth, 5000.0f, 1e-2f);
@@ -1528,8 +1528,8 @@ TEST_F(ControlModeStateMachineExtTest, StoredTunings_ThatCannotBeUsed_FallBackTo
     GivenNvmAlwaysInvalid();
 
     services::ConfigData config{};
-    config.currentSwitchingGain = 0.9f;
-    config.speedObserverBandwidthRatio = 90.0f;
+    config.currentLoop.switchingGain = 0.9f;
+    config.speedLoop.observerBandwidthRatio = 90.0f;
     ConstructSubjectWithConfig(config);
 
     EXPECT_NEAR(subject->StoredCurrentTunings().switchingGain, foc::CurrentLoopTunings{}.switchingGain, 1e-6f);
@@ -1574,7 +1574,7 @@ TEST_F(ControlModeStateMachineExtTest, SetCurrentTunings_AnswersOnlyOnceTheRecor
     EXPECT_CALL(nvmMock, SaveConfig(_, _))
         .WillOnce(Invoke([&pendingSave](const services::ConfigData& saved, infra::Function<void(services::NvmStatus)> onDone)
             {
-                EXPECT_NEAR(saved.currentBoundaryLayer, 0.9f, 1e-6f);
+                EXPECT_NEAR(saved.currentLoop.boundaryLayer, 0.9f, 1e-6f);
                 pendingSave = onDone;
             }));
 

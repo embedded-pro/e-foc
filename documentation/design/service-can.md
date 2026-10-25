@@ -276,6 +276,11 @@ Implements the `FocMotorCategoryServerObserver` interface. Holds references to `
   linkage reports the platform's default, flagged automatic), a start-up setting from the stored
   configuration.
 
+The settings callbacks — the PID bandwidth commands, `OnSetEncoderResolution`, `OnConfigureTelemetryRate`,
+`OnSelectAlgorithm`, `OnQueryAlgorithms`, `OnSetParameter` and `OnQueryParameter` — are forwarded to
+`FocMotorSettingsBridge`, which the bridge owns. It holds the one outstanding setting at a time, so a settings
+write that arrives while another is being stored is answered `busy`, whichever message carried it.
+
 The bridge validates that the correct control mode is active before accepting a setpoint command. An out-of-range setpoint results in `invalidPayload`. A mode mismatch results in `categoryError/modeMismatch`.
 
 ### Part E — FocMotorCanClient
@@ -498,6 +503,8 @@ graph LR
         CPS --> MCS["FocMotorCategoryServer"]
         MCS --> BRG["FocMotorCanBridge"]
         BRG --> SM["ControlModeStateMachine"]
+        BRG --> SET["FocMotorSettingsBridge"]
+        SET --> SM
     end
 
     subgraph "Client Path (host tools)"

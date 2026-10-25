@@ -520,7 +520,7 @@ TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_InTorqueMode_AcksSuccess)
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     EXPECT_FALSE(categoryErrorSent);
     ASSERT_TRUE(savedConfig.has_value());
-    EXPECT_NEAR(savedConfig->currentBandwidth, 1000.0f, 1e-2f);
+    EXPECT_NEAR(savedConfig->currentLoop.bandwidth, 1000.0f, 1e-2f);
 }
 
 TEST_F(FocMotorCanBridgeTest, OnSetPidCurrent_AcksOnlyOnceTheSettingIsStored)
@@ -569,7 +569,7 @@ TEST_F(FocMotorCanBridgeTest, OnSetPidSpeed_InSpeedMode_AcksSuccess)
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     EXPECT_FALSE(categoryErrorSent);
     ASSERT_TRUE(savedConfig.has_value());
-    EXPECT_NEAR(savedConfig->speedBandwidth, 100.0f, 1e-3f);
+    EXPECT_NEAR(savedConfig->speedLoop.bandwidth, 100.0f, 1e-3f);
 }
 
 TEST_F(FocMotorCanBridgeTest, OnSetPidPosition_InPositionMode_AcksSuccess)
@@ -585,7 +585,7 @@ TEST_F(FocMotorCanBridgeTest, OnSetPidPosition_InPositionMode_AcksSuccess)
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
     EXPECT_FALSE(categoryErrorSent);
     ASSERT_TRUE(savedConfig.has_value());
-    EXPECT_NEAR(savedConfig->positionBandwidth, 18.0f, 1e-4f);
+    EXPECT_NEAR(savedConfig->positionLoop.bandwidth, 18.0f, 1e-4f);
 }
 
 TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_Speed_EmitsResponseAndAcksSuccess)
@@ -1731,7 +1731,7 @@ TEST_F(FocMotorCanBridgeTest, SetParameter_ALoopSetting_IsAppliedStoredAndAnswer
     DispatchSetParameter(can::FocParameter::currentBoundaryLayer, 0.8f);
 
     ASSERT_TRUE(savedConfig.has_value());
-    EXPECT_NEAR(savedConfig->currentBoundaryLayer, 0.8f, 1e-6f);
+    EXPECT_NEAR(savedConfig->currentLoop.boundaryLayer, 0.8f, 1e-6f);
     ExpectAnswered(0.8f, false);
     ASSERT_TRUE(ackSpy.last.has_value());
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::success);
@@ -1749,7 +1749,7 @@ TEST_F(FocMotorCanBridgeTest, SetParameter_ABandwidthSetToZero_ReturnsToAutomati
     DispatchSetParameter(can::FocParameter::currentBandwidth, 0.0f);
 
     ASSERT_TRUE(savedConfig.has_value());
-    EXPECT_NEAR(savedConfig->currentBandwidth, 0.0f, 1e-9f);
+    EXPECT_NEAR(savedConfig->currentLoop.bandwidth, 0.0f, 1e-9f);
     const auto answer = AnsweredParameter();
     EXPECT_TRUE(answer.automatic);
     EXPECT_NEAR(answer.value, 10000.0f / 15.0f * 2.0f * std::numbers::pi_v<float>, 0.01f);

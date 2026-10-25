@@ -18,7 +18,7 @@ namespace tool
         std::string_view suffix;
         std::string_view description;
         std::string_view automaticLabel;
-        uint8_t usedBy{ 0xff };
+        uint32_t usedBy{ 0xffffffff };
     };
 
     struct SettingChange

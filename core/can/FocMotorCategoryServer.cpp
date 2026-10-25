@@ -29,8 +29,15 @@ namespace can
             setPidCurrent, setPidSpeed, setPidPosition,
             align, identifyElectrical, identifyMechanical, requestTelemetry,
             setEncoderResolution, queryMotorType, configureTelemetryRate, queryContractVersion,
-            selectAlgorithm, queryAlgorithms, setParameter, queryParameter);
+            settingsMessages.selectAlgorithm, settingsMessages.queryAlgorithms, settingsMessages.setParameter, settingsMessages.queryParameter);
     }
+
+    FocMotorCategoryServer::SettingsMessages::SettingsMessages(FocMotorCategoryServer& server)
+        : selectAlgorithm{ focSelectAlgorithmId, server, &FocMotorCategoryServer::HandleSelectAlgorithm }
+        , queryAlgorithms{ focQueryAlgorithmsId, server, &FocMotorCategoryServer::HandleQueryAlgorithms }
+        , setParameter{ focSetParameterId, server, &FocMotorCategoryServer::HandleSetParameter }
+        , queryParameter{ focQueryParameterId, server, &FocMotorCategoryServer::HandleQueryParameter }
+    {}
 
     uint8_t FocMotorCategoryServer::Id() const
     {

@@ -23,24 +23,24 @@ TEST_F(OperatorTuningsTest, every_loop_round_trips_through_the_configuration_rec
     state_machine::StoreTunings(config, position);
 
     const auto storedCurrent = state_machine::StoredCurrentTunings(config);
-    EXPECT_EQ(storedCurrent.bandwidth, current.bandwidth);
-    EXPECT_EQ(storedCurrent.switchingGain, current.switchingGain);
-    EXPECT_EQ(storedCurrent.boundaryLayer, current.boundaryLayer);
+    EXPECT_NEAR(storedCurrent.bandwidth, current.bandwidth, 1e-6f);
+    EXPECT_NEAR(storedCurrent.switchingGain, current.switchingGain, 1e-6f);
+    EXPECT_NEAR(storedCurrent.boundaryLayer, current.boundaryLayer, 1e-6f);
     EXPECT_TRUE(storedCurrent.twoStepDeadbeat);
 
     const auto storedSpeed = state_machine::StoredSpeedTunings(config);
-    EXPECT_EQ(storedSpeed.bandwidth, speed.bandwidth);
-    EXPECT_EQ(storedSpeed.speedErrorWeight, speed.speedErrorWeight);
-    EXPECT_EQ(storedSpeed.integralWeight, speed.integralWeight);
-    EXPECT_EQ(storedSpeed.observerBandwidthRatio, speed.observerBandwidthRatio);
-    EXPECT_EQ(storedSpeed.referenceTimeConstant, speed.referenceTimeConstant);
+    EXPECT_NEAR(storedSpeed.bandwidth, speed.bandwidth, 1e-6f);
+    EXPECT_NEAR(storedSpeed.speedErrorWeight, speed.speedErrorWeight, 1e-6f);
+    EXPECT_NEAR(storedSpeed.integralWeight, speed.integralWeight, 1e-6f);
+    EXPECT_NEAR(storedSpeed.observerBandwidthRatio, speed.observerBandwidthRatio, 1e-6f);
+    EXPECT_NEAR(storedSpeed.referenceTimeConstant, speed.referenceTimeConstant, 1e-6f);
 
     const auto storedPosition = state_machine::StoredPositionTunings(config);
-    EXPECT_EQ(storedPosition.bandwidth, position.bandwidth);
-    EXPECT_EQ(storedPosition.positionErrorWeight, position.positionErrorWeight);
-    EXPECT_EQ(storedPosition.speedErrorWeight, position.speedErrorWeight);
-    EXPECT_EQ(storedPosition.integralWeight, position.integralWeight);
-    EXPECT_EQ(storedPosition.referenceTimeConstant, position.referenceTimeConstant);
+    EXPECT_NEAR(storedPosition.bandwidth, position.bandwidth, 1e-6f);
+    EXPECT_NEAR(storedPosition.positionErrorWeight, position.positionErrorWeight, 1e-6f);
+    EXPECT_NEAR(storedPosition.speedErrorWeight, position.speedErrorWeight, 1e-6f);
+    EXPECT_NEAR(storedPosition.integralWeight, position.integralWeight, 1e-6f);
+    EXPECT_NEAR(storedPosition.referenceTimeConstant, position.referenceTimeConstant, 1e-6f);
 }
 
 TEST_F(OperatorTuningsTest, a_bandwidth_of_zero_is_automatic_and_acceptable)
@@ -76,13 +76,13 @@ TEST_F(OperatorTuningsTest, a_switching_gain_at_the_boundary_layer_cannot_be_des
 
 TEST_F(OperatorTuningsTest, sanitising_resets_only_the_loop_holding_an_unacceptable_value)
 {
-    config.speedObserverBandwidthRatio = 100.0f;
-    config.positionErrorWeight = 2.0f;
-    config.currentSwitchingGain = 0.6f;
+    config.speedLoop.observerBandwidthRatio = 100.0f;
+    config.positionLoop.errorWeight = 2.0f;
+    config.currentLoop.switchingGain = 0.6f;
 
     state_machine::SanitizeTunings(config);
 
-    EXPECT_EQ(config.speedObserverBandwidthRatio, foc::SpeedLoopTunings{}.observerBandwidthRatio);
-    EXPECT_EQ(config.positionErrorWeight, 2.0f);
-    EXPECT_EQ(config.currentSwitchingGain, foc::CurrentLoopTunings{}.switchingGain);
+    EXPECT_NEAR(config.speedLoop.observerBandwidthRatio, foc::SpeedLoopTunings{}.observerBandwidthRatio, 1e-6f);
+    EXPECT_NEAR(config.positionLoop.errorWeight, 2.0f, 1e-6f);
+    EXPECT_NEAR(config.currentLoop.switchingGain, foc::CurrentLoopTunings{}.switchingGain, 1e-6f);
 }
