@@ -2,8 +2,8 @@
   title: Runtime algorithm selection
   shall: >
     The system shall allow selection of the active control algorithm for each FOC
-    loop (current, speed, and position) at runtime via the CLI, without requiring
-    a firmware update or restart.
+    loop (current, speed, and position) at runtime via the CLI and via the CAN
+    SelectAlgorithm command, without requiring a firmware update or restart.
 
 - id: REQ-CTRL-002
   title: Algorithm selection permitted only when motor is stopped
@@ -108,9 +108,9 @@
   shall: >
     The system shall provide a query interface to read the currently active
     algorithm identifier for each control loop. This query shall be available
-    via the CLI (active_algorithms command) and shall reflect the algorithm that
-    is currently dispatched in the ISR, not the value most recently requested or
-    persisted.
+    via the CLI (active_algorithms command) and the CAN QueryAlgorithms command, and
+    shall reflect the algorithm that is currently dispatched in the ISR, not the
+    value most recently requested or persisted.
 
 - id: REQ-CTRL-014
   title: Control laws stay bounded on plants other than the nominal one
@@ -131,3 +131,23 @@
     bounds are twice the worst value repeated runs measured; the remaining bounds stay wide
     enough to cover a whole group of rows rather than to describe any one of them, and catch a
     law that fails to reach its setpoint, rings without settling, or holds far from it.
+
+- id: REQ-CTRL-015
+  title: Tuning settings are the operator's, persisted and restored
+  shall: >
+    Each loop's tuning settings — its bandwidth and the law-specific settings of its
+    algorithms — shall be settable by the operator, stored in non-volatile memory and
+    restored at boot. They shall be applied to the running controllers whenever the active
+    mode reaches Ready and whenever a setting or a motor parameter changes while the drive is
+    stopped. A bandwidth the operator has not set, or has set back to automatic, shall keep
+    the value the firmware derives for it, so that a drive whose settings were never touched
+    runs the loops it ran before the settings could be changed.
+
+- id: REQ-CTRL-016
+  title: A tuning setting that cannot be designed is refused without effect
+  shall: >
+    A tuning setting shall be refused, leaving both the running law and the stored settings
+    unchanged, when its value lies outside its range, when the drive is enabled or
+    calibrating, when the active control mode does not run its loop, when it would bring the
+    sliding-mode switching gain to or above the boundary layer, or when the active position
+    LQR or LQI design does not converge with it.

@@ -98,7 +98,7 @@ transition table the FOC state machine is built from. Every operator command, ev
 service completion and every fault notification is an **event**, and every arrow in the
 diagram is a **row** of the table: source state, event, target state, an optional guard and
 the action that builds the target state. Rows that must be accepted in a state without
-leaving it (a calibration sub-step changing, a flux-linkage save completing) are declared
+leaving it (a calibration sub-step changing, a motor-parameter save completing) are declared
 as internal rows.
 
 The table is a compile-time constant. Its rows are `constexpr` values whose guards and
@@ -144,11 +144,11 @@ state, and the target state is committed before its side effects (starting the d
 completing the pending command, notifying the ready handler) run, in that order.
 
 Every operator command that starts asynchronous work (`Calibrate`, `ReAlign`,
-`ReserveExternalCalibration`, `ClearCalibration`, `SetFluxLinkage`) and `Enable` are guarded by
+`ReserveExternalCalibration`, `ClearCalibration`, `SetMotorParameter`) and `Enable` are guarded by
 `HasPendingAsyncWork()`: they are rejected while a command is pending, while any NVM operation
 is in flight, including the boot-time check and load, while an identification service is
 running, or while a fault latched in an interrupt still owes its transition. One request therefore owns the machine at a time. A save still outstanding after an
-emergency stop cannot be overlapped by the save of a new run, a clear or a flux-linkage change
+emergency stop cannot be overlapped by the save of a new run, a clear or a motor-parameter change
 in progress cannot be interrupted by `Enable`, whose transition would discard the completion
 and leave the command pending forever, and the boot-time load cannot overwrite the record of a
 calibration that started before it answered. The command is completed with `rejected` and the
@@ -177,9 +177,9 @@ collaborators that carry out the work, each with one responsibility.
 
 | Collaborator         | Responsibility                                                                                                                                                                       |
 |----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `FocLifecycleTable`  | The 45 `constexpr` rows and the entered hooks; the only place that knows which event is legal in which state                                                                         |
+| `FocLifecycleTable`  | The 48 `constexpr` rows and the entered hooks; the only place that knows which event is legal in which state                                                                         |
 | `CalibrationFlow`    | Full calibration, re-alignment and external calibration: running the orchestrator, saving the record and completing the command                                                      |
-| `MaintenanceFlow`    | Clearing the stored calibration and changing the flux linkage                                                                                                                        |
+| `MaintenanceFlow`    | Clearing the stored calibration and editing the motor parameters it holds                                                                                                            |
 | `BootSequence`       | The boot-time validity check and load of the stored record                                                                                                                           |
 | `OperationFlow`      | Enable and disable, faults and emergency stop, and the post-commit work of every state                                                                                               |
 | `PendingCommand`     | The one outstanding operator command, and the result held back until the target state has been committed                                                                             |
@@ -290,6 +290,9 @@ creep cannot pass one encoder count at a time. A rotor already at rest costs the
 The offsets apply as soon as they are measured, so the identification and alignment steps after
 them read corrected currents (`service-current-offsets.md`). An electrical identification that
 arrives over CAN does not measure them and keeps the ones in force, and keeps the cogging map too.
+It keeps the mechanical parameters and the loop bandwidths of the record as well: it measures
+neither, and replacing an inertia entered or identified earlier with nothing would leave a speed or
+position mode uncalibrated again.
 
 The cogging map is measured with the speed loop configured from the identified mechanics, and a
 run that measures no map does not fail the calibration (`service-cogging-compensation.md`).
@@ -303,6 +306,39 @@ The calibration record line is what an external observer, the software-in-the-lo
 The torque constant every mechanical consumer uses — the identification service, the online inertia estimator and the speed-loop gain design — is not configured per target. It is derived from the record as $K_t = \tfrac{3}{2} p \psi_f$ (`core/foc/math/TorqueConstant.hpp`), the factor the plant model itself applies.
 
 A motor whose flux linkage is set with `set_flux_linkage` therefore gets a consistent torque constant without a second number to keep in step (REQ-SM-027).
+
+### Editing motor parameters
+
+The six motor parameters of the record — phase resistance, inductance (written to both axes), pole
+pairs, flux linkage, inertia and viscous friction — can also be entered, one at a time, with
+`SetMotorParameter`: from the CLI for the flux linkage (`set_flux_linkage`) and from CAN for all six
+(`service-can.md`). The command is accepted in `Idle` and `Ready` with no work outstanding, for a
+value inside the parameter's range; a record need not exist yet, so a motor can be commissioned
+from its datasheet (REQ-SM-031).
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Stopped
+    Stopped --> Saving : SetMotorParameter\n(Idle or Ready, nothing outstanding)
+    Saving --> Stopped : MotorParameterSaved Ok\nrecord updated, model re-applied
+    Saving --> Stopped : MotorParameterSaved failed\nrecord unchanged
+```
+
+The edited record is stored first and adopted only when the write has landed, so RAM never holds a
+value the NVM does not. Its stage is recomputed: a record that was complete stays complete, and an
+incomplete one becomes complete once it holds pole pairs, a positive resistance and inductance and
+whatever the active mode needs on top (inertia for speed and position). Once complete, the
+electrical model and the mode-specific calibration are applied as at boot. A completed record does
+not move the machine out of `Idle`: a rotor whose reference was never established still has to be
+aligned before it can be enabled, exactly as after boot.
+
+Changing the pole-pair count invalidates the rotor reference, because the encoder offset was
+measured in electrical angle for the old count: `Enable` is refused until the rotor is aligned again.
+No other parameter touches the reference, and none of them moves the rotor.
+
+While the save is outstanding the command owns the machine like any other NVM operation; a fault in
+that window aborts the command but not the write, and the stored value is adopted when it lands.
 
 ### Making the loops live before mechanical identification
 
@@ -598,13 +634,13 @@ decided by the transition table:
   and `Ready`, leading to `Idle` on success, to `Fault` on failure, and completing the command
   with `rejected` when the NVM is busy. It needs no request identity: the guard on every
   command that starts NVM work means one invalidation at most is outstanding.
-- The flux-linkage save completion becomes `FluxLinkageSaved`, handled in `Idle` and `Ready`
-  and completing the pending command without a transition.
+- The motor-parameter save completion becomes `MotorParameterSaved`, handled in `Idle` and
+  `Ready` and completing the pending command without a transition.
 - Both NVM completions also have rows in `Fault`, because a fault or an emergency stop while
   the operation is in flight aborts the command but not the erase or the write. The RAM record
   follows the NVM outcome whatever happened to the command: a successful invalidation drops the
   record, so a later `CmdClearFault` returns to `Idle` rather than restoring a calibration that
-  no longer exists in NVM, and a stored flux linkage is applied. An invalidation that fails
+  no longer exists in NVM, and a stored motor parameter is adopted. An invalidation that fails
   while already in `Fault` is ignored; the fault is already latched.
 
 Any of these events arriving in a state without a row for it is **forbidden**, and the save

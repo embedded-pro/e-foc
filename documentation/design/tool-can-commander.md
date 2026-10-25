@@ -2,9 +2,9 @@
 title: "CAN Commander Design"
 type: design
 status: draft
-version: 0.4.0
+version: 0.5.0
 component: "tool-can-commander"
-date: 2026-10-24
+date: 2026-10-25
 ---
 
 | Field     | Value                |
@@ -12,9 +12,9 @@ date: 2026-10-24
 | Title     | CAN Commander Design |
 | Type      | design               |
 | Status    | draft                |
-| Version   | 0.4.0                |
+| Version   | 0.5.0                |
 | Component | tool-can-commander   |
-| Date      | 2026-10-24           |
+| Date      | 2026-10-25           |
 
 ---
 
@@ -22,10 +22,13 @@ date: 2026-10-24
 
 **Is responsible for:**
 - Letting a bench engineer open one CAN interface and command every e-foc motor controller on it, each
-  addressed by its CAN node ID (configured base plus the board's ID jumpers): start, stop, control mode, torque/speed/position setpoints
-  and loop bandwidths, plus one emergency stop that reaches all of them.
+  addressed by its CAN node ID (configured base plus the board's ID jumpers): start, stop, clear fault,
+  control mode, torque/speed/position setpoints, the controller of each loop and its settings, the motor
+  parameters, the start-up settings, alignment and identification, plus one emergency stop that reaches all
+  of them.
 - Showing each controller's state as that controller reports it: heartbeat, firmware contract
-  compatibility, motor state and fault, measurements and identified motor parameters.
+  compatibility, motor state and fault, active control mode, measurements, identified motor parameters and
+  every setting it holds.
 - Keeping a persistent issue log per user, and turning it into a pre-filled bug report on request.
 - Telling the user when a newer release exists, without ever blocking the tool.
 - Shipping as a branded, installable product ("e-foc CAN Commander") for Windows and Debian-based Linux.
@@ -52,10 +55,12 @@ The tool is split so that everything but widget layout can be tested without a d
 - **Logic** — the command client, one for the whole bus. Every command names its node and every report says
   which node sent it. Per node it tracks: online (a frame was seen; offline after the protocol's 3 s server
   timeout or when the bus closes), firmware compatibility, and the last command sent until that command is
-  acknowledged, rejected or times out after 2 s. A newer command — typically the emergency stop — takes over
-  the slot and restarts the timeout; an acknowledgement of an older command no longer ends it. A command the
-  client refuses locally leaves the slot untouched. Closing the bus ends every pending command and reports
-  every node offline at once.
+  acknowledged, rejected or times out after 2 s (two minutes for alignment and identification). A newer
+  command — typically the emergency stop — takes over the slot and restarts the timeout; an acknowledgement
+  of an older command no longer ends it. A command the client refuses locally leaves the slot untouched.
+  Closing the bus ends every pending command and reports every node offline at once. The client also reads
+  each compatible node: its status every second and after every accepted command, because the controller
+  sends its status only when asked, and its settings (Part J).
 - **Support** — application identity, the issue log, the bug-report builder, the release feed reader, the
   update checker, and the bridge that runs the embedded-infrastructure event loop and timers on the GUI thread.
 - **Presentation** — the window, one panel per motor, the overview row and the status bar. Widgets only
@@ -75,6 +80,10 @@ graph TD
     M1 --> Header["Header: node, firmware, pending command"]
     M1 --> Commands["Commands"]
     M1 --> Telemetry["Telemetry and identified parameters"]
+    Commands --> Control["Motor Control: start, stop, clear fault, mode, setpoint"]
+    Commands --> Controllers["Controllers: algorithm and settings per loop"]
+    Commands --> Parameters["Motor Parameters: R, L, p, flux, J, B; align and identify"]
+    Commands --> Configuration["Configuration: start-up settings"]
 ```
 
 - A tab appears automatically for every node whose frames are seen on the bus. The user can also add a tab
@@ -87,15 +96,16 @@ graph TD
 
 ### Part C — state the user can see at all times
 
-| Element                                           | Shows                                                                                 | Source                              |
-|---------------------------------------------------|---------------------------------------------------------------------------------------|-------------------------------------|
-| Connection panel                                  | interface, bitrate, connected or not                                                  | bus adapter                         |
-| Overview row                                      | every motor's summary (running, idle, fault, offline, incompatible) with a status dot | each node                           |
-| Tab                                               | status dot and tooltip of that motor                                                  | each node                           |
-| Motor header                                      | node state, firmware contract, the command waiting for an answer                      | that node                           |
-| Control mode                                      | *requested…* until acknowledged, then *active*                                        | that node's mode response           |
-| Motor status, measurements, identified parameters | values, or "—" when nothing live is known                                             | that node's telemetry and responses |
-| Status bar                                        | motors online out of motors shown, and how many are in fault                          | all nodes                           |
+| Element                                           | Shows                                                                                 | Source                                  |
+|---------------------------------------------------|---------------------------------------------------------------------------------------|-----------------------------------------|
+| Connection panel                                  | interface, bitrate, connected or not                                                  | bus adapter                             |
+| Overview row                                      | every motor's summary (running, idle, fault, offline, incompatible) with a status dot | each node                               |
+| Tab                                               | status dot and tooltip of that motor                                                  | each node                               |
+| Motor header                                      | node state, firmware contract, the command waiting for an answer                      | that node                               |
+| Control mode                                      | *requested…* until acknowledged, then *active*                                        | that node's mode or algorithms response |
+| Controllers, motor parameters, configuration      | the values in force; an edited value is marked until it is applied or reverted        | that node's parameter responses         |
+| Motor status, measurements, identified parameters | values, or "—" when nothing live is known                                             | that node's status (read every second)  |
+| Status bar                                        | motors online out of motors shown, and how many are in fault                          | all nodes                               |
 
 A displayed state always comes from the controller. A motor's values are cleared when the bus closes or
 that node goes offline, so stale numbers never read as live. A fault on one motor stays visible in the
@@ -121,6 +131,60 @@ tool never offers precision that the frame drops.
 Each command outcome is logged in words and prefixed with its motor: accepted, the plain-language reason
 for a rejection (for example "not valid in the active control mode"), a command that was refused locally
 and never sent, or a command that received no answer in time.
+
+Align, Identify Electrical and Identify Mechanical move the rotor and answer only when they finish, so the
+tool waits up to two minutes for them instead of two seconds; the panel says the rotor will move before the
+button is pressed. The emergency stop takes over their slot like any other command, and also ends an Apply
+in progress (Part J). A controller that answers Identify Mechanical with "not implemented" gets that button
+disabled, with the reason, until its tab is closed.
+
+### Part J — controllers, motor parameters and configuration
+
+The settings tabs show what the node holds, not what was last typed. A node whose firmware contract is 2.1
+or newer is read completely when it is found compatible, and again after a mode change (accepted or
+refused), a controller change, an identification, an alignment or a Revert: the active mode and the
+algorithm of every loop, then every numbered parameter. Reads go one at a time, because the CAN send queue
+holds six frames; they do not make the node busy and are not logged one by one. A read that is not answered
+leaves "—".
+
+```mermaid
+flowchart LR
+    Node["Node compatible (2.1)"] --> Read["Read mode, algorithms, parameters"]
+    Read --> Forms["Forms show the values in force"]
+    Forms --> Edit["Operator edits: field marked as changed"]
+    Edit --> Apply["Apply: changed values sent one at a time"]
+    Apply --> Answer{"Answer"}
+    Answer -- accepted --> Forms
+    Answer -- refused or no answer --> Stop["Stop; remaining changes kept marked"]
+    Edit --> Revert["Revert: values in force restored"]
+```
+
+- **Controllers** shows the loops the active control mode runs: the current loop in torque mode, current and
+  speed in speed mode, all three in position mode. Each loop has its algorithm and the settings that
+  algorithm uses; the other settings of the loop are hidden, not deleted. A bandwidth can be left
+  *Automatic*, in which case the field shows the bandwidth the firmware derived.
+- **Motor Parameters** holds resistance, inductance, pole pairs, flux linkage (or the platform default),
+  inertia and viscous friction, and the commissioning actions Align, Identify Electrical and Identify
+  Mechanical. Changing the pole pairs says that the rotor has to be aligned again before it can start.
+- **Configuration** holds the settings read at start-up: encoder resolution, CAN node ID base and bitrate.
+  They are stored at once and take effect when the controller restarts; a new node ID or bitrate means the
+  motor appears under another tab, or only after reconnecting at the new bitrate, and the tab says so.
+
+Apply sends only the changed values, one at a time, each after the previous one was accepted, and stops at
+the first refusal or missing answer; the log names the refused value and why, and the values not sent stay
+marked. Within a loop the settings go before the algorithm, so a law is designed with the settings it was
+chosen with — unless the new law is one that never refuses a setting (all but speed LQI and position LQR and
+LQI), which then goes first, so the law it replaces does not judge settings it will no longer run. Of the
+sliding-mode pair the one that keeps the switching gain below the boundary layer goes first, and a pair that
+would end with the switching gain at or above the boundary layer is refused before anything is sent. Revert
+drops the edits and reads the values in force again.
+
+Controllers and motor parameters change only while the motor is stopped: their Apply is disabled, with the
+reason, while the last status says the motor runs or calibrates. Start-up settings can be stored at any time.
+
+A node on contract 2.0 has none of the 2.1 messages. Its Controllers tab offers the loop bandwidths alone,
+sent with the 2.0 bandwidth commands and not read back; the motor parameter fields are disabled with the
+reason; the commissioning actions and the encoder resolution work as on 2.1.
 
 ### Part E — issue log
 
@@ -368,6 +432,11 @@ sequenceDiagram
     Node-->>Client: Contract version
     Client->>Window: Node 3 compatible
     Note over Window: Motor 3 commands enabled
+    loop One read at a time (2.1: algorithms and every parameter, then status)
+        Client->>Node: Read
+        Node-->>Client: Value in force
+        Client->>Window: Show value
+    end
 ```
 
 ### Emergency stop with several motors
@@ -396,7 +465,9 @@ sequenceDiagram
 | Constraint             | Value / Description                                                                                  |
 |------------------------|------------------------------------------------------------------------------------------------------|
 | Motors per bus         | 8 (the servers `can-lite` tracks)                                                                    |
-| Command answer timeout | 2 s per node, restarted by every newer command                                                       |
+| Command answer timeout | 2 s per node, restarted by every newer command; 120 s for Align and identification                   |
+| Parameter reads        | one outstanding per node, 1 s each, never marking the node busy                                      |
+| Status reads           | each compatible node every 1 s and after every accepted command                                      |
 | Node offline after     | 3 s without a frame (`can-lite` server timeout)                                                      |
 | On-screen event log    | newest 5000 lines                                                                                    |
 | Issue log              | 1 MiB per file, 3 files, UTC timestamps                                                              |

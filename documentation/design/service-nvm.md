@@ -2,9 +2,9 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.3.2
+version: 0.4.0
 component: service-nvm
-date: 2026-10-22
+date: 2026-10-25
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-10-22
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.3.2                        |
+| Version   | 0.4.0                        |
 | Component | service-nvm                  |
-| Date      | 2026-10-22                   |
+| Date      | 2026-10-25                   |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -52,9 +52,14 @@ The service manages two independent EEPROM regions. Each region holds exactly on
 | Region        | Magic        | Data structure    | Data size |
 |---------------|--------------|-------------------|-----------|
 | Calibration   | `0xCAFEF00D` | `CalibrationData` | 108 bytes |
-| Configuration | `0xDEADBEEF` | `ConfigData`      | 20 bytes  |
+| Configuration | `0xDEADBEEF` | `ConfigData`      | 76 bytes  |
 
 The calibration record's layout is at version 4. The cogging map (`service-cogging-compensation.md`) took its data from 56 to 108 bytes, so a record written by an earlier firmware reads as a version mismatch and the motor has to be calibrated again.
+
+The configuration record's layout is at version 5. The operator's tuning settings (`controller-selection.md`
+Part H) took its data from 20 to 76 bytes, so a record written by an earlier firmware reads as a version
+mismatch once: the start-up settings, the default control mode and the algorithm selections return to their
+defaults and are stored again by the next change. The calibration record is untouched by that bump.
 
 The two regions use different `NvmRegion` instances (injected at construction) and can be read, written, and erased independently. An operation on the calibration region has no effect on the configuration region and vice versa.
 
@@ -217,18 +222,26 @@ stateDiagram-v2
 | encoderDirection     | —             | Polarity correction (+1 or −1)                      |
 | polePairs            | —             | Number of motor pole pairs                          |
 
-**ConfigData** (20 bytes total):
+**ConfigData** (76 bytes total):
 
-| Field              | Physical unit | Description                                  |
-|--------------------|---------------|----------------------------------------------|
-| canNodeId          | —             | Base CAN node ID; board ID added at boot     |
-| canBaudrate        | bit/s         | CAN bus baud rate                            |
-| telemetryRateHz    | Hz            | Rate at which telemetry frames are sent      |
-| encoderResolution  | —             | Encoder counts per mechanical revolution     |
-| defaultControlMode | —             | Control mode selected on power-up            |
-| currentAlgorithm   | —             | Current-loop algorithm selected on power-up  |
-| speedAlgorithm     | —             | Speed-loop algorithm selected on power-up    |
-| positionAlgorithm  | —             | Position-loop algorithm selected on power-up |
+| Field                 | Physical unit | Description                                                                                                    |
+|-----------------------|---------------|----------------------------------------------------------------------------------------------------------------|
+| canNodeId             | —             | Base CAN node ID; board ID added at boot                                                                       |
+| canBaudrate           | bit/s         | CAN bus baud rate                                                                                              |
+| telemetryRateHz       | Hz            | Rate at which telemetry frames are sent                                                                        |
+| encoderResolution     | —             | Encoder counts per mechanical revolution                                                                       |
+| defaultControlMode    | —             | Control mode selected on power-up                                                                              |
+| currentAlgorithm      | —             | Current-loop algorithm selected on power-up                                                                    |
+| speedAlgorithm        | —             | Speed-loop algorithm selected on power-up                                                                      |
+| positionAlgorithm     | —             | Position-loop algorithm selected on power-up                                                                   |
+| current loop tunings  | rad/s, A, —   | Bandwidth (0 = automatic), switching gain, boundary layer, two-step deadbeat flag                              |
+| speed loop tunings    | rad/s, —, s   | Bandwidth (0 = automatic), speed error and integral weights, observer bandwidth ratio, reference time constant |
+| position loop tunings | rad/s, —, s   | Bandwidth (0 = automatic), position error, speed error and integral weights, reference time constant           |
+
+The tuning fields hold the operator's values as entered; a bandwidth of 0 asks the firmware to derive it.
+They are range-checked when they are written and again at boot, where a value outside its range — possible
+only if a later firmware narrows a range without bumping the layout — is replaced by its default. The four-byte fields precede the byte-sized ones and three
+reserved bytes complete the last word, so the record has no implicit padding.
 
 The four selection fields are stored as raw byte identifiers. A record can pass the integrity check
 and still hold a byte outside the valid range for its selection, so each value is range-checked
