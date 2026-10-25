@@ -3,6 +3,7 @@ add_library(e_foc.integration_tests.steps OBJECT
     CanSteps.cpp
     CommonSteps.cpp
     ControllerMatrixSteps.cpp
+    ControllerSettingsSteps.cpp
     EepromSteps.cpp
     FaultSteps.cpp
     HardfaultRecoverySteps.cpp
