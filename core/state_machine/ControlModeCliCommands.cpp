@@ -181,12 +181,12 @@ namespace
             [&sm, &terminal](const infra::BoundedConstString& params)
             {
                 float value{ 0.0f };
-                if (auto error = ParseSingleFloat(params, value, 0.0f, foc::CommandLimits::maxFluxLinkage); error.has_value())
+                if (auto error = ParseSingleFloat(params, value, foc::CommandLimits::minFluxLinkage, foc::CommandLimits::maxFluxLinkage); error.has_value())
                 {
                     terminal.ProcessResult(*error);
                     return;
                 }
-                sm.SetFluxLinkage(foc::Weber{ value }, [](state_machine::CommandResult) {});
+                sm.SetMotorParameter(services::MotorParameter::fluxLinkage, value, [](state_machine::SettingResult) {});
                 terminal.ProcessResult(CliResult{});
             } });
 
@@ -308,7 +308,7 @@ namespace state_machine
         terminal.AddCommand({ { "apply_estimates", "ae", "Apply online estimates to PID gains" },
             [&sm](const infra::BoundedConstString&)
             {
-                sm.ActiveStateMachine().ApplyOnlineEstimates();
+                sm.ApplyOnlineEstimates();
             } });
 
         terminal.AddCommand({ { "active_mode", "am", "Print the active control mode" },

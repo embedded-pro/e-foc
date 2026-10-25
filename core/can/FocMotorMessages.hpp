@@ -25,6 +25,10 @@ namespace can
     static constexpr uint8_t focSetSpeedSetpointId = 0x10;
     static constexpr uint8_t focSetPositionSetpointId = 0x11;
     static constexpr uint8_t focQueryContractVersionId = 0x12;
+    static constexpr uint8_t focSelectAlgorithmId = 0x13;
+    static constexpr uint8_t focQueryAlgorithmsId = 0x14;
+    static constexpr uint8_t focSetParameterId = 0x15;
+    static constexpr uint8_t focQueryParameterId = 0x16;
 
     static constexpr uint8_t focMotorTypeResponseId = 0x80;
     static constexpr uint8_t focElectricalParamsResponseId = 0x86;
@@ -33,6 +37,8 @@ namespace can
     static constexpr uint8_t focTelemetryStatusResponseId = 0x89;
     static constexpr uint8_t focSelectControlModeResponseId = 0x8E;
     static constexpr uint8_t focContractVersionResponseId = 0x92;
+    static constexpr uint8_t focAlgorithmsResponseId = 0x93;
+    static constexpr uint8_t focParameterResponseId = 0x96;
 
     enum class FocMotorMode : uint8_t
     {
@@ -67,7 +73,87 @@ namespace can
         modeMismatch = 2,
         calibrationFailed = 3,
         abortedByFault = 4,
-        applicationError = 5
+        applicationError = 5,
+        invalidParameters = 6
+    };
+
+    enum class FocControlLoop : uint8_t
+    {
+        current = 0,
+        speed = 1,
+        position = 2
+    };
+
+    enum class FocCurrentAlgorithm : uint8_t
+    {
+        pid = 0,
+        decoupledPid = 1,
+        deadbeat = 2,
+        slidingMode = 3
+    };
+
+    enum class FocSpeedAlgorithm : uint8_t
+    {
+        pid = 0,
+        lqi = 1,
+        adrc = 2,
+        twoDof = 3
+    };
+
+    enum class FocPositionAlgorithm : uint8_t
+    {
+        pid = 0,
+        cascadeP = 1,
+        lqr = 2,
+        lqi = 3,
+        twoDof = 4
+    };
+
+    enum class FocParameter : uint8_t
+    {
+        currentBandwidth = 0x00,
+        currentSwitchingGain = 0x01,
+        currentBoundaryLayer = 0x02,
+        currentTwoStepDeadbeat = 0x03,
+        speedBandwidth = 0x10,
+        speedErrorWeight = 0x11,
+        speedIntegralWeight = 0x12,
+        speedObserverBandwidthRatio = 0x13,
+        speedReferenceTimeConstant = 0x14,
+        positionBandwidth = 0x20,
+        positionErrorWeight = 0x21,
+        positionSpeedErrorWeight = 0x22,
+        positionIntegralWeight = 0x23,
+        positionReferenceTimeConstant = 0x24,
+        resistance = 0x40,
+        inductance = 0x41,
+        polePairs = 0x42,
+        fluxLinkage = 0x43,
+        inertia = 0x44,
+        viscousFriction = 0x45,
+        encoderResolution = 0x60,
+        canNodeId = 0x61,
+        canBitrate = 0x62
+    };
+
+    static constexpr uint8_t focParameterAutomaticFlag = 0x01;
+
+    struct FocAlgorithms
+    {
+        FocMotorMode mode{ FocMotorMode::torque };
+        FocCurrentAlgorithm current{ FocCurrentAlgorithm::pid };
+        FocSpeedAlgorithm speed{ FocSpeedAlgorithm::pid };
+        FocPositionAlgorithm position{ FocPositionAlgorithm::pid };
+
+        friend constexpr bool operator==(const FocAlgorithms&, const FocAlgorithms&) = default;
+    };
+
+    struct FocParameterValue
+    {
+        float value{ 0.0f };
+        bool automatic{ false };
+
+        friend constexpr bool operator==(const FocParameterValue&, const FocParameterValue&) = default;
     };
 
     static constexpr int32_t focCurrentScale = 10;

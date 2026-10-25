@@ -22,6 +22,8 @@ target_sources(e_foc.can PRIVATE
     CanNodeAddress.cpp
     FocMotorMessages.hpp
     FocMotorWireContract.hpp
+    FocMotorSettings.hpp
+    FocMotorSettings.cpp
     FocMotorCategoryServer.hpp
     FocMotorCategoryServer.cpp
     FocMotorCategoryClient.hpp

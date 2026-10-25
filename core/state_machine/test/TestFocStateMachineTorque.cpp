@@ -774,7 +774,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_is_rejected_while_the_save
                 capturedSave = onDone;
             }));
     std::optional<state_machine::CommandResult> first;
-    sm.CmdSetFluxLinkage(foc::Weber{ 0.05f }, [&first](state_machine::CommandResult value)
+    sm.CmdSetMotorParameter(services::MotorParameter::fluxLinkage, 0.05f, [&first](state_machine::CommandResult value)
         {
             first = value;
         });
@@ -782,7 +782,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_is_rejected_while_the_save
     EXPECT_EQ(state_machine::CommandResult::abortedByFault, first);
 
     std::optional<state_machine::CommandResult> second;
-    sm.CmdSetFluxLinkage(foc::Weber{ 0.06f }, [&second](state_machine::CommandResult value)
+    sm.CmdSetMotorParameter(services::MotorParameter::fluxLinkage, 0.06f, [&second](state_machine::CommandResult value)
         {
             second = value;
         });
@@ -2795,7 +2795,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_in_ready_persists_and_retu
             }));
 
     auto result = state_machine::CommandResult::rejected;
-    sm.CmdSetFluxLinkage(foc::Weber{ 0.05f }, [&result](state_machine::CommandResult r)
+    sm.CmdSetMotorParameter(services::MotorParameter::fluxLinkage, 0.05f, [&result](state_machine::CommandResult r)
         {
             result = r;
         });
@@ -2804,20 +2804,129 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_in_ready_persists_and_retu
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
 }
 
-TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_with_zero_value_is_rejected)
+TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_to_zero_returns_to_the_configured_default)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    const auto configured = sm.ActiveFluxLinkage();
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_EQ(data.fluxLinkage, 0.0f);
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    auto result = state_machine::CommandResult::rejected;
+    sm.CmdSetMotorParameter(services::MotorParameter::fluxLinkage, 0.0f, [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::CommandResult::ok);
+    EXPECT_NEAR(sm.ActiveFluxLinkage().Value(), configured.Value(), 1e-6f);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineTorqueCliTest, changing_the_pole_pairs_in_ready_requires_another_alignment)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_EQ(data.polePairs, 5);
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    auto result = state_machine::CommandResult::rejected;
+    sm.CmdSetMotorParameter(services::MotorParameter::polePairs, 5.0f, [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::CommandResult::ok);
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_FALSE(std::get<state_machine::Ready>(sm.CurrentState()).rotorReferenceValid);
+    EXPECT_EQ(std::get<state_machine::Ready>(sm.CurrentState()).loadedData.polePairs, 5);
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
+
+    AlignAfterBoot(sm);
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::ok);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, changing_the_resistance_in_ready_keeps_the_rotor_reference)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValid();
+    auto sm = CreateStateMachine();
+    AlignAfterBoot(sm);
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_EQ(data.rPhase, 0.36f);
+                EXPECT_EQ(data.stage, services::CalibrationStage::complete);
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    sm.CmdSetMotorParameter(services::MotorParameter::resistance, 0.36f, [](state_machine::CommandResult) {});
+
+    ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+    EXPECT_EQ(std::get<state_machine::Ready>(sm.CurrentState()).loadedData.rPhase, 0.36f);
+    EXPECT_CALL(inverterMock, Start()).Times(1);
+    EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::ok);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, an_inductance_is_written_to_both_axes)
 {
     GivenFaultNotifierRegistered();
     GivenNvmValid();
     auto sm = CreateStateMachine();
 
-    auto result = state_machine::CommandResult::ok;
-    sm.CmdSetFluxLinkage(foc::Weber{ 0.0f }, [&result](state_machine::CommandResult r)
-        {
-            result = r;
-        });
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_EQ(data.lD, 0.2f);
+                EXPECT_EQ(data.lQ, 0.2f);
+                onDone(services::NvmStatus::Ok);
+            }));
 
-    EXPECT_EQ(result, state_machine::CommandResult::rejected);
+    sm.CmdSetMotorParameter(services::MotorParameter::inductance, 0.2f, [](state_machine::CommandResult) {});
+
+    EXPECT_EQ(sm.CalibrationRecord().lD, 0.2f);
+}
+
+TEST_F(FocStateMachineTorqueCliTest, a_datasheet_record_entered_from_scratch_becomes_complete_and_can_be_aligned)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .Times(3)
+        .WillRepeatedly(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    sm.CmdSetMotorParameter(services::MotorParameter::resistance, 0.36f, [](state_machine::CommandResult) {});
+    EXPECT_TRUE(sm.HasPartialCalibration());
+    sm.CmdSetMotorParameter(services::MotorParameter::inductance, 0.2f, [](state_machine::CommandResult) {});
+    sm.CmdSetMotorParameter(services::MotorParameter::polePairs, 4.0f, [](state_machine::CommandResult) {});
+
+    EXPECT_EQ(sm.CalibrationRecord().stage, services::CalibrationStage::complete);
+    EXPECT_FALSE(sm.HasPartialCalibration());
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+
+    AlignAfterBoot(sm);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
 }
 
 TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_with_negative_value_is_rejected)
@@ -2827,7 +2936,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_with_negative_value_is_rej
     auto sm = CreateStateMachine();
 
     auto result = state_machine::CommandResult::ok;
-    sm.CmdSetFluxLinkage(foc::Weber{ -0.05f }, [&result](state_machine::CommandResult r)
+    sm.CmdSetMotorParameter(services::MotorParameter::fluxLinkage, -0.05f, [&result](state_machine::CommandResult r)
         {
             result = r;
         });
@@ -2835,20 +2944,30 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_with_negative_value_is_rej
     EXPECT_EQ(result, state_machine::CommandResult::rejected);
 }
 
-TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_from_idle_no_calibration_is_rejected)
+TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_without_a_calibration_is_stored_for_the_next_one)
 {
     GivenFaultNotifierRegistered();
     GivenNvmInvalid();
     auto sm = CreateStateMachine();
 
-    auto result = state_machine::CommandResult::ok;
-    sm.CmdSetFluxLinkage(foc::Weber{ 0.05f }, [&result](state_machine::CommandResult r)
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_NEAR(data.fluxLinkage, 0.05f, 1e-6f);
+                EXPECT_EQ(data.stage, services::CalibrationStage::none);
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    auto result = state_machine::CommandResult::rejected;
+    sm.CmdSetMotorParameter(services::MotorParameter::fluxLinkage, 0.05f, [&result](state_machine::CommandResult r)
         {
             result = r;
         });
 
-    EXPECT_EQ(result, state_machine::CommandResult::rejected);
+    EXPECT_EQ(result, state_machine::CommandResult::ok);
+    EXPECT_NEAR(sm.ActiveFluxLinkage().Value(), 0.05f, 1e-6f);
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    EXPECT_FALSE(sm.HasPartialCalibration());
 }
 
 TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_from_enabled_is_rejected)
@@ -2863,7 +2982,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_from_enabled_is_rejected)
     ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 
     auto result = state_machine::CommandResult::ok;
-    sm.CmdSetFluxLinkage(foc::Weber{ 0.05f }, [&result](state_machine::CommandResult r)
+    sm.CmdSetMotorParameter(services::MotorParameter::fluxLinkage, 0.05f, [&result](state_machine::CommandResult r)
         {
             result = r;
         });
@@ -2886,7 +3005,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_nvm_busy_returns_rejected)
             }));
 
     auto result = state_machine::CommandResult::ok;
-    sm.CmdSetFluxLinkage(foc::Weber{ 0.05f }, [&result](state_machine::CommandResult r)
+    sm.CmdSetMotorParameter(services::MotorParameter::fluxLinkage, 0.05f, [&result](state_machine::CommandResult r)
         {
             result = r;
         });
@@ -2908,7 +3027,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_nvm_write_failed_returns_n
             }));
 
     auto result = state_machine::CommandResult::ok;
-    sm.CmdSetFluxLinkage(foc::Weber{ 0.05f }, [&result](state_machine::CommandResult r)
+    sm.CmdSetMotorParameter(services::MotorParameter::fluxLinkage, 0.05f, [&result](state_machine::CommandResult r)
         {
             result = r;
         });
@@ -2986,7 +3105,7 @@ TEST_F(FocStateMachineTorqueCliTest, flux_linkage_stored_after_a_fault_is_still_
             }));
 
     std::optional<state_machine::CommandResult> result;
-    sm.CmdSetFluxLinkage(foc::Weber{ 0.05f }, [&result](state_machine::CommandResult value)
+    sm.CmdSetMotorParameter(services::MotorParameter::fluxLinkage, 0.05f, [&result](state_machine::CommandResult value)
         {
             result = value;
         });

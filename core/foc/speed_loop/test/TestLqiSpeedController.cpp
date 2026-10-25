@@ -1,3 +1,4 @@
+#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/foc/speed_loop/LqiSpeedController.hpp"
 #include "core/foc/speed_loop/SpeedPlantModel.hpp"
 #include <algorithm>
@@ -218,4 +219,30 @@ TEST_F(TestLqiSpeedController, invalid_parameters_leave_the_controller_inert)
     auto output = controller.Compute({ foc::RadiansPerSecond{ 0.0f }, foc::RadiansPerSecond{ 10.0f } });
 
     EXPECT_NEAR(output.Value(), 0.0f, tolerance);
+}
+
+TEST_F(TestLqiSpeedController, the_default_settings_converge_for_both_reference_plants)
+{
+    EXPECT_TRUE(foc::LqiSpeedController::IsDesignFeasible(ValidParameters(), foc::SpeedLoopTunings{}));
+    EXPECT_TRUE(foc::LqiSpeedController::IsDesignFeasible(ReferenceMotorParameters(), foc::SpeedLoopTunings{}));
+}
+
+TEST_F(TestLqiSpeedController, a_design_that_does_not_converge_is_refused_and_leaves_the_law_inert)
+{
+    auto tunings = foc::SpeedLoopTunings{};
+    tunings.bandwidth = foc::CommandLimits::minBandwidth;
+
+    EXPECT_FALSE(foc::LqiSpeedController::IsDesignFeasible(ValidParameters(), tunings));
+
+    controller.Configure(ValidParameters());
+    EXPECT_FALSE(controller.SetTunings(tunings));
+    EXPECT_NEAR(controller.Compute({ foc::RadiansPerSecond{ 0.0f }, foc::RadiansPerSecond{ 100.0f } }).Value(), 0.0f, tolerance);
+}
+
+TEST_F(TestLqiSpeedController, a_design_without_mechanics_is_infeasible_and_leaves_the_law_inert)
+{
+    EXPECT_FALSE(foc::LqiSpeedController::IsDesignFeasible(foc::MechanicalModelParameters{}, foc::SpeedLoopTunings{}));
+    EXPECT_FALSE(controller.Configure(foc::MechanicalModelParameters{}));
+
+    EXPECT_NEAR(controller.Compute({ foc::RadiansPerSecond{ 0.0f }, foc::RadiansPerSecond{ 100.0f } }).Value(), 0.0f, tolerance);
 }

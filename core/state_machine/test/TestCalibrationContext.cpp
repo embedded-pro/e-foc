@@ -111,14 +111,6 @@ TEST_F(CalibrationContextTest, invalidate_resets_data_and_rotor_reference)
     EXPECT_FALSE(context.IsRotorReferenceValid());
 }
 
-TEST_F(CalibrationContextTest, pending_flux_linkage_commit_updates_calibration_data)
-{
-    context.SetData(CompleteData());
-    context.SetPendingFluxLinkage(0.010f);
-    context.CommitPendingFluxLinkage();
-    EXPECT_NEAR(context.Data().fluxLinkage, 0.010f, 1e-6f);
-}
-
 TEST_F(CalibrationContextTest, effective_flux_linkage_returns_calibrated_value_when_positive)
 {
     context.SetData(CompleteData());

@@ -52,8 +52,10 @@ namespace application
         state_machine::CommandResult CmdReserveExternalCalibration();
         state_machine::CommandResult CmdReleaseExternalCalibration();
         void CmdCompleteExternalCalibration(const services::CalibrationData& data, const infra::Function<void(state_machine::CommandResult)>& onDone);
-        void CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone);
+        void CmdSetMotorParameter(services::MotorParameter parameter, float value, const infra::Function<void(state_machine::CommandResult)>& onDone);
         foc::Weber ActiveFluxLinkage() const;
+        const services::CalibrationData& CalibrationRecord() const;
+        float AutomaticCurrentLoopBandwidth() const;
 
         void RegisterReadyHandler(const infra::Function<void()>& onReady);
         const StateMachine& TransitionTable() const;

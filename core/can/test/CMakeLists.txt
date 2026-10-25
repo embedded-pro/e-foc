@@ -29,6 +29,7 @@ target_sources(e_foc.can_test PRIVATE
     TestFocMotorCanBridge.cpp
     TestFocMotorCanClient.cpp
     TestFocMotorWireContract.cpp
+    TestFocMotorSettings.cpp
     TestWireContractDocumentation.cpp
 )
 

@@ -4,6 +4,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -60,6 +61,62 @@ namespace
         }
 
         return scales;
+    }
+
+    std::string Trim(const std::string& value)
+    {
+        const auto first = value.find_first_not_of(" \t`");
+        const auto last = value.find_last_not_of(" \t`");
+        return first == std::string::npos ? std::string{} : value.substr(first, last - first + 1);
+    }
+
+    std::vector<std::string> Cells(const std::string& line)
+    {
+        std::vector<std::string> cells;
+        std::istringstream stream{ line };
+        std::string cell;
+
+        std::getline(stream, cell, '|');
+        while (std::getline(stream, cell, '|'))
+            cells.push_back(Trim(cell));
+
+        return cells;
+    }
+
+    struct DocumentedParameter
+    {
+        std::string number;
+        std::string unit;
+        std::string automatic;
+    };
+
+    std::map<std::string, DocumentedParameter> DocumentedParameters()
+    {
+        std::map<std::string, DocumentedParameter> parameters;
+        std::istringstream lines{ DesignDocument() };
+        std::string line;
+
+        while (std::getline(lines, line))
+        {
+            if (line.size() < 2 || line[0] != '|')
+                continue;
+
+            const auto cells = Cells(line);
+            if (cells.size() < 5)
+                continue;
+
+            for (const auto& parameter : can::focParameters)
+                if (cells[1] == parameter.name)
+                    parameters[cells[1]] = DocumentedParameter{ cells[0], cells[2], cells[4] };
+        }
+
+        return parameters;
+    }
+
+    std::string Hex(uint8_t value)
+    {
+        static constexpr const char* digits{ "0123456789ABCDEF" };
+        return std::string{ "0x" } + digits[value >> 4] + digits[value & 0x0F];
     }
 }
 
@@ -119,4 +176,28 @@ TEST(WireContractDocumentation, the_documented_version_matches_the_contract)
 
     EXPECT_NE(std::string::npos, document.find("QueryContractVersion"));
     EXPECT_NE(std::string::npos, document.find("ContractVersionResponse"));
+}
+
+TEST(WireContractDocumentation, every_parameter_is_documented_with_its_number_unit_and_automatic_flag)
+{
+    const auto documented = DocumentedParameters();
+
+    for (const auto& parameter : can::focParameters)
+    {
+        const auto entry = documented.find(parameter.name);
+        ASSERT_NE(documented.end(), entry) << parameter.name;
+        EXPECT_EQ(Hex(static_cast<uint8_t>(parameter.id)), entry->second.number) << parameter.name;
+        EXPECT_EQ(std::string{ parameter.unit }, entry->second.unit) << parameter.name;
+        EXPECT_EQ(std::string{ parameter.automatic ? "yes" : "no" }, entry->second.automatic) << parameter.name;
+    }
+
+    EXPECT_EQ(can::focParameters.size(), documented.size());
+}
+
+TEST(WireContractDocumentation, the_algorithm_and_parameter_messages_are_documented)
+{
+    const auto document = DesignDocument();
+
+    for (const auto* name : { "SelectAlgorithm", "QueryAlgorithms", "SetParameter", "QueryParameter", "AlgorithmsResponse", "ParameterResponse", "invalidParameters" })
+        EXPECT_NE(std::string::npos, document.find(name)) << name;
 }

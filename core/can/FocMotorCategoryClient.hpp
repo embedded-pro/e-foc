@@ -33,6 +33,8 @@ namespace can
         virtual void OnContractVersionResponse(uint16_t sourceNodeId, uint8_t major, uint8_t minor) = 0;
         virtual void OnElectricalParamsResponse(uint16_t sourceNodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs) = 0;
         virtual void OnMechanicalParamsResponse(uint16_t sourceNodeId, foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia) = 0;
+        virtual void OnAlgorithmsResponse(uint16_t sourceNodeId, const FocAlgorithms& algorithms) = 0;
+        virtual void OnParameterResponse(uint16_t sourceNodeId, FocParameter parameter, FocParameterValue value) = 0;
     };
 
     enum class ContractCompatibility : uint8_t
@@ -66,6 +68,15 @@ namespace can
         bool SendSetSpeedBandwidth(uint16_t targetNodeId, float bandwidth);
         bool SendSetPositionBandwidth(uint16_t targetNodeId, float bandwidth);
         bool SendQueryContractVersion(uint16_t targetNodeId);
+        bool SendAlign(uint16_t targetNodeId);
+        bool SendIdentifyElectrical(uint16_t targetNodeId);
+        bool SendIdentifyMechanical(uint16_t targetNodeId);
+        bool SendRequestTelemetry(uint16_t targetNodeId);
+        bool SendSetEncoderResolution(uint16_t targetNodeId, uint32_t countsPerRevolution);
+        bool SendSelectAlgorithm(uint16_t targetNodeId, FocControlLoop loop, uint8_t algorithm);
+        bool SendQueryAlgorithms(uint16_t targetNodeId);
+        bool SendSetParameter(uint16_t targetNodeId, FocParameter parameter, float value);
+        bool SendQueryParameter(uint16_t targetNodeId, FocParameter parameter);
 
         ContractCompatibility Compatibility(uint16_t nodeId) const;
 
@@ -86,6 +97,8 @@ namespace can
         bool HandleContractVersionResponse(const hal::Can::Message& data);
         bool HandleElectricalParamsResponse(const hal::Can::Message& data);
         bool HandleMechanicalParamsResponse(const hal::Can::Message& data);
+        bool HandleAlgorithmsResponse(const hal::Can::Message& data);
+        bool HandleParameterResponse(const hal::Can::Message& data);
 
         services::CanMessageHandler<FocMotorCategoryClient> selectControlModeResponse{ focSelectControlModeResponseId, *this, &FocMotorCategoryClient::HandleSelectControlModeResponse };
         services::CanMessageHandler<FocMotorCategoryClient> categoryError{ services::canCategoryErrorResponseMessageTypeId, *this, &FocMotorCategoryClient::HandleCategoryError };
@@ -94,6 +107,8 @@ namespace can
         services::CanMessageHandler<FocMotorCategoryClient> contractVersionResponse{ focContractVersionResponseId, *this, &FocMotorCategoryClient::HandleContractVersionResponse };
         services::CanMessageHandler<FocMotorCategoryClient> electricalParamsResponse{ focElectricalParamsResponseId, *this, &FocMotorCategoryClient::HandleElectricalParamsResponse };
         services::CanMessageHandler<FocMotorCategoryClient> mechanicalParamsResponse{ focMechanicalParamsResponseId, *this, &FocMotorCategoryClient::HandleMechanicalParamsResponse };
+        services::CanMessageHandler<FocMotorCategoryClient> algorithmsResponse{ focAlgorithmsResponseId, *this, &FocMotorCategoryClient::HandleAlgorithmsResponse };
+        services::CanMessageHandler<FocMotorCategoryClient> parameterResponse{ focParameterResponseId, *this, &FocMotorCategoryClient::HandleParameterResponse };
 
         const CanFrameOrigin& origin;
         std::array<NodeContract, maxTrackedNodes> contracts{};

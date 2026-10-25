@@ -151,14 +151,24 @@ namespace application
         Dispatch(state_machine::CompleteExternalCalibration{ data, state_machine::CommandCallback{ onDone } });
     }
 
-    void FocStateMachineCommon::CmdSetFluxLinkage(foc::Weber fluxLinkage, const infra::Function<void(state_machine::CommandResult)>& onDone)
+    void FocStateMachineCommon::CmdSetMotorParameter(services::MotorParameter parameter, float value, const infra::Function<void(state_machine::CommandResult)>& onDone)
     {
-        Dispatch(state_machine::SetFluxLinkage{ fluxLinkage, state_machine::CommandCallback{ onDone } });
+        Dispatch(state_machine::SetMotorParameter{ parameter, value, state_machine::CommandCallback{ onDone } });
     }
 
     foc::Weber FocStateMachineCommon::ActiveFluxLinkage() const
     {
         return calibrationContext.ActiveFluxLinkage();
+    }
+
+    const services::CalibrationData& FocStateMachineCommon::CalibrationRecord() const
+    {
+        return calibrationContext.Data();
+    }
+
+    float FocStateMachineCommon::AutomaticCurrentLoopBandwidth() const
+    {
+        return calibrationContext.CurrentTuningsFor(calibrationContext.Data().currentLoopBandwidth).bandwidth;
     }
 
     void FocStateMachineCommon::RegisterReadyHandler(const infra::Function<void()>& onReady)

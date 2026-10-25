@@ -31,6 +31,7 @@ namespace application
     public:
         void ApplyOnlineEstimates() override;
         void TraceOnlineEstimates();
+        float AutomaticSpeedLoopBandwidth() const;
 
     protected:
         OuterLoopStateMachine(const TerminalAndTracer& terminalAndTracer,

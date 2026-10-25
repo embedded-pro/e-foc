@@ -51,6 +51,12 @@ namespace application
         return configured;
     }
 
+    float OuterLoopStateMachine::AutomaticSpeedLoopBandwidth() const
+    {
+        const auto bandwidth = GetCalibration().speedLoopBandwidth;
+        return foc::IsAcceptableSpeedBandwidth(bandwidth) ? bandwidth : velocityBandwidthRadPerSec;
+    }
+
     void OuterLoopStateMachine::ApplyModeSpecificCalibration(const services::CalibrationData& data)
     {
         ApplyMechanics(foc::NewtonMeterSecondSquared{ data.inertia }, foc::NewtonMeterSecondPerRadian{ data.frictionViscous }, data.speedLoopBandwidth, TorqueConstantFor(data));

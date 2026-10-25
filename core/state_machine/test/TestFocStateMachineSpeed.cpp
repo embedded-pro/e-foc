@@ -2300,6 +2300,108 @@ TEST_F(FocStateMachineSpeedCliTest, external_calibration_without_mechanics_stays
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::rejected);
 }
 
+TEST_F(FocStateMachineSpeedCliTest, entering_the_inertia_completes_an_electrical_only_record)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmInvalid();
+    auto sm = CreateSpeedStateMachine();
+
+    ExpectExternalCalibrationPersistsStage(services::CalibrationStage::none);
+    ASSERT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+    sm.CmdCompleteExternalCalibration(ElectricalOnlyData(), [](state_machine::CommandResult) {});
+    ASSERT_TRUE(sm.HasPartialCalibration());
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_EQ(data.inertia, 1.0e-5f);
+                EXPECT_EQ(data.stage, services::CalibrationStage::complete);
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    auto result = state_machine::CommandResult::rejected;
+    sm.CmdSetMotorParameter(services::MotorParameter::inertia, 1.0e-5f, [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::CommandResult::ok);
+    EXPECT_FALSE(sm.HasPartialCalibration());
+    EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+
+    AlignAfterBoot(sm);
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineSpeedCliTest, an_electrical_identification_keeps_the_mechanics_of_the_record)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithMechanics(0.005f, 0.001f);
+    auto sm = CreateSpeedStateMachine();
+
+    EXPECT_CALL(alignmentMock, ForceAlignment(_, _, _))
+        .WillOnce(Invoke([](std::size_t, const auto&, const infra::Function<void(std::optional<foc::Radians>)>& cb)
+            {
+                cb(foc::Radians{ 0.0f });
+            }));
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_EQ(data.inertia, 0.005f);
+                EXPECT_EQ(data.frictionViscous, 0.001f);
+                EXPECT_EQ(data.speedLoopBandwidth, 50.0f);
+                EXPECT_EQ(data.stage, services::CalibrationStage::complete);
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    ASSERT_EQ(sm.CmdReserveExternalCalibration(), state_machine::CommandResult::ok);
+    sm.CmdCompleteExternalCalibration(ElectricalOnlyData(), [](state_machine::CommandResult) {});
+
+    EXPECT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
+}
+
+TEST_F(FocStateMachineSpeedCliTest, a_motor_parameter_that_cannot_be_stored_leaves_the_record_unchanged)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithMechanics(0.005f, 0.001f);
+    auto sm = CreateSpeedStateMachine();
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData&, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                onDone(services::NvmStatus::WriteFailed);
+            }));
+
+    auto result = state_machine::CommandResult::ok;
+    sm.CmdSetMotorParameter(services::MotorParameter::inertia, 0.02f, [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+
+    EXPECT_EQ(result, state_machine::CommandResult::nvmFailed);
+    EXPECT_EQ(sm.CalibrationRecord().inertia, 0.005f);
+}
+
+TEST_F(FocStateMachineSpeedCliTest, a_non_physical_motor_parameter_is_rejected_without_a_write)
+{
+    GivenFaultNotifierRegistered();
+    GivenNvmValidWithMechanics(0.005f, 0.001f);
+    auto sm = CreateSpeedStateMachine();
+
+    auto result = state_machine::CommandResult::ok;
+    sm.CmdSetMotorParameter(services::MotorParameter::inertia, 0.0f, [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+    EXPECT_EQ(result, state_machine::CommandResult::rejected);
+
+    sm.CmdSetMotorParameter(services::MotorParameter::polePairs, 4.5f, [&result](state_machine::CommandResult r)
+        {
+            result = r;
+        });
+    EXPECT_EQ(result, state_machine::CommandResult::rejected);
+}
+
 TEST_F(FocStateMachineSpeedCliTest, complete_external_calibration_without_reserve_is_rejected)
 {
     GivenFaultNotifierRegistered();

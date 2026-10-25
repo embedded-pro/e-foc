@@ -10,17 +10,20 @@ namespace
 
 namespace foc
 {
+    bool LqiSpeedController::IsDesignFeasible(const MechanicalModelParameters& parameters, const SpeedLoopTunings& tunings)
+    {
+        return Solve(parameters, tunings).has_value();
+    }
+
     bool LqiSpeedController::Configure(const MechanicalModelParameters& motorParameters)
     {
         parameters = motorParameters;
         return Construct();
     }
 
-    bool LqiSpeedController::SetTunings(const SpeedLoopTunings& tunings)
+    bool LqiSpeedController::SetTunings(const SpeedLoopTunings& controllerTunings)
     {
-        bandwidth = tunings.bandwidth;
-        speedErrorWeight = tunings.speedErrorWeight;
-        integralWeight = tunings.integralWeight;
+        tunings = controllerTunings;
         return Construct();
     }
 
@@ -53,19 +56,17 @@ namespace foc
         return { SpeedLqi::GainStateMatrix{ 0.0f }, SpeedLqi::GainIntegralMatrix{ 0.0f }, 1.0f };
     }
 
-    bool LqiSpeedController::Construct()
+    // The weights are the operator's, so the Riccati solve may not converge; a design that does not stays inert
+    std::optional<LqiSpeedController::SpeedLqi> LqiSpeedController::Solve(const MechanicalModelParameters& parameters, const SpeedLoopTunings& tunings)
     {
         if (!AreMechanicalParametersValid(parameters))
-        {
-            lqi = Inert();
-            return false;
-        }
+            return std::nullopt;
 
         const auto plant = SpeedPlantModel::FromParameters(parameters);
 
         const math::SquareMatrix<float, 2> stateWeight{
-            { speedErrorWeight, 0.0f },
-            { 0.0f, integralWeight }
+            { tunings.speedErrorWeight, 0.0f },
+            { 0.0f, tunings.integralWeight }
         };
 
         const auto stateMatrix = SpeedPlant::StateMatrix{ plant.ad };
@@ -74,10 +75,16 @@ namespace foc
         const auto model = SpeedPlant::WithFullStateOutput(stateMatrix, inputMatrix);
 
         const math::SquareMatrix<float, 1> inputWeight{
-            NormalizedEffortWeight(bandwidth, parameters.samplingFrequency) * normalizedInputGain * normalizedInputGain
+            NormalizedEffortWeight(tunings.bandwidth, parameters.samplingFrequency) * normalizedInputGain * normalizedInputGain
         };
 
-        lqi = SpeedLqi{ model, stateWeight, inputWeight, 1.0f };
-        return true;
+        return SpeedLqi::TryCreate(model, stateWeight, inputWeight, 1.0f);
+    }
+
+    bool LqiSpeedController::Construct()
+    {
+        auto solved = Solve(parameters, tunings);
+        lqi = solved ? *solved : Inert();
+        return solved.has_value();
     }
 }

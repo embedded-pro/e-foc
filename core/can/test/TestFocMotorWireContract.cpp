@@ -7,6 +7,7 @@
 #include "core/can/FocMotorWireContract.hpp"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <limits>
 #include <set>
 #include <vector>
 
@@ -60,6 +61,10 @@ namespace
         MOCK_METHOD(void, OnRequestTelemetry, (const infra::Function<void()>&), (override));
         MOCK_METHOD(void, OnSetEncoderResolution, (uint32_t, (const infra::Function<void()>&)), (override));
         MOCK_METHOD(void, OnConfigureTelemetryRate, (uint32_t, (const infra::Function<void()>&)), (override));
+        MOCK_METHOD(void, OnSelectAlgorithm, (can::FocControlLoop, uint8_t, (const infra::Function<void(const can::FocAlgorithms&)>&)), (override));
+        MOCK_METHOD(void, OnQueryAlgorithms, ((const infra::Function<void(const can::FocAlgorithms&)>&)), (override));
+        MOCK_METHOD(void, OnSetParameter, (can::FocParameter, float, (const infra::Function<void(can::FocParameterValue)>&)), (override));
+        MOCK_METHOD(void, OnQueryParameter, (can::FocParameter, (const infra::Function<void(can::FocParameterValue)>&)), (override));
     };
 
     class ContractClientObserver
@@ -75,6 +80,8 @@ namespace
         MOCK_METHOD(void, OnContractVersionResponse, (uint16_t, uint8_t, uint8_t), (override));
         MOCK_METHOD(void, OnElectricalParamsResponse, (uint16_t, foc::Ohm, foc::MilliHenry, uint8_t), (override));
         MOCK_METHOD(void, OnMechanicalParamsResponse, (uint16_t, foc::NewtonMeterSecondPerRadian, foc::NewtonMeterSecondSquared), (override));
+        MOCK_METHOD(void, OnAlgorithmsResponse, (uint16_t, const can::FocAlgorithms&), (override));
+        MOCK_METHOD(void, OnParameterResponse, (uint16_t, can::FocParameter, can::FocParameterValue), (override));
     };
 
     struct FrameOriginStub
@@ -231,6 +238,47 @@ TEST_F(FocMotorWireContractTest, a_mode_command_is_the_documented_two_bytes)
     EXPECT_EQ(Bytes({ 0x00, 0x02 }), sentMessage);
 }
 
+TEST_F(FocMotorWireContractTest, an_algorithm_selection_is_the_documented_three_bytes)
+{
+    client.SendSelectAlgorithm(1, can::FocControlLoop::speed, static_cast<uint8_t>(can::FocSpeedAlgorithm::adrc));
+
+    EXPECT_EQ(can::focSelectAlgorithmId, sentMessageType);
+    EXPECT_EQ(Bytes({ 0x00, 0x01, 0x02 }), sentMessage);
+}
+
+TEST_F(FocMotorWireContractTest, a_parameter_write_carries_the_float_most_significant_byte_first)
+{
+    client.SendSetParameter(1, can::FocParameter::speedObserverBandwidthRatio, 8.0f);
+
+    EXPECT_EQ(can::focSetParameterId, sentMessageType);
+    EXPECT_EQ(Bytes({ 0x00, 0x13, 0x41, 0x00, 0x00, 0x00 }), sentMessage);
+}
+
+TEST_F(FocMotorWireContractTest, a_parameter_query_is_the_documented_two_bytes)
+{
+    client.SendQueryParameter(1, can::FocParameter::resistance);
+
+    EXPECT_EQ(can::focQueryParameterId, sentMessageType);
+    EXPECT_EQ(Bytes({ 0x00, 0x40 }), sentMessage);
+}
+
+TEST_F(FocMotorWireContractTest, a_parameter_response_flags_an_automatic_value)
+{
+    server.SendParameterResponse(can::FocParameter::currentBandwidth, can::FocParameterValue{ 1000.0f, true });
+
+    EXPECT_EQ(can::focParameterResponseId, respondedMessageType);
+    EXPECT_EQ(Bytes({ 0x00, 0x01, 0x44, 0x7A, 0x00, 0x00 }), respondedMessage);
+}
+
+TEST_F(FocMotorWireContractTest, an_algorithms_response_leads_with_the_active_mode)
+{
+    server.SendAlgorithmsResponse(can::FocAlgorithms{ can::FocMotorMode::position, can::FocCurrentAlgorithm::slidingMode,
+        can::FocSpeedAlgorithm::twoDof, can::FocPositionAlgorithm::lqr });
+
+    EXPECT_EQ(can::focAlgorithmsResponseId, respondedMessageType);
+    EXPECT_EQ(Bytes({ 0x02, 0x03, 0x03, 0x02 }), respondedMessage);
+}
+
 TEST_F(FocMotorWireContractTest, a_telemetry_status_frame_is_the_documented_six_bytes)
 {
     server.BroadcastTelemetryStatus(can::FocMotorState::partialCalibration, can::FocFaultCode::overVoltage,
@@ -274,6 +322,66 @@ TEST_F(FocMotorWireContractTest, every_command_the_client_sends_reaches_the_serv
     EXPECT_CALL(serverObserver, OnEmergencyStop(_));
     client.SendEmergencyStop(1);
     DeliverToServer();
+
+    EXPECT_CALL(serverObserver, OnSelectAlgorithm(can::FocControlLoop::position, static_cast<uint8_t>(can::FocPositionAlgorithm::twoDof), _));
+    client.SendSelectAlgorithm(1, can::FocControlLoop::position, static_cast<uint8_t>(can::FocPositionAlgorithm::twoDof));
+    DeliverToServer();
+
+    EXPECT_CALL(serverObserver, OnSetParameter(can::FocParameter::inertia, FloatEq(7.06e-6f), _));
+    client.SendSetParameter(1, can::FocParameter::inertia, 7.06e-6f);
+    DeliverToServer();
+
+    EXPECT_CALL(serverObserver, OnQueryParameter(can::FocParameter::canBitrate, _));
+    client.SendQueryParameter(1, can::FocParameter::canBitrate);
+    DeliverToServer();
+
+    EXPECT_CALL(serverObserver, OnQueryAlgorithms(_));
+    client.SendQueryAlgorithms(1);
+    DeliverToServer();
+}
+
+TEST_F(FocMotorWireContractTest, a_parameter_answer_reaches_the_client_with_its_value_and_flag_intact)
+{
+    EXPECT_CALL(serverObserver, OnQueryParameter(can::FocParameter::fluxLinkage, _))
+        .WillOnce(Invoke([](can::FocParameter, const infra::Function<void(can::FocParameterValue)>& onDone)
+            {
+                onDone(can::FocParameterValue{ 0.007f, true });
+            }));
+    client.SendQueryParameter(1, can::FocParameter::fluxLinkage);
+    DeliverToServer();
+
+    EXPECT_CALL(clientObserver, OnParameterResponse(1, can::FocParameter::fluxLinkage, can::FocParameterValue{ 0.007f, true }));
+    DeliverToClient();
+}
+
+TEST_F(FocMotorWireContractTest, an_algorithms_answer_reaches_the_client_intact)
+{
+    const can::FocAlgorithms algorithms{ can::FocMotorMode::speed, can::FocCurrentAlgorithm::deadbeat,
+        can::FocSpeedAlgorithm::lqi, can::FocPositionAlgorithm::cascadeP };
+
+    EXPECT_CALL(serverObserver, OnSelectAlgorithm(can::FocControlLoop::speed, static_cast<uint8_t>(can::FocSpeedAlgorithm::lqi), _))
+        .WillOnce(Invoke([&algorithms](can::FocControlLoop, uint8_t, const infra::Function<void(const can::FocAlgorithms&)>& onDone)
+            {
+                onDone(algorithms);
+            }));
+    client.SendSelectAlgorithm(1, can::FocControlLoop::speed, static_cast<uint8_t>(can::FocSpeedAlgorithm::lqi));
+    DeliverToServer();
+
+    EXPECT_CALL(clientObserver, OnAlgorithmsResponse(1, algorithms));
+    DeliverToClient();
+}
+
+TEST_F(FocMotorWireContractTest, every_documented_parameter_value_round_trips_bit_exactly)
+{
+    for (const auto& parameter : can::focParameters)
+    {
+        for (const auto value : { parameter.minimum, parameter.maximum })
+        {
+            EXPECT_CALL(serverObserver, OnSetParameter(parameter.id, value, _));
+            client.SendSetParameter(1, parameter.id, value);
+            DeliverToServer();
+        }
+    }
 }
 
 TEST_F(FocMotorWireContractTest, a_select_control_mode_response_reaches_the_client)
@@ -358,6 +466,15 @@ TEST_F(FocMotorWireContractTest, an_incompatible_major_refuses_every_further_cat
     EXPECT_FALSE(client.SendSetCurrentBandwidth(1, 100.0f));
     EXPECT_FALSE(client.SendSetSpeedBandwidth(1, 100.0f));
     EXPECT_FALSE(client.SendSetPositionBandwidth(1, 100.0f));
+    EXPECT_FALSE(client.SendAlign(1));
+    EXPECT_FALSE(client.SendIdentifyElectrical(1));
+    EXPECT_FALSE(client.SendIdentifyMechanical(1));
+    EXPECT_FALSE(client.SendRequestTelemetry(1));
+    EXPECT_FALSE(client.SendSetEncoderResolution(1, 4000));
+    EXPECT_FALSE(client.SendSelectAlgorithm(1, can::FocControlLoop::current, 0));
+    EXPECT_FALSE(client.SendQueryAlgorithms(1));
+    EXPECT_FALSE(client.SendSetParameter(1, can::FocParameter::resistance, 0.36f));
+    EXPECT_FALSE(client.SendQueryParameter(1, can::FocParameter::resistance));
 }
 
 TEST_F(FocMotorWireContractTest, an_incompatible_node_does_not_refuse_commands_to_other_nodes)
@@ -445,6 +562,10 @@ namespace
             { can::focSetSpeedSetpointId, { 0x00, 0x01, 0x2C } },
             { can::focSetPositionSetpointId, { 0x00, 0x01, 0x3A } },
             { can::focQueryContractVersionId, { 0x00 } },
+            { can::focSelectAlgorithmId, { 0x00, 0x01, 0x02 } },
+            { can::focQueryAlgorithmsId, { 0x00 } },
+            { can::focSetParameterId, { 0x00, 0x13, 0x41, 0x00, 0x00, 0x00 } },
+            { can::focQueryParameterId, { 0x00, 0x40 } },
 
             { can::focMotorTypeResponseId, { 0x01 } },
             { can::focElectricalParamsResponseId, { 0x01, 0xF4, 0x03, 0xE8, 0x07 } },
@@ -453,6 +574,8 @@ namespace
             { can::focTelemetryStatusResponseId, { 0x04, 0x02, 0x00, 0x00, 0x00, 0x00 } },
             { can::focSelectControlModeResponseId, { 0x02 } },
             { can::focContractVersionResponseId, { can::focContractVersionMajor, can::focContractVersionMinor } },
+            { can::focAlgorithmsResponseId, { 0x01, 0x00, 0x02, 0x00 } },
+            { can::focParameterResponseId, { 0x40, 0x00, 0x3E, 0xB8, 0x51, 0xEC } },
             { services::canCategoryErrorResponseMessageTypeId, { can::focStartId, static_cast<uint8_t>(can::FocMotorCategoryError::busy) } },
         };
         return vectors;
@@ -515,6 +638,10 @@ TEST_F(FocMotorWireContractTest, the_server_accepts_every_command_golden_vector)
     EXPECT_CALL(serverObserver, OnRequestTelemetry(_)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnSetEncoderResolution(_, _)).Times(AnyNumber());
     EXPECT_CALL(serverObserver, OnConfigureTelemetryRate(_, _)).Times(AnyNumber());
+    EXPECT_CALL(serverObserver, OnSelectAlgorithm(_, _, _)).Times(AnyNumber());
+    EXPECT_CALL(serverObserver, OnQueryAlgorithms(_)).Times(AnyNumber());
+    EXPECT_CALL(serverObserver, OnSetParameter(_, _, _)).Times(AnyNumber());
+    EXPECT_CALL(serverObserver, OnQueryParameter(_, _)).Times(AnyNumber());
 
     for (const auto& descriptor : can::focMotorMessages)
     {
@@ -544,4 +671,63 @@ TEST_F(FocMotorWireContractTest, an_overlong_category_error_frame_is_dropped_rat
 
     const auto overlong = Bytes({ can::focStartId, static_cast<uint8_t>(can::FocMotorCategoryError::busy), 0x00 });
     client.HandleMessage(services::canCategoryErrorResponseMessageTypeId, overlong);
+}
+
+TEST_F(FocMotorWireContractTest, every_response_golden_vector_reaches_the_client)
+{
+    EXPECT_CALL(clientObserver, OnAlgorithmsResponse(1, (can::FocAlgorithms{ can::FocMotorMode::speed, can::FocCurrentAlgorithm::pid, can::FocSpeedAlgorithm::adrc, can::FocPositionAlgorithm::pid })));
+    client.HandleMessage(can::focAlgorithmsResponseId, Bytes({ 0x01, 0x00, 0x02, 0x00 }));
+
+    EXPECT_CALL(clientObserver, OnParameterResponse(1, can::FocParameter::resistance, (can::FocParameterValue{ 0.36f, false })));
+    client.HandleMessage(can::focParameterResponseId, Bytes({ 0x40, 0x00, 0x3E, 0xB8, 0x51, 0xEC }));
+}
+
+TEST_F(FocMotorWireContractTest, an_algorithms_response_naming_no_algorithm_is_dropped)
+{
+    EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focAlgorithmsResponseId, Bytes({ 0x03, 0x00, 0x00, 0x00 })));
+    EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focAlgorithmsResponseId, Bytes({ 0x00, 0x04, 0x00, 0x00 })));
+    EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focAlgorithmsResponseId, Bytes({ 0x00, 0x00, 0x04, 0x00 })));
+    EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focAlgorithmsResponseId, Bytes({ 0x00, 0x00, 0x00, 0x05 })));
+}
+
+TEST_F(FocMotorWireContractTest, a_parameter_response_naming_no_parameter_is_dropped)
+{
+    EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focParameterResponseId, Bytes({ 0x05, 0x00, 0x3E, 0xB8, 0x51, 0xEC })));
+}
+
+TEST_F(FocMotorWireContractTest, parameter_numbers_are_unique_and_every_range_admits_its_bounds)
+{
+    std::set<uint8_t> numbers;
+    for (const auto& parameter : can::focParameters)
+    {
+        EXPECT_TRUE(numbers.insert(static_cast<uint8_t>(parameter.id)).second) << parameter.name;
+        EXPECT_LE(parameter.minimum, parameter.maximum) << parameter.name;
+        EXPECT_TRUE(can::IsAcceptableParameterValue(parameter, parameter.maximum)) << parameter.name;
+        EXPECT_TRUE(can::IsAcceptableParameterValue(parameter, parameter.minimum)) << parameter.name;
+        EXPECT_EQ(parameter.automatic, can::IsAcceptableParameterValue(parameter, 0.0f) && parameter.minimum > 0.0f) << parameter.name;
+    }
+}
+
+TEST_F(FocMotorWireContractTest, values_outside_a_parameter_s_domain_are_refused)
+{
+    const auto check = [](can::FocParameter id, float value)
+    {
+        const auto parameter = can::FindParameter(id);
+        EXPECT_TRUE(parameter.has_value());
+        return parameter.has_value() && can::IsAcceptableParameterValue(*parameter, value);
+    };
+
+    EXPECT_FALSE(check(can::FocParameter::speedObserverBandwidthRatio, 25.0f));
+    EXPECT_FALSE(check(can::FocParameter::speedErrorWeight, 0.0f));
+    EXPECT_FALSE(check(can::FocParameter::resistance, std::numeric_limits<float>::quiet_NaN()));
+    EXPECT_FALSE(check(can::FocParameter::inertia, std::numeric_limits<float>::infinity()));
+    EXPECT_FALSE(check(can::FocParameter::polePairs, 4.5f));
+    EXPECT_FALSE(check(can::FocParameter::canBitrate, 300000.0f));
+    EXPECT_FALSE(check(can::FocParameter::currentBandwidth, -1.0f));
+
+    EXPECT_TRUE(check(can::FocParameter::currentBandwidth, 0.0f));
+    EXPECT_TRUE(check(can::FocParameter::fluxLinkage, 0.0f));
+    EXPECT_TRUE(check(can::FocParameter::canBitrate, 500000.0f));
+    EXPECT_TRUE(check(can::FocParameter::polePairs, 7.0f));
+    EXPECT_TRUE(check(can::FocParameter::viscousFriction, 0.0f));
 }

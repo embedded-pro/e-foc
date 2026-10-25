@@ -32,10 +32,6 @@ namespace application
         bool IsRotorReferenceValid() const;
         void SetRotorReferenceValid(bool valid);
 
-        float PendingFluxLinkage() const;
-        void SetPendingFluxLinkage(float value);
-        void CommitPendingFluxLinkage();
-
         bool Apply(foc::FocBase& foc, foc::CurrentLoopTunable& tunable);
         void ApplyCurrentOffsets();
         bool ApplyModel(
@@ -64,7 +60,6 @@ namespace application
         std::optional<std::reference_wrapper<services::PhaseCurrentOffsets>> currentOffsets;
 
         services::CalibrationData calibrationData{};
-        float pendingFluxLinkage{ 0.0f };
         bool rotorReferenceValid_{ false };
 
         static constexpr float nyquistFactor = 15.0f;

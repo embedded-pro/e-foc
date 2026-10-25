@@ -34,9 +34,9 @@ namespace foc
         SetCurrentTuningsImpl(tunings);
     }
 
-    void SpeedCascade::SetSpeedTunings(const SpeedLoopTunings& tunings)
+    SelectResult SpeedCascade::SetSpeedTunings(const SpeedLoopTunings& tunings)
     {
-        SetSpeedTuningsImpl(tunings);
+        return SetSpeedTuningsImpl(tunings);
     }
 
     SelectResult SpeedCascade::SelectCurrentAlgorithm(CurrentAlgorithm algorithm)

@@ -27,6 +27,10 @@ target_link_libraries(e_foc.state_machine PUBLIC
 target_sources(e_foc.state_machine PRIVATE
     AlgorithmPersistence.hpp
     AlgorithmPersistence.cpp
+    ConfigWriter.hpp
+    ConfigWriter.cpp
+    OperatorTunings.hpp
+    OperatorTunings.cpp
     CalibrationContext.hpp
     CalibrationContext.cpp
     CalibrationOrchestrator.hpp

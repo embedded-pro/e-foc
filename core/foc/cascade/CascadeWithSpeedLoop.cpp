@@ -176,9 +176,9 @@ namespace foc
         currentLoop.SetTunings(tunings);
     }
 
-    void CascadeWithSpeedLoop::SetSpeedTuningsImpl(const SpeedLoopTunings& tunings)
+    SelectResult CascadeWithSpeedLoop::SetSpeedTuningsImpl(const SpeedLoopTunings& tunings)
     {
-        speedLoop.SetTunings(tunings);
+        return speedLoop.TrySetTunings(tunings);
     }
 
     void CascadeWithSpeedLoop::EnableSpeedLoop()

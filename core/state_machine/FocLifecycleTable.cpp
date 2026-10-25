@@ -5,6 +5,7 @@
 #include "core/state_machine/OperationFlow.hpp"
 #include "core/state_machine/PendingCommand.hpp"
 #include "services/fsm/StateMachineDefinition.hpp"
+#include <type_traits>
 
 namespace application
 {
@@ -279,25 +280,30 @@ namespace application
                 {
                     context.maintenance.RejectClear();
                 }),
-            Machine::InternalRow<Stopped, state_machine::SetFluxLinkage>(
-                [](LifecycleContext& context, Stopped&, const state_machine::SetFluxLinkage& command)
+            Machine::InternalRow<Stopped, state_machine::SetMotorParameter>(
+                [](LifecycleContext& context, Stopped&, const state_machine::SetMotorParameter& command)
                 {
-                    context.maintenance.BeginSetFluxLinkage(command);
+                    context.maintenance.BeginSetMotorParameter(command);
                 },
-                [](const LifecycleContext& context, const Stopped&, const state_machine::SetFluxLinkage& command)
+                [](const LifecycleContext& context, const Stopped&, const state_machine::SetMotorParameter& command)
                 {
-                    return !context.lifecycle.HasPendingAsyncWork() && context.maintenance.IsAcceptableFluxLinkage(command);
+                    return !context.lifecycle.HasPendingAsyncWork() && context.maintenance.IsAcceptableMotorParameter(command);
                 }),
         };
     }
 
     template<class S>
-    constexpr FocLifecycleTable::Transition FocLifecycleTable::FluxLinkageSavedRow()
+    constexpr FocLifecycleTable::Transition FocLifecycleTable::MotorParameterSavedRow()
     {
-        return Machine::InternalRow<S, state_machine::FluxLinkageSaved>(
-            [](LifecycleContext& context, S&, const state_machine::FluxLinkageSaved& event)
+        return Machine::InternalRow<S, state_machine::MotorParameterSaved>(
+            [](LifecycleContext& context, S& state, const state_machine::MotorParameterSaved& event)
             {
-                context.maintenance.OnFluxLinkageSaved(event.status);
+                context.maintenance.AdoptMotorParameter(event.status);
+
+                if constexpr (std::is_same_v<S, state_machine::Ready>)
+                    state = context.calibration.ReadyState();
+
+                context.maintenance.CompleteMotorParameter(event.status);
             });
     }
 
@@ -314,7 +320,7 @@ namespace application
                     return event.status == services::NvmStatus::Ok;
                 }),
             Machine::InternalRow<state_machine::Fault, state_machine::CalibrationInvalidated>(),
-            FluxLinkageSavedRow<state_machine::Fault>(),
+            MotorParameterSavedRow<state_machine::Fault>(),
         };
     }
 
@@ -322,8 +328,8 @@ namespace application
     {
         return services::JoinRows(MaintenanceRowsFor<state_machine::Idle>(), MaintenanceRowsFor<state_machine::Ready>(),
             std::array{
-                FluxLinkageSavedRow<state_machine::Idle>(),
-                FluxLinkageSavedRow<state_machine::Ready>(),
+                MotorParameterSavedRow<state_machine::Idle>(),
+                MotorParameterSavedRow<state_machine::Ready>(),
             },
             FaultReconciliationRows());
     }

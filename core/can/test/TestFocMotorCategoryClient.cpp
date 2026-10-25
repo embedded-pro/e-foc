@@ -42,6 +42,8 @@ namespace
         MOCK_METHOD(void, OnContractVersionResponse, (uint16_t sourceNodeId, uint8_t major, uint8_t minor), (override));
         MOCK_METHOD(void, OnElectricalParamsResponse, (uint16_t sourceNodeId, foc::Ohm resistance, foc::MilliHenry inductance, uint8_t polePairs), (override));
         MOCK_METHOD(void, OnMechanicalParamsResponse, (uint16_t sourceNodeId, foc::NewtonMeterSecondPerRadian friction, foc::NewtonMeterSecondSquared inertia), (override));
+        MOCK_METHOD(void, OnAlgorithmsResponse, (uint16_t sourceNodeId, const can::FocAlgorithms& algorithms), (override));
+        MOCK_METHOD(void, OnParameterResponse, (uint16_t sourceNodeId, can::FocParameter parameter, can::FocParameterValue value), (override));
     };
 
     struct FrameOriginStub
@@ -263,4 +265,76 @@ TEST_F(FocMotorCategoryClientTest, OnMechanicalParamsResponse_ShortPayload_IsRej
 {
     const auto msg = MakeMessage({ 0x00, 0x00, 0x3A, 0x98 });
     EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focMechanicalParamsResponseId, msg));
+}
+
+TEST_F(FocMotorCategoryClientTest, SendCommissioningCommands_TransmitTheirCommandIds)
+{
+    client.SendAlign(1);
+    EXPECT_EQ(lastSentMsgType, can::focAlignId);
+
+    client.SendIdentifyElectrical(1);
+    EXPECT_EQ(lastSentMsgType, can::focIdentifyElectricalId);
+
+    client.SendIdentifyMechanical(1);
+    EXPECT_EQ(lastSentMsgType, can::focIdentifyMechanicalId);
+
+    client.SendRequestTelemetry(1);
+    EXPECT_EQ(lastSentMsgType, can::focRequestTelemetryId);
+}
+
+TEST_F(FocMotorCategoryClientTest, SendSetEncoderResolution_EncodesCountsPerRevolution)
+{
+    client.SendSetEncoderResolution(1, 4096);
+
+    EXPECT_EQ(lastSentMsgType, can::focSetEncoderResolutionId);
+    ASSERT_EQ(lastSentMsg.size(), 5u);
+    EXPECT_EQ(services::CanFrameCodec::ReadUInt32(lastSentMsg, 1), 4096u);
+}
+
+TEST_F(FocMotorCategoryClientTest, SendSelectAlgorithm_EncodesLoopAndAlgorithm)
+{
+    client.SendSelectAlgorithm(1, can::FocControlLoop::current, static_cast<uint8_t>(can::FocCurrentAlgorithm::slidingMode));
+
+    EXPECT_EQ(lastSentMsgType, can::focSelectAlgorithmId);
+    ASSERT_EQ(lastSentMsg.size(), 3u);
+    EXPECT_EQ(lastSentMsg[1], 0x00);
+    EXPECT_EQ(lastSentMsg[2], 0x03);
+}
+
+TEST_F(FocMotorCategoryClientTest, SendSetParameter_EncodesParameterAndFloat)
+{
+    client.SendSetParameter(1, can::FocParameter::fluxLinkage, 0.007f);
+
+    EXPECT_EQ(lastSentMsgType, can::focSetParameterId);
+    EXPECT_EQ(lastSentMsg, MakeMessage({ 0x00, 0x43, 0x3B, 0xE5, 0x60, 0x42 }));
+}
+
+TEST_F(FocMotorCategoryClientTest, SendQueries_TransmitTheirCommandIds)
+{
+    client.SendQueryAlgorithms(1);
+    EXPECT_EQ(lastSentMsgType, can::focQueryAlgorithmsId);
+
+    client.SendQueryParameter(1, can::FocParameter::polePairs);
+    EXPECT_EQ(lastSentMsgType, can::focQueryParameterId);
+    ASSERT_EQ(lastSentMsg.size(), 2u);
+    EXPECT_EQ(lastSentMsg[1], 0x42);
+}
+
+TEST_F(FocMotorCategoryClientTest, OnAlgorithmsResponse_NotifiesTheSendingNode)
+{
+    EXPECT_CALL(observer, OnAlgorithmsResponse(3, (can::FocAlgorithms{ can::FocMotorMode::position, can::FocCurrentAlgorithm::deadbeat, can::FocSpeedAlgorithm::twoDof, can::FocPositionAlgorithm::lqi })));
+
+    client.HandleMessage(can::focAlgorithmsResponseId, MakeMessage({ 0x02, 0x02, 0x03, 0x03 }));
+}
+
+TEST_F(FocMotorCategoryClientTest, OnParameterResponse_DecodesValueAndAutomaticFlag)
+{
+    EXPECT_CALL(observer, OnParameterResponse(3, can::FocParameter::currentBandwidth, (can::FocParameterValue{ 1000.0f, true })));
+
+    client.HandleMessage(can::focParameterResponseId, MakeMessage({ 0x00, 0x01, 0x44, 0x7A, 0x00, 0x00 }));
+}
+
+TEST_F(FocMotorCategoryClientTest, OnParameterResponse_ShortPayload_IsRejected)
+{
+    EXPECT_EQ(services::CanDispatchResult::rejected, client.HandleMessage(can::focParameterResponseId, MakeMessage({ 0x00, 0x01, 0x44, 0x7A, 0x00 })));
 }

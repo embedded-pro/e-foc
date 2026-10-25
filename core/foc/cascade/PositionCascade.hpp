@@ -19,7 +19,7 @@ namespace foc
         bool ConfigureMechanics(const MechanicalModelParameters& parameters) override;
         void SetPoint(Radians point) override;
         void SetCurrentTunings(const CurrentLoopTunings& tunings) override;
-        void SetSpeedTunings(const SpeedLoopTunings& tunings) override;
+        SelectResult SetSpeedTunings(const SpeedLoopTunings& tunings) override;
         SelectResult SetPositionTunings(const PositionLoopTunings& tunings) override;
         SelectResult SelectCurrentAlgorithm(CurrentAlgorithm algorithm) override;
         CurrentAlgorithm ActiveCurrentAlgorithm() const override;

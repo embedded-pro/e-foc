@@ -18,7 +18,8 @@ namespace
         services::TracerToStream tracer{ stream };
         services::ConfigData configData{};
         application::NvmActivity nvmActivity;
-        state_machine::AlgorithmPersistence persistence{ nvm, configData, tracer, nvmActivity };
+        state_machine::ConfigWriter writer{ nvm, configData, tracer, nvmActivity };
+        state_machine::AlgorithmPersistence persistence{ writer, configData, tracer };
 
         StrictMock<foc::FocTorqueMock> currentMock;
         StrictMock<foc::FocSpeedMock> speedMock;
@@ -120,7 +121,7 @@ TEST_F(AlgorithmPersistenceTest, a_busy_nvm_is_retried_rather_than_silently_drop
     persistence.SelectCurrentAlgorithm(foc::CurrentAlgorithm::deadbeat, &currentMock);
     firstAttempt(services::NvmStatus::Busy);
 
-    EXPECT_TRUE(persistence.HasPendingPersist());
+    EXPECT_TRUE(writer.HasPendingPersist());
 
     EXPECT_CALL(nvm, SaveConfig(_, _))
         .WillOnce([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
@@ -130,7 +131,7 @@ TEST_F(AlgorithmPersistenceTest, a_busy_nvm_is_retried_rather_than_silently_drop
 
     ForwardTime(std::chrono::milliseconds{ 10 });
 
-    EXPECT_FALSE(persistence.HasPendingPersist());
+    EXPECT_FALSE(writer.HasPendingPersist());
 }
 
 TEST_F(AlgorithmPersistenceTest, a_persist_keeps_retrying_while_the_nvm_stays_busy)
@@ -149,7 +150,7 @@ TEST_F(AlgorithmPersistenceTest, a_persist_keeps_retrying_while_the_nvm_stays_bu
     for (int retry = 0; retry != 5; ++retry)
         ForwardTime(std::chrono::milliseconds{ 10 });
 
-    EXPECT_TRUE(persistence.HasPendingPersist());
+    EXPECT_TRUE(writer.HasPendingPersist());
 
     EXPECT_CALL(nvm, SaveConfig(_, _))
         .WillOnce([](const services::ConfigData&, infra::Function<void(services::NvmStatus)> onDone)
@@ -159,7 +160,7 @@ TEST_F(AlgorithmPersistenceTest, a_persist_keeps_retrying_while_the_nvm_stays_bu
 
     ForwardTime(std::chrono::milliseconds{ 10 });
 
-    EXPECT_FALSE(persistence.HasPendingPersist());
+    EXPECT_FALSE(writer.HasPendingPersist());
 }
 
 TEST_F(AlgorithmPersistenceTest, nvm_activity_stays_in_flight_while_a_persist_retry_is_armed)

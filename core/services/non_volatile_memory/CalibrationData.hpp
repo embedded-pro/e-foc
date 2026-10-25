@@ -41,4 +41,60 @@ namespace services
     };
 
     static_assert(sizeof(CalibrationData) == 108, "CalibrationData layout must be free of implicit padding");
+
+    enum class MotorParameter : uint8_t
+    {
+        resistance,
+        inductance,
+        polePairs,
+        fluxLinkage,
+        inertia,
+        viscousFriction
+    };
+
+    inline float ReadMotorParameter(const CalibrationData& data, MotorParameter parameter)
+    {
+        switch (parameter)
+        {
+            case MotorParameter::resistance:
+                return data.rPhase;
+            case MotorParameter::inductance:
+                return data.lD;
+            case MotorParameter::polePairs:
+                return static_cast<float>(data.polePairs);
+            case MotorParameter::fluxLinkage:
+                return data.fluxLinkage;
+            case MotorParameter::inertia:
+                return data.inertia;
+            default:
+                return data.frictionViscous;
+        }
+    }
+
+    // The record models a non-salient machine, so one inductance stands for both axes.
+    inline void WriteMotorParameter(CalibrationData& data, MotorParameter parameter, float value)
+    {
+        switch (parameter)
+        {
+            case MotorParameter::resistance:
+                data.rPhase = value;
+                break;
+            case MotorParameter::inductance:
+                data.lD = value;
+                data.lQ = value;
+                break;
+            case MotorParameter::polePairs:
+                data.polePairs = static_cast<uint8_t>(value);
+                break;
+            case MotorParameter::fluxLinkage:
+                data.fluxLinkage = value;
+                break;
+            case MotorParameter::inertia:
+                data.inertia = value;
+                break;
+            default:
+                data.frictionViscous = value;
+                break;
+        }
+    }
 }

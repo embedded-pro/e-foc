@@ -5,8 +5,6 @@
 #include "core/platform_abstraction/interfaces/Drivers.hpp"
 #include "core/services/electrical_system_ident/ElectricalParametersIdentification.hpp"
 #include "core/services/mechanical_system_ident/MechanicalParametersIdentification.hpp"
-#include "core/services/non_volatile_memory/ConfigData.hpp"
-#include "core/services/non_volatile_memory/NonVolatileMemory.hpp"
 #include "core/state_machine/ControlMode.hpp"
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/state_machine/FaultNotifier.hpp"
@@ -27,8 +25,6 @@ namespace can
             drivers::Encoder& encoder,
             services::ElectricalParametersIdentification& electricalIdent,
             services::MechanicalParametersIdentification* mechIdent,
-            services::NonVolatileMemory& nvm,
-            services::ConfigData configData,
             services::Tracer& tracer);
 
         static constexpr float maxPositionSetpoint{ foc::CommandLimits::maxPositionSetpoint };
@@ -54,6 +50,10 @@ namespace can
         void OnRequestTelemetry(const infra::Function<void()>& onDone) override;
         void OnSetEncoderResolution(uint32_t resolution, const infra::Function<void()>& onDone) override;
         void OnConfigureTelemetryRate(uint32_t rateHz, const infra::Function<void()>& onDone) override;
+        void OnSelectAlgorithm(FocControlLoop loop, uint8_t algorithm, const infra::Function<void(const FocAlgorithms&)>& onDone) override;
+        void OnQueryAlgorithms(const infra::Function<void(const FocAlgorithms&)>& onDone) override;
+        void OnSetParameter(FocParameter parameter, float value, const infra::Function<void(FocParameterValue)>& onDone) override;
+        void OnQueryParameter(FocParameter parameter, const infra::Function<void(FocParameterValue)>& onDone) override;
 
     private:
         static FocFaultCode ToCanFaultCode(state_machine::FaultCode code);
@@ -70,6 +70,16 @@ namespace can
         bool ElectricalIdentificationInProgress() const;
         bool MechanicalIdentificationInProgress() const;
         void FailElectricalIdentification(FocMotorCategoryError error);
+        bool SettingOutstanding() const;
+        void SetLoopSetting(FocParameter parameter, float value);
+        void SetStartupSetting(FocParameter parameter, uint32_t value);
+        void CompleteAlgorithmSelection(state_machine::SettingResult result);
+        void CompleteParameter(state_machine::SettingResult result);
+        void ReportSettingFailure(uint8_t commandId, state_machine::SettingResult result);
+        FocAlgorithms ActiveAlgorithms() const;
+        FocParameterValue HeldValue(FocParameter parameter) const;
+        FocParameterValue HeldLoopSetting(FocParameter parameter) const;
+        FocParameterValue HeldMotorParameter(FocParameter parameter) const;
 
         FocMotorCategoryServer& server;
         state_machine::ControlModeStateMachine& controlMode;
@@ -77,14 +87,16 @@ namespace can
         drivers::Encoder& encoder;
         services::ElectricalParametersIdentification& electricalIdent;
         services::MechanicalParametersIdentification* mechIdent;
-        services::NonVolatileMemory& nvm;
-        services::ConfigData configData;
 
         infra::Function<void(FocMotorMode)> pendingSelectCallback;
         infra::Function<void(services::CanAckStatus)> pendingAlignDoneCallback;
         infra::Function<void()> pendingElectricalIdentDoneCallback;
         infra::Function<void()> pendingMechIdentDoneCallback;
         infra::Function<void()> pendingNvmDoneCallback;
+        infra::Function<void(const FocAlgorithms&)> pendingAlgorithmCallback;
+        infra::Function<void(FocParameterValue)> pendingParameterCallback;
+        FocParameter pendingParameter{ FocParameter::currentBandwidth };
+        uint32_t previousStartupSetting{ 0 };
         std::optional<foc::Ohm> pendingElectricalR;
         std::optional<foc::MilliHenry> pendingElectricalL;
     };
