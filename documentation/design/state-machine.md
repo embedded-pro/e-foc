@@ -335,10 +335,24 @@ aligned before it can be enabled, exactly as after boot.
 
 Changing the pole-pair count invalidates the rotor reference, because the encoder offset was
 measured in electrical angle for the old count: `Enable` is refused until the rotor is aligned again.
-No other parameter touches the reference, and none of them moves the rotor.
+It also drops the cogging map, which is binned per electrical period and would compensate other
+positions after the change. Inertia and friction identified with the old count were derived through
+the old torque constant; the record keeps them, and they should be identified again. No other
+parameter touches the reference or the map, and none of them moves the rotor.
 
-While the save is outstanding the command owns the machine like any other NVM operation; a fault in
-that window aborts the command but not the write, and the stored value is adopted when it lands.
+While the save is outstanding the command owns the machine like any other NVM operation; a fault or an
+emergency stop in that window aborts the command but not the write, and the stored value is adopted
+when it lands. The command is therefore answered `aborted` (`abortedByFault` over CAN) rather than
+`busy`, and a client reads the value back.
+
+Two consequences of entering parameters by hand are left to the operator. A record completed by hand
+has no measured current offsets — they are measured only by the first step of `Calibrate` — so a drive
+commissioned from its datasheet should be calibrated once before it is relied on. And a motor
+parameter is stored even when the active speed LQI or position LQR/LQI law cannot be designed from it
+with the operator's settings: that law keeps the design derived from the automatic settings, the drive
+traces `Speed settings not applied` or `Position settings not applied`, and the settings read back are
+still the operator's. Refusing such a parameter needs a design check of the edited model before it is
+stored, which the cascades do not offer yet.
 
 ### Making the loops live before mechanical identification
 
@@ -827,15 +841,23 @@ sequenceDiagram
 without queueing. `NvmActivity` is therefore owned by `ControlModeStateMachine`, which outlives every
 mode switch, and every writer of the shared instance brackets its operation with it:
 
-| Writer                                                                                   | Accounting                                                                      |
-|------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------|
-| Calibration, maintenance and boot (`CalibrationFlow`, `MaintenanceFlow`, `BootSequence`) | `LifecycleEnvironment::nvmActivity`, a reference to the shared counter          |
-| `Select`'s `SaveConfig` and its rollback write                                           | `Begin`/`End` around each write                                                 |
-| `AlgorithmPersistence::PersistConfig`                                                    | `Begin` before the first attempt, `End` once a status other than `Busy` arrives |
-| `FocMotorCanBridge` encoder-resolution and telemetry-rate writes                         | `ControlModeStateMachine::BeginNvmActivity`/`EndNvmActivity`                    |
+| Writer                                                                                   | Accounting                                                               |
+|------------------------------------------------------------------------------------------|--------------------------------------------------------------------------|
+| Calibration, maintenance and boot (`CalibrationFlow`, `MaintenanceFlow`, `BootSequence`) | `LifecycleEnvironment::nvmActivity`, a reference to the shared counter   |
+| `Select`'s `SaveConfig` and its rollback write                                           | `Begin`/`End` around each write                                          |
+| `ConfigWriter`, for every other write of the configuration record                        | `Begin` before the first attempt, `End` once no write or rewrite is left |
 
 `HasPendingAsyncWork()` is therefore true while any of them is outstanding, and every guard built on
 it — `CmdCalibrate`, `CmdEnable`, `CmdClearCalibration`, `Select` — refuses instead of colliding.
+
+`ControlModeStateMachine` owns the one configuration record and one `ConfigWriter` for it. Algorithm
+selections, loop tunings and the CAN bridge's start-up settings change the record in place and ask
+the writer to store it. A request made while a write is outstanding is folded into one more write of
+the record as it then is, so no change is lost to a write that started before it; a store answered
+`Busy` by the NVM is retried every 10 ms. When a write finishes, its requester is answered before the
+folded-in rewrite takes its copy of the record, so a requester that takes its change back after a
+failed write is not stored by the rewrite. `Select` writes the record itself, and the CAN bridge
+answers `busy` to a start-up setting while a selection or a configuration write is outstanding.
 
 #### C2b — Algorithm Selection Is Refused While Busy
 

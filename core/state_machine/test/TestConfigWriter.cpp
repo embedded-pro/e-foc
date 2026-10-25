@@ -156,3 +156,25 @@ TEST_F(ConfigWriterTest, a_failed_write_is_reported_and_releases_the_memory)
     EXPECT_EQ(services::NvmStatus::WriteFailed, outcome);
     EXPECT_FALSE(nvmActivity.InFlight());
 }
+
+TEST_F(ConfigWriterTest, a_rewrite_stores_the_record_after_a_failed_writer_took_its_change_back)
+{
+    ExpectWriteHeld();
+    config.canNodeId = 5;
+    writer.Persist([this](services::NvmStatus status)
+        {
+            if (status != services::NvmStatus::Ok)
+                config.canNodeId = 1;
+        });
+
+    config.encoderResolution = 2048;
+    writer.Persist([](services::NvmStatus) {});
+
+    auto firstWrite = pendingWrite;
+    ExpectWriteHeld();
+    firstWrite(services::NvmStatus::WriteFailed);
+
+    ASSERT_TRUE(written.has_value());
+    EXPECT_EQ(1u, written->canNodeId);
+    EXPECT_EQ(2048u, written->encoderResolution);
+}

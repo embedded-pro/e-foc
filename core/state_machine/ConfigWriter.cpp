@@ -60,8 +60,11 @@ namespace state_machine
         if (status != services::NvmStatus::Ok)
             tracer.Trace() << "config persist failed";
 
+        // The finished write's owner answers first: it may take its change back, and the rewrite must not store it
         auto done = onWritten;
         onWritten = nullptr;
+        if (done != nullptr)
+            done(status);
 
         if (rewrite)
         {
@@ -75,8 +78,5 @@ namespace state_machine
             writing = false;
             nvmActivity.End();
         }
-
-        if (done != nullptr)
-            done(status);
     }
 }

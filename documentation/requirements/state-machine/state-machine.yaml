@@ -286,5 +286,8 @@
     positive resistance and inductance and the mode-specific values the active mode requires,
     and a complete record shall be applied to the controllers as at boot. A change of the
     pole-pair count shall invalidate the rotor reference, so that the drive cannot be enabled
-    until the rotor has been aligned again. An electrical identification shall keep the
-    mechanical parameters and loop bandwidths of the record, which it does not measure.
+    until the rotor has been aligned again, and shall drop the cogging map, which is binned per
+    electrical period. An edit interrupted by an emergency stop or a fault shall be answered as
+    aborted, not busy, because its record may still be stored. An electrical identification
+    shall keep the mechanical parameters and loop bandwidths of the record, which it does not
+    measure.

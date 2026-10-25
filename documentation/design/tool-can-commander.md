@@ -142,10 +142,10 @@ disabled, with the reason, until its tab is closed.
 
 The settings tabs show what the node holds, not what was last typed. A node whose firmware contract is 2.1
 or newer is read completely when it is found compatible, and again after a mode change (accepted or
-refused), a controller change, an identification, an alignment or a Revert: the active mode and the
-algorithm of every loop, then every numbered parameter. Reads go one at a time, because the CAN send queue
-holds six frames; they do not make the node busy and are not logged one by one. A read that is not answered
-leaves "—".
+refused), a controller change, an identification, an alignment, applied motor parameters, a refused
+setting or a Revert: the active mode and the algorithm of every loop, then every numbered parameter. Reads
+go one at a time, because the CAN send queue holds six frames; they do not make the node busy and are not
+logged one by one. A read that is not answered leaves "—".
 
 ```mermaid
 flowchart LR

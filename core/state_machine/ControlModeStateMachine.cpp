@@ -1,6 +1,7 @@
 #include "core/state_machine/ControlModeStateMachine.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
 #include "core/state_machine/ControlModeCliCommands.hpp"
+#include "core/state_machine/MotorParameterLimits.hpp"
 #include "core/state_machine/OperatorTunings.hpp"
 #include "infra/util/ReallyAssert.hpp"
 #include <cmath>
@@ -8,30 +9,6 @@
 
 namespace state_machine
 {
-    namespace
-    {
-        using foc::CommandLimits;
-
-        bool IsAcceptableMotorParameter(services::MotorParameter parameter, float value)
-        {
-            switch (parameter)
-            {
-                case services::MotorParameter::resistance:
-                    return foc::IsWithinInclusive(value, CommandLimits::minResistance, CommandLimits::maxResistance);
-                case services::MotorParameter::inductance:
-                    return foc::IsWithinInclusive(value, CommandLimits::minInductanceMilliHenry, CommandLimits::maxInductanceMilliHenry);
-                case services::MotorParameter::polePairs:
-                    return foc::IsWithinInclusive(value, 1.0f, CommandLimits::maxPolePairs) && std::round(value) == value;
-                case services::MotorParameter::fluxLinkage:
-                    return value == 0.0f || foc::IsWithinInclusive(value, CommandLimits::minFluxLinkage, CommandLimits::maxFluxLinkage);
-                case services::MotorParameter::inertia:
-                    return foc::IsWithinInclusive(value, CommandLimits::minInertia, CommandLimits::maxInertia);
-                default:
-                    return foc::IsWithinInclusive(value, 0.0f, CommandLimits::maxViscousFriction);
-            }
-        }
-    }
-
     ControlModeStateMachine::ControlModeStateMachine(
         const application::TerminalAndTracer& terminalAndTracer,
         const application::MotorHardware& hardware,
@@ -174,16 +151,16 @@ namespace state_machine
         return true;
     }
 
-    // Applying estimates re-derives the loop tunings, so the operator's settings go back on top of them
+    // An applied estimate re-derives its loop's tunings, so the operator's settings go back on top of that loop alone
     void ControlModeStateMachine::ApplyOnlineEstimates()
     {
-        ActiveStateMachine().ApplyOnlineEstimates();
+        const auto applied = ActiveStateMachine().ApplyOnlineEstimates();
 
-        if (auto* tunable = CurrentTunable())
+        if (auto* tunable = CurrentTunable(); applied.electrical && tunable != nullptr)
             tunable->SetCurrentTunings(EffectiveCurrentTunings());
 
-        if (auto* tunable = SpeedTunable())
-            tunable->SetSpeedTunings(*EffectiveSpeedTunings());
+        if (auto* tunable = SpeedTunable(); applied.mechanics && tunable != nullptr && tunable->SetSpeedTunings(*EffectiveSpeedTunings()) != foc::SelectResult::ok)
+            terminalAndTracer.tracer.Trace() << "[SM] Speed settings not applied: the active law cannot be designed with them";
     }
 
     TuningResult ControlModeStateMachine::CheckRedesignPreconditions() const
@@ -191,8 +168,8 @@ namespace state_machine
         if (std::holds_alternative<std::monostate>(activeSm))
             return TuningResult::wrongMode;
 
-        if (std::holds_alternative<Enabled>(ActiveStateMachine().CurrentState()))
-            return TuningResult::notWhileEnabled;
+        if (!IsStopped(ActiveStateMachine().CurrentState()))
+            return TuningResult::notStopped;
 
         return TuningResult::ok;
     }
@@ -586,6 +563,20 @@ namespace state_machine
         onDone(result);
     }
 
+    // An emergency stop answers a write whose record may still land, so it is not reported as busy
+    SettingResult ControlModeStateMachine::ToSettingResult(CommandResult result)
+    {
+        switch (result)
+        {
+            case CommandResult::nvmFailed:
+                return SettingResult::nvmFailed;
+            case CommandResult::abortedByFault:
+                return SettingResult::aborted;
+            default:
+                return SettingResult::busy;
+        }
+    }
+
     SettingResult ControlModeStateMachine::ToSettingResult(foc::SelectResult result)
     {
         switch (result)
@@ -738,7 +729,7 @@ namespace state_machine
             {
                 if (result != CommandResult::ok)
                 {
-                    CompleteSetting(result == CommandResult::nvmFailed ? SettingResult::nvmFailed : SettingResult::busy);
+                    CompleteSetting(ToSettingResult(result));
                     return;
                 }
 
@@ -770,6 +761,12 @@ namespace state_machine
     void ControlModeStateMachine::PersistConfig(const infra::Function<void(services::NvmStatus)>& onDone)
     {
         configWriter.Persist(onDone);
+    }
+
+    // A mode selection writes the record itself and switches only once nothing else is being stored
+    bool ControlModeStateMachine::HasPendingConfigWrite() const
+    {
+        return pendingSelectCallback != nullptr || configWriter.HasPendingPersist();
     }
 
     bool ControlModeStateMachine::HasPendingConfigPersist() const

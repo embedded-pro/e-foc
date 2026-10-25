@@ -299,6 +299,10 @@ namespace tool
             return;
         }
 
+        // A motor model changes what the automatic settings derive, so everything is read again
+        if (applyingPage == &commandPanel->MotorParameters())
+            client.RequestSettings(nodeId);
+
         applyingPage->SetApplying(false);
         applyingPage = nullptr;
         Report(IssueSeverity::info, "settings applied");
@@ -495,6 +499,10 @@ namespace tool
 
         if (IsChangeAnswer(commandType))
             StopApplying(QString("%1 was refused").arg(name));
+
+        // An interrupted write may still have landed, so the tabs show what the controller holds rather than what was sent
+        if (commandType == can::focSetParameterId || commandType == can::focSelectAlgorithmId)
+            client.RequestSettings(nodeId);
     }
 
     void MotorPanel::OnContractVersion(uint8_t major, uint8_t minor, bool compatible)

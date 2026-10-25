@@ -25,7 +25,7 @@ namespace state_machine
         ok,
         outOfRange,
         wrongMode,
-        notWhileEnabled
+        notStopped
     };
 
     enum class SettingResult : uint8_t
@@ -36,7 +36,8 @@ namespace state_machine
         wrongMode,
         outOfRange,
         invalidParameters,
-        nvmFailed
+        nvmFailed,
+        aborted
     };
 
     class ControlModeStateMachine
@@ -95,6 +96,7 @@ namespace state_machine
         services::ConfigData& Config();
         const services::ConfigData& Config() const;
         void PersistConfig(const infra::Function<void(services::NvmStatus)>& onDone);
+        bool HasPendingConfigWrite() const;
         bool HasPendingConfigPersist() const;
 
         foc::Weber ActiveFluxLinkage() const;
@@ -139,6 +141,7 @@ namespace state_machine
         void StoreAndPersist(const OnSetting& onDone);
         void CompleteSetting(SettingResult result);
         static SettingResult ToSettingResult(foc::SelectResult result);
+        static SettingResult ToSettingResult(CommandResult result);
 
         const application::TerminalAndTracer terminalAndTracer;
         const application::MotorHardware hardware;

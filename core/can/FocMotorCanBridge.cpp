@@ -1,5 +1,6 @@
 #include "core/can/FocMotorCanBridge.hpp"
 #include "core/can/FocMotorSettings.hpp"
+#include "core/foc/interfaces/CommandLimits.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
 #include "core/foc/math/TorqueConstant.hpp"
 #include "core/state_machine/FocStateMachine.hpp"
@@ -154,31 +155,41 @@ namespace can
 
     void FocMotorCanBridge::OnSetPidCurrent(float bandwidth, const infra::Function<void()>& onDone)
     {
-        ReportTuningOutcome(can::focSetPidCurrentId, controlMode.TrySetCurrentBandwidth(bandwidth), onDone);
+        SetLegacyBandwidth(can::focSetPidCurrentId, FocParameter::currentBandwidth, bandwidth, onDone);
     }
 
     void FocMotorCanBridge::OnSetPidSpeed(float bandwidth, const infra::Function<void()>& onDone)
     {
-        ReportTuningOutcome(can::focSetPidSpeedId, controlMode.TrySetSpeedBandwidth(bandwidth), onDone);
+        SetLegacyBandwidth(can::focSetPidSpeedId, FocParameter::speedBandwidth, bandwidth, onDone);
     }
 
     void FocMotorCanBridge::OnSetPidPosition(float bandwidth, const infra::Function<void()>& onDone)
     {
-        ReportTuningOutcome(can::focSetPidPositionId, controlMode.TrySetPositionBandwidth(bandwidth), onDone);
+        SetLegacyBandwidth(can::focSetPidPositionId, FocParameter::positionBandwidth, bandwidth, onDone);
     }
 
-    void FocMotorCanBridge::ReportTuningOutcome(uint8_t messageId, state_machine::TuningResult result, const infra::Function<void()>& onDone)
+    // A 2.0 bandwidth command sets the setting SetParameter sets and is answered the same way, once stored;
+    // contract 2.0 knows no automatic bandwidth, so a zero stays out of range
+    void FocMotorCanBridge::SetLegacyBandwidth(uint8_t messageId, FocParameter parameter, float bandwidth, const infra::Function<void()>& onDone)
     {
-        if (result == state_machine::TuningResult::ok)
+        if (SettingOutstanding())
         {
-            onDone();
+            server.SendCategoryError(messageId, FocMotorCategoryError::busy);
             return;
         }
 
-        // A redesign refused because the drive is running is a state problem, not a malformed frame
-        server.SendCommandAck(messageId, result == state_machine::TuningResult::notWhileEnabled
-                                             ? services::CanAckStatus::invalidState
-                                             : services::CanAckStatus::invalidPayload);
+        if (!(bandwidth >= foc::CommandLimits::minBandwidth))
+        {
+            server.SendCommandAck(messageId, services::CanAckStatus::invalidPayload);
+            return;
+        }
+
+        pendingLegacyCommand = messageId;
+        pendingNvmDoneCallback = onDone;
+        SetLoopSetting(parameter, bandwidth, [this](state_machine::SettingResult result)
+            {
+                CompleteStoredCommand(pendingLegacyCommand, result);
+            });
     }
 
     void FocMotorCanBridge::OnAlign(const infra::Function<void(services::CanAckStatus)>& onDone)
@@ -428,7 +439,7 @@ namespace can
 
     bool FocMotorCanBridge::SettingOutstanding() const
     {
-        return pendingNvmDoneCallback != nullptr || pendingAlgorithmCallback != nullptr || pendingParameterCallback != nullptr;
+        return pendingNvmDoneCallback != nullptr || pendingAlgorithmCallback != nullptr || pendingParameterCallback != nullptr || controlMode.HasPendingConfigWrite();
     }
 
     void FocMotorCanBridge::OnSelectAlgorithm(FocControlLoop loop, uint8_t algorithm, const infra::Function<void(const FocAlgorithms&)>& onDone)
@@ -469,15 +480,17 @@ namespace can
         pendingParameter = parameter;
         pendingParameterCallback = onDone;
 
+        const auto completed = [this](state_machine::SettingResult result)
+        {
+            CompleteParameter(result);
+        };
+
         if (GroupOf(parameter) == ParameterGroup::motor)
-            controlMode.SetMotorParameter(ToMotorParameter(parameter), value, [this](state_machine::SettingResult result)
-                {
-                    CompleteParameter(result);
-                });
+            controlMode.SetMotorParameter(ToMotorParameter(parameter), value, completed);
         else if (GroupOf(parameter) == ParameterGroup::startup)
             SetStartupSetting(parameter, static_cast<uint32_t>(value));
         else
-            SetLoopSetting(parameter, value);
+            SetLoopSetting(parameter, value, completed);
     }
 
     void FocMotorCanBridge::OnQueryParameter(FocParameter parameter, const infra::Function<void(FocParameterValue)>& onDone)
@@ -485,13 +498,8 @@ namespace can
         onDone(HeldValue(parameter));
     }
 
-    void FocMotorCanBridge::SetLoopSetting(FocParameter parameter, float value)
+    void FocMotorCanBridge::SetLoopSetting(FocParameter parameter, float value, const state_machine::ControlModeStateMachine::OnSetting& completed)
     {
-        const auto completed = [this](state_machine::SettingResult result)
-        {
-            CompleteParameter(result);
-        };
-
         if (GroupOf(parameter) == ParameterGroup::currentLoop)
             controlMode.SetCurrentTunings(WithSetting(controlMode.StoredCurrentTunings(), parameter, value), completed);
         else if (GroupOf(parameter) == ParameterGroup::speedLoop)
@@ -537,6 +545,17 @@ namespace can
             ReportSettingFailure(can::focSetParameterId, result);
     }
 
+    void FocMotorCanBridge::CompleteStoredCommand(uint8_t commandId, state_machine::SettingResult result)
+    {
+        auto onDone = pendingNvmDoneCallback;
+        pendingNvmDoneCallback = nullptr;
+
+        if (result == state_machine::SettingResult::ok)
+            onDone();
+        else
+            ReportSettingFailure(commandId, result);
+    }
+
     void FocMotorCanBridge::ReportSettingFailure(uint8_t commandId, state_machine::SettingResult result)
     {
         switch (result)
@@ -555,6 +574,9 @@ namespace can
                 break;
             case state_machine::SettingResult::nvmFailed:
                 server.SendCategoryError(commandId, FocMotorCategoryError::persistenceFailed);
+                break;
+            case state_machine::SettingResult::aborted:
+                server.SendCategoryError(commandId, FocMotorCategoryError::abortedByFault);
                 break;
             default:
                 server.SendCategoryError(commandId, FocMotorCategoryError::busy);

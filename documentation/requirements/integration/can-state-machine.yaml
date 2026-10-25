@@ -78,8 +78,8 @@
   shall: >
     FocMotorCanBridge shall implement all previously deferred commands.
     OnSetPidCurrent, OnSetPidSpeed, and OnSetPidPosition shall parse the bandwidth
-    field from the CAN frame and forward it to the corresponding TrySet*Bandwidth
-    method on ControlModeStateMachine, responding with success or invalidPayload.
+    field from the CAN frame and set the loop's stored bandwidth as SetParameter does,
+    acknowledging success once it is stored and refusing it as SetParameter would.
     OnIdentifyElectrical shall delegate to ElectricalParametersIdentification,
     broadcast the result via focElectricalParamsResponseId, and acknowledge success,
     or send calibrationFailed on estimation failure; every failure shall release the

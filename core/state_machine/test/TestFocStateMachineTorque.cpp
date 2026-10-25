@@ -1,5 +1,6 @@
 #include "TestFocStateMachineHelper.hpp"
 #include "core/foc/cascade/TorqueCascade.hpp"
+#include <array>
 #include <bit>
 #include <cstdint>
 
@@ -74,7 +75,7 @@ namespace
                     }));
         }
 
-        void GivenNvmValid()
+        static services::CalibrationData ValidRecord()
         {
             services::CalibrationData data{};
             data.polePairs = 7;
@@ -82,7 +83,16 @@ namespace
             data.lD = 1.0f;
             data.lQ = 1.0f;
             data.stage = services::CalibrationStage::complete;
+            return data;
+        }
 
+        void GivenNvmValid()
+        {
+            GivenNvmHolds(ValidRecord());
+        }
+
+        void GivenNvmHolds(const services::CalibrationData& data)
+        {
             EXPECT_CALL(nvmMock, IsCalibrationValid(_))
                 .WillOnce(Invoke([](infra::Function<void(bool)> onDone)
                     {
@@ -2814,7 +2824,7 @@ TEST_F(FocStateMachineTorqueCliTest, set_flux_linkage_to_zero_returns_to_the_con
     EXPECT_CALL(nvmMock, SaveCalibration(_, _))
         .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
             {
-                EXPECT_EQ(data.fluxLinkage, 0.0f);
+                EXPECT_NEAR(data.fluxLinkage, 0.0f, 1e-9f);
                 onDone(services::NvmStatus::Ok);
             }));
 
@@ -2861,6 +2871,46 @@ TEST_F(FocStateMachineTorqueCliTest, changing_the_pole_pairs_in_ready_requires_a
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::ok);
 }
 
+TEST_F(FocStateMachineTorqueCliTest, changing_the_pole_pairs_drops_the_cogging_map)
+{
+    GivenFaultNotifierRegistered();
+    auto record = ValidRecord();
+    record.coggingTorqueScale = 0.01f;
+    record.coggingTorque.fill(10);
+    GivenNvmHolds(record);
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_NEAR(data.coggingTorqueScale, 0.0f, 1e-9f);
+                EXPECT_EQ(data.coggingTorque, (std::array<int8_t, services::coggingMapBins>{}));
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    sm.CmdSetMotorParameter(services::MotorParameter::polePairs, 5.0f, [](state_machine::CommandResult) {});
+}
+
+TEST_F(FocStateMachineTorqueCliTest, changing_the_resistance_keeps_the_cogging_map)
+{
+    GivenFaultNotifierRegistered();
+    auto record = ValidRecord();
+    record.coggingTorqueScale = 0.01f;
+    record.coggingTorque.fill(10);
+    GivenNvmHolds(record);
+    auto sm = CreateStateMachine();
+
+    EXPECT_CALL(nvmMock, SaveCalibration(_, _))
+        .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
+            {
+                EXPECT_NEAR(data.coggingTorqueScale, 0.01f, 1e-9f);
+                EXPECT_EQ(data.coggingTorque[0], 10);
+                onDone(services::NvmStatus::Ok);
+            }));
+
+    sm.CmdSetMotorParameter(services::MotorParameter::resistance, 0.36f, [](state_machine::CommandResult) {});
+}
+
 TEST_F(FocStateMachineTorqueCliTest, changing_the_resistance_in_ready_keeps_the_rotor_reference)
 {
     GivenFaultNotifierRegistered();
@@ -2871,7 +2921,7 @@ TEST_F(FocStateMachineTorqueCliTest, changing_the_resistance_in_ready_keeps_the_
     EXPECT_CALL(nvmMock, SaveCalibration(_, _))
         .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
             {
-                EXPECT_EQ(data.rPhase, 0.36f);
+                EXPECT_NEAR(data.rPhase, 0.36f, 1e-6f);
                 EXPECT_EQ(data.stage, services::CalibrationStage::complete);
                 onDone(services::NvmStatus::Ok);
             }));
@@ -2879,7 +2929,7 @@ TEST_F(FocStateMachineTorqueCliTest, changing_the_resistance_in_ready_keeps_the_
     sm.CmdSetMotorParameter(services::MotorParameter::resistance, 0.36f, [](state_machine::CommandResult) {});
 
     ASSERT_TRUE(std::holds_alternative<state_machine::Ready>(sm.CurrentState()));
-    EXPECT_EQ(std::get<state_machine::Ready>(sm.CurrentState()).loadedData.rPhase, 0.36f);
+    EXPECT_NEAR(std::get<state_machine::Ready>(sm.CurrentState()).loadedData.rPhase, 0.36f, 1e-6f);
     EXPECT_CALL(inverterMock, Start()).Times(1);
     EXPECT_EQ(sm.CmdEnable(), state_machine::CommandResult::ok);
 }
@@ -2893,14 +2943,14 @@ TEST_F(FocStateMachineTorqueCliTest, an_inductance_is_written_to_both_axes)
     EXPECT_CALL(nvmMock, SaveCalibration(_, _))
         .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
             {
-                EXPECT_EQ(data.lD, 0.2f);
-                EXPECT_EQ(data.lQ, 0.2f);
+                EXPECT_NEAR(data.lD, 0.2f, 1e-6f);
+                EXPECT_NEAR(data.lQ, 0.2f, 1e-6f);
                 onDone(services::NvmStatus::Ok);
             }));
 
     sm.CmdSetMotorParameter(services::MotorParameter::inductance, 0.2f, [](state_machine::CommandResult) {});
 
-    EXPECT_EQ(sm.CalibrationRecord().lD, 0.2f);
+    EXPECT_NEAR(sm.CalibrationRecord().lD, 0.2f, 1e-6f);
 }
 
 TEST_F(FocStateMachineTorqueCliTest, a_datasheet_record_entered_from_scratch_becomes_complete_and_can_be_aligned)

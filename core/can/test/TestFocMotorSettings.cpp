@@ -38,11 +38,11 @@ TEST(FocMotorSettings, writing_one_loop_setting_leaves_the_others_of_its_loop_al
 {
     const auto tunings = can::WithSetting(foc::SpeedLoopTunings{}, can::FocParameter::speedObserverBandwidthRatio, 8.0f);
 
-    EXPECT_EQ(tunings.observerBandwidthRatio, 8.0f);
-    EXPECT_EQ(tunings.bandwidth, foc::SpeedLoopTunings{}.bandwidth);
-    EXPECT_EQ(tunings.speedErrorWeight, foc::SpeedLoopTunings{}.speedErrorWeight);
-    EXPECT_EQ(tunings.integralWeight, foc::SpeedLoopTunings{}.integralWeight);
-    EXPECT_EQ(tunings.referenceTimeConstant, foc::SpeedLoopTunings{}.referenceTimeConstant);
+    EXPECT_NEAR(tunings.observerBandwidthRatio, 8.0f, 1e-5f);
+    EXPECT_NEAR(tunings.bandwidth, foc::SpeedLoopTunings{}.bandwidth, 1e-6f);
+    EXPECT_NEAR(tunings.speedErrorWeight, foc::SpeedLoopTunings{}.speedErrorWeight, 1e-6f);
+    EXPECT_NEAR(tunings.integralWeight, foc::SpeedLoopTunings{}.integralWeight, 1e-6f);
+    EXPECT_NEAR(tunings.referenceTimeConstant, foc::SpeedLoopTunings{}.referenceTimeConstant, 1e-6f);
 }
 
 TEST(FocMotorSettings, every_motor_parameter_reaches_the_calibration_record_field_it_names)
@@ -62,8 +62,8 @@ TEST(FocMotorSettings, every_motor_parameter_reaches_the_calibration_record_fiel
     services::CalibrationData record{};
     services::WriteMotorParameter(record, can::ToMotorParameter(can::FocParameter::resistance), 0.36f);
     services::WriteMotorParameter(record, can::ToMotorParameter(can::FocParameter::inertia), 7.06e-6f);
-    EXPECT_EQ(record.rPhase, 0.36f);
-    EXPECT_EQ(record.inertia, 7.06e-6f);
+    EXPECT_NEAR(record.rPhase, 0.36f, 1e-6f);
+    EXPECT_NEAR(record.inertia, 7.06e-6f, 1e-11f);
 }
 
 TEST(FocMotorSettings, every_startup_setting_reaches_its_configuration_field)

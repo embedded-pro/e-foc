@@ -299,10 +299,10 @@ verbatim, so an operator always learns why a selection was refused.
 
 From contract 2.1 the FOC motor category carries algorithm selection and the tuning settings
 (`service-can.md`, Part A). `SelectAlgorithm` names a loop and an algorithm of that loop and is
-held to the same rules as the CLI command: refused with `busy` unless the active mode is stopped
-with no work outstanding (Part D), refused with `modeMismatch` when the active mode does not run
-that loop, and refused with `invalidParameters` when the algorithm cannot be designed from the
-motor model it would run on (Part H). `QueryAlgorithms` reports the algorithm in force for every
+held to the same rules as the CLI command: refused with `invalidState` unless the active mode is
+stopped (`Idle` or `Ready`), with `busy` while work is outstanding (Part D), with `modeMismatch` when
+the active mode does not run that loop, and with `invalidParameters` when the algorithm cannot be
+designed from the motor model it would run on (Part H). `QueryAlgorithms` reports the algorithm in force for every
 loop; a loop the active mode does not run reports the identifier stored for it.
 
 Over CAN a selection is acknowledged once its identifier has been stored, so a client never reads

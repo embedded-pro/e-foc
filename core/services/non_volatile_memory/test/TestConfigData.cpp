@@ -47,25 +47,25 @@ TEST_F(TestConfigData, config_data_sizeof_is_76)
 TEST_F(TestConfigData, make_default_config_data_leaves_every_bandwidth_automatic)
 {
     const auto cfg = services::MakeDefaultConfigData();
-    EXPECT_EQ(cfg.currentBandwidth, 0.0f);
-    EXPECT_EQ(cfg.speedBandwidth, 0.0f);
-    EXPECT_EQ(cfg.positionBandwidth, 0.0f);
+    EXPECT_NEAR(cfg.currentBandwidth, 0.0f, 1e-9f);
+    EXPECT_NEAR(cfg.speedBandwidth, 0.0f, 1e-9f);
+    EXPECT_NEAR(cfg.positionBandwidth, 0.0f, 1e-9f);
 }
 
 TEST_F(TestConfigData, make_default_config_data_holds_the_default_law_settings)
 {
     const auto cfg = services::MakeDefaultConfigData();
-    EXPECT_EQ(cfg.currentSwitchingGain, foc::CurrentLoopTunings{}.switchingGain);
-    EXPECT_EQ(cfg.currentBoundaryLayer, foc::CurrentLoopTunings{}.boundaryLayer);
+    EXPECT_NEAR(cfg.currentSwitchingGain, foc::CurrentLoopTunings{}.switchingGain, 1e-6f);
+    EXPECT_NEAR(cfg.currentBoundaryLayer, foc::CurrentLoopTunings{}.boundaryLayer, 1e-6f);
     EXPECT_EQ(cfg.currentTwoStepDeadbeat, uint8_t{ 0 });
-    EXPECT_EQ(cfg.speedErrorWeight, foc::SpeedLoopTunings{}.speedErrorWeight);
-    EXPECT_EQ(cfg.speedIntegralWeight, foc::SpeedLoopTunings{}.integralWeight);
-    EXPECT_EQ(cfg.speedObserverBandwidthRatio, foc::SpeedLoopTunings{}.observerBandwidthRatio);
-    EXPECT_EQ(cfg.speedReferenceTimeConstant, foc::SpeedLoopTunings{}.referenceTimeConstant);
-    EXPECT_EQ(cfg.positionErrorWeight, foc::PositionLoopTunings{}.positionErrorWeight);
-    EXPECT_EQ(cfg.positionSpeedErrorWeight, foc::PositionLoopTunings{}.speedErrorWeight);
-    EXPECT_EQ(cfg.positionIntegralWeight, foc::PositionLoopTunings{}.integralWeight);
-    EXPECT_EQ(cfg.positionReferenceTimeConstant, foc::PositionLoopTunings{}.referenceTimeConstant);
+    EXPECT_NEAR(cfg.speedErrorWeight, foc::SpeedLoopTunings{}.speedErrorWeight, 1e-6f);
+    EXPECT_NEAR(cfg.speedIntegralWeight, foc::SpeedLoopTunings{}.integralWeight, 1e-6f);
+    EXPECT_NEAR(cfg.speedObserverBandwidthRatio, foc::SpeedLoopTunings{}.observerBandwidthRatio, 1e-6f);
+    EXPECT_NEAR(cfg.speedReferenceTimeConstant, foc::SpeedLoopTunings{}.referenceTimeConstant, 1e-6f);
+    EXPECT_NEAR(cfg.positionErrorWeight, foc::PositionLoopTunings{}.positionErrorWeight, 1e-6f);
+    EXPECT_NEAR(cfg.positionSpeedErrorWeight, foc::PositionLoopTunings{}.speedErrorWeight, 1e-6f);
+    EXPECT_NEAR(cfg.positionIntegralWeight, foc::PositionLoopTunings{}.integralWeight, 1e-6f);
+    EXPECT_NEAR(cfg.positionReferenceTimeConstant, foc::PositionLoopTunings{}.referenceTimeConstant, 1e-6f);
 }
 
 TEST_F(TestConfigData, make_default_config_data_selects_pid_for_both_loops)

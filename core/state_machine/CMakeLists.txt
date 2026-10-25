@@ -59,6 +59,7 @@ target_sources(e_foc.state_machine PRIVATE
     LifecycleCliCommands.hpp
     LifecycleContext.hpp
     MaintenanceFlow.hpp
+    MotorParameterLimits.hpp
     MaintenanceFlow.cpp
     ModeHooks.hpp
     NvmActivity.hpp

@@ -86,6 +86,13 @@ namespace state_machine
         return std::holds_alternative<Idle>(state) || std::holds_alternative<Ready>(state);
     }
 
+    // Which loops an application of online estimates re-derived, whether or not the new design took
+    struct AppliedEstimates
+    {
+        bool mechanics{ false };
+        bool electrical{ false };
+    };
+
     class FocStateMachineBase
     {
     protected:
@@ -105,8 +112,10 @@ namespace state_machine
         virtual void CmdClearCalibration(const infra::Function<void(CommandResult)>& onDone) = 0;
         virtual CommandResult CmdEmergencyStop() = 0;
 
-        virtual void ApplyOnlineEstimates()
-        {}
+        virtual AppliedEstimates ApplyOnlineEstimates()
+        {
+            return {};
+        }
 
         virtual foc::MotionObservation ObserveMotion() const
         {

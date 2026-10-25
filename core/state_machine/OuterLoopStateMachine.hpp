@@ -29,7 +29,7 @@ namespace application
         ~OuterLoopStateMachine() = default;
 
     public:
-        void ApplyOnlineEstimates() override;
+        state_machine::AppliedEstimates ApplyOnlineEstimates() override;
         void TraceOnlineEstimates();
         float AutomaticSpeedLoopBandwidth() const;
 

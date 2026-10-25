@@ -1064,9 +1064,12 @@ TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_does_not_change_state
     sm.CmdEnable();
     ASSERT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
 
-    sm.ApplyOnlineEstimates();
+    const auto applied = sm.ApplyOnlineEstimates();
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Enabled>(sm.CurrentState()));
+    EXPECT_TRUE(applied.electrical);
+    // The record's zero friction is not a physical estimate, so the mechanics are skipped
+    EXPECT_FALSE(applied.mechanics);
 }
 
 TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_is_ignored_when_not_enabled)
@@ -1075,9 +1078,11 @@ TEST_F(FocStateMachineSpeedCliTest, apply_online_estimates_is_ignored_when_not_e
     GivenNvmValidWithSpeedGains();
     auto sm = CreateSpeedStateMachine();
 
-    sm.ApplyOnlineEstimates();
+    const auto applied = sm.ApplyOnlineEstimates();
 
     EXPECT_TRUE(std::holds_alternative<state_machine::Idle>(sm.CurrentState()));
+    EXPECT_FALSE(applied.mechanics);
+    EXPECT_FALSE(applied.electrical);
 }
 
 TEST_F(FocStateMachineSpeedCliTest, cli_ae_command_applies_estimates_when_enabled)
@@ -2314,7 +2319,7 @@ TEST_F(FocStateMachineSpeedCliTest, entering_the_inertia_completes_an_electrical
     EXPECT_CALL(nvmMock, SaveCalibration(_, _))
         .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
             {
-                EXPECT_EQ(data.inertia, 1.0e-5f);
+                EXPECT_NEAR(data.inertia, 1.0e-5f, 1e-10f);
                 EXPECT_EQ(data.stage, services::CalibrationStage::complete);
                 onDone(services::NvmStatus::Ok);
             }));
@@ -2347,9 +2352,9 @@ TEST_F(FocStateMachineSpeedCliTest, an_electrical_identification_keeps_the_mecha
     EXPECT_CALL(nvmMock, SaveCalibration(_, _))
         .WillOnce(Invoke([](const services::CalibrationData& data, infra::Function<void(services::NvmStatus)> onDone)
             {
-                EXPECT_EQ(data.inertia, 0.005f);
-                EXPECT_EQ(data.frictionViscous, 0.001f);
-                EXPECT_EQ(data.speedLoopBandwidth, 50.0f);
+                EXPECT_NEAR(data.inertia, 0.005f, 1e-8f);
+                EXPECT_NEAR(data.frictionViscous, 0.001f, 1e-8f);
+                EXPECT_NEAR(data.speedLoopBandwidth, 50.0f, 1e-4f);
                 EXPECT_EQ(data.stage, services::CalibrationStage::complete);
                 onDone(services::NvmStatus::Ok);
             }));
@@ -2379,7 +2384,7 @@ TEST_F(FocStateMachineSpeedCliTest, a_motor_parameter_that_cannot_be_stored_leav
         });
 
     EXPECT_EQ(result, state_machine::CommandResult::nvmFailed);
-    EXPECT_EQ(sm.CalibrationRecord().inertia, 0.005f);
+    EXPECT_NEAR(sm.CalibrationRecord().inertia, 0.005f, 1e-8f);
 }
 
 TEST_F(FocStateMachineSpeedCliTest, a_non_physical_motor_parameter_is_rejected_without_a_write)

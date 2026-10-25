@@ -15,7 +15,7 @@ namespace
 
     constexpr auto wrongModeMessage = "rejected: command does not apply to the active control mode.";
     constexpr auto wrongStateMessage = "rejected: setpoints are only accepted in Ready or Enabled.";
-    constexpr auto whileEnabledMessage = "rejected: bandwidth cannot be redesigned while enabled.";
+    constexpr auto notStoppedMessage = "rejected: settings change only while the motor is stopped.";
     constexpr auto outOfRangeMessage = "invalid value: out of range.";
 
     CliResult ToCliResult(state_machine::TuningResult result)
@@ -26,8 +26,8 @@ namespace
                 return CliResult{};
             case state_machine::TuningResult::outOfRange:
                 return CliResult{ CliStatus::error, outOfRangeMessage };
-            case state_machine::TuningResult::notWhileEnabled:
-                return CliResult{ CliStatus::error, whileEnabledMessage };
+            case state_machine::TuningResult::notStopped:
+                return CliResult{ CliStatus::error, notStoppedMessage };
             case state_machine::TuningResult::wrongMode:
                 break;
         }

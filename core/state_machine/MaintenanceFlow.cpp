@@ -1,7 +1,7 @@
 #include "core/state_machine/MaintenanceFlow.hpp"
 #include "core/foc/math/ParameterValidation.hpp"
+#include "core/state_machine/MotorParameterLimits.hpp"
 #include <cmath>
-#include <limits>
 
 namespace application
 {
@@ -41,25 +41,9 @@ namespace application
 
     bool MaintenanceFlow::IsAcceptableMotorParameter(const state_machine::SetMotorParameter& command) const
     {
-        const auto value = command.value;
-        bool acceptable{ false };
-
-        switch (command.parameter)
-        {
-            case services::MotorParameter::polePairs:
-                acceptable = foc::IsWithinInclusive(value, 1.0f, static_cast<float>(std::numeric_limits<uint8_t>::max())) && std::round(value) == value;
-                break;
-            case services::MotorParameter::fluxLinkage:
-            case services::MotorParameter::viscousFriction:
-                acceptable = foc::IsFiniteNonNegative(value);
-                break;
-            default:
-                acceptable = foc::IsFinitePositive(value);
-                break;
-        }
-
+        const auto acceptable = state_machine::IsAcceptableMotorParameter(command.parameter, command.value);
         if (!acceptable)
-            env.tracer.Trace() << "[SM] Motor parameter rejected: not a physical value";
+            env.tracer.Trace() << "[SM] Motor parameter rejected: outside its range";
 
         return acceptable;
     }
@@ -92,7 +76,7 @@ namespace application
         if (env.context.Data().polePairs != previous.polePairs)
         {
             env.context.SetRotorReferenceValid(false);
-            env.tracer.Trace() << "[SM] Pole pairs changed; align the rotor before enabling";
+            env.tracer.Trace() << "[SM] Pole pairs changed; cogging map dropped; align the rotor before enabling";
         }
 
         if (calibration.HasValidCalibration())
@@ -128,6 +112,13 @@ namespace application
     {
         auto edited = data;
         services::WriteMotorParameter(edited, pendingParameter, pendingValue);
+
+        // The cogging map is binned per electrical period, so after a pole-pair change it describes other positions
+        if (edited.polePairs != data.polePairs)
+        {
+            edited.coggingTorqueScale = 0.0f;
+            edited.coggingTorque.fill(0);
+        }
 
         if (data.stage == services::CalibrationStage::complete || CompletesRecord(edited))
             edited.stage = services::CalibrationStage::complete;
